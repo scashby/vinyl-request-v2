@@ -175,30 +175,11 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
   // Loading state
   if (loading) {
     return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 20001,
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          padding: '40px 60px',
-          fontSize: '16px',
-          color: '#333',
-          boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-          textAlign: 'center',
-        }}>
-          <div style={{ fontSize: '32px', marginBottom: '16px' }}>⏳</div>
-          <div style={{ fontWeight: '600', marginBottom: '8px' }}>Loading Album...</div>
-          <div style={{ fontSize: '14px', color: '#666' }}>Please wait</div>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[20001]">
+        <div className="bg-white rounded-lg px-16 py-10 text-center shadow-2xl">
+          <div className="text-4xl mb-4">⏳</div>
+          <div className="font-bold text-gray-900 mb-2">Loading Album...</div>
+          <div className="text-sm text-gray-500">Please wait</div>
         </div>
       </div>
     );
@@ -207,44 +188,16 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
   // Error state
   if (error || !album || !editedAlbum) {
     return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 20001,
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          padding: '40px 60px',
-          fontSize: '16px',
-          color: '#333',
-          boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-          textAlign: 'center',
-        }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px', color: '#ef4444' }}>⚠️</div>
-          <div style={{ fontWeight: '600', marginBottom: '8px', color: '#ef4444' }}>Error</div>
-          <div style={{ fontSize: '14px', color: '#666', marginBottom: '24px' }}>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[20001]">
+        <div className="bg-white rounded-lg px-16 py-10 text-center shadow-2xl">
+          <div className="text-5xl mb-4 text-red-500">⚠️</div>
+          <div className="font-bold text-red-500 mb-2">Error</div>
+          <div className="text-sm text-gray-500 mb-6">
             {error || 'Failed to load album data'}
           </div>
           <button
             onClick={onClose}
-            style={{
-              padding: '10px 24px',
-              background: '#6b7280',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer',
-            }}
+            className="px-6 py-2.5 bg-gray-500 text-white border-none rounded font-medium cursor-pointer hover:bg-gray-600"
           >
             Close
           </button>
@@ -431,90 +384,34 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
   };
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 20001,
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '4px',
-        width: '90vw',
-        maxWidth: '1100px',
-        height: '85vh',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[20001]">
+      <div className="bg-white rounded w-[90vw] max-w-[1100px] h-[85vh] flex flex-col overflow-hidden shadow-2xl">
         {/* Header - BOLD TITLE */}
-        <div style={{
-          backgroundColor: '#F7941D',
-          color: 'white',
-          padding: '12px 16px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <h2 style={{
-            margin: 0,
-            fontSize: '18px',
-            fontWeight: 'bold',
-            fontFamily: 'system-ui, -apple-system, sans-serif',
-          }}>
+        <div className="bg-[#F7941D] text-white px-4 py-3 flex justify-between items-center shrink-0">
+          <h2 className="m-0 text-lg font-bold font-sans">
             {album.title} / {album.artist}
           </h2>
           <button
             onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'white',
-              fontSize: '24px',
-              cursor: 'pointer',
-              padding: '0 4px',
-              lineHeight: '1',
-              fontWeight: '300',
-            }}
+            className="bg-transparent border-none text-white text-2xl cursor-pointer p-0 leading-none font-light hover:text-white/80"
           >
             ×
           </button>
         </div>
 
         {/* Tabs */}
-        <div style={{
-          borderBottom: '1px solid #e5e7eb',
-          background: 'white',
-          display: 'flex',
-          gap: '0',
-        }}>
+        <div className="border-b border-gray-200 bg-white flex shrink-0 overflow-x-auto">
           {TABS.map((tab) => {
             const Icon = tab.IconComponent;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                style={{
-                  padding: '12px 16px',
-                  border: 'none',
-                  background: 'transparent',
-                  borderBottom: activeTab === tab.id ? '2px solid #F7941D' : '2px solid transparent',
-                  color: activeTab === tab.id ? '#111827' : '#6b7280',
-                  fontSize: '13px',
-                  fontWeight: activeTab === tab.id ? '600' : '400',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontFamily: 'system-ui, -apple-system, sans-serif',
-                }}
+                className={`px-4 py-3 border-none bg-transparent text-[13px] cursor-pointer whitespace-nowrap flex items-center gap-1.5 font-sans transition-colors ${
+                  activeTab === tab.id 
+                    ? 'border-b-2 border-b-[#F7941D] text-gray-900 font-semibold' 
+                    : 'border-b-2 border-b-transparent text-gray-500 font-normal hover:text-gray-700'
+                }`}
               >
                 <Icon />
                 <span>{tab.label}</span>
@@ -524,12 +421,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         </div>
 
         {/* Tab Content */}
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '16px',
-          background: 'white',
-        }}>
+        <div className="flex-1 overflow-y-auto p-4 bg-white">
           {activeTab === 'main' && (
             <MainTab ref={mainTabRef} album={editedAlbum} onChange={handleFieldChange} />
           )}
@@ -557,11 +449,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         </div>
 
         {/* Bottom Bar */}
-        <div style={{
-          borderTop: '1px solid #e5e7eb',
-          padding: '12px 16px',
-          background: 'white',
-        }}>
+        <div className="border-t border-gray-200 p-3 bg-white shrink-0">
           <UniversalBottomBar
             album={editedAlbum}
             onChange={handleFieldChange}

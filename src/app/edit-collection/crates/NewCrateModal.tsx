@@ -130,87 +130,37 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }:
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 30002,
-      }}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30002]"
       onClick={handleClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          width: '480px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-        }}
+        className="bg-white rounded-lg w-[480px] shadow-xl"
       >
         {/* Header */}
-        <div
-          style={{
-            padding: '20px 24px',
-            borderBottom: '1px solid #e5e7eb',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#111827' }}>
+        <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center">
+          <h2 className="m-0 text-lg font-semibold text-gray-900">
             {isEditing ? 'Edit Crate' : 'New Crate'}
           </h2>
           <button
             onClick={handleClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              fontSize: '24px',
-              cursor: 'pointer',
-              color: '#6b7280',
-              padding: '0',
-              lineHeight: '1',
-            }}
+            className="bg-transparent border-none text-2xl cursor-pointer text-gray-500 p-0 leading-none hover:text-gray-700"
           >
             ×
           </button>
         </div>
 
         {/* Content */}
-        <div style={{ padding: '24px' }}>
+        <div className="p-6">
           {error && (
-            <div
-              style={{
-                marginBottom: '16px',
-                padding: '12px',
-                background: '#fee2e2',
-                border: '1px solid #ef4444',
-                borderRadius: '6px',
-                color: '#991b1b',
-                fontSize: '14px',
-              }}
-            >
+            <div className="mb-4 p-3 bg-red-100 border border-red-500 rounded-md text-red-800 text-sm">
               {error}
             </div>
           )}
 
           {/* Name Input */}
-          <div style={{ marginBottom: '20px' }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#374151',
-                marginBottom: '8px',
-              }}
-            >
+          <div className="mb-5">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
               Crate Name
             </label>
             <input
@@ -219,15 +169,7 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }:
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter crate name..."
               autoFocus
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '14px',
-                color: '#111827',
-                outline: 'none',
-              }}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-md text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   handleSave();
@@ -237,35 +179,20 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }:
           </div>
 
           {/* Icon Picker */}
-          <div style={{ marginBottom: '20px' }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#374151',
-                marginBottom: '8px',
-              }}
-            >
+          <div className="mb-5">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
               Icon
             </label>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <div className="flex gap-2 flex-wrap">
               {PRESET_ICONS.map((presetIcon) => (
                 <button
                   key={presetIcon}
                   onClick={() => setIcon(presetIcon)}
-                  style={{
-                    width: '48px',
-                    height: '48px',
-                    border: icon === presetIcon ? '2px solid #3b82f6' : '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    background: icon === presetIcon ? '#eff6ff' : 'white',
-                    cursor: 'pointer',
-                    fontSize: '24px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
+                  className={`w-12 h-12 border rounded-md cursor-pointer text-2xl flex items-center justify-center ${
+                    icon === presetIcon 
+                      ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100' 
+                      : 'border-gray-300 bg-white hover:bg-gray-50'
+                  }`}
                 >
                   {presetIcon}
                 </button>
@@ -274,104 +201,55 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }:
           </div>
 
           {/* Color Picker */}
-          <div style={{ marginBottom: '20px' }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#374151',
-                marginBottom: '8px',
-              }}
-            >
+          <div className="mb-5">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
               Color
             </label>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <div className="flex gap-2 flex-wrap">
               {PRESET_COLORS.map((presetColor) => (
                 <button
                   key={presetColor}
                   onClick={() => setColor(presetColor)}
-                  style={{
-                    width: '48px',
-                    height: '48px',
-                    border: color === presetColor ? '3px solid #111827' : '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    background: presetColor,
-                    cursor: 'pointer',
-                  }}
+                  className={`w-12 h-12 rounded-md cursor-pointer ${
+                    color === presetColor ? 'border-[3px] border-gray-900' : 'border border-gray-300'
+                  }`}
+                  style={{ backgroundColor: presetColor }}
                 />
               ))}
             </div>
           </div>
 
           {/* Preview */}
-          <div
-            style={{
-              padding: '16px',
-              background: '#f9fafb',
-              borderRadius: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-            }}
-          >
-            <div
-              style={{
-                fontSize: '32px',
-              }}
-            >
+          <div className="p-4 bg-gray-50 rounded-md flex items-center gap-3 border border-gray-200">
+            <div className="text-4xl leading-none">
               {icon}
             </div>
             <div>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
+              <div className="text-sm font-semibold text-gray-900">
                 {name || 'Untitled Crate'}
               </div>
-              <div style={{ fontSize: '12px', color: '#6b7280' }}>Manual Crate</div>
+              <div className="text-xs text-gray-500">Manual Crate</div>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            padding: '16px 24px',
-            borderTop: '1px solid #e5e7eb',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '12px',
-          }}
-        >
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
           <button
             onClick={handleClose}
             disabled={saving}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#f3f4f6',
-              color: '#374151',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: saving ? 'not-allowed' : 'pointer',
-              opacity: saving ? 0.5 : 1,
-            }}
+            className={`px-4 py-2 bg-gray-100 text-gray-700 border-none rounded text-sm font-medium cursor-pointer hover:bg-gray-200 ${
+              saving ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={saving || !name.trim()}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: saving || !name.trim() ? 'not-allowed' : 'pointer',
-              opacity: saving || !name.trim() ? 0.5 : 1,
-            }}
+            className={`px-4 py-2 bg-blue-500 text-white border-none rounded text-sm font-medium cursor-pointer hover:bg-blue-600 ${
+              saving || !name.trim() ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
           >
             {saving ? (isEditing ? 'Saving...' : 'Creating...') : (isEditing ? 'Save Changes' : 'Create Crate')}
           </button>

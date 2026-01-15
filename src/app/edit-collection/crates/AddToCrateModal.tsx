@@ -87,122 +87,47 @@ export function AddToCrateModal({
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 30001,
-      }}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30001]"
       onClick={handleCancel}
     >
       <div
-        style={{
-          backgroundColor: 'white',
-          borderRadius: '6px',
-          width: '500px',
-          maxHeight: '600px',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-        }}
+        className="bg-white rounded-md w-[500px] max-h-[600px] flex flex-col overflow-hidden shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div
-          style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid #e5e7eb',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            backgroundColor: 'white',
-          }}
-        >
-          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#111827' }}>
+        <div className="px-4 py-3 border-b border-gray-200 flex justify-between items-center bg-white">
+          <h3 className="m-0 text-base font-semibold text-gray-900">
             Add {selectedCount} Album{selectedCount !== 1 ? 's' : ''} to Crate
           </h3>
           <button
             onClick={handleCancel}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#6b7280',
-              fontSize: '20px',
-              cursor: 'pointer',
-              padding: '0 4px',
-              lineHeight: '1',
-            }}
+            className="bg-transparent border-none text-gray-500 text-xl cursor-pointer p-1 leading-none hover:text-gray-700"
           >
             ×
           </button>
         </div>
 
         {/* Search + New Crate Button */}
-        <div
-          style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid #e5e7eb',
-            display: 'flex',
-            gap: '8px',
-            alignItems: 'center',
-          }}
-        >
+        <div className="px-4 py-3 border-b border-gray-200 flex gap-2 items-center">
           <input
             type="text"
             placeholder="Search crates..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              flex: 1,
-              padding: '6px 10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              fontSize: '13px',
-              outline: 'none',
-            }}
+            className="flex-1 px-2.5 py-1.5 border border-gray-300 rounded text-[13px] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
           <button
             onClick={onOpenNewCrate}
-            style={{
-              padding: '6px 12px',
-              background: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '13px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
+            className="px-3 py-1.5 bg-blue-500 text-white border-none rounded text-[13px] font-medium cursor-pointer whitespace-nowrap hover:bg-blue-600"
           >
             New Crate
           </button>
         </div>
 
         {/* Crates List */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '8px 16px',
-          }}
-        >
+        <div className="flex-1 overflow-y-auto p-2">
           {filteredCrates.length === 0 ? (
-            <div
-              style={{
-                padding: '40px 20px',
-                textAlign: 'center',
-                color: '#9ca3af',
-                fontSize: '13px',
-              }}
-            >
+            <div className="p-10 text-center text-gray-400 text-[13px]">
               {searchQuery 
                 ? 'No crates match your search' 
                 : manualCrates.length === 0
@@ -216,36 +141,16 @@ export function AddToCrateModal({
               return (
                 <label
                   key={crate.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '6px 8px',
-                    cursor: 'pointer',
-                    borderRadius: '3px',
-                    marginBottom: '1px',
-                    backgroundColor: 'transparent',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f3f4f6';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
+                  className="flex items-center justify-between px-2 py-1.5 cursor-pointer rounded-sm mb-0.5 hover:bg-gray-100 transition-colors"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                  <div className="flex items-center gap-2.5 flex-1">
                     <input
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => handleToggleCrate(crate.id)}
-                      style={{
-                        width: '16px',
-                        height: '16px',
-                        cursor: 'pointer',
-                        margin: 0,
-                      }}
+                      className="w-4 h-4 cursor-pointer m-0 accent-blue-600"
                     />
-                    <span style={{ fontSize: '13px', color: '#111827', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="text-[13px] text-gray-900 flex items-center gap-1.5">
                       {crate.is_smart ? (
                         <BoxIcon color={crate.icon} size={16} />
                       ) : (
@@ -255,13 +160,7 @@ export function AddToCrateModal({
                     </span>
                   </div>
                   {crate.album_count !== undefined && (
-                    <span
-                      style={{
-                        fontSize: '13px',
-                        color: '#6b7280',
-                        fontWeight: '400',
-                      }}
-                    >
+                    <span className="text-[13px] text-gray-500 font-normal">
                       {crate.album_count}
                     </span>
                   )}
@@ -272,49 +171,28 @@ export function AddToCrateModal({
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            padding: '12px 16px',
-            borderTop: '1px solid #e5e7eb',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <div style={{ fontSize: '13px', color: '#6b7280' }}>
+        <div className="px-4 py-3 border-t border-gray-200 flex justify-between items-center bg-gray-50">
+          <div className="text-[13px] text-gray-500">
             {selectedCrateIds.length} crate{selectedCrateIds.length !== 1 ? 's' : ''} selected
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="flex gap-2">
             <button
               onClick={handleCancel}
               disabled={saving}
-              style={{
-                padding: '6px 16px',
-                background: '#e5e7eb',
-                color: '#374151',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '13px',
-                fontWeight: '500',
-                cursor: saving ? 'not-allowed' : 'pointer',
-                opacity: saving ? 0.5 : 1,
-              }}
+              className={`px-4 py-1.5 bg-white border border-gray-300 text-gray-700 rounded text-[13px] font-medium cursor-pointer hover:bg-gray-50 ${
+                saving ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={selectedCrateIds.length === 0 || saving}
-              style={{
-                padding: '6px 16px',
-                background: selectedCrateIds.length > 0 && !saving ? '#3b82f6' : '#d1d5db',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '13px',
-                fontWeight: '600',
-                cursor: selectedCrateIds.length > 0 && !saving ? 'pointer' : 'not-allowed',
-              }}
+              className={`px-4 py-1.5 border-none rounded text-[13px] font-semibold cursor-pointer text-white ${
+                selectedCrateIds.length > 0 && !saving 
+                  ? 'bg-blue-500 hover:bg-blue-600' 
+                  : 'bg-gray-300 cursor-not-allowed'
+              }`}
             >
               {saving ? 'Adding...' : 'Add to Crates'}
             </button>

@@ -124,61 +124,22 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 30001,
-      }}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30001]"
       onClick={handleClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          width: '600px',
-          maxHeight: '80vh',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-        }}
+        className="bg-white rounded-lg w-[600px] max-h-[80vh] flex flex-col shadow-xl"
       >
         {/* Header */}
-        <div
-          style={{
-            padding: '20px 24px',
-            borderBottom: '1px solid #e5e7eb',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#111827' }}>
+        <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center">
+          <h2 className="m-0 text-lg font-semibold text-gray-900">
             Manage Crates
           </h2>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div className="flex gap-2 items-center">
             <button
               onClick={onOpenNewCrate}
-              style={{
-                padding: '6px 12px',
-                background: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '13px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
+              className="px-3 py-1.5 bg-blue-500 text-white border-none rounded text-xs font-medium cursor-pointer flex items-center gap-1 hover:bg-blue-600"
               title="Create new crate"
             >
               <span>📦</span>
@@ -186,19 +147,7 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
             </button>
             <button
               onClick={onOpenNewSmartCrate}
-              style={{
-                padding: '6px 12px',
-                background: '#8b5cf6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '13px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
+              className="px-3 py-1.5 bg-violet-500 text-white border-none rounded text-xs font-medium cursor-pointer flex items-center gap-1 hover:bg-violet-600"
               title="Create new smart crate"
             >
               <span>⚡</span>
@@ -206,15 +155,7 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
             </button>
             <button
               onClick={handleClose}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                fontSize: '24px',
-                cursor: 'pointer',
-                color: '#6b7280',
-                padding: '0',
-                lineHeight: '1',
-              }}
+              className="bg-transparent border-none text-2xl cursor-pointer text-gray-500 p-0 leading-none hover:text-gray-700"
             >
               ×
             </button>
@@ -222,131 +163,64 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
         </div>
 
         {/* Content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+        <div className="flex-1 overflow-y-auto p-6">
           {error && (
-            <div
-              style={{
-                marginBottom: '16px',
-                padding: '12px',
-                background: '#fee2e2',
-                border: '1px solid #ef4444',
-                borderRadius: '6px',
-                color: '#991b1b',
-                fontSize: '14px',
-              }}
-            >
+            <div className="mb-4 p-3 bg-red-100 border border-red-500 rounded-md text-red-800 text-sm">
               {error}
             </div>
           )}
 
           {loading ? (
-            <div
-              style={{
-                padding: '40px',
-                textAlign: 'center',
-                color: '#6b7280',
-                fontSize: '14px',
-              }}
-            >
+            <div className="p-10 text-center text-gray-500 text-sm">
               Loading crates...
             </div>
           ) : crates.length === 0 ? (
-            <div
-              style={{
-                padding: '40px',
-                textAlign: 'center',
-                color: '#6b7280',
-                fontSize: '14px',
-              }}
-            >
+            <div className="p-10 text-center text-gray-500 text-sm">
               No crates yet. Create your first crate!
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className="flex flex-col gap-2">
               {crates.map((crate, index) => (
                 <div
                   key={crate.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '12px',
-                    background: '#f9fafb',
-                    borderRadius: '6px',
-                    border: '1px solid #e5e7eb',
-                  }}
+                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-md border border-gray-200"
                 >
                   {/* Reorder Buttons */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <div className="flex flex-col gap-0.5">
                     <button
                       onClick={() => handleReorder(crate.id, 'up')}
                       disabled={index === 0}
-                      style={{
-                        width: '24px',
-                        height: '20px',
-                        background: index === 0 ? '#f3f4f6' : 'white',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '3px',
-                        cursor: index === 0 ? 'not-allowed' : 'pointer',
-                        fontSize: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: index === 0 ? '#d1d5db' : '#374151',
-                      }}
+                      className={`w-6 h-5 border border-gray-300 rounded text-xs flex items-center justify-center ${
+                        index === 0 ? 'bg-gray-100 text-gray-300 cursor-not-allowed' : 'bg-white text-gray-700 cursor-pointer hover:bg-gray-50'
+                      }`}
                     >
                       ▲
                     </button>
                     <button
                       onClick={() => handleReorder(crate.id, 'down')}
                       disabled={index === crates.length - 1}
-                      style={{
-                        width: '24px',
-                        height: '20px',
-                        background: index === crates.length - 1 ? '#f3f4f6' : 'white',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '3px',
-                        cursor: index === crates.length - 1 ? 'not-allowed' : 'pointer',
-                        fontSize: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: index === crates.length - 1 ? '#d1d5db' : '#374151',
-                      }}
+                      className={`w-6 h-5 border border-gray-300 rounded text-xs flex items-center justify-center ${
+                        index === crates.length - 1 ? 'bg-gray-100 text-gray-300 cursor-not-allowed' : 'bg-white text-gray-700 cursor-pointer hover:bg-gray-50'
+                      }`}
                     >
                       ▼
                     </button>
                   </div>
 
                   {/* Icon and Info */}
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div
-                      style={{
-                        fontSize: '28px',
-                        lineHeight: '1',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
+                  <div className="flex-1 flex items-center gap-3">
+                    <div className="text-3xl leading-none flex items-center justify-center">
                       {crate.is_smart ? (
                         <BoxIcon color={crate.icon} size={28} />
                       ) : (
                         crate.icon
                       )}
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <div
-                        style={{
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          color: '#111827',
-                          marginBottom: '2px',
-                        }}
-                      >
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold text-gray-900 mb-0.5">
                         {crate.name}
                       </div>
-                      <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                      <div className="text-xs text-gray-500">
                         {crate.is_smart ? (
                           <>
                             Smart Crate • {crate.smart_rules?.rules?.length || 0} rule(s) •{' '}
@@ -361,7 +235,7 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
                   </div>
 
                   {/* Action Buttons */}
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div className="flex gap-2">
                     {/* Edit button */}
                     <button
                       onClick={() => {
@@ -371,16 +245,7 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
                           onOpenEditCrate(crate);
                         }
                       }}
-                      style={{
-                        padding: '6px 12px',
-                        background: 'white',
-                        color: '#374151',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px',
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                        fontWeight: '500',
-                      }}
+                      className="px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded text-xs cursor-pointer font-medium hover:bg-gray-50"
                     >
                       Edit
                     </button>
@@ -389,16 +254,9 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
                     <button
                       onClick={() => handleDelete(crate.id, crate.name)}
                       disabled={deletingId === crate.id}
-                      style={{
-                        padding: '6px 12px',
-                        background: '#ef4444',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        fontSize: '13px',
-                        cursor: deletingId === crate.id ? 'not-allowed' : 'pointer',
-                        opacity: deletingId === crate.id ? 0.5 : 1,
-                      }}
+                      className={`px-3 py-1.5 bg-red-500 text-white border-none rounded text-xs cursor-pointer ${
+                        deletingId === crate.id ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-600'
+                      }`}
                     >
                       {deletingId === crate.id ? 'Deleting...' : 'Delete'}
                     </button>
@@ -410,26 +268,10 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            padding: '16px 24px',
-            borderTop: '1px solid #e5e7eb',
-            display: 'flex',
-            justifyContent: 'flex-end',
-          }}
-        >
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
           <button
             onClick={handleClose}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer',
-            }}
+            className="px-4 py-2 bg-blue-500 text-white border-none rounded text-sm font-medium cursor-pointer hover:bg-blue-600"
           >
             Done
           </button>
