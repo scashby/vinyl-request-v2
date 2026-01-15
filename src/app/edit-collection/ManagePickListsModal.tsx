@@ -380,61 +380,21 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
   return (
     <>
       <div 
-        style={{ 
-          position: 'fixed', 
-          top: 0, 
-          left: 0, 
-          right: 0, 
-          bottom: 0, 
-          backgroundColor: 'rgba(0, 0, 0, 0.5)', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          zIndex: 30000 
-        }} 
+        className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30000] p-4"
         onClick={onClose}
       >
         <div 
-          style={{ 
-            backgroundColor: 'white', 
-            borderRadius: '8px', 
-            width: '800px', 
-            height: '600px', 
-            display: 'flex', 
-            flexDirection: 'column', 
-            overflow: 'hidden', 
-            boxShadow: '0 4px 20px rgba(0,0,0,0.2)' 
-          }} 
+          className="bg-white rounded-lg w-full max-w-[800px] h-[600px] flex flex-col overflow-hidden shadow-xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div 
-            style={{ 
-              padding: '12px 16px', 
-              backgroundColor: '#f97316', 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              borderTopLeftRadius: '8px',
-              borderTopRightRadius: '8px',
-            }}
-          >
-            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'white' }}>
+          <div className="px-4 py-3 bg-orange-500 flex justify-between items-center rounded-t-lg">
+            <h3 className="m-0 text-[15px] font-semibold text-white">
               {config ? `Manage ${config.label}s` : 'Manage Pick Lists'}
             </h3>
             <button 
               onClick={onClose} 
-              style={{ 
-                background: 'transparent', 
-                border: 'none', 
-                color: 'white', 
-                fontSize: '22px', 
-                cursor: 'pointer', 
-                padding: 0, 
-                lineHeight: '1',
-                display: 'flex',
-                alignItems: 'center',
-              }}
+              className="bg-transparent border-none text-white text-2xl cursor-pointer p-0 leading-none flex items-center hover:text-white/80"
             >
               ×
             </button>
@@ -528,37 +488,32 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
           </div>
 
           {/* Table Content */}
-          <div style={{ flex: 1, overflowY: 'auto', backgroundColor: 'white' }}>
+          <div className="flex-1 overflow-y-auto bg-white">
             {!selectedList ? (
-              <div style={{ padding: '50px 30px', textAlign: 'center', color: '#9ca3af', fontSize: '13px', fontStyle: 'italic' }}>
+              <div className="py-12 text-center text-gray-400 text-[13px] italic">
                 Select a pick list to manage...
               </div>
             ) : filteredItems.length === 0 ? (
-              <div style={{ padding: '50px 30px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
+              <div className="py-12 text-center text-gray-400 text-[13px]">
                 {searchQuery ? 'No items match your search' : 'No items available'}
               </div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+              <table className="w-full border-collapse table-fixed">
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: 'white' }}>
-                    <th style={{ width: '40px', padding: '8px' }}></th>
+                  <tr className="border-b border-gray-200 bg-white sticky top-0 z-10">
+                    <th className="w-10 p-2"></th>
                     <th 
-                      style={{ 
-                        padding: '8px 12px', 
-                        textAlign: 'left', 
-                        cursor: 'pointer', 
-                        verticalAlign: 'top'
-                      }}
+                      className="px-3 py-2 text-left cursor-pointer align-top hover:bg-gray-50"
                       onClick={handleSortToggle}
                     >
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Name</span>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-semibold text-gray-500">Name</span>
                         
                         {showSortNameUI && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
-                            <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '400' }}>Sort Name</span>
+                          <div className="flex items-center gap-1 mt-px">
+                            <span className="text-[11px] font-normal text-gray-400">Sort Name</span>
                             {sortBy === 'sortName' && (
-                              <span style={{ fontSize: '10px', color: '#9ca3af' }}>
+                              <span className="text-[10px] text-gray-400">
                                 {sortDirection === 'asc' ? '▼' : '▲'}
                               </span>
                             )}
@@ -566,16 +521,16 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
                         )}
                         
                         {(!showSortNameUI || sortBy === 'name') && (
-                           <span style={{ fontSize: '10px', color: '#9ca3af', marginLeft: '4px' }}>
+                           <span className="text-[10px] text-gray-400 ml-1">
                               {sortBy === 'none' ? '' : (sortDirection === 'asc' ? '▼' : '▲')}
                            </span>
                         )}
                       </div>
                     </th>
-                    <th style={{ width: '60px', padding: '8px 12px', textAlign: 'center', verticalAlign: 'middle', fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>
+                    <th className="w-[60px] px-3 py-2 text-center align-middle text-xs font-semibold text-gray-500">
                       Count
                     </th>
-                    <th style={{ width: '40px', padding: '8px' }}></th>
+                    <th className="w-10 p-2"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -586,32 +541,20 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
                     return (
                       <tr 
                         key={item.id} 
-                        style={{ 
-                          backgroundColor: index % 2 === 0 ? 'white' : '#f9fafb',
-                          borderBottom: '1px solid #f3f4f6' 
-                        }}
+                        className={`border-b border-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                       >
-                        <td style={{ padding: '8px', textAlign: 'center', verticalAlign: 'middle' }}>
+                        <td className="p-2 text-center align-middle">
                           {mergeMode ? (
                             <input
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => toggleSelection(item.id)}
-                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                              className="w-4 h-4 cursor-pointer m-0 align-middle"
                             />
                           ) : (
                             <button 
                               onClick={() => handleEdit(item)}
-                              style={{ 
-                                background: 'transparent', 
-                                border: 'none', 
-                                cursor: 'pointer', 
-                                color: '#3b82f6',
-                                padding: '4px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
+                              className="bg-transparent border-none cursor-pointer text-blue-500 p-1 flex items-center justify-center hover:text-blue-600"
                               title="Edit"
                             >
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -621,37 +564,26 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
                             </button>
                           )}
                         </td>
-                        <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <span style={{ fontSize: '13px', color: '#111827', fontWeight: '500' }}>
+                        <td className="px-3 py-2 align-middle">
+                          <div className="flex flex-col">
+                            <span className="text-[13px] font-medium text-gray-900">
                               {item.name}
                             </span>
                             {showSortNameUI && (
-                              <span style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>
+                              <span className="text-[11px] text-gray-400 mt-px">
                                 {sortName}
                               </span>
                             )}
                           </div>
                         </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'center', verticalAlign: 'middle', fontSize: '13px', color: '#4b5563' }}>
+                        <td className="px-3 py-2 text-center align-middle text-[13px] text-gray-600">
                           {item.count}
                         </td>
-                        <td style={{ padding: '8px', textAlign: 'center', verticalAlign: 'middle' }}>
+                        <td className="p-2 text-center align-middle">
                           {!mergeMode && config?.allowDelete && (
                             <button 
                               onClick={(e) => handleDelete(item.id, e)}
-                              style={{ 
-                                background: 'transparent', 
-                                border: 'none', 
-                                cursor: 'pointer', 
-                                color: '#ef4444',
-                                fontSize: '18px',
-                                padding: '0 4px',
-                                lineHeight: '1',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
+                              className="bg-transparent border-none cursor-pointer text-red-500 text-lg p-0 leading-none flex items-center justify-center hover:text-red-600"
                               title="Delete"
                             >
                               ×

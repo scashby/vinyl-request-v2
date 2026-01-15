@@ -207,102 +207,66 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
 
   return (
     <>
-      {/* Backdrop */}
       <div
+        className="fixed inset-0 bg-black/50 z-[50000]"
         onClick={onClose}
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.5)',
-          zIndex: 50000,
-        }}
       />
 
-      {/* Modal */}
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 50001,
-          display: 'flex',
-          flexDirection: 'column',
-          background: '#F5F5F5',
-        }}
-      >
+      <div className="fixed inset-0 z-[50001] flex flex-col bg-gray-100">
         {/* Header */}
-        <div style={{ background: '#2A2A2A', color: 'white', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '20px' }}>📊</span>
-            <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Statistics</h1>
+        <div className="bg-[#2A2A2A] text-white px-6 py-4 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">📊</span>
+            <h1 className="m-0 text-lg font-semibold">Statistics</h1>
           </div>
           <button
             onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'white',
-              fontSize: '24px',
-              cursor: 'pointer',
-              padding: '4px 8px',
-            }}
+            className="bg-transparent border-none text-white text-2xl cursor-pointer p-1 hover:text-gray-300"
           >
             ×
           </button>
         </div>
 
         {/* Content */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+        <div className="flex-1 overflow-auto p-6">
           {loading ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+            <div className="p-10 text-center text-gray-500">
               Calculating statistics...
             </div>
           ) : !stats ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+            <div className="p-10 text-center text-gray-500">
               Failed to load statistics
             </div>
           ) : (
-            <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+            <div className="max-w-[1400px] mx-auto">
               {/* Overview Stats */}
-              <div style={{ background: 'white', borderRadius: '8px', padding: '32px', marginBottom: '24px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                <div style={{ fontSize: '24px', fontWeight: 600, color: '#1a1a1a', marginBottom: '12px' }}>
+              <div className="bg-white rounded-lg p-8 mb-6 text-center shadow-sm">
+                <div className="text-2xl font-semibold text-gray-900 mb-3">
                   {stats.totalAlbums} albums and {stats.totalArtists} Artists
                 </div>
-                <div style={{ fontSize: '16px', color: '#666' }}>
+                <div className="text-base text-gray-500">
                   {stats.totalDiscs} discs, {stats.totalTracks} tracks / total runtime: {stats.totalRuntime.days} days, {stats.totalRuntime.hours} hours, {stats.totalRuntime.minutes} minutes
                 </div>
               </div>
 
               {/* Charts Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 {/* Albums by Format */}
-                <div style={{ background: 'white', borderRadius: '8px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                  <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>Albums by Format</h2>
+                <div className="bg-white rounded-lg p-6 shadow-sm">
+                  <h2 className="m-0 mb-4 text-lg font-semibold text-gray-900">Albums by Format</h2>
                   
-                  {/* Legend - Horizontal above chart */}
-                  <div style={{ 
-                    display: 'flex', 
-                    flexWrap: 'wrap', 
-                    gap: '12px 16px',
-                    marginBottom: '20px',
-                    fontSize: '12px',
-                    justifyContent: 'center'
-                  }}>
+                  {/* Legend */}
+                  <div className="flex flex-wrap gap-x-4 gap-y-3 mb-5 justify-center text-xs">
                     {stats.formatData.map((item, idx) => (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div style={{ width: '12px', height: '12px', background: item.color, borderRadius: '2px', flexShrink: 0 }} />
-                        <span style={{ color: '#1a1a1a', whiteSpace: 'nowrap' }}>{item.name}</span>
+                      <div key={idx} className="flex items-center gap-1.5">
+                        <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                        <span className="text-gray-900 whitespace-nowrap">{item.name}</span>
                       </div>
                     ))}
                   </div>
 
-                  {/* Pie Chart - Centered */}
-                  <div style={{ display: 'flex', justifyContent: 'center', width: '100%', height: '300px' }}>
+                  {/* Pie Chart */}
+                  <div className="flex justify-center w-full h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -325,15 +289,15 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
                 </div>
 
                 {/* Most Recent Additions */}
-                <div style={{ background: 'white', borderRadius: '8px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                  <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>Most recent additions</h2>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="bg-white rounded-lg p-6 shadow-sm">
+                  <h2 className="m-0 mb-4 text-lg font-semibold text-gray-900">Most recent additions</h2>
+                  <div className="flex flex-col gap-3">
                     {stats.recentAdditions.slice(0, 5).map((album) => {
                       const imageUrl = album.image_url && album.image_url.trim().toLowerCase() !== 'no'
                         ? album.image_url.trim()
                         : '/images/placeholder.png';
                       return (
-                        <div key={album.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '8px', borderRadius: '4px', border: '1px solid #E8E8E8' }}>
+                        <div key={album.id} className="flex gap-3 items-center p-2 rounded border border-gray-200">
                           <Image
                             src={imageUrl}
                             alt={album.title}
@@ -341,14 +305,14 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
                             height={60}
                             unoptimized
                           />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '14px', fontWeight: 600, color: '#0066cc', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold text-blue-600 mb-0.5 truncate">
                             {album.title}
                           </div>
-                          <div style={{ fontSize: '13px', color: '#666', marginBottom: '2px' }}>{album.artist}</div>
-                          <div style={{ fontSize: '12px', color: '#999' }}>{album.format} - {album.year || 'Unknown'}</div>
+                          <div className="text-[13px] text-gray-500 mb-0.5">{album.artist}</div>
+                          <div className="text-xs text-gray-400">{album.format} - {album.year || 'Unknown'}</div>
                         </div>
-                        <div style={{ textAlign: 'right', fontSize: '12px', color: '#666', flexShrink: 0 }}>
+                        <div className="text-right text-xs text-gray-500 shrink-0">
                           {album.tracks?.filter((t) => t.type === 'track').length || 0} tracks<br />
                           {album.date_added ? new Date(album.date_added).toLocaleDateString() : ''}
                         </div>
@@ -360,8 +324,8 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
               </div>
 
               {/* Albums by Release Year */}
-              <div style={{ background: 'white', borderRadius: '8px', padding: '24px', marginBottom: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>Albums by Release Year</h2>
+              <div className="bg-white rounded-lg p-6 mb-6 shadow-sm">
+                <h2 className="m-0 mb-4 text-lg font-semibold text-gray-900">Albums by Release Year</h2>
                 <ResponsiveContainer width="100%" height={250}>
                   <AreaChart data={stats.yearData}>
                     <defs>
@@ -379,8 +343,8 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
               </div>
 
               {/* Albums by Genre */}
-              <div style={{ background: 'white', borderRadius: '8px', padding: '24px', marginBottom: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>Albums by Genre</h2>
+              <div className="bg-white rounded-lg p-6 mb-6 shadow-sm">
+                <h2 className="m-0 mb-4 text-lg font-semibold text-gray-900">Albums by Genre</h2>
                 <ResponsiveContainer width="100%" height={400}>
                   <BarChart data={stats.genreData.slice(0, 15)}>
                     <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#666' }} angle={-45} textAnchor="end" height={100} />
@@ -395,8 +359,8 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
               </div>
 
               {/* Albums by Artist */}
-              <div style={{ background: 'white', borderRadius: '8px', padding: '24px', marginBottom: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>Albums by Artist</h2>
+              <div className="bg-white rounded-lg p-6 mb-6 shadow-sm">
+                <h2 className="m-0 mb-4 text-lg font-semibold text-gray-900">Albums by Artist</h2>
                 <ResponsiveContainer width="100%" height={350}>
                   <BarChart data={stats.artistData.slice(0, 20)}>
                     <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#666' }} angle={-45} textAnchor="end" height={120} />
@@ -411,11 +375,11 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
               </div>
 
               {/* Bottom Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px' }}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Played */}
-                <div style={{ background: 'white', borderRadius: '8px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                  <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>Played</h2>
-                  <div style={{ width: '100%', height: '250px' }}>
+                <div className="bg-white rounded-lg p-6 shadow-sm">
+                  <h2 className="m-0 mb-4 text-lg font-semibold text-gray-900">Played</h2>
+                  <div className="w-full h-[250px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -435,30 +399,30 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '12px', fontSize: '13px' }}>
+                  <div className="flex justify-center gap-4 mt-3 text-[13px]">
                     {stats.playedData.map((item, idx) => (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div style={{ width: '12px', height: '12px', background: item.color, borderRadius: '2px' }} />
-                        <span style={{ color: '#1a1a1a' }}>{item.name}</span>
+                      <div key={idx} className="flex items-center gap-1.5">
+                        <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
+                        <span className="text-gray-900">{item.name}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 {/* Most Played */}
-                <div style={{ background: 'white', borderRadius: '8px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                  <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>Most played</h2>
+                <div className="bg-white rounded-lg p-6 shadow-sm">
+                  <h2 className="m-0 mb-4 text-lg font-semibold text-gray-900">Most played</h2>
                   {stats.mostPlayed.length === 0 ? (
-                    <div style={{ padding: '40px', textAlign: 'center', color: '#999', fontSize: '14px' }}>
+                    <div className="py-10 text-center text-gray-400 text-sm">
                       No play data yet
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div className="flex flex-col gap-2">
                       {stats.mostPlayed.slice(0, 5).map((item, idx) => (
-                        <div key={idx} style={{ fontSize: '13px', color: '#1a1a1a', padding: '8px', borderRadius: '4px', background: '#F8F8F8' }}>
-                          <div style={{ fontWeight: 600 }}>{item.album.artist}</div>
-                          <div style={{ color: '#666' }}>{item.album.title}</div>
-                          <div style={{ color: '#999', fontSize: '12px' }}>{item.playCount} plays</div>
+                        <div key={idx} className="text-[13px] text-gray-900 p-2 rounded bg-gray-50">
+                          <div className="font-semibold">{item.album.artist}</div>
+                          <div className="text-gray-600">{item.album.title}</div>
+                          <div className="text-gray-400 text-xs">{item.playCount} plays</div>
                         </div>
                       ))}
                     </div>
@@ -466,19 +430,19 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
                 </div>
 
                 {/* Most Recently Played */}
-                <div style={{ background: 'white', borderRadius: '8px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                  <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>Most recently played</h2>
+                <div className="bg-white rounded-lg p-6 shadow-sm">
+                  <h2 className="m-0 mb-4 text-lg font-semibold text-gray-900">Most recently played</h2>
                   {stats.recentlyPlayed.length === 0 ? (
-                    <div style={{ padding: '40px', textAlign: 'center', color: '#999', fontSize: '14px' }}>
+                    <div className="py-10 text-center text-gray-400 text-sm">
                       No play data yet
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div className="flex flex-col gap-2">
                       {stats.recentlyPlayed.slice(0, 5).map((item, idx) => (
-                        <div key={idx} style={{ fontSize: '13px', color: '#1a1a1a', padding: '8px', borderRadius: '4px', background: '#F8F8F8' }}>
-                          <div style={{ fontWeight: 600 }}>{item.album.artist}</div>
-                          <div style={{ color: '#666' }}>{item.album.title}</div>
-                          <div style={{ color: '#999', fontSize: '12px' }}>{new Date(item.lastPlayed).toLocaleDateString()}</div>
+                        <div key={idx} className="text-[13px] text-gray-900 p-2 rounded bg-gray-50">
+                          <div className="font-semibold">{item.album.artist}</div>
+                          <div className="text-gray-600">{item.album.title}</div>
+                          <div className="text-gray-400 text-xs">{new Date(item.lastPlayed).toLocaleDateString()}</div>
                         </div>
                       ))}
                     </div>

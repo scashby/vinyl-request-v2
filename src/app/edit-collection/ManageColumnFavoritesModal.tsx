@@ -111,119 +111,61 @@ export function ManageColumnFavoritesModal({
   return (
     <>
       <div
+        className="fixed inset-0 bg-black/60 z-[31000]"
         onClick={onClose}
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.6)',
-          zIndex: 31000,
-        }}
       />
 
       <div
+        className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-md max-h-[80vh] flex flex-col z-[31001] shadow-xl transition-all duration-200 ${
+          showColumnSelector ? 'w-full max-w-[900px]' : 'w-full max-w-[600px]'
+        }`}
         onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          backgroundColor: 'white',
-          borderRadius: '4px',
-          width: showColumnSelector ? '900px' : '600px',
-          maxHeight: '80vh',
-          display: 'flex',
-          flexDirection: 'column',
-          zIndex: 31001,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-        }}
       >
         {/* Header */}
-        <div style={{
-          backgroundColor: '#FF8C42',
-          color: 'white',
-          padding: '12px 16px',
-          borderRadius: '4px 4px 0 0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>
+        <div className="bg-[#FF8C42] text-white px-4 py-3 rounded-t-md flex justify-between items-center">
+          <h2 className="m-0 text-base font-semibold">
             Manage Column Favorites
           </h2>
           <button
             onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'white',
-              fontSize: '24px',
-              cursor: 'pointer',
-              padding: '0 4px',
-              lineHeight: '1',
-            }}
+            className="bg-transparent border-none text-white text-2xl cursor-pointer p-1 leading-none hover:text-white/80"
           >
             ×
           </button>
         </div>
 
         {/* Content */}
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <div className="flex flex-1 overflow-hidden">
           {/* Favorites List */}
-          <div style={{
-            width: showColumnSelector ? '280px' : '100%',
-            borderRight: showColumnSelector ? '1px solid #e0e0e0' : 'none',
-            display: 'flex',
-            flexDirection: 'column',
-          }}>
-            <div style={{ padding: '16px', borderBottom: '1px solid #e0e0e0' }}>
+          <div className={`flex flex-col border-r border-gray-200 ${
+            showColumnSelector ? 'w-[280px]' : 'w-full border-none'
+          }`}>
+            <div className="p-4 border-b border-gray-200">
               <button
                 onClick={handleAddNew}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  backgroundColor: '#5BA3D0',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '3px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                }}
+                className="w-full py-2 px-3 bg-blue-400 text-white border-none rounded text-[13px] font-semibold cursor-pointer flex items-center justify-center gap-1.5 hover:bg-blue-500"
               >
-                <span style={{ fontSize: '16px' }}>+</span>
+                <span className="text-base">+</span>
                 <span>New Favorite</span>
               </button>
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+            <div className="flex-1 overflow-y-auto p-2">
               {localFavorites.map(favorite => (
                 <div
                   key={favorite.id}
-                  style={{
-                    marginBottom: '4px',
-                    border: selectedId === favorite.id ? '2px solid #5BA3D0' : '1px solid #e0e0e0',
-                    borderRadius: '3px',
-                    backgroundColor: selectedId === favorite.id ? '#f0f8ff' : 'white',
-                  }}
+                  className={`mb-1 border rounded transition-colors ${
+                    selectedId === favorite.id 
+                      ? 'border-blue-400 bg-blue-50' 
+                      : 'border-gray-200 bg-white'
+                  }`}
                 >
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px',
-                  }}>
+                  <div className="flex items-center gap-2 p-2">
                     <input
                       type="radio"
                       checked={selectedId === favorite.id}
                       onChange={() => onSelect(favorite.id)}
-                      style={{ cursor: 'pointer' }}
+                      className="cursor-pointer"
                     />
                     {editingId === favorite.id ? (
                       <input
@@ -236,68 +178,38 @@ export function ManageColumnFavoritesModal({
                           if (e.key === 'Escape') setEditingId(null);
                         }}
                         autoFocus
-                        style={{
-                          flex: 1,
-                          padding: '4px 6px',
-                          border: '1px solid #5BA3D0',
-                          borderRadius: '2px',
-                          fontSize: '13px',
-                          color: '#1a1a1a',
-                        }}
+                        className="flex-1 px-1.5 py-1 border border-blue-400 rounded text-[13px] text-gray-900 outline-none"
                       />
                     ) : (
-                      <span style={{ flex: 1, fontSize: '13px', fontWeight: 500, color: '#1a1a1a' }}>
+                      <span className="flex-1 text-[13px] font-medium text-gray-900">
                         {favorite.name}
                       </span>
                     )}
-                    <div style={{ display: 'flex', gap: '4px' }}>
+                    <div className="flex gap-1">
                       <button
                         onClick={() => handleEdit(favorite)}
                         title="Edit columns"
-                        style={{
-                          padding: '4px 8px',
-                          backgroundColor: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                        }}
+                        className="p-1 bg-transparent border-none cursor-pointer text-sm hover:scale-110"
                       >
                         ✏️
                       </button>
                       <button
                         onClick={() => handleRename(favorite.id)}
                         title="Rename"
-                        style={{
-                          padding: '4px 8px',
-                          backgroundColor: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                        }}
+                        className="p-1 bg-transparent border-none cursor-pointer text-sm hover:scale-110"
                       >
                         📝
                       </button>
                       <button
                         onClick={() => handleDelete(favorite.id)}
                         title="Delete"
-                        style={{
-                          padding: '4px 8px',
-                          backgroundColor: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          color: '#ef4444',
-                        }}
+                        className="p-1 bg-transparent border-none cursor-pointer text-sm text-red-500 hover:text-red-600 hover:scale-110"
                       >
                         🗑️
                       </button>
                     </div>
                   </div>
-                  <div style={{
-                    padding: '4px 8px 8px 32px',
-                    fontSize: '11px',
-                    color: '#999',
-                  }}>
+                  <div className="px-2 pb-2 pl-8 text-[11px] text-gray-400">
                     {favorite.columns.length} columns
                   </div>
                 </div>
@@ -307,72 +219,39 @@ export function ManageColumnFavoritesModal({
 
           {/* Column Selector */}
           {showColumnSelector && selectedFavoriteForEdit && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <div style={{ padding: '16px', borderBottom: '1px solid #e0e0e0' }}>
-                <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#333' }}>
+            <div className="flex-1 flex flex-col">
+              <div className="p-4 border-b border-gray-200">
+                <h3 className="m-0 text-sm font-semibold text-gray-800">
                   Select Columns for: {selectedFavoriteForEdit.name}
                 </h3>
               </div>
 
-              <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+              <div className="flex-1 overflow-y-auto p-2">
                 {Object.entries(COLUMN_FIELDS).map(([groupName, fields]) => {
                   const isExpanded = expandedGroups.has(groupName);
                   return (
-                    <div key={groupName} style={{ marginBottom: '4px' }}>
+                    <div key={groupName} className="mb-1">
                       <button
                         onClick={() => toggleGroup(groupName)}
-                        style={{
-                          width: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '8px 12px',
-                          background: '#2C2C2C',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          textAlign: 'left',
-                        }}
+                        className="w-full flex items-center gap-2 p-2 bg-[#2C2C2C] text-white border-none rounded cursor-pointer text-[13px] font-semibold text-left hover:bg-[#3a3a3a]"
                       >
-                        <span style={{
-                          fontSize: '10px',
-                          transition: 'transform 0.2s',
-                          transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)'
-                        }}>
+                        <span className={`text-[10px] transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}>
                           ▶
                         </span>
                         <span>{groupName}</span>
                       </button>
 
                       {isExpanded && (
-                        <div style={{ paddingLeft: '28px', paddingTop: '4px' }}>
+                        <div className="pl-7 pt-1">
                           {fields.map(field => {
                             const isSelected = selectedFavoriteForEdit.columns.includes(field);
 
                             return (
                               <label
                                 key={field}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px',
-                                  padding: '6px 8px',
-                                  cursor: 'pointer',
-                                  fontSize: '13px',
-                                  borderRadius: '3px',
-                                  marginBottom: '2px',
-                                  color: '#1a1a1a',
-                                  backgroundColor: isSelected ? '#f0f0f0' : 'transparent',
-                                }}
-                                onMouseEnter={(e) => {
-                                  if (!isSelected) e.currentTarget.style.background = '#f5f5f5';
-                                }}
-                                onMouseLeave={(e) => {
-                                  if (!isSelected) e.currentTarget.style.background = 'transparent';
-                                }}
+                                className={`flex items-center gap-2 px-2 py-1.5 cursor-pointer text-[13px] rounded mb-0.5 text-gray-900 transition-colors ${
+                                  isSelected ? 'bg-gray-100' : 'hover:bg-gray-50'
+                                }`}
                               >
                                 <input
                                   type="checkbox"
@@ -386,7 +265,7 @@ export function ManageColumnFavoritesModal({
                                       columns: newColumns
                                     });
                                   }}
-                                  style={{ cursor: 'pointer' }}
+                                  className="cursor-pointer accent-blue-500"
                                 />
                                 <span>{field}</span>
                               </label>
@@ -399,20 +278,10 @@ export function ManageColumnFavoritesModal({
                 })}
               </div>
 
-              <div style={{ padding: '16px', borderTop: '1px solid #e0e0e0' }}>
+              <div className="p-4 border-t border-gray-200">
                 <button
                   onClick={() => handleSaveColumns(selectedFavoriteForEdit.columns)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    backgroundColor: '#5BA3D0',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '3px',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
+                  className="w-full py-2 px-3 bg-blue-400 text-white border-none rounded text-[13px] font-semibold cursor-pointer hover:bg-blue-500"
                 >
                   Save Column Selection
                 </button>
@@ -422,24 +291,10 @@ export function ManageColumnFavoritesModal({
         </div>
 
         {/* Footer */}
-        <div style={{
-          padding: '16px',
-          borderTop: '1px solid #e0e0e0',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: '8px',
-        }}>
+        <div className="p-4 border-t border-gray-200 flex justify-end gap-2">
           <button
             onClick={onClose}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#f0f0f0',
-              border: '1px solid #d0d0d0',
-              borderRadius: '3px',
-              fontSize: '13px',
-              cursor: 'pointer',
-              color: '#1a1a1a',
-            }}
+            className="px-4 py-2 bg-gray-100 border border-gray-300 rounded text-[13px] cursor-pointer text-gray-800 hover:bg-gray-200"
           >
             Cancel
           </button>
@@ -447,16 +302,7 @@ export function ManageColumnFavoritesModal({
             onClick={() => {
               onSave(localFavorites);
             }}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#5BA3D0',
-              color: 'white',
-              border: 'none',
-              borderRadius: '3px',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
+            className="px-4 py-2 bg-blue-400 text-white border-none rounded text-[13px] font-semibold cursor-pointer hover:bg-blue-500"
           >
             Close
           </button>
