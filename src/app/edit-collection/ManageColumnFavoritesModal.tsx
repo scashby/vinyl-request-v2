@@ -122,25 +122,25 @@ export function ManageColumnFavoritesModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-[#FF8C42] text-white px-4 py-3 rounded-t-md flex justify-between items-center">
+        <div className="bg-[#FF8C42] text-white px-4 py-3 rounded-t-md flex justify-between items-center shrink-0">
           <h2 className="m-0 text-base font-semibold">
             Manage Column Favorites
           </h2>
           <button
             onClick={onClose}
-            className="bg-transparent border-none text-white text-2xl cursor-pointer p-1 leading-none hover:text-white/80"
+            className="bg-transparent border-none text-white text-3xl cursor-pointer leading-none p-1 hover:text-white/80"
           >
             ×
           </button>
         </div>
 
         {/* Content */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden min-h-0">
           {/* Favorites List */}
-          <div className={`flex flex-col border-r border-gray-200 ${
-            showColumnSelector ? 'w-[280px]' : 'w-full border-none'
+          <div className={`flex flex-col shrink-0 transition-all duration-200 ${
+            showColumnSelector ? 'w-[280px] border-r border-gray-200' : 'w-full'
           }`}>
-            <div className="p-4 border-b border-gray-200">
+            <div className="p-4 border-b border-gray-100">
               <button
                 onClick={handleAddNew}
                 className="w-full py-2 px-3 bg-blue-400 text-white border-none rounded text-[13px] font-semibold cursor-pointer flex items-center justify-center gap-1.5 hover:bg-blue-500"

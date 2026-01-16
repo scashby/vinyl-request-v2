@@ -62,11 +62,11 @@ export default function Header({
 
             <div className="mb-5">
               <div className="text-[11px] font-semibold text-[#999] mb-2.5 uppercase tracking-wider">Collection</div>
-              <button onClick={() => { setSidebarOpen(false); setShowManagePickListsModal(true); }} title="Create and manage pick lists" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded">
-                <span style={{ marginRight: '10px' }}>📋</span> Manage Pick Lists
+              <button onClick={() => { setSidebarOpen(false); setShowManagePickListsModal(true); }} title="Create and manage pick lists" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded transition-colors">
+                <span className="mr-2.5">📋</span> Manage Pick Lists
               </button>
-              <button onClick={() => { setSidebarOpen(false); setShowManageCratesModal(true); }} title="Manage crates (DJ workflow organization)" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded">
-                <span style={{ marginRight: '10px' }}>📦</span> Manage Crates
+              <button onClick={() => { setSidebarOpen(false); setShowManageCratesModal(true); }} title="Manage crates (DJ workflow organization)" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded transition-colors">
+                <span className="mr-2.5">📦</span> Manage Crates
               </button>
             </div>
 
@@ -74,23 +74,23 @@ export default function Header({
 
             <div className="mb-5">
               <div className="text-[11px] font-semibold text-[#999] mb-2.5 uppercase tracking-wider">Tools</div>
-              <button onClick={() => { setSidebarOpen(false); setShowPrintToPDF(true); }} title="Export collection to PDF" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded">
-                <span style={{ marginRight: '10px' }}>🖨️</span> Print to PDF
+              <button onClick={() => { setSidebarOpen(false); setShowPrintToPDF(true); }} title="Export collection to PDF" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded transition-colors">
+                <span className="mr-2.5">🖨️</span> Print to PDF
               </button>
-              <button onClick={() => { setSidebarOpen(false); setShowStatistics(true); }} title="View collection statistics" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded">
-                <span style={{ marginRight: '10px' }}>📊</span> Statistics
+              <button onClick={() => { setSidebarOpen(false); setShowStatistics(true); }} title="View collection statistics" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded transition-colors">
+                <span className="mr-2.5">📊</span> Statistics
               </button>
-              <button onClick={() => { setSidebarOpen(false); setShowImportModal(true); }} title="Import album data from various sources" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded">
-                <span style={{ marginRight: '10px' }}>📥</span> Import Data
+              <button onClick={() => { setSidebarOpen(false); setShowImportModal(true); }} title="Import album data from various sources" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded transition-colors">
+                <span className="mr-2.5">📥</span> Import Data
               </button>
-              <button onClick={() => { setSidebarOpen(false); setShowFindDuplicates(true); }} title="Find duplicate albums" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded">
-                <span style={{ marginRight: '10px' }}>🔍</span> Find Duplicates
+              <button onClick={() => { setSidebarOpen(false); setShowFindDuplicates(true); }} title="Find duplicate albums" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded transition-colors">
+                <span className="mr-2.5">🔍</span> Find Duplicates
               </button>
-              <button title="Track loaned albums" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded">
-                <span style={{ marginRight: '10px' }}>📚</span> Loan Manager
+              <button title="Track loaned albums" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded transition-colors">
+                <span className="mr-2.5">📚</span> Loan Manager
               </button>
-              <button onClick={() => { setSidebarOpen(false); setShowSettings(true); }} title="Application settings" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded">
-                <span style={{ marginRight: '10px' }}>⚙️</span> Settings
+              <button onClick={() => { setSidebarOpen(false); setShowSettings(true); }} title="Application settings" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded transition-colors">
+                <span className="mr-2.5">⚙️</span> Settings
               </button>
             </div>
           </div>
@@ -99,10 +99,10 @@ export default function Header({
 
       <div className="bg-gradient-to-r from-[#8809AC] to-[#A855F7] text-white px-4 py-2 flex items-center justify-between h-[50px] shrink-0 clz-header">
         <div className="flex items-center gap-4">
-          <button onClick={() => setSidebarOpen(true)} title="Open menu" className="bg-none border-none text-white cursor-pointer text-xl p-1 hover:bg-white/10 rounded">☰</button>
-          <div className="flex items-center gap-2">
-            <span style={{ fontSize: '18px' }}>♪</span>
-            <span style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '0.5px' }}>DWD Collection Management System</span>
+          <button onClick={() => setSidebarOpen(true)} title="Open menu" className="bg-none border-none text-white cursor-pointer text-xl p-1 hover:bg-white/10 rounded transition-colors">☰</button>
+          <div className="flex items-center gap-2 select-none">
+            <span className="text-[18px]">♪</span>
+            <span className="text-[15px] font-semibold tracking-[0.5px]">DWD Collection Management System</span>
           </div>
         </div>
         <div className="flex gap-3 items-center">

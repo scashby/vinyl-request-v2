@@ -366,28 +366,14 @@ export function PrintToPDFModal({
             </div>
 
             {/* Page Setup */}
-            <div style={{ marginBottom: '24px' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '12px',
-                }}
-              >
-                <div style={{ fontSize: '16px', fontWeight: 600, color: '#1a1a1a' }}>
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-3">
+                <div className="text-base font-semibold text-gray-900">
                   Page Setup
                 </div>
                 <button
                   onClick={() => setShowMoreSettings(!showMoreSettings)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#0066cc',
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    padding: 0,
-                  }}
+                  className="bg-transparent border-none text-blue-600 text-sm cursor-pointer p-0 hover:underline"
                 >
                   More settings ⋮
                 </button>

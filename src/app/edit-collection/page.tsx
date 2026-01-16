@@ -143,24 +143,24 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
 
   return (
     <div className="p-4 flex-1 overflow-y-auto bg-gradient-to-br from-[#f5f7fa] to-[#c3cfe2]">
-      <div className="text-sm text-[#333] mb-1 font-normal">{album.artist}</div>
+      <div className="text-sm text-gray-800 mb-1 font-normal">{album.artist}</div>
       <div className="flex items-center gap-2 mb-4">
-        <h4 className="text-[#2196F3] m-0 text-lg font-normal">{album.title}</h4>
-        <div className="bg-[#2196F3] text-white rounded px-2 py-1 text-base flex items-center justify-center" title="Album owned">✓</div>
+        <h4 className="text-[#2196F3] m-0 text-lg font-semibold">{album.title}</h4>
+        <div className="bg-[#2196F3] text-white rounded px-1.5 py-0.5 text-xs flex items-center justify-center font-bold" title="Album owned">✓</div>
       </div>
 
-      <div className="relative mb-3">
+      <div className="relative mb-4 group">
         {(imageIndex === 0 ? album.image_url : album.back_image_url) ? (
           <Image 
             src={(imageIndex === 0 ? album.image_url : album.back_image_url) || ''} 
             alt={`${album.artist} - ${album.title} ${imageIndex === 0 ? 'front' : 'back'}`}
             width={400}
             height={400}
-            style={{ width: '100%', height: 'auto', aspectRatio: '1', objectFit: 'cover', border: '1px solid #ddd' }}
+            className="w-full h-auto aspect-square object-cover border border-gray-300 rounded shadow-sm"
             unoptimized
           />
         ) : (
-          <div className="w-full aspect-square bg-white flex items-center justify-center text-[#999] text-5xl border border-[#ddd]">🎵</div>
+          <div className="w-full aspect-square bg-white flex items-center justify-center text-gray-300 text-5xl border border-gray-200 rounded">🎵</div>
         )}
         
         {album.back_image_url && (
@@ -218,7 +218,7 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
         const sortedDiscs = Array.from(discMap.entries()).sort(([a], [b]) => a - b);
 
         return (
-          <div style={{ marginBottom: '16px' }}>
+          <div className="mb-4">
             {sortedDiscs.map(([discNumber, tracks]) => {
               const discMeta = album.disc_metadata?.find(d => d.disc_number === discNumber);
               const discTitle = discMeta?.title || `Disc #${discNumber}`;
@@ -226,9 +226,9 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
 
               return (
                 <div key={discNumber} className="mb-4">
-                  <div className="text-sm font-bold text-white mb-2 p-2 px-3 bg-[#2196F3] rounded flex justify-between items-center">
+                  <div className="text-xs font-bold text-white mb-1.5 p-2 px-3 bg-[#2196F3] rounded flex justify-between items-center shadow-sm uppercase tracking-wider">
                     <span>{discTitle}</span>
-                    {runtime && <span>{runtime}</span>}
+                    {runtime && <span className="font-mono">{runtime}</span>}
                   </div>
                   <div className="flex flex-col gap-px">
                     {tracks.map((track, idx) => {
@@ -311,18 +311,20 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
           </div>
           <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
             <span className="font-semibold min-w-[140px]">My Rating</span>
-            <span>
+            <div className="flex-1">
               {album.my_rating ? (
-                <span className="flex gap-0.5">
+                <div className="flex gap-0.5 items-center">
                   {Array.from({ length: album.my_rating }).map((_, i) => (
-                    <span key={i} style={{ color: '#fbbf24', fontSize: '14px' }}>★</span>
+                    <span key={i} className="text-yellow-400 text-sm">★</span>
                   ))}
                   {Array.from({ length: 10 - album.my_rating }).map((_, i) => (
-                    <span key={i} style={{ color: '#d1d5db', fontSize: '14px' }}>★</span>
+                    <span key={i} className="text-gray-300 text-sm">★</span>
                   ))}
-                </span>
-              ) : '—'}
-            </span>
+                </div>
+              ) : (
+                <span className="text-gray-400">—</span>
+              )}
+            </div>
           </div>
           <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
             <span className="font-semibold min-w-[140px]">Last Cleaned</span>
@@ -765,33 +767,33 @@ function CollectionBrowserPage() {
 
         <div className="bg-[#3A3A3A] text-white px-4 py-2 flex items-center justify-between gap-5 h-[48px] shrink-0">
           <div className="flex gap-2 items-center shrink-0">
-            <button title="Add new albums to collection" className="bg-[#368CF8] text-white border-none px-3 py-1.5 rounded cursor-pointer text-[13px] font-medium flex items-center gap-1 whitespace-nowrap">
-              <span style={{ fontSize: '16px' }}>+</span>
+            <button title="Add new albums to collection" className="bg-[#368CF8] hover:bg-[#2c72c9] text-white border-none px-3 py-1.5 rounded cursor-pointer text-[13px] font-medium flex items-center gap-1 whitespace-nowrap transition-colors">
+              <span className="text-[16px]">+</span>
               <span>Add Albums</span>
             </button>
 
-            <div style={{ position: 'relative' }}>
-              <button onClick={() => setShowCollectionDropdown(!showCollectionDropdown)} title="Filter by collection status" className="bg-[#2a2a2a] text-white border border-[#555] px-3 py-1.5 rounded cursor-pointer text-[13px] flex items-center gap-1.5">
+            <div className="relative">
+              <button onClick={() => setShowCollectionDropdown(!showCollectionDropdown)} title="Filter by collection status" className="bg-[#2a2a2a] text-white border border-[#555] px-3 py-1.5 rounded cursor-pointer text-[13px] flex items-center gap-1.5 hover:bg-[#333] transition-colors">
                 <span>📚</span>
                 <span>{collectionFilter}</span>
-                <span style={{ fontSize: '10px' }}>▼</span>
+                <span className="text-[10px]">▼</span>
               </button>
             </div>
           </div>
 
           <div className="flex gap-0.5 items-center flex-1 justify-center">
-            <button onClick={() => setSelectedLetter('All')} title="Show all albums" className={`bg-transparent text-white border-none px-2 py-1 cursor-pointer text-xs rounded-sm ${selectedLetter === 'All' ? 'bg-[#5A9BD5]' : ''}`}>All</button>
-            <button onClick={() => setSelectedLetter('0-9')} title="Filter by numbers" className={`bg-transparent text-white border-none px-2 py-1 cursor-pointer text-xs rounded-sm ${selectedLetter === '0-9' ? 'bg-[#5A9BD5]' : ''}`}>0-9</button>
+            <button onClick={() => setSelectedLetter('All')} title="Show all albums" className={`bg-transparent text-white border-none px-2 py-1 cursor-pointer text-xs rounded-sm transition-colors ${selectedLetter === 'All' ? 'bg-[#5A9BD5]' : 'hover:bg-white/10'}`}>All</button>
+            <button onClick={() => setSelectedLetter('0-9')} title="Filter by numbers" className={`bg-transparent text-white border-none px-2 py-1 cursor-pointer text-xs rounded-sm transition-colors ${selectedLetter === '0-9' ? 'bg-[#5A9BD5]' : 'hover:bg-white/10'}`}>0-9</button>
             {alphabet.map(letter => (
-              <button key={letter} onClick={() => setSelectedLetter(letter)} title={`Filter by letter ${letter}`} className={`bg-transparent text-white border-none px-2 py-1 cursor-pointer text-xs rounded-sm ${selectedLetter === letter ? 'bg-[#5A9BD5]' : ''}`}>{letter}</button>
+              <button key={letter} onClick={() => setSelectedLetter(letter)} title={`Filter by letter ${letter}`} className={`bg-transparent text-white border-none px-2 py-1 cursor-pointer text-xs rounded-sm transition-colors ${selectedLetter === letter ? 'bg-[#5A9BD5]' : 'hover:bg-white/10'}`}>{letter}</button>
             ))}
           </div>
 
           <div className="flex items-center shrink-0">
-            <div style={{ position: 'relative' }}>
-              <button onClick={() => setShowSearchTypeDropdown(!showSearchTypeDropdown)} title="Search type" className="bg-[#2a2a2a] text-white border border-[#555] border-r-0 px-2.5 py-1.5 cursor-pointer text-[13px] rounded-l flex items-center gap-1 h-8">
+            <div className="relative">
+              <button onClick={() => setShowSearchTypeDropdown(!showSearchTypeDropdown)} title="Search type" className="bg-[#2a2a2a] text-white border border-[#555] border-r-0 px-2.5 py-1.5 cursor-pointer text-[13px] rounded-l flex items-center gap-1 h-8 hover:bg-[#333] transition-colors">
                 <span>🔍</span>
-                <span style={{ fontSize: '10px' }}>▼</span>
+                <span className="text-[10px]">▼</span>
               </button>
             </div>
             <input type="text" placeholder="Search albums..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} title="Search your collection" className="bg-[#2a2a2a] text-white border border-[#555] border-l-0 px-3 py-1.5 rounded-r text-[13px] w-[220px] h-8 outline-none" />
