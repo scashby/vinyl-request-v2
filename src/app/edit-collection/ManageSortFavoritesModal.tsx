@@ -243,28 +243,22 @@ export function ManageSortFavoritesModal({
               ))}
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+            <div className="flex-1 overflow-y-auto p-2">
               {localFavorites.map(favorite => (
                 <div
                   key={favorite.id}
-                  style={{
-                    marginBottom: '4px',
-                    border: selectedId === favorite.id ? '2px solid #5BA3D0' : '1px solid #e0e0e0',
-                    borderRadius: '3px',
-                    backgroundColor: selectedId === favorite.id ? '#f0f8ff' : 'white',
-                  }}
+                  className={`mb-1 border rounded transition-colors ${
+                    selectedId === favorite.id 
+                      ? 'border-[#5BA3D0] border-2 bg-[#f0f8ff]' 
+                      : 'border-gray-200 bg-white'
+                  }`}
                 >
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px',
-                  }}>
+                  <div className="flex items-center gap-2 p-2">
                     <input
                       type="radio"
                       checked={selectedId === favorite.id}
                       onChange={() => onSelect(favorite.id)}
-                      style={{ cursor: 'pointer' }}
+                      className="cursor-pointer"
                     />
                     {editingId === favorite.id ? (
                       <input
@@ -277,68 +271,38 @@ export function ManageSortFavoritesModal({
                           if (e.key === 'Escape') setEditingId(null);
                         }}
                         autoFocus
-                        style={{
-                          flex: 1,
-                          padding: '4px 6px',
-                          border: '1px solid #5BA3D0',
-                          borderRadius: '2px',
-                          fontSize: '13px',
-                          color: '#1a1a1a',
-                        }}
+                        className="flex-1 px-1.5 py-1 border border-[#5BA3D0] rounded text-[13px] text-gray-900 outline-none"
                       />
                     ) : (
-                      <span style={{ flex: 1, fontSize: '13px', fontWeight: 500, color: '#1a1a1a' }}>
+                      <span className="flex-1 text-[13px] font-medium text-gray-900">
                         {favorite.name}
                       </span>
                     )}
-                    <div style={{ display: 'flex', gap: '4px' }}>
+                    <div className="flex gap-1">
                       <button
                         onClick={() => handleEdit(favorite)}
                         title="Edit sort fields"
-                        style={{
-                          padding: '4px 8px',
-                          backgroundColor: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                        }}
+                        className="p-1 bg-transparent border-none cursor-pointer text-sm hover:scale-110"
                       >
                         ✏️
                       </button>
                       <button
                         onClick={() => handleRename(favorite.id)}
                         title="Rename"
-                        style={{
-                          padding: '4px 8px',
-                          backgroundColor: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                        }}
+                        className="p-1 bg-transparent border-none cursor-pointer text-sm hover:scale-110"
                       >
                         📝
                       </button>
                       <button
                         onClick={() => handleDelete(favorite.id)}
                         title="Delete"
-                        style={{
-                          padding: '4px 8px',
-                          backgroundColor: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          color: '#ef4444',
-                        }}
+                        className="p-1 bg-transparent border-none cursor-pointer text-sm text-red-500 hover:text-red-600 hover:scale-110"
                       >
                         🗑️
                       </button>
                     </div>
                   </div>
-                  <div style={{
-                    padding: '4px 8px 8px 32px',
-                    fontSize: '11px',
-                    color: '#999',
-                  }}>
+                  <div className="px-2 pb-2 pl-8 text-[11px] text-gray-400">
                     {favorite.fields.map(f => `${f.field} ${f.direction.toUpperCase()}`).join(' | ')}
                   </div>
                 </div>

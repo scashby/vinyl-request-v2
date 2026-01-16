@@ -276,23 +276,16 @@ export function PrintToPDFModal({
         </div>
 
         {/* Content */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            background: 'white',
-            padding: '24px',
-          }}
-        >
-          <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+        <div className="flex-1 overflow-y-auto bg-white p-6">
+          <div className="max-w-[1400px] mx-auto">
             {/* Two Column Layout */}
-            <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: '24px', marginBottom: '24px' }}>
+            <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 mb-6">
               {/* LEFT: Which Albums */}
               <div>
-                <div style={{ fontSize: '16px', fontWeight: 600, color: '#1a1a1a', marginBottom: '12px' }}>
+                <div className="text-base font-semibold text-gray-900 mb-3">
                   Which Albums
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div className="flex flex-col gap-1.5">
                   {[
                     { value: 'all' as const, label: 'All Albums', count: allAlbums.length },
                     { value: 'current' as const, label: 'Current List', count: currentListAlbums.length },
@@ -300,37 +293,21 @@ export function PrintToPDFModal({
                   ].map(option => (
                     <label
                       key={option.value}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '12px 16px',
-                        background: whichAlbums === option.value ? '#E8E8E8' : 'white',
-                        border: '1px solid #D8D8D8',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        color: '#1a1a1a',
-                      }}
+                      className={`flex items-center p-3 px-4 rounded border transition-colors cursor-pointer text-sm ${
+                        whichAlbums === option.value 
+                          ? 'bg-gray-100 border-gray-300' 
+                          : 'bg-white border-gray-200 hover:bg-gray-50'
+                      }`}
                     >
                       <input
                         type="radio"
                         name="whichAlbums"
                         checked={whichAlbums === option.value}
                         onChange={() => setWhichAlbums(option.value)}
-                        style={{ marginRight: '12px' }}
+                        className="mr-3 cursor-pointer accent-blue-500"
                       />
-                      <span style={{ color: '#1a1a1a' }}>{option.label}</span>
-                      <span
-                        style={{
-                          marginLeft: 'auto',
-                          background: '#888',
-                          color: 'white',
-                          padding: '3px 12px',
-                          borderRadius: '12px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                        }}
-                      >
+                      <span className="text-gray-900 font-medium">{option.label}</span>
+                      <span className="ml-auto bg-gray-500 text-white px-3 py-0.5 rounded-full text-xs font-semibold">
                         {option.count}
                       </span>
                     </label>
