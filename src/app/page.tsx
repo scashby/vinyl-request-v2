@@ -12,7 +12,7 @@ export default function Page() {
     <div className="min-h-screen font-sans bg-black">
       <header className="relative z-0 h-screen flex items-center justify-center text-center overflow-hidden">
         <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover -z-10 brightness-[0.4]">
-          <source src="/images/videos/header-video.mp4" type="video/mp4" />
+          <source src="/videos/header-video.mp4" type="video/mp4" />
           Your browser does not support the video tag.
         </video>
 
