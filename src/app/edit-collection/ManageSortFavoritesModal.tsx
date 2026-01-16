@@ -165,7 +165,7 @@ export function ManageSortFavoritesModal({
         }`}
       >
         {/* Header */}
-        <div className="bg-[#FF8C42] text-white px-4 py-3 rounded-t-md flex justify-between items-center">
+        <div className="bg-[#FF8C42] text-white px-4 py-3 rounded-t-md flex justify-between items-center shrink-0">
           <h2 className="m-0 text-base font-semibold">
             Manage Sorting Favorites
           </h2>
@@ -177,70 +177,19 @@ export function ManageSortFavoritesModal({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2">
-              {localFavorites.map(favorite => (
-                <div
-                  key={favorite.id}
-                  className={`mb-1 border rounded transition-colors ${
-                    selectedId === favorite.id 
-                      ? 'border-[#5BA3D0] border-2 bg-[#f0f8ff]' 
-                      : 'border-gray-200 bg-white'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 p-2">
-                    <input
-                      type="radio"
-                      checked={selectedId === favorite.id}
-                      onChange={() => onSelect(favorite.id)}
-                      className="cursor-pointer"
-                    />
-                    {editingId === favorite.id ? (
-                      <input
-                        type="text"
-                        value={editingName}
-                        onChange={(e) => setEditingName(e.target.value)}
-                        onBlur={handleSaveRename}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveRename();
-                          if (e.key === 'Escape') setEditingId(null);
-                        }}
-                        autoFocus
-                        className="flex-1 px-1.5 py-1 border border-[#5BA3D0] rounded text-[13px] text-gray-900 outline-none"
-                      />
-                    ) : (
-                      <span className="flex-1 text-[13px] font-medium text-gray-900">
-                        {favorite.name}
-                      </span>
-                    )}
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => handleEdit(favorite)}
-                        title="Edit sort fields"
-                        className="p-1 bg-transparent border-none cursor-pointer text-sm hover:scale-110"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => handleRename(favorite.id)}
-                        title="Rename"
-                        className="p-1 bg-transparent border-none cursor-pointer text-sm hover:scale-110"
-                      >
-                        📝
-                      </button>
-                      <button
-                        onClick={() => handleDelete(favorite.id)}
-                        title="Delete"
-                        className="p-1 bg-transparent border-none cursor-pointer text-sm text-red-500 hover:text-red-600 hover:scale-110"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-                  <div className="px-2 pb-2 pl-8 text-[11px] text-gray-400">
-                    {favorite.fields.map(f => `${f.field} ${f.direction.toUpperCase()}`).join(' | ')}
-                  </div>
-                </div>
-              ))}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Favorites List */}
+          <div className={`flex flex-col ${
+            showSortSelector ? 'w-[280px] border-r border-gray-200' : 'w-full'
+          }`}>
+            <div className="p-4 border-b border-gray-200">
+              <button
+                onClick={handleAddNew}
+                className="w-full px-3 py-2 bg-[#5BA3D0] text-white border-none rounded text-[13px] font-semibold cursor-pointer flex items-center justify-center gap-1.5 hover:bg-[#4a8eb8] transition-colors"
+              >
+                <span className="text-base">+</span>
+                <span>New Favorite</span>
+              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-2">
@@ -312,7 +261,7 @@ export function ManageSortFavoritesModal({
 
           {/* Sort Field Selector */}
           {showSortSelector && selectedFavoriteForEdit && (
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col border-l border-gray-200">
               <div className="p-4 border-b border-gray-200">
                 <h3 className="m-0 mb-3 text-sm font-semibold text-gray-800">
                   Select Sort Fields for: {selectedFavoriteForEdit.name}
@@ -328,7 +277,7 @@ export function ManageSortFavoritesModal({
 
               <div className="flex-1 flex gap-3 p-3 overflow-hidden">
                 {/* Available Fields */}
-                <div style={{ flex: 1, overflowY: 'auto', borderRight: '1px solid #e0e0e0', paddingRight: '12px' }}>
+                <div className="flex-1 overflow-y-auto pr-3 border-r border-gray-200">
                   {Object.entries(SORT_FIELDS).map(([groupName, fields]) => {
                     const isExpanded = expandedGroups.has(groupName);
                     const filteredFields = searchQuery
@@ -338,67 +287,34 @@ export function ManageSortFavoritesModal({
                     if (filteredFields.length === 0) return null;
 
                     return (
-                      <div key={groupName} style={{ marginBottom: '4px' }}>
+                      <div key={groupName} className="mb-1">
                         <button
                           onClick={() => toggleGroup(groupName)}
-                          style={{
-                            width: '100%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '8px 12px',
-                            background: '#2C2C2C',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            textAlign: 'left',
-                          }}
+                          className="w-full flex items-center gap-2 p-2 bg-[#2C2C2C] text-white border-none rounded cursor-pointer text-[13px] font-semibold text-left hover:bg-[#3a3a3a]"
                         >
-                          <span style={{
-                            fontSize: '10px',
-                            transition: 'transform 0.2s',
-                            transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)'
-                          }}>
+                          <span className={`text-[10px] transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}>
                             ▶
                           </span>
                           <span>{groupName}</span>
                         </button>
 
                         {isExpanded && (
-                          <div style={{ paddingLeft: '12px', paddingTop: '4px' }}>
+                          <div className="pl-3 pt-1">
                             {filteredFields.map(field => {
                               const isSelected = selectedFavoriteForEdit.fields.some(f => f.field === field);
 
                               return (
                                 <label
                                   key={field}
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    padding: '6px 8px',
-                                    cursor: 'pointer',
-                                    fontSize: '13px',
-                                    borderRadius: '3px',
-                                    marginBottom: '2px',
-                                    color: '#1a1a1a',
-                                    backgroundColor: isSelected ? '#f0f0f0' : 'transparent',
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    if (!isSelected) e.currentTarget.style.background = '#f5f5f5';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    if (!isSelected) e.currentTarget.style.background = 'transparent';
-                                  }}
+                                  className={`flex items-center gap-2 px-2 py-1.5 cursor-pointer text-[13px] rounded mb-0.5 text-gray-900 transition-colors ${
+                                    isSelected ? 'bg-gray-100' : 'hover:bg-gray-50'
+                                  }`}
                                 >
                                   <input
                                     type="checkbox"
                                     checked={isSelected}
                                     onChange={() => toggleField(field)}
-                                    style={{ cursor: 'pointer' }}
+                                    className="cursor-pointer accent-blue-500"
                                   />
                                   <span>{field}</span>
                                 </label>
@@ -442,20 +358,10 @@ export function ManageSortFavoritesModal({
                 </div>
               </div>
 
-              <div style={{ padding: '16px', borderTop: '1px solid #e0e0e0' }}>
+              <div className="p-4 border-t border-gray-200">
                 <button
                   onClick={() => handleSaveSortFields(selectedFavoriteForEdit.fields)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    backgroundColor: '#5BA3D0',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '3px',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
+                  className="w-full py-2 bg-[#5BA3D0] text-white border-none rounded text-[13px] font-semibold cursor-pointer hover:bg-[#4a8eb8] transition-colors"
                 >
                   Save Sort Fields
                 </button>
@@ -465,24 +371,10 @@ export function ManageSortFavoritesModal({
         </div>
 
         {/* Footer */}
-        <div style={{
-          padding: '16px',
-          borderTop: '1px solid #e0e0e0',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: '8px',
-        }}>
+        <div className="p-4 border-t border-gray-200 flex justify-end gap-2 shrink-0">
           <button
             onClick={onClose}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#f0f0f0',
-              border: '1px solid #d0d0d0',
-              borderRadius: '3px',
-              fontSize: '13px',
-              cursor: 'pointer',
-              color: '#1a1a1a',
-            }}
+            className="px-4 py-2 bg-gray-100 border border-gray-200 rounded text-[13px] cursor-pointer text-gray-800 hover:bg-gray-200"
           >
             Cancel
           </button>
@@ -490,16 +382,7 @@ export function ManageSortFavoritesModal({
             onClick={() => {
               onSave(localFavorites);
             }}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#5BA3D0',
-              color: 'white',
-              border: 'none',
-              borderRadius: '3px',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
+            className="px-4 py-2 bg-[#5BA3D0] text-white border-none rounded text-[13px] font-semibold cursor-pointer hover:bg-[#4a8eb8] transition-colors"
           >
             Close
           </button>

@@ -316,46 +316,25 @@ export function PrintToPDFModal({
               </div>
 
               {/* RIGHT: Visible Columns + Sort Order */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div className="flex flex-col gap-6">
                 {/* Visible Columns */}
                 <div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '12px',
-                    }}
-                  >
-                    <div style={{ fontSize: '16px', fontWeight: 600, color: '#1a1a1a' }}>
+                  <div className="flex justify-between items-center mb-3">
+                    <div className="text-base font-semibold text-gray-900">
                       Visible Columns
                     </div>
                     <button
                       onClick={() => setShowManageColumnFavorites(true)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#0066cc',
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        padding: 0,
-                      }}
+                      className="bg-transparent border-none text-blue-600 text-sm cursor-pointer p-0 hover:underline"
                     >
                       Manage ⋮
                     </button>
                   </div>
-                  <div
-                    style={{
-                      background: 'white',
-                      border: '1px solid #D8D8D8',
-                      borderRadius: '4px',
-                      padding: '16px',
-                    }}
-                  >
-                    <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: '#1a1a1a' }}>
+                  <div className="bg-white border border-gray-200 rounded p-4 shadow-sm">
+                    <div className="text-[13px] font-semibold text-gray-900 mb-1.5">
                       {selectedColumnFavorite?.name || 'My List View columns'}
                     </div>
-                    <div style={{ fontSize: '13px', color: '#666' }}>
+                    <div className="text-[13px] text-gray-500 leading-relaxed">
                       {selectedColumnFavorite?.columns.join(', ') || ''}
                     </div>
                   </div>
@@ -363,45 +342,22 @@ export function PrintToPDFModal({
 
                 {/* Sort Order */}
                 <div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '12px',
-                    }}
-                  >
-                    <div style={{ fontSize: '16px', fontWeight: 600, color: '#1a1a1a' }}>
+                  <div className="flex justify-between items-center mb-3">
+                    <div className="text-base font-semibold text-gray-900">
                       Sort Order
                     </div>
                     <button
                       onClick={() => setShowManageSortFavorites(true)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#0066cc',
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        padding: 0,
-                      }}
+                      className="bg-transparent border-none text-blue-600 text-sm cursor-pointer p-0 hover:underline"
                     >
                       Manage ⋮
                     </button>
                   </div>
-                  <div
-                    style={{
-                      background: 'white',
-                      border: '1px solid #D8D8D8',
-                      borderRadius: '4px',
-                      padding: '16px',
-                      fontSize: '14px',
-                      color: '#1a1a1a',
-                    }}
-                  >
+                  <div className="bg-white border border-gray-200 rounded p-4 text-sm text-gray-900 shadow-sm">
                     {selectedSortFavorite?.fields.map((sf, idx) => (
-                      <span key={idx}>
-                        {idx > 0 && ' | '}
-                        {sf.field} {sf.direction === 'asc' ? '⬆' : '⬇'}
+                      <span key={idx} className="inline-flex items-center">
+                        {idx > 0 && <span className="mx-2 text-gray-300">|</span>}
+                        {sf.field} <span className="ml-1 text-gray-400">{sf.direction === 'asc' ? '⬆' : '⬇'}</span>
                       </span>
                     )) || 'Artist ⬆ | Title ⬆'}
                   </div>
@@ -437,121 +393,122 @@ export function PrintToPDFModal({
                 </button>
               </div>
 
-              <div
-                style={{
-                  background: 'white',
-                  border: '1px solid #D8D8D8',
-                  borderRadius: '4px',
-                  padding: '24px',
-                }}
-              >
-                <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', marginBottom: '20px' }}>
+              <div className="bg-white border border-gray-200 rounded p-6 shadow-sm">
+                <div className="flex flex-col md:flex-row gap-8 items-start mb-5">
                   {/* Layout */}
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#1a1a1a' }}>Layout</div>
-                    <div style={{ display: 'flex', gap: '16px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#1a1a1a' }}>
-                        <input type="radio" checked={layout === 'portrait'} onChange={() => setLayout('portrait')} />
+                  <div className="shrink-0">
+                    <div className="text-[13px] font-semibold text-gray-900 mb-2">Layout</div>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer">
+                        <input type="radio" checked={layout === 'portrait'} onChange={() => setLayout('portrait')} className="accent-blue-500" />
                         Portrait
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#1a1a1a' }}>
-                        <input type="radio" checked={layout === 'landscape'} onChange={() => setLayout('landscape')} />
+                      <label className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer">
+                        <input type="radio" checked={layout === 'landscape'} onChange={() => setLayout('landscape')} className="accent-blue-500" />
                         Landscape
                       </label>
                     </div>
                   </div>
 
                   {/* Title */}
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#1a1a1a' }}>Title</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-semibold text-gray-900 mb-2">Title</div>
                     <input
                       type="text"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
-                      style={{
-                        width: '100%',
-                        maxWidth: '300px',
-                        padding: '6px 10px',
-                        border: '1px solid #D8D8D8',
-                        borderRadius: '4px',
-                        fontSize: '14px',
-                        color: '#1a1a1a',
-                      }}
+                      className="w-full max-w-xs px-2.5 py-1.5 border border-gray-200 rounded text-sm text-gray-900 outline-none focus:border-blue-400 transition-colors"
                     />
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', fontSize: '13px', color: '#1a1a1a' }}>
-                      <input type="checkbox" checked={titleOnEveryPage} onChange={(e) => setTitleOnEveryPage(e.target.checked)} />
+                    <label className="flex items-center gap-2 mt-2 text-[13px] text-gray-600 cursor-pointer">
+                      <input type="checkbox" checked={titleOnEveryPage} onChange={(e) => setTitleOnEveryPage(e.target.checked)} className="accent-blue-500" />
                       on every page
                     </label>
                   </div>
 
                   {/* Right checkboxes */}
-                  <div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#1a1a1a', marginBottom: '8px' }}>
-                      <input type="checkbox" checked={wrapInsideColumn} onChange={(e) => setWrapInsideColumn(e.target.checked)} />
+                  <div className="shrink-0 space-y-2 pt-1">
+                    <label className="flex items-center gap-2 text-[13px] text-gray-900 cursor-pointer">
+                      <input type="checkbox" checked={wrapInsideColumn} onChange={(e) => setWrapInsideColumn(e.target.checked)} className="accent-blue-500" />
                       Wrap inside column
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#1a1a1a' }}>
-                      <input type="checkbox" checked={coverThumbnails} onChange={(e) => setCoverThumbnails(e.target.checked)} />
+                    <label className="flex items-center gap-2 text-[13px] text-gray-900 cursor-pointer">
+                      <input type="checkbox" checked={coverThumbnails} onChange={(e) => setCoverThumbnails(e.target.checked)} className="accent-blue-500" />
                       Cover thumbnails
                     </label>
                   </div>
                 </div>
 
                 {showMoreSettings && (
-                  <div style={{ display: 'flex', gap: '32px', flexWrap: 'wrap', paddingTop: '20px', borderTop: '1px solid #E8E8E8' }}>
-                    <div style={{ flex: '0 0 auto', minWidth: '150px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#1a1a1a' }}>Margins</div>
-                      <select value={margins} onChange={(e) => setMargins(e.target.value)} style={{ width: '100%', padding: '6px 10px', border: '1px solid #D8D8D8', borderRadius: '4px', fontSize: '14px', background: 'white', color: '#1a1a1a' }}>
+                  <div className="flex gap-8 flex-wrap pt-5 border-t border-gray-100">
+                    <div className="w-[150px]">
+                      <div className="text-[13px] font-semibold text-gray-900 mb-2">Margins</div>
+                      <select value={margins} onChange={(e) => setMargins(e.target.value)} className="w-full px-2.5 py-1.5 border border-gray-200 rounded text-sm text-gray-900 bg-white outline-none focus:border-blue-400 transition-colors cursor-pointer">
                         {['Small', 'Medium', 'Large'].map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
                     </div>
 
-                    <div style={{ flex: '0 0 auto', minWidth: '150px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#1a1a1a' }}>Font type:</div>
-                      <select value={fontType} onChange={(e) => setFontType(e.target.value)} style={{ width: '100%', padding: '6px 10px', border: '1px solid #D8D8D8', borderRadius: '4px', fontSize: '14px', background: 'white', color: '#1a1a1a' }}>
+                    <div className="w-[150px]">
+                      <div className="text-[13px] font-semibold text-gray-900 mb-2">Font type:</div>
+                      <select value={fontType} onChange={(e) => setFontType(e.target.value)} className="w-full px-2.5 py-1.5 border border-gray-200 rounded text-sm text-gray-900 bg-white outline-none focus:border-blue-400 transition-colors cursor-pointer">
                         {['Arial', 'Helvetica', 'Times'].map(f => <option key={f} value={f}>{f}</option>)}
                       </select>
                     </div>
 
-                    <div style={{ flex: '0 0 auto', minWidth: '100px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#1a1a1a' }}>Font size:</div>
-                      <select value={fontSize} onChange={(e) => setFontSize(e.target.value)} style={{ width: '100%', padding: '6px 10px', border: '1px solid #D8D8D8', borderRadius: '4px', fontSize: '14px', background: 'white', color: '#1a1a1a' }}>
+                    <div className="w-[100px]">
+                      <div className="text-[13px] font-semibold text-gray-900 mb-2">Font size:</div>
+                      <select value={fontSize} onChange={(e) => setFontSize(e.target.value)} className="w-full px-2.5 py-1.5 border border-gray-200 rounded text-sm text-gray-900 bg-white outline-none focus:border-blue-400 transition-colors cursor-pointer">
                         {['8', '9', '10', '11', '12'].map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
 
-                    <div style={{ flex: '0 0 auto' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#1a1a1a' }}>Color:</div>
-                      <input type="color" value={fontColor} onChange={(e) => setFontColor(e.target.value)} style={{ width: '70px', height: '38px', border: '1px solid #D8D8D8', borderRadius: '4px', cursor: 'pointer' }} />
+                    <div className="w-[70px]">
+                      <div className="text-[13px] font-semibold text-gray-900 mb-2">Color:</div>
+                      <input type="color" value={fontColor} onChange={(e) => setFontColor(e.target.value)} className="w-full h-9 border border-gray-200 rounded p-1 cursor-pointer" />
                     </div>
 
-                    <div style={{ flex: '1', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#1a1a1a' }}>
-                        <input type="checkbox" checked={columnFieldNames} onChange={(e) => setColumnFieldNames(e.target.checked)} />
+                    <div className="flex-1 space-y-2 pt-1 min-w-[180px]">
+                      <label className="flex items-center gap-2 text-[13px] text-gray-900 cursor-pointer">
+                        <input type="checkbox" checked={columnFieldNames} onChange={(e) => setColumnFieldNames(e.target.checked)} className="accent-blue-500" />
                         Column field names
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', marginLeft: '22px', color: '#1a1a1a' }}>
-                        <input type="checkbox" checked={columnFieldNamesEveryPage} onChange={(e) => setColumnFieldNamesEveryPage(e.target.checked)} disabled={!columnFieldNames} />
+                      <label className={`flex items-center gap-2 text-[13px] text-gray-600 ml-5 cursor-pointer ${!columnFieldNames ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                        <input type="checkbox" checked={columnFieldNamesEveryPage} onChange={(e) => setColumnFieldNamesEveryPage(e.target.checked)} disabled={!columnFieldNames} className="accent-blue-500" />
                         on every page
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#1a1a1a' }}>
-                        <input type="checkbox" checked={rowShading} onChange={(e) => setRowShading(e.target.checked)} />
+                      <label className="flex items-center gap-2 text-[13px] text-gray-900 cursor-pointer">
+                        <input type="checkbox" checked={rowShading} onChange={(e) => setRowShading(e.target.checked)} className="accent-blue-500" />
                         Row shading
                       </label>
                     </div>
 
-                    <div style={{ flex: '0 0 auto' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#1a1a1a' }}>Borders</div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                    <div className="shrink-0 pt-1">
+                      <div className="text-[13px] font-semibold text-gray-900 mb-3">Borders</div>
+                      <div className="flex gap-4">
                         {(['none', 'middle', 'outside', 'all'] as const).map((borderType) => (
-                          <label key={borderType} style={{ textAlign: 'center', cursor: 'pointer' }}>
-                            <div style={{ width: '44px', height: '44px', border: '2px solid #ccc', borderRadius: '4px', marginBottom: '4px', background: borders === borderType ? '#e3f2fd' : 'white', display: borderType === 'middle' ? 'flex' : borderType === 'all' ? 'grid' : 'block', flexDirection: 'column', justifyContent: 'space-evenly', gridTemplateColumns: borderType === 'all' ? '1fr 1fr' : undefined, gridTemplateRows: borderType === 'all' ? '1fr 1fr' : undefined, gap: borderType === 'all' ? '2px' : undefined, padding: '6px' }}>
-                              {borderType === 'middle' && <><div style={{ borderBottom: '1px solid #666', height: '5px' }} /><div style={{ borderBottom: '1px solid #666', height: '5px' }} /><div style={{ borderBottom: '1px solid #666', height: '5px' }} /></>}
-                              {borderType === 'outside' && <div style={{ border: '2px solid #666', width: '100%', height: '100%' }} />}
-                              {borderType === 'all' && <><div style={{ border: '1px solid #666' }} /><div style={{ border: '1px solid #666' }} /><div style={{ border: '1px solid #666' }} /><div style={{ border: '1px solid #666' }} /></>}
+                          <label key={borderType} className="flex flex-col items-center cursor-pointer group">
+                            <div className={`w-11 h-11 border-2 rounded mb-1.5 transition-colors flex items-center justify-center p-1 ${
+                              borders === borderType ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white group-hover:border-gray-300'
+                            }`}>
+                              {borderType === 'middle' && (
+                                <div className="w-full flex flex-col gap-1.5">
+                                  <div className="border-b border-gray-400 h-px w-full" />
+                                  <div className="border-b border-gray-400 h-px w-full" />
+                                  <div className="border-b border-gray-400 h-px w-full" />
+                                </div>
+                              )}
+                              {borderType === 'outside' && <div className="border-2 border-gray-400 w-full h-full" />}
+                              {borderType === 'all' && (
+                                <div className="grid grid-cols-2 grid-rows-2 gap-0.5 w-full h-full">
+                                  <div className="border border-gray-400" /><div className="border border-gray-400" />
+                                  <div className="border border-gray-400" /><div className="border border-gray-400" />
+                                </div>
+                              )}
+                              {borderType === 'none' && <div className="text-gray-300 text-xs">/</div>}
                             </div>
-                            <input type="radio" name="borders" checked={borders === borderType} onChange={() => setBorders(borderType)} />
-                            <div style={{ fontSize: '10px', color: '#1a1a1a', marginTop: '2px' }}>{borderType.charAt(0).toUpperCase() + borderType.slice(1)}</div>
+                            <input type="radio" name="borders" checked={borders === borderType} onChange={() => setBorders(borderType)} className="sr-only" />
+                            <div className={`text-[10px] font-medium ${borders === borderType ? 'text-blue-600' : 'text-gray-500'}`}>
+                              {borderType.charAt(0).toUpperCase() + borderType.slice(1)}
+                            </div>
                           </label>
                         ))}
                       </div>
@@ -559,23 +516,23 @@ export function PrintToPDFModal({
                   </div>
                 )}
 
-                <div style={{ display: 'flex', gap: '24px', marginTop: '16px', flexWrap: 'wrap' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#1a1a1a' }}>
-                    <input type="checkbox" checked={maxAlbumsEnabled} onChange={(e) => setMaxAlbumsEnabled(e.target.checked)} />
-                    Max albums per page:
-                    <input type="number" value={maxAlbumsPerPage} onChange={(e) => setMaxAlbumsPerPage(e.target.value)} disabled={!maxAlbumsEnabled} style={{ width: '60px', padding: '4px 8px', border: '1px solid #D8D8D8', borderRadius: '4px', fontSize: '13px', marginLeft: '4px', color: '#1a1a1a' }} />
+                <div className="flex gap-8 mt-5 flex-wrap items-center">
+                  <label className="flex items-center gap-2 text-[13px] text-gray-900 cursor-pointer">
+                    <input type="checkbox" checked={maxAlbumsEnabled} onChange={(e) => setMaxAlbumsEnabled(e.target.checked)} className="accent-blue-500" />
+                    <span>Max albums per page:</span>
+                    <input type="number" value={maxAlbumsPerPage} onChange={(e) => setMaxAlbumsPerPage(e.target.value)} disabled={!maxAlbumsEnabled} className="w-16 px-2 py-1 border border-gray-200 rounded text-[13px] text-gray-900 outline-none focus:border-blue-400 disabled:opacity-50 disabled:bg-gray-50 transition-colors" />
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#1a1a1a' }}>
-                    <input type="checkbox" checked={pageNumbers} onChange={(e) => setPageNumbers(e.target.checked)} />
+                  <label className="flex items-center gap-2 text-[13px] text-gray-900 cursor-pointer">
+                    <input type="checkbox" checked={pageNumbers} onChange={(e) => setPageNumbers(e.target.checked)} className="accent-blue-500" />
                     Page numbers
                   </label>
-                  <div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#1a1a1a' }}>
-                      <input type="checkbox" checked={printDateTime} onChange={(e) => setPrintDateTime(e.target.checked)} />
+                  <div className="flex gap-6 items-center">
+                    <label className="flex items-center gap-2 text-[13px] text-gray-900 cursor-pointer">
+                      <input type="checkbox" checked={printDateTime} onChange={(e) => setPrintDateTime(e.target.checked)} className="accent-blue-500" />
                       Print date/time
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', marginLeft: '22px', marginTop: '4px', color: '#1a1a1a' }}>
-                      <input type="checkbox" checked={printDateTimeEveryPage} onChange={(e) => setPrintDateTimeEveryPage(e.target.checked)} disabled={!printDateTime} />
+                    <label className={`flex items-center gap-2 text-[13px] text-gray-600 cursor-pointer ${!printDateTime ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                      <input type="checkbox" checked={printDateTimeEveryPage} onChange={(e) => setPrintDateTimeEveryPage(e.target.checked)} disabled={!printDateTime} className="accent-blue-500" />
                       on every page
                     </label>
                   </div>
@@ -584,28 +541,28 @@ export function PrintToPDFModal({
             </div>
 
             {/* Preview */}
-            <div style={{ marginBottom: '24px' }}>
-              <div style={{ fontSize: '16px', fontWeight: 600, color: '#1a1a1a', marginBottom: '12px' }}>Preview</div>
-              <div style={{ background: '#4A4A4A', border: '1px solid #D8D8D8', borderRadius: '4px', padding: '40px', textAlign: 'center', minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ background: 'white', width: '600px', minHeight: '800px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', padding: '40px 30px', textAlign: 'left' }}>
-                  <div style={{ fontSize: '20px', fontWeight: 600, marginBottom: '20px', textAlign: 'center', color: '#1a1a1a' }}>{title}</div>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+            <div className="mb-6">
+              <div className="text-base font-semibold text-gray-900 mb-3">Preview</div>
+              <div className="bg-[#4A4A4A] border border-gray-300 rounded-lg p-10 flex items-center justify-center min-h-[500px] shadow-inner">
+                <div className="bg-white w-[600px] min-h-[800px] shadow-2xl p-10 text-left scale-90 md:scale-100 origin-center transition-transform">
+                  <div className="text-xl font-bold mb-6 text-center text-gray-900 tracking-tight">{title}</div>
+                  <table className="w-full border-collapse text-[11px]">
                     <thead>
-                      <tr style={{ borderBottom: '2px solid #333' }}>
+                      <tr className="border-b-2 border-gray-900">
                         {(selectedColumnFavorite?.columns || []).slice(0, 6).map(col => (
-                          <th key={col} style={{ textAlign: 'left', padding: '8px 4px', fontWeight: 600, color: '#1a1a1a' }}>{col}</th>
+                          <th key={col} className="text-left py-2 px-1 font-bold text-gray-900">{col}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {currentListAlbums.slice(0, maxAlbumsEnabled ? parseInt(maxAlbumsPerPage) || 10 : 10).map((album, idx) => (
-                        <tr key={album.id} style={{ borderBottom: '1px solid #ddd', background: rowShading && idx % 2 === 1 ? '#f5f5f5' : 'white' }}>
-                          <td style={{ padding: '6px 4px', color: '#1a1a1a' }}>{album.artist}</td>
-                          <td style={{ padding: '6px 4px', color: '#1a1a1a' }}>{album.title}</td>
-                          <td style={{ padding: '6px 4px', color: '#1a1a1a' }}>{album.year || '—'}</td>
-                          <td style={{ padding: '6px 4px', color: '#1a1a1a' }}>{album.format || '—'}</td>
-                          <td style={{ padding: '6px 4px', color: '#1a1a1a' }}>{album.discs || '—'}</td>
-                          <td style={{ padding: '6px 4px', color: '#1a1a1a' }}>{album.tracks?.filter(t => t.type === 'track').length || '—'}</td>
+                        <tr key={album.id} className={`border-b border-gray-200 ${rowShading && idx % 2 === 1 ? 'bg-gray-50' : 'bg-white'}`}>
+                          <td className="py-2 px-1 text-gray-900 truncate">{album.artist}</td>
+                          <td className="py-2 px-1 text-gray-900 truncate">{album.title}</td>
+                          <td className="py-2 px-1 text-gray-800">{album.year || '—'}</td>
+                          <td className="py-2 px-1 text-gray-800">{album.format || '—'}</td>
+                          <td className="py-2 px-1 text-gray-800">{album.discs || '—'}</td>
+                          <td className="py-2 px-1 text-gray-800">{album.tracks?.filter(t => t.type === 'track').length || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -615,10 +572,10 @@ export function PrintToPDFModal({
             </div>
 
             {/* Generate Button */}
-            <div style={{ textAlign: 'center', paddingBottom: '40px' }}>
+            <div className="text-center pb-10">
               <button 
                 onClick={generatePDF}
-                style={{ background: '#4FC3F7', color: 'white', border: 'none', padding: '12px 40px', borderRadius: '4px', fontSize: '15px', fontWeight: 500, cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}
+                className="bg-[#4FC3F7] hover:bg-[#3fb0e3] text-white border-none px-10 py-3 rounded text-[15px] font-semibold cursor-pointer shadow-md hover:shadow-lg transition-all active:scale-95"
               >
                 Generate PDF file
               </button>
