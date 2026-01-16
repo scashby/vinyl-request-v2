@@ -401,57 +401,21 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
           </div>
 
           {/* Toolbar */}
-          <div 
-            style={{ 
-              padding: '12px 16px', 
-              borderBottom: '1px solid #e5e7eb', 
-              display: 'flex', 
-              alignItems: 'center', 
-              backgroundColor: 'white',
-              gap: '12px'
-            }}
-          >
-            <div style={{ flex: '0 0 35%', position: 'relative' }}>
+          <div className="px-4 py-3 border-b border-gray-200 flex items-center bg-white gap-3">
+            <div className="w-[35%] relative">
               <input
                 type="text"
                 placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ 
-                  width: '100%', 
-                  padding: '6px 10px', 
-                  border: '1px solid #d1d5db', 
-                  borderRadius: '4px', 
-                  fontSize: '13px', 
-                  outline: 'none', 
-                  backgroundColor: 'white', 
-                  color: '#111827',
-                  boxSizing: 'border-box'
-                }}
+                className="w-full px-2.5 py-1.5 border border-gray-300 rounded text-[13px] outline-none bg-white text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
             </div>
 
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <div className="flex-1 flex justify-center items-center">
                {selectedList && (
-                <div style={{ 
-                  backgroundColor: '#f3f4f6', 
-                  padding: '4px 12px', 
-                  borderRadius: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '12px',
-                  color: '#4b5563',
-                  border: '1px solid #e5e7eb'
-                }}>
-                  <span style={{ 
-                    backgroundColor: 'black', 
-                    color: 'white', 
-                    padding: '1px 6px', 
-                    borderRadius: '10px', 
-                    fontWeight: '600',
-                    fontSize: '11px'
-                  }}>
+                <div className="bg-gray-100 px-3 py-1 rounded flex items-center gap-1.5 text-xs text-gray-600 border border-gray-200">
+                  <span className="bg-black text-white px-1.5 py-px rounded-full font-bold text-[10px]">
                     {filteredItems.length}
                   </span>
                   <span>{config?.label}s</span>
@@ -460,22 +424,11 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
             </div>
 
             {!hideListSelector && (
-              <div style={{ flex: '0 0 35%' }}>
+              <div className="w-[35%]">
                 <select
                   value={selectedList}
                   onChange={(e) => setSelectedList(e.target.value)}
-                  style={{ 
-                    width: '100%', 
-                    padding: '6px 10px', 
-                    border: '1px solid #d1d5db', 
-                    borderRadius: '4px', 
-                    fontSize: '13px', 
-                    outline: 'none', 
-                    backgroundColor: 'white', 
-                    cursor: 'pointer', 
-                    color: '#111827',
-                    boxSizing: 'border-box'
-                  }}
+                  className="w-full px-2.5 py-1.5 border border-gray-300 rounded text-[13px] outline-none bg-white cursor-pointer text-gray-900 focus:border-blue-500"
                 >
                   <option value="">Select a list...</option>
                   {Object.entries(PICK_LIST_CONFIGS).sort((a, b) => a[1].label.localeCompare(b[1].label)).map(([key, cfg]) => (
@@ -484,7 +437,7 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
                 </select>
               </div>
             )}
-            {hideListSelector && <div style={{ flex: '0 0 35%' }} />}
+            {hideListSelector && <div className="w-[35%]" />}
           </div>
 
           {/* Table Content */}
@@ -599,62 +552,43 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
           </div>
 
           {/* Footer */}
-          <div style={{ 
-            padding: '12px 16px', 
-            borderTop: '1px solid #e5e7eb', 
-            backgroundColor: 'white', 
-            borderBottomLeftRadius: '8px', 
-            borderBottomRightRadius: '8px',
-            height: '50px',
-            display: 'flex',
-            alignItems: 'center'
-          }}>
+          <div className="px-4 py-3 border-t border-gray-200 bg-white rounded-b-lg h-[50px] flex items-center">
             {!mergeMode ? (
-              <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end' }}>
+              <div className="w-full flex justify-end">
                 {config?.allowMerge && (
                   <button
                     onClick={() => { setMergeMode(true); setSelectedItems(new Set()); }}
                     disabled={!selectedList}
-                    style={{ 
-                      padding: '6px 16px', 
-                      background: !selectedList ? '#f3f4f6' : '#e5e7eb', 
-                      color: !selectedList ? '#9ca3af' : '#374151', 
-                      border: 'none', 
-                      borderRadius: '4px', 
-                      fontSize: '13px', 
-                      fontWeight: '500', 
-                      cursor: !selectedList ? 'not-allowed' : 'pointer' 
-                    }}
+                    className={`px-4 py-1.5 border-none rounded text-[13px] font-medium transition-colors ${
+                      !selectedList 
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                        : 'bg-gray-200 text-gray-700 cursor-pointer hover:bg-gray-300'
+                    }`}
                   >
                     Merge Mode
                   </button>
                 )}
               </div>
             ) : (
-              <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '13px', color: '#6b7280', fontWeight: '500' }}>
+              <div className="w-full flex justify-between items-center">
+                <span className="text-[13px] font-medium text-gray-500">
                   {selectedItems.size > 0 ? `${selectedItems.size} selected...` : 'Select items to merge...'}
                 </span>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div className="flex gap-2">
                   <button
                     onClick={() => { setMergeMode(false); setSelectedItems(new Set()); }}
-                    style={{ padding: '6px 16px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}
+                    className="px-4 py-1.5 bg-gray-200 text-gray-700 border-none rounded text-[13px] font-medium cursor-pointer hover:bg-gray-300"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleOpenMergeModal}
                     disabled={selectedItems.size < 2}
-                    style={{ 
-                      padding: '6px 16px', 
-                      background: selectedItems.size >= 2 ? '#3b82f6' : '#d1d5db', 
-                      color: 'white', 
-                      border: 'none', 
-                      borderRadius: '4px', 
-                      fontSize: '13px', 
-                      fontWeight: '600', 
-                      cursor: selectedItems.size >= 2 ? 'pointer' : 'not-allowed' 
-                    }}
+                    className={`px-4 py-1.5 border-none rounded text-[13px] font-semibold text-white transition-colors ${
+                      selectedItems.size >= 2 
+                        ? 'bg-blue-500 cursor-pointer hover:bg-blue-600' 
+                        : 'bg-gray-300 cursor-not-allowed'
+                    }`}
                   >
                     Merge to
                   </button>
