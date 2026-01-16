@@ -45,7 +45,8 @@ function BrowseAlbumsContent() {
   // Helper function to format date
   const formatDate = (dateString) => {
     if (!dateString || dateString === '9999-12-31') return '';
-    const date = new Date(dateString);
+    // Append T00:00:00 to force local time interpretation instead of UTC
+    const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('en-US', { 
       weekday: 'long',
       year: 'numeric', 

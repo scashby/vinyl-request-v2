@@ -114,7 +114,7 @@ function BrowseQueueContent() {
   };
 
   const formatDate = (dateString) =>
-    dateString ? new Date(dateString).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "";
+    dateString ? new Date(dateString + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "";
 
   // Get primary queue type for display
   const queueTypes = eventData?.queue_types || (eventData?.queue_type ? [eventData.queue_type] : ['side']);
