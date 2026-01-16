@@ -28,6 +28,10 @@ function isImageArray(value: unknown): boolean {
   return Array.isArray(value) && value.length > 0 && value.every(v => isImageUrl(v));
 }
 
+function isSimpleArray(value: unknown): boolean {
+  return Array.isArray(value) && value.every(v => typeof v === 'string' || typeof v === 'number');
+}
+
 // --- COMPONENT: Image Grid Selector (For Galleries) ---
 function ImageGridSelector({
   images,
@@ -453,11 +457,11 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                                     selectedImages={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
                                     onToggle={(url) => handleResolve(conflict, url, 'current')}
                                   />
-                                ) : Array.isArray(conflict.current_value) ? (
+                                ) : isSimpleArray(conflict.current_value) ? (
                                   <ArrayChipSelector
                                     label="Current (DB)"
                                     color="green"
-                                    items={conflict.current_value}
+                                    items={conflict.current_value as string[]}
                                     selectedItems={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
                                     onToggle={(val) => handleResolve(conflict, val, 'current')}
                                   />
@@ -486,12 +490,12 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                                             selectedImages={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
                                             onToggle={(url) => handleResolve(conflict, url, source)}
                                           />
-                                        ) : Array.isArray(val) ? (
+                                        ) : isSimpleArray(val) ? (
                                           <ArrayChipSelector
                                             key={source}
                                             label={source}
                                             color="blue"
-                                            items={val}
+                                            items={val as string[]}
                                             selectedItems={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
                                             onToggle={(item) => handleResolve(conflict, item, source)}
                                           />
