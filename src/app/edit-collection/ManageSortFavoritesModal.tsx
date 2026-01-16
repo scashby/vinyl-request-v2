@@ -19,8 +19,6 @@ interface ManageSortFavoritesModalProps {
   onClose: () => void;
   favorites: SortFavorite[];
   onSave: (favorites: SortFavorite[]) => void;
-  selectedId: string;
-  onSelect: (id: string) => void;
 }
 
 const SORT_FIELDS = {
@@ -37,9 +35,7 @@ export function ManageSortFavoritesModal({
   isOpen,
   onClose,
   favorites,
-  onSave,
-  selectedId,
-  onSelect
+  onSave
 }: ManageSortFavoritesModalProps) {
   const [localFavorites, setLocalFavorites] = useState<SortFavorite[]>(favorites);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -190,6 +186,54 @@ export function ManageSortFavoritesModal({
                 <span className="text-base">+</span>
                 <span>New Favorite</span>
               </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {localFavorites.map((fav) => (
+                <div
+                  key={fav.id}
+                  onClick={() => handleEdit(fav)}
+                  className={`flex items-center justify-between p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 group ${
+                    selectedFavoriteForEdit?.id === fav.id ? 'bg-blue-50' : ''
+                  }`}
+                >
+                  {editingId === fav.id ? (
+                    <input
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      onBlur={handleSaveRename}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSaveRename()}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex-1 px-2 py-1 text-[13px] border border-blue-300 rounded outline-none"
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="text-[13px] font-medium text-gray-700">
+                      {fav.name}
+                    </span>
+                  )}
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRename(fav.id);
+                      }}
+                      className="p-1 text-gray-400 hover:text-blue-500 transition-colors"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(fav.id);
+                      }}
+                      className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      🗑
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

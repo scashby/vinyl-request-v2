@@ -427,18 +427,12 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
 
           {/* Package/Sleeve Condition */}
           <div>
-            <label style={labelStyle}>Package/Sleeve Condition</label>
-            <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Package/Sleeve Condition</label>
+            <div className="flex items-stretch">
               <select 
                 value={album.package_sleeve_condition || ''}
                 onChange={(e) => onChange('package_sleeve_condition', e.target.value)}
-                style={{ 
-                  ...selectStyle, 
-                  flex: 1, 
-                  height: '36px',
-                  borderRadius: '4px 0 0 4px',
-                  borderRight: 'none'
-                }}
+                className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
               >
                 <option value="">Select...</option>
                 {packageConditions.map(item => (
@@ -448,20 +442,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
               <button 
                 onClick={() => handleOpenPicker('package_sleeve_condition')}
                 disabled={dataLoading}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  padding: 0,
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0 4px 4px 0',
-                  backgroundColor: 'white',
-                  cursor: dataLoading ? 'wait' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6b7280',
-                  flexShrink: 0,
-                }}
+                className="w-9 h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-wait"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                   <circle cx="1.5" cy="2.5" r="1"/>
@@ -477,18 +458,12 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
 
           {/* Media Condition */}
           <div>
-            <label style={labelStyle}>Media Condition</label>
-            <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Media Condition</label>
+            <div className="flex items-stretch">
               <select 
                 value={album.media_condition || ''}
                 onChange={(e) => onChange('media_condition', e.target.value)}
-                style={{ 
-                  ...selectStyle, 
-                  flex: 1, 
-                  height: '36px',
-                  borderRadius: '4px 0 0 4px',
-                  borderRight: 'none'
-                }}
+                className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
               >
                 <option value="">Select...</option>
                 {mediaConditions.map(item => (
@@ -498,20 +473,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
               <button 
                 onClick={() => handleOpenPicker('media_condition')}
                 disabled={dataLoading}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  padding: 0,
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0 4px 4px 0',
-                  backgroundColor: 'white',
-                  cursor: dataLoading ? 'wait' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6b7280',
-                  flexShrink: 0,
-                }}
+                className="w-9 h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-wait"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                   <circle cx="1.5" cy="2.5" r="1"/>
@@ -527,27 +489,18 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
 
           {/* Studio */}
           <div>
-            <label style={labelStyle}>Studio</label>
-            <div style={{ display: 'flex', gap: '4px' }}>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Studio</label>
+            <div className="flex items-stretch">
               <input
                 type="text"
                 value={album.studio || ''}
                 onChange={(e) => onChange('studio', e.target.value)}
-                style={{ ...inputStyle, flex: 1 }}
+                className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
                 placeholder="Add studio..."
               />
               <button
                 onClick={() => handleOpenPicker('studio')}
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  backgroundColor: 'white',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  color: '#6b7280',
-                  fontWeight: '300',
-                }}
+                className="px-3 py-2 border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 text-base font-light"
               >
                 +
               </button>
@@ -556,18 +509,12 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
 
           {/* Country */}
           <div>
-            <label style={labelStyle}>Country</label>
-            <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Country</label>
+            <div className="flex items-stretch">
               <select 
                 value={album.country || ''}
                 onChange={(e) => onChange('country', e.target.value)}
-                style={{ 
-                  ...selectStyle, 
-                  flex: 1, 
-                  height: '36px',
-                  borderRadius: '4px 0 0 4px',
-                  borderRight: 'none'
-                }}
+                className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
               >
                 <option value="">Select...</option>
                 {countries.map(item => (
@@ -577,20 +524,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
               <button 
                 onClick={() => handleOpenPicker('country')}
                 disabled={dataLoading}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  padding: 0,
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0 4px 4px 0',
-                  backgroundColor: 'white',
-                  cursor: dataLoading ? 'wait' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6b7280',
-                  flexShrink: 0,
-                }}
+                className="w-9 h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-wait"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                   <circle cx="1.5" cy="2.5" r="1"/>
@@ -606,18 +540,12 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
 
           {/* Sound */}
           <div>
-            <label style={labelStyle}>Sound</label>
-            <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Sound</label>
+            <div className="flex items-stretch">
               <select 
                 value={album.sound || ''}
                 onChange={(e) => onChange('sound', e.target.value)}
-                style={{ 
-                  ...selectStyle, 
-                  flex: 1, 
-                  height: '36px',
-                  borderRadius: '4px 0 0 4px',
-                  borderRight: 'none'
-                }}
+                className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
               >
                 <option value="">Select...</option>
                 {sounds.map(item => (
@@ -627,20 +555,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
               <button 
                 onClick={() => handleOpenPicker('sound')}
                 disabled={dataLoading}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  padding: 0,
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0 4px 4px 0',
-                  backgroundColor: 'white',
-                  cursor: dataLoading ? 'wait' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6b7280',
-                  flexShrink: 0,
-                }}
+                className="w-9 h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-wait"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                   <circle cx="1.5" cy="2.5" r="1"/>
@@ -670,37 +585,15 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
 
           {/* Vinyl Color - MULTI-SELECT */}
           <div>
-            <label style={labelStyle}>Vinyl Color</label>
-            <div style={{ display: 'flex', gap: '0', alignItems: 'flex-start' }}>
-              <div style={{
-                flex: 1,
-                padding: '6px 10px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px 0 0 4px',
-                borderRight: 'none',
-                minHeight: '36px',
-                display: 'flex',
-                gap: '6px',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                backgroundColor: 'white',
-                boxSizing: 'border-box',
-              }}>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Vinyl Color</label>
+            <div className="flex items-start">
+              <div className="flex-1 px-2.5 py-1.5 border border-gray-300 rounded-l border-r-0 min-h-[38px] flex flex-wrap gap-1.5 items-center bg-white box-border">
                 {album.vinyl_color && album.vinyl_color.length > 0 ? (
                   <>
                     {album.vinyl_color.map((color, idx) => (
                       <span
                         key={idx}
-                        style={{
-                          backgroundColor: '#e5e7eb',
-                          padding: '4px 10px',
-                          borderRadius: '4px',
-                          fontSize: '13px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          color: '#374151',
-                        }}
+                        className="bg-gray-200 px-2.5 py-1 rounded text-[13px] inline-flex items-center gap-1.5 text-gray-700"
                       >
                         {color}
                         <button
@@ -708,16 +601,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
                             const newColors = album.vinyl_color?.filter((_, i) => i !== idx) || [];
                             onChange('vinyl_color', newColors);
                           }}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#6b7280',
-                            cursor: 'pointer',
-                            padding: 0,
-                            fontSize: '16px',
-                            lineHeight: '1',
-                            fontWeight: '300',
-                          }}
+                          className="bg-transparent border-none text-gray-500 hover:text-red-500 cursor-pointer p-0 text-base leading-none font-light"
                         >
                           ×
                         </button>
@@ -729,21 +613,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
               <button 
                 onClick={() => handleOpenPicker('vinyl_color')}
                 disabled={dataLoading}
-                style={{
-                  width: '36px',
-                  minHeight: '40px',
-                  padding: 0,
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0 4px 4px 0',
-                  backgroundColor: 'white',
-                  cursor: dataLoading ? 'wait' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6b7280',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                }}
+                className="w-9 h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-wait shrink-0 box-border"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                   <circle cx="1.5" cy="2.5" r="1"/>
@@ -759,18 +629,12 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
 
           {/* Vinyl Weight - DROPDOWN */}
           <div>
-            <label style={labelStyle}>Vinyl Weight</label>
-            <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Vinyl Weight</label>
+            <div className="flex items-stretch">
               <select 
                 value={album.vinyl_weight || ''}
                 onChange={(e) => onChange('vinyl_weight', e.target.value)}
-                style={{ 
-                  ...selectStyle, 
-                  flex: 1, 
-                  height: '36px',
-                  borderRadius: '4px 0 0 4px',
-                  borderRight: 'none'
-                }}
+                className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
               >
                 <option value="">Select...</option>
                 {vinylWeights.map(item => (
@@ -780,20 +644,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
               <button 
                 onClick={() => handleOpenPicker('vinyl_weight')}
                 disabled={dataLoading}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  padding: 0,
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0 4px 4px 0',
-                  backgroundColor: 'white',
-                  cursor: dataLoading ? 'wait' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6b7280',
-                  flexShrink: 0,
-                }}
+                className="w-9 h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-wait"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                   <circle cx="1.5" cy="2.5" r="1"/>
@@ -809,23 +660,17 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
 
           {/* RPM */}
           <div>
-            <label style={labelStyle}>RPM</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">RPM</label>
+            <div className="flex gap-2">
               {['N/A', '33', '45', '78'].map((rpm) => (
                 <button
                   key={rpm}
                   onClick={() => onChange('rpm', rpm === 'N/A' ? null : rpm)}
-                  style={{
-                    flex: 1,
-                    padding: '8px',
-                    border: `2px solid ${album.rpm === rpm || (rpm === 'N/A' && !album.rpm) ? '#3b82f6' : '#d1d5db'}`,
-                    borderRadius: '4px',
-                    backgroundColor: album.rpm === rpm || (rpm === 'N/A' && !album.rpm) ? '#eff6ff' : 'white',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: album.rpm === rpm || (rpm === 'N/A' && !album.rpm) ? '#3b82f6' : '#374151',
-                  }}
+                  className={`flex-1 py-2 border-2 rounded text-sm font-medium cursor-pointer ${
+                    album.rpm === rpm || (rpm === 'N/A' && !album.rpm)
+                      ? 'border-blue-500 bg-blue-50 text-blue-500'
+                      : 'border-gray-300 bg-white text-gray-700'
+                  }`}
                 >
                   {rpm}
                 </button>
@@ -835,33 +680,23 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
 
           {/* Extra - NO PICKER BUTTON */}
           <div>
-            <label style={labelStyle}>Extra</label>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Extra</label>
             <textarea
               value={album.extra || ''}
               onChange={(e) => onChange('extra', e.target.value)}
-              style={{
-                ...inputStyle,
-                minHeight: '80px',
-                resize: 'vertical',
-              }}
+              className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500 min-h-[80px] resize-y"
               placeholder="Additional details..."
             />
           </div>
 
           {/* SPARS */}
           <div>
-            <label style={labelStyle}>SPARS</label>
-            <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">SPARS</label>
+            <div className="flex items-stretch">
               <select 
                 value={album.spars_code || ''}
                 onChange={(e) => onChange('spars_code', e.target.value)}
-                style={{ 
-                  ...selectStyle, 
-                  flex: 1, 
-                  height: '36px',
-                  borderRadius: '4px 0 0 4px',
-                  borderRight: 'none'
-                }}
+                className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
               >
                 <option value="">Select...</option>
                 {spars.map(item => (
@@ -871,20 +706,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
               <button 
                 onClick={() => handleOpenPicker('spars_code')}
                 disabled={dataLoading}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  padding: 0,
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0 4px 4px 0',
-                  backgroundColor: 'white',
-                  cursor: dataLoading ? 'wait' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6b7280',
-                  flexShrink: 0,
-                }}
+                className="w-9 h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-wait"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                   <circle cx="1.5" cy="2.5" r="1"/>
@@ -900,18 +722,12 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
 
           {/* Box Set */}
           <div>
-            <label style={labelStyle}>Box Set</label>
-            <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Box Set</label>
+            <div className="flex items-stretch">
               <select 
                 value={album.box_set || ''}
                 onChange={(e) => onChange('box_set', e.target.value)}
-                style={{ 
-                  ...selectStyle, 
-                  flex: 1, 
-                  height: '36px',
-                  borderRadius: '4px 0 0 4px',
-                  borderRight: 'none'
-                }}
+                className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
               >
                 <option value="">Select...</option>
                 {boxSets.map(item => (
@@ -921,20 +737,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
               <button 
                 onClick={() => handleOpenPicker('box_set')}
                 disabled={dataLoading}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  padding: 0,
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0 4px 4px 0',
-                  backgroundColor: 'white',
-                  cursor: dataLoading ? 'wait' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6b7280',
-                  flexShrink: 0,
-                }}
+                className="w-9 h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-wait"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                   <circle cx="1.5" cy="2.5" r="1"/>
@@ -950,33 +753,17 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
 
           {/* Is Live */}
           <div>
-            <label style={labelStyle}>Is Live</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Is Live</label>
+            <div className="flex gap-2">
               {['No', 'Yes'].map((option) => (
                 <button
                   key={option}
                   onClick={() => onChange('is_live', option === 'Yes')}
-                  style={{
-                    flex: 1,
-                    padding: '8px',
-                    border: `2px solid ${
-                      (option === 'Yes' && album.is_live) || (option === 'No' && !album.is_live)
-                        ? '#3b82f6'
-                        : '#d1d5db'
-                    }`,
-                    borderRadius: '4px',
-                    backgroundColor:
-                      (option === 'Yes' && album.is_live) || (option === 'No' && !album.is_live)
-                        ? '#eff6ff'
-                        : 'white',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color:
-                      (option === 'Yes' && album.is_live) || (option === 'No' && !album.is_live)
-                        ? '#3b82f6'
-                        : '#374151',
-                  }}
+                  className={`flex-1 py-2 border-2 rounded text-sm font-medium cursor-pointer ${
+                    (option === 'Yes' && album.is_live) || (option === 'No' && !album.is_live)
+                      ? 'border-blue-500 bg-blue-50 text-blue-500'
+                      : 'border-gray-300 bg-white text-gray-700'
+                  }`}
                 >
                   {option}
                 </button>
@@ -1085,32 +872,32 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
             </div>
 
             {/* Content */}
-            <div style={{ padding: '16px' }}>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={labelStyle}>Name</label>
+            <div className="p-4">
+              <div className="mb-4">
+                <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Name</label>
                 <input
                   type="text"
                   value={boxSetName}
                   onChange={(e) => setBoxSetName(e.target.value)}
-                  style={inputStyle}
+                  className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500"
                   placeholder="Box Set Name"
                 />
               </div>
 
-              <div style={{ marginBottom: '16px' }}>
-                <label style={labelStyle}>Barcode</label>
+              <div className="mb-4">
+                <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Barcode</label>
                 <input
                   type="text"
                   value={boxSetBarcode}
                   onChange={(e) => setBoxSetBarcode(e.target.value)}
-                  style={inputStyle}
+                  className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500"
                   placeholder="Barcode"
                 />
               </div>
 
               <div>
-                <label style={labelStyle}>Release Date</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Release Date</label>
+                <div className="flex gap-2">
                   <input
                     type="text"
                     value={boxSetReleaseDate.year}
@@ -1118,7 +905,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
                       setBoxSetReleaseDate({ ...boxSetReleaseDate, year: e.target.value })
                     }
                     placeholder="YYYY"
-                    style={{ ...inputStyle, textAlign: 'center' }}
+                    className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500 text-center"
                   />
                   <input
                     type="text"
@@ -1127,7 +914,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
                       setBoxSetReleaseDate({ ...boxSetReleaseDate, month: e.target.value })
                     }
                     placeholder="MM"
-                    style={{ ...inputStyle, width: '60px', textAlign: 'center' }}
+                    className="w-[60px] px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500 text-center"
                   />
                   <input
                     type="text"
@@ -1136,7 +923,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
                       setBoxSetReleaseDate({ ...boxSetReleaseDate, day: e.target.value })
                     }
                     placeholder="DD"
-                    style={{ ...inputStyle, width: '60px', textAlign: 'center' }}
+                    className="w-[60px] px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500 text-center"
                   />
                 </div>
               </div>
