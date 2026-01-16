@@ -4,7 +4,7 @@ import Footer from 'components/Footer';
 const InternalLayout = ({ title, children }) => {
   return (
     <div className="w-full">
-      <header className="relative h-[40vh] min-h-[300px] w-full bg-cover bg-center bg-no-repeat bg-[url('/images/hero-bg.jpg')]">
+      <header className="relative h-[40vh] min-h-[300px] w-full bg-cover bg-center bg-no-repeat bg-[url('/images/event-header-still.jpg')]">
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center p-4">
           <h1 className="text-4xl md:text-5xl font-bold text-white text-center drop-shadow-md">
             {title}

@@ -815,7 +815,7 @@ function CollectionBrowserPage() {
         )}
 
         <div className="flex flex-1 overflow-hidden min-h-0">
-          <div className="w-[220px] bg-[#2C2C2C] text-white flex flex-col overflow-hidden border-r border-[#1a1a1a] shrink-0">
+          <div className="hidden md:flex w-[220px] bg-[#2C2C2C] text-white flex-col overflow-hidden border-r border-[#1a1a1a] shrink-0">
             <div className="p-2.5 border-b border-[#1a1a1a] flex justify-between items-center shrink-0">
               <div className="relative">
                 <button onClick={() => setShowFolderModeDropdown(!showFolderModeDropdown)} title="Change view mode" className="bg-[#3a3a3a] text-white border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-xs flex items-center gap-1.5">
