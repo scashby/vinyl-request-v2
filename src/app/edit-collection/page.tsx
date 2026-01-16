@@ -817,7 +817,7 @@ function CollectionBrowserPage() {
         <div className="flex flex-1 overflow-hidden min-h-0">
           <div className="w-[220px] bg-[#2C2C2C] text-white flex flex-col overflow-hidden border-r border-[#1a1a1a] shrink-0">
             <div className="p-2.5 border-b border-[#1a1a1a] flex justify-between items-center shrink-0">
-              <div style={{ position: 'relative' }}>
+              <div className="relative">
                 <button onClick={() => setShowFolderModeDropdown(!showFolderModeDropdown)} title="Change view mode" className="bg-[#3a3a3a] text-white border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-xs flex items-center gap-1.5">
                   <span>{folderMode === 'crates' ? '📦' : '📁'}</span>
                   <span>{folderMode === 'crates' ? 'Crates' : 'Format'}</span>
@@ -903,7 +903,7 @@ function CollectionBrowserPage() {
                   <span style={{ fontSize: '9px' }}>▼</span>
                 </button>
                 
-                <div style={{ position: 'relative' }}>
+                <div className="relative">
                   <button onClick={() => setShowSortDropdown(!showSortDropdown)} title="Change sort order" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
                     <span>↕️</span>
                     <span className="text-[9px]">▼</span>
@@ -946,7 +946,7 @@ function CollectionBrowserPage() {
             </div>
           </div>
 
-          <div className="w-[380px] bg-white border-l border-[#ddd] overflow-auto flex flex-col shrink-0">
+          <div className="hidden lg:flex w-[380px] bg-white border-l border-[#ddd] overflow-auto flex-col shrink-0">
             <div className="px-3 py-1.5 border-b border-[#555] flex items-center justify-between bg-[#4a4a4a] h-10 shrink-0">
               <div className="flex gap-1.5 items-center">
                 <button onClick={() => selectedAlbumId && handleEditAlbum(selectedAlbumId)} title="Edit album details" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-sm text-white">✏️</button>
