@@ -579,6 +579,8 @@ export function PrintToPDFModal({
           setSortFavorites(updated);
           setShowManageSortFavorites(false);
         }}
+        selectedId={selectedSortFavoriteId}
+        onSelect={setSelectedSortFavoriteId}
       />
 
       <ManageColumnFavoritesModal
