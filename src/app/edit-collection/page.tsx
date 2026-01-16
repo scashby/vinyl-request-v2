@@ -64,7 +64,7 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
   const [imageIndex, setImageIndex] = useState(0);
 
   if (!album) {
-    return <div className={styles.infoEmpty}>Select an album to view details</div>;
+    return <div className="py-20 text-center text-gray-400 text-sm italic">Select an album to view details</div>;
   }
 
   const getDiscRuntime = (discNumber: number): string => {
@@ -193,7 +193,7 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
       </div>
 
       <div className="text-[13px] text-[#666] mb-3 font-normal">
-        <span style={{ fontWeight: 600 }}>CAT NO</span> {album.cat_no || '—'}
+        <span className="font-semibold">CAT NO</span> {album.cat_no || '—'}
       </div>
 
       <a href={getEbayUrl()} target="_blank" rel="noopener noreferrer" className="text-[13px] text-[#2196F3] mb-4 block no-underline font-normal hover:underline">
@@ -809,7 +809,7 @@ function CollectionBrowserPage() {
             <button onClick={() => setShowAddToCrateModal(true)} title="Add selected albums to a crate" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">📦 Add to Crate</button>
             <button title="Export selected to PDF" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">🖨 Print to PDF</button>
             <button title="More actions" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">⋮</button>
-            <div style={{ flex: 1 }} />
+            <div className="flex-1" />
             <span className="text-xs font-medium">{selectedAlbumIds.size} of {filteredAndSortedAlbums.length} selected</span>
           </div>
         )}
@@ -821,7 +821,7 @@ function CollectionBrowserPage() {
                 <button onClick={() => setShowFolderModeDropdown(!showFolderModeDropdown)} title="Change view mode" className="bg-[#3a3a3a] text-white border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-xs flex items-center gap-1.5">
                   <span>{folderMode === 'crates' ? '📦' : '📁'}</span>
                   <span>{folderMode === 'crates' ? 'Crates' : 'Format'}</span>
-                  <span style={{ fontSize: '10px' }}>▼</span>
+                  <span className="text-[10px]">▼</span>
                 </button>
 
                 {showFolderModeDropdown && (
@@ -906,7 +906,7 @@ function CollectionBrowserPage() {
                 <div style={{ position: 'relative' }}>
                   <button onClick={() => setShowSortDropdown(!showSortDropdown)} title="Change sort order" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
                     <span>↕️</span>
-                    <span style={{ fontSize: '9px' }}>▼</span>
+                    <span className="text-[9px]">▼</span>
                   </button>
                   
                   {showSortDropdown && (
@@ -919,7 +919,7 @@ function CollectionBrowserPage() {
                             {options.map(opt => (
                               <button key={opt.value} onClick={() => handleSortChange(opt.value)} className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${sortBy === opt.value ? 'bg-[#e3f2fd]' : ''}`}>
                                 <span>{opt.label}</span>
-                                {sortBy === opt.value && <span style={{ color: '#2196F3' }}>✓</span>}
+                                {sortBy === opt.value && <span className="text-[#2196F3]">✓</span>}
                               </button>
                             ))}
                           </div>
@@ -931,7 +931,7 @@ function CollectionBrowserPage() {
                 
                 <button onClick={() => setShowColumnSelector(true)} title="Select visible columns" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
                   <span>⊞</span>
-                  <span style={{ fontSize: '9px' }}>▼</span>
+                  <span className="text-[9px]">▼</span>
                 </button>
               </div>
               <div className="text-xs text-[#ddd] font-semibold">{loading ? 'Loading...' : `${filteredAndSortedAlbums.length} albums`}</div>
@@ -957,7 +957,7 @@ function CollectionBrowserPage() {
               
               <button title="Select visible fields" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
                 <span>⊞</span>
-                <span style={{ fontSize: '9px' }}>▼</span>
+                <span className="text-[9px]">▼</span>
               </button>
             </div>
 
