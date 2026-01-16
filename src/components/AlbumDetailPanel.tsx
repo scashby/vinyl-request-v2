@@ -156,7 +156,7 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
   return (
     <div className="w-full md:w-[380px] h-full bg-white border-l border-gray-200 flex flex-col shrink-0">
       <div className="p-4 border-b border-gray-200 flex items-start gap-3">
-        <Image src={album.image_url || '/images/placeholder.png'} alt={album.title} width={80} height={80} className="rounded-md object-cover shrink-0" unoptimized />
+        <Image src={album.image_url || '/images/coverplaceholder.png'} alt={album.title} width={80} height={80} className="rounded-md object-cover shrink-0" unoptimized />
         <div className="flex-1 min-w-0">
           <h3 className="text-base font-bold text-gray-800 m-0 mb-1 line-clamp-2">
             {album.title}

@@ -589,6 +589,8 @@ export function PrintToPDFModal({
           setColumnFavorites(updated);
           setShowManageColumnFavorites(false);
         }}
+        selectedId={selectedColumnFavoriteId}
+        onSelect={setSelectedColumnFavoriteId}
       />
     </>
   );
