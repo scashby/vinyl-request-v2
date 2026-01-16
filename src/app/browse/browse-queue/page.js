@@ -20,6 +20,11 @@ function BrowseQueueContent() {
   const [showSuggestionBox, setShowSuggestionBox] = useState(false);
 
   const loadEventAndQueue = useCallback(async () => {
+    if (!eventId) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data: event } = await supabase
         .from("events")

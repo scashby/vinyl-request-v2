@@ -85,7 +85,7 @@ export default function DialoguesPage() {
               <div className="bg-white border border-gray-100 rounded-2xl shadow-lg overflow-hidden mb-10 flex flex-col md:flex-row">
                 <div className="md:w-1/2 relative h-64 md:h-auto">
                   <Image
-                    src={extractFirstImg(featured) || "/images/fallback.jpg"}
+                    src={extractFirstImg(featured) || "/images/placeholder.png"}
                     alt={featured.title}
                     fill
                     className="object-cover"
@@ -135,7 +135,7 @@ export default function DialoguesPage() {
                   >
                     <div className="relative h-48 w-full">
                       <Image
-                        src={extractFirstImg(post) || "/images/fallback.jpg"}
+                        src={extractFirstImg(post) || "/images/placeholder.png"}
                         alt={post.title}
                         fill
                         className="object-cover"
