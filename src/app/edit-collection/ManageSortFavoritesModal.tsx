@@ -155,58 +155,23 @@ export function ManageSortFavoritesModal({
     <>
       <div
         onClick={onClose}
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.6)',
-          zIndex: 31000,
-        }}
+        className="fixed inset-0 bg-black/60 z-[31000]"
       />
 
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          backgroundColor: 'white',
-          borderRadius: '4px',
-          width: showSortSelector ? '900px' : '600px',
-          maxHeight: '80vh',
-          display: 'flex',
-          flexDirection: 'column',
-          zIndex: 31001,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-        }}
+        className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-md flex flex-col z-[31001] shadow-xl max-h-[80vh] transition-all duration-200 ${
+          showSortSelector ? 'w-full max-w-[900px]' : 'w-full max-w-[600px]'
+        }`}
       >
         {/* Header */}
-        <div style={{
-          backgroundColor: '#FF8C42',
-          color: 'white',
-          padding: '12px 16px',
-          borderRadius: '4px 4px 0 0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>
+        <div className="bg-[#FF8C42] text-white px-4 py-3 rounded-t-md flex justify-between items-center">
+          <h2 className="m-0 text-base font-semibold">
             Manage Sorting Favorites
           </h2>
           <button
             onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'white',
-              fontSize: '24px',
-              cursor: 'pointer',
-              padding: '0 4px',
-              lineHeight: '1',
-            }}
+            className="bg-transparent border-none text-white text-2xl cursor-pointer p-1 leading-none hover:text-white/80"
           >
             ×
           </button>

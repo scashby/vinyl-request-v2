@@ -257,60 +257,19 @@ export function PrintToPDFModal({
 
   return (
     <>
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'white',
-          zIndex: 10000,
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-        }}
-      >
+      <div className="fixed inset-0 bg-white z-[10000] flex flex-col overflow-hidden">
         {/* Black Header Bar */}
-        <div
-          style={{
-            background: '#2A2A2A',
-            color: 'white',
-            padding: '14px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexShrink: 0,
-          }}
-        >
+        <div className="bg-[#2A2A2A] text-white px-6 py-3.5 flex items-center justify-between shrink-0">
           <button
             onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'white',
-              cursor: 'pointer',
-              fontSize: '15px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: 0,
-            }}
+            className="bg-transparent border-none text-white cursor-pointer text-[15px] flex items-center gap-2 p-0 hover:text-white/80"
           >
             ◀ Back
           </button>
-          <div style={{ fontSize: '16px', fontWeight: 500, color: 'white' }}>Print to PDF</div>
+          <div className="text-base font-medium">Print to PDF</div>
           <button
             onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'white',
-              fontSize: '28px',
-              cursor: 'pointer',
-              lineHeight: '1',
-              padding: 0,
-            }}
+            className="bg-transparent border-none text-white text-3xl cursor-pointer leading-none p-0 hover:text-white/80"
           >
             ×
           </button>

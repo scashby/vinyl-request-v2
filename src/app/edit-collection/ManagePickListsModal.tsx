@@ -401,8 +401,8 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
           </div>
 
           {/* Toolbar */}
-          <div className="px-4 py-3 border-b border-gray-200 flex items-center bg-white gap-3">
-            <div className="w-[35%] relative">
+          <div className="px-4 py-3 border-b border-gray-200 flex flex-col md:flex-row md:items-center bg-white gap-3">
+            <div className="w-full md:w-[35%] relative">
               <input
                 type="text"
                 placeholder="Search..."
@@ -424,7 +424,7 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
             </div>
 
             {!hideListSelector && (
-              <div className="w-[35%]">
+              <div className="w-full md:w-[35%]">
                 <select
                   value={selectedList}
                   onChange={(e) => setSelectedList(e.target.value)}
@@ -437,7 +437,7 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
                 </select>
               </div>
             )}
-            {hideListSelector && <div className="w-[35%]" />}
+            {hideListSelector && <div className="hidden md:block md:w-[35%]" />}
           </div>
 
           {/* Table Content */}

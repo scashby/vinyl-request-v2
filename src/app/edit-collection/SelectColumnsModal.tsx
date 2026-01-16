@@ -53,55 +53,19 @@ export function SelectColumnsModal({ isOpen, onClose, initialColumns, onSave }: 
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 20000,
-      }}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[20000]"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'white',
-          width: '600px',
-          maxHeight: '80vh',
-          display: 'flex',
-          flexDirection: 'column',
-          borderRadius: '8px',
-          overflow: 'hidden',
-        }}
+        className="bg-white w-full max-w-[600px] max-h-[80vh] flex flex-col rounded-lg overflow-hidden shadow-xl"
       >
         {/* Orange Header */}
-        <div
-          style={{
-            background: 'linear-gradient(135deg, #FF8C42 0%, #FF6B35 100%)',
-            color: 'white',
-            padding: '16px 20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div style={{ fontSize: '16px', fontWeight: 600, color: 'white' }}>Select Column Fields</div>
+        <div className="bg-gradient-to-br from-[#FF8C42] to-[#FF6B35] text-white px-5 py-4 flex items-center justify-between">
+          <div className="text-base font-semibold">Select Column Fields</div>
           <button
             onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'white',
-              fontSize: '24px',
-              cursor: 'pointer',
-              lineHeight: '1',
-              padding: 0,
-            }}
+            className="bg-transparent border-none text-white text-2xl cursor-pointer leading-none p-0 hover:text-white/80"
           >
             ×
           </button>
