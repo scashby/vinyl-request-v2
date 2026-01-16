@@ -177,37 +177,70 @@ export function ManageSortFavoritesModal({
           </button>
         </div>
 
-        {/* Content */}
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-          {/* Favorites List */}
-          <div style={{
-            width: showSortSelector ? '280px' : '100%',
-            borderRight: showSortSelector ? '1px solid #e0e0e0' : 'none',
-            display: 'flex',
-            flexDirection: 'column',
-          }}>
-            <div style={{ padding: '16px', borderBottom: '1px solid #e0e0e0' }}>
-              <button
-                onClick={handleAddNew}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  backgroundColor: '#5BA3D0',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '3px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                }}
-              >
-                <span style={{ fontSize: '16px' }}>+</span>
-                <span>New Favorite</span>
-              </button>
+        <div className="flex-1 overflow-y-auto p-2">
+              {localFavorites.map(favorite => (
+                <div
+                  key={favorite.id}
+                  className={`mb-1 border rounded transition-colors ${
+                    selectedId === favorite.id 
+                      ? 'border-[#5BA3D0] border-2 bg-[#f0f8ff]' 
+                      : 'border-gray-200 bg-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 p-2">
+                    <input
+                      type="radio"
+                      checked={selectedId === favorite.id}
+                      onChange={() => onSelect(favorite.id)}
+                      className="cursor-pointer"
+                    />
+                    {editingId === favorite.id ? (
+                      <input
+                        type="text"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onBlur={handleSaveRename}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveRename();
+                          if (e.key === 'Escape') setEditingId(null);
+                        }}
+                        autoFocus
+                        className="flex-1 px-1.5 py-1 border border-[#5BA3D0] rounded text-[13px] text-gray-900 outline-none"
+                      />
+                    ) : (
+                      <span className="flex-1 text-[13px] font-medium text-gray-900">
+                        {favorite.name}
+                      </span>
+                    )}
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handleEdit(favorite)}
+                        title="Edit sort fields"
+                        className="p-1 bg-transparent border-none cursor-pointer text-sm hover:scale-110"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => handleRename(favorite.id)}
+                        title="Rename"
+                        className="p-1 bg-transparent border-none cursor-pointer text-sm hover:scale-110"
+                      >
+                        📝
+                      </button>
+                      <button
+                        onClick={() => handleDelete(favorite.id)}
+                        title="Delete"
+                        className="p-1 bg-transparent border-none cursor-pointer text-sm text-red-500 hover:text-red-600 hover:scale-110"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                  <div className="px-2 pb-2 pl-8 text-[11px] text-gray-400">
+                    {favorite.fields.map(f => `${f.field} ${f.direction.toUpperCase()}`).join(' | ')}
+                  </div>
+                </div>
+              ))}
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
@@ -315,9 +348,9 @@ export function ManageSortFavoritesModal({
 
           {/* Sort Field Selector */}
           {showSortSelector && selectedFavoriteForEdit && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <div style={{ padding: '16px', borderBottom: '1px solid #e0e0e0' }}>
-                <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 600, color: '#333' }}>
+            <div className="flex-1 flex flex-col">
+              <div className="p-4 border-b border-gray-200">
+                <h3 className="m-0 mb-3 text-sm font-semibold text-gray-800">
                   Select Sort Fields for: {selectedFavoriteForEdit.name}
                 </h3>
                 <input
@@ -325,18 +358,11 @@ export function ManageSortFavoritesModal({
                   placeholder="🔍 Search fields..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '6px 10px',
-                    border: '1px solid #D8D8D8',
-                    borderRadius: '4px',
-                    fontSize: '13px',
-                    color: '#1a1a1a',
-                  }}
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded text-[13px] text-gray-900 outline-none focus:border-blue-400 transition-colors"
                 />
               </div>
 
-              <div style={{ flex: 1, display: 'flex', gap: '12px', padding: '12px', overflow: 'hidden' }}>
+              <div className="flex-1 flex gap-3 p-3 overflow-hidden">
                 {/* Available Fields */}
                 <div style={{ flex: 1, overflowY: 'auto', borderRight: '1px solid #e0e0e0', paddingRight: '12px' }}>
                   {Object.entries(SORT_FIELDS).map(([groupName, fields]) => {
@@ -422,53 +448,27 @@ export function ManageSortFavoritesModal({
                 </div>
 
                 {/* Selected Fields */}
-                <div style={{ width: '280px', display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#333' }}>
+                <div className="w-[280px] flex flex-col">
+                  <div className="text-[13px] font-semibold mb-2 text-gray-800">
                     Selected Fields ({selectedFavoriteForEdit.fields.length})
                   </div>
-                  <div style={{ flex: 1, overflowY: 'auto', background: '#f8f8f8', borderRadius: '4px', padding: '8px' }}>
+                  <div className="flex-1 overflow-y-auto bg-gray-50 rounded-md p-2">
                     {selectedFavoriteForEdit.fields.map((sortField, idx) => (
                       <div
                         key={idx}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          marginBottom: '6px',
-                          padding: '8px',
-                          background: 'white',
-                          borderRadius: '4px',
-                          border: '1px solid #D8D8D8',
-                        }}
+                        className="flex items-center gap-2 mb-1.5 p-2 bg-white rounded border border-gray-200 shadow-sm transition-shadow hover:shadow-md"
                       >
-                        <span style={{ fontSize: '16px', color: '#888', cursor: 'grab' }}>☰</span>
-                        <span style={{ flex: 1, fontSize: '13px', color: '#1a1a1a' }}>{sortField.field}</span>
+                        <span className="text-base text-gray-400 cursor-grab">☰</span>
+                        <span className="flex-1 text-[13px] text-gray-900">{sortField.field}</span>
                         <button
                           onClick={() => toggleDirection(sortField.field)}
-                          style={{
-                            padding: '4px 10px',
-                            background: '#0066cc',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                          }}
+                          className="px-2 py-1 bg-blue-600 text-white border-none rounded text-[10px] font-bold cursor-pointer hover:bg-blue-700 transition-colors"
                         >
                           {sortField.direction.toUpperCase()}
                         </button>
                         <button
                           onClick={() => removeField(sortField.field)}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#666',
-                            fontSize: '18px',
-                            cursor: 'pointer',
-                            lineHeight: '1',
-                            padding: 0,
-                          }}
+                          className="bg-transparent border-none text-gray-400 text-xl cursor-pointer leading-none p-0 hover:text-red-500 transition-colors"
                         >
                           ×
                         </button>

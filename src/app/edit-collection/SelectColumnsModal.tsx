@@ -72,10 +72,10 @@ export function SelectColumnsModal({ isOpen, onClose, initialColumns, onSave }: 
         </div>
 
         {/* Content */}
-        <div style={{ padding: '20px', flex: 1, overflowY: 'auto', background: 'white' }}>
+        <div className="p-5 flex-1 overflow-y-auto bg-white">
           {/* Name field */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: '#1a1a1a' }}>
+          <div className="mb-4">
+            <label className="block text-[13px] font-semibold mb-1.5 text-gray-900">
               Name
             </label>
             <input
@@ -83,82 +83,47 @@ export function SelectColumnsModal({ isOpen, onClose, initialColumns, onSave }: 
               value={favoriteName}
               onChange={(e) => setFavoriteName(e.target.value)}
               placeholder="Save as favorite..."
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #D8D8D8',
-                borderRadius: '4px',
-                fontSize: '14px',
-                color: '#1a1a1a',
-              }}
+              className="w-full px-3 py-2 border border-gray-200 rounded text-sm text-gray-900 outline-none focus:border-blue-400 transition-colors"
             />
           </div>
 
-          <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '12px', color: '#1a1a1a' }}>
+          <div className="text-sm font-semibold mb-3 text-gray-900">
             Columns
           </div>
 
           <input
             type="text"
-            placeholder="🔍"
+            placeholder="🔍 Search columns..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              border: '1px solid #D8D8D8',
-              borderRadius: '4px',
-              marginBottom: '12px',
-              fontSize: '14px',
-              color: '#1a1a1a',
-            }}
+            className="w-full px-3 py-2 border border-gray-200 rounded mb-3 text-sm text-gray-900 outline-none focus:border-blue-400 transition-colors"
           />
 
           {Object.entries(COLUMN_FIELDS).map(([category, fields]) => (
-            <div key={category} style={{ marginBottom: '8px' }}>
+            <div key={category} className="mb-2">
               <button
                 onClick={() => toggleCategory(category)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  background: '#2A2A2A',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  textAlign: 'left',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}
+                className="w-full px-3 py-2 bg-[#2A2A2A] text-white border-none rounded text-sm font-semibold cursor-pointer flex items-center justify-between hover:bg-[#3a3a3a] transition-colors"
               >
                 <span>{category}</span>
                 <span>{expandedCategories.has(category) ? '▼' : '▶'}</span>
               </button>
               {expandedCategories.has(category) && (
-                <div style={{ padding: '8px 0' }}>
+                <div className="py-2">
                   {fields
                     .filter(field => !searchQuery || field.toLowerCase().includes(searchQuery.toLowerCase()))
                     .map(field => (
                       <label
                         key={field}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          padding: '6px 12px',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          color: '#1a1a1a',
-                          background: selectedColumns.includes(field) ? '#F0F0F0' : 'white',
-                        }}
+                        className={`flex items-center px-3 py-1.5 cursor-pointer text-sm text-gray-900 rounded mb-0.5 transition-colors ${
+                          selectedColumns.includes(field) ? 'bg-gray-100' : 'hover:bg-gray-50'
+                        }`}
                       >
                         <input
                           type="checkbox"
                           checked={selectedColumns.includes(field)}
                           onChange={() => toggleColumn(field)}
-                          style={{ marginRight: '10px' }}
+                          className="mr-2.5 cursor-pointer accent-blue-500"
                         />
                         {field}
                       </label>
@@ -170,42 +135,16 @@ export function SelectColumnsModal({ isOpen, onClose, initialColumns, onSave }: 
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            padding: '16px 20px',
-            borderTop: '1px solid #E8E8E8',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '12px',
-            background: 'white',
-          }}
-        >
+        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-3 bg-white rounded-b-lg">
           <button
             onClick={onClose}
-            style={{
-              padding: '8px 20px',
-              background: 'white',
-              color: '#1a1a1a',
-              border: '1px solid #D8D8D8',
-              borderRadius: '4px',
-              fontSize: '14px',
-              cursor: 'pointer',
-            }}
+            className="px-5 py-2 bg-white text-gray-900 border border-gray-200 rounded text-sm cursor-pointer hover:bg-gray-50 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            style={{
-              padding: '8px 20px',
-              background: '#4FC3F7',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '14px',
-              fontWeight: 500,
-              cursor: 'pointer',
-            }}
+            className="px-5 py-2 bg-[#4FC3F7] text-white border-none rounded text-sm font-medium cursor-pointer hover:bg-[#3fb0e3] transition-colors"
           >
             Save
           </button>
