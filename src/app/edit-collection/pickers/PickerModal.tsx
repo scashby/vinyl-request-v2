@@ -243,43 +243,16 @@ export function PickerModal({
           </table>
         </div>
 
-        <div
-          style={{
-            padding: '12px 16px',
-            borderTop: '1px solid #e5e7eb',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '8px',
-            backgroundColor: 'white'
-          }}
-        >
+        <div className="px-4 py-3 border-t border-gray-200 flex justify-end gap-2 bg-white">
           <button
             onClick={handleCancel}
-            style={{
-              padding: '6px 16px',
-              background: '#e5e7eb',
-              color: '#374151',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '13px',
-              fontWeight: '500',
-              cursor: 'pointer',
-            }}
+            className="px-4 py-1.5 bg-gray-200 text-gray-700 border-none rounded text-[13px] font-medium cursor-pointer hover:bg-gray-300"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            style={{
-              padding: '6px 16px',
-              background: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '13px',
-              fontWeight: '600',
-              cursor: 'pointer',
-            }}
+            className="px-4 py-1.5 bg-blue-500 text-white border-none rounded text-[13px] font-semibold cursor-pointer hover:bg-blue-600"
           >
             Save
           </button>
