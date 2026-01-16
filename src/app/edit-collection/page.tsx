@@ -978,14 +978,7 @@ function CollectionBrowserPage() {
 export default function Page() {
   return (
     <Suspense fallback={
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        fontSize: '16px',
-        color: '#666'
-      }}>
+      <div className="flex items-center justify-center h-screen text-base text-gray-500">
         Loading...
       </div>
     }>

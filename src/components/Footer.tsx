@@ -48,29 +48,9 @@ const socials = [
 
 export default function Footer() {
   return (
-    <footer
-      style={{
-        background: "#f3f3f3",
-        color: "#222",
-        fontSize: "15px",
-        width: "100%",
-        borderTop: "1px solid #e2e2e2",
-        minHeight: "36px",
-        position: "relative",
-      }}
-    >
+    <footer className="bg-[#f3f3f3] text-[#222] text-[15px] w-full border-t border-[#e2e2e2] min-h-[36px] relative">
       {/* Absolutely positioned right-side icon row */}
-      <div
-        style={{
-          position: "absolute",
-          right: 16,
-          top: "50%",
-          transform: "translateY(-50%)",
-          display: "flex",
-          gap: "10px",
-          zIndex: 2,
-        }}
-      >
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2.5 z-[2]">
         {socials.map((s) => (
           <a
             key={s.name}
@@ -78,34 +58,15 @@ export default function Footer() {
             target="_blank"
             rel="noopener noreferrer"
             aria-label={s.name}
-            style={{ opacity: 0.68, transition: "opacity 0.2s" }}
+            className="opacity-[0.68] transition-opacity duration-200 hover:opacity-100"
           >
             {s.icon}
           </a>
         ))}
       </div>
       {/* Centered copyright */}
-      <div
-        style={{
-          maxWidth: "1140px",
-          margin: "0 auto",
-          height: "36px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          position: "relative",
-          zIndex: 1,
-        }}
-      >
-        <span
-          style={{
-            width: "100%",
-            textAlign: "center",
-            fontWeight: 400,
-            letterSpacing: "0.02em",
-            color: "#222",
-          }}
-        >
+      <div className="max-w-[1140px] mx-auto h-[36px] flex items-center justify-center relative z-[1]">
+        <span className="w-full text-center font-normal tracking-wide text-[#222]">
           &copy; {new Date().getFullYear()} Dead Wax Dialogues
         </span>
       </div>

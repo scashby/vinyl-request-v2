@@ -2,7 +2,7 @@ import React from "react";
 
 export default function LandingLayout({ children }) {
   return (
-    <div style={{ position: "relative", height: "100vh", overflow: "hidden" }}>
+    <div className="relative h-screen overflow-hidden">
       {children}
     </div>
   );

@@ -109,17 +109,17 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
     
     let content;
     if (linkUrl) {
-      content = <a href={linkUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6', textDecoration: 'none', fontWeight: 500 }}>{displayValue} →</a>;
+      content = <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 no-underline font-medium hover:underline">{displayValue} →</a>;
     } else {
       content = <span>{displayValue}</span>;
     }
 
     return (
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
+      <div className="mb-3">
+        <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.5px] mb-1">
           {label}
         </div>
-        <div style={{ fontSize: 14, color: '#1f2937' }}>
+        <div className="text-sm text-gray-800">
           {content}
         </div>
       </div>
@@ -130,13 +130,13 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
     if (!values || values.length === 0) return null;
 
     return (
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
+      <div className="mb-3">
+        <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.5px] mb-1.5">
           {label}
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <div className="flex flex-wrap gap-1.5">
           {values.map((value, idx) => (
-            <span key={idx} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 4, background: '#f3f4f6', color: '#374151', fontWeight: 500 }}>
+            <span key={idx} className="text-xs px-2.5 py-1 rounded bg-gray-100 text-gray-700 font-medium">
               {value}
             </span>
           ))}
@@ -154,36 +154,42 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
 };
 
   return (
-    <div style={{ width: 380, height: '100%', background: 'white', borderLeft: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-      <div style={{ padding: 16, borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-        <Image src={album.image_url || '/images/placeholder.png'} alt={album.title} width={80} height={80} style={{ borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} unoptimized />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 'bold', color: '#1f2937', margin: '0 0 4px 0', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+    <div className="w-full md:w-[380px] h-full bg-white border-l border-gray-200 flex flex-col shrink-0">
+      <div className="p-4 border-b border-gray-200 flex items-start gap-3">
+        <Image src={album.image_url || '/images/placeholder.png'} alt={album.title} width={80} height={80} className="rounded-md object-cover shrink-0" unoptimized />
+        <div className="flex-1 min-w-0">
+          <h3 className="text-base font-bold text-gray-800 m-0 mb-1 line-clamp-2">
             {album.title}
           </h3>
-          <p style={{ fontSize: 14, color: '#6b7280', margin: '0 0 8px 0' }}>
+          <p className="text-sm text-gray-500 m-0 mb-2">
             {album.artist}
           </p>
-          <div style={{ display: 'flex', gap: 6, fontSize: 12, color: '#9ca3af' }}>
+          <div className="flex gap-1.5 text-xs text-gray-400">
             {album.year && <span>{album.year}</span>}
             {album.format && <span>• {album.format}</span>}
           </div>
         </div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, color: '#6b7280', cursor: 'pointer', padding: 4, lineHeight: 1, flexShrink: 0 }}>
+        <button onClick={onClose} className="bg-transparent border-none text-xl text-gray-500 cursor-pointer p-1 leading-none shrink-0 hover:text-gray-700">
           ✕
         </button>
       </div>
 
-      <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', overflowX: 'auto' }}>
+      <div className="flex border-b border-gray-200 bg-gray-50 overflow-x-auto">
         {tabs.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ flex: '0 0 auto', padding: '12px 12px', border: 'none', background: activeTab === tab.id ? 'white' : 'transparent', color: activeTab === tab.id ? '#3b82f6' : '#6b7280', fontSize: 11, fontWeight: 600, cursor: 'pointer', borderBottom: activeTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent', transition: 'all 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minWidth: 60 }}>
-            <span style={{ fontSize: 16 }}>{tab.icon}</span>
+          <button 
+            key={tab.id} 
+            onClick={() => setActiveTab(tab.id)} 
+            className={`flex-none px-3 py-3 border-b-2 text-[11px] font-semibold cursor-pointer flex flex-col items-center gap-1 min-w-[60px] transition-all duration-200 ${
+              activeTab === tab.id ? 'bg-white text-blue-500 border-blue-500' : 'bg-transparent text-gray-500 border-transparent hover:bg-gray-100'
+            }`}
+          >
+            <span className="text-base">{tab.icon}</span>
             <span>{tab.label}</span>
           </button>
         ))}
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+      <div className="flex-1 overflow-y-auto p-4">
         {activeTab === 'main' && (
           <div>
             {renderField('Format', album.format)}
@@ -194,19 +200,19 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
             {renderField('Date Added', album.date_added ? new Date(album.date_added).toLocaleDateString() : null)}
             
             {album.blocked_sides && album.blocked_sides.length > 0 && (
-              <div style={{ marginTop: 16, padding: 12, background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 6 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#dc2626', marginBottom: 4 }}>
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                <div className="text-xs font-semibold text-red-600 mb-1">
                   ⚠️ Blocked Sides
                 </div>
-                <div style={{ fontSize: 12, color: '#991b1b' }}>
+                <div className="text-xs text-red-800">
                   {album.blocked_sides.join(', ')}
                 </div>
               </div>
             )}
 
             {(album.for_sale || album.wholesale_cost) && (
-              <div style={{ marginTop: 16, padding: 12, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#059669', marginBottom: 8 }}>
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                <div className="text-xs font-semibold text-green-600 mb-2">
                   💰 Sale Info
                 </div>
                 {album.for_sale && album.sale_price && renderField('Sale Price', `$${album.sale_price.toFixed(2)}`)}
@@ -230,8 +236,8 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
             {renderArrayField('Apple Music Genres', album.apple_music_genres)}
 
             {(!album.spotify_label && !album.discogs_genres?.length && !album.spotify_genres?.length) && (
-              <div style={{ padding: 20, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
+              <div className="p-5 text-center text-gray-400 text-[13px]">
+                <div className="text-[32px] mb-2">📋</div>
                 No detailed metadata available
               </div>
             )}
@@ -250,8 +256,8 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
             {renderArrayField('Signed By', album.signed_by)}
 
             {(!album.purchase_date && !album.purchase_store && !album.owner && !album.play_count) && (
-              <div style={{ padding: 20, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>👤</div>
+              <div className="p-5 text-center text-gray-400 text-[13px]">
+                <div className="text-[32px] mb-2">👤</div>
                 No personal tracking info
               </div>
             )}
@@ -275,7 +281,7 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
               </div>
             )}
 
-            <button onClick={onEditTags} style={{ marginTop: 16, width: '100%', padding: '10px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={onEditTags} className="mt-4 w-full p-2.5 bg-violet-500 text-white border-none rounded-md text-[13px] font-semibold cursor-pointer hover:bg-violet-600">
               ✏️ Edit Tags
             </button>
           </div>
@@ -284,52 +290,52 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
         {activeTab === 'notes' && (
           <div>
             {album.notes && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
+              <div className="mb-4">
+                <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.5px] mb-1.5">
                   General Notes
                 </div>
-                <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.6, padding: 12, background: '#f9fafb', borderRadius: 6, whiteSpace: 'pre-wrap' }}>
+                <div className="text-[13px] text-gray-700 leading-relaxed p-3 bg-gray-50 rounded-md whitespace-pre-wrap">
                   {album.notes}
                 </div>
               </div>
             )}
 
             {album.discogs_notes && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
+              <div className="mb-4">
+                <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.5px] mb-1.5">
                   Discogs Notes
                 </div>
-                <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.6, padding: 12, background: '#f9fafb', borderRadius: 6, whiteSpace: 'pre-wrap' }}>
+                <div className="text-[13px] text-gray-700 leading-relaxed p-3 bg-gray-50 rounded-md whitespace-pre-wrap">
                   {album.discogs_notes}
                 </div>
               </div>
             )}
 
             {album.sale_notes && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
+              <div className="mb-4">
+                <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.5px] mb-1.5">
                   Sale Notes
                 </div>
-                <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.6, padding: 12, background: '#f9fafb', borderRadius: 6, whiteSpace: 'pre-wrap' }}>
+                <div className="text-[13px] text-gray-700 leading-relaxed p-3 bg-gray-50 rounded-md whitespace-pre-wrap">
                   {album.sale_notes}
                 </div>
               </div>
             )}
 
             {album.pricing_notes && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
+              <div className="mb-4">
+                <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.5px] mb-1.5">
                   Pricing Notes
                 </div>
-                <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.6, padding: 12, background: '#f9fafb', borderRadius: 6, whiteSpace: 'pre-wrap' }}>
+                <div className="text-[13px] text-gray-700 leading-relaxed p-3 bg-gray-50 rounded-md whitespace-pre-wrap">
                   {album.pricing_notes}
                 </div>
               </div>
             )}
 
             {(!album.notes && !album.discogs_notes && !album.sale_notes && !album.pricing_notes) && (
-              <div style={{ padding: 20, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>📝</div>
+              <div className="p-5 text-center text-gray-400 text-[13px]">
+                <div className="text-[32px] mb-2">📝</div>
                 No notes available
               </div>
             )}
@@ -344,8 +350,8 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
             {renderField('Apple Music ID', album.apple_music_id, album.apple_music_url || undefined)}
 
             {(!album.discogs_master_id && !album.discogs_release_id && !album.spotify_id && !album.apple_music_id) && (
-              <div style={{ padding: 20, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>🔗</div>
+              <div className="p-5 text-center text-gray-400 text-[13px]">
+                <div className="text-[32px] mb-2">🔗</div>
                 No external IDs available
               </div>
             )}
@@ -353,12 +359,12 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
         )}
       </div>
 
-      <div style={{ padding: 16, borderTop: '1px solid #e5e7eb', display: 'flex', gap: 8 }}>
-        <Link href={`/admin/edit-entry/${album.id}`} style={{ flex: 1, padding: '10px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, textAlign: 'center', textDecoration: 'none', cursor: 'pointer' }}>
+      <div className="p-4 border-t border-gray-200 flex gap-2">
+        <Link href={`/admin/edit-entry/${album.id}`} className="flex-1 p-2.5 bg-blue-500 text-white border-none rounded-md text-[13px] font-semibold text-center no-underline cursor-pointer hover:bg-blue-600">
           ✏️ Edit Album
         </Link>
         {!album.for_sale && (
-          <button onClick={onMarkForSale} style={{ flex: 1, padding: '10px', background: '#10b981', color: 'white', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={onMarkForSale} className="flex-1 p-2.5 bg-emerald-500 text-white border-none rounded-md text-[13px] font-semibold cursor-pointer hover:bg-emerald-600">
             💰 Sell
           </button>
         )}

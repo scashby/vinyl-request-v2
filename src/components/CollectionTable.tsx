@@ -249,7 +249,7 @@ const CollectionTable = memo(function CollectionTable({
             }}
             onChange={handleSelectAll}
             onClick={(e) => e.stopPropagation()}
-            style={{ cursor: 'pointer', margin: 0 }}
+            className="cursor-pointer m-0"
           />
         ) : (
           <>
@@ -273,7 +273,7 @@ const CollectionTable = memo(function CollectionTable({
           checked={isSelected}
           onChange={(e) => handleCheckboxClick(e, albumId)}
           onClick={(e) => e.stopPropagation()}
-          style={{ cursor: 'pointer', margin: 0 }}
+          className="cursor-pointer m-0"
         />
       );
     }
