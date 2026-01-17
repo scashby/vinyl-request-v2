@@ -32,10 +32,6 @@ function isImageArray(value: unknown): boolean {
   return Array.isArray(value) && value.length > 0 && value.every(v => isImageUrl(v));
 }
 
-function isSimpleArray(value: unknown): boolean {
-  return Array.isArray(value) && value.every(v => typeof v === 'string' || typeof v === 'number');
-}
-
 // --- COMPONENT: Image Grid Selector (For Galleries) ---
 function ImageGridSelector({
   images,
