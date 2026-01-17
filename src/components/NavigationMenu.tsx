@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 
 export default function NavigationMenu() {
@@ -31,17 +32,33 @@ export default function NavigationMenu() {
       <nav
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${
           isScrolled 
-            ? 'bg-black/80 backdrop-blur-md border-b border-white/10 py-3 shadow-lg' 
-            : 'bg-transparent border-transparent py-5'
+            ? 'bg-black/90 backdrop-blur-md border-b border-white/10 py-2 shadow-lg' 
+            : 'bg-transparent border-transparent py-4'
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 md:px-6 flex items-center justify-between">
+        <div className="w-full px-6 md:px-10 flex items-center justify-between">
           
           {/* Logo / Brand Area */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <span className="font-serif-display font-bold text-2xl tracking-tight text-white group-hover:text-[#00c4ff] transition-colors">
-              DWD
-            </span>
+          <Link href="/" className="flex items-center gap-3 group">
+            {/* CSS invert makes the black logos white */}
+            <div className="relative w-10 h-10">
+              <Image 
+                src="/images/Skulllogo.png" 
+                alt="DWD" 
+                fill
+                className="object-contain invert brightness-0 invert-100 transition-transform group-hover:scale-105"
+                style={{ filter: 'invert(1)' }}
+              />
+            </div>
+            <div className="relative w-32 h-8 hidden sm:block">
+              <Image 
+                src="/images/Text.png" 
+                alt="Dead Wax Dialogues" 
+                fill
+                className="object-contain"
+                style={{ filter: 'invert(1)' }}
+              />
+            </div>
           </Link>
 
           {/* Desktop Navigation */}
