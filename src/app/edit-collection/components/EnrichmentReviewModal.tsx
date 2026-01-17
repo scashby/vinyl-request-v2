@@ -256,7 +256,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
 
   const handleResolve = (conflict: ExtendedFieldConflict, value: unknown, source: string) => {
     const key = `${conflict.album_id}-${conflict.field_name}`;
-    const MERGEABLE_FIELDS = ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url'];
+    const MERGEABLE_FIELDS = ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url', 'label'];
     const isMergeable = MERGEABLE_FIELDS.includes(conflict.field_name);
 
     if (isMergeable) {
@@ -362,7 +362,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
             {/* RESTORED: Finalize All Button */}
             <button 
               onClick={() => {
-                const nonMergableFields = ['image_url', 'back_image_url', 'original_release_date', 'country', 'barcode', 'year', 'format', 'label', 'catalog_no'];
+                const nonMergableFields = ['image_url', 'back_image_url', 'original_release_date', 'country', 'barcode', 'year', 'format', 'catalog_no', 'tracks'];
                 const newFinalized = { ...finalizedFields };
                 conflicts.forEach(c => {
                   if (nonMergableFields.includes(c.field_name)) {
