@@ -550,31 +550,41 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
 
         {/* FOOTER */}
         <div className="p-5 border-t border-gray-200 flex justify-between items-center gap-3 bg-white">
-          <div className="flex gap-2">
-            <button 
-              onClick={() => setPage(p => Math.max(0, p - 1))}
-              disabled={page === 0}
-              className="px-4 py-2 bg-white border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              Previous
-            </button>
-            <span className="flex items-center text-sm font-medium text-gray-600">
-              Page {page + 1} of {totalPages || 1}
-            </span>
-            <button 
-              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
-              className="px-4 py-2 bg-white border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              Next
-            </button>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex gap-2 items-center">
+              <button 
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="px-4 py-2 bg-white border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                Previous
+              </button>
+              <span className="flex items-center text-sm font-medium text-gray-600">
+                Page {page + 1} of {totalPages || 1}
+              </span>
+              <button 
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+                className="px-4 py-2 bg-white border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                Next
+              </button>
+            </div>
+            <div className="text-[10px] text-gray-500 font-medium italic pl-1">
+              Selections are retained across pages. Save applies to all albums.
+            </div>
           </div>
 
           <div className="flex gap-3">
             <button onClick={onCancel} className="px-6 py-2 bg-white border-2 border-gray-300 rounded text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-50">Cancel</button>
             <button 
               onClick={() => onComplete(resolutions as Record<string, { value: unknown, source: string }>, finalizedFields)}
-              className="px-6 py-2 bg-amber-500 text-white border-none rounded text-sm font-bold cursor-pointer hover:bg-amber-600 shadow-sm"
+              disabled={page < (totalPages || 1) - 1}
+              className={`px-6 py-2 border-none rounded text-sm font-bold shadow-sm transition-colors ${
+                page < (totalPages || 1) - 1
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-amber-500 text-white cursor-pointer hover:bg-amber-600'
+              }`}
             >
               Save Changes
             </button>
