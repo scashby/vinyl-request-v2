@@ -11,7 +11,12 @@ module.exports = {
     "queue-section"
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ['var(--font-inter)'],
+        serif: ['var(--font-playfair)'],
+      },
+    },
   },
   plugins: [],
 }
