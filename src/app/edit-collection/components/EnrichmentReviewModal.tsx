@@ -24,6 +24,10 @@ function isImageUrl(url: unknown): boolean {
          url.includes('mzstatic.com');
 }
 
+function isSimpleArray(value: unknown): boolean {
+  return Array.isArray(value) && value.every(v => typeof v === 'string' || typeof v === 'number');
+}
+
 function isImageArray(value: unknown): boolean {
   return Array.isArray(value) && value.length > 0 && value.every(v => isImageUrl(v));
 }
@@ -233,6 +237,8 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
   // State tracks the RESOLVED VALUE, not just the source
   const [resolutions, setResolutions] = useState<Record<string, { value: unknown, source: string, selectedSources?: string[] }>>({});
   const [finalizedFields, setFinalizedFields] = useState<Record<string, boolean>>({});
+  const [page, setPage] = useState(0);
+  const ITEMS_PER_PAGE = 5;
 
   const groupedConflicts = useMemo(() => {
     const groups: Record<number, ExtendedFieldConflict[]> = {};
@@ -336,6 +342,9 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
   };
 
   const totalChanges = Object.keys(groupedConflicts).length;
+  const groups = Object.values(groupedConflicts);
+  const totalPages = Math.ceil(groups.length / ITEMS_PER_PAGE);
+  const visibleGroups = groups.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30000]">
@@ -382,7 +391,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
         {/* LIST CONTENT */}
         <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
           <div className="flex flex-col gap-6">
-            {Object.values(groupedConflicts).map((group, idx) => {
+            {visibleGroups.map((group, idx) => {
               const albumInfo = group[0];
               
               return (
@@ -544,8 +553,29 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
         </div>
 
         {/* FOOTER */}
-        <div className="p-5 border-t border-gray-200 flex justify-end gap-3 bg-white">
-          <button onClick={onCancel} className="px-6 py-2 bg-white border-2 border-gray-300 rounded text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-50">Cancel</button>
+        <div className="p-5 border-t border-gray-200 flex justify-between items-center gap-3 bg-white">
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="px-4 py-2 bg-white border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              Previous
+            </button>
+            <span className="flex items-center text-sm font-medium text-gray-600">
+              Page {page + 1} of {totalPages || 1}
+            </span>
+            <button 
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              className="px-4 py-2 bg-white border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              Next
+            </button>
+          </div>
+
+          <div className="flex gap-3">
+            <button onClick={onCancel} className="px-6 py-2 bg-white border-2 border-gray-300 rounded text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-50">Cancel</button>
           <button 
             onClick={() => onComplete(resolutions as Record<string, { value: unknown, source: string }>, finalizedFields)}
             className="px-6 py-2 bg-amber-500 text-white border-none rounded text-sm font-bold cursor-pointer hover:bg-amber-600 shadow-sm"
