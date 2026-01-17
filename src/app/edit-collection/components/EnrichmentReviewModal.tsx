@@ -371,7 +371,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                 });
                 setFinalizedFields(newFinalized);
               }}
-              className="px-4 py-2 text-[13px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-md cursor-pointer hover:bg-violet-100"
+              className="px-4 py-2 text-[13px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-md cursor-pointer hover:bg-violet-200 transition-all shadow-sm active:bg-violet-300"
             >
               Finalize All (Static Fields)
             </button>
