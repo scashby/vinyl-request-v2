@@ -572,16 +572,17 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
 
           <div className="flex gap-3">
             <button onClick={onCancel} className="px-6 py-2 bg-white border-2 border-gray-300 rounded text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-50">Cancel</button>
-          <button 
-            onClick={() => onComplete(resolutions as Record<string, { value: unknown, source: string }>, finalizedFields)}
-            className="px-6 py-2 bg-amber-500 text-white border-none rounded text-sm font-bold cursor-pointer hover:bg-amber-600 shadow-sm"
-          >
-            Save Changes
-          </button>
+            <button 
+              onClick={() => onComplete(resolutions as Record<string, { value: unknown, source: string }>, finalizedFields)}
+              className="px-6 py-2 bg-amber-500 text-white border-none rounded text-sm font-bold cursor-pointer hover:bg-amber-600 shadow-sm"
+            >
+              Save Changes
+            </button>
+          </div>
         </div>
 
-      </div>
-      </div>
+      </div> {/* Closes Modal Card */}
+      </div> {/* Closes Scroll Wrapper */}
     </div>
   );
 }
