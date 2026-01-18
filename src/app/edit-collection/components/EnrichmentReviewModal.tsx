@@ -1,7 +1,7 @@
 // src/app/edit-collection/components/EnrichmentReviewModal.tsx
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { type ExtendedFieldConflict } from './ImportEnrichModal';
 import { SERVICE_ICONS } from 'lib/enrichment-data-mapping';
@@ -201,14 +201,18 @@ function ConflictValue({
   if (isImage && typeof value === 'string') {
     return (
       <ContentWrapper>
-        <div className="relative w-full aspect-square bg-gray-100 rounded overflow-hidden">
-          <Image 
+        <div className="relative w-full aspect-square bg-gray-100 rounded overflow-hidden flex items-center justify-center">
+          {/* Switched to standard img tag to avoid Next.js mixed-content loops and performance overhead on large lists */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img 
             src={value} 
-            alt={label} 
-            fill
-            style={{ objectFit: 'contain' }}
-            unoptimized
-            onLoadingComplete={(img) => setDimensions({ w: img.naturalWidth, h: img.naturalHeight })}
+            alt={label}
+            className="max-w-full max-h-full object-contain"
+            loading="lazy"
+            onLoad={(e) => {
+              const img = e.currentTarget;
+              setDimensions({ w: img.naturalWidth, h: img.naturalHeight });
+            }}
             onError={() => setIsImage(false)}
           />
         </div>
@@ -234,7 +238,15 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
   const [resolutions, setResolutions] = useState<Record<string, { value: unknown, source: string, selectedSources?: string[] }>>({});
   const [finalizedFields, setFinalizedFields] = useState<Record<string, boolean>>({});
   const [page, setPage] = useState(0);
+  const listRef = useRef<HTMLDivElement>(null);
   const ITEMS_PER_PAGE = 5;
+
+  // Scroll to top on page change
+  useEffect(() => {
+    if (listRef.current) {
+      listRef.current.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [page]);
 
   const groupedConflicts = useMemo(() => {
     const groups: Record<number, ExtendedFieldConflict[]> = {};
@@ -247,16 +259,29 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
 
   useEffect(() => {
     const defaults: Record<string, { value: unknown, source: string }> = {};
+    const autoFinalized: Record<string, boolean> = {};
+
     conflicts.forEach(c => {
       const key = `${c.album_id}-${c.field_name}`;
       defaults[key] = { value: c.current_value, source: 'current' };
+
+      // Auto-finalize TRACKS if DB already has data (User Preference)
+      if (c.field_name === 'tracks' && Array.isArray(c.current_value) && c.current_value.length > 0) {
+        autoFinalized[key] = true;
+      }
     });
     setResolutions(defaults);
+    setFinalizedFields(prev => ({ ...prev, ...autoFinalized }));
   }, [conflicts]);
 
   const handleResolve = (conflict: ExtendedFieldConflict, value: unknown, source: string) => {
     const key = `${conflict.album_id}-${conflict.field_name}`;
-    const MERGEABLE_FIELDS = ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url', 'label'];
+    // Added engineers, writers, mixers per user request
+    const MERGEABLE_FIELDS = [
+      'genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 
+      'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url', 
+      'label', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger'
+    ];
     const isMergeable = MERGEABLE_FIELDS.includes(conflict.field_name);
 
     if (isMergeable) {
@@ -385,7 +410,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
         </div>
 
         {/* LIST CONTENT */}
-        <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
+        <div className="flex-1 overflow-y-auto bg-gray-50 p-6" ref={listRef}>
           <div className="flex flex-col gap-6">
             {visibleGroups.map((group, idx) => {
               const albumInfo = group[0];
@@ -411,20 +436,31 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                       const selected = resolutions[key] || { value: conflict.current_value, source: 'current' };
                       const isImageArrayField = isImageArray(conflict.current_value) || isImageArray(conflict.new_value);
                       
+                      // Define fields that should behave as mergeable lists (Chips)
+                      const TEXT_LIST_FIELDS = ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 'label', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger'];
+                      const isTextListField = TEXT_LIST_FIELDS.includes(conflict.field_name);
+
+                      // Helper to normalize values to array for Chip Selector
+                      const toArray = (v: unknown): string[] => {
+                        if (Array.isArray(v)) return v.map(String);
+                        if (!v) return [];
+                        return String(v).split(/,\s*/).map(s => s.trim()).filter(Boolean);
+                      };
+
                       return (
                         <div key={key}>
                           <div className="flex justify-between items-center mb-2">
                             <div className="flex items-center gap-3">
                               <div className="text-xs font-bold text-gray-600 uppercase">
-                                {conflict.field_name.replace(/_/g, ' ')}
+                                {conflict.field_name === 'label' ? 'RECORD LABELS' : conflict.field_name.replace(/_/g, ' ')}
                               </div>
-                              {/* RESTORED: Action Bar for merging text fields OR Gallery Mode for images */}
+                              {/* Action Bar for merging text fields OR Gallery Mode for images */}
                               {isImageArrayField ? (
                                 <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
                                   GALLERY MODE: Click images to Keep/Reject
                                 </span>
                               ) : (
-                                ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags'].includes(conflict.field_name) && (
+                                isTextListField && (
                                   <div className="flex gap-2 items-center">
                                     <button 
                                       onClick={() => handleResolve(conflict, conflict.current_value, 'current')}
@@ -462,11 +498,11 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                                     selectedImages={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
                                     onToggle={(url) => handleResolve(conflict, url, 'current')}
                                   />
-                                ) : isSimpleArray(conflict.current_value) ? (
+                                ) : (isTextListField || isSimpleArray(conflict.current_value)) ? (
                                   <ArrayChipSelector
                                     label="Current (DB)"
                                     color="green"
-                                    items={conflict.current_value as string[]}
+                                    items={toArray(conflict.current_value)}
                                     selectedItems={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
                                     onToggle={(val) => handleResolve(conflict, val, 'current')}
                                   />
@@ -476,7 +512,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                                     color="green"
                                     value={conflict.current_value}
                                     isSelected={selected.source === 'current' || (selected.selectedSources?.includes('current') ?? false)}
-                                    isMultiSelect={!isImageArrayField && ['genres', 'styles', 'musicians'].includes(conflict.field_name)}
+                                    isMultiSelect={false}
                                     onClick={() => handleResolve(conflict, conflict.current_value, 'current')}
                                   />
                                 )}
@@ -495,12 +531,12 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                                             selectedImages={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
                                             onToggle={(url) => handleResolve(conflict, url, source)}
                                           />
-                                        ) : isSimpleArray(val) ? (
+                                        ) : (isTextListField || isSimpleArray(val)) ? (
                                           <ArrayChipSelector
                                             key={source}
                                             label={source}
                                             color="blue"
-                                            items={val as string[]}
+                                            items={toArray(val)}
                                             selectedItems={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
                                             onToggle={(item) => handleResolve(conflict, item, source)}
                                           />
@@ -511,7 +547,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                                               color="blue"
                                               value={val}
                                               isSelected={selected.source === source || (selected.selectedSources?.includes(source) ?? false)}
-                                              isMultiSelect={!isImageArrayField && ['genres', 'styles', 'musicians'].includes(conflict.field_name)}
+                                              isMultiSelect={false}
                                               onClick={() => handleResolve(conflict, val, source)}
                                           />
                                         )
