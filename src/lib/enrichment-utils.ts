@@ -59,6 +59,7 @@ export type CandidateData = {
   lyrics?: string;
   lyrics_url?: string;
   notes?: string; // Wikipedia/Discogs Notes
+  enrichment_summary?: Record<string, string>; // Structured External Data (Setlist.fm, WhoSampled, etc)
   companies?: string[]; // Discogs Companies
   
   // Sonic Domain
@@ -308,6 +309,12 @@ interface CAAImage {
 }
 
 const USER_AGENT = 'DeadwaxDialogues/1.0 (https://deadwaxdialogues.com)';
+
+// Helper to force HTTPS
+const toHttps = (url: string | undefined | null) => {
+    if (!url) return undefined;
+    return url.replace(/^http:\/\//i, 'https://');
+};
 
 // ============================================================================
 // 1. MUSICBRAINZ (Dates, Labels, Country, Deep Credits)
@@ -655,10 +662,10 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
     let primaryImage: string | undefined = undefined;
     let backImage: string | undefined = undefined;
 
-    if (allImages.length > 0) primaryImage = allImages[0].uri;
-    if (allImages.length > 1) backImage = allImages[1].uri;
+    if (allImages.length > 0) primaryImage = toHttps(allImages[0].uri);
+    if (allImages.length > 1) backImage = toHttps(allImages[1].uri);
     if (allImages.length > 2) {
-       galleryImages.push(...allImages.slice(2).map((i: DiscogsImage) => i.uri));
+       galleryImages.push(...allImages.slice(2).map((i: DiscogsImage) => toHttps(i.uri)!));
     }
 
     const candidate: CandidateData = {
@@ -750,7 +757,7 @@ export async function fetchLastFmData(album: { artist: string, title: string }):
     const candidate: CandidateData = {
       lastfm_url: data.album.url,
       tags: tags, // RENAMED: Match generic bucket in CandidateData
-      image_url: largeImg || undefined
+      image_url: toHttps(largeImg)
     };
 
     mapTagsToMoods(tags, candidate);
@@ -785,13 +792,14 @@ export async function fetchCoverArtData(album: { musicbrainz_id?: string }): Pro
         images.forEach((img: CAAImage) => {
             // If it's not the chosen front or back, put it in the gallery
             if (img.image !== front && img.image !== back) {
-                gallery.push(img.image);
+                const secureUrl = toHttps(img.image);
+                if (secureUrl) gallery.push(secureUrl);
             }
         });
 
         const resultData: CandidateData = { 
-            image_url: front, 
-            back_image_url: back 
+            image_url: toHttps(front), 
+            back_image_url: toHttps(back) 
         };
 
         if (gallery.length > 0) {
@@ -883,7 +891,7 @@ export async function fetchWhoSampledData(album: { artist: string, title: string
         success: true,
         source: 'whosampled',
         data: {
-            notes: `Search WhoSampled: ${searchUrl}` 
+            enrichment_summary: { whosampled: `Search WhoSampled: ${searchUrl}` }
         }
     };
 }
@@ -916,7 +924,7 @@ export async function fetchSecondHandSongsData(album: { artist: string, title: s
             success: true,
             source: 'secondhandsongs',
             data: {
-                notes: summary,
+                enrichment_summary: { secondhandsongs: summary },
                 // Use is_cover flag if the entity type suggests it
                 is_cover: match.entityType === 'performance' // A performance is often a cover in their DB context
             }
@@ -942,8 +950,8 @@ export async function fetchTheAudioDBData(album: { artist: string, title: string
         if (!info) return { success: false, source: 'theaudiodb', error: 'Not Found' };
 
         const candidate: CandidateData = {
-            image_url: info.strAlbumThumb || undefined,
-            back_image_url: info.strAlbumThumbBack || undefined,
+            image_url: toHttps(info.strAlbumThumb),
+            back_image_url: toHttps(info.strAlbumThumbBack),
             genres: info.strGenre ? [info.strGenre] : undefined,
             styles: info.strStyle ? [info.strStyle] : undefined,
             mood_happy: info.strMood === 'Happy' ? 1 : undefined,
@@ -956,7 +964,7 @@ export async function fetchTheAudioDBData(album: { artist: string, title: string
 
         // Add CD/Vinyl art to gallery if available
         if (info.strAlbumCDart) {
-            candidate.inner_sleeve_images = [info.strAlbumCDart];
+            candidate.inner_sleeve_images = [toHttps(info.strAlbumCDart)!];
         }
 
         return { success: true, source: 'theaudiodb', data: candidate };
@@ -1042,7 +1050,7 @@ export async function fetchSetlistFmData(album: { artist: string, musicbrainz_id
                 success: true,
                 source: 'setlistfm',
                 data: {
-                    notes: `Setlist.fm: ${artist.name} has linked setlists. View tour history: ${artist.url}`
+                    enrichment_summary: { setlistfm: `Setlist.fm: ${artist.name} has linked setlists. View tour history: ${artist.url}` }
                 }
             };
         }
@@ -1053,7 +1061,7 @@ export async function fetchSetlistFmData(album: { artist: string, musicbrainz_id
         return {
             success: true,
             source: 'setlistfm',
-            data: { notes: `Setlist.fm Search: https://www.setlist.fm/search?query=${encodeURIComponent(album.artist)}` }
+            data: { enrichment_summary: { setlistfm: `Setlist.fm Search: https://www.setlist.fm/search?query=${encodeURIComponent(album.artist)}` } }
         };
     }
 }
@@ -1068,7 +1076,7 @@ export async function fetchRateYourMusicData(album: { artist: string, title: str
         success: true,
         source: 'rateyourmusic',
         data: {
-            notes: `RYM Search: ${url}`
+            enrichment_summary: { rateyourmusic: `RYM Search: ${url}` }
         }
     };
 }
@@ -1091,9 +1099,9 @@ export async function fetchFanartTvData(album: { musicbrainz_id?: string }): Pro
 
         if (data.albums?.[album.musicbrainz_id]) {
             const alb = data.albums[album.musicbrainz_id];
-            if (alb.albumcover?.[0]) cover = alb.albumcover[0].url;
-            if (alb.cdart) images.push(...alb.cdart.map((i: { url: string }) => i.url));
-            if (alb.albumcover) images.push(...alb.albumcover.slice(1).map((i: { url: string }) => i.url));
+            if (alb.albumcover?.[0]) cover = toHttps(alb.albumcover[0].url);
+            if (alb.cdart) images.push(...alb.cdart.map((i: { url: string }) => toHttps(i.url)!));
+            if (alb.albumcover) images.push(...alb.albumcover.slice(1).map((i: { url: string }) => toHttps(i.url)!));
         }
 
         return {
@@ -1132,7 +1140,7 @@ export async function fetchDeezerData(album: { artist: string, title: string }):
             success: true,
             source: 'deezer',
             data: {
-                image_url: info.cover_xl || info.cover_big,
+                image_url: toHttps(info.cover_xl || info.cover_big),
                 genres: genres,
                 original_release_date: detail.release_date,
                 labels: detail.label ? [detail.label] : undefined,
@@ -1154,7 +1162,7 @@ export async function fetchMusixmatchData(album: { artist: string, title: string
         success: true,
         source: 'musixmatch',
         data: {
-            notes: `Musixmatch Lyrics: ${url}`
+            enrichment_summary: { musixmatch: `Musixmatch Lyrics: ${url}` }
         }
     };
 }
@@ -1168,7 +1176,7 @@ export async function fetchPopsikeData(album: { artist: string, title: string })
         success: true,
         source: 'popsike',
         data: {
-            notes: `Check Vinyl Value: ${url}`
+            enrichment_summary: { popsike: `Check Vinyl Value: ${url}` }
         }
     };
 }
@@ -1182,7 +1190,7 @@ export async function fetchPitchforkData(album: { artist: string, title: string 
         success: true,
         source: 'pitchfork',
         data: {
-            notes: `Pitchfork Reviews: ${url}`
+            enrichment_summary: { pitchfork: `Pitchfork Reviews: ${url}` }
         }
     };
 }

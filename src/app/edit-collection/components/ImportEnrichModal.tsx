@@ -28,7 +28,7 @@ const ALLOWED_COLUMNS = new Set([
   'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
   'apple_music_id', 'apple_music_url', 'lastfm_id', 'lastfm_url', 
   'musicbrainz_id', 'musicbrainz_url', 'wikipedia_url', 'genius_url', 
-  'lastfm_tags', 'notes', 'genres', 'styles', 'original_release_date',
+  'lastfm_tags', 'notes', 'enrichment_summary', 'genres', 'styles', 'original_release_date',
   'inner_sleeve_images', 'musicians', 'credits', 'producers', 'engineers', 
   'songwriters', 'composer', 'conductor', 'orchestra',
   'tempo_bpm', 'musical_key', 'lyrics', 'time_signature', 
@@ -446,10 +446,19 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const trackSavePromises: Promise<unknown>[] = [];
     
     // PRIORITY MATRICES
-    const GLOBAL_PRIORITY = ['discogs', 'musicbrainz', 'spotify', 'appleMusic', 'lastfm', 'coverArt', 'wikipedia', 'genius', 'whosampled', 'secondhandsongs'];
+    // Ordered by general data quality/relevance
+    const GLOBAL_PRIORITY = [
+      'discogs', 'musicbrainz', 'spotify', 'appleMusic', 'deezer', 
+      'rateyourmusic', 'lastfm', 'theaudiodb', 'wikipedia', 'wikidata', 
+      'coverArt', 'fanarttv', 
+      'genius', 'musixmatch', 
+      'whosampled', 'secondhandsongs', 'setlistfm', 
+      'popsike', 'pitchfork'
+    ];
     
     // "Discogs Supremacy" for physical/static metadata
-    const STATIC_PRIORITY = ['discogs', 'musicbrainz', 'spotify', 'appleMusic'];
+    // Added Deezer/Wikidata as fallbacks for dates/barcodes
+    const STATIC_PRIORITY = ['discogs', 'musicbrainz', 'spotify', 'appleMusic', 'deezer', 'wikidata'];
     
     // "Sonic" priority for audio features
     const SONIC_PRIORITY = ['spotify', 'acousticbrainz', 'musicbrainz'];
@@ -610,7 +619,21 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
              proposedValue = combinedNotes.join('\n\n');
              isMerge = true; // Treat as a merge so we can edit it
           }
-          // Strategy 3: Single Values -> Priority Winner
+          // Strategy 3: Enrichment Summary -> Deep Merge
+          else if (key === 'enrichment_summary') {
+             const combinedSummary: Record<string, string> = {};
+             
+             // Merge all source objects
+             Object.values(sourceValues).forEach(val => {
+                if (typeof val === 'object' && val !== null) {
+                   Object.assign(combinedSummary, val);
+                }
+             });
+             
+             proposedValue = combinedSummary;
+             // No 'isMerge' flag needed here as we want to present the full object
+          }
+          // Strategy 4: Single Values -> Priority Winner
           else {
              // Determine appropriate priority list based on field type
              let priorityList = GLOBAL_PRIORITY;

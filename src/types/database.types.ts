@@ -305,6 +305,10 @@ export interface Database {
           genius_song_id: number | null
           lyrics_cached_at: string | null
           // NEW FIELDS START
+          energy: number | null
+          enrichment_sources: string[] | null
+          finalized_fields: string[] | null
+          enrichment_summary: Json | null
           musicians: string[] | null
           producers: string[] | null
           credits: Json | null
@@ -339,6 +343,10 @@ export interface Database {
           genius_song_id?: number | null
           lyrics_cached_at?: string | null
           // NEW FIELDS START
+          energy?: number | null
+          enrichment_sources?: string[] | null
+          finalized_fields?: string[] | null
+          enrichment_summary?: Json | null
           musicians?: string[] | null
           producers?: string[] | null
           credits?: Json | null
@@ -373,6 +381,10 @@ export interface Database {
           genius_song_id?: number | null
           lyrics_cached_at?: string | null
           // NEW FIELDS START
+          energy?: number | null
+          enrichment_sources?: string[] | null
+          finalized_fields?: string[] | null
+          enrichment_summary?: Json | null
           musicians?: string[] | null
           producers?: string[] | null
           credits?: Json | null
