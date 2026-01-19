@@ -126,14 +126,23 @@ export type ExtendedFieldConflict = FieldConflict & {
 const normalizeValue = (val: unknown): string => {
   if (val === null || val === undefined) return '';
   if (typeof val === 'number') return String(val);
+  
+  // Helper to clean strings (protocol agnostic, trimmed, lowercased)
+  const clean = (s: unknown) => String(s).trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+
   if (Array.isArray(val)) {
-    if (val.length === 0) return '';
-    // Sort a copy to avoid mutating original data and ensure consistent comparison
-    // Use a deep string representation for sorting to handle objects inside arrays if needed
-    return JSON.stringify([...val].map(v => String(v)).sort());
+    // Filter out empty strings/nulls from arrays before comparing
+    const validItems = val.filter(v => v !== null && v !== undefined && String(v).trim() !== '');
+    if (validItems.length === 0) return '';
+    
+    // Sort and normalize for consistent comparison
+    return JSON.stringify(validItems.map(clean).sort());
   }
+  
   if (typeof val === 'object') return JSON.stringify(val);
-  return String(val).trim();
+  
+  // Single string comparison
+  return clean(val);
 };
 
 const areValuesEqual = (a: unknown, b: unknown): boolean => {
@@ -567,7 +576,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       Object.entries(fieldCandidates).forEach(([key, sourceValues]) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const currentVal = (album as any)[key];
-          const isCurrentEmpty = !currentVal || (Array.isArray(currentVal) && currentVal.length === 0);
+          
+          // Robust check for "Empty": null, undefined, empty array, or array of empty strings
+          const isCurrentEmpty = !currentVal || 
+            (Array.isArray(currentVal) && (
+               currentVal.length === 0 || 
+               currentVal.every(v => !v || String(v).trim() === '')
+            )) ||
+            (typeof currentVal === 'string' && currentVal.trim() === '');
+
           const sources = Object.keys(sourceValues);
           if (sources.length === 0) return;
 
@@ -682,8 +699,12 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           else {
               // 1. Skip Tracks if DB already has data (User Preference)
               if (key === 'tracks' && !isCurrentEmpty) return;
+              
+              // 2. Skip if we just auto-filled this field in this specific iteration (safety check)
+              if (autoFilledFields.includes(key)) return;
 
               // Check if the proposed value is actually different from DB
+              // The new normalizeValue function handles http/https equality
               if (!areValuesEqual(currentVal, proposedValue)) {
                   // Re-calculate primary source for the conflict record using the same logic
                   let priorityList = GLOBAL_PRIORITY;
