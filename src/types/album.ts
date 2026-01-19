@@ -210,6 +210,22 @@ export type Album = {
   last_enriched_at: string | null;
   
   // ============================================================================
+  // ENRICHMENT & SONIC DNA (NEW)
+  // ============================================================================
+  enrichment_summary: Record<string, string> | null;
+  tempo_bpm: number | null;
+  musical_key: string | null;
+  energy: number | null;
+  danceability: number | null;
+  mood_acoustic: number | null;
+  mood_electronic: number | null;
+  mood_happy: number | null;
+  mood_sad: number | null;
+  mood_aggressive: number | null;
+  mood_relaxed: number | null;
+  mood_party: number | null;
+
+  // ============================================================================
   // TAGS & NOTES
   // ============================================================================
   custom_tags: string[] | null;

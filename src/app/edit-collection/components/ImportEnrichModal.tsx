@@ -127,21 +127,19 @@ const normalizeValue = (val: unknown): string => {
   if (val === null || val === undefined) return '';
   if (typeof val === 'number') return String(val);
   
-  // Helper to clean strings (protocol agnostic, trimmed, lowercased)
-  const clean = (s: unknown) => String(s).trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  // Helper: Strip protocol, query params, trailing slash, lowercase
+  const clean = (s: unknown) => String(s).trim().toLowerCase()
+    .replace(/^https?:\/\//, '') // Ignore http vs https
+    .replace(/\/+$/, '')         // Ignore trailing slashes
+    .split('?')[0];              // Ignore query params (common in images)
 
   if (Array.isArray(val)) {
-    // Filter out empty strings/nulls from arrays before comparing
     const validItems = val.filter(v => v !== null && v !== undefined && String(v).trim() !== '');
     if (validItems.length === 0) return '';
-    
-    // Sort and normalize for consistent comparison
     return JSON.stringify(validItems.map(clean).sort());
   }
   
   if (typeof val === 'object') return JSON.stringify(val);
-  
-  // Single string comparison
   return clean(val);
 };
 
@@ -634,13 +632,18 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
              });
              
              proposedValue = combinedNotes.join('\n\n');
-             isMerge = true; // Treat as a merge so we can edit it
+             isMerge = true; 
           }
-          // Strategy 3: Enrichment Summary -> Deep Merge
+          // Strategy 3: Enrichment Summary -> Deep Merge (Keep existing, add new)
           else if (key === 'enrichment_summary') {
              const combinedSummary: Record<string, string> = {};
              
-             // Merge all source objects
+             // 1. Keep existing DB values
+             if (currentVal && typeof currentVal === 'object') {
+                Object.assign(combinedSummary, currentVal);
+             }
+
+             // 2. Merge new source objects
              Object.values(sourceValues).forEach(val => {
                 if (typeof val === 'object' && val !== null) {
                    Object.assign(combinedSummary, val);
@@ -648,7 +651,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
              });
              
              proposedValue = combinedSummary;
-             // No 'isMerge' flag needed here as we want to present the full object
+             isMerge = true; 
           }
           // Strategy 4: Single Values -> Priority Winner
           else {
@@ -675,6 +678,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
              proposedValue = sourceValues[winnerSrc];
           }
+
+          // CRITICAL: Ignore empty/null proposals to prevent Ghost Conflicts
+          if (proposedValue === null || proposedValue === undefined || proposedValue === '') return;
+          if (Array.isArray(proposedValue) && proposedValue.length === 0) return;
+          if (typeof proposedValue === 'object' && Object.keys(proposedValue as object).length === 0) return;
 
           // DECISION: Auto-Fill vs Conflict
           
@@ -762,9 +770,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           logDetails.push(`${field} (${valStr.substring(0, 20)}${valStr.length > 20 ? '...' : ''})`);
         });
 
-        if (logDetails.length > 0) {
-          addLog(`${album.artist} - ${album.title}`, 'auto-fill', `Added: ${logDetails.join(', ')}`);
-        }
+        // PERFORMANCE FIX: Commented out per-item state update to prevent freezing
+        // if (logDetails.length > 0) {
+        //   addLog(`${album.artist} - ${album.title}`, 'auto-fill', `Added: ${logDetails.join(', ')}`);
+        // }
       }
     });
 

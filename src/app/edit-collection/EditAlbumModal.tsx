@@ -12,14 +12,20 @@ import { TracksTab, type TracksTabRef } from './tabs/TracksTab';
 import { PersonalTab } from './tabs/PersonalTab';
 import { CoverTab } from './tabs/CoverTab';
 import { LinksTab } from './tabs/LinksTab';
+import { EnrichmentTab } from './tabs/EnrichmentTab';
 import { UniversalBottomBar } from 'components/UniversalBottomBar';
 import { PickerModal } from './pickers/PickerModal';
 import { fetchLocations, type PickerDataItem } from './pickers/pickerDataUtils';
 
-type TabId = 'main' | 'details' | 'classical' | 'people' | 'tracks' | 'personal' | 'cover' | 'links';
+type TabId = 'main' | 'details' | 'enrichment' | 'classical' | 'people' | 'tracks' | 'personal' | 'cover' | 'links';
 
 // SVG icon components
 const TabIcons = {
+  bolt: () => (
+    <svg width="14" height="14" viewBox="0 0 512 512" fill="currentColor">
+      <path d="M288 32c0-17.7-14.3-32-32-32s-32 14.3-32 32V274.7l-73.4-73.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l128 128c12.5 12.5 32.8 12.5 45.3 0l128-128c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L288 274.7V32zM64 352c-35.3 0-64 28.7-64 64v32c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V416c0-35.3-28.7-64-64-64H64z"/>
+    </svg>
+  ),
   music: () => (
     <svg width="14" height="14" viewBox="0 0 512 512" fill="currentColor">
       <path d="M499.1 6.3c8.1 6 12.9 15.6 12.9 25.7v72V368c0 44.2-43 80-96 80s-96-35.8-96-80s43-80 96-80c11.2 0 22 1.6 32 4.6V147L192 223.8V432c0 44.2-43 80-96 80s-96-35.8-96-80s43-80 96-80c11.2 0 22 1.6 32 4.6V200 128c0-14.1 9.3-26.6 22.8-30.7l320-96c9.7-2.9 20.2-1.1 28.3 5z"/>
@@ -65,6 +71,7 @@ const TabIcons = {
 const TABS: { id: TabId; label: string; IconComponent: () => React.ReactElement }[] = [
   { id: 'main', label: 'Main', IconComponent: TabIcons.music },
   { id: 'details', label: 'Details', IconComponent: TabIcons.info },
+  { id: 'enrichment', label: 'Facts/Sonic', IconComponent: TabIcons.bolt },
   { id: 'classical', label: 'Classical', IconComponent: TabIcons.violin },
   { id: 'people', label: 'People', IconComponent: TabIcons.users },
   { id: 'tracks', label: 'Tracks', IconComponent: TabIcons.listOrdered },
@@ -427,6 +434,9 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           )}
           {activeTab === 'details' && (
             <DetailsTab album={editedAlbum} onChange={handleFieldChange} />
+          )}
+          {activeTab === 'enrichment' && (
+            <EnrichmentTab album={editedAlbum} onChange={handleFieldChange} />
           )}
           {activeTab === 'classical' && (
             <ClassicalTab album={editedAlbum} onChange={handleFieldChange} />

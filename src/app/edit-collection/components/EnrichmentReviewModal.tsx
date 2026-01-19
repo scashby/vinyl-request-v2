@@ -308,70 +308,61 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
 
   const handleResolve = (conflict: ExtendedFieldConflict, value: unknown, source: string) => {
     const key = `${conflict.album_id}-${conflict.field_name}`;
-    // Added engineers, writers, mixers per user request
+    
+    // Explicit list of fields that support "Chip Selection" (Merging)
+    // Note: 'labels' covers both 'label' and 'labels' keys due to normalization
     const MERGEABLE_FIELDS = [
       'genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 
       'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url', 
-      'label', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger'
+      'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger', 'songwriters'
     ];
+    
     const isMergeable = MERGEABLE_FIELDS.includes(conflict.field_name);
 
     if (isMergeable) {
       setResolutions(prev => {
-        const current = prev[key] || { value: [], source: 'merge', selectedSources: [] };
-        const currentItems = new Set(Array.isArray(current.value) ? current.value as string[] : []);
-        
-        // 1. Toggle individual string/item (Phase 4 UX)
-        if (typeof value === 'string' && !isImageUrl(value)) {
-          if (currentItems.has(value)) currentItems.delete(value);
-          else currentItems.add(value);
-          return { ...prev, [key]: { value: Array.from(currentItems), source: 'custom', selectedSources: ['custom'] } };
+        // Get currently selected items (or default to current value if first interaction)
+        const currentRes = prev[key];
+        let currentItems: Set<string>;
+
+        if (currentRes) {
+           currentItems = new Set(Array.isArray(currentRes.value) ? (currentRes.value as string[]).map(String) : []);
+        } else {
+           // Default state: 'current' value is selected
+           currentItems = new Set(Array.isArray(conflict.current_value) ? (conflict.current_value as string[]).map(String) : []);
         }
 
-        // 2. Special Handling for Image Arrays (Gallery)
+        // Handle Image Gallery vs Text Chips
         if (isImageArray(conflict.current_value) || isImageArray(conflict.new_value)) {
-           // For images, 'value' holds the actual selected URLs array
-           const currentSelection = new Set(Array.isArray(current.value) ? current.value as string[] : []);
-           const toggledUrl = String(value); // In image grid mode, value passed is the single URL toggled
-           
-           // If the value passed is NOT a single URL string (e.g. "Select All"), handle differently
-           if (typeof value !== 'string') {
-              // Fallback to standard merge if not clicking specific image
-              const sources = current.selectedSources || [];
-              const newSources = sources.includes(source) ? sources.filter(s => s !== source) : [...sources, source];
-              // Re-calculate full set based on sources
-              const mergedSet = new Set<string>();
-              newSources.forEach(src => {
-                const val = src === 'current' ? conflict.current_value : conflict.candidates?.[src];
-                if (Array.isArray(val)) val.forEach(v => mergedSet.add(String(v)));
-              });
-              return { ...prev, [key]: { value: Array.from(mergedSet), source: 'merge', selectedSources: newSources } };
+           // Image Mode: Toggle the specific URL passed in 'value'
+           const urlToToggle = String(value);
+           if (currentItems.has(urlToToggle)) currentItems.delete(urlToToggle);
+           else currentItems.add(urlToToggle);
+        } else {
+           // Text Mode: Handle Chip Clicks
+           // If 'value' is an array (e.g. user clicked "Select All New" or a source box), add all
+           if (Array.isArray(value)) {
+              (value as string[]).forEach(v => currentItems.add(String(v)));
+           } 
+           // If 'value' is a single string (clicked a specific chip), toggle it
+           else {
+              const strVal = String(value);
+              if (currentItems.has(strVal)) currentItems.delete(strVal);
+              else currentItems.add(strVal);
            }
-
-           // Toggle individual image
-           if (currentSelection.has(toggledUrl)) currentSelection.delete(toggledUrl);
-           else currentSelection.add(toggledUrl);
-           
-           return { ...prev, [key]: { value: Array.from(currentSelection), source: 'custom', selectedSources: ['custom'] } };
         }
-
-        // Standard Text Array Merge (Genres, etc.)
-        const sources = current.selectedSources || [];
-        const newSources = sources.includes(source) ? sources.filter(s => s !== source) : [...sources, source];
-        const mergedSet = new Set<string>();
-        newSources.forEach(src => {
-          const val = src === 'current' ? conflict.current_value : conflict.candidates?.[src];
-          if (Array.isArray(val)) val.forEach(v => mergedSet.add(String(v)));
-          else if (val) mergedSet.add(String(val));
-        });
 
         return { 
           ...prev, 
-          [key]: { value: Array.from(mergedSet), source: 'merge', selectedSources: newSources } 
+          [key]: { 
+            value: Array.from(currentItems), 
+            source: 'custom_merge', // Mark as custom so UI knows it's a mix
+            selectedSources: ['custom'] 
+          } 
         };
       });
     } else {
-      // Standard Radio-style behavior for static fields
+      // Standard Radio-style behavior for static fields (Date, Country, Barcode)
       setResolutions(prev => ({ ...prev, [key]: { value, source } }));
     }
   };
