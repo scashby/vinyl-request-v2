@@ -10,6 +10,17 @@ import {
   fetchCoverArtData, 
   fetchWikipediaData, 
   fetchGeniusData,
+  fetchWhoSampledData,
+  fetchSecondHandSongsData,
+  fetchTheAudioDBData,
+  fetchWikidataData,
+  fetchSetlistFmData,
+  fetchRateYourMusicData,
+  fetchFanartTvData,
+  fetchDeezerData,
+  fetchMusixmatchData,
+  fetchPopsikeData,
+  fetchPitchforkData,
   type CandidateData, 
   type EnrichmentResult
 } from "lib/enrichment-utils";
@@ -93,6 +104,17 @@ export async function POST(req: Request) {
       if (services.wikipedia) promises.push(fetchWikipediaData(typedAlbum));
       if (services.genius) promises.push(fetchGeniusData(typedAlbum));
       if (services.coverArt) promises.push(fetchCoverArtData(typedAlbum));
+      if (services.whosampled) promises.push(fetchWhoSampledData(typedAlbum));
+      if (services.secondhandsongs) promises.push(fetchSecondHandSongsData(typedAlbum));
+      if (services.theaudiodb) promises.push(fetchTheAudioDBData(typedAlbum));
+      if (services.wikidata) promises.push(fetchWikidataData(typedAlbum));
+      if (services.setlistfm) promises.push(fetchSetlistFmData(typedAlbum));
+      if (services.rateyourmusic) promises.push(fetchRateYourMusicData(typedAlbum));
+      if (services.fanarttv) promises.push(fetchFanartTvData(typedAlbum));
+      if (services.deezer) promises.push(fetchDeezerData(typedAlbum));
+      if (services.musixmatch) promises.push(fetchMusixmatchData(typedAlbum));
+      if (services.popsike) promises.push(fetchPopsikeData(typedAlbum));
+      if (services.pitchfork) promises.push(fetchPitchforkData(typedAlbum));
 
       const settled = await Promise.allSettled(promises);
       

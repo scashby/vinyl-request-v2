@@ -916,3 +916,232 @@ export async function fetchSecondHandSongsData(album: { artist: string, title: s
         return { success: false, source: 'secondhandsongs', error: (e as Error).message };
     }
 }
+
+// ============================================================================
+// 11. THEAUDIODB (Art, Genres, Moods)
+// ============================================================================
+export async function fetchTheAudioDBData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
+    try {
+        // Use '1' for test API key or env variable
+        const apiKey = process.env.THEAUDIODB_API_KEY || '1'; 
+        const url = `https://www.theaudiodb.com/api/v1/json/${apiKey}/searchalbum.php?s=${encodeURIComponent(album.artist)}&a=${encodeURIComponent(album.title)}`;
+        
+        const res = await fetch(url);
+        const data = await res.json();
+        const info = data.album?.[0];
+
+        if (!info) return { success: false, source: 'theaudiodb', error: 'Not Found' };
+
+        const candidate: CandidateData = {
+            image_url: info.strAlbumThumb || undefined,
+            back_image_url: info.strAlbumThumbBack || undefined,
+            genres: info.strGenre ? [info.strGenre] : undefined,
+            styles: info.strStyle ? [info.strStyle] : undefined,
+            mood_happy: info.strMood === 'Happy' ? 1 : undefined,
+            mood_sad: info.strMood === 'Sad' ? 1 : undefined,
+            original_release_date: info.intYearReleased,
+            notes: info.strDescriptionEN,
+            country: info.strLocation,
+            labels: info.strLabel ? [info.strLabel] : undefined
+        };
+
+        // Add CD/Vinyl art to gallery if available
+        if (info.strAlbumCDart) {
+            candidate.inner_sleeve_images = [info.strAlbumCDart];
+        }
+
+        return { success: true, source: 'theaudiodb', data: candidate };
+    } catch (e) {
+        return { success: false, source: 'theaudiodb', error: (e as Error).message };
+    }
+}
+
+// ============================================================================
+// 12. WIKIDATA (Canonical Facts & IDs)
+// ============================================================================
+export async function fetchWikidataData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
+    try {
+        // SPARQL Query to find album by Title AND Artist Label
+        const sparql = `
+            SELECT ?item ?itemLabel ?date ?producerLabel WHERE {
+              ?item wdt:P31/wdt:P279* wd:Q482994; # Instance of Album
+                    rdfs:label ?itemLabel.
+              FILTER(REGEX(?itemLabel, "^${album.title}$", "i"))
+              
+              ?item wdt:P175 ?artist. # Performer
+              ?artist rdfs:label ?artistLabel.
+              FILTER(REGEX(?artistLabel, "^${album.artist}$", "i"))
+              
+              OPTIONAL { ?item wdt:P577 ?date. }
+              OPTIONAL { ?item wdt:P162 ?producer. }
+              
+              SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
+            } LIMIT 1
+        `;
+
+        const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(sparql)}&format=json`;
+        const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+        const data = await res.json();
+        
+        if (!data.results?.bindings?.length) return { success: false, source: 'wikidata', error: 'Not Found' };
+
+        const result = data.results.bindings[0];
+        const date = result.date?.value; // ISO Date
+
+        return {
+            success: true,
+            source: 'wikidata',
+            data: {
+                wikipedia_url: result.item.value, // Wikidata URL
+                original_release_date: date ? date.split('T')[0] : undefined,
+                producers: result.producerLabel ? [result.producerLabel.value] : undefined
+            }
+        };
+    } catch (e) {
+        return { success: false, source: 'wikidata', error: (e as Error).message };
+    }
+}
+
+// ============================================================================
+// 13. SETLIST.FM (Live Context)
+// ============================================================================
+export async function fetchSetlistFmData(album: { artist: string }): Promise<EnrichmentResult> {
+    // Generate Search Link (API requires specific MBIDs and is complex for "Album" lookup)
+    const url = `https://www.setlist.fm/search?query=${encodeURIComponent(album.artist)}`;
+    return {
+        success: true,
+        source: 'setlistfm',
+        data: {
+            notes: `Check Setlists: ${url}`
+        }
+    };
+}
+
+// ============================================================================
+// 14. RATE YOUR MUSIC (Community Meta)
+// ============================================================================
+export async function fetchRateYourMusicData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
+    // Scraping is blocked by Cloudflare. Provide Smart Search Link.
+    const url = `https://rateyourmusic.com/search?searchtype=l&searchterm=${encodeURIComponent(album.artist + ' ' + album.title)}`;
+    return {
+        success: true,
+        source: 'rateyourmusic',
+        data: {
+            notes: `RYM Search: ${url}`
+        }
+    };
+}
+
+// ============================================================================
+// 15. FANART.TV (High Res Logos/Backgrounds/CDArt)
+// ============================================================================
+export async function fetchFanartTvData(album: { musicbrainz_id?: string }): Promise<EnrichmentResult> {
+    if (!album.musicbrainz_id) return { success: false, source: 'fanarttv', error: 'No MBID' };
+    const apiKey = process.env.FANART_TV_API_KEY;
+    if (!apiKey) return { success: false, source: 'fanarttv', error: 'No API Key' };
+
+    try {
+        const res = await fetch(`https://webservice.fanart.tv/v3/music/albums/${album.musicbrainz_id}?api_key=${apiKey}`);
+        if (!res.ok) return { success: false, source: 'fanarttv', error: 'Not Found' };
+        
+        const data = await res.json();
+        const images: string[] = [];
+        let cover: string | undefined;
+
+        if (data.albums?.[album.musicbrainz_id]) {
+            const alb = data.albums[album.musicbrainz_id];
+            if (alb.albumcover?.[0]) cover = alb.albumcover[0].url;
+            if (alb.cdart) images.push(...alb.cdart.map((i: { url: string }) => i.url));
+            if (alb.albumcover) images.push(...alb.albumcover.slice(1).map((i: { url: string }) => i.url));
+        }
+
+        return {
+            success: true,
+            source: 'fanarttv',
+            data: {
+                image_url: cover,
+                inner_sleeve_images: images.length > 0 ? images : undefined
+            }
+        };
+    } catch (e) {
+        return { success: false, source: 'fanarttv', error: (e as Error).message };
+    }
+}
+
+// ============================================================================
+// 16. DEEZER (Metadata, Genres, Covers)
+// ============================================================================
+export async function fetchDeezerData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
+    try {
+        const query = `artist:"${album.artist}" album:"${album.title}"`;
+        const res = await fetch(`https://api.deezer.com/search/album?q=${encodeURIComponent(query)}&limit=1`);
+        const data = await res.json();
+        
+        const info = data.data?.[0];
+        if (!info) return { success: false, source: 'deezer', error: 'Not Found' };
+
+        // Fetch detailed album info for genres
+        const detailRes = await fetch(`https://api.deezer.com/album/${info.id}`);
+        const detail = await detailRes.json();
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const genres = detail.genres?.data?.map((g: any) => g.name);
+
+        return {
+            success: true,
+            source: 'deezer',
+            data: {
+                image_url: info.cover_xl || info.cover_big,
+                genres: genres,
+                original_release_date: detail.release_date,
+                labels: detail.label ? [detail.label] : undefined,
+                barcode: detail.upc
+            }
+        };
+    } catch (e) {
+        return { success: false, source: 'deezer', error: (e as Error).message };
+    }
+}
+
+// ============================================================================
+// 17. MUSIXMATCH (Lyrics Link)
+// ============================================================================
+export async function fetchMusixmatchData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
+    // Smart Search Link
+    const url = `https://www.musixmatch.com/search/${encodeURIComponent(album.artist + ' ' + album.title)}`;
+    return {
+        success: true,
+        source: 'musixmatch',
+        data: {
+            notes: `Musixmatch Lyrics: ${url}`
+        }
+    };
+}
+
+// ============================================================================
+// 18. POPSIKE (Vinyl Valuation)
+// ============================================================================
+export async function fetchPopsikeData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
+    const url = `https://www.popsike.com/php/quicksearch.php?searchtext=${encodeURIComponent(album.artist + ' ' + album.title)}&sortord=dprice&category=25`;
+    return {
+        success: true,
+        source: 'popsike',
+        data: {
+            notes: `Check Vinyl Value: ${url}`
+        }
+    };
+}
+
+// ============================================================================
+// 19. PITCHFORK (Reviews)
+// ============================================================================
+export async function fetchPitchforkData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
+    const url = `https://pitchfork.com/search/?query=${encodeURIComponent(album.artist + ' ' + album.title)}`;
+    return {
+        success: true,
+        source: 'pitchfork',
+        data: {
+            notes: `Pitchfork Reviews: ${url}`
+        }
+    };
+}

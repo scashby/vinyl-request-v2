@@ -39,23 +39,28 @@ export type EnrichmentService =
   | 'theaudiodb'
   | 'rateyourmusic'
   | 'setlistfm'
-  | 'wikidata';
+  | 'wikidata'
+  | 'fanarttv'
+  | 'deezer'
+  | 'musixmatch'
+  | 'popsike'
+  | 'pitchfork';
 
 /**
  * Maps data categories to the services that can provide that data
  */
 export const DATA_TO_SERVICES: Record<DataCategory, EnrichmentService[]> = {
-  artwork: ['coverArtArchive', 'musicbrainz', 'discogs', 'spotify', 'appleMusic', 'lastfm', 'theaudiodb'],
+  artwork: ['coverArtArchive', 'musicbrainz', 'discogs', 'spotify', 'appleMusic', 'lastfm', 'theaudiodb', 'fanarttv', 'deezer'],
   credits: ['musicbrainz', 'allmusic', 'appleMusic', 'discogs', 'genius', 'wikidata'],
-  tracklists: ['discogs', 'spotify', 'appleMusic', 'lastfm', 'setlistfm'],
+  tracklists: ['discogs', 'spotify', 'appleMusic', 'lastfm', 'setlistfm', 'deezer'],
   sonic_domain: ['acousticbrainz', 'musicbrainz', 'spotify', 'whosampled', 'secondhandsongs'],
-  genres: ['discogs', 'spotify', 'appleMusic', 'allmusic', 'lastfm', 'musicbrainz', 'rateyourmusic', 'theaudiodb'],
-  streaming_links: ['spotify', 'appleMusic', 'lastfm', 'musicbrainz', 'allmusic', 'wikipedia', 'whosampled', 'secondhandsongs', 'setlistfm'],
-  reviews: ['allmusic', 'lastfm', 'spotify', 'appleMusic', 'wikipedia', 'rateyourmusic'],
-  chart_data: ['wikipedia', 'rateyourmusic'],
-  release_metadata: ['musicbrainz', 'discogs', 'spotify', 'appleMusic', 'wikipedia', 'wikidata'],
-  lyrics: ['genius'],
-  similar_albums: ['lastfm', 'allmusic', 'rateyourmusic'],
+  genres: ['discogs', 'spotify', 'appleMusic', 'allmusic', 'lastfm', 'musicbrainz', 'rateyourmusic', 'theaudiodb', 'deezer'],
+  streaming_links: ['spotify', 'appleMusic', 'lastfm', 'musicbrainz', 'allmusic', 'wikipedia', 'whosampled', 'secondhandsongs', 'setlistfm', 'deezer', 'musixmatch'],
+  reviews: ['allmusic', 'lastfm', 'spotify', 'appleMusic', 'wikipedia', 'rateyourmusic', 'pitchfork'],
+  chart_data: ['wikipedia', 'rateyourmusic', 'billboard' as EnrichmentService], // Placeholder cast if billboard not fully typed yet
+  release_metadata: ['musicbrainz', 'discogs', 'spotify', 'appleMusic', 'wikipedia', 'wikidata', 'popsike'],
+  lyrics: ['genius', 'musixmatch'],
+  similar_albums: ['lastfm', 'allmusic', 'rateyourmusic', 'deezer'],
   cultural_context: ['wikipedia', 'wikidata'],
 };
 
@@ -321,7 +326,12 @@ export const SERVICE_DISPLAY_NAMES: Record<EnrichmentService, string> = {
   theaudiodb: 'TheAudioDB',
   rateyourmusic: 'Rate Your Music',
   setlistfm: 'Setlist.fm',
-  wikidata: 'Wikidata'
+  wikidata: 'Wikidata',
+  fanarttv: 'Fanart.tv',
+  deezer: 'Deezer',
+  musixmatch: 'Musixmatch',
+  popsike: 'Popsike',
+  pitchfork: 'Pitchfork'
 };
 
 /**
@@ -343,7 +353,12 @@ export const SERVICE_ICONS: Record<EnrichmentService, string> = {
   theaudiodb: '🔊',
   rateyourmusic: '📈',
   setlistfm: '🎤',
-  wikidata: '🌐'
+  wikidata: '🌐',
+  fanarttv: '🎨',
+  deezer: '⚡',
+  musixmatch: '🎤',
+  popsike: '💲',
+  pitchfork: '⚡'
 };
 
 /**

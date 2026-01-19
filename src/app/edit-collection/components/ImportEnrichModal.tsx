@@ -246,6 +246,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       coverArt: activeServices.has('coverArtArchive'),
       whosampled: activeServices.has('whosampled'),
       secondhandsongs: activeServices.has('secondhandsongs'),
+      theaudiodb: activeServices.has('theaudiodb'),
+      wikidata: activeServices.has('wikidata'),
+      setlistfm: activeServices.has('setlistfm'),
+      rateyourmusic: activeServices.has('rateyourmusic'),
+      fanarttv: activeServices.has('fanarttv'),
+      deezer: activeServices.has('deezer'),
+      musixmatch: activeServices.has('musixmatch'),
+      popsike: activeServices.has('popsike'),
+      pitchfork: activeServices.has('pitchfork'),
     };
   }
 
