@@ -297,7 +297,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
           side: dbTrack.side || 'A',
           is_header: dbTrack.type === 'header',
         };
-      }).filter((t): t is Track => t !== null);
+      }).filter((t) => t !== null) as Track[];
       
       setTracks(loadedTracks);
       
