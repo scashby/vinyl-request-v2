@@ -79,6 +79,22 @@ type Album = {
   last_cleaned_date: string | null;
   signed_by: string[] | null;
   play_count: number | null;
+  // ENRICHMENT FIELDS
+  enrichment_summary: Record<string, string> | null;
+  musicians: string[] | null;
+  producers: string[] | null;
+  companies: string[] | null;
+  tempo_bpm: number | null;
+  musical_key: string | null;
+  energy: number | null;
+  danceability: number | null;
+  mood_acoustic: number | null;
+  mood_happy: number | null;
+  mood_sad: number | null;
+  mood_party: number | null;
+  mood_relaxed: number | null;
+  mood_aggressive: number | null;
+  mood_electronic: number | null;
 };
 
 interface AlbumDetailPanelProps {
@@ -239,6 +255,117 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
               <div className="p-5 text-center text-gray-400 text-[13px]">
                 <div className="text-[32px] mb-2">📋</div>
                 No detailed metadata available
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'enrichment' && (
+          <div className="flex flex-col gap-6">
+            
+            {/* 1. EXTERNAL FACTS CARD */}
+            {album.enrichment_summary && Object.keys(album.enrichment_summary).length > 0 && (
+              <div className="bg-blue-50 border border-blue-100 rounded-md overflow-hidden">
+                <div className="px-3 py-2 bg-blue-100/50 border-b border-blue-100 text-xs font-bold text-blue-800 uppercase tracking-wide">
+                  External Data Sources
+                </div>
+                <div className="p-3 flex flex-col gap-3">
+                  {Object.entries(album.enrichment_summary).map(([source, text], idx) => (
+                    <div key={idx} className="text-sm text-gray-800">
+                      <span className="font-semibold text-gray-600 capitalize mr-1">
+                        {source.replace(/_/g, ' ')}:
+                      </span>
+                      {text.includes('http') ? (
+                        <span>
+                          {text.split(/(https?:\/\/[^\s]+)/g).map((part, i) => 
+                            part.match(/^https?:\/\//) ? (
+                              <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">
+                                {part.includes('whosampled') ? 'View on WhoSampled' : 
+                                 part.includes('secondhandsongs') ? 'View on SHS' :
+                                 part.includes('setlist') ? 'View Tour History' : 
+                                 'View Link'} →
+                              </a>
+                            ) : part
+                          )}
+                        </span>
+                      ) : (
+                        <span>{text}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 2. SONIC DNA CARD */}
+            {(album.tempo_bpm || album.musical_key || album.energy) && (
+              <div>
+                <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  Sonic DNA
+                </div>
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  {album.tempo_bpm && (
+                    <div className="p-2 bg-gray-50 rounded border border-gray-100 text-center">
+                      <div className="text-[10px] text-gray-400 uppercase">Tempo</div>
+                      <div className="font-bold text-gray-800">{album.tempo_bpm} BPM</div>
+                    </div>
+                  )}
+                  {album.musical_key && (
+                    <div className="p-2 bg-gray-50 rounded border border-gray-100 text-center">
+                      <div className="text-[10px] text-gray-400 uppercase">Key</div>
+                      <div className="font-bold text-gray-800">{album.musical_key}</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Audio Features Bars */}
+                <div className="space-y-3">
+                  {[
+                    { label: 'Energy', val: album.energy, color: 'bg-orange-500' },
+                    { label: 'Danceability', val: album.danceability, color: 'bg-purple-500' },
+                    { label: 'Acoustic', val: album.mood_acoustic, color: 'bg-amber-600' },
+                    { label: 'Happy', val: album.mood_happy, color: 'bg-yellow-400' },
+                    { label: 'Sad', val: album.mood_sad, color: 'bg-blue-400' },
+                    { label: 'Electronic', val: album.mood_electronic, color: 'bg-cyan-500' },
+                  ].map(feat => (
+                    typeof feat.val === 'number' && (
+                      <div key={feat.label} className="flex items-center gap-2 text-xs">
+                        <div className="w-20 text-gray-500">{feat.label}</div>
+                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full ${feat.color}`} 
+                            style={{ width: `${feat.val * 100}%` }} 
+                          />
+                        </div>
+                        <div className="w-8 text-right font-mono text-gray-400">
+                          {Math.round(feat.val * 100)}%
+                        </div>
+                      </div>
+                    )
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 3. EXTENDED CREDITS CARD */}
+            {(album.musicians?.length || album.producers?.length || album.companies?.length) && (
+              <div>
+                <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  Extended Credits
+                </div>
+                <div className="flex flex-col gap-4">
+                  {renderArrayField('Producers', album.producers)}
+                  {renderArrayField('Musicians', album.musicians)}
+                  {renderArrayField('Companies/Studios', album.companies)}
+                </div>
+              </div>
+            )}
+
+            {/* Fallback */}
+            {!album.enrichment_summary && !album.tempo_bpm && !album.musicians && (
+              <div className="p-5 text-center text-gray-400 text-[13px]">
+                <div className="text-[32px] mb-2">⚡</div>
+                No enrichment data found.<br/>Run "Enrich Collection" to populate.
               </div>
             )}
           </div>
