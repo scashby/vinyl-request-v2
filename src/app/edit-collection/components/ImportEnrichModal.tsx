@@ -156,6 +156,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [status, setStatus] = useState('');
   const [folderFilter, setFolderFilter] = useState('');
   const [batchSize, setBatchSize] = useState('25');
+  const [autoSnooze, setAutoSnooze] = useState(true); // Default to true (30-day skip)
   
   // Granular Configuration State
   // Map: FieldName -> Set of Allowed Service IDs
@@ -511,10 +512,13 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             const finalized = (album as Record<string, unknown>).finalized_fields as string[] | undefined;
             if (Array.isArray(finalized) && finalized.includes(key)) return;
 
-            const lastReviewed = (album as Record<string, unknown>).last_reviewed_at as string | undefined;
-            if (lastReviewed) {
-               const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-               if (new Date(lastReviewed).getTime() > thirtyDaysAgo) return; 
+            // AUTO-SNOOZE: Skip items reviewed in the last 30 days if enabled
+            if (autoSnooze) {
+               const lastReviewed = (album as Record<string, unknown>).last_reviewed_at as string | undefined;
+               if (lastReviewed) {
+                  const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+                  if (new Date(lastReviewed).getTime() > thirtyDaysAgo) return; 
+               }
             }
 
             const alreadySeen = (resolutions as ResolutionHistory[] | null)?.some(r => 
@@ -584,7 +588,29 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
              proposedValue = Array.from(mergedSet);
              isMerge = true;
           } 
-          // Strategy 2: Single Values -> Priority Winner
+          // Strategy 2: Notes -> Smart Append (Combine Wikipedia, Links, Discogs)
+          else if (key === 'notes') {
+             const combinedNotes: string[] = [];
+             const seenContent = new Set<string>();
+
+             // Sort sources by priority so Wikipedia comes first, then links
+             const sortedSources = sources.sort((a, b) => {
+                 return GLOBAL_PRIORITY.indexOf(a) - GLOBAL_PRIORITY.indexOf(b);
+             });
+
+             sortedSources.forEach(src => {
+                 const val = String(sourceValues[src]).trim();
+                 if (val && !seenContent.has(val)) {
+                     // Always keep distinct content
+                     combinedNotes.push(val);
+                     seenContent.add(val);
+                 }
+             });
+             
+             proposedValue = combinedNotes.join('\n\n');
+             isMerge = true; // Treat as a merge so we can edit it
+          }
+          // Strategy 3: Single Values -> Priority Winner
           else {
              // Determine appropriate priority list based on field type
              let priorityList = GLOBAL_PRIORITY;
@@ -1009,10 +1035,18 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                   <StatBox label="Fully Enriched" value={stats.fullyEnriched} color="#10b981" onClick={() => showCategory('fully-enriched', 'Fully Enriched')} />
                   <div className="relative">
                     <StatBox label="Needs Enrichment" value={stats.needsEnrichment} color="#f59e0b" onClick={() => showCategory('needs-enrichment', 'Needs Enrichment')} />
-                    {/* RESTORED: Snooze Badge */}
-                    <div className="absolute -top-2.5 right-2.5 bg-gray-100 px-2 py-0.5 rounded-xl text-[10px] text-gray-500 border border-gray-200 font-semibold">
-                      Auto-Snooze Active
-                    </div>
+                    {/* AUTO-SNOOZE TOGGLE */}
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setAutoSnooze(!autoSnooze); }}
+                      className={`absolute -top-2.5 right-2.5 px-2 py-0.5 rounded-xl text-[10px] border font-bold cursor-pointer transition-all ${
+                        autoSnooze 
+                          ? 'bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200' 
+                          : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                      }`}
+                      title={autoSnooze ? "Skipping items reviewed in last 30 days" : "Checking ALL items (ignoring recent reviews)"}
+                    >
+                      {autoSnooze ? '💤 Snooze Active' : '⚡ Snooze OFF'}
+                    </button>
                   </div>
                 </div>
               </div>

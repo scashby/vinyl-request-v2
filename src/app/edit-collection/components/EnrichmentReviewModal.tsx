@@ -224,10 +224,39 @@ function ConflictValue({
     ? JSON.stringify(value, null, 2) 
     : String(value ?? '');
 
+  // Detect and render links if the value contains http/https
+  const renderContent = () => {
+    if (!value) return 'Empty / None';
+    
+    // Simple URL detection
+    if (typeof value === 'string' && (value.includes('http://') || value.includes('https://'))) {
+      const parts = value.split(/(https?:\/\/[^\s]+)/g);
+      return (
+        <>
+          {parts.map((part, i) => 
+            part.match(/^https?:\/\//) ? (
+              <a 
+                key={i} 
+                href={part} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()} // Prevent selecting the card when clicking link
+                className="text-blue-600 hover:underline break-all relative z-50"
+              >
+                {part}
+              </a>
+            ) : part
+          )}
+        </>
+      );
+    }
+    return displayValue;
+  };
+
   return (
     <ContentWrapper>
       <div className={`text-[13px] whitespace-pre-wrap break-words leading-relaxed mt-1 ${value ? 'not-italic' : 'italic'}`}>
-        {value ? displayValue : 'Empty / None'}
+        {renderContent()}
       </div>
     </ContentWrapper>
   );

@@ -873,7 +873,9 @@ export async function fetchWikipediaData(album: { artist: string, title: string 
 // 9. WHOSAMPLED (Samples & Covers)
 // ============================================================================
 export async function fetchWhoSampledData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
-    // Note: WhoSampled has no public API. This generates a search link for the UI.
+    // TODO: Spotify acquired WhoSampled (Nov 2025). 
+    // When "SongDNA" or equivalent endpoints become available in the Spotify Web API, 
+    // replace this link generator with a real API call to fetch sample/cover data directly.
     const query = `${album.artist} ${album.title}`;
     const searchUrl = `https://www.whosampled.com/search/?q=${encodeURIComponent(query)}`;
     
@@ -890,28 +892,35 @@ export async function fetchWhoSampledData(album: { artist: string, title: string
 // 10. SECONDHANDSONGS (Originals & Adaptations)
 // ============================================================================
 export async function fetchSecondHandSongsData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
-    // Requires API Key (SHS_API_KEY in .env)
     const apiKey = process.env.SHS_API_KEY;
-    if (!apiKey) {
-        return { success: false, source: 'secondhandsongs', error: 'No API Key' };
-    }
+    if (!apiKey) return { success: false, source: 'secondhandsongs', error: 'No API Key' };
 
     try {
+        // 1. Search for the Work (Song/Album)
         const url = `https://secondhandsongs.com/search/object?q=${encodeURIComponent(album.title)}&performer=${encodeURIComponent(album.artist)}`;
         const res = await fetch(url, { headers: { 'Authorization': `Bearer ${apiKey}` } });
         const data = await res.json();
         
-        // Basic implementation: Return the first match URL
-        if (data.length > 0) {
-            return {
-                success: true,
-                source: 'secondhandsongs',
-                data: {
-                    notes: `SHS Link: https://secondhandsongs.com${data[0].uri}`
-                }
-            };
+        if (data.length === 0) return { success: false, source: 'secondhandsongs', error: 'Not Found' };
+
+        const match = data[0];
+        const uri = match.uri; // e.g., /release/12345
+        
+        // 2. Summarize the match
+        let summary = `SecondHandSongs: Found "${match.title}" (${match.entityType})`;
+        if (match.entityType === 'release') {
+            summary += `. View covers and originals: https://secondhandsongs.com${uri}`;
         }
-        return { success: false, source: 'secondhandsongs', error: 'Not Found' };
+
+        return {
+            success: true,
+            source: 'secondhandsongs',
+            data: {
+                notes: summary,
+                // Use is_cover flag if the entity type suggests it
+                is_cover: match.entityType === 'performance' // A performance is often a cover in their DB context
+            }
+        };
     } catch (e) {
         return { success: false, source: 'secondhandsongs', error: (e as Error).message };
     }
@@ -1005,16 +1014,48 @@ export async function fetchWikidataData(album: { artist: string, title: string }
 // ============================================================================
 // 13. SETLIST.FM (Live Context)
 // ============================================================================
-export async function fetchSetlistFmData(album: { artist: string }): Promise<EnrichmentResult> {
-    // Generate Search Link (API requires specific MBIDs and is complex for "Album" lookup)
-    const url = `https://www.setlist.fm/search?query=${encodeURIComponent(album.artist)}`;
-    return {
-        success: true,
-        source: 'setlistfm',
-        data: {
-            notes: `Check Setlists: ${url}`
+export async function fetchSetlistFmData(album: { artist: string, musicbrainz_id?: string }): Promise<EnrichmentResult> {
+    const apiKey = process.env.SETLIST_FM_API_KEY;
+    
+    // Fallback if no key
+    if (!apiKey) {
+        return {
+            success: true,
+            source: 'setlistfm',
+            data: { notes: `Setlist.fm Search: https://www.setlist.fm/search?query=${encodeURIComponent(album.artist)}` }
+        };
+    }
+
+    try {
+        // Perform a quick search for the Artist to get their stats and URL
+        const artistSearchUrl = `https://api.setlist.fm/rest/1.0/search/artists?artistName=${encodeURIComponent(album.artist)}&sort=relevance`;
+        const res = await fetch(artistSearchUrl, { 
+            headers: { 'x-api-key': apiKey, 'Accept': 'application/json' } 
+        });
+        
+        if (!res.ok) throw new Error('API Error');
+        const data = await res.json();
+        
+        if (data.artist && data.artist.length > 0) {
+            const artist = data.artist[0]; // Best match
+            return {
+                success: true,
+                source: 'setlistfm',
+                data: {
+                    notes: `Setlist.fm: ${artist.name} has linked setlists. View tour history: ${artist.url}`
+                }
+            };
         }
-    };
+        
+        return { success: false, source: 'setlistfm', error: 'Artist Not Found' };
+    } catch {
+        // Fallback to link on error
+        return {
+            success: true,
+            source: 'setlistfm',
+            data: { notes: `Setlist.fm Search: https://www.setlist.fm/search?query=${encodeURIComponent(album.artist)}` }
+        };
+    }
 }
 
 // ============================================================================
