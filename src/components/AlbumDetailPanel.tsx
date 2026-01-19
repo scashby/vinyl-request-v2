@@ -104,7 +104,7 @@ interface AlbumDetailPanelProps {
   onMarkForSale: () => void;
 }
 
-type TabId = 'main' | 'details' | 'personal' | 'tags' | 'notes' | 'ids';
+type TabId = 'main' | 'details' | 'enrichment' | 'personal' | 'tags' | 'notes' | 'ids';
 
 export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkForSale }: AlbumDetailPanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>('main');
@@ -112,6 +112,7 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
   const tabs: { id: TabId; label: string; icon: string }[] = [
     { id: 'main', label: 'Main', icon: '📋' },
     { id: 'details', label: 'Details', icon: '🎵' },
+    { id: 'enrichment', label: 'Facts', icon: '⚡' },
     { id: 'personal', label: 'Personal', icon: '👤' },
     { id: 'tags', label: 'Tags', icon: '🏷️' },
     { id: 'notes', label: 'Notes', icon: '📝' },
@@ -365,7 +366,7 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
             {!album.enrichment_summary && !album.tempo_bpm && !album.musicians && (
               <div className="p-5 text-center text-gray-400 text-[13px]">
                 <div className="text-[32px] mb-2">⚡</div>
-                No enrichment data found.<br/>Run "Enrich Collection" to populate.
+                No enrichment data found.<br/>Run &quot;Enrich Collection&quot; to populate.
               </div>
             )}
           </div>
