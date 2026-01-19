@@ -251,6 +251,9 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
   const groupedConflicts = useMemo(() => {
     const groups: Record<number, ExtendedFieldConflict[]> = {};
     conflicts.forEach(c => {
+      // 1. Skip Tracks if DB already has data (User request: don't review if populated)
+      if (c.field_name === 'tracks' && Array.isArray(c.current_value) && c.current_value.length > 0) return;
+
       if (!groups[c.album_id]) groups[c.album_id] = [];
       groups[c.album_id].push(c);
     });
@@ -437,7 +440,8 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                       const isImageArrayField = isImageArray(conflict.current_value) || isImageArray(conflict.new_value);
                       
                       // Define fields that should behave as mergeable lists (Chips)
-                      const TEXT_LIST_FIELDS = ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 'label', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger'];
+                      // Added 'labels' to ensure Multi-Select works for Record Labels
+                      const TEXT_LIST_FIELDS = ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger'];
                       const isTextListField = TEXT_LIST_FIELDS.includes(conflict.field_name);
 
                       // Helper to normalize values to array for Chip Selector
@@ -452,7 +456,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                           <div className="flex justify-between items-center mb-2">
                             <div className="flex items-center gap-3">
                               <div className="text-xs font-bold text-gray-600 uppercase">
-                                {conflict.field_name === 'label' ? 'RECORD LABELS' : conflict.field_name.replace(/_/g, ' ')}
+                                {['label', 'labels'].includes(conflict.field_name) ? 'RECORD LABELS' : conflict.field_name.replace(/_/g, ' ')}
                               </div>
                               {/* Action Bar for merging text fields OR Gallery Mode for images */}
                               {isImageArrayField ? (

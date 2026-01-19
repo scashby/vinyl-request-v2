@@ -126,7 +126,12 @@ export type ExtendedFieldConflict = FieldConflict & {
 const normalizeValue = (val: unknown): string => {
   if (val === null || val === undefined) return '';
   if (typeof val === 'number') return String(val);
-  if (Array.isArray(val)) return JSON.stringify(val.sort());
+  if (Array.isArray(val)) {
+    if (val.length === 0) return '';
+    // Sort a copy to avoid mutating original data and ensure consistent comparison
+    // Use a deep string representation for sorting to handle objects inside arrays if needed
+    return JSON.stringify([...val].map(v => String(v)).sort());
+  }
   if (typeof val === 'object') return JSON.stringify(val);
   return String(val).trim();
 };
@@ -239,6 +244,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       wikipedia: activeServices.has('wikipedia'),
       genius: activeServices.has('genius'),
       coverArt: activeServices.has('coverArtArchive'),
+      whosampled: activeServices.has('whosampled'),
+      secondhandsongs: activeServices.has('secondhandsongs'),
     };
   }
 
@@ -580,7 +587,17 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
              }
 
              // Pick the value from the highest priority source available
-             const winnerSrc = priorityList.find(s => sources.includes(s)) || sources[0];
+             let winnerSrc = priorityList.find(s => sources.includes(s)) || sources[0];
+
+             // DISCOGS SUPREMACY: If we have a linked Discogs release, force Discogs for physical fields
+             // Exception: 'year' is excluded from this lock per user request (pressing vs original date)
+             if (album.discogs_release_id && sources.includes('discogs')) {
+                // LOCK these fields to Discogs data only
+                if (['tracklist', 'labels', 'cat_no', 'country', 'barcode', 'format'].includes(key)) {
+                   winnerSrc = 'discogs';
+                }
+             }
+
              proposedValue = sourceValues[winnerSrc];
           }
 
@@ -605,6 +622,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           } 
           // Case B: Conflict (Database has data OR Sources disagree on a single value)
           else {
+              // 1. Skip Tracks if DB already has data (User Preference)
+              if (key === 'tracks' && !isCurrentEmpty) return;
+
               // Check if the proposed value is actually different from DB
               if (!areValuesEqual(currentVal, proposedValue)) {
                   // Re-calculate primary source for the conflict record using the same logic

@@ -295,7 +295,20 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     packaging: data.formats?.[0]?.descriptions?.find((d: string) => 
       ['Gatefold', 'Single Sleeve', 'Digipak'].some(p => d.includes(p))
     ) || null,
+    notes: data.notes || null,
+    original_release_date: data.released || null,
   };
+
+  // Extract Labels from companies
+  if (data.companies && Array.isArray(data.companies)) {
+    const labels = data.companies
+      .filter((c: { entity_type_name: string; name: string }) => c.entity_type_name === 'Label')
+      .map((c: { name: string }) => c.name);
+    
+    if (labels.length > 0) {
+      enriched.labels = labels;
+    }
+  }
 
   if (data.formats && Array.isArray(data.formats)) {
     const soundDescriptions = data.formats[0]?.descriptions || [];
@@ -304,6 +317,15 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
       soundTypes.some(type => d.includes(type))
     );
     if (sound) enriched.sound = sound;
+  }
+
+  // Validate date format (YYYY-MM-DD)
+  if (typeof enriched.original_release_date === 'string') {
+    // If only Year (YYYY), default to Jan 1st or leave as is depending on DB preference
+    // For now, we only keep it if it looks like a full date or at least YYYY
+    if (!/^\d{4}/.test(enriched.original_release_date)) {
+      delete enriched.original_release_date;
+    }
   }
 
   if (data.identifiers && Array.isArray(data.identifiers)) {
