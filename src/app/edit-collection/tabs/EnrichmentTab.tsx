@@ -6,6 +6,7 @@ import type { Album } from 'types/album';
 
 interface EnrichmentTabProps {
   album: Album;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onChange: (field: keyof Album, value: any) => void;
 }
 
@@ -79,7 +80,7 @@ export function EnrichmentTab({ album, onChange }: EnrichmentTabProps) {
             ))
           ) : (
             <div className="text-center text-gray-400 text-sm py-4 italic">
-              No external enrichment data found. Run "Enrich Collection" to populate.
+              No external enrichment data found. Run &quot;Enrich Collection&quot; to populate.
             </div>
           )}
         </div>
