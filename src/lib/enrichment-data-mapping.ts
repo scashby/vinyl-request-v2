@@ -35,24 +35,28 @@ export type EnrichmentService =
   | 'discogs'
   | 'genius'
   | 'whosampled'
-  | 'secondhandsongs';
+  | 'secondhandsongs'
+  | 'theaudiodb'
+  | 'rateyourmusic'
+  | 'setlistfm'
+  | 'wikidata';
 
 /**
  * Maps data categories to the services that can provide that data
  */
 export const DATA_TO_SERVICES: Record<DataCategory, EnrichmentService[]> = {
-  artwork: ['coverArtArchive', 'musicbrainz', 'discogs', 'spotify', 'appleMusic', 'lastfm'],
-  credits: ['musicbrainz', 'allmusic', 'appleMusic', 'discogs', 'genius'],
-  tracklists: ['discogs', 'spotify', 'appleMusic', 'lastfm'],
+  artwork: ['coverArtArchive', 'musicbrainz', 'discogs', 'spotify', 'appleMusic', 'lastfm', 'theaudiodb'],
+  credits: ['musicbrainz', 'allmusic', 'appleMusic', 'discogs', 'genius', 'wikidata'],
+  tracklists: ['discogs', 'spotify', 'appleMusic', 'lastfm', 'setlistfm'],
   sonic_domain: ['acousticbrainz', 'musicbrainz', 'spotify', 'whosampled', 'secondhandsongs'],
-  genres: ['discogs', 'spotify', 'appleMusic', 'allmusic', 'lastfm', 'musicbrainz'],
-  streaming_links: ['spotify', 'appleMusic', 'lastfm', 'musicbrainz', 'allmusic', 'wikipedia', 'whosampled', 'secondhandsongs'],
-  reviews: ['allmusic', 'lastfm', 'spotify', 'appleMusic', 'wikipedia'],
-  chart_data: ['wikipedia'],
-  release_metadata: ['musicbrainz', 'discogs', 'spotify', 'appleMusic', 'wikipedia'],
+  genres: ['discogs', 'spotify', 'appleMusic', 'allmusic', 'lastfm', 'musicbrainz', 'rateyourmusic', 'theaudiodb'],
+  streaming_links: ['spotify', 'appleMusic', 'lastfm', 'musicbrainz', 'allmusic', 'wikipedia', 'whosampled', 'secondhandsongs', 'setlistfm'],
+  reviews: ['allmusic', 'lastfm', 'spotify', 'appleMusic', 'wikipedia', 'rateyourmusic'],
+  chart_data: ['wikipedia', 'rateyourmusic'],
+  release_metadata: ['musicbrainz', 'discogs', 'spotify', 'appleMusic', 'wikipedia', 'wikidata'],
   lyrics: ['genius'],
-  similar_albums: ['lastfm', 'allmusic'],
-  cultural_context: ['wikipedia'],
+  similar_albums: ['lastfm', 'allmusic', 'rateyourmusic'],
+  cultural_context: ['wikipedia', 'wikidata'],
 };
 
 /**
@@ -313,7 +317,11 @@ export const SERVICE_DISPLAY_NAMES: Record<EnrichmentService, string> = {
   discogs: 'Discogs',
   genius: 'Genius',
   whosampled: 'WhoSampled',
-  secondhandsongs: 'SecondHandSongs'
+  secondhandsongs: 'SecondHandSongs',
+  theaudiodb: 'TheAudioDB',
+  rateyourmusic: 'Rate Your Music',
+  setlistfm: 'Setlist.fm',
+  wikidata: 'Wikidata'
 };
 
 /**
@@ -331,7 +339,11 @@ export const SERVICE_ICONS: Record<EnrichmentService, string> = {
   discogs: '💿',
   genius: '📝',
   whosampled: '✂️',
-  secondhandsongs: '♻️'
+  secondhandsongs: '♻️',
+  theaudiodb: '🔊',
+  rateyourmusic: '📈',
+  setlistfm: '🎤',
+  wikidata: '🌐'
 };
 
 /**
