@@ -284,21 +284,28 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
       console.log('📀 Loading existing tracks from album:', album.tracks);
       
       // Convert database tracks to internal Track format
-      const loadedTracks: Track[] = album.tracks.map((dbTrack, index) => ({
-        id: `track-${index}`,
-        position: parseInt(dbTrack.position || '0'),
-        title: dbTrack.title || '',
-        artist: dbTrack.artist || '',
-        duration: dbTrack.duration || '',
-        disc_number: dbTrack.disc_number || 1,
-        side: dbTrack.side || 'A',
-        is_header: dbTrack.type === 'header',
-      }));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const loadedTracks: Track[] = album.tracks.map((dbTrack: any, index: number) => {
+        if (!dbTrack) return null; // Skip null entries
+        return {
+          id: `track-${index}`,
+          position: parseInt(dbTrack.position || '0'),
+          title: dbTrack.title || '',
+          artist: dbTrack.artist || '',
+          duration: dbTrack.duration || '',
+          disc_number: dbTrack.disc_number || 1,
+          side: dbTrack.side || 'A',
+          is_header: dbTrack.type === 'header',
+        };
+      }).filter((t): t is Track => t !== null);
+      
       setTracks(loadedTracks);
       
       // Load disc metadata if available
       if (album.disc_metadata && Array.isArray(album.disc_metadata)) {
-        const loadedDiscs: Disc[] = album.disc_metadata.map((dbDisc) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const loadedDiscs: Disc[] = album.disc_metadata.map((dbDisc: any) => {
+          if (!dbDisc) return null; // Skip null entries
           const discNum = dbDisc.disc_number || 1;
           const matrixData = album.matrix_numbers?.[discNum.toString()];
           
@@ -310,8 +317,9 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
             matrix_side_a: matrixData?.side_a || '',
             matrix_side_b: matrixData?.side_b || '',
           };
-        });
-        setDiscs(loadedDiscs);
+        }).filter((d): d is Disc => d !== null);
+        
+        if (loadedDiscs.length > 0) setDiscs(loadedDiscs);
       }
     } else if (album.discs && album.discs > 1) {
       // No saved tracks - initialize empty discs based on disc count
