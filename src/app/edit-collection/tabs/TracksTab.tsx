@@ -317,7 +317,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
             matrix_side_a: matrixData?.side_a || '',
             matrix_side_b: matrixData?.side_b || '',
           };
-        }).filter((d): d is Disc => d !== null);
+        }).filter((d) => d !== null) as Disc[];
         
         if (loadedDiscs.length > 0) setDiscs(loadedDiscs);
       }

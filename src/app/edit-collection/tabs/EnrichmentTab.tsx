@@ -6,8 +6,7 @@ import type { Album } from 'types/album';
 
 interface EnrichmentTabProps {
   album: Album;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onChange: (field: keyof Album, value: any) => void;
+  onChange: <K extends keyof Album>(field: K, value: Album[K]) => void;
 }
 
 export function EnrichmentTab({ album, onChange }: EnrichmentTabProps) {

@@ -310,7 +310,6 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
     const key = `${conflict.album_id}-${conflict.field_name}`;
     
     // Explicit list of fields that support "Chip Selection" (Merging)
-    // Note: 'labels' covers both 'label' and 'labels' keys due to normalization
     const MERGEABLE_FIELDS = [
       'genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 
       'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url', 
@@ -321,48 +320,31 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
 
     if (isMergeable) {
       setResolutions(prev => {
-        // Get currently selected items (or default to current value if first interaction)
         const currentRes = prev[key];
-        let currentItems: Set<string>;
+        const currentVal = currentRes ? currentRes.value : conflict.current_value;
+        const currentArray = Array.isArray(currentVal) ? currentVal : (currentVal ? [currentVal] : []);
+        const currentItems = new Set(currentArray.map(String));
 
-        if (currentRes) {
-           currentItems = new Set(Array.isArray(currentRes.value) ? (currentRes.value as string[]).map(String) : []);
+        if (Array.isArray(value)) {
+            // Add all items from source
+            value.forEach(v => currentItems.add(String(v)));
         } else {
-           // Default state: 'current' value is selected
-           currentItems = new Set(Array.isArray(conflict.current_value) ? (conflict.current_value as string[]).map(String) : []);
-        }
-
-        // Handle Image Gallery vs Text Chips
-        if (isImageArray(conflict.current_value) || isImageArray(conflict.new_value)) {
-           // Image Mode: Toggle the specific URL passed in 'value'
-           const urlToToggle = String(value);
-           if (currentItems.has(urlToToggle)) currentItems.delete(urlToToggle);
-           else currentItems.add(urlToToggle);
-        } else {
-           // Text Mode: Handle Chip Clicks
-           // If 'value' is an array (e.g. user clicked "Select All New" or a source box), add all
-           if (Array.isArray(value)) {
-              (value as string[]).forEach(v => currentItems.add(String(v)));
-           } 
-           // If 'value' is a single string (clicked a specific chip), toggle it
-           else {
-              const strVal = String(value);
-              if (currentItems.has(strVal)) currentItems.delete(strVal);
-              else currentItems.add(strVal);
-           }
+            // Toggle single item
+            const strVal = String(value);
+            if (currentItems.has(strVal)) currentItems.delete(strVal);
+            else currentItems.add(strVal);
         }
 
         return { 
           ...prev, 
           [key]: { 
             value: Array.from(currentItems), 
-            source: 'custom_merge', // Mark as custom so UI knows it's a mix
+            source: 'custom_merge',
             selectedSources: ['custom'] 
           } 
         };
       });
     } else {
-      // Standard Radio-style behavior for static fields (Date, Country, Barcode)
       setResolutions(prev => ({ ...prev, [key]: { value, source } }));
     }
   };

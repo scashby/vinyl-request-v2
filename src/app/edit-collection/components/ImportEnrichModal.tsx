@@ -681,7 +681,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
           // CRITICAL: Ignore empty/null proposals to prevent Ghost Conflicts
           if (proposedValue === null || proposedValue === undefined || proposedValue === '') return;
-          if (Array.isArray(proposedValue) && proposedValue.length === 0) return;
+          
+          // Check for empty arrays OR arrays containing only whitespace/empty strings
+          if (Array.isArray(proposedValue)) {
+             // Filter out empty strings explicitly to prevent Ghost Conflicts with ['']
+             const filtered = proposedValue.filter(v => v && String(v).trim() !== '');
+             if (filtered.length === 0) return;
+             proposedValue = filtered;
+          }
+          
           if (typeof proposedValue === 'object' && Object.keys(proposedValue as object).length === 0) return;
 
           // DECISION: Auto-Fill vs Conflict
@@ -872,8 +880,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           action: actionText 
         });
         
-        // ADDED: Logging for manual changes
-        addLog(`${c.artist} - ${c.title}`, 'conflict-resolved', `${actionText} ${c.field_name}`);
+        // ADDED: Logging for manual changes (Commented out to prevent freezing on bulk save)
+        // addLog(`${c.artist} - ${c.title}`, 'conflict-resolved', `${actionText} ${c.field_name}`);
 
         const trackSource = (decision.source === 'current' || decision.source === 'merge') ? null : decision.source;
         if (trackSource && c.candidates?.[trackSource]) {
