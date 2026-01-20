@@ -342,7 +342,7 @@ export default function MediaGradingPage() {
     setItems((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function updateItem(idx: number, updater: (item: any) => any) {
+  function updateItem(idx: number, updater: (item: MediaState) => MediaState) {
     setItems((prev) => prev.map((it, i) => (i === idx ? updater(it) : it)));
   }
 
@@ -384,8 +384,8 @@ export default function MediaGradingPage() {
 
           if (isAudio && entry.tracks !== null) {
             if (labels.sideable && entry.tracks && typeof entry.tracks === "object") {
-              const countS1 = entry.sides?.S1 ? Math.max(0, parseInt(entry.tracks.S1 || 0, 10)) : 0;
-              const countS2 = entry.sides?.S2 ? Math.max(0, parseInt(entry.tracks.S2 || 0, 10)) : 0;
+              const countS1 = entry.sides?.S1 ? Math.max(0, entry.tracks.S1 || 0) : 0;
+              const countS2 = entry.sides?.S2 ? Math.max(0, entry.tracks.S2 || 0) : 0;
               const total = countS1 + countS2;
               if (total > 0) {
                 const amt = total * MEDIA_PENALTIES.perTrack;
@@ -393,7 +393,7 @@ export default function MediaGradingPage() {
                 deductions.push({ label: `Tracks affected (${entry.label})`, amount: amt });
               }
             } else if (!labels.sideable && typeof entry.tracks === "number") {
-              const t = Math.max(0, parseInt(entry.tracks || 0, 10));
+              const t = Math.max(0, entry.tracks || 0);
               if (t > 0) {
                 const amt = t * MEDIA_PENALTIES.perTrack;
                 score -= amt;
@@ -451,7 +451,7 @@ export default function MediaGradingPage() {
       return allowedWhenSealedNonVinyl.has(key) || key === "allIntact" || key === "allSeamsIntact";
     };
 
-    const applyBlock = (blockArr: any[]) => {
+    const applyBlock = (blockArr: GradingOption[]) => {
       if (!blockArr) return;
       blockArr.forEach((cfg) => {
         if (!allowKey(cfg.key)) return;
@@ -760,7 +760,7 @@ export default function MediaGradingPage() {
 
     const setMissing = (val: boolean) => updateItem(index, (it) => ({ ...it, missing: val }));
 
-    const sectionBlock = (title: string, keyName: string, arr: any[]) => {
+    const sectionBlock = (title: string, keyName: keyof MediaState['sections'], arr: MediaItemState[]) => {
       if (sealed && mediaType !== "vinyl") {
         return null;
       }
@@ -865,8 +865,8 @@ export default function MediaGradingPage() {
                             onChange={(e) =>
                               setEntry(keyName, entry.key, {
                                 tracks: {
-                                  ...entry.tracks,
-                                  S1: Math.max(0, parseInt(e.target.value || "0", 10)),
+                                  ...(entry.tracks as { S1: number; S2: number }),
+                                  S1: Math.max(0, parseInt(String(e.target.value || "0"), 10)),
                                 },
                               })
                             }
@@ -883,8 +883,8 @@ export default function MediaGradingPage() {
                             onChange={(e) =>
                               setEntry(keyName, entry.key, {
                                 tracks: {
-                                  ...entry.tracks,
-                                  S2: Math.max(0, parseInt(e.target.value || "0", 10)),
+                                  ...(entry.tracks as { S1: number; S2: number }),
+                                  S2: Math.max(0, parseInt(String(e.target.value || "0"), 10)),
                                 },
                               })
                             }
@@ -899,10 +899,10 @@ export default function MediaGradingPage() {
                           id={`${id}-tracks`}
                           type="number"
                           min="0"
-                          value={entry.tracks}
+                          value={typeof entry.tracks === 'number' ? entry.tracks : 0}
                           onChange={(e) =>
                             setEntry(keyName, entry.key, {
-                              tracks: Math.max(0, parseInt(e.target.value || "0", 10)),
+                              tracks: Math.max(0, parseInt(String(e.target.value || "0"), 10)),
                             })
                           }
                           className="w-16 p-1 border border-slate-300 rounded text-center"
