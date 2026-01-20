@@ -12,31 +12,18 @@ interface CoverTabProps {
   onChange: <K extends keyof Album>(field: K, value: Album[K]) => void;
 }
 
-interface CropState {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+// Extend Album locally to include Inner Sleeve Images until global types are updated
+interface ExtendedAlbum extends Album {
+  inner_sleeve_images?: string[] | null;
 }
 
-type DragHandle = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w' | 'move';
-
-export function CoverTab({ album, onChange }: CoverTabProps) {
-  const [uploading, setUploading] = useState<'front' | 'back' | null>(null);
-  const [cropMode, setCropMode] = useState<'front' | 'back' | null>(null);
-  const [frontRotation, setFrontRotation] = useState(0);
-  const [backRotation, setBackRotation] = useState(0);
+export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
+  const album = baseAlbum as ExtendedAlbum;
+  const [uploading, setUploading] = useState<'front' | 'back' | 'inner' | null>(null);
   const [showFindCover, setShowFindCover] = useState(false);
   const [findCoverType, setFindCoverType] = useState<'front' | 'back'>('front');
-  const [cropState, setCropState] = useState<CropState>({ x: 0, y: 0, width: 100, height: 100 });
-  const [imageBounds, setImageBounds] = useState<{ x: number; y: number; width: number; height: number }>({ x: 0, y: 0, width: 100, height: 100 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragHandle, setDragHandle] = useState<DragHandle | null>(null);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [cropStart, setCropStart] = useState<CropState>({ x: 0, y: 0, width: 0, height: 0 });
-  const imageRef = useRef<HTMLDivElement>(null);
 
-  const handleUpload = async (coverType: 'front' | 'back') => {
+  const handleUpload = async (coverType: 'front' | 'back' | 'inner') => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -65,8 +52,13 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
           .from('album-images')
           .getPublicUrl(filePath);
 
-        const field = coverType === 'front' ? 'image_url' : 'back_image_url';
-        onChange(field, publicUrl as Album[typeof field]);
+        if (coverType === 'inner') {
+          const currentImages = album.inner_sleeve_images || [];
+          onChange('inner_sleeve_images' as any, [...currentImages, publicUrl]);
+        } else {
+          const field = coverType === 'front' ? 'image_url' : 'back_image_url';
+          onChange(field, publicUrl as Album[typeof field]);
+        }
       } catch (error) {
         console.error(`Error uploading ${coverType} cover:`, error);
         alert(`Failed to upload ${coverType} cover. Please try again.`);
@@ -100,6 +92,32 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
     }
 
     onChange(field, null as Album[typeof field]);
+  };
+
+  const handleRemoveInner = async (index: number) => {
+    const currentImages = album.inner_sleeve_images || [];
+    const imageUrl = currentImages[index];
+
+    if (imageUrl && imageUrl.includes('album-images/')) {
+      try {
+        const urlParts = imageUrl.split('/album-images/');
+        if (urlParts.length > 1) {
+          const filePath = `album-images/${urlParts[1].split('?')[0]}`;
+          
+          const { error } = await supabase.storage
+            .from('album-images')
+            .remove([filePath]);
+
+          if (error) console.error('Error deleting file:', error);
+        }
+      } catch (error) {
+        console.error('Error removing file:', error);
+      }
+    }
+
+    const newImages = [...currentImages];
+    newImages.splice(index, 1);
+    onChange('inner_sleeve_images' as any, newImages);
   };
 
   const handleFindOnline = (coverType: 'front' | 'back') => {
@@ -261,136 +279,127 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  const renderCoverSection = (
-    title: string,
-    coverType: 'front' | 'back'
-  ) => {
-    const isUploading = uploading === coverType;
-    const isInCropMode = cropMode === coverType;
-    const imageUrl = coverType === 'front' ? album.image_url : album.back_image_url;
-
-    return (
-      <div className="flex flex-col flex-1 min-w-0 min-h-0">
-        <div className="flex flex-col h-full border border-gray-200 rounded-md p-2.5 bg-gray-50">
-          <h3 className="text-xs font-semibold text-gray-500 mb-1.5 mt-0">
-            {title}
-          </h3>
-          
-          {isInCropMode ? (
-            <div className="flex mb-1.5 bg-blue-400 rounded overflow-hidden">
-              <button type="button" onClick={handleCropReset} className="flex-1 px-1 py-0.5 bg-transparent border-none border-r border-white/30 text-[10px] cursor-pointer text-white font-medium whitespace-nowrap hover:bg-blue-500">
-                × Reset
-              </button>
-              <button type="button" onClick={handleCropRotateImage} className="flex-1 px-1 py-0.5 bg-transparent border-none border-r border-white/30 text-[10px] cursor-pointer text-white font-medium whitespace-nowrap hover:bg-blue-500">
-                🔄 Rotate
-              </button>
-              <button type="button" onClick={handleCropApply} className="flex-1 px-1 py-0.5 bg-transparent border-none text-[10px] cursor-pointer text-white font-medium whitespace-nowrap hover:bg-blue-500">
-                ✓ Apply
-              </button>
+  return (
+    <div className="h-full flex flex-col overflow-y-auto p-4 gap-4">
+      {/* FRONT & BACK ROW */}
+      <div className="flex gap-4 h-[350px]">
+        {/* FRONT COVER */}
+        <div className="flex-1 flex flex-col border border-gray-200 rounded-md p-3 bg-gray-50">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-sm font-bold text-gray-700 m-0">Front Cover</h3>
+            <div className="flex gap-1">
+              {album.image_url ? (
+                <>
+                  <button 
+                    onClick={() => handleFindOnline('front')}
+                    className="px-2 py-1 text-[10px] bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Replace
+                  </button>
+                  <button 
+                    onClick={() => handleRemove('front')}
+                    className="px-2 py-1 text-[10px] bg-red-600 text-white rounded hover:bg-red-700"
+                  >
+                    Remove
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button 
+                    onClick={() => handleFindOnline('front')}
+                    className="px-2 py-1 text-[10px] bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Search
+                  </button>
+                  <button 
+                    onClick={() => handleUpload('front')}
+                    className="px-2 py-1 text-[10px] bg-gray-600 text-white rounded hover:bg-gray-700"
+                  >
+                    Upload
+                  </button>
+                </>
+              )}
             </div>
-          ) : (
-            <div className="flex mb-1.5 bg-[#1a1a1a] rounded overflow-hidden">
-              <button type="button" onClick={() => handleFindOnline(coverType)} disabled={isUploading} className={`flex-1 px-1 py-0.5 bg-transparent border-none border-r border-[#333] text-[10px] font-medium text-white whitespace-nowrap overflow-hidden text-ellipsis ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-black'}`}>
-                🔍 Find Online
-              </button>
-              <button type="button" onClick={() => handleUpload(coverType)} disabled={isUploading} className={`flex-1 px-1 py-0.5 bg-transparent border-none border-r border-[#333] text-[10px] font-medium text-white whitespace-nowrap overflow-hidden text-ellipsis ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-black'}`}>
-                ⬆ Upload
-              </button>
-              <button type="button" onClick={() => handleRemove(coverType)} disabled={isUploading} className={`flex-1 px-1 py-0.5 bg-transparent border-none border-r border-[#333] text-[10px] font-medium text-white whitespace-nowrap overflow-hidden text-ellipsis ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-black'}`}>
-                🗑 Remove
-              </button>
-              <button type="button" onClick={() => handleCropRotate(coverType)} disabled={isUploading} className={`flex-1 px-1 py-0.5 bg-transparent border-none text-[10px] font-medium text-white whitespace-nowrap overflow-hidden text-ellipsis ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-black'}`}>
-                ✂ Crop / Rotate
-              </button>
-            </div>
-          )}
-
-          <div ref={imageRef} className="flex-1 min-h-0 border border-gray-300 rounded flex items-center justify-center bg-white overflow-hidden relative">
-            {isUploading ? (
-              <div className="text-gray-500 text-xs text-center">Uploading...</div>
-            ) : imageUrl ? (
-              <>
-                <div 
-                  className="w-full h-full relative transition-transform duration-300 ease-out"
-                  style={{ transform: `rotate(${coverType === 'front' ? frontRotation : backRotation}deg)` }}
-                >
-                  <Image src={imageUrl} alt={`${title} artwork`} fill
-                    style={{ objectFit: 'contain' }} unoptimized />
-                </div>
-                
-                {isInCropMode && (
-                  <>
-                    <div 
-                      className="absolute inset-0 bg-black/50 pointer-events-none"
-                      style={{
-                        clipPath: `polygon(
-                          0% 0%, 
-                          0% 100%, 
-                          ${cropState.x}% 100%, 
-                          ${cropState.x}% ${cropState.y}%, 
-                          ${cropState.x + cropState.width}% ${cropState.y}%, 
-                          ${cropState.x + cropState.width}% ${cropState.y + cropState.height}%, 
-                          ${cropState.x}% ${cropState.y + cropState.height}%, 
-                          ${cropState.x}% 100%, 
-                          100% 100%, 
-                          100% 0%
-                        )`
-                      }} 
-                    />
-                    
-                    <div 
-                      onMouseDown={(e) => handleMouseDown(e, 'move')} 
-                      className="absolute border-2 border-blue-500 bg-transparent cursor-move"
-                      style={{
-                        left: `${cropState.x}%`, top: `${cropState.y}%`,
-                        width: `${cropState.width}%`, height: `${cropState.height}%`,
-                      }}
-                    >
-                      {/* Corner handles - exactly on corners */}
-                      {[
-                        { pos: 'nw' as DragHandle, style: { top: '-7px', left: '-7px' }, cursor: 'nwse-resize' },
-                        { pos: 'ne' as DragHandle, style: { top: '-7px', right: '-7px' }, cursor: 'nesw-resize' },
-                        { pos: 'sw' as DragHandle, style: { bottom: '-7px', left: '-7px' }, cursor: 'nesw-resize' },
-                        { pos: 'se' as DragHandle, style: { bottom: '-7px', right: '-7px' }, cursor: 'nwse-resize' },
-                      ].map(({ pos, style, cursor }) => (
-                        <div key={pos} onMouseDown={(e) => handleMouseDown(e, pos)} 
-                          className="absolute w-3 h-3 bg-blue-500 border-2 border-white rounded-full"
-                          style={{ cursor, ...style }} 
-                        />
-                      ))}
-                      
-                      {/* Edge handles - exactly on edges */}
-                      {[
-                        { pos: 'n' as DragHandle, style: { top: '-7px', left: '50%', transform: 'translateX(-50%)', width: '40px', height: '12px' }, cursor: 'ns-resize' },
-                        { pos: 's' as DragHandle, style: { bottom: '-7px', left: '50%', transform: 'translateX(-50%)', width: '40px', height: '12px' }, cursor: 'ns-resize' },
-                        { pos: 'e' as DragHandle, style: { right: '-7px', top: '50%', transform: 'translateY(-50%)', width: '12px', height: '40px' }, cursor: 'ew-resize' },
-                        { pos: 'w' as DragHandle, style: { left: '-7px', top: '50%', transform: 'translateY(-50%)', width: '12px', height: '40px' }, cursor: 'ew-resize' },
-                      ].map(({ pos, style, cursor }) => (
-                        <div key={pos} onMouseDown={(e) => handleMouseDown(e, pos)} 
-                          className="absolute bg-blue-500 border-2 border-white rounded-sm"
-                          style={{ cursor, ...style }} 
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </>
+          </div>
+          <div className="flex-1 relative bg-white border border-gray-300 rounded overflow-hidden flex items-center justify-center">
+            {album.image_url ? (
+              <Image src={album.image_url} alt="Front Cover" fill style={{ objectFit: 'contain' }} unoptimized />
             ) : (
-              <div className="text-gray-400 text-xs text-center">
-                No {coverType} cover
-              </div>
+              <span className="text-gray-400 text-xs">No Front Cover</span>
+            )}
+          </div>
+        </div>
+
+        {/* BACK COVER */}
+        <div className="flex-1 flex flex-col border border-gray-200 rounded-md p-3 bg-gray-50">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-sm font-bold text-gray-700 m-0">Back Cover</h3>
+            <div className="flex gap-1">
+              <button 
+                onClick={() => handleFindOnline('back')}
+                className="px-2 py-1 text-[10px] bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                {album.back_image_url ? 'Replace' : 'Search'}
+              </button>
+              <button 
+                onClick={() => handleUpload('back')}
+                className="px-2 py-1 text-[10px] bg-gray-600 text-white rounded hover:bg-gray-700"
+              >
+                {album.back_image_url ? 'Upload New' : 'Upload'}
+              </button>
+              {album.back_image_url && (
+                <button 
+                  onClick={() => handleRemove('back')}
+                  className="px-2 py-1 text-[10px] bg-red-600 text-white rounded hover:bg-red-700"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="flex-1 relative bg-white border border-gray-300 rounded overflow-hidden flex items-center justify-center">
+            {album.back_image_url ? (
+              <Image src={album.back_image_url} alt="Back Cover" fill style={{ objectFit: 'contain' }} unoptimized />
+            ) : (
+              <span className="text-gray-400 text-xs">No Back Cover</span>
             )}
           </div>
         </div>
       </div>
-    );
-  };
 
-  return (
-    <div className="h-full flex flex-col overflow-hidden p-3">
-      <div className="flex gap-4 flex-1 min-h-0">
-        {renderCoverSection('Front Cover', 'front')}
-        {renderCoverSection('Back Cover', 'back')}
+      {/* INNER SLEEVES GALLERY */}
+      <div className="flex flex-col border border-gray-200 rounded-md p-3 bg-gray-50">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-sm font-bold text-gray-700 m-0">Inner Sleeves</h3>
+          <button 
+            onClick={() => handleUpload('inner')}
+            disabled={uploading === 'inner'}
+            className="px-3 py-1.5 text-xs bg-gray-800 text-white rounded hover:bg-black disabled:opacity-50"
+          >
+            {uploading === 'inner' ? 'Uploading...' : '+ Add Image'}
+          </button>
+        </div>
+
+        {(!album.inner_sleeve_images || album.inner_sleeve_images.length === 0) ? (
+          <div className="p-8 text-center border-2 border-dashed border-gray-300 rounded bg-gray-50/50">
+            <span className="text-gray-400 text-sm">No inner sleeves added</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-4 gap-3">
+            {album.inner_sleeve_images.map((imgUrl, idx) => (
+              <div key={idx} className="group relative aspect-square bg-white border border-gray-200 rounded overflow-hidden">
+                <Image src={imgUrl} alt={`Inner ${idx + 1}`} fill style={{ objectFit: 'cover' }} unoptimized />
+                <button
+                  onClick={() => handleRemoveInner(idx)}
+                  className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
+                  title="Remove Image"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <FindCoverModal
