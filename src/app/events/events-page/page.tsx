@@ -44,54 +44,59 @@ export default function Page() {
 
   useEffect(() => {
     const load = async () => {
-      // Load events
-      const { data: ev, error: evError } = await supabase
-        .from("events")
-        .select("*")
-        .order("date", { ascending: true });
+      try {
+        // Load events
+        const { data: ev, error: evError } = await supabase
+          .from("events")
+          .select("*")
+          .order("date", { ascending: true });
 
-      if (evError) {
-        console.error("Error loading events", evError);
+        if (evError) {
+          console.error("Error loading events", evError);
+        }
+
+        const today = new Date().toISOString().slice(0, 10);
+        const all = ev || [];
+
+        // Keep upcoming + TBA
+        const filtered = all.filter((e) => {
+          const d = e.date;
+          if (!d || d === "" || d === "9999-12-31") return true; // TBA
+          return d >= today;
+        });
+
+        // Sort: dated first, by date; then TBA
+        const sorted = [...filtered].sort((a, b) => {
+          const aTBA =
+            !a.date || a.date === "" || a.date === "9999-12-31";
+          const bTBA =
+            !b.date || b.date === "" || b.date === "9999-12-31";
+          if (aTBA && !bTBA) return 1;
+          if (!aTBA && bTBA) return -1;
+          if (aTBA && bTBA) return 0;
+
+          return (a.date || "").localeCompare(b.date || "");
+        });
+
+        setEvents(sorted);
+
+        // Load DJ sets
+        const { data: sets, error: setsError } = await supabase
+          .from("dj_sets")
+          .select(`*, events ( id, title, date, location )`)
+          .order("recorded_at", { ascending: false })
+          .limit(6);
+
+        if (setsError) {
+          console.error("Error loading dj_sets", setsError);
+        }
+
+        setPastDJSets(sets || []);
+      } catch (err) {
+        console.error("Unexpected error loading page data:", err);
+      } finally {
+        setLoading(false);
       }
-
-      const today = new Date().toISOString().slice(0, 10);
-      const all = ev || [];
-
-      // Keep upcoming + TBA
-      const filtered = all.filter((e) => {
-        const d = e.date;
-        if (!d || d === "" || d === "9999-12-31") return true; // TBA
-        return d >= today;
-      });
-
-      // Sort: dated first, by date; then TBA
-      const sorted = [...filtered].sort((a, b) => {
-        const aTBA =
-          !a.date || a.date === "" || a.date === "9999-12-31";
-        const bTBA =
-          !b.date || b.date === "" || b.date === "9999-12-31";
-        if (aTBA && !bTBA) return 1;
-        if (!aTBA && bTBA) return -1;
-        if (aTBA && bTBA) return 0;
-
-        return (a.date || "").localeCompare(b.date || "");
-      });
-
-      setEvents(sorted);
-
-      // Load DJ sets
-      const { data: sets, error: setsError } = await supabase
-        .from("dj_sets")
-        .select(`*, events ( id, title, date, location )`)
-        .order("recorded_at", { ascending: false })
-        .limit(6);
-
-      if (setsError) {
-        console.error("Error loading dj_sets", setsError);
-      }
-
-      setPastDJSets(sets || []);
-      setLoading(false);
     };
 
     load();
@@ -213,9 +218,7 @@ export default function Page() {
 
                   <div className={`grid gap-7 ${upNext.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
                     {upNext.map((ev) => {
-                      // FIX: Updated placeholder path
-                      const img =
-                        ev.image_url || "/images/coverplaceholder.png";
+                      const img = ev.image_url || "/images/coverplaceholder.png";
                       const d = compactDate(ev.date);
                       const tba =
                         !ev.date ||
@@ -268,7 +271,6 @@ export default function Page() {
                   <SectionTitle text="Featured" />
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                     {featuredGrid.map((e) => {
-                      // FIX: Updated placeholder path
                       const img = e.image_url || "/images/coverplaceholder.png";
                       const d = compactDate(e.date);
                       const tba = !e.date || e.date === "" || e.date === "9999-12-31";
@@ -317,9 +319,7 @@ export default function Page() {
                   {/* LEFT COLUMN: list of upcoming events */}
                   <div className="space-y-4">
                     {events.map((e) => {
-                      // FIX: Updated placeholder path
-                      const img =
-                        e.image_url || "/images/coverplaceholder.png";
+                      const img = e.image_url || "/images/coverplaceholder.png";
 
                       return (
                         <Link

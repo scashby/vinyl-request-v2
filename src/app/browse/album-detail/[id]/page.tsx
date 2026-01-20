@@ -1,3 +1,4 @@
+// src/app/browse/album-detail/[id]/page.tsx
 "use client";
 
 import { useEffect, useState, useCallback, Suspense } from 'react';

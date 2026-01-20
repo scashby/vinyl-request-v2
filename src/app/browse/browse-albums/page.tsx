@@ -1,3 +1,4 @@
+// src/app/browse/browse-albums/page.tsx
 "use client";
 
 import { Suspense } from 'react';
@@ -112,62 +113,67 @@ function BrowseAlbumsContent() {
   useEffect(() => {
     async function fetchAllAlbums() {
       setLoading(true);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let allRows: any[] = [];
-      let from = 0;
-      const batchSize = 1000;
-      let keepGoing = true;
-      
-      while (keepGoing) {
-        const { data: batch, error } = await supabase
-          .from('collection')
-          .select('*')
-          .or('blocked.is.null,blocked.eq.false')
-          .neq('folder', 'Sale')
-          .range(from, from + batchSize - 1);
-          
-        if (error) {
-          console.error('Error fetching albums:', error);
-          break;
-        }
-        if (!batch || batch.length === 0) break;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let allRows: any[] = [];
+        let from = 0;
+        const batchSize = 1000;
+        let keepGoing = true;
         
-        allRows = allRows.concat(batch);
-        keepGoing = batch.length === batchSize;
-        from += batchSize;
+        while (keepGoing) {
+          const { data: batch, error } = await supabase
+            .from('collection')
+            .select('*')
+            .or('blocked.is.null,blocked.eq.false')
+            .neq('folder', 'Sale')
+            .range(from, from + batchSize - 1);
+            
+          if (error) {
+            console.error('Error fetching albums:', error);
+            break;
+          }
+          if (!batch || batch.length === 0) break;
+          
+          allRows = allRows.concat(batch);
+          keepGoing = batch.length === batchSize;
+          from += batchSize;
+        }
+        
+        const parsed: BrowseAlbum[] = allRows.map(album => ({
+          id: album.id,
+          title: album.title,
+          artist: album.artist,
+          year: album.year ? String(album.year) : '',
+          folder: album.folder,
+          mediaType: album.folder,
+          dateAdded: album.date_added,
+          justAdded: isJustAdded(album.date_added),
+          steves_top_200: album.steves_top_200,
+          this_weeks_top_10: album.this_weeks_top_10,
+          inner_circle_preferred: album.inner_circle_preferred,
+          is_1001: album.is_1001,
+          tracklists: album.tracklists,
+          media_condition: album.media_condition,
+          discogs_notes: album.discogs_notes,
+          discogs_genres: album.discogs_genres,
+          discogs_styles: album.discogs_styles,
+          spotify_genres: album.spotify_genres,
+          spotify_label: album.spotify_label,
+          apple_music_genre: album.apple_music_genre,
+          apple_music_genres: album.apple_music_genres,
+          apple_music_label: album.apple_music_label,
+          image:
+            (album.image_url && album.image_url.trim().toLowerCase() !== 'no')
+              ? album.image_url.trim()
+              : '/images/coverplaceholder.png'
+        }));
+        
+        setAlbums(parsed);
+      } catch (err) {
+        console.error("Error loading albums:", err);
+      } finally {
+        setLoading(false);
       }
-      
-      const parsed: BrowseAlbum[] = allRows.map(album => ({
-        id: album.id,
-        title: album.title,
-        artist: album.artist,
-        year: album.year ? String(album.year) : '',
-        folder: album.folder,
-        mediaType: album.folder,
-        dateAdded: album.date_added,
-        justAdded: isJustAdded(album.date_added),
-        steves_top_200: album.steves_top_200,
-        this_weeks_top_10: album.this_weeks_top_10,
-        inner_circle_preferred: album.inner_circle_preferred,
-        is_1001: album.is_1001,
-        tracklists: album.tracklists,
-        media_condition: album.media_condition,
-        discogs_notes: album.discogs_notes,
-        discogs_genres: album.discogs_genres,
-        discogs_styles: album.discogs_styles,
-        spotify_genres: album.spotify_genres,
-        spotify_label: album.spotify_label,
-        apple_music_genre: album.apple_music_genre,
-        apple_music_genres: album.apple_music_genres,
-        apple_music_label: album.apple_music_label,
-        image:
-          (album.image_url && album.image_url.trim().toLowerCase() !== 'no')
-            ? album.image_url.trim()
-            : '/images/coverplaceholder.png'
-      }));
-      
-      setAlbums(parsed);
-      setLoading(false);
     }
     
     fetchAllAlbums();
@@ -265,6 +271,7 @@ function BrowseAlbumsContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
+      {/* HEADER IS NOW OUTSIDE THE LOADING CHECK */}
       <header className="relative w-full h-[300px] flex items-center justify-center bg-gray-900 overflow-hidden">
         <div 
           className="absolute inset-0 bg-cover bg-center opacity-50"

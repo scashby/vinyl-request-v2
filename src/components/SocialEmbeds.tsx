@@ -14,7 +14,6 @@ export default function SocialEmbeds() {
   const hasLoaded = useRef(false);
 
   useEffect(() => {
-    // Prevent double-firing in Strict Mode
     if (hasLoaded.current) return;
     hasLoaded.current = true;
 
@@ -36,15 +35,20 @@ export default function SocialEmbeds() {
 }
 
 function SafeEmbed({ html, platform }: { html: string, platform: string }) {
-  // If it is a simple iframe (like Threads), render directly
+  // Fix 1: Remove conflicting 'allowfullscreen' attributes that cause browser warnings
+  const cleanHtml = html
+    .replace(/allowfullscreen="?"/g, '') 
+    .replace(/allowfullscreen/g, '');
+
+  // If it's a simple iframe (Threads, Spotify, Apple), render directly
   if (html.includes('<iframe') || platform.toLowerCase().includes('threads')) {
-     return <div className="social-embed" dangerouslySetInnerHTML={{ __html: html }} />;
+     return <div className="social-embed" dangerouslySetInnerHTML={{ __html: cleanHtml }} />;
   }
 
-  // Use the safe renderer for scripts
+  // Use the safe renderer for script-based embeds (Facebook, LinkedIn)
   return (
     <div className="social-embed">
-      <SafeHtml html={html} />
+      <SafeHtml html={cleanHtml} />
     </div>
   );
 }
@@ -55,30 +59,21 @@ function SafeHtml({ html }: { html: string }) {
   useEffect(() => {
     if (!ref) return;
 
-    // --- CRITICAL FIX: NUKE document.write ---
-    // This prevents legacy scripts (like LinkedIn/Facebook) from crashing Next.js
-    // by trying to write to a closed document stream.
-    
-    // We cast to 'any' to bypass TypeScript's read-only check without using @ts-expect-error
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (document as any).write = () => { console.warn('Blocked dangerous document.write call from embed'); };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (document as any).writeln = () => { console.warn('Blocked dangerous document.writeln call from embed'); };
-
-    // 1. Set content
     ref.innerHTML = html;
 
-    // 2. Execute scripts safely
     const scripts = ref.querySelectorAll("script");
     scripts.forEach(oldScript => {
+      // Fix 2: Safety check for document.write
+      // In a SPA, document.write clears the page. We must prevent execution if present.
+      if (oldScript.textContent?.includes('document.write')) {
+        console.error("Skipped a script that uses document.write to prevent app crash.");
+        return; 
+      }
+
       const newScript = document.createElement("script");
-      
-      // Copy attributes
       Array.from(oldScript.attributes).forEach(attr =>
         newScript.setAttribute(attr.name, attr.value)
       );
-      
-      // Copy content
       newScript.textContent = oldScript.textContent;
       
       try {
