@@ -1,6 +1,4 @@
-// Fixed Browse Albums page with compact search controls and all filter options
-// Excludes "Sales" folder items from the collection
-// Replace: src/app/browse/browse-albums/page.js
+// src/app/browse/browse-albums/page.tsx
 
 "use client";
 
@@ -267,14 +265,7 @@ function BrowseAlbumsContent() {
   const hasSearchQuery = searchTerm.trim().length > 0;
   const hasNoResults = hasSearchQuery && filteredAlbums.length === 0;
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-xl text-gray-600 font-semibold animate-pulse">Loading albums...</div>
-      </div>
-    );
-  }
-
+  // FIX: Header renders immediately; loading state only affects the content below
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
       <header className="relative w-full h-[300px] flex items-center justify-center bg-gray-900 overflow-hidden">
@@ -299,172 +290,181 @@ function BrowseAlbumsContent() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {/* Search & Filter Bar */}
-        <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6">
-          <input
-            type="text"
-            placeholder="Search by artist or title"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full md:flex-[2] p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-          />
-
-          <select
-            value={mediaFilter}
-            onChange={(e) => setMediaFilter(e.target.value)}
-            className="w-full md:flex-1 p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="">All Media Types</option>
-            {normalizedDropdown.map((format) => (
-              <option key={format} value={format.trim().toLowerCase()}>
-                {format}
-              </option>
-            ))}
-          </select>
-
-          <select 
-            value={sortField} 
-            onChange={e => setSortField(e.target.value)}
-            className="w-full md:w-40 p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="artist">Artist</option>
-            <option value="date_added">Date Added</option>
-            <option value="title">Title</option>
-            <option value="year">Year</option>
-          </select>
-
-          <button
-            onClick={() => setSortAsc(a => !a)}
-            className="w-full md:w-auto px-4 py-2.5 bg-gray-100 text-blue-600 font-semibold rounded-lg hover:bg-gray-200 border border-gray-200 transition-colors whitespace-nowrap"
-          >
-            Sort: {sortAsc ? 'A→Z' : 'Z→A'}
-          </button>
-
-          {!hasNoResults && !showSuggestionBox && (
-            <button
-              onClick={() => setShowSuggestionBox(true)}
-              className="w-full md:w-auto px-4 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap shadow-sm"
-            >
-              💡 Suggest Album
-            </button>
-          )}
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-wrap gap-3 items-center mb-6 w-full">
-          <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold cursor-pointer transition-all ${
-            justAddedCount > 0 
-              ? "bg-green-50 border-green-500 text-green-700 hover:bg-green-100" 
-              : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60"
-          }`}>
-            <input
-              type="checkbox"
-              checked={showJustAdded}
-              onChange={(e) => setShowJustAdded(e.target.checked)}
-              disabled={justAddedCount === 0}
-              className="accent-green-600 w-4 h-4"
-            />
-            {justAddedCount > 0 && <span className="animate-pulse">✨</span>} Just Added ({justAddedCount})
-          </label>
-
-          <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold cursor-pointer transition-all ${
-            stevesTop200Count > 0 
-              ? "bg-red-50 border-red-500 text-red-700 hover:bg-red-100" 
-              : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60"
-          }`}>
-            <input
-              type="checkbox"
-              checked={showStevesTop200}
-              onChange={(e) => setShowStevesTop200(e.target.checked)}
-              disabled={stevesTop200Count === 0}
-              className="accent-red-600 w-4 h-4"
-            />
-            🏆 Steve&apos;s Top 200 ({stevesTop200Count})
-          </label>
-
-          <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold cursor-pointer transition-all ${
-            thisWeeksTop10Count > 0 
-              ? "bg-purple-50 border-purple-500 text-purple-700 hover:bg-purple-100" 
-              : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60"
-          }`}>
-            <input
-              type="checkbox"
-              checked={showThisWeeksTop10}
-              onChange={(e) => setShowThisWeeksTop10(e.target.checked)}
-              disabled={thisWeeksTop10Count === 0}
-              className="accent-purple-600 w-4 h-4"
-            />
-            📈 This Week&apos;s Top 10 ({thisWeeksTop10Count})
-          </label>
-
-          <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold cursor-pointer transition-all ${
-            innerCirclePreferredCount > 0 
-              ? "bg-orange-50 border-orange-500 text-orange-700 hover:bg-orange-100" 
-              : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60"
-          }`}>
-            <input
-              type="checkbox"
-              checked={showInnerCirclePreferred}
-              onChange={(e) => setShowInnerCirclePreferred(e.target.checked)}
-              disabled={innerCirclePreferredCount === 0}
-              className="accent-orange-600 w-4 h-4"
-            />
-            ⭐ Inner Circle Preferred ({innerCirclePreferredCount})
-          </label>
-        </div>
-
-        <div className="text-gray-500 text-sm mb-6 px-1">
-          {hasSearchQuery ? (
-            <>Showing {filteredAlbums.length} results for &ldquo;{searchTerm}&rdquo;</>
-          ) : (
-            <>Showing {filteredAlbums.length} albums</>
-          )}
-        </div>
-
-        {(hasNoResults || showSuggestionBox) && (
-          <div className="mb-8">
-            <AlbumSuggestionBox 
-              context={hasNoResults ? "search" : "general"}
-              searchQuery={hasNoResults ? searchTerm : ''}
-              eventId={eventId}
-              eventTitle={eventTitle}
-              onClose={() => setShowSuggestionBox(false)}
-            />
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="text-xl text-gray-600 font-semibold animate-pulse">Loading albums...</div>
+            <div className="text-sm text-gray-400 mt-2">Fetching collection data</div>
           </div>
-        )}
+        ) : (
+          <>
+            {/* Search & Filter Bar */}
+            <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6">
+              <input
+                type="text"
+                placeholder="Search by artist or title"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full md:flex-[2] p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              />
 
-        <section className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-          {filteredAlbums.map((album) => (
-            <AlbumCard
-              key={album.id}
-              album={{
-                ...album,
-                eventId: eventId,
-                justAdded: album.justAdded
-              }}
-            />
-          ))}
-        </section>
+              <select
+                value={mediaFilter}
+                onChange={(e) => setMediaFilter(e.target.value)}
+                className="w-full md:flex-1 p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="">All Media Types</option>
+                {normalizedDropdown.map((format) => (
+                  <option key={format} value={format.trim().toLowerCase()}>
+                    {format}
+                  </option>
+                ))}
+              </select>
 
-        {filteredAlbums.length === 0 && !hasSearchQuery && (
-          <div className="text-center py-16 text-gray-500">
-            <div className="text-5xl mb-4">🎵</div>
-            <p className="text-lg">No albums match your current filters.</p>
-            <p className="text-sm mt-2">Try adjusting your filters or suggest new albums!</p>
-          </div>
-        )}
+              <select 
+                value={sortField} 
+                onChange={e => setSortField(e.target.value)}
+                className="w-full md:w-40 p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="artist">Artist</option>
+                <option value="date_added">Date Added</option>
+                <option value="title">Title</option>
+                <option value="year">Year</option>
+              </select>
 
-        {hasNoResults && (
-          <div className="text-center py-12 px-6 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-300 my-8">
-            <div className="text-5xl mb-4">🔍</div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">No albums found</h3>
-            <p className="text-gray-600 mb-4">
-              No albums match your search for &ldquo;<strong>{searchTerm}</strong>&rdquo;
-            </p>
-            <p className="text-sm text-gray-500">
-              The album suggestion form above can help you request this album for the collection.
-            </p>
-          </div>
+              <button
+                onClick={() => setSortAsc(a => !a)}
+                className="w-full md:w-auto px-4 py-2.5 bg-gray-100 text-blue-600 font-semibold rounded-lg hover:bg-gray-200 border border-gray-200 transition-colors whitespace-nowrap"
+              >
+                Sort: {sortAsc ? 'A→Z' : 'Z→A'}
+              </button>
+
+              {!hasNoResults && !showSuggestionBox && (
+                <button
+                  onClick={() => setShowSuggestionBox(true)}
+                  className="w-full md:w-auto px-4 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap shadow-sm"
+                >
+                  💡 Suggest Album
+                </button>
+              )}
+            </div>
+
+            {/* Filters */}
+            <div className="flex flex-wrap gap-3 items-center mb-6 w-full">
+              <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold cursor-pointer transition-all ${
+                justAddedCount > 0 
+                  ? "bg-green-50 border-green-500 text-green-700 hover:bg-green-100" 
+                  : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60"
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={showJustAdded}
+                  onChange={(e) => setShowJustAdded(e.target.checked)}
+                  disabled={justAddedCount === 0}
+                  className="accent-green-600 w-4 h-4"
+                />
+                {justAddedCount > 0 && <span className="animate-pulse">✨</span>} Just Added ({justAddedCount})
+              </label>
+
+              <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold cursor-pointer transition-all ${
+                stevesTop200Count > 0 
+                  ? "bg-red-50 border-red-500 text-red-700 hover:bg-red-100" 
+                  : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60"
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={showStevesTop200}
+                  onChange={(e) => setShowStevesTop200(e.target.checked)}
+                  disabled={stevesTop200Count === 0}
+                  className="accent-red-600 w-4 h-4"
+                />
+                🏆 Steve&apos;s Top 200 ({stevesTop200Count})
+              </label>
+
+              <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold cursor-pointer transition-all ${
+                thisWeeksTop10Count > 0 
+                  ? "bg-purple-50 border-purple-500 text-purple-700 hover:bg-purple-100" 
+                  : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60"
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={showThisWeeksTop10}
+                  onChange={(e) => setShowThisWeeksTop10(e.target.checked)}
+                  disabled={thisWeeksTop10Count === 0}
+                  className="accent-purple-600 w-4 h-4"
+                />
+                📈 This Week&apos;s Top 10 ({thisWeeksTop10Count})
+              </label>
+
+              <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold cursor-pointer transition-all ${
+                innerCirclePreferredCount > 0 
+                  ? "bg-orange-50 border-orange-500 text-orange-700 hover:bg-orange-100" 
+                  : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60"
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={showInnerCirclePreferred}
+                  onChange={(e) => setShowInnerCirclePreferred(e.target.checked)}
+                  disabled={innerCirclePreferredCount === 0}
+                  className="accent-orange-600 w-4 h-4"
+                />
+                ⭐ Inner Circle Preferred ({innerCirclePreferredCount})
+              </label>
+            </div>
+
+            <div className="text-gray-500 text-sm mb-6 px-1">
+              {hasSearchQuery ? (
+                <>Showing {filteredAlbums.length} results for &ldquo;{searchTerm}&rdquo;</>
+              ) : (
+                <>Showing {filteredAlbums.length} albums</>
+              )}
+            </div>
+
+            {(hasNoResults || showSuggestionBox) && (
+              <div className="mb-8">
+                <AlbumSuggestionBox 
+                  context={hasNoResults ? "search" : "general"}
+                  searchQuery={hasNoResults ? searchTerm : ''}
+                  eventId={eventId}
+                  eventTitle={eventTitle}
+                  onClose={() => setShowSuggestionBox(false)}
+                />
+              </div>
+            )}
+
+            <section className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+              {filteredAlbums.map((album) => (
+                <AlbumCard
+                  key={album.id}
+                  album={{
+                    ...album,
+                    eventId: eventId,
+                    justAdded: album.justAdded
+                  }}
+                />
+              ))}
+            </section>
+
+            {filteredAlbums.length === 0 && !hasSearchQuery && (
+              <div className="text-center py-16 text-gray-500">
+                <div className="text-5xl mb-4">🎵</div>
+                <p className="text-lg">No albums match your current filters.</p>
+                <p className="text-sm mt-2">Try adjusting your filters or suggest new albums!</p>
+              </div>
+            )}
+
+            {hasNoResults && (
+              <div className="text-center py-12 px-6 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-300 my-8">
+                <div className="text-5xl mb-4">🔍</div>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">No albums found</h3>
+                <p className="text-gray-600 mb-4">
+                  No albums match your search for &ldquo;<strong>{searchTerm}</strong>&rdquo;
+                </p>
+                <p className="text-sm text-gray-500">
+                  The album suggestion form above can help you request this album for the collection.
+                </p>
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>
