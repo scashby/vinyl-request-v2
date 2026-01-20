@@ -1,7 +1,6 @@
-// src/components/SocialEmbeds.tsx
 'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 interface SocialEmbedData {
   id: number;
@@ -12,16 +11,19 @@ interface SocialEmbedData {
 
 export default function SocialEmbeds() {
   const [embeds, setEmbeds] = useState<SocialEmbedData[]>([]);
+  const hasLoaded = useRef(false);
 
   useEffect(() => {
-    let isMounted = true;
+    // Prevent double-firing in Strict Mode
+    if (hasLoaded.current) return;
+    hasLoaded.current = true;
+
     fetch("/api/social-embeds")
       .then(res => res.json())
       .then((data: SocialEmbedData[]) => {
-        if (isMounted) setEmbeds(data);
+        setEmbeds(data || []);
       })
       .catch(err => console.error("Failed to load social embeds:", err));
-    return () => { isMounted = false; };
   }, []);
 
   return (
@@ -33,15 +35,13 @@ export default function SocialEmbeds() {
   );
 }
 
-// Sub-component to safely handle script injection and iframe isolation
 function SafeEmbed({ html, platform }: { html: string, platform: string }) {
-  // If it's a Threads or simple iframe embed, render it directly
-  if (html.includes('<iframe') || platform.toLowerCase() === 'threads') {
+  // If it is a simple iframe (like Threads), render directly
+  if (html.includes('<iframe') || platform.toLowerCase().includes('threads')) {
      return <div className="social-embed" dangerouslySetInnerHTML={{ __html: html }} />;
   }
 
-  // For Facebook and others that use document.write or sensitive scripts, 
-  // we render them in a shadow/iframe context or safe div
+  // Use the safe renderer for scripts
   return (
     <div className="social-embed">
       <SafeHtml html={html} />
@@ -55,22 +55,30 @@ function SafeHtml({ html }: { html: string }) {
   useEffect(() => {
     if (!ref) return;
 
-    // 1. Reset content
+    // --- CRITICAL FIX: NUKE document.write ---
+    // This prevents legacy scripts (like LinkedIn/Facebook) from crashing Next.js
+    // by trying to write to a closed document stream.
+    
+    // We cast to 'any' to bypass TypeScript's read-only check without using @ts-expect-error
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (document as any).write = () => { console.warn('Blocked dangerous document.write call from embed'); };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (document as any).writeln = () => { console.warn('Blocked dangerous document.writeln call from embed'); };
+
+    // 1. Set content
     ref.innerHTML = html;
 
-    // 2. Scan for scripts
+    // 2. Execute scripts safely
     const scripts = ref.querySelectorAll("script");
     scripts.forEach(oldScript => {
-      // Check for dangerous document.write usage
-      if (oldScript.textContent?.includes('document.write')) {
-        console.warn('Blocked script containing document.write to prevent crash.');
-        return; 
-      }
-
       const newScript = document.createElement("script");
+      
+      // Copy attributes
       Array.from(oldScript.attributes).forEach(attr =>
         newScript.setAttribute(attr.name, attr.value)
       );
+      
+      // Copy content
       newScript.textContent = oldScript.textContent;
       
       try {

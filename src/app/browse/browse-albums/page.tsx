@@ -1,4 +1,3 @@
-// src/app/browse/browse-albums/page.tsx
 "use client";
 
 import { Suspense } from 'react';
@@ -9,7 +8,6 @@ import { supabase } from 'src/lib/supabaseClient';
 import { useSearchParams } from 'next/navigation';
 import { formatEventText } from 'src/utils/textFormatter';
 
-// ... (Keep your existing BrowseAlbum interface here) ...
 interface BrowseAlbum {
   id: number;
   title: string;
@@ -42,7 +40,6 @@ function BrowseAlbumsContent() {
   const allowedFormatsParam = searchParams.get('allowedFormats');
   const eventTitleParam = searchParams.get('eventTitle');
 
-  // ... (Keep all your existing state definitions: albums, searchTerm, etc.) ...
   const [albums, setAlbums] = useState<BrowseAlbum[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [allowedFormats, setAllowedFormats] = useState<string[] | null>(null);
@@ -58,7 +55,7 @@ function BrowseAlbumsContent() {
   const [showSuggestionBox, setShowSuggestionBox] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // ... (Keep your helper functions: isJustAdded, formatDate) ...
+  // Helper function to check if album was added in last 2 weeks
   const isJustAdded = (dateAdded?: string) => {
     if (!dateAdded) return false;
     const addedDate = new Date(dateAdded);
@@ -67,8 +64,10 @@ function BrowseAlbumsContent() {
     return addedDate >= twoWeeksAgo;
   };
 
+  // Helper function to format date
   const formatDate = (dateString?: string) => {
     if (!dateString || dateString === '9999-12-31') return '';
+    // Append T00:00:00 to force local time interpretation instead of UTC
     const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('en-US', { 
       weekday: 'long',
@@ -78,7 +77,6 @@ function BrowseAlbumsContent() {
     });
   };
 
-  // ... (Keep your useEffects for fetching data exactly as they were) ...
   useEffect(() => {
     let isMounted = true;
     async function fetchEventDataIfNeeded() {
@@ -175,7 +173,6 @@ function BrowseAlbumsContent() {
     fetchAllAlbums();
   }, []);
 
-  // ... (Keep your useMemos for formatVariants, normalizedFormats, normalizedDropdown, filteredAlbums) ...
   const formatVariants = (format: string) => {
     const f = format.trim().toLowerCase();
     if (f === "cd" || f === "cds") return ["cd", "cds"];
@@ -268,7 +265,6 @@ function BrowseAlbumsContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
-      {/* HEADER IS NOW OUTSIDE THE LOADING CHECK */}
       <header className="relative w-full h-[300px] flex items-center justify-center bg-gray-900 overflow-hidden">
         <div 
           className="absolute inset-0 bg-cover bg-center opacity-50"

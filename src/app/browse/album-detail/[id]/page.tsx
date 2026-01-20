@@ -1,4 +1,3 @@
-// src/app/browse/album-detail/[id]/page.tsx
 "use client";
 
 import { useEffect, useState, useCallback, Suspense } from 'react';
@@ -405,7 +404,7 @@ function AlbumDetailContent() {
   const queueTypesArray = Array.isArray(queueTypes) ? queueTypes : [queueTypes];
 
   return (
-    // FIX: Added pt-[120px] to account for fixed header
+    // FIX: Added pt-[120px] to push content down below the fixed header
     <div className="min-h-screen bg-gray-900 text-white relative overflow-hidden font-sans pt-[120px]">
       {/* Background Blur */}
       <div 
