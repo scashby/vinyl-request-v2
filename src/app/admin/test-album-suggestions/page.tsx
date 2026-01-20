@@ -26,9 +26,10 @@ export default function AdminTestAlbumSuggestionsPage() {
           setApiStatus('error');
           setTestResults(prev => [...prev, `❌ API GET failed: ${response.status}`]);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         setApiStatus('error');
-        setTestResults(prev => [...prev, `❌ API Error: ${error.message}`]);
+        const msg = error instanceof Error ? error.message : String(error);
+        setTestResults(prev => [...prev, `❌ API Error: ${msg}`]);
       }
     };
 
@@ -59,8 +60,9 @@ export default function AdminTestAlbumSuggestionsPage() {
       } else {
         setTestResults(prev => [...prev, `❌ Submission failed: ${data.error}`]);
       }
-    } catch (error: any) {
-      setTestResults(prev => [...prev, `❌ Submission error: ${error.message}`]);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      setTestResults(prev => [...prev, `❌ Submission error: ${msg}`]);
     }
   };
 

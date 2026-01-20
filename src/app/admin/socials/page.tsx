@@ -34,7 +34,7 @@ export default function AdminSocialEmbedsPage() {
 
   const handleChange = (index: number, key: keyof SocialEmbed, value: string | boolean) => {
     const updated = [...embeds];
-    // @ts-ignore - Dynamic key assignment
+    // @ts-expect-error - Dynamic key assignment
     updated[index][key] = value;
     setEmbeds(updated);
   };

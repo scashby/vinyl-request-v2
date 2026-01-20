@@ -13,19 +13,6 @@ interface GradingOption {
   tracks?: boolean;
 }
 
-interface GradingSection {
-  [key: string]: GradingOption[];
-}
-
-interface MediaState {
-  missing: boolean;
-  sections: {
-    visual: any[];
-    audio: any[];
-    labelArea: any[];
-  };
-}
-
 const MEDIA_PENALTIES = {
   lightScuffs: 3,
   scratches: 8,
@@ -331,6 +318,7 @@ export default function MediaGradingPage() {
   }
 
   const computeMediaScoreForItem = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (item: any) => {
       if (item.missing) return { score: 0, deductions: [{ label: "Item missing", amount: 100 }] };
 
@@ -498,6 +486,7 @@ export default function MediaGradingPage() {
     if (sealed) {
       if (mediaType === "vinyl") {
         const anyWarp = items.some((it) =>
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           it.sections.visual.some((e: any) => e.key === "warping" && e.checked)
         );
         const anyMissing = items.some((it) => it.missing);
@@ -520,6 +509,7 @@ export default function MediaGradingPage() {
       if (item.missing) return false;
       let glossyChecked = false;
       let anyOtherChecked = false;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const scan = (arr: any[]) => {
         for (const e of arr) {
           if (e.checked) {
@@ -547,7 +537,7 @@ export default function MediaGradingPage() {
     return true;
   }, [packagingChecks, packagingMissing]);
 
-  function scoreToGrade(score: number, opts: any) {
+  function scoreToGrade(score: number, opts: { isMedia: boolean; mediaSealedAllM: boolean; packagingSealedM: boolean; isSealed: boolean }) {
     const { isMedia, mediaSealedAllM, packagingSealedM, isSealed } = opts;
     if (isSealed) {
       if (isMedia && mediaSealedAllM) return "M";
@@ -714,13 +704,16 @@ export default function MediaGradingPage() {
   );
 
   // Helper for Media Item Card
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const MediaItemCard = ({ item, index }: { item: any; index: number }) => {
     const [L1, L2] = sideLettersForIndex(index);
     const idxLabel = `${labels.itemWord} #${index + 1}`;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const setEntry = (sectionKey: string, entryKey: string, updates: any) => {
       updateItem(index, (it) => {
         const next = { ...it, sections: { ...it.sections } };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const arr = next.sections[sectionKey].map((e: any) =>
           e.key === entryKey ? { ...e, ...updates } : e
         );
@@ -943,7 +936,7 @@ export default function MediaGradingPage() {
     "writing",
     "stickers",
   ]);
-  const filterAllowed = (arr: any[]) => (isSealedVinyl ? arr.filter((x) => vinylAllowedKeys.has(x.key)) : arr);
+  const filterAllowed = (arr: GradingOption[]) => (isSealedVinyl ? arr.filter((x) => vinylAllowedKeys.has(x.key)) : arr);
 
   const PackagingPanel = (
     <section className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">

@@ -70,7 +70,7 @@ export default function ManageDJSetsPage() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setDjSets((data as any[]) || []);
+      setDjSets((data as unknown as DJSet[]) || []);
     } catch (error) {
       console.error('Error loading DJ sets:', error);
       setStatus('Error loading DJ sets');
@@ -178,9 +178,10 @@ export default function ManageDJSetsPage() {
       // Reload DJ sets
       loadDJSets();
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Save error:', error);
-      setStatus(`Save failed: ${error.message}`);
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      setStatus(`Save failed: ${msg}`);
     } finally {
       setSaving(false);
     }
@@ -201,9 +202,10 @@ export default function ManageDJSetsPage() {
 
       setStatus('DJ set deleted successfully');
       loadDJSets();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Delete error:', error);
-      setStatus(`Delete failed: ${error.message}`);
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      setStatus(`Delete failed: ${msg}`);
     }
   };
 

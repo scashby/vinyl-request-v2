@@ -31,7 +31,7 @@ export default function AdminMostWantedPage() {
 
   const handleChange = (index: number, key: keyof MostWantedItem, value: string | number) => {
     const updated = [...items];
-    // @ts-ignore - Dynamic assignment
+    // @ts-expect-error - Dynamic assignment
     updated[index][key] = value;
     setItems(updated);
   };

@@ -12,6 +12,7 @@ function EditEventPageContent() {
   // Convert string ID to number if present, otherwise pass null
   const numericId = id ? parseInt(id, 10) : null;
 
+  // @ts-expect-error - EditEventForm props definition might be missing id in current types
   return <EditEventForm id={numericId} />;
 }
 

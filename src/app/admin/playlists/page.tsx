@@ -34,7 +34,7 @@ export default function AdminPlaylistsPage() {
 
   const handleChange = (index: number, key: keyof Playlist, value: string) => {
     const updated = [...playlists];
-    // @ts-ignore - Dynamic key assignment
+    // @ts-expect-error - Dynamic key assignment
     updated[index][key] = value;
     setPlaylists(updated);
   };

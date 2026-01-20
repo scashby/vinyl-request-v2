@@ -115,9 +115,10 @@ export default function EditAboutPage() {
 
       setMessage('About page content saved successfully!');
       setTimeout(() => setMessage(''), 3000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving about content:', error);
-      setMessage(`Error saving: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setMessage(`Error saving: ${errorMessage}`);
     }
     setSaving(false);
   };
