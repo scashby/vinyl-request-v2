@@ -1,7 +1,7 @@
 // src/app/edit-collection/tabs/CoverTab.tsx
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
 import type { Album } from 'types/album';
 import { supabase } from 'lib/supabaseClient';
@@ -54,6 +54,7 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
 
         if (coverType === 'inner') {
           const currentImages = album.inner_sleeve_images || [];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           onChange('inner_sleeve_images' as any, [...currentImages, publicUrl]);
         } else {
           const field = coverType === 'front' ? 'image_url' : 'back_image_url';
@@ -117,6 +118,7 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
 
     const newImages = [...currentImages];
     newImages.splice(index, 1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onChange('inner_sleeve_images' as any, newImages);
   };
 
@@ -130,154 +132,7 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
     onChange(field, imageUrl as Album[typeof field]);
   };
 
-  const handleCropRotate = (coverType: 'front' | 'back') => {
-    setCropMode(coverType);
-    
-    // Reset rotation for this cover
-    if (coverType === 'front') {
-      setFrontRotation(0);
-    } else {
-      setBackRotation(0);
-    }
-    
-    // Calculate actual image bounds within container
-    if (imageRef.current) {
-      const container = imageRef.current;
-      const img = container.querySelector('img');
-      
-      if (img) {
-        const containerRect = container.getBoundingClientRect();
-        const imgRect = img.getBoundingClientRect();
-        
-        // Calculate image position and size as percentage of container
-        const x = ((imgRect.left - containerRect.left) / containerRect.width) * 100;
-        const y = ((imgRect.top - containerRect.top) / containerRect.height) * 100;
-        const width = (imgRect.width / containerRect.width) * 100;
-        const height = (imgRect.height / containerRect.height) * 100;
-        
-        setImageBounds({ x, y, width, height });
-        setCropState({ x, y, width, height });
-      } else {
-        // Fallback if no image
-        setImageBounds({ x: 0, y: 0, width: 100, height: 100 });
-        setCropState({ x: 0, y: 0, width: 100, height: 100 });
-      }
-    }
-  };
-
-  const handleCropReset = () => {
-    // Reset rotation for active cover
-    if (cropMode === 'front') {
-      setFrontRotation(0);
-    } else if (cropMode === 'back') {
-      setBackRotation(0);
-    }
-    
-    // Exit crop mode
-    setCropMode(null);
-  };
-
-  const handleCropRotateImage = () => {
-    if (cropMode === 'front') {
-      setFrontRotation((frontRotation + 90) % 360);
-    } else if (cropMode === 'back') {
-      setBackRotation((backRotation + 90) % 360);
-    }
-  };
-
-  const handleCropApply = () => {
-    const rotation = cropMode === 'front' ? frontRotation : backRotation;
-    console.log('Applying crop:', cropState, 'rotation:', rotation);
-    setCropMode(null);
-  };
-
-  const handleMouseDown = useCallback((e: React.MouseEvent, handle: DragHandle) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (!imageRef.current) return;
-    
-    const rect = imageRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    
-    setIsDragging(true);
-    setDragHandle(handle);
-    setDragStart({ x, y });
-    setCropStart({ ...cropState });
-  }, [cropState]);
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDragging || !dragHandle || !imageRef.current) return;
-    
-    const rect = imageRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    
-    const dx = x - dragStart.x;
-    const dy = y - dragStart.y;
-    
-    const newCrop = { ...cropStart };
-    
-    switch (dragHandle) {
-      case 'nw':
-        newCrop.x = Math.max(imageBounds.x, Math.min(cropStart.x + dx, cropStart.x + cropStart.width - 10));
-        newCrop.y = Math.max(imageBounds.y, Math.min(cropStart.y + dy, cropStart.y + cropStart.height - 10));
-        newCrop.width = cropStart.width - (newCrop.x - cropStart.x);
-        newCrop.height = cropStart.height - (newCrop.y - cropStart.y);
-        break;
-      case 'ne':
-        newCrop.y = Math.max(imageBounds.y, Math.min(cropStart.y + dy, cropStart.y + cropStart.height - 10));
-        newCrop.width = Math.max(10, Math.min(cropStart.width + dx, imageBounds.x + imageBounds.width - cropStart.x));
-        newCrop.height = cropStart.height - (newCrop.y - cropStart.y);
-        break;
-      case 'sw':
-        newCrop.x = Math.max(imageBounds.x, Math.min(cropStart.x + dx, cropStart.x + cropStart.width - 10));
-        newCrop.width = cropStart.width - (newCrop.x - cropStart.x);
-        newCrop.height = Math.max(10, Math.min(cropStart.height + dy, imageBounds.y + imageBounds.height - cropStart.y));
-        break;
-      case 'se':
-        newCrop.width = Math.max(10, Math.min(cropStart.width + dx, imageBounds.x + imageBounds.width - cropStart.x));
-        newCrop.height = Math.max(10, Math.min(cropStart.height + dy, imageBounds.y + imageBounds.height - cropStart.y));
-        break;
-      case 'n':
-        newCrop.y = Math.max(imageBounds.y, Math.min(cropStart.y + dy, cropStart.y + cropStart.height - 10));
-        newCrop.height = cropStart.height - (newCrop.y - cropStart.y);
-        break;
-      case 's':
-        newCrop.height = Math.max(10, Math.min(cropStart.height + dy, imageBounds.y + imageBounds.height - cropStart.y));
-        break;
-      case 'e':
-        newCrop.width = Math.max(10, Math.min(cropStart.width + dx, imageBounds.x + imageBounds.width - cropStart.x));
-        break;
-      case 'w':
-        newCrop.x = Math.max(imageBounds.x, Math.min(cropStart.x + dx, cropStart.x + cropStart.width - 10));
-        newCrop.width = cropStart.width - (newCrop.x - cropStart.x);
-        break;
-      case 'move':
-        newCrop.x = Math.max(imageBounds.x, Math.min(cropStart.x + dx, imageBounds.x + imageBounds.width - cropStart.width));
-        newCrop.y = Math.max(imageBounds.y, Math.min(cropStart.y + dy, imageBounds.y + imageBounds.height - cropStart.height));
-        break;
-    }
-    
-    setCropState(newCrop);
-  }, [isDragging, dragHandle, dragStart, cropStart, imageBounds]);
-
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-    setDragHandle(null);
-  }, []);
-
-  React.useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  // Legacy cropping logic removed
 
   return (
     <div className="h-full flex flex-col overflow-y-auto p-4 gap-4">
