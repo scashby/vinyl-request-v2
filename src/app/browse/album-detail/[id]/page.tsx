@@ -675,13 +675,13 @@ function AlbumDetailContent() {
                           {isBlocked && <span className="text-red-500 text-xs">!</span>}
                         </div>
                         <div className="font-medium text-white">
-                          {typeof track === 'string' ? track : (track as any).title || (track as any).name || 'Unknown Track'}
+                          {typeof track === 'string' ? track : (track as Track).title || (track as Track).name || 'Unknown Track'}
                         </div>
                         <div className="text-gray-400 text-sm">
-                          {typeof track === 'object' && (track as any).artist ? (track as any).artist : album.artist}
+                          {typeof track === 'object' && (track as Track).artist ? (track as Track).artist : album.artist}
                         </div>
                         <div className="text-right text-gray-500 text-sm font-mono">
-                          {typeof track === 'object' && (track as any).duration ? (track as any).duration : '--:--'}
+                          {typeof track === 'object' && (track as Track).duration ? (track as Track).duration : '--:--'}
                         </div>
                       </div>
                     );

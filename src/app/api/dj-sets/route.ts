@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     console.error('Error fetching DJ sets:', error);
     return NextResponse.json({
       success: false,
-      error: error.message
+      error: (error as Error).message
     }, { status: 500 });
   }
 }
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     console.error('Error creating DJ set:', error);
     return NextResponse.json({
       success: false,
-      error: error.message
+      error: (error as Error).message
     }, { status: 500 });
   }
 }
@@ -149,7 +149,7 @@ export async function PUT(request: NextRequest) {
     console.error('Error updating DJ set:', error);
     return NextResponse.json({
       success: false,
-      error: error.message
+      error: (error as Error).message
     }, { status: 500 });
   }
 }
@@ -184,7 +184,7 @@ export async function DELETE(request: NextRequest) {
     console.error('Error deleting DJ set:', error);
     return NextResponse.json({
       success: false,
-      error: error.message
+      error: (error as Error).message
     }, { status: 500 });
   }
 }
@@ -249,7 +249,7 @@ export async function PATCH(request: NextRequest) {
     console.error('Error handling live stream action:', error);
     return NextResponse.json({
       success: false,
-      error: error.message
+      error: (error as Error).message
     }, { status: 500 });
   }
 }

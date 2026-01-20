@@ -35,7 +35,6 @@ export async function POST(request: NextRequest) {
     const drive = await initGoogleDrive();
 
     // Upload to Google Drive
-    // @ts-expect-error - ReadableStream types compatibility issue
     const response = await drive.files.create({
       requestBody: {
         name: name,
@@ -81,7 +80,7 @@ export async function POST(request: NextRequest) {
     console.error('Google Drive upload error:', error);
     const msg = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Upload failed', details: error.message },
+      { error: 'Upload failed', details: msg },
       { status: 500 }
     );
   }

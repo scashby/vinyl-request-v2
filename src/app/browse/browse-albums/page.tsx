@@ -35,7 +35,7 @@ interface BrowseAlbum {
   apple_music_genre?: string;
   apple_music_genres?: string[];
   apple_music_label?: string;
-  image?: string;
+  image: string;
 }
 
 function BrowseAlbumsContent() {
@@ -116,13 +116,14 @@ function BrowseAlbumsContent() {
   useEffect(() => {
     async function fetchAllAlbums() {
       setLoading(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let allRows: any[] = [];
       let from = 0;
       const batchSize = 1000;
       let keepGoing = true;
       
       while (keepGoing) {
-        let { data: batch, error } = await supabase
+        const { data: batch, error } = await supabase
           .from('collection')
           .select('*')
           .or('blocked.is.null,blocked.eq.false')
@@ -164,7 +165,7 @@ function BrowseAlbumsContent() {
         apple_music_genres: album.apple_music_genres,
         apple_music_label: album.apple_music_label,
         image:
-          album.image_url && album.image_url.trim().toLowerCase() !== 'no'
+          (album.image_url && album.image_url.trim().toLowerCase() !== 'no')
             ? album.image_url.trim()
             : '/images/coverplaceholder.png'
       }));
@@ -238,7 +239,7 @@ function BrowseAlbumsContent() {
              matchesStevesTop200 && matchesThisWeeksTop10 && matchesInnerCirclePreferred;
     });
     
-    fa = [...fa].sort((a: any, b: any) => {
+    fa = [...fa].sort((a: BrowseAlbum, b: BrowseAlbum) => {
       let va, vb;
       
       if (sortField === 'date_added') {

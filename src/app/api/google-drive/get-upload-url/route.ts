@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     console.error('Upload URL generation error:', error);
     const msg = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to generate upload URL', details: error.message },
+      { error: 'Failed to generate upload URL', details: msg },
       { status: 500 }
     );
   }

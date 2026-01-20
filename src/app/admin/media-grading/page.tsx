@@ -13,6 +13,26 @@ interface GradingOption {
   tracks?: boolean;
 }
 
+interface MediaItemState {
+  key: string;
+  checked: boolean;
+  subOptions: string[] | null;
+  subIndex: number | null;
+  sides: { S1: boolean; S2: boolean } | null;
+  tracks: { S1: number; S2: number } | number | null;
+  penalty: number;
+  label: string;
+}
+
+interface MediaState {
+  missing: boolean;
+  sections: {
+    visual: MediaItemState[];
+    audio: MediaItemState[];
+    labelArea: MediaItemState[];
+  };
+}
+
 const MEDIA_PENALTIES = {
   lightScuffs: 3,
   scratches: 8,
@@ -241,7 +261,7 @@ function getPackagingLabels(mediaType: string) {
 
 function makeInitialMediaState(mediaType: string) {
   const labels = getMediaLabels(mediaType);
-  const fold = (arr: any[]) =>
+  const fold = (arr: GradingOption[]) =>
     arr.map((cfg) => ({
       key: cfg.key,
       checked: false,
