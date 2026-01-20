@@ -1,3 +1,4 @@
+// src/app/events/events-page/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -213,8 +214,8 @@ export default function Page() {
 
                   <div className={`grid gap-7 ${upNext.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
                     {upNext.map((ev) => {
-                      const img =
-                        ev.image_url || "/images/placeholder.png";
+                      // FIX: Updated placeholder image path
+                      const img = ev.image_url || "/images/coverplaceholder.png";
                       const d = compactDate(ev.date);
                       const tba =
                         !ev.date ||
@@ -267,7 +268,8 @@ export default function Page() {
                   <SectionTitle text="Featured" />
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                     {featuredGrid.map((e) => {
-                      const img = e.image_url || "/images/placeholder.png";
+                      // FIX: Updated placeholder image path
+                      const img = e.image_url || "/images/coverplaceholder.png";
                       const d = compactDate(e.date);
                       const tba = !e.date || e.date === "" || e.date === "9999-12-31";
 
@@ -315,8 +317,8 @@ export default function Page() {
                   {/* LEFT COLUMN: list of upcoming events */}
                   <div className="space-y-4">
                     {events.map((e) => {
-                      const img =
-                        e.image_url || "/images/placeholder.png";
+                      // FIX: Updated placeholder image path
+                      const img = e.image_url || "/images/coverplaceholder.png";
 
                       return (
                         <Link

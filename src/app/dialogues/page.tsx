@@ -1,6 +1,4 @@
-// Dialogues page ("/dialogues")
-// Lists all WordPress articles (with tag/category badges), and embedded playlists.
-
+// src/app/dialogues/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -105,7 +103,8 @@ export default function DialoguesPage() {
               <div className="bg-white border border-gray-100 rounded-2xl shadow-lg overflow-hidden mb-10 flex flex-col md:flex-row">
                 <div className="md:w-1/2 relative h-64 md:h-auto">
                   <Image
-                    src={extractFirstImg(featured) || "/images/placeholder.png"}
+                    // FIX: Updated placeholder image path
+                    src={extractFirstImg(featured) || "/images/coverplaceholder.png"}
                     alt={featured.title}
                     fill
                     className="object-cover"
@@ -155,7 +154,8 @@ export default function DialoguesPage() {
                   >
                     <div className="relative h-48 w-full">
                       <Image
-                        src={extractFirstImg(post) || "/images/placeholder.png"}
+                        // FIX: Updated placeholder image path
+                        src={extractFirstImg(post) || "/images/coverplaceholder.png"}
                         alt={post.title}
                         fill
                         className="object-cover"
