@@ -16,7 +16,7 @@ interface BrowseAlbum {
   id: number;
   title: string;
   artist: string;
-  year?: string;
+  year?: string | number;
   folder?: string;
   mediaType?: string;
   dateAdded?: string;
@@ -145,7 +145,7 @@ function BrowseAlbumsContent() {
         id: album.id,
         title: album.title,
         artist: album.artist,
-        year: album.year,
+        year: album.year || '',
         folder: album.folder,
         mediaType: album.folder,
         dateAdded: album.date_added,

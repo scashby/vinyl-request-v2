@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef } from "react";
 
 interface SocialEmbedData {
   id: number;

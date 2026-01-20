@@ -3,6 +3,26 @@
 import React, { useState, useMemo, useCallback } from "react";
 import Link from 'next/link';
 
+interface MediaItemState {
+  key: string;
+  checked: boolean;
+  subOptions: string[] | null;
+  subIndex: number | null;
+  sides: { S1: boolean; S2: boolean } | null;
+  tracks: { S1: number; S2: number } | number | null;
+  penalty: number;
+  label: string;
+}
+
+interface MediaState {
+  missing: boolean;
+  sections: {
+    visual: MediaItemState[];
+    audio: MediaItemState[];
+    labelArea: MediaItemState[];
+  };
+}
+
 interface GradingOption {
   key: string;
   label: string;
@@ -344,8 +364,8 @@ export default function MediaGradingPage() {
       let score = 100;
       const deductions: { label: string; amount: number }[] = [];
 
-      const evalRow = (row: any[], isAudio: boolean) => {
-        row.forEach((entry: any) => {
+      const evalRow = (row: MediaItemState[], isAudio: boolean) => {
+        row.forEach((entry: MediaItemState) => {
           if (!entry.checked) return;
 
           if (sealed) {

@@ -73,6 +73,7 @@ function BrowseQueueContent() {
       }
 
       const albumIds = requests.map(r => r.album_id).filter(Boolean);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let albums: any[] = [];
 
       if (albumIds.length) {

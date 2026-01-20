@@ -15,7 +15,6 @@ interface Event {
   image_url?: string;
   is_featured_grid?: boolean;
   featured_priority?: number | string | null;
-  [key: string]: any;
 }
 
 interface DJSet {
@@ -30,7 +29,6 @@ interface DJSet {
     date: string;
     location?: string;
   };
-  [key: string]: any;
 }
 
 interface DateObj {

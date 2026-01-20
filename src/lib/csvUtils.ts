@@ -25,11 +25,11 @@ export interface ProcessedRelease {
 
 // 🛠 Extract, normalize fields
 export function parseDiscogsCSV(file: File, callback: (rows: ProcessedRelease[]) => void): void {
-  Papa.parse<DiscogsCSVRow>(file, {
+  Papa.parse(file, {
     header: true,
     skipEmptyLines: true,
     complete: (results) => {
-      const rows = results.data.map((row) => ({
+      const rows = (results.data as DiscogsCSVRow[]).map((row) => ({
         artist: row['Artist'],
         title: row['Title'],
         format: row['Format'],

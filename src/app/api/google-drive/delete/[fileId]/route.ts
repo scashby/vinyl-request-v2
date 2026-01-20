@@ -40,11 +40,11 @@ export async function DELETE(
       message: 'File deleted successfully',
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Google Drive delete error:', error);
     
     // Handle file not found
-    if (error.code === 404) {
+    if ((error as { code?: number }).code === 404) {
       return NextResponse.json({
         success: true,
         message: 'File already deleted or not found',
@@ -52,7 +52,7 @@ export async function DELETE(
     }
 
     return NextResponse.json(
-      { error: 'Delete failed', details: error.message },
+      { error: 'Delete failed', details: (error as Error).message },
       { status: 500 }
     );
   }

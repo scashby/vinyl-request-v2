@@ -215,7 +215,7 @@ export default function Page() {
 
             {has_queue && (
               <>
-                <QueueSection eventId={event.id} />
+                <QueueSection eventId={String(event.id)} />
                 <button
                   className="text-blue-600 underline mt-4 inline-block font-medium text-base hover:text-blue-800 transition-colors"
                   onClick={goToBrowse}

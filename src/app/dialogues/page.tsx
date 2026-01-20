@@ -72,6 +72,7 @@ export default function DialoguesPage() {
       .then(data => {
         if (!data.items || !Array.isArray(data.items)) return;
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const items: BlogPost[] = data.items.map((p: any) => ({
           ...p,
           link: p.guid || p.link
