@@ -1,6 +1,4 @@
-// Album Detail page with queue type support (track/side/album)
-// Replace: src/app/browse/album-detail/[id]/page.js
-
+// src/app/browse/album-detail/[id]/page.tsx
 "use client";
 
 import { useEffect, useState, useCallback, Suspense } from 'react';
@@ -407,7 +405,8 @@ function AlbumDetailContent() {
   const queueTypesArray = Array.isArray(queueTypes) ? queueTypes : [queueTypes];
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white relative overflow-hidden font-sans">
+    // FIX: Added pt-[120px] to account for fixed header
+    <div className="min-h-screen bg-gray-900 text-white relative overflow-hidden font-sans pt-[120px]">
       {/* Background Blur */}
       <div 
         className="absolute inset-0 bg-cover bg-center blur-3xl opacity-30 scale-110 pointer-events-none"
