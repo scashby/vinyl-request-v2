@@ -2,18 +2,21 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { supabase } from 'lib/supabaseClient';
 import type { Album } from 'types/album';
 import { MainTab, type MainTabRef } from './tabs/MainTab';
 import { DetailsTab } from './tabs/DetailsTab';
-import { ClassicalTab } from './tabs/ClassicalTab';
 import { PeopleTab } from './tabs/PeopleTab';
-import { TracksTab, type TracksTabRef } from './tabs/TracksTab';
+import { type TracksTabRef } from './tabs/TracksTab';
 import { PersonalTab } from './tabs/PersonalTab';
-import { CoverTab } from './tabs/CoverTab';
 import { LinksTab } from './tabs/LinksTab';
-import { EnrichmentTab } from './tabs/EnrichmentTab';
 import { UniversalBottomBar } from 'components/UniversalBottomBar';
+
+const ClassicalTab = dynamic(() => import('./tabs/ClassicalTab').then(mod => mod.ClassicalTab));
+const TracksTab = dynamic(() => import('./tabs/TracksTab').then(mod => mod.TracksTab));
+const CoverTab = dynamic(() => import('./tabs/CoverTab').then(mod => mod.CoverTab));
+const EnrichmentTab = dynamic(() => import('./tabs/EnrichmentTab').then(mod => mod.EnrichmentTab));
 import { PickerModal } from './pickers/PickerModal';
 import { fetchLocations, type PickerDataItem } from './pickers/pickerDataUtils';
 
