@@ -1,4 +1,5 @@
-import "./globals.css"; // The ONLY global style file
+// src/app/layout.tsx
+import "./globals.css";
 import { Inter, Playfair_Display } from "next/font/google";
 import Layout from "components/Layout";
 import { Analytics } from "@vercel/analytics/next"
@@ -19,6 +20,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} ${playfair.variable} font-sans antialiased bg-white text-black`}>
+        {/* REQUIRED for Facebook SDK to function without errors */}
+        <div id="fb-root"></div> 
+        
         <Layout>{children}</Layout>
         <Analytics />
       </body>
