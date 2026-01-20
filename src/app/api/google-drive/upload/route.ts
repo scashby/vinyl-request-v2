@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     const drive = await initGoogleDrive();
 
     // Upload to Google Drive
-    // @ts-ignore - ReadableStream types compatibility issue
+    // @ts-expect-error - ReadableStream types compatibility issue
     const response = await drive.files.create({
       requestBody: {
         name: name,
@@ -77,8 +77,9 @@ export async function POST(request: NextRequest) {
         throw new Error("Upload failed: No ID returned");
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Google Drive upload error:', error);
+    const msg = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
       { error: 'Upload failed', details: error.message },
       { status: 500 }

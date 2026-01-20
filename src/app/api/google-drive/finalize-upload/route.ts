@@ -51,8 +51,9 @@ export async function POST(request: NextRequest) {
       createdTime: fileInfo.data.createdTime,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Finalize upload error:', error);
+    const msg = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
       { error: 'Failed to finalize upload', details: error.message },
       { status: 500 }

@@ -318,8 +318,7 @@ export default function MediaGradingPage() {
   }
 
   const computeMediaScoreForItem = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (item: any) => {
+    (item: MediaState) => {
       if (item.missing) return { score: 0, deductions: [{ label: "Item missing", amount: 100 }] };
 
       let score = 100;
@@ -486,8 +485,7 @@ export default function MediaGradingPage() {
     if (sealed) {
       if (mediaType === "vinyl") {
         const anyWarp = items.some((it) =>
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          it.sections.visual.some((e: any) => e.key === "warping" && e.checked)
+          it.sections.visual.some((e: MediaItemState) => e.key === "warping" && e.checked)
         );
         const anyMissing = items.some((it) => it.missing);
         mediaAllM = !anyWarp && !anyMissing;
@@ -509,8 +507,7 @@ export default function MediaGradingPage() {
       if (item.missing) return false;
       let glossyChecked = false;
       let anyOtherChecked = false;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const scan = (arr: any[]) => {
+      const scan = (arr: MediaItemState[]) => {
         for (const e of arr) {
           if (e.checked) {
             if (e.key === "glossy") glossyChecked = true;
@@ -704,8 +701,7 @@ export default function MediaGradingPage() {
   );
 
   // Helper for Media Item Card
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const MediaItemCard = ({ item, index }: { item: any; index: number }) => {
+  const MediaItemCard = ({ item, index }: { item: MediaState; index: number }) => {
     const [L1, L2] = sideLettersForIndex(index);
     const idxLabel = `${labels.itemWord} #${index + 1}`;
 

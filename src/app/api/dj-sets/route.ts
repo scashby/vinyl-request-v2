@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       count: data?.length || 0
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching DJ sets:', error);
     return NextResponse.json({
       success: false,
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
       message: 'DJ set created successfully'
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating DJ set:', error);
     return NextResponse.json({
       success: false,
@@ -145,7 +145,7 @@ export async function PUT(request: NextRequest) {
       message: 'DJ set updated successfully'
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating DJ set:', error);
     return NextResponse.json({
       success: false,
@@ -180,7 +180,7 @@ export async function DELETE(request: NextRequest) {
       message: 'DJ set deleted successfully'
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting DJ set:', error);
     return NextResponse.json({
       success: false,
@@ -245,7 +245,7 @@ export async function PATCH(request: NextRequest) {
       error: 'Invalid action'
     }, { status: 400 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error handling live stream action:', error);
     return NextResponse.json({
       success: false,

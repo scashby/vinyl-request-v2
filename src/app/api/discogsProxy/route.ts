@@ -154,8 +154,9 @@ export async function GET(req: NextRequest) {
     console.log("Missing required parameters");
     return new NextResponse("Missing releaseId or masterId parameter", { status: 400 });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Proxy error:", err);
-    return new NextResponse(`Server error: ${err.message}`, { status: 500 });
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return new NextResponse(`Server error: ${msg}`, { status: 500 });
   }
 }
