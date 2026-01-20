@@ -18,10 +18,12 @@ const initGoogleDrive = async () => {
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { fileId: string } }
+  // 1. Update the type definition to wrap params in Promise
+  { params }: { params: Promise<{ fileId: string }> }
 ) {
   try {
-    const { fileId } = params;
+    // 2. Await the params object before destructuring
+    const { fileId } = await params;
 
     if (!fileId) {
       return NextResponse.json({ error: 'No file ID provided' }, { status: 400 });
