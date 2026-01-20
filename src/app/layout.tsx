@@ -19,8 +19,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} ${playfair.variable} font-sans antialiased bg-white text-black`}>
-        {/* Required for Facebook SDK to function correctly */}
+        {/* FIX: Required anchor for Facebook SDK */}
         <div id="fb-root"></div>
+        
         <Layout>{children}</Layout>
         <Analytics />
       </body>

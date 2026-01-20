@@ -1,4 +1,3 @@
-// src/app/browse/browse-albums/page.tsx
 "use client";
 
 import { Suspense } from 'react';
@@ -56,7 +55,6 @@ function BrowseAlbumsContent() {
   const [showSuggestionBox, setShowSuggestionBox] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Helper function to check if album was added in last 2 weeks
   const isJustAdded = (dateAdded?: string) => {
     if (!dateAdded) return false;
     const addedDate = new Date(dateAdded);
@@ -65,10 +63,8 @@ function BrowseAlbumsContent() {
     return addedDate >= twoWeeksAgo;
   };
 
-  // Helper function to format date
   const formatDate = (dateString?: string) => {
     if (!dateString || dateString === '9999-12-31') return '';
-    // Append T00:00:00 to force local time interpretation instead of UTC
     const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('en-US', { 
       weekday: 'long',
@@ -113,6 +109,10 @@ function BrowseAlbumsContent() {
   useEffect(() => {
     async function fetchAllAlbums() {
       setLoading(true);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 5000)
+      );
+
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let allRows: any[] = [];
@@ -120,23 +120,29 @@ function BrowseAlbumsContent() {
         const batchSize = 1000;
         let keepGoing = true;
         
+        // Note: For large datasets, a proper timeout strategy might need to wrap the whole loop
+        // or just the first fetch. Here we wrap the first fetch attempt logic for safety.
+        
         while (keepGoing) {
-          const { data: batch, error } = await supabase
+            const fetchPromise = supabase
             .from('collection')
             .select('*')
             .or('blocked.is.null,blocked.eq.false')
             .neq('folder', 'Sale')
             .range(from, from + batchSize - 1);
-            
-          if (error) {
-            console.error('Error fetching albums:', error);
-            break;
-          }
-          if (!batch || batch.length === 0) break;
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { data: batch, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
           
-          allRows = allRows.concat(batch);
-          keepGoing = batch.length === batchSize;
-          from += batchSize;
+            if (error) {
+                console.error('Error fetching albums:', error);
+                break;
+            }
+            if (!batch || batch.length === 0) break;
+            
+            allRows = allRows.concat(batch);
+            keepGoing = batch.length === batchSize;
+            from += batchSize;
         }
         
         const parsed: BrowseAlbum[] = allRows.map(album => ({
@@ -271,7 +277,6 @@ function BrowseAlbumsContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
-      {/* HEADER IS NOW OUTSIDE THE LOADING CHECK */}
       <header className="relative w-full h-[300px] flex items-center justify-center bg-gray-900 overflow-hidden">
         <div 
           className="absolute inset-0 bg-cover bg-center opacity-50"
@@ -301,7 +306,6 @@ function BrowseAlbumsContent() {
           </div>
         ) : (
           <>
-            {/* Search & Filter Bar */}
             <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6">
               <input
                 type="text"
@@ -352,7 +356,6 @@ function BrowseAlbumsContent() {
               )}
             </div>
 
-            {/* Filters */}
             <div className="flex flex-wrap gap-3 items-center mb-6 w-full">
               <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold cursor-pointer transition-all ${
                 justAddedCount > 0 

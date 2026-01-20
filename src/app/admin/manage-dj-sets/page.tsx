@@ -60,9 +60,23 @@ export default function ManageDJSetsPage() {
   }, []);
 
   const loadDJSets = async () => {
+    // FIX: 5-second timeout to prevent infinite hanging
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Timeout')), 5000)
+    );
+
     try {
-      const { data, error } = await supabase
+      const fetchPromise = supabase
         .from('dj_sets')
+        .select(`
+          *,
+          events(title, date, location)
+        `)
+        .order('recorded_at', { ascending: false });
+
+      // FIX: Race against timeout
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
         .select(`
           *,
           events(title, date)

@@ -102,7 +102,7 @@ export default function DialoguesPage() {
               <div className="bg-white border border-gray-100 rounded-2xl shadow-lg overflow-hidden mb-10 flex flex-col md:flex-row">
                 <div className="md:w-1/2 relative h-64 md:h-auto">
                   <Image
-                    // FIX: Updated placeholder path
+                    // FIX: Updated placeholder image path
                     src={extractFirstImg(featured) || "/images/coverplaceholder.png"}
                     alt={featured.title}
                     fill
@@ -153,7 +153,7 @@ export default function DialoguesPage() {
                   >
                     <div className="relative h-48 w-full">
                       <Image
-                        // FIX: Updated placeholder path
+                        // FIX: Updated placeholder image path
                         src={extractFirstImg(post) || "/images/coverplaceholder.png"}
                         alt={post.title}
                         fill

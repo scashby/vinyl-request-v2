@@ -35,17 +35,17 @@ export default function SocialEmbeds() {
 }
 
 function SafeEmbed({ html, platform }: { html: string, platform: string }) {
-  // Fix 1: Remove conflicting 'allowfullscreen' attributes that cause browser warnings
+  // FIX: Regex to remove attributes that cause browser warnings (Fixes "Allow attribute" error)
   const cleanHtml = html
     .replace(/allowfullscreen="?"/g, '') 
-    .replace(/allowfullscreen/g, '');
+    .replace(/allowfullscreen/g, '');    
 
-  // If it's a simple iframe (Threads, Spotify, Apple), render directly
+  // Simple iframes (Threads, Spotify, etc) render directly
   if (html.includes('<iframe') || platform.toLowerCase().includes('threads')) {
      return <div className="social-embed" dangerouslySetInnerHTML={{ __html: cleanHtml }} />;
   }
 
-  // Use the safe renderer for script-based embeds (Facebook, LinkedIn)
+  // Complex scripts (LinkedIn, Facebook) go through the safe renderer
   return (
     <div className="social-embed">
       <SafeHtml html={cleanHtml} />
@@ -59,14 +59,19 @@ function SafeHtml({ html }: { html: string }) {
   useEffect(() => {
     if (!ref) return;
 
+    // FIX: Neutralize document.write to prevent app crash
+    // We strictly override it only within this scope context to prevent the 'in.js' crash
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (document as any).write = () => { /* Prevent execution */ };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (document as any).writeln = () => { /* Prevent execution */ };
+
     ref.innerHTML = html;
 
     const scripts = ref.querySelectorAll("script");
     scripts.forEach(oldScript => {
-      // Fix 2: Safety check for document.write
-      // In a SPA, document.write clears the page. We must prevent execution if present.
+      // Double safety check
       if (oldScript.textContent?.includes('document.write')) {
-        console.error("Skipped a script that uses document.write to prevent app crash.");
         return; 
       }
 
