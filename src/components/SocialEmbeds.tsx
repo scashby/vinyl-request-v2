@@ -80,7 +80,7 @@ function SafeHtml({ html }: { html: string }) {
       
       try {
         oldScript.replaceWith(newScript);
-      } catch (err) {
+      } catch {
         // Suppress activation errors
       }
     });

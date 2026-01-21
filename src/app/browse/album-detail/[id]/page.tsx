@@ -703,3 +703,10 @@ function AlbumDetailContent() {
     </div>
   );
 }
+export default function AlbumDetailPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AlbumDetailContent />
+    </Suspense>
+  );
+}
