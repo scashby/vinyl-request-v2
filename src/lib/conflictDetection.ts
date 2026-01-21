@@ -310,4 +310,136 @@ export function detectConflicts(existingAlbum: Record<string, unknown>, imported
   }
   return { safeUpdates, conflicts };
 }
-// (Remaining helper functions smartMergeTracks, compareTrackArrays, etc. omitted for brevity but remain unchanged)
+/**
+ * Smart track merging - preserves enriched data from current DB
+ */
+export function smartMergeTracks(
+  currentTracks: Track[] | null,
+  newTracks: Track[] | null
+): Track[] {
+  if (!currentTracks && !newTracks) return [];
+  if (!currentTracks) return newTracks || [];
+  if (!newTracks) return currentTracks;
+  const currentMap = new Map<string, Track>();
+  currentTracks.forEach(track => currentMap.set(track.position, track));
+  const merged: Track[] = [];
+  newTracks.forEach(newTrack => {
+    const currentTrack = currentMap.get(newTrack.position);
+    if (currentTrack) {
+      merged.push({
+        ...newTrack,
+        id: currentTrack.id || newTrack.id,
+        lyrics_url: currentTrack.lyrics_url || newTrack.lyrics_url,
+        lyrics: currentTrack.lyrics || newTrack.lyrics,
+        lyrics_source: currentTrack.lyrics_source || newTrack.lyrics_source,
+        title: newTrack.title,
+        artist: newTrack.artist || currentTrack.artist,
+        duration: newTrack.duration || currentTrack.duration,
+      });
+      currentMap.delete(newTrack.position);
+    } else {
+      merged.push(newTrack);
+    }
+  });
+  currentMap.forEach(track => merged.push(track));
+  merged.sort((a, b) => {
+    const aNum = parseInt(a.position);
+    const bNum = parseInt(b.position);
+    if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+    return a.position.localeCompare(b.position);
+  });
+  return merged;
+}
+
+/**
+ * Merge two arrays - combines both and removes duplicates
+ */
+export function mergeArrays(current: string[], incoming: string[]): string[] {
+  const merged = [...incoming];
+  for (const item of current) {
+    if (!merged.includes(item)) merged.push(item);
+  }
+  return merged;
+}
+
+/**
+ * Apply a resolution to get the final value
+ */
+export function applyResolution(
+  currentValue: unknown,
+  newValue: unknown,
+  resolution: ResolutionStrategy
+): unknown {
+  switch (resolution) {
+    case 'keep_current': return currentValue;
+    case 'use_new': return newValue;
+    case 'merge':
+      if (Array.isArray(currentValue) && Array.isArray(newValue)) {
+        if (currentValue.length > 0 && typeof currentValue[0] === 'string') {
+          return mergeArrays(currentValue as string[], newValue as string[]);
+        }
+      }
+      return newValue;
+    default: return currentValue;
+  }
+}
+
+/**
+ * Get the rejected value for resolution tracking
+ */
+export function getRejectedValue(
+  currentValue: unknown,
+  newValue: unknown,
+  resolution: ResolutionStrategy
+): unknown {
+  switch (resolution) {
+    case 'keep_current': return newValue;
+    case 'use_new': return currentValue;
+    default: return null;
+  }
+}
+
+/**
+ * Get human-readable field name for display
+ */
+export function getFieldDisplayName(fieldName: string): string {
+  const nameMap: Record<string, string> = {
+    tracks: 'Tracks',
+    disc_metadata: 'Disc Metadata',
+    discs: 'Number of Discs',
+    musicians: 'Musicians',
+    producers: 'Producers',
+    engineers: 'Engineers',
+    songwriters: 'Songwriters',
+    packaging: 'Packaging',
+    sound: 'Sound',
+    spars_code: 'SPARS Code',
+    rpm: 'RPM',
+    vinyl_color: 'Vinyl Color',
+    vinyl_weight: 'Vinyl Weight',
+    matrix_numbers: 'Matrix Numbers',
+    image_url: 'Cover Image',
+    back_image_url: 'Back Cover Image',
+    discogs_genres: 'Genres',
+    discogs_styles: 'Styles',
+    notes: 'Notes',
+    studio: 'Studio',
+    my_rating: 'Rating',
+    media_condition: 'Media Condition',
+    package_sleeve_condition: 'Sleeve Condition',
+    composer: 'Composer',
+    conductor: 'Conductor',
+    orchestra: 'Orchestra',
+    chorus: 'Chorus',
+    length_seconds: 'Length',
+    is_live: 'Live Recording',
+  };
+  return nameMap[fieldName] || fieldName;
+}
+
+/**
+ * Check if a field can be merged
+ */
+export function canMergeField(value: unknown): boolean {
+  return Array.isArray(value);
+}
