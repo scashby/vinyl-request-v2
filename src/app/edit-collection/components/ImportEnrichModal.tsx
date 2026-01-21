@@ -28,7 +28,7 @@ const ALLOWED_COLUMNS = new Set([
   'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
   'apple_music_id', 'apple_music_url', 'lastfm_id', 'lastfm_url', 
   'musicbrainz_id', 'musicbrainz_url', 'wikipedia_url', 'genius_url', 
-  'lastfm_tags', 'notes', 'enrichment_summary', 'genres', 'styles', 'original_release_date',
+  'lastfm_tags', 'notes', 'enriched_metadata', 'enrichment_summary', 'genres', 'styles', 'original_release_date',
   'inner_sleeve_images', 'musicians', 'credits', 'producers', 'engineers', 
   'songwriters', 'composer', 'conductor', 'orchestra',
   'tempo_bpm', 'musical_key', 'lyrics', 'time_signature', 
@@ -99,6 +99,7 @@ type Album = {
   image_url: string | null;
   finalized_fields?: string[];
   last_reviewed_at?: string;
+  enriched_metadata?: Record<string, unknown>; // New JSONB column
   [key: string]: unknown; // Allows dynamic access like album[key]
 };
 
@@ -362,7 +363,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       try {
         const payload = {
           albumIds: specificAlbumIds,
-          limit: specificAlbumIds ? undefined : 5, // Reduced from 50 to 5 to prevent Vercel 504 Timeouts
+          limit: specificAlbumIds ? undefined : 5, // Reduced to prevent timeouts
           cursor: specificAlbumIds ? undefined : cursorRef.current,
           folder: folderFilter || undefined,
           services: getServicesForSelection(),
@@ -528,6 +529,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             );
             if (alreadySeen) return; 
 
+            // *** REDIRECT 'NOTES' TO ENRICHED_METADATA ***
+            if (key === 'notes' && value) {
+               // We don't want to conflict with the 'notes' column (which is personal).
+               // We map it to 'enriched_metadata' instead.
+               if (!fieldCandidates['enriched_metadata']) fieldCandidates['enriched_metadata'] = {};
+               // Store it keyed by source
+               fieldCandidates['enriched_metadata'][source] = value;
+               return; 
+            }
+
             let newVal = value;
             if (key === 'original_release_date' && typeof newVal === 'string') {
                  if (/^\d{4}$/.test(newVal)) newVal = `${newVal}-12-25`;
@@ -565,7 +576,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                currentVal.length === 0 || 
                currentVal.every(v => !v || String(v).trim() === '')
             )) ||
-            (typeof currentVal === 'string' && currentVal.trim() === '');
+            (typeof currentVal === 'string' && currentVal.trim() === '') ||
+            (typeof currentVal === 'object' && Object.keys(currentVal as object).length === 0);
 
           const sources = Object.keys(sourceValues);
           if (sources.length === 0) return;
@@ -576,7 +588,13 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           let proposedValue: unknown;
           let isMerge = false;
 
-          if (isArrayField) {
+          // Special Handling for 'enriched_metadata'
+          if (key === 'enriched_metadata') {
+             // Pass the full source map to the review modal
+             proposedValue = sourceValues;
+             isMerge = true;
+          }
+          else if (isArrayField) {
              const mergedSet = new Set<string>();
              const lowerCaseMap = new Set<string>();
              
@@ -596,23 +614,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
              isMerge = true;
           } 
           else if (key === 'notes') {
-             const combinedNotes: string[] = [];
-             const seenContent = new Set<string>();
-
-             const sortedSources = sources.sort((a, b) => {
-                 return GLOBAL_PRIORITY.indexOf(a) - GLOBAL_PRIORITY.indexOf(b);
-             });
-
-             sortedSources.forEach(src => {
-                 const val = String(sourceValues[src]).trim();
-                 if (val && !seenContent.has(val)) {
-                     combinedNotes.push(val);
-                     seenContent.add(val);
-                 }
-             });
-             
-             proposedValue = combinedNotes.join('\n\n');
-             isMerge = true; 
+              // Should not happen due to redirect, but safe fallback
+              proposedValue = Object.values(sourceValues)[0];
           }
           else if (key === 'enrichment_summary') {
              const combinedSummary: Record<string, string> = {};
@@ -660,8 +663,22 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           const singleValuesAgree = !isArrayField && uniqueSingleValues.size === 1;
 
           if (isCurrentEmpty && (isMerge || singleValuesAgree)) {
-              updatesForAlbum[key] = proposedValue;
-              autoFilledFields.push(key);
+              if (key === 'enriched_metadata') {
+                 // Auto-fill logic for metadata
+                 const base = (currentVal as Record<string, unknown>) || {};
+                 const newMeta = { ...base };
+                 Object.entries(sourceValues).forEach(([src, txt]) => {
+                     if (src === 'wikipedia') newMeta['wiki_bio'] = txt;
+                     if (src === 'discogs') newMeta['media_notes'] = txt;
+                     if (src === 'allmusic') newMeta['review'] = txt;
+                     else newMeta[`${src}_notes`] = txt;
+                 });
+                 updatesForAlbum[key] = newMeta;
+                 autoFilledFields.push(key);
+              } else {
+                 updatesForAlbum[key] = proposedValue;
+                 autoFilledFields.push(key);
+              }
               
               sources.forEach(src => {
                  historyUpdates.push({

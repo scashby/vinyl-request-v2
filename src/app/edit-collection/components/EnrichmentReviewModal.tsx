@@ -63,7 +63,7 @@ const ImageGridSelector = React.memo(({
         <span>{label} ({images.length})</span>
         <span>{Array.from(selectedImages).filter(img => images.includes(img)).length} Selected</span>
       </div>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
         {images.map((url, idx) => {
           const isSelected = selectedImages.has(url);
           return (
@@ -166,6 +166,7 @@ const ConflictValue = React.memo(({
   color: 'green' | 'blue';
   isMultiSelect?: boolean; 
 }) => {
+  const [dimensions, setDimensions] = useState<{ w: number, h: number } | null>(null);
   const [isImage, setIsImage] = useState(false);
 
   useEffect(() => {
@@ -190,7 +191,6 @@ const ConflictValue = React.memo(({
   const ContentWrapper = ({ children }: { children: React.ReactNode }) => (
     <div 
       onClick={onClick} 
-      // REMOVED h-full here to fix stretching issues
       className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 flex flex-col gap-2 relative w-full ${borderColor} ${bgColor} hover:shadow-sm`}
     >
       <div className={`text-[11px] font-bold uppercase flex justify-between items-center gap-1.5 ${labelColor}`}>
@@ -203,7 +203,7 @@ const ConflictValue = React.memo(({
            />
            <div className="flex items-center gap-1 flex-1 min-w-0">
              <span className="shrink-0">{getIcon(label)}</span>
-             <span className="truncate" title={label}>{label}</span>
+             <span className="truncate" title={label}>{label} {isImage && dimensions && `(${dimensions.w}x${dimensions.h})`}</span>
            </div>
         </div>
       </div>
@@ -221,12 +221,16 @@ const ConflictValue = React.memo(({
             fill
             sizes="200px"
             className="object-contain"
+            onLoad={(e) => {
+                if (!dimensions) {
+                    setDimensions({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight });
+                }
+            }}
             onError={() => setIsImage(false)}
+            loading="lazy" 
             unoptimized
           />
         </div>
-        {/* Simple dimension hint if needed, without triggering re-renders */}
-        <div className="text-[9px] text-center text-gray-400 mt-1">Image Preview</div>
       </ContentWrapper>
     );
   }
@@ -298,9 +302,10 @@ const ConflictRow = React.memo(({
     ];
     
     const isTextListField = TEXT_LIST_FIELDS.includes(conflict.field_name);
-    const isNotesField = conflict.field_name === 'notes';
+    // Enriched Metadata should always be treated as multi-select for merging
+    const isEnrichedMetadata = conflict.field_name === 'enriched_metadata';
     
-    const isMultiSelect = isTextListField || isNotesField;
+    const isMultiSelect = isTextListField || isEnrichedMetadata;
 
     const toArray = (v: unknown) => {
         if (Array.isArray(v)) return v.map(String);
@@ -382,7 +387,7 @@ const ConflictRow = React.memo(({
                     GALLERY MODE
                 </span>
                 )}
-                {isNotesField && (
+                {isEnrichedMetadata && (
                 <span className="text-[10px] text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
                     SMART MERGE ENABLED
                 </span>
@@ -485,6 +490,8 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
 
     currentConflicts.forEach(c => {
       const key = `${c.album_id}-${c.field_name}`;
+      
+      // Default to "Current"
       defaults[key] = { value: c.current_value, source: 'current', selectedSources: ['current'] };
       
       // Auto-finalize simple single-value fields (optional convenience)
@@ -502,11 +509,11 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
     
     // Explicitly listing fields that support multi-source merging
     const MERGEABLE_FIELDS = [
-      'genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 
+      'genres', 'styles', 'musicians', 'credits', 'producers', 'engineers', 'tags', 
       'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url', 
-      'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 
-      'lyricist', 'arranger', 'songwriters', 'notes', 'samples', 
-      'sampled_by', 'awards', 'certifications'
+      'label', 'labels', 'writers', 'mixers', 'composer', 
+      'lyricist', 'arranger', 'songwriters', 'samples', 
+      'sampled_by', 'awards', 'certifications', 'enriched_metadata'
     ];
     
     if (MERGEABLE_FIELDS.includes(conflict.field_name)) {
@@ -515,7 +522,6 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
         const selectedSources = new Set(currentRes?.selectedSources || ['current']);
 
         if (source === 'custom_merge') {
-            // Chips pass the already-merged value directly
             return {
                 ...prev,
                 [key]: { value, source: 'custom_merge', selectedSources: Array.from(selectedSources) }
@@ -529,38 +535,49 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
             selectedSources.add(source);
         }
         
-        // Safety: ensure at least one source if empty? (Notes allows empty)
         const newSelectedSources = Array.from(selectedSources);
 
-        // --- NOTES MERGING LOGIC ---
-        if (conflict.field_name === 'notes') {
-            const parts: string[] = [];
-            
-            if (selectedSources.has('current') && conflict.current_value) {
-                parts.push(String(conflict.current_value).trim());
-            }
+        // --- ENRICHED METADATA MERGE LOGIC ---
+        // For 'enriched_metadata', we are selecting which keys (sources) to include in the JSON
+        if (conflict.field_name === 'enriched_metadata') {
+             // For metadata, the 'value' passed in (if singular) is just one piece
+             // But we need to construct the full JSON object based on selected sources.
+             const newMeta: Record<string, unknown> = {};
+             
+             // If Current is selected, we keep current keys
+             if (selectedSources.has('current') && conflict.current_value) {
+                Object.assign(newMeta, conflict.current_value);
+             }
+             
+             // If candidate sources are selected, map them
+             if (conflict.candidates) {
+                 Object.entries(conflict.candidates).forEach(([candSource, candVal]) => {
+                     if (selectedSources.has(candSource)) {
+                         // Map source back to specific keys if needed, 
+                         // or just rely on the Import logic that passed them in as sourceValues.
+                         // Wait, in ImportEnrichModal we passed: 
+                         // fieldCandidates['enriched_metadata'][source] = value;
+                         // So candVal IS the note text.
+                         // We need to decide a key for it.
+                         if (candSource === 'wikipedia') newMeta['wiki_bio'] = candVal;
+                         else if (candSource === 'discogs') newMeta['media_notes'] = candVal;
+                         else if (candSource === 'allmusic') newMeta['review'] = candVal;
+                         else newMeta[`${candSource}_notes`] = candVal;
+                     }
+                 });
+             }
 
-            if (conflict.candidates) {
-                Object.entries(conflict.candidates).forEach(([candSource, candVal]) => {
-                    if (selectedSources.has(candSource) && candVal) {
-                        parts.push(`--- ${candSource.toUpperCase()} NOTES ---\n${String(candVal).trim()}`);
-                    }
-                });
-            } else if (selectedSources.has(conflict.source) && conflict.new_value) {
-                 parts.push(`--- ${conflict.source.toUpperCase()} NOTES ---\n${String(conflict.new_value).trim()}`);
-            }
-
-            return {
+             return {
                 ...prev,
                 [key]: {
-                    value: parts.join('\n\n').trim(),
-                    source: 'custom_merge',
-                    selectedSources: newSelectedSources
+                   value: newMeta,
+                   source: 'custom_merge',
+                   selectedSources: newSelectedSources
                 }
-            };
+             };
         }
 
-        // --- ARRAY MERGING LOGIC (Fallback if not using Chips) ---
+        // --- ARRAY MERGING LOGIC ---
         const combinedItems = new Set<string>();
         const addItems = (val: unknown) => {
             const arr = Array.isArray(val) ? val : (val ? [val] : []);
@@ -621,8 +638,8 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
       'genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 
       'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url', 
       'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 
-      'lyricist', 'arranger', 'songwriters', 'notes', 'tracks', 
-      'samples', 'sampled_by', 'awards', 'certifications'
+      'lyricist', 'arranger', 'songwriters', 'tracks', 
+      'samples', 'sampled_by', 'awards', 'certifications', 'enriched_metadata'
     ];
 
     const newFinalized = { ...finalizedFields };
