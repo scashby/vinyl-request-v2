@@ -1,4 +1,4 @@
-// Home page ("/") — Landing for Dead Wax Dialogues
+// src/app/page.tsx
 
 "use client";
 
@@ -25,22 +25,25 @@ export default function Page() {
           </p>
 
           <nav className="flex gap-4 justify-center flex-wrap mt-8">
-            <Link href="/browse/browse-queue" className="px-6 py-3 bg-neutral-900/90 text-white rounded-full font-medium hover:bg-neutral-800 transition-colors backdrop-blur-sm border border-white/10">
-              Browse Queue
-            </Link>
-            <Link href="/browse/browse-albums" className="px-6 py-3 bg-neutral-900/90 text-white rounded-full font-medium hover:bg-neutral-800 transition-colors backdrop-blur-sm border border-white/10">
-              Browse Albums
+            <Link href="/about" className="px-6 py-3 bg-neutral-900/90 text-white rounded-full font-medium hover:bg-neutral-800 transition-colors backdrop-blur-sm border border-white/10">
+              About
             </Link>
             <Link href="/events/events-page" className="px-6 py-3 bg-neutral-900/90 text-white rounded-full font-medium hover:bg-neutral-800 transition-colors backdrop-blur-sm border border-white/10">
               Events
             </Link>
+            <Link href="/dj-sets" className="px-6 py-3 bg-neutral-900/90 text-white rounded-full font-medium hover:bg-neutral-800 transition-colors backdrop-blur-sm border border-white/10">
+              DJ Sets
+            </Link>
             <Link href="/dialogues" className="px-6 py-3 bg-neutral-900/90 text-white rounded-full font-medium hover:bg-neutral-800 transition-colors backdrop-blur-sm border border-white/10">
               Dialogues
+            </Link>
+            <Link href="/merch" className="px-6 py-3 bg-[#00c4ff]/90 text-black rounded-full font-bold hover:bg-[#00c4ff] transition-colors backdrop-blur-sm">
+              Merch
             </Link>
 
             {session && (
               <Link
-                href="/admin/admin-dashboard"
+                href="/admin"
                 className="px-6 py-3 bg-blue-600/90 text-white rounded-full font-medium hover:bg-blue-700 transition-colors backdrop-blur-sm shadow-lg shadow-blue-900/20"
               >
                 Admin

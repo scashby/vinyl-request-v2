@@ -1,3 +1,4 @@
+// src/components/NavigationMenu.tsx
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -20,11 +21,11 @@ export default function NavigationMenu() {
   }, []);
 
   const navLinks = [
+    { name: 'About', path: '/about' },
     { name: 'Events', path: '/events/events-page' },
     { name: 'DJ Sets', path: '/dj-sets' },
-    { name: 'Browse Albums', path: '/browse/browse-albums' },
     { name: 'Dialogues', path: '/dialogues' },
-    { name: 'About', path: '/about' },
+    { name: 'Merch', path: '/merch' },
   ];
 
   return (
@@ -38,9 +39,7 @@ export default function NavigationMenu() {
       >
         <div className="w-full px-6 md:px-10 flex items-center justify-between">
           
-          {/* Logo / Brand Area */}
           <Link href="/" className="flex items-center gap-3 group">
-            {/* CSS invert makes the black logos white */}
             <div className="relative w-10 h-10">
               <Image 
                 src="/images/Skulllogo.png" 
@@ -61,7 +60,6 @@ export default function NavigationMenu() {
             </div>
           </Link>
 
-          {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
             {navLinks.map((item) => {
               const isActive = pathname === item.path;
@@ -80,17 +78,8 @@ export default function NavigationMenu() {
                 </Link>
               );
             })}
-             <a 
-                href="https://shop.deadwaxdialogues.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-sm font-bold uppercase tracking-wider text-zinc-300 hover:text-[#00c4ff] transition-colors"
-              >
-                Merch
-              </a>
           </div>
 
-          {/* Mobile Menu Toggle */}
           <button 
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="md:hidden p-2 text-white hover:text-[#00c4ff] transition-colors z-50 relative"
@@ -105,7 +94,6 @@ export default function NavigationMenu() {
         </div>
       </nav>
 
-      {/* Mobile Menu Overlay */}
       <div 
         className={`fixed inset-0 z-40 bg-black/95 backdrop-blur-xl transition-all duration-300 md:hidden flex flex-col items-center justify-center gap-8 ${
           isMobileMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'
@@ -130,15 +118,6 @@ export default function NavigationMenu() {
             {item.name}
           </Link>
         ))}
-         <a 
-            href="https://shop.deadwaxdialogues.com" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="text-2xl font-bold uppercase tracking-widest text-zinc-400 hover:text-[#00c4ff]"
-          >
-            Merch
-          </a>
       </div>
     </>
   );
