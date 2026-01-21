@@ -1,4 +1,3 @@
-// src/app/admin/manage-dj-sets/page.tsx - SIMPLIFIED VERSION
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -60,23 +59,9 @@ export default function ManageDJSetsPage() {
   }, []);
 
   const loadDJSets = async () => {
-    // FIX: 5-second timeout to prevent infinite hanging
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Timeout')), 5000)
-    );
-
     try {
-      const fetchPromise = supabase
+      const { data, error } = await supabase
         .from('dj_sets')
-        .select(`
-          *,
-          events(title, date, location)
-        `)
-        .order('recorded_at', { ascending: false });
-
-      // FIX: Race against timeout
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
         .select(`
           *,
           events(title, date)
@@ -164,7 +149,7 @@ export default function ManageDJSetsPage() {
         .insert({
           title: formData.title,
           description: formData.description,
-          event_id: formData.event_id || null,
+          event_id: formData.event_id ? parseInt(formData.event_id) : null,
           file_url: viewLink,
           download_url: downloadLink,
           google_drive_id: fileId,
