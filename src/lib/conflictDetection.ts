@@ -443,3 +443,61 @@ export function getFieldDisplayName(fieldName: string): string {
 export function canMergeField(value: unknown): boolean {
   return Array.isArray(value);
 }
+/**
+ * Normalize text for matching (lowercase, no punctuation, trimmed)
+ */
+function normalizeText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Find matching album in collection by artist + title + format
+ * Used for CLZ/Discogs import matching
+ */
+export function findMatchingAlbum<T extends { artist: string; title: string; format: string }>(
+  importedAlbum: { artist: string; title: string; format: string },
+  existingAlbums: T[]
+): T | undefined {
+  const importArtistNorm = normalizeText(importedAlbum.artist);
+  const importTitleNorm = normalizeText(importedAlbum.title);
+  const importFormatNorm = normalizeText(importedAlbum.format);
+  
+  return existingAlbums.find(album => {
+    const albumArtistNorm = normalizeText(album.artist);
+    const albumTitleNorm = normalizeText(album.title);
+    const albumFormatNorm = normalizeText(album.format);
+    
+    return (
+      albumArtistNorm === importArtistNorm &&
+      albumTitleNorm === importTitleNorm &&
+      albumFormatNorm === importFormatNorm
+    );
+  });
+}
+
+/**
+ * Get safe updates for an album (combining identifying field updates and non-conflicting updates)
+ * This is a convenience wrapper combining buildIdentifyingFieldUpdates and the safeUpdates from detectConflicts
+ */
+export function getSafeUpdates(
+  existingAlbum: Record<string, unknown>,
+  importedData: Record<string, unknown>,
+  source: ImportSource,
+  previousResolutions: PreviousResolution[] = []
+): Record<string, unknown> {
+  // Get identifying field updates (NULL -> value)
+  const identifyingUpdates = buildIdentifyingFieldUpdates(existingAlbum, importedData);
+  
+  // Get safe updates for conflictable fields
+  const { safeUpdates } = detectConflicts(existingAlbum, importedData, source, previousResolutions);
+  
+  // Combine both
+  return {
+    ...identifyingUpdates,
+    ...safeUpdates
+  };
+}
