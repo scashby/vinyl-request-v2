@@ -68,7 +68,7 @@ export default function Page() {
           No visual footprint, but cursor changes to pointer on hover.
         */}
         <Link 
-          href="/admin/admin-dashboard" 
+          href="/admin/" 
           className="absolute bottom-0 left-0 w-8 h-8 opacity-0 cursor-default hover:cursor-pointer z-50"
           aria-hidden="true"
           title="Admin Access"
