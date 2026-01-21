@@ -405,26 +405,21 @@ function AlbumDetailContent() {
   const queueTypesArray = Array.isArray(queueTypes) ? queueTypes : [queueTypes];
 
   return (
-    // FIX: Removed pt-[120px] and added top padding for standard header
-    // Removed bg-gray-900 so the fixed background can be seen
-    <div className="min-h-screen relative font-sans pt-[90px]">
+    // FIX: Removed pt-[120px] and added standard pt-[80px] to account for main header.
+    // FIX: Removed bg-gray-900 to reveal fixed background image.
+    <div className="min-h-screen relative overflow-hidden font-sans pt-[80px] bg-gray-900/10">
       
-      {/* Background Blur - FIX: Moved to fixed container behind everything */}
-      <div className="fixed inset-0 w-full h-full -z-10 bg-gray-900">
-        <Image
-          src={imageUrl}
-          alt=""
-          fill
-          className="object-cover blur-3xl opacity-30 scale-110"
-          priority
-          unoptimized
-        />
-      </div>
+      {/* Background Blur */}
+      {/* FIX: Moved to fixed position z-0 to sit behind everything. Added quotes to URL. */}
+      <div 
+        className="fixed inset-0 bg-cover bg-center blur-3xl opacity-30 scale-110 pointer-events-none z-0"
+        style={{ backgroundImage: `url('${imageUrl}')` }}
+      />
 
       {/* Top Navigation Bar */}
-      {/* FIX: Changed to sticky top-[70px] to sit below main nav */}
+      {/* FIX: Changed to sticky top-[72px] to clear the main navigation header */}
       {eventId && (
-        <div className="sticky top-[70px] z-20 bg-black/80 backdrop-blur-md border-b border-white/10 p-3 pl-16 flex gap-4 items-center flex-wrap shadow-lg">
+        <div className="sticky top-[72px] z-40 bg-black/80 backdrop-blur-md border-b border-white/10 p-3 pl-16 flex gap-4 items-center flex-wrap shadow-lg">
           <button
             onClick={goToBrowse}
             className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-2 text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95"
@@ -454,8 +449,8 @@ function AlbumDetailContent() {
         </div>
       )}
 
-      {/* Album Header */}
-      <div className="relative z-10 container mx-auto px-4 py-12 flex flex-col md:flex-row gap-8 md:gap-12 items-start text-white">
+      {/* Album Header - Relative z-10 to sit above background */}
+      <div className="relative z-10 container mx-auto px-4 py-12 flex flex-col md:flex-row gap-8 md:gap-12 items-start">
         <div className="relative group shrink-0 mx-auto md:mx-0">
           <Image
             src={imageUrl}
@@ -468,7 +463,7 @@ function AlbumDetailContent() {
         </div>
         
         <div className="flex-1 flex flex-col justify-center w-full">
-          <h1 className="text-4xl md:text-6xl font-black mb-2 leading-tight tracking-tight drop-shadow-lg">
+          <h1 className="text-4xl md:text-6xl font-black mb-2 leading-tight tracking-tight drop-shadow-lg text-white">
             {album.title}
             {album.is_1001 ? (
               <span 
@@ -559,7 +554,7 @@ function AlbumDetailContent() {
 
       {/* Track Listings */}
       {album?.tracklists && (
-        <div className="relative z-10 container mx-auto px-4 pb-24 max-w-4xl text-white">
+        <div className="relative z-10 container mx-auto px-4 pb-24 max-w-4xl">
           <h3 className="text-2xl font-bold mb-6 text-white flex items-center gap-3">
             Track Listing
             {queueTypesArray.includes('track') && eventId && eventData?.has_queue && (
@@ -645,7 +640,7 @@ function AlbumDetailContent() {
       )}
 
       {!album?.tracklists && album?.sides && (
-        <div className="relative z-10 container mx-auto px-4 pb-24 max-w-4xl text-white">
+        <div className="relative z-10 container mx-auto px-4 pb-24 max-w-4xl">
           <h3 className="text-2xl font-bold mb-8 text-white">Album Sides</h3>
           
           {Object.entries(album.sides).map(([sideName, tracks]) => {
