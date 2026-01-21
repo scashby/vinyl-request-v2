@@ -8,7 +8,7 @@ import { SERVICE_ICONS } from 'lib/enrichment-data-mapping';
 interface EnrichmentReviewModalProps {
   conflicts: ExtendedFieldConflict[];
   onSave: (
-    resolutions: Record<string, { value: unknown, source: string }>,
+    resolutions: Record<string, { value: unknown, source: string, selectedSources?: string[] }>,
     finalizedFields: Record<string, boolean>,
     albumId: number
   ) => void;
@@ -137,7 +137,6 @@ function ArrayChipSelector({
                   : 'bg-white border-gray-300 text-gray-700'
               }`}
             >
-              {/* Implicit checkbox via visual state, but keeping text clean */}
               {isSelected && <span>✓</span>}
               {item}
             </button>
@@ -163,6 +162,7 @@ function ConflictValue({
   color: 'green' | 'blue';
   isMultiSelect?: boolean; 
 }) {
+  const [dimensions, setDimensions] = useState<{ w: number, h: number } | null>(null);
   const [isImage, setIsImage] = useState(false);
 
   useEffect(() => {
@@ -191,7 +191,7 @@ function ConflictValue({
     >
       <div className={`text-[11px] font-bold uppercase flex justify-between items-center gap-1.5 ${labelColor}`}>
         <div className="flex items-center gap-2">
-           {/* Primary Selection Input */}
+           {/* Explicit Checkbox/Radio for Selection */}
            <input 
              type={isMultiSelect ? "checkbox" : "radio"} 
              checked={isSelected} 
@@ -200,7 +200,7 @@ function ConflictValue({
            />
            <div className="flex items-center gap-1">
              <span>{getIcon(label)}</span>
-             <span>{label}</span>
+             <span>{label} {isImage && dimensions && `(${dimensions.w}x${dimensions.h})`}</span>
            </div>
         </div>
       </div>
@@ -217,6 +217,7 @@ function ConflictValue({
             src={value} 
             alt={label}
             className="w-full h-full object-contain"
+            onLoad={(e) => setDimensions({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
             onError={() => setIsImage(false)}
             loading="lazy" 
           />
@@ -278,15 +279,14 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
   useEffect(() => {
     if (!currentAlbumId) return;
 
-    const defaults: Record<string, { value: unknown, source: string }> = {};
+    const defaults: Record<string, { value: unknown, source: string, selectedSources?: string[] }> = {};
     const autoFinalized: Record<string, boolean> = {};
 
     currentConflicts.forEach(c => {
       const key = `${c.album_id}-${c.field_name}`;
       
-      // Auto-normalize text array fields to Title Case for initial state if possible
-      // but usually we keep current_value as is until user interacts
-      defaults[key] = { value: c.current_value, source: 'current' };
+      // Default to "Current"
+      defaults[key] = { value: c.current_value, source: 'current', selectedSources: ['current'] };
 
       if (c.field_name === 'tracks' && Array.isArray(c.current_value) && c.current_value.length > 0) {
         autoFinalized[key] = true;
@@ -304,51 +304,94 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
     const MERGEABLE_FIELDS = [
       'genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 
       'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url', 
-      'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger', 'songwriters', 'notes',
-      'samples', 'sampled_by', 'awards', 'certifications'
+      'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger', 'songwriters', 
+      'notes', 'samples', 'sampled_by', 'awards', 'certifications'
     ];
     
     if (MERGEABLE_FIELDS.includes(conflict.field_name)) {
       setResolutions(prev => {
         const currentRes = prev[key];
-        const currentVal = currentRes ? currentRes.value : conflict.current_value;
+        const selectedSources = new Set(currentRes?.selectedSources || ['current']);
 
-        // Implementation of Hybrid Notes merging logic: join with headers
+        // Toggle selection
+        if (selectedSources.has(source)) {
+            selectedSources.delete(source);
+        } else {
+            selectedSources.add(source);
+        }
+        
+        // If nothing selected, maybe default back to current? Or allow empty.
+        if (selectedSources.size === 0) selectedSources.add('current');
+
+        const newSelectedSources = Array.from(selectedSources);
+
+        // --- NOTES MERGING LOGIC ---
         if (conflict.field_name === 'notes') {
-          const currentNotes = String(currentVal || '').trim();
-          const newNotes = String(value || '').trim();
-          if (currentNotes.includes(newNotes)) return prev;
-          
-          const combined = currentNotes 
-            ? `${currentNotes}\n\n--- ${source.toUpperCase()} NOTES ---\n${newNotes}` 
-            : newNotes;
+            const parts: string[] = [];
             
-          return { ...prev, [key]: { value: combined, source: 'custom_merge' } };
+            // 1. Current Value
+            if (selectedSources.has('current') && conflict.current_value) {
+                parts.push(String(conflict.current_value).trim());
+            }
+
+            // 2. Candidate Values (Discogs, Wiki, etc)
+            if (conflict.candidates) {
+                Object.entries(conflict.candidates).forEach(([candSource, candVal]) => {
+                    if (selectedSources.has(candSource) && candVal) {
+                        parts.push(`--- ${candSource.toUpperCase()} NOTES ---\n${String(candVal).trim()}`);
+                    }
+                });
+            }
+            
+            // 3. Simple New Value (if single source and selected)
+            if (conflict.new_value && selectedSources.has(conflict.source) && !conflict.candidates) {
+                 parts.push(`--- ${conflict.source.toUpperCase()} NOTES ---\n${String(conflict.new_value).trim()}`);
+            }
+
+            return {
+                ...prev,
+                [key]: {
+                    value: parts.join('\n\n').trim(),
+                    source: 'custom_merge',
+                    selectedSources: newSelectedSources
+                }
+            };
         }
 
-        const currentArray = Array.isArray(currentVal) ? currentVal : (currentVal ? [currentVal] : []);
-        // Normalize everything to Title Case in the Set to handle duplicates properly
-        const currentItems = new Set(currentArray.map(String).map(toTitleCase));
+        // --- ARRAY MERGING LOGIC ---
+        const combinedItems = new Set<string>();
+        
+        // Helper to add items to set
+        const addItems = (val: unknown) => {
+            const arr = Array.isArray(val) ? val : (val ? [val] : []);
+            arr.forEach(v => combinedItems.add(toTitleCase(String(v))));
+        };
 
-        if (Array.isArray(value)) {
-            value.forEach(v => currentItems.add(toTitleCase(String(v))));
-        } else {
-            const strVal = toTitleCase(String(value));
-            if (currentItems.has(strVal)) currentItems.delete(strVal);
-            else currentItems.add(strVal);
+        if (selectedSources.has('current')) addItems(conflict.current_value);
+        
+        if (conflict.candidates) {
+            Object.entries(conflict.candidates).forEach(([candSource, candVal]) => {
+                if (selectedSources.has(candSource)) addItems(candVal);
+            });
+        } else if (selectedSources.has(conflict.source)) {
+            addItems(conflict.new_value);
         }
 
         return { 
           ...prev, 
           [key]: { 
-            value: Array.from(currentItems), 
+            value: Array.from(combinedItems), 
             source: 'custom_merge',
-            selectedSources: ['custom'] 
+            selectedSources: newSelectedSources 
           } 
         };
       });
     } else {
-      setResolutions(prev => ({ ...prev, [key]: { value, source } }));
+      // Standard Radio Selection (Single Value)
+      setResolutions(prev => ({ 
+          ...prev, 
+          [key]: { value, source, selectedSources: [source] } 
+      }));
     }
   };
 
@@ -437,17 +480,15 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
                   // UPDATED: Added new array fields here as well for proper rendering
                   const TEXT_LIST_FIELDS = ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger', 'samples', 'sampled_by', 'awards', 'certifications'];
                   const isTextListField = TEXT_LIST_FIELDS.includes(conflict.field_name);
+                  const isNotesField = conflict.field_name === 'notes';
                   
+                  // Treat Notes as a multi-select field for the purpose of the UI
+                  const isMultiSelect = isTextListField || isNotesField;
+
                   const toArray = (v: unknown) => {
                     if (Array.isArray(v)) return v.map(String);
                     if (!v) return [];
                     return String(v).split(/,\s*/).map(s => s.trim()).filter(Boolean);
-                  };
-
-                  const getSelectedSet = (val: unknown) => {
-                     if (Array.isArray(val)) return new Set(val as string[]);
-                     if (val) return new Set([String(val)]);
-                     return new Set<string>();
                   };
 
                   if (isTextListField) {
@@ -491,16 +532,18 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
                             label="Currently in Database"
                             color="green"
                             items={allCurrent}
-                            selectedItems={getSelectedSet(selected.value)}
-                            onToggle={(val) => handleResolve(conflict, val, 'current')}
+                            selectedItems={new Set(toArray(selected.value))}
+                            onToggle={(val) => {
+                                handleResolve(conflict, val, 'custom_merge');
+                            }}
                           />
                           {actualNewItems.length > 0 && (
                             <ArrayChipSelector
                               label="New Suggestions Found (Not in DB)"
                               color="blue"
                               items={actualNewItems}
-                              selectedItems={getSelectedSet(selected.value)}
-                              onToggle={(val) => handleResolve(conflict, val, 'enrichment')}
+                              selectedItems={new Set(toArray(selected.value))}
+                              onToggle={(val) => handleResolve(conflict, val, 'custom_merge')}
                             />
                           )}
                         </div>
@@ -518,6 +561,11 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
                           {isImageArrayField && (
                             <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
                               GALLERY MODE
+                            </span>
+                          )}
+                          {isNotesField && (
+                            <span className="text-[10px] text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                              SMART MERGE ENABLED
                             </span>
                           )}
                         </div>
@@ -540,7 +588,7 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
                                 label="Current Gallery"
                                 color="green"
                                 images={conflict.current_value as string[]}
-                                selectedImages={getSelectedSet(selected.value)}
+                                selectedImages={new Set(selected.value as string[])}
                                 onToggle={(url) => handleResolve(conflict, url, 'current')}
                               />
                             ) : (
@@ -548,8 +596,8 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
                                 label="Current (DB)"
                                 color="green"
                                 value={conflict.current_value}
-                                isSelected={selected.source === 'current' || (selected.selectedSources?.includes('current') ?? false)}
-                                isMultiSelect={false}
+                                isSelected={selected.selectedSources?.includes('current') ?? false}
+                                isMultiSelect={isMultiSelect}
                                 onClick={() => handleResolve(conflict, conflict.current_value, 'current')}
                               />
                             )}
@@ -564,7 +612,7 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
                                         label={`${source} Candidates`}
                                         color="blue"
                                         images={val as string[]}
-                                        selectedImages={getSelectedSet(selected.value)}
+                                        selectedImages={new Set(selected.value as string[])}
                                         onToggle={(url) => handleResolve(conflict, url, source)}
                                       />
                                     ) : (
@@ -573,8 +621,8 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
                                           label={source}
                                           color="blue"
                                           value={val}
-                                          isSelected={selected.source === source || (selected.selectedSources?.includes(source) ?? false)}
-                                          isMultiSelect={false}
+                                          isSelected={selected.selectedSources?.includes(source) ?? false}
+                                          isMultiSelect={isMultiSelect}
                                           onClick={() => handleResolve(conflict, val, source)}
                                       />
                                     )
@@ -584,7 +632,8 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
                                   label={`New (${conflict.source || 'Unknown'})`}
                                   color="blue"
                                   value={conflict.new_value}
-                                  isSelected={selected.source === (conflict.source || 'enrichment')}
+                                  isSelected={selected.selectedSources?.includes(conflict.source || 'enrichment') ?? false}
+                                  isMultiSelect={isMultiSelect}
                                   onClick={() => handleResolve(conflict, conflict.new_value, conflict.source || 'enrichment')}
                               />
                             )}
