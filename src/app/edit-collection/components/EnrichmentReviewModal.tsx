@@ -8,19 +8,15 @@ import { SERVICE_ICONS } from 'lib/enrichment-data-mapping';
 
 interface EnrichmentReviewModalProps {
   conflicts: ExtendedFieldConflict[];
-  /**
-   * Called when the user saves the CURRENT album. 
-   * The parent should save this data to DB and remove the album from the 'conflicts' list.
-   */
   onSave: (
     resolutions: Record<string, { value: unknown, source: string }>,
     finalizedFields: Record<string, boolean>,
     albumId: number
   ) => void;
+  onSkip: (albumId: number) => void;
   onCancel: () => void;
 }
 
-// --- HELPER: Image Detection ---
 function isImageUrl(url: unknown): boolean {
   if (typeof url !== 'string') return false;
   return !!url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || 
@@ -37,7 +33,6 @@ function isImageArray(value: unknown): boolean {
   return Array.isArray(value) && value.length > 0 && value.every(v => isImageUrl(v));
 }
 
-// --- COMPONENT: Image Grid Selector ---
 function ImageGridSelector({
   images,
   selectedImages,
@@ -89,7 +84,6 @@ function ImageGridSelector({
   );
 }
 
-// --- COMPONENT: Array Selector ---
 function ArrayChipSelector({
   items,
   selectedItems,
@@ -111,13 +105,16 @@ function ArrayChipSelector({
   const activeBg = isGreen ? 'bg-[#047857]' : 'bg-[#1d4ed8]';
   const activeBorder = isGreen ? 'border-[#047857]' : 'border-[#1d4ed8]';
 
+  // Deduplicate items for display to prevent duplicates
+  const uniqueItems = Array.from(new Set(items));
+
   return (
     <div className={`p-3 rounded-lg border-2 flex flex-col gap-2 flex-1 ${borderColor} ${bgColor}`}>
       <div className={`text-[11px] font-bold uppercase ${labelColor}`}>
         {label}
       </div>
       <div className="flex flex-wrap gap-1.5">
-        {items.map((item, idx) => {
+        {uniqueItems.map((item, idx) => {
           const isSelected = selectedItems.has(item);
           return (
             <button
@@ -138,7 +135,6 @@ function ArrayChipSelector({
   );
 }
 
-// --- HELPER: Value Component ---
 function ConflictValue({ 
   value, 
   onClick, 
@@ -170,7 +166,6 @@ function ConflictValue({
     : 'bg-white';
   const labelColor = isGreen ? 'text-[#047857]' : 'text-[#1d4ed8]';
 
-  // Helper to get icon
   const getIcon = (lbl: string) => {
     const key = Object.keys(SERVICE_ICONS).find(k => lbl.toLowerCase().includes(k.toLowerCase()));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -262,11 +257,9 @@ function ConflictValue({
   );
 }
 
-export default function EnrichmentReviewModal({ conflicts, onSave, onCancel }: EnrichmentReviewModalProps) {
-  // STATE: Current Album ID processing (always grab the first one from the queue)
+export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCancel }: EnrichmentReviewModalProps) {
   const currentAlbumId = conflicts.length > 0 ? conflicts[0].album_id : null;
   
-  // Calculate conflicts just for this album
   const currentConflicts = useMemo(() => 
     conflicts.filter(c => c.album_id === currentAlbumId), 
     [conflicts, currentAlbumId]
@@ -275,7 +268,6 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onCancel }: E
   const [resolutions, setResolutions] = useState<Record<string, { value: unknown, source: string, selectedSources?: string[] }>>({});
   const [finalizedFields, setFinalizedFields] = useState<Record<string, boolean>>({});
 
-  // Reset/Init state when we switch to a new album
   useEffect(() => {
     if (!currentAlbumId) return;
 
@@ -286,7 +278,6 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onCancel }: E
       const key = `${c.album_id}-${c.field_name}`;
       defaults[key] = { value: c.current_value, source: 'current' };
 
-      // Auto-finalize TRACKS if DB already has data (User Preference)
       if (c.field_name === 'tracks' && Array.isArray(c.current_value) && c.current_value.length > 0) {
         autoFinalized[key] = true;
       }
@@ -352,7 +343,14 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onCancel }: E
     setResolutions(newResolutions);
   };
 
-  // If no album is left, the parent should handle closing, but we render nothing
+  const handleFinalizeAll = () => {
+    const newFinalized = { ...finalizedFields };
+    currentConflicts.forEach(c => {
+      newFinalized[`${c.album_id}-${c.field_name}`] = true;
+    });
+    setFinalizedFields(newFinalized);
+  };
+
   if (!currentAlbumId || currentConflicts.length === 0) return null;
 
   const albumInfo = currentConflicts[0];
@@ -375,6 +373,9 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onCancel }: E
           </div>
           
           <div className="flex gap-3">
+             <button onClick={handleFinalizeAll} className="px-3 py-2 text-[12px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-md hover:bg-violet-100">
+               Finalize All Fields
+             </button>
              <button onClick={handleSelectAllCurrent} className="px-3 py-2 text-[12px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100">
                Reset to Current
              </button>
@@ -384,7 +385,7 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onCancel }: E
           </div>
         </div>
 
-        {/* LIST CONTENT (Single Album) */}
+        {/* LIST CONTENT */}
         <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm mb-6">
               
@@ -532,8 +533,14 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onCancel }: E
           </div>
 
           <div className="flex gap-3">
-            <button onClick={onCancel} className="px-6 py-2 bg-white border-2 border-gray-300 rounded text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-50">
+            <button onClick={onCancel} className="px-4 py-2 bg-white border border-gray-300 rounded text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-50">
                Stop Review
+            </button>
+            <button 
+              onClick={() => onSkip(currentAlbumId)}
+              className="px-4 py-2 bg-gray-100 border border-gray-300 rounded text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-200"
+            >
+              Skip (Snooze)
             </button>
             <button 
               onClick={() => onSave(resolutions, finalizedFields, currentAlbumId)}

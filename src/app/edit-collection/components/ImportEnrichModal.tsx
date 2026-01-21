@@ -165,9 +165,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [batchSize, setBatchSize] = useState('25');
   const [autoSnooze, setAutoSnooze] = useState(true); // Default to true (30-day skip)
   
-  // Granular Configuration State
-  // Map: FieldName -> Set of Allowed Service IDs
-  // If a field is present in this object, it is enabled. The Set contains its allowed sources.
   const [fieldConfig, setFieldConfig] = useState<FieldConfigMap>({});
 
   // Initialize Default State on Load
@@ -201,7 +198,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [conflicts, setConflicts] = useState<ExtendedFieldConflict[]>([]);
   const [sessionLog, setSessionLog] = useState<LogEntry[]>([]);
   const logEndRef = useRef<HTMLDivElement>(null);
-// NEW: State for the Audit Summary after a batch is saved
   const [batchSummary, setBatchSummary] = useState<{album: string, field: string, action: string}[] | null>(null);
 
   // Loop Control Refs
@@ -234,9 +230,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
 
   function getServicesForSelection() {
-    // Calculate which services are needed based on the enabled fields
     const activeServices = new Set<string>();
-    
     Object.values(fieldConfig).forEach(allowedSources => {
       allowedSources.forEach(s => activeServices.add(s));
     });
@@ -381,22 +375,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const candidates = result.results || [];
 
         if (result.processedCount > candidates.length) {
-          collectedSummary.push({
-            album: 'Batch Scan',
-            field: 'Multiple Albums',
-            action: 'No New Data Found for some items'
-          });
+          // This is fine, just logs empty results
         }
 
         if (candidates.length === 0 && hasMoreRef.current === false) {
           break; 
         }
 
-        // UPDATED: Destructure summary from return logic
         const { conflicts: batchConflicts, summary: batchSummaryItems } = await processBatchAndSave(candidates);
         
         collectedConflicts = [...collectedConflicts, ...batchConflicts];
-        // Safely add items only if they exist
         if (batchSummaryItems && batchSummaryItems.length > 0) {
             collectedSummary = [...collectedSummary, ...batchSummaryItems];
         }
@@ -413,7 +401,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     setEnriching(false);
 
-    // UPDATED: Push the accumulated summary to the UI only at the end
     if (collectedSummary.length > 0) {
         setBatchSummary(prev => [...(prev || []), ...collectedSummary]);
     }
@@ -451,7 +438,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const trackSavePromises: Promise<unknown>[] = [];
     
     // PRIORITY MATRICES
-    // Ordered by general data quality/relevance
     const GLOBAL_PRIORITY = [
       'discogs', 'musicbrainz', 'spotify', 'appleMusic', 'deezer', 
       'rateyourmusic', 'lastfm', 'theaudiodb', 'wikipedia', 'wikidata', 
@@ -461,21 +447,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       'popsike', 'pitchfork'
     ];
     
-    // "Discogs Supremacy" for physical/static metadata
-    // Added Deezer/Wikidata as fallbacks for dates/barcodes
     const STATIC_PRIORITY = ['discogs', 'musicbrainz', 'spotify', 'appleMusic', 'deezer', 'wikidata'];
-    
-    // "Sonic" priority for audio features
     const SONIC_PRIORITY = ['spotify', 'acousticbrainz', 'musicbrainz'];
 
-    // NEW: Local summary collector to avoid setting state in loop
     const localBatchSummary: {album: string, field: string, action: string}[] = [];
 
     results.forEach((item) => {
       processedIds.push(item.album.id);
       const { album, candidates } = item;
       
-      // LOGGING: Explicitly report what was found before processing
       const foundKeys = new Set<string>();
       Object.values(candidates).forEach((c) => {
         if (c && typeof c === 'object') {
@@ -484,9 +464,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       });
       
       if (foundKeys.size > 0) {
-         // Create a readable summary of what was found
          const summary = Array.from(foundKeys)
-            .filter(k => !['artist', 'title'].includes(k)) // Skip basics
+            .filter(k => !['artist', 'title'].includes(k))
             .map(k => k.replace(/_/g, ' '))
             .join(', ');
             
@@ -508,25 +487,20 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
          Object.entries(sourceData).forEach(([key, value]) => {
             if (!ALLOWED_COLUMNS.has(key)) return;
             
-            // 1. Check Field Granularity: Is this field enabled?
             const allowedSources = fieldConfig[key];
-            if (!allowedSources) return; // Field is disabled
+            if (!allowedSources) return; 
 
-            // 2. Check Source Granularity: Is this specific source allowed for this field?
             let normalizedSource = source;
             if (source === 'appleMusicEnhanced') normalizedSource = 'appleMusic';
             if (source === 'coverArt') normalizedSource = 'coverArtArchive';
             
-            if (!allowedSources.has(normalizedSource)) return; // Source is disabled for this field
-            // ------------------------------------------------------------------
+            if (!allowedSources.has(normalizedSource)) return; 
 
-            // Allow tracks and lyrics to pass through to fieldCandidates for review/save 
             if (['bpm', 'key', 'time_signature'].includes(key)) return;
 
             const finalized = (album as Record<string, unknown>).finalized_fields as string[] | undefined;
             if (Array.isArray(finalized) && finalized.includes(key)) return;
 
-            // AUTO-SNOOZE: Skip items reviewed in the last 30 days if enabled
             if (autoSnooze) {
                const lastReviewed = (album as Record<string, unknown>).last_reviewed_at as string | undefined;
                if (lastReviewed) {
@@ -547,7 +521,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             }
             
             if (newVal !== null && newVal !== undefined && newVal !== '') {
-               // Normalization: Ensure plural 'labels' column correctly receives data from 'label' key
                const targetKey = key === 'label' ? 'labels' : key;
                if (!fieldCandidates[targetKey]) fieldCandidates[targetKey] = {};
                fieldCandidates[targetKey][source] = newVal;
@@ -573,7 +546,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const currentVal = (album as any)[key];
           
-          // Robust check for "Empty": null, undefined, empty array, or array of empty strings
           const isCurrentEmpty = !currentVal || 
             (Array.isArray(currentVal) && (
                currentVal.length === 0 || 
@@ -590,7 +562,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           let proposedValue: unknown;
           let isMerge = false;
 
-          // Strategy 1: Arrays -> Smart Union
           if (isArrayField) {
              const mergedSet = new Set<string>();
              const lowerCaseMap = new Set<string>();
@@ -599,7 +570,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                 if (Array.isArray(val)) {
                    val.forEach(item => {
                       const str = String(item).trim();
-                      const lower = str.toLowerCase().replace(/[^a-z0-9]/g, ''); // Normalize
+                      const lower = str.toLowerCase().replace(/[^a-z0-9]/g, ''); 
                       if (!lowerCaseMap.has(lower)) {
                          mergedSet.add(str);
                          lowerCaseMap.add(lower);
@@ -610,12 +581,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
              proposedValue = Array.from(mergedSet);
              isMerge = true;
           } 
-          // Strategy 2: Notes -> Smart Append (Combine Wikipedia, Links, Discogs)
           else if (key === 'notes') {
              const combinedNotes: string[] = [];
              const seenContent = new Set<string>();
 
-             // Sort sources by priority so Wikipedia comes first, then links
              const sortedSources = sources.sort((a, b) => {
                  return GLOBAL_PRIORITY.indexOf(a) - GLOBAL_PRIORITY.indexOf(b);
              });
@@ -623,7 +592,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
              sortedSources.forEach(src => {
                  const val = String(sourceValues[src]).trim();
                  if (val && !seenContent.has(val)) {
-                     // Always keep distinct content
                      combinedNotes.push(val);
                      seenContent.add(val);
                  }
@@ -632,43 +600,30 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
              proposedValue = combinedNotes.join('\n\n');
              isMerge = true; 
           }
-          // Strategy 3: Enrichment Summary -> Deep Merge (Keep existing, add new)
           else if (key === 'enrichment_summary') {
              const combinedSummary: Record<string, string> = {};
-             
-             // 1. Keep existing DB values
              if (currentVal && typeof currentVal === 'object') {
                 Object.assign(combinedSummary, currentVal);
              }
-
-             // 2. Merge new source objects
              Object.values(sourceValues).forEach(val => {
                 if (typeof val === 'object' && val !== null) {
                    Object.assign(combinedSummary, val);
                 }
              });
-             
              proposedValue = combinedSummary;
              isMerge = true; 
           }
-          // Strategy 4: Single Values -> Priority Winner
           else {
-             // Determine appropriate priority list based on field type
              let priorityList = GLOBAL_PRIORITY;
-             
              if (['original_release_date', 'year', 'tracklist', 'labels', 'cat_no', 'country', 'barcode'].includes(key)) {
                 priorityList = STATIC_PRIORITY;
              } else if (['tempo_bpm', 'musical_key', 'energy', 'danceability'].includes(key)) {
                 priorityList = SONIC_PRIORITY;
              }
 
-             // Pick the value from the highest priority source available
              let winnerSrc = priorityList.find(s => sources.includes(s)) || sources[0];
 
-             // DISCOGS SUPREMACY: If we have a linked Discogs release, force Discogs for physical fields
-             // Exception: 'year' is excluded from this lock per user request (pressing vs original date)
              if (album.discogs_release_id && sources.includes('discogs')) {
-                // LOCK these fields to Discogs data only
                 if (['tracklist', 'labels', 'cat_no', 'country', 'barcode', 'format'].includes(key)) {
                    winnerSrc = 'discogs';
                 }
@@ -677,12 +632,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
              proposedValue = sourceValues[winnerSrc];
           }
 
-          // CRITICAL: Ignore empty/null proposals to prevent Ghost Conflicts
           if (proposedValue === null || proposedValue === undefined || proposedValue === '') return;
           
-          // Check for empty arrays OR arrays containing only whitespace/empty strings
           if (Array.isArray(proposedValue)) {
-             // Filter out empty strings explicitly to prevent Ghost Conflicts with ['']
              const filtered = proposedValue.filter(v => v && String(v).trim() !== '');
              if (filtered.length === 0) return;
              proposedValue = filtered;
@@ -690,11 +642,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           
           if (typeof proposedValue === 'object' && Object.keys(proposedValue as object).length === 0) return;
 
-          // DECISION: Auto-Fill vs Conflict
-          
-          // Case A: Auto-Fill (Database is empty AND we have a valid proposal)
-          // For Single values, we also check if sources disagree. If they do, we might want to review even if DB is empty.
-          // But for Arrays, we always trust the merge if DB is empty.
           const uniqueSingleValues = new Set(Object.values(sourceValues).map(v => normalizeValue(v)));
           const singleValuesAgree = !isArrayField && uniqueSingleValues.size === 1;
 
@@ -702,25 +649,17 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               updatesForAlbum[key] = proposedValue;
               autoFilledFields.push(key);
               
-              // Log history for all contributing sources
               sources.forEach(src => {
                  historyUpdates.push({
                     album_id: album.id, field_name: key, source: src, resolution: 'auto_fill', kept_value: proposedValue, resolved_at: new Date().toISOString()
                  });
               });
           } 
-          // Case B: Conflict (Database has data OR Sources disagree on a single value)
           else {
-              // 1. Skip Tracks if DB already has data (User Preference)
               if (key === 'tracks' && !isCurrentEmpty) return;
-              
-              // 2. Skip if we just auto-filled this field in this specific iteration (safety check)
               if (autoFilledFields.includes(key)) return;
 
-              // Check if the proposed value is actually different from DB
-              // The new normalizeValue function handles http/https equality
               if (!areValuesEqual(currentVal, proposedValue)) {
-                  // Re-calculate primary source for the conflict record using the same logic
                   let priorityList = GLOBAL_PRIORITY;
                   if (['original_release_date', 'year', 'tracklist', 'labels', 'cat_no', 'country', 'barcode'].includes(key)) {
                      priorityList = STATIC_PRIORITY;
@@ -734,7 +673,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                       current_value: currentVal,
                       new_value: proposedValue,
                       source: primarySource, 
-                      candidates: sourceValues, // Keep raw candidates for the dropdown picker
+                      candidates: sourceValues,
                       existing_finalized: album.finalized_fields || [],
                       artist: album.artist,
                       title: album.title,
@@ -749,16 +688,23 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           }
       });
 
+      // ALWAYS update timestamps, even if no conflicts, to prevent infinite loops
+      const timestamp = new Date().toISOString();
+      updatesForAlbum.last_enriched_at = timestamp;
+      
+      // If we auto-filled something, that counts as a review.
+      // If we found nothing and have no conflicts, that ALSO counts as a review (we checked it).
+      // Only skip updating last_reviewed_at if we generated a conflict (because user needs to review it).
+      const hasConflicts = newConflicts.some(c => c.album_id === album.id);
+      if (!hasConflicts) {
+          updatesForAlbum.last_reviewed_at = timestamp;
+      }
+
       if (Object.keys(updatesForAlbum).length > 0) {
-        updatesForAlbum.last_enriched_at = new Date().toISOString();
         autoUpdates.push({ id: album.id, fields: updatesForAlbum });
         
-        const logDetails: string[] = [];
-
         autoFilledFields.forEach(field => {
           const val = updatesForAlbum[field];
-          
-          // Fix: Proper string conversion for arrays (genres, credits) to avoid "Complex Data"
           let valStr = String(val);
           if (Array.isArray(val)) {
             valStr = val.join(', ');
@@ -771,15 +717,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             field: field,
             action: `Auto-Filled: ${valStr.substring(0, 50)}${valStr.length > 50 ? '...' : ''}`
           });
-
-          // Fix: Log actual values instead of just field names
-          logDetails.push(`${field} (${valStr.substring(0, 20)}${valStr.length > 20 ? '...' : ''})`);
         });
-
-        // PERFORMANCE FIX: Commented out per-item state update to prevent freezing
-        // if (logDetails.length > 0) {
-        //   addLog(`${album.artist} - ${album.title}`, 'auto-fill', `Added: ${logDetails.join(', ')}`);
-        // }
       }
     });
 
@@ -795,15 +733,21 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       await Promise.all(trackSavePromises);
     }
 
+    // FINAL SAFETY: Update any touched IDs that weren't caught in autoUpdates
+    // This ensures albums with "No Data Found" still get their timestamps updated so they don't loop.
     const changedIds = new Set(autoUpdates.map(u => u.id));
+    // Also include albums that have pending conflicts (we don't want to auto-timestamp them yet)
     newConflicts.forEach(c => changedIds.add(c.album_id));
+    
     const untouchedIds = processedIds.filter(id => !changedIds.has(id));
     
     if (untouchedIds.length > 0) {
-      await supabase.from('collection').update({ last_enriched_at: new Date().toISOString() }).in('id', untouchedIds);
+      const now = new Date().toISOString();
+      await supabase.from('collection')
+        .update({ last_enriched_at: now, last_reviewed_at: now }) // Mark as reviewed!
+        .in('id', untouchedIds);
     }
 
-    // UPDATED: Return summary instead of setting state directly
     return { conflicts: newConflicts, summary: localBatchSummary };
   }
   
@@ -824,12 +768,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
        if (match) {
          const patch: Record<string, unknown> = {};
-         // FIXED: Use correct property names from enrichment-utils
          if (match.tempo_bpm) patch.tempo_bpm = match.tempo_bpm;
          if (match.musical_key) patch.musical_key = match.musical_key;
          if (match.lyrics) patch.lyrics = match.lyrics;
          
-         // NEW: Sonic Domain Fields
          if (match.is_cover !== undefined) patch.is_cover = match.is_cover;
          if (match.original_artist) patch.original_artist = match.original_artist;
          if (match.original_year) patch.original_year = match.original_year;
@@ -848,6 +790,27 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     return 0;
   }
 
+  // --- NEW: SKIP HANDLER (SNOOZE) ---
+  async function handleSkip(albumId: number) {
+    const timestamp = new Date().toISOString();
+    await supabase.from('collection').update({ last_reviewed_at: timestamp }).eq('id', albumId);
+    
+    setConflicts(prev => {
+        const nextQueue = prev.filter(c => c.album_id !== albumId);
+        if (nextQueue.length === 0) {
+             if (isLoopingRef.current && hasMoreRef.current) {
+                 setTimeout(() => runScanLoop(), 500);
+             } else {
+                 setShowReview(false);
+                 setStatus('All conflicts resolved or skipped.');
+                 if (onImportComplete) onImportComplete();
+                 loadStats();
+             }
+        }
+        return nextQueue;
+    });
+  }
+
   async function handleSingleAlbumSave(
     resolutions: Record<string, { value: unknown; source: string; selectedSources?: string[] }>,
     finalizedFields: Record<string, boolean>,
@@ -858,18 +821,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const timestamp = new Date().toISOString();
     const trackSavePromises: Promise<number>[] = [];
 
-    // 1. Process resolutions for THIS album only
+    // 1. Process resolutions
     Object.keys(resolutions).forEach((key) => {
-        // key format is "albumId-fieldName"
         if (!key.startsWith(`${albumId}-`)) return;
         
-        const fieldName = key.split('-').slice(1).join('-'); // Handle fields with dashes if any
+        const fieldName = key.split('-').slice(1).join('-');
         const decision = resolutions[key];
         
         updates[fieldName] = decision.value;
 
-        // Log history (optional, keep if you want resolution tracking)
-        // Find original conflict to get candidates for history logging
         const conflict = conflicts.find(c => c.album_id === albumId && c.field_name === fieldName);
         if (conflict && conflict.candidates) {
              Object.entries(conflict.candidates).forEach(([src]) => {
@@ -884,7 +844,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                 });
              });
              
-             // Check if we need to save Track Data from this source
              const trackSource = (decision.source === 'current' || decision.source === 'merge') ? null : decision.source;
              if (trackSource && conflict.candidates[trackSource]) {
                 const cand = conflict.candidates[trackSource] as { tracks?: unknown[] };
@@ -900,22 +859,19 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         if (!key.startsWith(`${albumId}-`) || !finalizedFields[key]) return;
         const fieldName = key.split('-').slice(1).join('-');
         
-        // Append to existing finalized array
         const conflict = conflicts.find(c => c.album_id === albumId && c.field_name === fieldName);
         const currentList = conflict?.existing_finalized || [];
         if (!currentList.includes(fieldName)) {
-            // If we are already updating, add to it. If not, create array.
             const existing = (updates.finalized_fields as string[]) || currentList;
             updates.finalized_fields = [...new Set([...existing, fieldName])];
         }
     });
 
-    // 3. Perform Database Updates
+    // 3. Database Updates
     if (Object.keys(updates).length > 0) {
         updates.last_enriched_at = timestamp;
         updates.last_reviewed_at = timestamp;
 
-        // Ensure Array columns are arrays
         ['labels', 'genres', 'styles', 'finalized_fields', 'enrichment_sources'].forEach(field => {
             if (updates[field] !== undefined && !Array.isArray(updates[field])) {
                 updates[field] = [updates[field]];
@@ -926,10 +882,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         if (error) {
             console.error(`Failed to save album ${albumId}:`, error);
             addLog(String(albumId), 'skipped', `Save Error: ${error.message}`);
-            return; // Don't remove from queue if save failed
+            return;
         }
     } else {
-        // Even if no fields changed (all "Keep Current"), update timestamp
         await supabase.from('collection').update({ last_reviewed_at: timestamp }).eq('id', albumId);
     }
 
@@ -941,14 +896,12 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     await Promise.all(trackSavePromises);
 
-    // 4. CRITICAL: Remove from Queue (This triggers UI update to next album)
+    // 4. Remove from Queue
     setConflicts(prev => {
         const nextQueue = prev.filter(c => c.album_id !== albumId);
         
-        // If queue is empty, check if we should fetch more
         if (nextQueue.length === 0) {
              if (isLoopingRef.current && hasMoreRef.current) {
-                 // Trigger next batch
                  setTimeout(() => runScanLoop(), 500);
              } else {
                  setShowReview(false);
@@ -984,6 +937,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       <EnrichmentReviewModal 
         conflicts={conflicts} 
         onSave={handleSingleAlbumSave}
+        onSkip={handleSkip}
         onCancel={() => { 
           setShowReview(false); 
           isLoopingRef.current = false; 
