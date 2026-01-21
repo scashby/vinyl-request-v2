@@ -2,8 +2,7 @@
 /**
  * COMPLETE ENRICHMENT SYSTEM - DATA TO SERVICE MAPPING
  * Authoritative source for enrichment architecture
- * 
- * ARCHITECTURE PRINCIPLES:
+ * * ARCHITECTURE PRINCIPLES:
  * 1. CANONICAL fields (musicians, image_url, tempo_bpm) - all services merge here
  * 2. SERVICE-SPECIFIC fields (spotify_id, discogs_genres) - unique per service
  * 3. Stats check ACTUAL DATA not service presence
@@ -187,7 +186,8 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
     'lastfm_listeners',
     'spotify_popularity',
     'critical_reception',
-    'apple_music_editorial_notes'
+    'apple_music_editorial_notes',
+    'pitchfork_score'
   ],
   chart_data: [
     'chart_positions',
@@ -304,7 +304,12 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
 
   // --- LYRICS ---
   'tracks.lyrics': ['genius'],
-  'tracks.lyrics_url': ['genius']
+  'tracks.lyrics_url': ['genius'],
+
+  // --- REVIEWS & CHARTS (Newly Added) ---
+  'pitchfork_score': ['pitchfork'],
+  'awards': ['wikipedia', 'wikidata', 'allmusic'],
+  'certifications': ['wikipedia', 'wikidata']
 };
 
 /**
