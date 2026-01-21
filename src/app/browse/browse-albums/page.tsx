@@ -111,12 +111,10 @@ function BrowseAlbumsContent() {
   }, [eventId, allowedFormatsParam, eventTitleParam]);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function fetchAllAlbums() {
       setLoading(true);
-      // Timeout failsafe
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout')), 5000)
-      );
 
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -125,17 +123,14 @@ function BrowseAlbumsContent() {
         const batchSize = 1000;
         let keepGoing = true;
         
-        while (keepGoing) {
-            const fetchPromise = supabase
-            .from('collection')
-            .select('*')
-            .or('blocked.is.null,blocked.eq.false')
-            .neq('folder', 'Sale')
-            .range(from, from + batchSize - 1);
+        while (keepGoing && isMounted) {
+            const { data: batch, error } = await supabase
+              .from('collection')
+              .select('*')
+              .or('blocked.is.null,blocked.eq.false')
+              .neq('folder', 'Sale')
+              .range(from, from + batchSize - 1);
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const { data: batch, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
-          
             if (error) {
                 console.error('Error fetching albums:', error);
                 break;
@@ -143,10 +138,17 @@ function BrowseAlbumsContent() {
             if (!batch || batch.length === 0) break;
             
             allRows = allRows.concat(batch);
-            keepGoing = batch.length === batchSize;
-            from += batchSize;
+            
+            // If we got fewer results than requested, we've hit the end
+            if (batch.length < batchSize) {
+                keepGoing = false;
+            } else {
+                from += batchSize;
+            }
         }
         
+        if (!isMounted) return;
+
         const parsed: BrowseAlbum[] = allRows.map(album => ({
           id: album.id,
           title: album.title,
@@ -180,11 +182,13 @@ function BrowseAlbumsContent() {
       } catch (err) {
         console.error("Error loading albums:", err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
     
     fetchAllAlbums();
+    
+    return () => { isMounted = false; };
   }, []);
 
   const formatVariants = (format: string) => {
