@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import Image from 'next/image';
 import { type ExtendedFieldConflict } from './ImportEnrichModal';
 import { SERVICE_ICONS } from 'lib/enrichment-data-mapping';
 
@@ -16,6 +17,8 @@ interface EnrichmentReviewModalProps {
   onCancel: () => void;
 }
 
+// --- HELPERS ---
+
 function isImageUrl(url: unknown): boolean {
   if (typeof url !== 'string') return false;
   return !!url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || 
@@ -29,12 +32,11 @@ function isImageArray(value: unknown): boolean {
   return Array.isArray(value) && value.length > 0 && value.every(v => isImageUrl(v));
 }
 
-// Helper for consistent casing (Title Case)
 function toTitleCase(str: string): string {
   return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 }
 
-// --- MEMOIZED SUB-COMPONENTS TO FIX PERFORMANCE ---
+// --- MEMOIZED COMPONENTS (PERFORMANCE FIX) ---
 
 const ImageGridSelector = React.memo(({
   images,
@@ -61,7 +63,7 @@ const ImageGridSelector = React.memo(({
         <span>{label} ({images.length})</span>
         <span>{Array.from(selectedImages).filter(img => images.includes(img)).length} Selected</span>
       </div>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2">
         {images.map((url, idx) => {
           const isSelected = selectedImages.has(url);
           return (
@@ -69,7 +71,7 @@ const ImageGridSelector = React.memo(({
               key={`${idx}-${url}`} 
               onClick={() => onToggle(url)}
               className={`relative aspect-square rounded overflow-hidden cursor-pointer border-2 transition-all ${
-                isSelected ? `border-[3px] ${borderSelected} opacity-100 shadow-md` : 'border-gray-300 opacity-80 hover:opacity-100'
+                isSelected ? `border-[3px] ${borderSelected} opacity-100 shadow-md` : 'border-gray-300 opacity-70 hover:opacity-100'
               }`}
             >
               <div className="absolute top-1 left-1 z-20 pointer-events-none">
@@ -80,12 +82,13 @@ const ImageGridSelector = React.memo(({
                   className={`w-5 h-5 accent-${isGreen ? 'emerald' : 'blue'}-600 shadow-sm border-white border rounded`}
                 />
               </div>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img 
+              <Image 
                 src={url} 
                 alt="" 
-                className="w-full h-full object-cover" 
-                loading="lazy"
+                fill
+                sizes="100px"
+                className="object-cover" 
+                unoptimized
               />
             </div>
           );
@@ -133,11 +136,11 @@ const ArrayChipSelector = React.memo(({
               onClick={() => onToggle(item)}
               className={`px-2.5 py-1 rounded-2xl text-xs cursor-pointer border transition-all flex items-center gap-1 ${
                 isSelected 
-                  ? `${activeBg} ${activeBorder} text-white` 
+                  ? `${activeBg} ${activeBorder} text-white shadow-sm` 
                   : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
               }`}
             >
-              {isSelected && <span>✓</span>}
+              {isSelected && <span className="font-bold">✓</span>}
               {item}
             </button>
           );
@@ -163,7 +166,6 @@ const ConflictValue = React.memo(({
   color: 'green' | 'blue';
   isMultiSelect?: boolean; 
 }) => {
-  const [dimensions, setDimensions] = useState<{ w: number, h: number } | null>(null);
   const [isImage, setIsImage] = useState(false);
 
   useEffect(() => {
@@ -188,7 +190,8 @@ const ConflictValue = React.memo(({
   const ContentWrapper = ({ children }: { children: React.ReactNode }) => (
     <div 
       onClick={onClick} 
-      className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 flex flex-col gap-2 relative h-full w-full ${borderColor} ${bgColor} hover:shadow-sm`}
+      // REMOVED h-full here to fix stretching issues
+      className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 flex flex-col gap-2 relative w-full ${borderColor} ${bgColor} hover:shadow-sm`}
     >
       <div className={`text-[11px] font-bold uppercase flex justify-between items-center gap-1.5 ${labelColor}`}>
         <div className="flex items-center gap-2 w-full">
@@ -200,7 +203,7 @@ const ConflictValue = React.memo(({
            />
            <div className="flex items-center gap-1 flex-1 min-w-0">
              <span className="shrink-0">{getIcon(label)}</span>
-             <span className="truncate" title={label}>{label} {isImage && dimensions && `(${dimensions.w}x${dimensions.h})`}</span>
+             <span className="truncate" title={label}>{label}</span>
            </div>
         </div>
       </div>
@@ -212,20 +215,18 @@ const ConflictValue = React.memo(({
     return (
       <ContentWrapper>
         <div className="relative w-full aspect-square bg-gray-100 rounded overflow-hidden flex items-center justify-center mt-1">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img 
+          <Image 
             src={value} 
             alt={label}
-            className="w-full h-full object-contain"
-            onLoad={(e) => {
-                if (!dimensions) {
-                    setDimensions({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight });
-                }
-            }}
+            fill
+            sizes="200px"
+            className="object-contain"
             onError={() => setIsImage(false)}
-            loading="lazy" 
+            unoptimized
           />
         </div>
+        {/* Simple dimension hint if needed, without triggering re-renders */}
+        <div className="text-[9px] text-center text-gray-400 mt-1">Image Preview</div>
       </ContentWrapper>
     );
   }
@@ -235,7 +236,7 @@ const ConflictValue = React.memo(({
     : String(value ?? '');
 
   const renderContent = () => {
-    if (!value) return 'Empty / None';
+    if (!value) return <span className="text-gray-400 italic">Empty / None</span>;
     if (typeof value === 'string' && (value.includes('http://') || value.includes('https://'))) {
       const parts = value.split(/(https?:\/\/[^\s]+)/g);
       return (
@@ -271,7 +272,7 @@ const ConflictValue = React.memo(({
 ConflictValue.displayName = 'ConflictValue';
 
 
-// --- CONFLICT ROW COMPONENT (Isolates renders per row) ---
+// --- ISOLATED CONFLICT ROW (PERFORMANCE FIX) ---
 const ConflictRow = React.memo(({
     conflict,
     resolutions,
@@ -289,11 +290,16 @@ const ConflictRow = React.memo(({
     const selected = resolutions[key] || { value: conflict.current_value, source: 'current' };
     const isImageArrayField = isImageArray(conflict.current_value) || isImageArray(conflict.new_value);
     
-    const TEXT_LIST_FIELDS = ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger', 'samples', 'sampled_by', 'awards', 'certifications'];
+    // Explicitly add Engineers/Producers here
+    const TEXT_LIST_FIELDS = [
+        'genres', 'styles', 'musicians', 'credits', 'producers', 'engineers', 
+        'tags', 'label', 'labels', 'writers', 'mixers', 'composer', 'lyricist', 
+        'arranger', 'samples', 'sampled_by', 'awards', 'certifications', 'songwriters'
+    ];
+    
     const isTextListField = TEXT_LIST_FIELDS.includes(conflict.field_name);
     const isNotesField = conflict.field_name === 'notes';
     
-    // Treat Notes as a multi-select field for the purpose of the UI
     const isMultiSelect = isTextListField || isNotesField;
 
     const toArray = (v: unknown) => {
@@ -303,12 +309,13 @@ const ConflictRow = React.memo(({
     };
 
     if (isTextListField) {
+        // Force Title Case for consistency
         const allCurrent = toArray(conflict.current_value).map(toTitleCase);
         const allNewItems = new Set<string>();
         
         if (conflict.candidates) {
             Object.values(conflict.candidates).forEach(val => {
-            toArray(val).forEach(item => allNewItems.add(toTitleCase(item)));
+                toArray(val).forEach(item => allNewItems.add(toTitleCase(item)));
             });
         } else if (conflict.new_value) {
             toArray(conflict.new_value).forEach(item => allNewItems.add(toTitleCase(item)));
@@ -317,11 +324,11 @@ const ConflictRow = React.memo(({
         const currentSet = new Set(allCurrent);
         const actualNewItems = Array.from(allNewItems).filter(item => !currentSet.has(item));
 
-        // Use selected.value to determine selected chips
+        // Calculate selected items for chips
         const selectedChipSet = new Set(toArray(selected.value));
 
         return (
-            <div>
+            <div className="mb-8">
             <div className="flex justify-between items-center mb-2">
                 <div className="flex items-center gap-3">
                 <div className="text-xs font-bold text-gray-600 uppercase">
@@ -343,11 +350,11 @@ const ConflictRow = React.memo(({
             </div>
             <div className="flex flex-col gap-3">
                 <ArrayChipSelector
-                label="Currently in Database"
-                color="green"
-                items={allCurrent}
-                selectedItems={selectedChipSet}
-                onToggle={(val) => onResolve(conflict, val, 'custom_merge')}
+                    label="Currently in Database"
+                    color="green"
+                    items={allCurrent}
+                    selectedItems={selectedChipSet}
+                    onToggle={(val) => onResolve(conflict, val, 'custom_merge')}
                 />
                 {actualNewItems.length > 0 && (
                 <ArrayChipSelector
@@ -364,7 +371,7 @@ const ConflictRow = React.memo(({
     }
 
     return (
-        <div>
+        <div className="mb-8">
             <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-3">
                 <div className="text-xs font-bold text-gray-600 uppercase">
@@ -397,20 +404,20 @@ const ConflictRow = React.memo(({
             <div className="flex flex-col">
                 {isImageArrayField && Array.isArray(conflict.current_value) ? (
                     <ImageGridSelector 
-                    label="Current Gallery"
-                    color="green"
-                    images={conflict.current_value as string[]}
-                    selectedImages={new Set(selected.value as string[])}
-                    onToggle={(url) => onResolve(conflict, url, 'current')}
+                        label="Current Gallery"
+                        color="green"
+                        images={conflict.current_value as string[]}
+                        selectedImages={new Set(selected.value as string[])}
+                        onToggle={(url) => onResolve(conflict, url, 'current')}
                     />
                 ) : (
                     <ConflictValue 
-                    label="Current (DB)"
-                    color="green"
-                    value={conflict.current_value}
-                    isSelected={selected.selectedSources?.includes('current') ?? false}
-                    isMultiSelect={isMultiSelect}
-                    onClick={() => onResolve(conflict, conflict.current_value, 'current')}
+                        label="Current (DB)"
+                        color="green"
+                        value={conflict.current_value}
+                        isSelected={selected.selectedSources?.includes('current') ?? false}
+                        isMultiSelect={isMultiSelect}
+                        onClick={() => onResolve(conflict, conflict.current_value, 'current')}
                     />
                 )}
             </div>
@@ -420,12 +427,12 @@ const ConflictRow = React.memo(({
                     Object.entries(conflict.candidates).map(([source, val]) => (
                         isImageArrayField && Array.isArray(val) ? (
                             <ImageGridSelector 
-                            key={source}
-                            label={`${source} Candidates`}
-                            color="blue"
-                            images={val as string[]}
-                            selectedImages={new Set(selected.value as string[])}
-                            onToggle={(url) => onResolve(conflict, url, source)}
+                                key={source}
+                                label={`${source} Candidates`}
+                                color="blue"
+                                images={val as string[]}
+                                selectedImages={new Set(selected.value as string[])}
+                                onToggle={(url) => onResolve(conflict, url, source)}
                             />
                         ) : (
                             <ConflictValue 
@@ -478,12 +485,11 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
 
     currentConflicts.forEach(c => {
       const key = `${c.album_id}-${c.field_name}`;
-      
-      // Default to "Current"
       defaults[key] = { value: c.current_value, source: 'current', selectedSources: ['current'] };
-
-      if (c.field_name === 'tracks' && Array.isArray(c.current_value) && c.current_value.length > 0) {
-        autoFinalized[key] = true;
+      
+      // Auto-finalize simple single-value fields (optional convenience)
+      if (['artist', 'title', 'year'].includes(c.field_name)) {
+         autoFinalized[key] = true;
       }
     });
 
@@ -494,11 +500,13 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
   const handleResolve = useCallback((conflict: ExtendedFieldConflict, value: unknown, source: string) => {
     const key = `${conflict.album_id}-${conflict.field_name}`;
     
+    // Explicitly listing fields that support multi-source merging
     const MERGEABLE_FIELDS = [
       'genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 
       'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url', 
-      'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger', 'songwriters', 
-      'notes', 'samples', 'sampled_by', 'awards', 'certifications'
+      'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 
+      'lyricist', 'arranger', 'songwriters', 'notes', 'samples', 
+      'sampled_by', 'awards', 'certifications'
     ];
     
     if (MERGEABLE_FIELDS.includes(conflict.field_name)) {
@@ -506,28 +514,32 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
         const currentRes = prev[key];
         const selectedSources = new Set(currentRes?.selectedSources || ['current']);
 
-        // Toggle selection
+        if (source === 'custom_merge') {
+            // Chips pass the already-merged value directly
+            return {
+                ...prev,
+                [key]: { value, source: 'custom_merge', selectedSources: Array.from(selectedSources) }
+            };
+        }
+
+        // Toggle logic for Radio/Checkbox approach
         if (selectedSources.has(source)) {
             selectedSources.delete(source);
         } else {
             selectedSources.add(source);
         }
         
-        // Ensure at least empty set if nothing selected (though usually we keep something)
-        // If notes, we allow empty.
-        
+        // Safety: ensure at least one source if empty? (Notes allows empty)
         const newSelectedSources = Array.from(selectedSources);
 
         // --- NOTES MERGING LOGIC ---
         if (conflict.field_name === 'notes') {
             const parts: string[] = [];
             
-            // 1. Current Value
             if (selectedSources.has('current') && conflict.current_value) {
                 parts.push(String(conflict.current_value).trim());
             }
 
-            // 2. Candidate Values (Discogs, Wiki, etc)
             if (conflict.candidates) {
                 Object.entries(conflict.candidates).forEach(([candSource, candVal]) => {
                     if (selectedSources.has(candSource) && candVal) {
@@ -535,7 +547,6 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
                     }
                 });
             } else if (selectedSources.has(conflict.source) && conflict.new_value) {
-                 // Fallback for non-candidate simple structure
                  parts.push(`--- ${conflict.source.toUpperCase()} NOTES ---\n${String(conflict.new_value).trim()}`);
             }
 
@@ -549,31 +560,14 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
             };
         }
 
-        // --- ARRAY MERGING LOGIC ---
+        // --- ARRAY MERGING LOGIC (Fallback if not using Chips) ---
         const combinedItems = new Set<string>();
-        
-        // Helper to add items to set
         const addItems = (val: unknown) => {
             const arr = Array.isArray(val) ? val : (val ? [val] : []);
             arr.forEach(v => combinedItems.add(toTitleCase(String(v))));
         };
 
-        // If 'custom_merge' comes from chips, 'value' is already the set of strings
-        if (source === 'custom_merge') {
-             // In this case, 'value' passed in IS the final array from the chip selector
-             return {
-                ...prev,
-                [key]: {
-                   value: value,
-                   source: 'custom_merge',
-                   selectedSources: newSelectedSources
-                }
-             };
-        }
-
-        // Otherwise recalculate from sources
         if (selectedSources.has('current')) addItems(conflict.current_value);
-        
         if (conflict.candidates) {
             Object.entries(conflict.candidates).forEach(([candSource, candVal]) => {
                 if (selectedSources.has(candSource)) addItems(candVal);
@@ -592,7 +586,7 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
         };
       });
     } else {
-      // Standard Radio Selection (Single Value)
+      // Standard Radio Selection (Single Value - Artist, Title, Year)
       setResolutions(prev => ({ 
           ...prev, 
           [key]: { value, source, selectedSources: [source] } 
