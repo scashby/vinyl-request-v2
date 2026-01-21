@@ -1,3 +1,4 @@
+// src/app/dialogues/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -209,7 +210,15 @@ export default function DialoguesPage() {
                     <div className="text-sm font-bold text-purple-900 mb-2 uppercase tracking-wide">
                       {p.platform}
                     </div>
-                    <div className="rounded-lg overflow-hidden shadow-sm bg-white" dangerouslySetInnerHTML={{ __html: p.embed_html || p.embed_url || '' }} />
+                    <div 
+                      className="rounded-lg overflow-hidden shadow-sm bg-white" 
+                      dangerouslySetInnerHTML={{ 
+                        // Fix: Clean HTML to remove Allow attribute errors
+                        __html: (p.embed_html || p.embed_url || '')
+                          .replace(/allowfullscreen="?"/g, '')
+                          .replace(/allowfullscreen/g, '') 
+                      }} 
+                    />
                   </div>
                 ))}
               </div>

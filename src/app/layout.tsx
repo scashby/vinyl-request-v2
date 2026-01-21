@@ -1,3 +1,4 @@
+// src/app/layout.tsx
 import "./globals.css";
 import { Inter, Playfair_Display } from "next/font/google";
 import Layout from "components/Layout";
@@ -19,8 +20,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} ${playfair.variable} font-sans antialiased bg-white text-black`}>
-        {/* FIX: Required anchor for Facebook SDK */}
-        <div id="fb-root"></div>
+        {/* REQUIRED for Facebook SDK to function without errors */}
+        <div id="fb-root"></div> 
         
         <Layout>{children}</Layout>
         <Analytics />

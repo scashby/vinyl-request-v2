@@ -1,477 +1,261 @@
+// src/app/dj-sets/page.tsx
 "use client";
 
 import { useEffect, useState } from 'react';
 import { supabase } from 'src/lib/supabaseClient';
-import Link from 'next/link';
+
+interface Event {
+  id: number;
+  title: string;
+  date: string;
+  location?: string;
+}
 
 interface DJSet {
   id: number;
   title: string;
   description?: string;
+  tags?: string[];
   file_url: string;
   download_url?: string;
-  recorded_at: string;
+  recorded_at?: string;
   created_at: string;
-  tags?: string[];
-  events?: {
-    title: string;
-    date: string;
-  };
+  download_count: number;
+  track_listing?: string[];
+  events?: Event;
 }
 
-interface EventOption {
-  id: number;
-  title: string;
-  date: string;
-}
-
-interface DJSetFormData {
-  title: string;
-  description: string;
-  event_id: string;
-  recorded_at: string;
-  tags: string;
-  track_listing: string;
-  google_drive_url: string;
-}
-
-export default function ManageDJSetsPage() {
+export default function DJSetsPage() {
   const [djSets, setDjSets] = useState<DJSet[]>([]);
-  const [events, setEvents] = useState<EventOption[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState('');
-
-  // Form state
-  const [formData, setFormData] = useState<DJSetFormData>({
-    title: '',
-    description: '',
-    event_id: '',
-    recorded_at: '',
-    tags: '',
-    track_listing: '',
-    google_drive_url: ''
-  });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterBy, setFilterBy] = useState('all');
 
   useEffect(() => {
     loadDJSets();
-    loadEvents();
   }, []);
 
   const loadDJSets = async () => {
+    // Timeout failsafe
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Timeout')), 5000)
+    );
+
     try {
-      const { data, error } = await supabase
+      const fetchPromise = supabase
         .from('dj_sets')
         .select(`
           *,
-          events(title, date)
+          events(title, date, location)
         `)
-        .order('created_at', { ascending: false });
+        .order('recorded_at', { ascending: false });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
 
       if (error) throw error;
       setDjSets((data as unknown as DJSet[]) || []);
     } catch (error) {
       console.error('Error loading DJ sets:', error);
-      setStatus('Error loading DJ sets');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadEvents = async () => {
+  const handleDownload = async (setId: number, fileUrl: string, title: string) => {
     try {
-      const { data, error } = await supabase
-        .from('events')
-        .select('id, title, date')
-        .order('date', { ascending: false });
+      // Track download
+      await supabase
+        .from('dj_sets')
+        .update({ download_count: (djSets.find(s => s.id === setId)?.download_count || 0) + 1 })
+        .eq('id', setId);
 
-      if (error) throw error;
-      setEvents(data || []);
+      // Trigger download
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      link.download = `${title}.mp3`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } catch (error) {
-      console.error('Error loading events:', error);
+      console.error('Download error:', error);
     }
   };
 
-  const extractGoogleDriveFileId = (url: string): string | null => {
-    const patterns = [
-      /\/file\/d\/([a-zA-Z0-9-_]+)/,
-      /id=([a-zA-Z0-9-_]+)/,
-      /folders\/([a-zA-Z0-9-_]+)/
-    ];
-
-    for (const pattern of patterns) {
-      const match = url.match(pattern);
-      if (match) return match[1];
-    }
-    return null;
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
   };
 
-  const generateGoogleDriveLinks = (url: string) => {
-    const fileId = extractGoogleDriveFileId(url);
-    if (!fileId) return { viewLink: url, downloadLink: url };
-
-    return {
-      viewLink: `https://drive.google.com/file/d/${fileId}/view`,
-      downloadLink: `https://drive.google.com/uc?export=download&id=${fileId}`
-    };
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const filteredSets = djSets.filter(set => {
+    const matchesSearch = set.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         set.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         set.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    if (!formData.google_drive_url) {
-      setStatus('Please provide a Google Drive link');
-      return;
-    }
-
-    if (!formData.title) {
-      setStatus('Please provide a title');
-      return;
-    }
-
-    setSaving(true);
-    setStatus('Saving DJ set information...');
-
-    try {
-      const tags = formData.tags ? formData.tags.split(',').map(tag => tag.trim()) : [];
-      const trackListing = formData.track_listing ? 
-        formData.track_listing.split('\n').map(track => track.trim()).filter(Boolean) : [];
-
-      const { viewLink, downloadLink } = generateGoogleDriveLinks(formData.google_drive_url);
-      const fileId = extractGoogleDriveFileId(formData.google_drive_url);
-
-      const { error: dbError } = await supabase
-        .from('dj_sets')
-        .insert({
-          title: formData.title,
-          description: formData.description,
-          event_id: formData.event_id ? parseInt(formData.event_id) : null,
-          file_url: viewLink,
-          download_url: downloadLink,
-          google_drive_id: fileId,
-          recorded_at: formData.recorded_at || new Date().toISOString(),
-          tags,
-          track_listing: trackListing,
-          storage_provider: 'google_drive'
-        });
-
-      if (dbError) throw dbError;
-
-      setStatus('DJ set added successfully!');
-      
-      setFormData({
-        title: '',
-        description: '',
-        event_id: '',
-        recorded_at: '',
-        tags: '',
-        track_listing: '',
-        google_drive_url: ''
-      });
-
-      loadDJSets();
-
-    } catch (error: unknown) {
-      console.error('Save error:', error);
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      setStatus(`Save failed: ${msg}`);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const deleteDJSet = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this DJ set? This cannot be undone.')) {
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('dj_sets')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setStatus('DJ set deleted successfully');
-      loadDJSets();
-    } catch (error: unknown) {
-      console.error('Delete error:', error);
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      setStatus(`Delete failed: ${msg}`);
-    }
-  };
+    if (filterBy === 'all') return matchesSearch;
+    if (filterBy === 'events') return matchesSearch && set.events;
+    if (filterBy === 'standalone') return matchesSearch && !set.events;
+    
+    return matchesSearch;
+  });
 
   if (loading) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
-        <h1>Loading DJ Sets...</h1>
+      <div className="bg-white min-h-screen">
+        <header className="relative w-full h-[300px] flex items-center justify-center bg-[url('/images/event-header-still.jpg')] bg-cover bg-center">
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-8">
+            <h1 className="font-serif-display text-4xl md:text-5xl font-bold text-white text-center m-0">Live Sessions & DJ Sets</h1>
+          </div>
+        </header>
+        <main className="container-responsive py-12">
+          <div className="text-center p-8">
+            <h2 className="text-xl font-semibold text-gray-600">Loading Live Sessions & DJ Sets...</h2>
+          </div>
+        </main>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 24, background: '#fff', color: '#222', minHeight: '100vh' }}>
-      <div style={{ marginBottom: 32, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ fontSize: 32, fontWeight: 'bold', margin: '0 0 8px 0' }}>
-            🎧 Manage DJ Sets
-          </h1>
-          <p style={{ color: '#666', fontSize: 16, margin: 0 }}>
-            Add DJ sets by uploading to Google Drive first, then entering the details here
-          </p>
+    <div className="bg-white min-h-screen">
+      <header className="relative w-full h-[300px] flex items-center justify-center bg-[url('/images/event-header-still.jpg')] bg-cover bg-center">
+        <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-8">
+          <h1 className="font-serif-display text-4xl md:text-5xl font-bold text-white text-center m-0">DJ Sets</h1>
         </div>
-        <Link
-          href="/admin/admin-dashboard"
-          style={{
-            background: '#6b7280',
-            color: 'white',
-            padding: '8px 16px',
-            borderRadius: 8,
-            textDecoration: 'none',
-            fontSize: 14,
-            fontWeight: 600
-          }}
-        >
-          ← Back to Dashboard
-        </Link>
-      </div>
-
-      <div style={{
-        background: '#f0f9ff',
-        border: '1px solid #0ea5e9',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 24
-      }}>
-        <h3 style={{ margin: '0 0 8px 0', color: '#0c4a6e' }}>How to Add DJ Sets:</h3>
-        <ol style={{ margin: 0, paddingLeft: 20, color: '#0c4a6e' }}>
-          <li>Upload your DJ set MP3 to Google Drive</li>
-          <li>Right-click the file → Share → Change to &quot;Anyone with the link&quot;</li>
-          <li>Copy the Google Drive link</li>
-          <li>Fill out the form below with the link and details</li>
-        </ol>
-      </div>
-
-      <div style={{
-        background: '#f8fafc',
-        border: '1px solid #e2e8f0',
-        borderRadius: 12,
-        padding: 24,
-        marginBottom: 32
-      }}>
-        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16 }}>
-          Add New DJ Set
-        </h2>
-        
-        <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 14 }}>
-                Google Drive Link *
-              </label>
-              <input
-                type="url"
-                value={formData.google_drive_url}
-                onChange={(e) => setFormData(prev => ({ ...prev, google_drive_url: e.target.value }))}
-                placeholder="https://drive.google.com/file/d/..."
-                disabled={saving}
-                required
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: 6,
-                  width: '100%',
-                  fontSize: 14
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 14 }}>
-                Title *
-              </label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="e.g. Live Jukebox at Devil's Purse"
-                disabled={saving}
-                required
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: 6,
-                  width: '100%',
-                  fontSize: 14
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 14 }}>
-                Event (Optional)
-              </label>
-              <select
-                value={formData.event_id}
-                onChange={(e) => setFormData(prev => ({ ...prev, event_id: e.target.value }))}
-                disabled={saving}
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: 6,
-                  width: '100%',
-                  fontSize: 14,
-                  background: 'white'
-                }}
-              >
-                <option value="">No associated event</option>
-                {events.map(event => (
-                  <option key={event.id} value={event.id}>
-                    {event.title} - {new Date(event.date).toLocaleDateString()}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 14 }}>
-                Recorded Date
-              </label>
-              <input
-                type="datetime-local"
-                value={formData.recorded_at}
-                onChange={(e) => setFormData(prev => ({ ...prev, recorded_at: e.target.value }))}
-                disabled={saving}
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: 6,
-                  width: '100%',
-                  fontSize: 14
-                }}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 14 }}>
-                Description
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Describe the set..."
-                disabled={saving}
-                rows={3}
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: 6,
-                  width: '100%',
-                  fontSize: 14
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 14 }}>
-                Tags (comma-separated)
-              </label>
-              <input
-                type="text"
-                value={formData.tags}
-                onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
-                placeholder="vinyl, house, disco"
-                disabled={saving}
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: 6,
-                  width: '100%',
-                  fontSize: 14
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 14 }}>
-                Track Listing (one per line)
-              </label>
-              <textarea
-                value={formData.track_listing}
-                onChange={(e) => setFormData(prev => ({ ...prev, track_listing: e.target.value }))}
-                placeholder="Artist - Track"
-                disabled={saving}
-                rows={4}
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: 6,
-                  width: '100%',
-                  fontSize: 14,
-                  fontFamily: 'monospace'
-                }}
-              />
-            </div>
-          </div>
-
-          <div style={{ gridColumn: '1 / -1', marginTop: 16 }}>
-            <button
-              type="submit"
-              disabled={saving}
-              style={{
-                background: saving ? '#9ca3af' : '#4285f4',
-                color: 'white',
-                border: 'none',
-                borderRadius: 8,
-                padding: '12px 24px',
-                fontSize: 16,
-                fontWeight: 600,
-                cursor: saving ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {saving ? 'Saving...' : 'Add DJ Set'}
-            </button>
-          </div>
-        </form>
-
-        {status && (
-          <div style={{
-            marginTop: 16,
-            padding: 12,
-            borderRadius: 6,
-            background: status.includes('Error') || status.includes('failed') ? '#fee2e2' : '#dcfce7',
-            color: status.includes('Error') || status.includes('failed') ? '#dc2626' : '#059669',
-            fontWeight: 600
-          }}>
-            {status}
-          </div>
-        )}
-      </div>
-
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12 }}>
-        <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>
-          DJ Sets ({djSets.length})
+      </header>
+      
+      <main className="container-responsive py-8">
+        {/* Search and Filter */}
+        <div className="flex flex-col md:flex-row gap-4 mb-8 justify-center items-center px-4">
+          <input
+            type="text"
+            placeholder="Search sets, events, tags..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full md:w-96 p-3 rounded-lg border border-gray-300 focus:border-blue-500 outline-none transition-colors"
+          />
+          <select
+            value={filterBy}
+            onChange={(e) => setFilterBy(e.target.value)}
+            className="w-full md:w-48 p-3 rounded-lg border border-gray-300 bg-white outline-none cursor-pointer"
+          >
+            <option value="all">All Sets</option>
+            <option value="events">Event Sets</option>
+            <option value="standalone">Standalone Sets</option>
+          </select>
         </div>
-        <div style={{ maxHeight: 600, overflowY: 'auto' }}>
-            {djSets.map((set) => (
-              <div key={set.id} style={{ padding: '16px 24px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                    <strong>{set.title}</strong>
-                    <div style={{ fontSize: 12, color: '#666' }}>{new Date(set.recorded_at || set.created_at).toLocaleDateString()}</div>
-                </div>
-                <button 
-                    onClick={() => deleteDJSet(set.id)}
-                    style={{ background: '#dc2626', color: 'white', border: 'none', padding: '6px 12px', borderRadius: 4, cursor: 'pointer' }}
+
+        {/* DJ Sets Grid */}
+        <div className="px-4">
+          {filteredSets.length === 0 ? (
+            <div className="text-center py-16 text-gray-500">
+              <div className="text-5xl mb-4">🎧</div>
+              <h2 className="text-2xl font-bold mb-2">No DJ sets found</h2>
+              <p>Try adjusting your search or filter criteria</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+              {filteredSets.map((set) => (
+                <div
+                  key={set.id}
+                  className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:-translate-y-1 hover:shadow-lg transition-all duration-300 flex flex-col gap-4"
                 >
-                    Delete
-                </button>
-              </div>
-            ))}
+                  {/* Header */}
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2 leading-tight">
+                      {set.title}
+                    </h3>
+                    
+                    {set.events && (
+                      <div className="text-blue-500 text-sm font-semibold mb-2 flex items-center gap-2">
+                        📍 {set.events.title}
+                        {set.events.location && ` • ${set.events.location}`}
+                      </div>
+                    )}
+
+                    <div className="text-xs text-gray-500 font-medium">
+                      {formatDate(set.recorded_at || set.created_at)}
+                      {set.download_count > 0 && ` • ${set.download_count} downloads`}
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  {set.description && (
+                    <p className="text-sm text-gray-600 leading-relaxed p-3 bg-gray-50 rounded-lg border-l-4 border-gray-200">
+                      {set.description}
+                    </p>
+                  )}
+
+                  {/* Tags */}
+                  {set.tags && set.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {set.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold"
+                        >
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Play Controls */}
+                  <div className="mt-auto flex flex-col sm:flex-row gap-4">
+                    {/* Large Play Button */}
+                    <a
+                      href={set.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 bg-gradient-to-br from-blue-500 to-green-500 hover:to-green-600 text-white rounded-xl py-3 px-6 font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+                    >
+                      <span className="text-xl">▶</span>
+                      <span>Play</span>
+                    </a>
+
+                    {/* Download Button */}
+                    <a
+                      href={set.download_url || set.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => handleDownload(set.id, set.file_url, set.title)}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-3 px-4 font-semibold flex items-center justify-center gap-2 transition-colors duration-200"
+                    >
+                      ⬇ DL
+                    </a>
+                  </div>
+
+                  {/* Track Listing */}
+                  {set.track_listing && set.track_listing.length > 0 && (
+                    <details className="mt-2 group">
+                      <summary className="cursor-pointer font-semibold text-gray-700 text-sm py-2 border-b border-gray-200 list-none flex items-center justify-between group-open:text-blue-600">
+                        <span>🎵 Track Listing ({set.track_listing.length})</span>
+                        <span className="text-xs text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                      </summary>
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-2 max-h-48 overflow-y-auto">
+                        <ol className="list-decimal list-inside space-y-1">
+                          {set.track_listing.map((track, index) => (
+                            <li
+                              key={index}
+                              className="text-xs text-gray-600 font-mono leading-tight"
+                            >
+                              {track}
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    </details>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

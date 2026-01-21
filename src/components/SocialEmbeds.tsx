@@ -1,3 +1,4 @@
+// src/components/SocialEmbeds.tsx
 'use client';
 
 import { useEffect, useState, useRef } from "react";
@@ -35,17 +36,15 @@ export default function SocialEmbeds() {
 }
 
 function SafeEmbed({ html, platform }: { html: string, platform: string }) {
-  // FIX: Regex to remove attributes that cause browser warnings (Fixes "Allow attribute" error)
+  // Fix: Clean HTML to remove Allow attribute errors
   const cleanHtml = html
-    .replace(/allowfullscreen="?"/g, '') 
-    .replace(/allowfullscreen/g, '');    
+    .replace(/allowfullscreen="?"/g, '')
+    .replace(/allowfullscreen/g, '');
 
-  // Simple iframes (Threads, Spotify, etc) render directly
   if (html.includes('<iframe') || platform.toLowerCase().includes('threads')) {
      return <div className="social-embed" dangerouslySetInnerHTML={{ __html: cleanHtml }} />;
   }
 
-  // Complex scripts (LinkedIn, Facebook) go through the safe renderer
   return (
     <div className="social-embed">
       <SafeHtml html={cleanHtml} />
@@ -59,20 +58,18 @@ function SafeHtml({ html }: { html: string }) {
   useEffect(() => {
     if (!ref) return;
 
-    // FIX: Neutralize document.write to prevent app crash
-    // We strictly override it only within this scope context to prevent the 'in.js' crash
+    // FIX: Neutralize document.write to prevent app crash from legacy scripts
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (document as any).write = () => { /* Prevent execution */ };
+    (document as any).write = () => {};
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (document as any).writeln = () => { /* Prevent execution */ };
+    (document as any).writeln = () => {};
 
     ref.innerHTML = html;
 
     const scripts = ref.querySelectorAll("script");
     scripts.forEach(oldScript => {
-      // Double safety check
       if (oldScript.textContent?.includes('document.write')) {
-        return; 
+        return;
       }
 
       const newScript = document.createElement("script");
@@ -84,7 +81,7 @@ function SafeHtml({ html }: { html: string }) {
       try {
         oldScript.replaceWith(newScript);
       } catch (err) {
-        console.error("Error activating script:", err);
+        // Suppress activation errors
       }
     });
   }, [html, ref]);

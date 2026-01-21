@@ -44,12 +44,20 @@ export default function Page() {
 
   useEffect(() => {
     const load = async () => {
+      // Timeout failsafe: prevents infinite loading if Supabase hangs
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 5000)
+      );
+
       try {
         // Load events
-        const { data: ev, error: evError } = await supabase
+        const fetchEvents = supabase
           .from("events")
           .select("*")
           .order("date", { ascending: true });
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: ev, error: evError } = await Promise.race([fetchEvents, timeoutPromise]) as any;
 
         if (evError) {
           console.error("Error loading events", evError);
@@ -59,14 +67,14 @@ export default function Page() {
         const all = ev || [];
 
         // Keep upcoming + TBA
-        const filtered = all.filter((e) => {
+        const filtered = all.filter((e: Event) => {
           const d = e.date;
           if (!d || d === "" || d === "9999-12-31") return true; // TBA
           return d >= today;
         });
 
         // Sort: dated first, by date; then TBA
-        const sorted = [...filtered].sort((a, b) => {
+        const sorted = [...filtered].sort((a: Event, b: Event) => {
           const aTBA =
             !a.date || a.date === "" || a.date === "9999-12-31";
           const bTBA =
@@ -81,11 +89,14 @@ export default function Page() {
         setEvents(sorted);
 
         // Load DJ sets
-        const { data: sets, error: setsError } = await supabase
+        const fetchSets = supabase
           .from("dj_sets")
           .select(`*, events ( id, title, date, location )`)
           .order("recorded_at", { ascending: false })
           .limit(6);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: sets, error: setsError } = await Promise.race([fetchSets, timeoutPromise]) as any;
 
         if (setsError) {
           console.error("Error loading dj_sets", setsError);
@@ -218,7 +229,7 @@ export default function Page() {
 
                   <div className={`grid gap-7 ${upNext.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
                     {upNext.map((ev) => {
-                      // Corrected image path here
+                      // FIX: Updated placeholder path
                       const img =
                         ev.image_url || "/images/coverplaceholder.png";
                       const d = compactDate(ev.date);
@@ -273,7 +284,7 @@ export default function Page() {
                   <SectionTitle text="Featured" />
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                     {featuredGrid.map((e) => {
-                      // Corrected image path here
+                      // FIX: Updated placeholder path
                       const img = e.image_url || "/images/coverplaceholder.png";
                       const d = compactDate(e.date);
                       const tba = !e.date || e.date === "" || e.date === "9999-12-31";
@@ -322,7 +333,7 @@ export default function Page() {
                   {/* LEFT COLUMN: list of upcoming events */}
                   <div className="space-y-4">
                     {events.map((e) => {
-                      // Corrected image path here
+                      // FIX: Updated placeholder path
                       const img =
                         e.image_url || "/images/coverplaceholder.png";
 

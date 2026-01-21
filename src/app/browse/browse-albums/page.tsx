@@ -1,3 +1,4 @@
+// src/app/browse/browse-albums/page.tsx
 "use client";
 
 import { Suspense } from 'react';
@@ -55,6 +56,7 @@ function BrowseAlbumsContent() {
   const [showSuggestionBox, setShowSuggestionBox] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Helper function to check if album was added in last 2 weeks
   const isJustAdded = (dateAdded?: string) => {
     if (!dateAdded) return false;
     const addedDate = new Date(dateAdded);
@@ -63,8 +65,10 @@ function BrowseAlbumsContent() {
     return addedDate >= twoWeeksAgo;
   };
 
+  // Helper function to format date
   const formatDate = (dateString?: string) => {
     if (!dateString || dateString === '9999-12-31') return '';
+    // Append T00:00:00 to force local time interpretation instead of UTC
     const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('en-US', { 
       weekday: 'long',
@@ -109,6 +113,7 @@ function BrowseAlbumsContent() {
   useEffect(() => {
     async function fetchAllAlbums() {
       setLoading(true);
+      // Timeout failsafe
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Timeout')), 5000)
       );
@@ -119,9 +124,6 @@ function BrowseAlbumsContent() {
         let from = 0;
         const batchSize = 1000;
         let keepGoing = true;
-        
-        // Note: For large datasets, a proper timeout strategy might need to wrap the whole loop
-        // or just the first fetch. Here we wrap the first fetch attempt logic for safety.
         
         while (keepGoing) {
             const fetchPromise = supabase
@@ -306,6 +308,7 @@ function BrowseAlbumsContent() {
           </div>
         ) : (
           <>
+            {/* Search & Filter Bar */}
             <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6">
               <input
                 type="text"
@@ -356,6 +359,7 @@ function BrowseAlbumsContent() {
               )}
             </div>
 
+            {/* Filters */}
             <div className="flex flex-wrap gap-3 items-center mb-6 w-full">
               <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold cursor-pointer transition-all ${
                 justAddedCount > 0 
