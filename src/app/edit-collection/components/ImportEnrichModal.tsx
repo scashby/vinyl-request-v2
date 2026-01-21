@@ -231,6 +231,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
   function getServicesForSelection() {
     const activeServices = new Set<string>();
+    
     Object.values(fieldConfig).forEach(allowedSources => {
       allowedSources.forEach(s => activeServices.add(s));
     });
@@ -352,7 +353,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           limit: specificAlbumIds ? undefined : 50,
           cursor: specificAlbumIds ? undefined : cursorRef.current,
           folder: folderFilter || undefined,
-          services: getServicesForSelection()
+          services: getServicesForSelection(),
+          autoSnooze: autoSnooze // PASSED TO SERVER
         };
 
         const res = await fetch('/api/enrich-sources/fetch-candidates', {
@@ -375,7 +377,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const candidates = result.results || [];
 
         if (result.processedCount > candidates.length) {
-          // This is fine, just logs empty results
+          // This is fine, logs empty results if any
         }
 
         if (candidates.length === 0 && hasMoreRef.current === false) {
@@ -437,7 +439,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const historyUpdates: { album_id: number; field_name: string; source: string; resolution: string; kept_value: unknown; resolved_at: string }[] = [];
     const trackSavePromises: Promise<unknown>[] = [];
     
-    // PRIORITY MATRICES
     const GLOBAL_PRIORITY = [
       'discogs', 'musicbrainz', 'spotify', 'appleMusic', 'deezer', 
       'rateyourmusic', 'lastfm', 'theaudiodb', 'wikipedia', 'wikidata', 
@@ -501,6 +502,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             const finalized = (album as Record<string, unknown>).finalized_fields as string[] | undefined;
             if (Array.isArray(finalized) && finalized.includes(key)) return;
 
+            // CLIENT SIDE CHECK (Still useful for specific fields)
             if (autoSnooze) {
                const lastReviewed = (album as Record<string, unknown>).last_reviewed_at as string | undefined;
                if (lastReviewed) {
@@ -692,9 +694,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const timestamp = new Date().toISOString();
       updatesForAlbum.last_enriched_at = timestamp;
       
-      // If we auto-filled something, that counts as a review.
-      // If we found nothing and have no conflicts, that ALSO counts as a review (we checked it).
-      // Only skip updating last_reviewed_at if we generated a conflict (because user needs to review it).
+      // FIX: Mark as reviewed even if we only found "No Conflicts"
       const hasConflicts = newConflicts.some(c => c.album_id === album.id);
       if (!hasConflicts) {
           updatesForAlbum.last_reviewed_at = timestamp;

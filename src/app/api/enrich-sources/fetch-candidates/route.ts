@@ -38,7 +38,8 @@ export async function POST(req: Request) {
       cursor = 0,
       limit = 10,
       folder,
-      services
+      services,
+      autoSnooze = false // NEW: Accept Snooze parameter
     } = body;
 
     let targetAlbums: Record<string, unknown>[] = [];
@@ -62,6 +63,14 @@ export async function POST(req: Request) {
 
       if (folder) query = query.eq('folder', folder);
 
+      // SERVER-SIDE SNOOZE FILTERING
+      if (autoSnooze) {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        // Select items where last_reviewed_at is NULL OR older than 30 days
+        query = query.or(`last_reviewed_at.is.null,last_reviewed_at.lt.${thirtyDaysAgo.toISOString()}`);
+      }
+
       const { data, error } = await query;
       if (error) throw error;
       const fetched = data || [];
@@ -72,8 +81,6 @@ export async function POST(req: Request) {
         nextCursor = (fetched[fetched.length - 1] as any).id;
       }
 
-      // NO FILTERING: We process everything we fetched.
-      // This ensures we check for upgrades even if data exists.
       targetAlbums = fetched;
     }
 
