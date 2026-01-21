@@ -1,3 +1,4 @@
+// src/app/edit-collection/components/EnrichmentReviewModal.tsx
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -22,8 +23,6 @@ function isImageUrl(url: unknown): boolean {
          url.includes('i.scdn.co') || 
          url.includes('mzstatic.com');
 }
-
-// Helper removed to resolve ESLint 'unused variable' error
 
 function isImageArray(value: unknown): boolean {
   return Array.isArray(value) && value.length > 0 && value.every(v => isImageUrl(v));
@@ -295,10 +294,12 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
   const handleResolve = (conflict: ExtendedFieldConflict, value: unknown, source: string) => {
     const key = `${conflict.album_id}-${conflict.field_name}`;
     
+    // UPDATED: Added new array fields (awards, certifications, samples) to ensure they are handled as mergeable tags
     const MERGEABLE_FIELDS = [
       'genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 
       'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url', 
-      'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger', 'songwriters', 'notes'
+      'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger', 'songwriters', 'notes',
+      'samples', 'sampled_by', 'awards', 'certifications'
     ];
     
     if (MERGEABLE_FIELDS.includes(conflict.field_name)) {
@@ -425,7 +426,9 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
                   const key = `${conflict.album_id}-${conflict.field_name}`;
                   const selected = resolutions[key] || { value: conflict.current_value, source: 'current' };
                   const isImageArrayField = isImageArray(conflict.current_value) || isImageArray(conflict.new_value);
-                  const TEXT_LIST_FIELDS = ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger'];
+                  
+                  // UPDATED: Added new array fields here as well for proper rendering
+                  const TEXT_LIST_FIELDS = ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger', 'samples', 'sampled_by', 'awards', 'certifications'];
                   const isTextListField = TEXT_LIST_FIELDS.includes(conflict.field_name);
                   
                   const toArray = (v: unknown) => {

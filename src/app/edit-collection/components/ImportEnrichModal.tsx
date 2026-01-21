@@ -33,7 +33,13 @@ const ALLOWED_COLUMNS = new Set([
   'songwriters', 'composer', 'conductor', 'orchestra',
   'tempo_bpm', 'musical_key', 'lyrics', 'time_signature', 
   'danceability', 'energy', 'mood_acoustic', 'mood_happy', 'mood_sad',
-  'mood_aggressive', 'mood_electronic', 'mood_party', 'mood_relaxed'
+  'mood_aggressive', 'mood_electronic', 'mood_party', 'mood_relaxed',
+  // --- UNBLOCKED FIELDS ---
+  'samples', 'sampled_by',
+  'is_cover', 'original_artist', 'original_year',
+  'tracks.lyrics', 'tracks.lyrics_url',
+  'cultural_significance', 'recording_location', 'critical_reception', 'awards', 'certifications',
+  'allmusic_rating', 'pitchfork_score'
 ]);
 
 // --- 2. TYPES ---
@@ -78,6 +84,12 @@ type EnrichmentStats = {
   missingLabels?: number;
   missingOriginalDate?: number;
   missingCatalogNumber: number;
+  // --- OPTIONAL STATS FOR NEW CATEGORIES ---
+  missingLyrics?: number;
+  missingReviews?: number;
+  missingChartData?: number;
+  missingSimilar?: number;
+  missingContext?: number;
 };
 
 type Album = {
@@ -1000,6 +1012,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     );
   }
 
+  // --- UPDATED CONFIG WITH NEW CATEGORIES ---
   const dataCategoriesConfig: { category: DataCategory; count: number; subcounts?: { label: string; count: number }[] }[] = stats ? [
     { category: 'artwork', count: stats.missingArtwork, subcounts: [
         { label: 'Back covers', count: stats.missingBackCover },
@@ -1026,7 +1039,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         { label: 'Barcodes', count: stats.missingBarcode || 0 },
         { label: 'Labels', count: stats.missingLabels || 0 },
     ]},
-    { category: 'cultural_context', count: 0, subcounts: [] }, // New category
+    { category: 'lyrics', count: stats.missingLyrics || 0, subcounts: [] },
+    { category: 'reviews', count: stats.missingReviews || 0, subcounts: [] },
+    { category: 'chart_data', count: stats.missingChartData || 0, subcounts: [] },
+    { category: 'cultural_context', count: stats.missingContext || 0, subcounts: [] },
+    { category: 'similar_albums', count: stats.missingSimilar || 0, subcounts: [] },
   ] : [];
 
   return (
