@@ -76,14 +76,12 @@ function AlbumDetailContent() {
 
   const fetchEventData = useCallback(async () => {
     if (!eventId) return;
-    
     try {
       const { data, error } = await supabase
         .from('events')
         .select('*')
         .eq('id', eventId)
         .single();
-
       if (!error && data) {
         setEventData(data as EventData);
       }
@@ -93,310 +91,153 @@ function AlbumDetailContent() {
   }, [eventId]);
 
   useEffect(() => {
-    if (id) {
-      fetchAlbum();
-    }
-    if (eventId) {
-      fetchEventData();
-    }
+    if (id) fetchAlbum();
+    if (eventId) fetchEventData();
   }, [id, eventId, fetchAlbum, fetchEventData]);
 
-  // Handler for side-based queue
   const handleAddToQueue = async (side: string) => {
-    if (!eventId || !album) {
-      setRequestStatus('No event selected');
-      return;
-    }
-
+    if (!eventId || !album) return;
     setSubmittingRequest(true);
     try {
-      const { data: existingRows, error: findErr } = await supabase
+      const { data: existing, error } = await supabase
         .from('requests')
         .select('id, votes')
         .eq('event_id', eventId)
         .eq('album_id', id)
         .eq('side', side)
-        .order('timestamp', { ascending: true })
-        .limit(1);
+        .maybeSingle();
 
-      if (findErr) throw findErr;
-
-      const existing = Array.isArray(existingRows) ? existingRows[0] : null;
+      if (error) throw error;
 
       if (existing) {
-        const newVotes = (existing.votes ?? 0) + 1;
-        const { error: updateErr } = await supabase
-          .from('requests')
-          .update({ votes: newVotes })
-          .eq('id', existing.id);
-
-        if (updateErr) throw updateErr;
-
-        setRequestStatus(`Added vote: ${album.title} — Side ${side}. Votes: x${newVotes}`);
+        await supabase.from('requests').update({ votes: (existing.votes || 1) + 1 }).eq('id', existing.id);
+        setRequestStatus(`Upvoted Side ${side}`);
       } else {
-        const { error: insertErr } = await supabase.from('requests').insert([{
-          album_id: id,
-          artist: album.artist,
-          title: album.title,
-          side: side,
-          event_id: eventId,
-          votes: 1,
-          status: 'open'
+        await supabase.from('requests').insert([{
+          album_id: id, artist: album.artist, title: album.title, side, event_id: eventId, votes: 1, status: 'open'
         }]);
-
-        if (insertErr) throw insertErr;
-
-        setRequestStatus(`Added ${album.title} — Side ${side} to queue! Votes: x1`);
+        setRequestStatus(`Requested Side ${side}`);
       }
     } catch (e) {
       console.error(e);
-      setRequestStatus('Failed to add to queue');
+      setRequestStatus('Error adding to queue');
     } finally {
       setSubmittingRequest(false);
     }
   };
 
-  // Handler for track-based queue
   const handleAddTrackToQueue = async (track: Track) => {
-    if (!eventId || !album) {
-      setRequestStatus('No event selected');
-      return;
-    }
-
+    if (!eventId || !album) return;
     setSubmittingRequest(true);
     try {
-      const { data: existingRows, error: findErr } = await supabase
+      const { data: existing, error } = await supabase
         .from('requests')
         .select('id, votes')
         .eq('event_id', eventId)
         .eq('album_id', id)
         .eq('track_number', track.position || '')
-        .order('timestamp', { ascending: true })
-        .limit(1);
+        .maybeSingle();
 
-      if (findErr) throw findErr;
-
-      const existing = Array.isArray(existingRows) ? existingRows[0] : null;
+      if (error) throw error;
 
       if (existing) {
-        const newVotes = (existing.votes ?? 0) + 1;
-        const { error: updateErr } = await supabase
-          .from('requests')
-          .update({ votes: newVotes })
-          .eq('id', existing.id);
-
-        if (updateErr) throw updateErr;
-
-        setRequestStatus(`Added vote: ${track.title || track.name}. Votes: x${newVotes}`);
+        await supabase.from('requests').update({ votes: (existing.votes || 1) + 1 }).eq('id', existing.id);
+        setRequestStatus(`Upvoted: ${track.title}`);
       } else {
-        const { error: insertErr } = await supabase.from('requests').insert([{
-          album_id: id,
-          artist: track.artist || album.artist,
-          title: track.title || track.name,
-          track_number: track.position || '',
-          track_name: track.title || track.name,
-          track_duration: track.duration || '',
-          event_id: eventId,
-          votes: 1,
-          status: 'open',
-          side: null
+        await supabase.from('requests').insert([{
+          album_id: id, artist: track.artist || album.artist, title: track.title || track.name,
+          track_number: track.position || '', track_name: track.title || track.name,
+          track_duration: track.duration || '', event_id: eventId, votes: 1, status: 'open', side: null
         }]);
-
-        if (insertErr) throw insertErr;
-
-        setRequestStatus(`Added "${track.title || track.name}" to queue! Votes: x1`);
+        setRequestStatus(`Requested: ${track.title}`);
       }
     } catch (e) {
       console.error(e);
-      setRequestStatus('Failed to add to queue');
+      setRequestStatus('Error adding track');
     } finally {
       setSubmittingRequest(false);
     }
   };
 
-  // Handler for album-based queue
   const handleAddAlbumToQueue = async () => {
-    if (!eventId || !album) {
-      setRequestStatus('No event selected');
-      return;
-    }
-
+    if (!eventId || !album) return;
     setSubmittingRequest(true);
     try {
-      const { data: existingRows, error: findErr } = await supabase
+      const { data: existing, error } = await supabase
         .from('requests')
         .select('id, votes')
         .eq('event_id', eventId)
         .eq('album_id', id)
         .is('side', null)
         .is('track_number', null)
-        .order('timestamp', { ascending: true })
-        .limit(1);
+        .maybeSingle();
 
-      if (findErr) throw findErr;
-
-      const existing = Array.isArray(existingRows) ? existingRows[0] : null;
+      if (error) throw error;
 
       if (existing) {
-        const newVotes = (existing.votes ?? 0) + 1;
-        const { error: updateErr } = await supabase
-          .from('requests')
-          .update({ votes: newVotes })
-          .eq('id', existing.id);
-
-        if (updateErr) throw updateErr;
-
-        setRequestStatus(`Added vote for full album: ${album.title}. Votes: x${newVotes}`);
+        await supabase.from('requests').update({ votes: (existing.votes || 1) + 1 }).eq('id', existing.id);
+        setRequestStatus(`Upvoted Album`);
       } else {
-        const { error: insertErr } = await supabase.from('requests').insert([{
-          album_id: id,
-          artist: album.artist,
-          title: album.title,
-          side: null,
-          track_number: null,
-          track_name: null,
-          event_id: eventId,
-          votes: 1,
-          status: 'open'
+        await supabase.from('requests').insert([{
+          album_id: id, artist: album.artist, title: album.title, side: null, track_number: null,
+          track_name: null, event_id: eventId, votes: 1, status: 'open'
         }]);
-
-        if (insertErr) throw insertErr;
-
-        setRequestStatus(`Added full album "${album.title}" to queue! Votes: x1`);
+        setRequestStatus(`Requested Album`);
       }
     } catch (e) {
       console.error(e);
-      setRequestStatus('Failed to add to queue');
+      setRequestStatus('Error adding album');
     } finally {
       setSubmittingRequest(false);
     }
   };
 
-  const goToEvent = () => {
-    if (eventId) {
-      router.push(`/events/event-detail/${eventId}`);
-    }
-  };
-
-  const goToBrowse = () => {
-    if (eventId) {
-      router.push(`/browse/browse-albums?eventId=${eventId}`);
-    } else {
-      router.push('/browse/browse-albums');
-    }
-  };
-
-  const goToQueue = () => {
-    if (eventId) {
-      router.push(`/browse/browse-queue?eventId=${eventId}`);
-    }
-  };
+  const goToEvent = () => router.push(`/events/event-detail/${eventId}`);
+  const goToBrowse = () => router.push(`/browse/browse-albums?eventId=${eventId}`);
+  const goToQueue = () => router.push(`/browse/browse-queue?eventId=${eventId}`);
 
   const getAvailableSides = () => {
     const sides = new Set<string>();
-    
     if (album?.tracklists) {
       try {
-        const parsedTracks = JSON.parse(album.tracklists);
-        
-        if (Array.isArray(parsedTracks)) {
-          parsedTracks.forEach(track => {
-            if (track.position) {
-              const sideMatch = track.position.match(/^([A-Z])/);
-              if (sideMatch) {
-                sides.add(sideMatch[1]);
-              }
-            }
-          });
-        }
+        const parsed = JSON.parse(album.tracklists);
+        if (Array.isArray(parsed)) parsed.forEach(t => t.position?.match(/^([A-Z])/) && sides.add(t.position.match(/^([A-Z])/)[1]));
       } catch {
-        const trackLines = album.tracklists.split('\n').filter(track => track.trim());
-        trackLines.forEach(track => {
-          const sideMatch = track.match(/^([A-Z])\d+/);
-          if (sideMatch) {
-            sides.add(sideMatch[1]);
-          }
-        });
+        album.tracklists.split('\n').forEach(t => t.match(/^([A-Z])\d+/) && sides.add(t.match(/^([A-Z])\d+/)[1]));
       }
     }
-    
-    if (sides.size === 0 && album?.sides) {
-      Object.keys(album.sides).forEach(side => {
-        sides.add(side.toUpperCase());
-      });
-    }
-    
-    if (sides.size === 0) {
-      sides.add('A');
-      sides.add('B');
-    }
-    
+    if (sides.size === 0 && album?.sides) Object.keys(album.sides).forEach(s => sides.add(s.toUpperCase()));
+    if (sides.size === 0) { sides.add('A'); sides.add('B'); }
     return Array.from(sides).sort();
   };
 
   const getTracksList = (): Track[] => {
     if (!album?.tracklists) return [];
-
     try {
-      const parsedTracks = JSON.parse(album.tracklists);
-      
-      if (Array.isArray(parsedTracks)) {
-        return parsedTracks;
-      }
-      return [];
+      const parsed = JSON.parse(album.tracklists);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      // Parse plain text format
-      return album.tracklists.split('\n').filter(track => track.trim()).map((track, index) => {
-        const trackMatch = track.trim().match(/^(\d+\.?\s*)?(.+)$/);
-        const trackName = trackMatch ? trackMatch[2] : track.trim();
-        
-        return {
-          position: String(index + 1),
-          title: trackName,
-          artist: album.artist,
-          duration: '--:--'
-        };
+      return album.tracklists.split('\n').filter(t => t.trim()).map((t, i) => {
+        const match = t.trim().match(/^(\d+\.?\s*)?(.+)$/);
+        return { position: String(i + 1), title: match ? match[2] : t.trim(), artist: album.artist, duration: '--:--' };
       });
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
-        <p className="text-xl animate-pulse">Loading album...</p>
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-white"><div className="text-xl font-light tracking-widest animate-pulse">LOADING</div></div>;
+  if (error) return <div className="min-h-screen bg-black flex items-center justify-center text-red-500">Error: {error}</div>;
+  if (!album) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Album not found</div>;
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-red-400">
-        <p className="text-xl">Error: {error}</p>
-      </div>
-    );
-  }
-
-  if (!album) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
-        <p className="text-xl">Album not found</p>
-      </div>
-    );
-  }
-
-  const imageUrl = album.image_url && album.image_url.toLowerCase() !== 'no' 
-    ? album.image_url 
-    : '/images/coverplaceholder.png';
-
-  // Handle both old queue_type (singular) and new queue_types (array)
+  const imageUrl = album.image_url && album.image_url.toLowerCase() !== 'no' ? album.image_url : '/images/coverplaceholder.png';
   const queueTypes = eventData?.queue_types || (eventData?.queue_type ? [eventData.queue_type] : ['side']);
   const queueTypesArray = Array.isArray(queueTypes) ? queueTypes : [queueTypes];
 
   return (
-    <div className="min-h-screen relative font-sans text-white">
+    <div className="min-h-screen relative font-sans text-white bg-black selection:bg-blue-500 selection:text-white">
       
-      {/* 1. SMART BACKGROUND (Fixed, Blurred, Scaled) */}
-      <div className="fixed inset-0 w-full h-full -z-50 bg-black">
+      {/* --- BACKGROUND LAYER --- */}
+      {/* 1. The blurred image provides the "smart color" ambience. */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
         <Image
           src={imageUrl}
           alt=""
@@ -405,312 +246,179 @@ function AlbumDetailContent() {
           priority
           unoptimized
         />
-        {/* Dark overlay to ensure contrast base */}
-        <div className="absolute inset-0 bg-black/40" />
+        {/* 2. A gradient overlay ensures text at the bottom is always readable against the color. */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/90" />
       </div>
 
-      {/* Spacer for Main Header (pushes content below the fixed site nav) */}
-      <div className="h-[80px]" />
+      {/* Spacer to push content below the Fixed Main Navigation (approx 72px) */}
+      <div className="h-[72px]" />
 
-      {/* 2. SECONDARY HEADER (Sticky) 
-          top-[57px] accounts for the Scrolled Main Header height (~57px) 
-      */}
+      {/* --- SECONDARY HEADER --- */}
+      {/* Sticky positioning at 57px (height of main nav when scrolled) to lock them together */}
       {eventId && (
-        <div className="sticky top-[57px] z-40 bg-black/80 backdrop-blur-xl border-b border-white/10 p-3 pl-4 md:pl-16 flex gap-4 items-center flex-wrap shadow-2xl">
-          <button
-            onClick={goToBrowse}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-2 text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95"
-          >
-            ← Browse Collection
-          </button>
-          
-          <button
-            onClick={goToQueue}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95"
-          >
-            🎵 View Queue
-          </button>
-
-          <button
-            onClick={goToEvent}
-            className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-4 py-2 text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95"
-          >
-            📅 Event Details
-          </button>
-
-          {eventData && (
-            <span className="text-gray-300 text-sm ml-auto font-medium hidden md:block">
-              Event: <span className="text-white">{eventData.title}</span>
-            </span>
-          )}
+        <div className="sticky top-[57px] z-40 bg-black/90 border-b border-white/10 shadow-2xl backdrop-blur-md">
+          <div className="container mx-auto px-4 py-3 flex gap-4 items-center justify-between">
+            <div className="flex gap-3">
+              <button onClick={goToBrowse} className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all">
+                ← Browse
+              </button>
+              <button onClick={goToQueue} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)]">
+                Queue
+              </button>
+            </div>
+            {eventData && (
+               <div 
+                 className="text-right hidden sm:block cursor-pointer hover:opacity-80 transition-opacity"
+                 onClick={goToEvent}
+               >
+                 <div className="text-[10px] text-gray-400 uppercase tracking-widest">Event</div>
+                 <div className="text-xs font-bold text-white">{eventData.title}</div>
+               </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* 3. MAIN CONTENT AREA */}
-      <div className="relative z-10 container mx-auto px-4 py-12 flex flex-col md:flex-row gap-8 md:gap-12 items-start">
-        <div className="relative group shrink-0 mx-auto md:mx-0">
-          <Image
-            src={imageUrl}
-            alt={`${album.artist} - ${album.title}`}
-            width={350}
-            height={350}
-            className="rounded-xl shadow-2xl w-[250px] h-[250px] md:w-[350px] md:h-[350px] object-cover ring-1 ring-white/20"
-            unoptimized
-          />
+      {/* --- ALBUM HEADER CONTENT --- */}
+      <div className="relative z-10 container mx-auto px-4 py-12 flex flex-col md:flex-row gap-10 items-start">
+        {/* Cover Art - High Elevation Shadow */}
+        <div className="relative shrink-0 mx-auto md:mx-0 w-[280px] md:w-[350px]">
+          <div className="aspect-square relative rounded-lg shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 overflow-hidden">
+            <Image
+              src={imageUrl}
+              alt={album.title}
+              fill
+              className="object-cover"
+              priority
+              unoptimized
+            />
+          </div>
         </div>
         
-        <div className="flex-1 flex flex-col justify-center w-full">
-          <h1 className="text-4xl md:text-6xl font-black mb-2 leading-tight tracking-tight drop-shadow-xl text-white">
+        {/* Info */}
+        <div className="flex-1 w-full pt-2">
+          <h1 className="text-4xl md:text-6xl font-black text-white leading-tight mb-2 drop-shadow-lg">
             {album.title}
-            {album.is_1001 ? (
-              <span 
-                title="On the 1001 Albums list" 
-                className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold leading-none border border-white/30 bg-black/60 text-white ml-3 align-middle -translate-y-2"
-              >
-                1001
-              </span>
-            ) : null}
           </h1>
-          <h2 className="text-2xl md:text-3xl text-gray-200 font-bold mb-4 drop-shadow-md">{album.artist}</h2>
+          <h2 className="text-2xl md:text-3xl text-gray-200 font-medium mb-6 drop-shadow-md">
+            {album.artist}
+          </h2>
           
-          <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-300 font-medium uppercase tracking-widest mb-6">
-            {album.year && <span>Year: <span className="text-white">{album.year}</span></span>}
-            {album.year && album.format && <span className="text-gray-500">•</span>}
-            {album.format && <span>Format: <span className="text-white">{album.format}</span></span>}
-            {album.format && album.folder && <span className="text-gray-500">•</span>}
-            {album.folder && <span>Category: <span className="text-white">{album.folder}</span></span>}
+          <div className="flex flex-wrap gap-2 mb-6">
+            {[album.year, album.format, album.folder].filter(Boolean).map((tag, i) => (
+              <span key={i} className="px-3 py-1 bg-white/10 backdrop-blur-md rounded border border-white/10 text-xs font-bold uppercase tracking-wider text-gray-200">
+                {tag}
+              </span>
+            ))}
+            {album.is_1001 && (
+              <span className="px-3 py-1 bg-yellow-500/20 border border-yellow-500/50 text-yellow-200 rounded text-xs font-bold uppercase tracking-wider">
+                ★ 1001 Albums
+              </span>
+            )}
           </div>
-          
-          {album.media_condition && (
-            <div className="inline-block bg-black/40 border border-white/10 rounded px-3 py-1 text-sm text-gray-300 mb-4 self-start backdrop-blur-sm">
-              Condition: <span className="text-white font-semibold">{album.media_condition}</span>
-            </div>
-          )}
-          
+
           {album.notes && (
-            <div className="p-4 bg-black/40 rounded-xl backdrop-blur-md border border-white/10 max-w-2xl shadow-lg">
-              <strong className="block text-gray-400 text-xs uppercase tracking-wider mb-1">Notes</strong>
-              <p className="text-gray-100 leading-relaxed">{album.notes}</p>
+            <div className="bg-black/30 backdrop-blur-md p-4 rounded-lg border border-white/5 mb-8 text-gray-300 text-sm leading-relaxed max-w-2xl">
+              {album.notes}
             </div>
           )}
 
-          {/* Queue Actions */}
+          {/* Voting / Request Section */}
           {eventId && eventData?.has_queue && (
-            <div className="mt-8 pt-8 border-t border-white/10">
+            <div className="bg-black/40 backdrop-blur-md p-5 rounded-xl border border-white/10">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-white">Make a Request</h3>
+                {requestStatus && <span className="text-xs font-bold text-emerald-400 animate-pulse">{requestStatus}</span>}
+              </div>
+
               {queueTypesArray.includes('side') && (
-                <>
-                  <h3 className="text-white mb-4 text-lg font-bold flex items-center gap-2">
-                    <span className="text-blue-400">●</span> Add Side to Queue
-                  </h3>
-                  <div className="flex flex-wrap gap-3 mb-6">
-                    {getAvailableSides().map((side, index) => (
-                      <button
-                        key={side}
-                        onClick={() => handleAddToQueue(side)}
-                        disabled={submittingRequest}
-                        className={`px-6 py-3 rounded-lg font-bold text-white shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed
-                          ${index % 4 === 0 ? 'bg-blue-600 hover:bg-blue-500' : 
-                            index % 4 === 1 ? 'bg-emerald-600 hover:bg-emerald-500' : 
-                            index % 4 === 2 ? 'bg-amber-600 hover:bg-amber-500' : 'bg-red-600 hover:bg-red-500'}`}
-                      >
-                        Side {side}
-                      </button>
-                    ))}
-                  </div>
-                </>
+                <div className="flex flex-wrap gap-2">
+                  {getAvailableSides().map((side) => (
+                    <button
+                      key={side}
+                      onClick={() => handleAddToQueue(side)}
+                      disabled={submittingRequest}
+                      className="px-6 py-3 bg-white text-black hover:bg-gray-200 rounded-lg font-bold text-sm transition-transform active:scale-95 disabled:opacity-50"
+                    >
+                      Side {side}
+                    </button>
+                  ))}
+                </div>
               )}
 
               {queueTypesArray.includes('album') && (
-                <>
-                  <h3 className="text-white mb-4 text-lg font-bold flex items-center gap-2">
-                    <span className="text-purple-400">●</span> Add Album to Queue
-                  </h3>
-                  <button
-                    onClick={handleAddAlbumToQueue}
-                    disabled={submittingRequest}
-                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl px-8 py-4 font-bold text-lg shadow-xl shadow-purple-900/30 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mb-6 flex items-center gap-3"
-                  >
-                    💿 Request Full Album
-                  </button>
-                </>
-              )}
-              
-              {requestStatus && (
-                <div className={`inline-block px-4 py-2 rounded-lg font-bold text-sm backdrop-blur-md shadow-lg ${
-                  requestStatus.includes('Error') || requestStatus.includes('Failed') 
-                    ? 'bg-red-500/20 text-red-100 border border-red-500/30' 
-                    : 'bg-emerald-500/20 text-emerald-100 border border-emerald-500/30'
-                }`}>
-                  {requestStatus}
-                </div>
+                <button
+                  onClick={handleAddAlbumToQueue}
+                  disabled={submittingRequest}
+                  className="w-full sm:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-sm transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] active:scale-95"
+                >
+                  Request Full Album
+                </button>
               )}
             </div>
           )}
         </div>
       </div>
 
-      {/* 4. TRACK LISTING (Contrasted Container) */}
-      {album?.tracklists && (
+      {/* --- TRACK LISTING --- */}
+      {/* High contrast container: Black background with blur to ensure readability over the colorful background */}
+      {(album?.tracklists || album?.sides) && (
         <div className="relative z-10 container mx-auto px-4 pb-24 max-w-5xl">
-          <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
-            <div className="p-6 border-b border-white/10 bg-white/5">
-              <h3 className="text-2xl font-bold text-white flex items-center gap-3">
-                Track Listing
-                {queueTypesArray.includes('track') && eventId && eventData?.has_queue && (
-                  <span className="text-sm font-normal text-gray-400 bg-black/40 px-2 py-1 rounded ml-auto">
-                    Tap + to add tracks
-                  </span>
-                )}
-              </h3>
-            </div>
-            
-            <div className="grid grid-cols-[auto_1fr_1fr_auto_auto] gap-4 px-4 py-3 border-b border-white/10 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 bg-black/20">
-              <div className="text-center w-8">#</div>
-              <div>Title</div>
-              <div className="hidden md:block">Artist</div>
-              <div className="text-right">Time</div>
-              {queueTypesArray.includes('track') && eventId && eventData?.has_queue && (
-                <div className="text-center w-16">Add</div>
+          <div className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-white/10 bg-white/5 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-white uppercase tracking-widest">Track Listing</h3>
+              {queueTypesArray.includes('track') && (
+                <span className="text-[10px] uppercase font-bold text-gray-500 bg-black/50 px-2 py-1 rounded">Tap + to add</span>
               )}
             </div>
             
-            <div className="space-y-0">
-              {(() => {
-                const tracks = getTracksList();
-                const blockedTracks = album.blocked_tracks || [];
-                
-                return tracks.map((track, index) => {
-                  const blockedInfo = blockedTracks.find(bt => bt.position === track.position);
-                  const isBlocked = !!blockedInfo;
-                  
+            <div className="divide-y divide-white/5">
+              {album.tracklists ? (
+                getTracksList().map((track, i) => {
+                  const blocked = album.blocked_tracks?.find(b => b.position === track.position);
                   return (
-                    <div 
-                      key={index} 
-                      className={`grid grid-cols-[auto_1fr_1fr_auto_auto] gap-4 px-4 py-4 items-center group border-b border-white/5 last:border-0 transition-colors ${
-                        isBlocked ? 'opacity-50 grayscale bg-red-900/10' : 'hover:bg-white/10'
-                      }`}
-                    >
-                      <div className="text-center w-8 text-gray-500 font-mono text-sm flex justify-center items-center gap-1">
-                        {track.position || index + 1}
-                        {isBlocked && (
-                          <span 
-                            title={blockedInfo.reason || 'Track blocked'}
-                            className="w-4 h-4 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center cursor-help"
-                          >
-                            !
-                          </span>
-                        )}
+                    <div key={i} className={`group flex items-center p-4 hover:bg-white/5 transition-colors ${blocked ? 'opacity-40 grayscale' : ''}`}>
+                      <span className="w-8 text-sm font-mono text-gray-500 text-center">{track.position || i + 1}</span>
+                      <div className="flex-1 px-4 min-w-0">
+                        <div className="text-sm font-bold text-white truncate">{track.title || track.name}</div>
+                        <div className="text-xs text-gray-400 truncate">{track.artist || album.artist}</div>
                       </div>
-                      <div className="font-bold text-gray-200 group-hover:text-white transition-colors">
-                        {track.title || track.name || 'Unknown Track'}
-                        {isBlocked && (
-                          <span className="ml-2 text-xs text-red-300 italic">
-                            ({blockedInfo.reason || 'Blocked'})
-                          </span>
-                        )}
-                      </div>
-                      <div className="hidden md:block text-gray-400 text-sm">
-                        {track.artist || album.artist}
-                      </div>
-                      <div className="text-right text-gray-500 text-sm font-mono">
-                        {track.duration || '--:--'}
-                      </div>
-                      {queueTypesArray.includes('track') && eventId && eventData?.has_queue && (
-                        <div className="text-center w-16 flex justify-center">
-                          <button
-                            onClick={() => handleAddTrackToQueue(track)}
-                            disabled={submittingRequest || isBlocked}
-                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                              isBlocked 
-                                ? 'bg-gray-800 text-gray-600 cursor-not-allowed' 
-                                : 'bg-white/10 hover:bg-blue-600 text-white hover:scale-110 active:scale-95'
-                            }`}
-                            title={isBlocked ? blockedInfo.reason || 'Track blocked' : 'Add to queue'}
-                          >
-                            {isBlocked ? '✕' : '+'}
-                          </button>
-                        </div>
+                      <span className="text-xs font-mono text-gray-600 mr-4">{track.duration || '--:--'}</span>
+                      {queueTypesArray.includes('track') && eventId && eventData?.has_queue && !blocked && (
+                        <button
+                          onClick={() => handleAddTrackToQueue(track)}
+                          disabled={submittingRequest}
+                          className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-blue-600 hover:scale-110 transition-all"
+                        >
+                          +
+                        </button>
                       )}
                     </div>
                   );
-                });
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Sides Listing (for records without detailed tracks) */}
-      {!album?.tracklists && album?.sides && (
-        <div className="relative z-10 container mx-auto px-4 pb-24 max-w-5xl">
-          <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl p-8">
-            <h3 className="text-2xl font-bold mb-8 text-white">Album Sides</h3>
-            
-            {Object.entries(album.sides).map(([sideName, tracks]) => {
-              const blockedTracks = album.blocked_tracks || [];
-              
-              return (
-                <div key={sideName} className="mb-8 last:mb-0">
-                  <div className="flex items-center gap-4 mb-4">
-                    <h4 className="text-xl font-bold text-white bg-white/10 px-3 py-1 rounded">Side {sideName}</h4>
-                    <div className="h-px flex-1 bg-white/10"></div>
-                  </div>
-                  
-                  <div className="grid grid-cols-[auto_1fr_1fr_auto] gap-4 px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                    <div className="w-8 text-center">#</div>
-                    <div>Title</div>
-                    <div>Artist</div>
-                    <div className="text-right">Time</div>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    {Array.isArray(tracks) ? tracks.map((track, index) => {
-                      const trackPosition = `${sideName}${index + 1}`;
-                      const blockedInfo = blockedTracks.find(bt => bt.position === trackPosition);
-                      const isBlocked = !!blockedInfo;
-                      
-                      return (
-                        <div 
-                          key={index} 
-                          className={`grid grid-cols-[auto_1fr_1fr_auto] gap-4 px-4 py-3 rounded-lg items-center transition-colors ${
-                            isBlocked ? 'opacity-50 bg-red-900/10' : 'hover:bg-white/10 bg-white/5'
-                          }`}
-                        >
-                          <div className="w-8 text-center text-gray-500 font-mono text-sm flex justify-center gap-1">
-                            {index + 1}
-                            {isBlocked && <span className="text-red-500 text-xs">!</span>}
-                          </div>
-                          <div className="font-medium text-gray-200">
-                            {typeof track === 'string' ? track : (track as Track).title || (track as Track).name || 'Unknown Track'}
-                          </div>
-                          <div className="text-gray-400 text-sm">
-                            {typeof track === 'object' && (track as Track).artist ? (track as Track).artist : album.artist}
-                          </div>
-                          <div className="text-right text-gray-500 text-sm font-mono">
-                            {typeof track === 'object' && (track as Track).duration ? (track as Track).duration : '--:--'}
-                          </div>
+                })
+              ) : (
+                Object.entries(album.sides || {}).map(([side, tracks]) => (
+                  <div key={side}>
+                    <div className="px-4 py-2 bg-white/5 text-xs font-bold text-gray-400 uppercase tracking-widest border-y border-white/5">Side {side}</div>
+                    {Array.isArray(tracks) && tracks.map((track, i) => (
+                      <div key={i} className="flex items-center p-4 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0">
+                        <span className="w-8 text-sm font-mono text-gray-500 text-center">{i + 1}</span>
+                        <div className="flex-1 px-4 font-medium text-gray-200">
+                          {typeof track === 'string' ? track : (track.title || track.name)}
                         </div>
-                      );
-                    }) : (
-                      <div className="grid grid-cols-[auto_1fr_1fr_auto] gap-4 px-4 py-3 rounded-lg items-center bg-white/5">
-                        <div className="w-8 text-center text-gray-500">1</div>
-                        <div className="font-medium text-white italic">
-                          {typeof tracks === 'string' ? tracks : 'No track information'}
-                        </div>
-                        <div className="text-gray-400">{album.artist}</div>
-                        <div className="text-right text-gray-500">--:--</div>
                       </div>
-                    )}
+                    ))}
                   </div>
-                </div>
-              );
-            })}
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
     </div>
   );
 }
+
 export default function AlbumDetailPage() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
