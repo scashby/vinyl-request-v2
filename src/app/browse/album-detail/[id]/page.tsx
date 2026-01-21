@@ -400,24 +400,36 @@ function AlbumDetailContent() {
     ? album.image_url 
     : '/images/coverplaceholder.png';
 
-  // Handle both old queue_type (singular) and new queue_types (array)
   const queueTypes = eventData?.queue_types || (eventData?.queue_type ? [eventData.queue_type] : ['side']);
   const queueTypesArray = Array.isArray(queueTypes) ? queueTypes : [queueTypes];
 
   return (
-    // FIX: Main container padding pushes content down so it doesn't hide behind the fixed header
-    <div className="min-h-screen bg-gray-900 text-white relative overflow-hidden font-sans pt-[120px]">
-      {/* Background Blur */}
-      {/* FIX: Added quotes to url to prevent syntax errors */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center blur-3xl opacity-30 scale-110 pointer-events-none"
-        style={{ backgroundImage: `url('${imageUrl}')` }}
-      />
+    // FIX: Removed fixed padding. Added min-h-screen relative to establish positioning context.
+    <div className="min-h-screen bg-gray-900 text-white relative font-sans">
+      
+      {/* FIX: Background Image Implementation 
+        Using Next.js Image component with fixed positioning at the bottom of the stack (-z-10)
+      */}
+      <div className="fixed inset-0 w-full h-full -z-10">
+        <Image
+          src={imageUrl}
+          alt="Background"
+          fill
+          className="object-cover blur-3xl opacity-30 scale-110"
+          priority
+          unoptimized
+        />
+        {/* Overlay to ensure text readability */}
+        <div className="absolute inset-0 bg-gray-900/50" />
+      </div>
 
-      {/* Top Navigation Bar */}
-      {/* FIX: Changed to fixed position to stay at top */}
+      {/* FIX: Menu Bar
+        Changed from 'fixed' to 'sticky top-0'.
+        This puts it in normal flow (so it doesn't cover content) 
+        but sticks to the top when scrolling.
+      */}
       {eventId && (
-        <div className="fixed top-0 left-0 w-full z-50 bg-black/80 backdrop-blur-md border-b border-white/10 p-3 pl-16 flex gap-4 items-center flex-wrap shadow-lg">
+        <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-md border-b border-white/10 p-3 pl-4 md:pl-16 flex gap-4 items-center flex-wrap shadow-lg">
           <button
             onClick={goToBrowse}
             className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-2 text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95"
@@ -447,7 +459,7 @@ function AlbumDetailContent() {
         </div>
       )}
 
-      {/* Album Header */}
+      {/* Album Header - Added top padding to create breathing room from the nav */}
       <div className="relative z-10 container mx-auto px-4 py-12 flex flex-col md:flex-row gap-8 md:gap-12 items-start">
         <div className="relative group shrink-0 mx-auto md:mx-0">
           <Image
