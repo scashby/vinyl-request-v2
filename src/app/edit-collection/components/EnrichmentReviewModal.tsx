@@ -1,7 +1,7 @@
 // src/app/edit-collection/components/EnrichmentReviewModal.tsx
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { type ExtendedFieldConflict } from './ImportEnrichModal';
 import { SERVICE_ICONS } from 'lib/enrichment-data-mapping';
 
@@ -34,7 +34,9 @@ function toTitleCase(str: string): string {
   return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 }
 
-function ImageGridSelector({
+// --- MEMOIZED SUB-COMPONENTS TO FIX PERFORMANCE ---
+
+const ImageGridSelector = React.memo(({
   images,
   selectedImages,
   onToggle,
@@ -46,7 +48,7 @@ function ImageGridSelector({
   onToggle: (url: string) => void;
   label: string;
   color: 'green' | 'blue';
-}) {
+}) => {
   const isGreen = color === 'green';
   const borderColor = isGreen ? 'border-[#10b981]' : 'border-[#3b82f6]';
   const bgColor = isGreen ? 'bg-[#f0fdf4]' : 'bg-[#eff6ff]';
@@ -59,32 +61,30 @@ function ImageGridSelector({
         <span>{label} ({images.length})</span>
         <span>{Array.from(selectedImages).filter(img => images.includes(img)).length} Selected</span>
       </div>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
         {images.map((url, idx) => {
           const isSelected = selectedImages.has(url);
           return (
             <div 
               key={`${idx}-${url}`} 
               onClick={() => onToggle(url)}
-              className={`relative aspect-square rounded overflow-hidden cursor-pointer border transition-all ${
-                isSelected ? `border-[3px] ${borderSelected} opacity-100` : 'border-gray-300 opacity-60 hover:opacity-80'
+              className={`relative aspect-square rounded overflow-hidden cursor-pointer border-2 transition-all ${
+                isSelected ? `border-[3px] ${borderSelected} opacity-100 shadow-md` : 'border-gray-300 opacity-80 hover:opacity-100'
               }`}
             >
-              <div className="absolute top-1 left-1 z-20">
+              <div className="absolute top-1 left-1 z-20 pointer-events-none">
                 <input 
                   type="checkbox" 
                   checked={isSelected} 
                   readOnly 
-                  className="w-5 h-5 cursor-pointer accent-blue-600 shadow-md border-white border"
+                  className={`w-5 h-5 accent-${isGreen ? 'emerald' : 'blue'}-600 shadow-sm border-white border rounded`}
                 />
               </div>
-              
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
                 src={url} 
                 alt="" 
                 className="w-full h-full object-cover" 
-                style={{ minWidth: '100%', minHeight: '100%' }}
                 loading="lazy"
               />
             </div>
@@ -93,9 +93,10 @@ function ImageGridSelector({
       </div>
     </div>
   );
-}
+});
+ImageGridSelector.displayName = 'ImageGridSelector';
 
-function ArrayChipSelector({
+const ArrayChipSelector = React.memo(({
   items,
   selectedItems,
   onToggle,
@@ -107,7 +108,7 @@ function ArrayChipSelector({
   onToggle: (item: string) => void;
   label: string;
   color: 'green' | 'blue';
-}) {
+}) => {
   const isGreen = color === 'green';
   const borderColor = isGreen ? 'border-[#10b981]' : 'border-[#3b82f6]';
   const bgColor = isGreen ? 'bg-[#f0fdf4]' : 'bg-[#eff6ff]';
@@ -116,7 +117,6 @@ function ArrayChipSelector({
   const activeBg = isGreen ? 'bg-[#047857]' : 'bg-[#1d4ed8]';
   const activeBorder = isGreen ? 'border-[#047857]' : 'border-[#1d4ed8]';
 
-  // Deduplicate items for display
   const uniqueItems = Array.from(new Set(items));
 
   return (
@@ -134,7 +134,7 @@ function ArrayChipSelector({
               className={`px-2.5 py-1 rounded-2xl text-xs cursor-pointer border transition-all flex items-center gap-1 ${
                 isSelected 
                   ? `${activeBg} ${activeBorder} text-white` 
-                  : 'bg-white border-gray-300 text-gray-700'
+                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
               }`}
             >
               {isSelected && <span>✓</span>}
@@ -145,9 +145,10 @@ function ArrayChipSelector({
       </div>
     </div>
   );
-}
+});
+ArrayChipSelector.displayName = 'ArrayChipSelector';
 
-function ConflictValue({ 
+const ConflictValue = React.memo(({ 
   value, 
   onClick, 
   isSelected, 
@@ -161,7 +162,7 @@ function ConflictValue({
   label: string;
   color: 'green' | 'blue';
   isMultiSelect?: boolean; 
-}) {
+}) => {
   const [dimensions, setDimensions] = useState<{ w: number, h: number } | null>(null);
   const [isImage, setIsImage] = useState(false);
 
@@ -187,20 +188,19 @@ function ConflictValue({
   const ContentWrapper = ({ children }: { children: React.ReactNode }) => (
     <div 
       onClick={onClick} 
-      className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 flex flex-col gap-2 relative ${borderColor} ${bgColor}`}
+      className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 flex flex-col gap-2 relative h-full w-full ${borderColor} ${bgColor} hover:shadow-sm`}
     >
       <div className={`text-[11px] font-bold uppercase flex justify-between items-center gap-1.5 ${labelColor}`}>
-        <div className="flex items-center gap-2">
-           {/* Explicit Checkbox/Radio for Selection */}
+        <div className="flex items-center gap-2 w-full">
            <input 
              type={isMultiSelect ? "checkbox" : "radio"} 
              checked={isSelected} 
              readOnly 
-             className={`cursor-pointer w-4 h-4 accent-${isGreen ? 'emerald' : 'blue'}-600`}
+             className={`cursor-pointer w-4 h-4 accent-${isGreen ? 'emerald' : 'blue'}-600 shrink-0`}
            />
-           <div className="flex items-center gap-1">
-             <span>{getIcon(label)}</span>
-             <span>{label} {isImage && dimensions && `(${dimensions.w}x${dimensions.h})`}</span>
+           <div className="flex items-center gap-1 flex-1 min-w-0">
+             <span className="shrink-0">{getIcon(label)}</span>
+             <span className="truncate" title={label}>{label} {isImage && dimensions && `(${dimensions.w}x${dimensions.h})`}</span>
            </div>
         </div>
       </div>
@@ -217,7 +217,11 @@ function ConflictValue({
             src={value} 
             alt={label}
             className="w-full h-full object-contain"
-            onLoad={(e) => setDimensions({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+            onLoad={(e) => {
+                if (!dimensions) {
+                    setDimensions({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight });
+                }
+            }}
             onError={() => setIsImage(false)}
             loading="lazy" 
           />
@@ -263,7 +267,197 @@ function ConflictValue({
       </div>
     </ContentWrapper>
   );
-}
+});
+ConflictValue.displayName = 'ConflictValue';
+
+
+// --- CONFLICT ROW COMPONENT (Isolates renders per row) ---
+const ConflictRow = React.memo(({
+    conflict,
+    resolutions,
+    finalizedFields,
+    onResolve,
+    onFinalize
+}: {
+    conflict: ExtendedFieldConflict;
+    resolutions: Record<string, { value: unknown, source: string, selectedSources?: string[] }>;
+    finalizedFields: Record<string, boolean>;
+    onResolve: (conflict: ExtendedFieldConflict, value: unknown, source: string) => void;
+    onFinalize: (key: string, val: boolean) => void;
+}) => {
+    const key = `${conflict.album_id}-${conflict.field_name}`;
+    const selected = resolutions[key] || { value: conflict.current_value, source: 'current' };
+    const isImageArrayField = isImageArray(conflict.current_value) || isImageArray(conflict.new_value);
+    
+    const TEXT_LIST_FIELDS = ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger', 'samples', 'sampled_by', 'awards', 'certifications'];
+    const isTextListField = TEXT_LIST_FIELDS.includes(conflict.field_name);
+    const isNotesField = conflict.field_name === 'notes';
+    
+    // Treat Notes as a multi-select field for the purpose of the UI
+    const isMultiSelect = isTextListField || isNotesField;
+
+    const toArray = (v: unknown) => {
+        if (Array.isArray(v)) return v.map(String);
+        if (!v) return [];
+        return String(v).split(/,\s*/).map(s => s.trim()).filter(Boolean);
+    };
+
+    if (isTextListField) {
+        const allCurrent = toArray(conflict.current_value).map(toTitleCase);
+        const allNewItems = new Set<string>();
+        
+        if (conflict.candidates) {
+            Object.values(conflict.candidates).forEach(val => {
+            toArray(val).forEach(item => allNewItems.add(toTitleCase(item)));
+            });
+        } else if (conflict.new_value) {
+            toArray(conflict.new_value).forEach(item => allNewItems.add(toTitleCase(item)));
+        }
+
+        const currentSet = new Set(allCurrent);
+        const actualNewItems = Array.from(allNewItems).filter(item => !currentSet.has(item));
+
+        // Use selected.value to determine selected chips
+        const selectedChipSet = new Set(toArray(selected.value));
+
+        return (
+            <div>
+            <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-3">
+                <div className="text-xs font-bold text-gray-600 uppercase">
+                    {['label', 'labels'].includes(conflict.field_name) ? 'RECORD LABELS' : conflict.field_name.replace(/_/g, ' ')}
+                </div>
+                <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                    UNIFIED TAG REVIEW
+                </span>
+                </div>
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-500 select-none">
+                <input 
+                    type="checkbox" 
+                    checked={finalizedFields[key] || false}
+                    onChange={(e) => onFinalize(key, e.target.checked)}
+                    className="accent-blue-600"
+                />
+                Mark as Finalized
+                </label>
+            </div>
+            <div className="flex flex-col gap-3">
+                <ArrayChipSelector
+                label="Currently in Database"
+                color="green"
+                items={allCurrent}
+                selectedItems={selectedChipSet}
+                onToggle={(val) => onResolve(conflict, val, 'custom_merge')}
+                />
+                {actualNewItems.length > 0 && (
+                <ArrayChipSelector
+                    label="New Suggestions Found (Not in DB)"
+                    color="blue"
+                    items={actualNewItems}
+                    selectedItems={selectedChipSet}
+                    onToggle={(val) => onResolve(conflict, val, 'custom_merge')}
+                />
+                )}
+            </div>
+            </div>
+        );
+    }
+
+    return (
+        <div>
+            <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center gap-3">
+                <div className="text-xs font-bold text-gray-600 uppercase">
+                {conflict.field_name.replace(/_/g, ' ')}
+                </div>
+                {isImageArrayField && (
+                <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
+                    GALLERY MODE
+                </span>
+                )}
+                {isNotesField && (
+                <span className="text-[10px] text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                    SMART MERGE ENABLED
+                </span>
+                )}
+            </div>
+            <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-500 select-none">
+                <input 
+                type="checkbox" 
+                checked={finalizedFields[key] || false}
+                onChange={(e) => onFinalize(key, e.target.checked)}
+                className="accent-blue-600"
+                />
+                Mark as Finalized
+            </label>
+            </div>
+
+            {/* Layout fix: items-start prevents stretching */}
+            <div className="grid grid-cols-[1fr_2fr] gap-4 items-start">
+            <div className="flex flex-col">
+                {isImageArrayField && Array.isArray(conflict.current_value) ? (
+                    <ImageGridSelector 
+                    label="Current Gallery"
+                    color="green"
+                    images={conflict.current_value as string[]}
+                    selectedImages={new Set(selected.value as string[])}
+                    onToggle={(url) => onResolve(conflict, url, 'current')}
+                    />
+                ) : (
+                    <ConflictValue 
+                    label="Current (DB)"
+                    color="green"
+                    value={conflict.current_value}
+                    isSelected={selected.selectedSources?.includes('current') ?? false}
+                    isMultiSelect={isMultiSelect}
+                    onClick={() => onResolve(conflict, conflict.current_value, 'current')}
+                    />
+                )}
+            </div>
+
+            <div className={`grid gap-3 ${isImageArrayField ? 'grid-cols-1' : 'grid-cols-[repeat(auto-fill,minmax(200px,1fr))]'}`}>
+                {conflict.candidates ? (
+                    Object.entries(conflict.candidates).map(([source, val]) => (
+                        isImageArrayField && Array.isArray(val) ? (
+                            <ImageGridSelector 
+                            key={source}
+                            label={`${source} Candidates`}
+                            color="blue"
+                            images={val as string[]}
+                            selectedImages={new Set(selected.value as string[])}
+                            onToggle={(url) => onResolve(conflict, url, source)}
+                            />
+                        ) : (
+                            <ConflictValue 
+                                key={source}
+                                label={source}
+                                color="blue"
+                                value={val}
+                                isSelected={selected.selectedSources?.includes(source) ?? false}
+                                isMultiSelect={isMultiSelect}
+                                onClick={() => onResolve(conflict, val, source)}
+                            />
+                        )
+                    ))
+                ) : (
+                    <ConflictValue 
+                        label={`New (${conflict.source || 'Unknown'})`}
+                        color="blue"
+                        value={conflict.new_value}
+                        isSelected={selected.selectedSources?.includes(conflict.source || 'enrichment') ?? false}
+                        isMultiSelect={isMultiSelect}
+                        onClick={() => onResolve(conflict, conflict.new_value, conflict.source || 'enrichment')}
+                    />
+                )}
+            </div>
+            </div>
+        </div>
+    );
+});
+ConflictRow.displayName = 'ConflictRow';
+
+
+// --- MAIN COMPONENT ---
 
 export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCancel }: EnrichmentReviewModalProps) {
   const currentAlbumId = conflicts.length > 0 ? conflicts[0].album_id : null;
@@ -297,10 +491,9 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
     setFinalizedFields(autoFinalized);
   }, [currentAlbumId, currentConflicts]);
 
-  const handleResolve = (conflict: ExtendedFieldConflict, value: unknown, source: string) => {
+  const handleResolve = useCallback((conflict: ExtendedFieldConflict, value: unknown, source: string) => {
     const key = `${conflict.album_id}-${conflict.field_name}`;
     
-    // UPDATED: Added new array fields (awards, certifications, samples) to ensure they are handled as mergeable tags
     const MERGEABLE_FIELDS = [
       'genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 
       'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url', 
@@ -320,9 +513,9 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
             selectedSources.add(source);
         }
         
-        // If nothing selected, maybe default back to current? Or allow empty.
-        if (selectedSources.size === 0) selectedSources.add('current');
-
+        // Ensure at least empty set if nothing selected (though usually we keep something)
+        // If notes, we allow empty.
+        
         const newSelectedSources = Array.from(selectedSources);
 
         // --- NOTES MERGING LOGIC ---
@@ -341,10 +534,8 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
                         parts.push(`--- ${candSource.toUpperCase()} NOTES ---\n${String(candVal).trim()}`);
                     }
                 });
-            }
-            
-            // 3. Simple New Value (if single source and selected)
-            if (conflict.new_value && selectedSources.has(conflict.source) && !conflict.candidates) {
+            } else if (selectedSources.has(conflict.source) && conflict.new_value) {
+                 // Fallback for non-candidate simple structure
                  parts.push(`--- ${conflict.source.toUpperCase()} NOTES ---\n${String(conflict.new_value).trim()}`);
             }
 
@@ -367,6 +558,20 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
             arr.forEach(v => combinedItems.add(toTitleCase(String(v))));
         };
 
+        // If 'custom_merge' comes from chips, 'value' is already the set of strings
+        if (source === 'custom_merge') {
+             // In this case, 'value' passed in IS the final array from the chip selector
+             return {
+                ...prev,
+                [key]: {
+                   value: value,
+                   source: 'custom_merge',
+                   selectedSources: newSelectedSources
+                }
+             };
+        }
+
+        // Otherwise recalculate from sources
         if (selectedSources.has('current')) addItems(conflict.current_value);
         
         if (conflict.candidates) {
@@ -393,33 +598,47 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
           [key]: { value, source, selectedSources: [source] } 
       }));
     }
-  };
+  }, []);
 
-  const handleSelectAllNew = () => {
+  const handleFinalizeKey = useCallback((key: string, val: boolean) => {
+      setFinalizedFields(prev => ({ ...prev, [key]: val }));
+  }, []);
+
+  const handleSelectAllNew = useCallback(() => {
     const newResolutions: Record<string, { value: unknown, source: string, selectedSources?: string[] }> = {};
     currentConflicts.forEach(c => {
       const key = `${c.album_id}-${c.field_name}`;
       newResolutions[key] = { value: c.new_value, source: c.source || 'enrichment', selectedSources: [c.source || 'enrichment'] };
     });
     setResolutions(newResolutions);
-  };
+  }, [currentConflicts]);
 
-  const handleSelectAllCurrent = () => {
+  const handleSelectAllCurrent = useCallback(() => {
     const newResolutions: Record<string, { value: unknown, source: string, selectedSources?: string[] }> = {};
     currentConflicts.forEach(c => {
       const key = `${c.album_id}-${c.field_name}`;
       newResolutions[key] = { value: c.current_value, source: 'current', selectedSources: ['current'] };
     });
     setResolutions(newResolutions);
-  };
+  }, [currentConflicts]);
 
-  const handleFinalizeAll = () => {
+  const handleFinalizeStatic = useCallback(() => {
+    const NON_STATIC_FIELDS = [
+      'genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 
+      'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url', 
+      'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 
+      'lyricist', 'arranger', 'songwriters', 'notes', 'tracks', 
+      'samples', 'sampled_by', 'awards', 'certifications'
+    ];
+
     const newFinalized = { ...finalizedFields };
     currentConflicts.forEach(c => {
-      newFinalized[`${c.album_id}-${c.field_name}`] = true;
+      if (!NON_STATIC_FIELDS.includes(c.field_name)) {
+         newFinalized[`${c.album_id}-${c.field_name}`] = true;
+      }
     });
     setFinalizedFields(newFinalized);
-  };
+  }, [currentConflicts, finalizedFields]);
 
   if (!currentAlbumId || currentConflicts.length === 0) return null;
 
@@ -443,8 +662,8 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
           </div>
           
           <div className="flex gap-3">
-             <button onClick={handleFinalizeAll} className="px-3 py-2 text-[12px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-md hover:bg-violet-100">
-               Finalize All Fields
+             <button onClick={handleFinalizeStatic} className="px-3 py-2 text-[12px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-md hover:bg-violet-100">
+               Finalize Static Fields
              </button>
              <button onClick={handleSelectAllCurrent} className="px-3 py-2 text-[12px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100">
                Reset to Current
@@ -472,176 +691,16 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
 
               {/* CONFLICT ROWS */}
               <div className="p-4 flex flex-col gap-8">
-                {currentConflicts.map((conflict) => {
-                  const key = `${conflict.album_id}-${conflict.field_name}`;
-                  const selected = resolutions[key] || { value: conflict.current_value, source: 'current' };
-                  const isImageArrayField = isImageArray(conflict.current_value) || isImageArray(conflict.new_value);
-                  
-                  // UPDATED: Added new array fields here as well for proper rendering
-                  const TEXT_LIST_FIELDS = ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger', 'samples', 'sampled_by', 'awards', 'certifications'];
-                  const isTextListField = TEXT_LIST_FIELDS.includes(conflict.field_name);
-                  const isNotesField = conflict.field_name === 'notes';
-                  
-                  // Treat Notes as a multi-select field for the purpose of the UI
-                  const isMultiSelect = isTextListField || isNotesField;
-
-                  const toArray = (v: unknown) => {
-                    if (Array.isArray(v)) return v.map(String);
-                    if (!v) return [];
-                    return String(v).split(/,\s*/).map(s => s.trim()).filter(Boolean);
-                  };
-
-                  if (isTextListField) {
-                    // Force Title Case for all displayed items
-                    const allCurrent = toArray(conflict.current_value).map(toTitleCase);
-                    const allNewItems = new Set<string>();
-                    
-                    if (conflict.candidates) {
-                      Object.values(conflict.candidates).forEach(val => {
-                        toArray(val).forEach(item => allNewItems.add(toTitleCase(item)));
-                      });
-                    }
-
-                    const currentSet = new Set(allCurrent);
-                    // Filter out new items that are already present (case-insensitive check handled by normalization)
-                    const actualNewItems = Array.from(allNewItems).filter(item => !currentSet.has(item));
-
-                    return (
-                      <div key={key}>
-                        <div className="flex justify-between items-center mb-2">
-                          <div className="flex items-center gap-3">
-                            <div className="text-xs font-bold text-gray-600 uppercase">
-                              {['label', 'labels'].includes(conflict.field_name) ? 'RECORD LABELS' : conflict.field_name.replace(/_/g, ' ')}
-                            </div>
-                            <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                                UNIFIED TAG REVIEW
-                            </span>
-                          </div>
-                          <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-500 select-none">
-                            <input 
-                              type="checkbox" 
-                              checked={finalizedFields[key] || false}
-                              onChange={(e) => setFinalizedFields(prev => ({ ...prev, [key]: e.target.checked }))}
-                              className="accent-blue-600"
-                            />
-                            Mark as Finalized
-                          </label>
-                        </div>
-                        <div className="flex flex-col gap-3">
-                          <ArrayChipSelector
-                            label="Currently in Database"
-                            color="green"
-                            items={allCurrent}
-                            selectedItems={new Set(toArray(selected.value))}
-                            onToggle={(val) => {
-                                handleResolve(conflict, val, 'custom_merge');
-                            }}
-                          />
-                          {actualNewItems.length > 0 && (
-                            <ArrayChipSelector
-                              label="New Suggestions Found (Not in DB)"
-                              color="blue"
-                              items={actualNewItems}
-                              selectedItems={new Set(toArray(selected.value))}
-                              onToggle={(val) => handleResolve(conflict, val, 'custom_merge')}
-                            />
-                          )}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div key={key}>
-                      <div className="flex justify-between items-center mb-2">
-                        <div className="flex items-center gap-3">
-                          <div className="text-xs font-bold text-gray-600 uppercase">
-                            {conflict.field_name.replace(/_/g, ' ')}
-                          </div>
-                          {isImageArrayField && (
-                            <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
-                              GALLERY MODE
-                            </span>
-                          )}
-                          {isNotesField && (
-                            <span className="text-[10px] text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
-                              SMART MERGE ENABLED
-                            </span>
-                          )}
-                        </div>
-                        <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-500 select-none">
-                          <input 
-                            type="checkbox" 
-                            checked={finalizedFields[key] || false}
-                            onChange={(e) => setFinalizedFields(prev => ({ ...prev, [key]: e.target.checked }))}
-                            className="accent-blue-600"
-                          />
-                          Mark as Finalized
-                        </label>
-                      </div>
-
-                      {/* Layout fix: items-start prevents stretching */}
-                      <div className="grid grid-cols-[1fr_2fr] gap-4 items-start">
-                        <div className="flex flex-col">
-                            {isImageArrayField && Array.isArray(conflict.current_value) ? (
-                              <ImageGridSelector 
-                                label="Current Gallery"
-                                color="green"
-                                images={conflict.current_value as string[]}
-                                selectedImages={new Set(selected.value as string[])}
-                                onToggle={(url) => handleResolve(conflict, url, 'current')}
-                              />
-                            ) : (
-                              <ConflictValue 
-                                label="Current (DB)"
-                                color="green"
-                                value={conflict.current_value}
-                                isSelected={selected.selectedSources?.includes('current') ?? false}
-                                isMultiSelect={isMultiSelect}
-                                onClick={() => handleResolve(conflict, conflict.current_value, 'current')}
-                              />
-                            )}
-                        </div>
-
-                        <div className={`grid gap-3 ${isImageArrayField ? 'grid-cols-1' : 'grid-cols-[repeat(auto-fill,minmax(200px,1fr))]'}`}>
-                            {conflict.candidates ? (
-                                Object.entries(conflict.candidates).map(([source, val]) => (
-                                    isImageArrayField && Array.isArray(val) ? (
-                                      <ImageGridSelector 
-                                        key={source}
-                                        label={`${source} Candidates`}
-                                        color="blue"
-                                        images={val as string[]}
-                                        selectedImages={new Set(selected.value as string[])}
-                                        onToggle={(url) => handleResolve(conflict, url, source)}
-                                      />
-                                    ) : (
-                                      <ConflictValue 
-                                          key={source}
-                                          label={source}
-                                          color="blue"
-                                          value={val}
-                                          isSelected={selected.selectedSources?.includes(source) ?? false}
-                                          isMultiSelect={isMultiSelect}
-                                          onClick={() => handleResolve(conflict, val, source)}
-                                      />
-                                    )
-                                ))
-                            ) : (
-                              <ConflictValue 
-                                  label={`New (${conflict.source || 'Unknown'})`}
-                                  color="blue"
-                                  value={conflict.new_value}
-                                  isSelected={selected.selectedSources?.includes(conflict.source || 'enrichment') ?? false}
-                                  isMultiSelect={isMultiSelect}
-                                  onClick={() => handleResolve(conflict, conflict.new_value, conflict.source || 'enrichment')}
-                              />
-                            )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                {currentConflicts.map((conflict) => (
+                    <ConflictRow 
+                        key={`${conflict.album_id}-${conflict.field_name}`}
+                        conflict={conflict}
+                        resolutions={resolutions}
+                        finalizedFields={finalizedFields}
+                        onResolve={handleResolve}
+                        onFinalize={handleFinalizeKey}
+                    />
+                ))}
               </div>
             </div>
         </div>
