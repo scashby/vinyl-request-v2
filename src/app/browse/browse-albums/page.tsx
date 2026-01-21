@@ -123,6 +123,7 @@ function BrowseAlbumsContent() {
         const batchSize = 1000;
         let keepGoing = true;
         
+        // Removed the artificial 5-second timeout Promise.race logic
         while (keepGoing && isMounted) {
             const { data: batch, error } = await supabase
               .from('collection')
