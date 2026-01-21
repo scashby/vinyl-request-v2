@@ -30,6 +30,15 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// Helper to chunk arrays for concurrency control
+const chunkArray = <T>(array: T[], size: number): T[][] => {
+  const chunked: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunked.push(array.slice(i, i + size));
+  }
+  return chunked;
+};
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -93,47 +102,62 @@ export async function POST(req: Request) {
       });
     }
 
-    const results = [];
+    const results: { album: Record<string, unknown>, candidates: Record<string, CandidateData> }[] = [];
 
-    for (const album of targetAlbums) {
-      const candidates: Record<string, CandidateData> = {};
-      const promises: Promise<EnrichmentResult | null>[] = [];
+    // --- UPDATED CONCURRENCY LOGIC ---
+    // Process albums in chunks of 5 to speed up response time while respecting rate limits
+    const CHUNK_SIZE = 5;
+    const chunks = chunkArray(targetAlbums, CHUNK_SIZE);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const typedAlbum = album as any;
+    for (const chunk of chunks) {
+       const chunkPromises = chunk.map(async (album) => {
+          const candidates: Record<string, CandidateData> = {};
+          const promises: Promise<EnrichmentResult | null>[] = [];
 
-      // Always fetch requested services
-      if (services.musicbrainz) promises.push(fetchMusicBrainzData(typedAlbum));
-      if (services.discogs) promises.push(fetchDiscogsData(typedAlbum));
-      if (services.spotify) promises.push(fetchSpotifyData(typedAlbum));
-      if (services.appleMusicEnhanced) promises.push(fetchAppleMusicData(typedAlbum));
-      if (services.lastfm) promises.push(fetchLastFmData(typedAlbum));
-      if (services.wikipedia) promises.push(fetchWikipediaData(typedAlbum));
-      if (services.genius) promises.push(fetchGeniusData(typedAlbum));
-      if (services.coverArt) promises.push(fetchCoverArtData(typedAlbum));
-      if (services.whosampled) promises.push(fetchWhoSampledData(typedAlbum));
-      if (services.secondhandsongs) promises.push(fetchSecondHandSongsData(typedAlbum));
-      if (services.theaudiodb) promises.push(fetchTheAudioDBData(typedAlbum));
-      if (services.wikidata) promises.push(fetchWikidataData(typedAlbum));
-      if (services.setlistfm) promises.push(fetchSetlistFmData(typedAlbum));
-      if (services.rateyourmusic) promises.push(fetchRateYourMusicData(typedAlbum));
-      if (services.fanarttv) promises.push(fetchFanartTvData(typedAlbum));
-      if (services.deezer) promises.push(fetchDeezerData(typedAlbum));
-      if (services.musixmatch) promises.push(fetchMusixmatchData(typedAlbum));
-      if (services.popsike) promises.push(fetchPopsikeData(typedAlbum));
-      if (services.pitchfork) promises.push(fetchPitchforkData(typedAlbum));
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const typedAlbum = album as any;
 
-      const settled = await Promise.allSettled(promises);
-      
-      settled.forEach(res => {
-        if (res.status === 'fulfilled' && res.value && res.value.success && res.value.data) {
-          candidates[res.value.source] = res.value.data;
-        }
-      });
+          // Always fetch requested services
+          if (services.musicbrainz) promises.push(fetchMusicBrainzData(typedAlbum));
+          if (services.discogs) promises.push(fetchDiscogsData(typedAlbum));
+          if (services.spotify) promises.push(fetchSpotifyData(typedAlbum));
+          if (services.appleMusicEnhanced) promises.push(fetchAppleMusicData(typedAlbum));
+          if (services.lastfm) promises.push(fetchLastFmData(typedAlbum));
+          if (services.wikipedia) promises.push(fetchWikipediaData(typedAlbum));
+          if (services.genius) promises.push(fetchGeniusData(typedAlbum));
+          if (services.coverArt) promises.push(fetchCoverArtData(typedAlbum));
+          if (services.whosampled) promises.push(fetchWhoSampledData(typedAlbum));
+          if (services.secondhandsongs) promises.push(fetchSecondHandSongsData(typedAlbum));
+          if (services.theaudiodb) promises.push(fetchTheAudioDBData(typedAlbum));
+          if (services.wikidata) promises.push(fetchWikidataData(typedAlbum));
+          if (services.setlistfm) promises.push(fetchSetlistFmData(typedAlbum));
+          if (services.rateyourmusic) promises.push(fetchRateYourMusicData(typedAlbum));
+          if (services.fanarttv) promises.push(fetchFanartTvData(typedAlbum));
+          if (services.deezer) promises.push(fetchDeezerData(typedAlbum));
+          if (services.musixmatch) promises.push(fetchMusixmatchData(typedAlbum));
+          if (services.popsike) promises.push(fetchPopsikeData(typedAlbum));
+          if (services.pitchfork) promises.push(fetchPitchforkData(typedAlbum));
 
-      if (Object.keys(candidates).length > 0) {
-        results.push({ album, candidates });
-      }
+          const settled = await Promise.allSettled(promises);
+          
+          settled.forEach(res => {
+            if (res.status === 'fulfilled' && res.value && res.value.success && res.value.data) {
+              candidates[res.value.source] = res.value.data;
+            }
+          });
+
+          if (Object.keys(candidates).length > 0) {
+            return { album, candidates };
+          }
+          return null;
+       });
+
+       // Wait for this chunk of albums to complete
+       const chunkResults = await Promise.all(chunkPromises);
+       
+       chunkResults.forEach(res => {
+          if (res) results.push(res);
+       });
     }
 
     return NextResponse.json({ 

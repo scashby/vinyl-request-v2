@@ -174,7 +174,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [enriching, setEnriching] = useState(false);
   const [status, setStatus] = useState('');
   const [folderFilter, setFolderFilter] = useState('');
-  const [batchSize, setBatchSize] = useState('25');
+  const [batchSize, setBatchSize] = useState('10');
   const [autoSnooze, setAutoSnooze] = useState(true); // Default to true (30-day skip)
   
   const [fieldConfig, setFieldConfig] = useState<FieldConfigMap>({});
@@ -362,7 +362,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       try {
         const payload = {
           albumIds: specificAlbumIds,
-          limit: specificAlbumIds ? undefined : 50,
+          limit: specificAlbumIds ? undefined : 5, // Reduced from 50 to 5 to prevent Vercel 504 Timeouts
           cursor: specificAlbumIds ? undefined : cursorRef.current,
           folder: folderFilter || undefined,
           services: getServicesForSelection(),
@@ -1118,8 +1118,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                 <div className="flex items-center gap-2">
                   <label className="font-semibold text-sm text-gray-900">Batch Size:</label>
                   <select value={batchSize} onChange={(e) => setBatchSize(e.target.value)} disabled={enriching} className="p-1.5 rounded border border-gray-300 text-gray-900">
-                    <option value="25">25 (Recommended)</option>
-                    <option value="50">50</option>
+                    <option value="10">10 (Safe)</option>
+                    <option value="25">25 (Standard)</option>
                   </select>
                 </div>
               </div>
