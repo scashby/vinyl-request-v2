@@ -1,4 +1,3 @@
-// src/app/edit-collection/components/EnrichmentReviewModal.tsx
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -105,7 +104,7 @@ function ArrayChipSelector({
   const activeBg = isGreen ? 'bg-[#047857]' : 'bg-[#1d4ed8]';
   const activeBorder = isGreen ? 'border-[#047857]' : 'border-[#1d4ed8]';
 
-  // Deduplicate items for display to prevent duplicates
+  // Deduplicate items for display
   const uniqueItems = Array.from(new Set(items));
 
   return (
@@ -408,10 +407,18 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
                   const isImageArrayField = isImageArray(conflict.current_value) || isImageArray(conflict.new_value);
                   const TEXT_LIST_FIELDS = ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger'];
                   const isTextListField = TEXT_LIST_FIELDS.includes(conflict.field_name);
+                  
                   const toArray = (v: unknown) => {
                     if (Array.isArray(v)) return v.map(String);
                     if (!v) return [];
                     return String(v).split(/,\s*/).map(s => s.trim()).filter(Boolean);
+                  };
+
+                  // Helper to safely get selected set for both Arrays and Single Strings
+                  const getSelectedSet = (val: unknown) => {
+                     if (Array.isArray(val)) return new Set(val as string[]);
+                     if (val) return new Set([String(val)]);
+                     return new Set<string>();
                   };
 
                   return (
@@ -451,7 +458,7 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
                                 label="Current Gallery"
                                 color="green"
                                 images={conflict.current_value as string[]}
-                                selectedImages={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
+                                selectedImages={getSelectedSet(selected.value)}
                                 onToggle={(url) => handleResolve(conflict, url, 'current')}
                               />
                             ) : (isTextListField || isSimpleArray(conflict.current_value)) ? (
@@ -459,7 +466,7 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
                                 label="Current (DB)"
                                 color="green"
                                 items={toArray(conflict.current_value)}
-                                selectedItems={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
+                                selectedItems={getSelectedSet(selected.value)}
                                 onToggle={(val) => handleResolve(conflict, val, 'current')}
                               />
                             ) : (
@@ -484,7 +491,7 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
                                         label={`${source} Candidates`}
                                         color="blue"
                                         images={val as string[]}
-                                        selectedImages={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
+                                        selectedImages={getSelectedSet(selected.value)}
                                         onToggle={(url) => handleResolve(conflict, url, source)}
                                       />
                                     ) : (isTextListField || isSimpleArray(val)) ? (
@@ -493,7 +500,7 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
                                         label={source}
                                         color="blue"
                                         items={toArray(val)}
-                                        selectedItems={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
+                                        selectedItems={getSelectedSet(selected.value)}
                                         onToggle={(item) => handleResolve(conflict, item, source)}
                                       />
                                     ) : (
