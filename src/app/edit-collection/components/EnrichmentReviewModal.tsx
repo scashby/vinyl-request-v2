@@ -21,11 +21,17 @@ function isImageUrl(url: unknown): boolean {
   return !!url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || 
          url.includes('images.discogs.com') ||
          url.includes('i.scdn.co') || 
-         url.includes('mzstatic.com');
+         url.includes('mzstatic.com') ||
+         url.includes('coverartarchive.org');
 }
 
 function isImageArray(value: unknown): boolean {
   return Array.isArray(value) && value.length > 0 && value.every(v => isImageUrl(v));
+}
+
+// Helper for consistent casing (Title Case)
+function toTitleCase(str: string): string {
+  return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 }
 
 function ImageGridSelector({
@@ -64,22 +70,22 @@ function ImageGridSelector({
                 isSelected ? `border-[3px] ${borderSelected} opacity-100` : 'border-gray-300 opacity-60 hover:opacity-80'
               }`}
             >
-              <div className="absolute top-1 left-1 z-10">
+              <div className="absolute top-1 left-1 z-20">
                 <input 
                   type="checkbox" 
                   checked={isSelected} 
                   readOnly 
-                  className="w-4 h-4 cursor-pointer accent-blue-600 shadow-sm"
+                  className="w-5 h-5 cursor-pointer accent-blue-600 shadow-md border-white border"
                 />
               </div>
               
-              {/* Standard img tag and object-cover style fixes Safari grey box issues by avoiding Next.js layout wrappers */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
                 src={url} 
                 alt="" 
                 className="w-full h-full object-cover" 
                 style={{ minWidth: '100%', minHeight: '100%' }}
+                loading="lazy"
               />
             </div>
           );
@@ -114,7 +120,7 @@ function ArrayChipSelector({
   const uniqueItems = Array.from(new Set(items));
 
   return (
-    <div className={`p-3 rounded-lg border-2 flex flex-col gap-2 flex-1 ${borderColor} ${bgColor}`}>
+    <div className={`p-3 rounded-lg border-2 flex flex-col gap-2 ${borderColor} ${bgColor}`}>
       <div className={`text-[11px] font-bold uppercase ${labelColor}`}>
         {label}
       </div>
@@ -125,13 +131,15 @@ function ArrayChipSelector({
             <button
               key={`${idx}-${item}`}
               onClick={() => onToggle(item)}
-              className={`px-2.5 py-1 rounded-2xl text-xs cursor-pointer border transition-all ${
+              className={`px-2.5 py-1 rounded-2xl text-xs cursor-pointer border transition-all flex items-center gap-1 ${
                 isSelected 
                   ? `${activeBg} ${activeBorder} text-white` 
                   : 'bg-white border-gray-300 text-gray-700'
               }`}
             >
-              {isSelected ? '✓ ' : ''}{item}
+              {/* Implicit checkbox via visual state, but keeping text clean */}
+              {isSelected && <span>✓</span>}
+              {item}
             </button>
           );
         })}
@@ -155,7 +163,6 @@ function ConflictValue({
   color: 'green' | 'blue';
   isMultiSelect?: boolean; 
 }) {
-  const [dimensions, setDimensions] = useState<{ w: number, h: number } | null>(null);
   const [isImage, setIsImage] = useState(false);
 
   useEffect(() => {
@@ -180,23 +187,22 @@ function ConflictValue({
   const ContentWrapper = ({ children }: { children: React.ReactNode }) => (
     <div 
       onClick={onClick} 
-      className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 flex flex-col gap-2 relative h-full min-w-0 flex-1 ${borderColor} ${bgColor}`}
+      className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 flex flex-col gap-2 relative ${borderColor} ${bgColor}`}
     >
       <div className={`text-[11px] font-bold uppercase flex justify-between items-center gap-1.5 ${labelColor}`}>
-        <div className="flex items-center gap-1">
-           <span>{getIcon(label)}</span>
-           <span>{label} {isImage && dimensions && `(${dimensions.w} x ${dimensions.h} px)`}</span>
+        <div className="flex items-center gap-2">
+           {/* Primary Selection Input */}
+           <input 
+             type={isMultiSelect ? "checkbox" : "radio"} 
+             checked={isSelected} 
+             readOnly 
+             className={`cursor-pointer w-4 h-4 accent-${isGreen ? 'emerald' : 'blue'}-600`}
+           />
+           <div className="flex items-center gap-1">
+             <span>{getIcon(label)}</span>
+             <span>{label}</span>
+           </div>
         </div>
-        {isMultiSelect ? (
-          <input 
-            type="checkbox" 
-            checked={isSelected} 
-            readOnly 
-            className="cursor-pointer w-4 h-4 z-50 relative accent-blue-500"
-          />
-        ) : (
-          isSelected && <span className="z-50 relative">✓ SELECTED</span>
-        )}
       </div>
       {children}
     </div>
@@ -205,17 +211,14 @@ function ConflictValue({
   if (isImage && typeof value === 'string') {
     return (
       <ContentWrapper>
-        <div className="relative w-full aspect-square bg-gray-100 rounded overflow-hidden flex items-center justify-center">
+        <div className="relative w-full aspect-square bg-gray-100 rounded overflow-hidden flex items-center justify-center mt-1">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img 
             src={value} 
             alt={label}
             className="w-full h-full object-contain"
-            onLoad={(e) => {
-              const img = e.currentTarget;
-              setDimensions({ w: img.naturalWidth, h: img.naturalHeight });
-            }}
             onError={() => setIsImage(false)}
+            loading="lazy" 
           />
         </div>
       </ContentWrapper>
@@ -240,7 +243,7 @@ function ConflictValue({
                 target="_blank" 
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()} 
-                className="text-blue-600 hover:underline break-all relative z-50"
+                className="text-blue-600 hover:underline break-all relative z-10"
               >
                 {part}
               </a>
@@ -254,7 +257,7 @@ function ConflictValue({
 
   return (
     <ContentWrapper>
-      <div className={`text-[13px] whitespace-pre-wrap break-words leading-relaxed mt-1 ${value ? 'not-italic' : 'italic'}`}>
+      <div className={`text-[13px] whitespace-pre-wrap break-words leading-relaxed pl-6 ${value ? 'not-italic' : 'italic'}`}>
         {renderContent()}
       </div>
     </ContentWrapper>
@@ -280,6 +283,9 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
 
     currentConflicts.forEach(c => {
       const key = `${c.album_id}-${c.field_name}`;
+      
+      // Auto-normalize text array fields to Title Case for initial state if possible
+      // but usually we keep current_value as is until user interacts
       defaults[key] = { value: c.current_value, source: 'current' };
 
       if (c.field_name === 'tracks' && Array.isArray(c.current_value) && c.current_value.length > 0) {
@@ -321,12 +327,13 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
         }
 
         const currentArray = Array.isArray(currentVal) ? currentVal : (currentVal ? [currentVal] : []);
-        const currentItems = new Set(currentArray.map(String));
+        // Normalize everything to Title Case in the Set to handle duplicates properly
+        const currentItems = new Set(currentArray.map(String).map(toTitleCase));
 
         if (Array.isArray(value)) {
-            value.forEach(v => currentItems.add(String(v)));
+            value.forEach(v => currentItems.add(toTitleCase(String(v))));
         } else {
-            const strVal = String(value);
+            const strVal = toTitleCase(String(value));
             if (currentItems.has(strVal)) currentItems.delete(strVal);
             else currentItems.add(strVal);
         }
@@ -444,16 +451,19 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
                   };
 
                   if (isTextListField) {
-                    const allCurrent = toArray(conflict.current_value);
+                    // Force Title Case for all displayed items
+                    const allCurrent = toArray(conflict.current_value).map(toTitleCase);
                     const allNewItems = new Set<string>();
+                    
                     if (conflict.candidates) {
                       Object.values(conflict.candidates).forEach(val => {
-                        toArray(val).forEach(item => allNewItems.add(item));
+                        toArray(val).forEach(item => allNewItems.add(toTitleCase(item)));
                       });
                     }
 
-                    const currentLower = new Set(allCurrent.map(s => s.toLowerCase()));
-                    const actualNewItems = Array.from(allNewItems).filter(item => !currentLower.has(item.toLowerCase()));
+                    const currentSet = new Set(allCurrent);
+                    // Filter out new items that are already present (case-insensitive check handled by normalization)
+                    const actualNewItems = Array.from(allNewItems).filter(item => !currentSet.has(item));
 
                     return (
                       <div key={key}>
@@ -522,7 +532,8 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
                         </label>
                       </div>
 
-                      <div className="grid grid-cols-[1fr_2fr] gap-4 items-stretch">
+                      {/* Layout fix: items-start prevents stretching */}
+                      <div className="grid grid-cols-[1fr_2fr] gap-4 items-start">
                         <div className="flex flex-col">
                             {isImageArrayField && Array.isArray(conflict.current_value) ? (
                               <ImageGridSelector 
