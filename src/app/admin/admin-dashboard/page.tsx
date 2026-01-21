@@ -1,20 +1,45 @@
-// src/app/admin/admin-dashboard/page.js - UPDATED WITHOUT AUDIO RECOGNITION
+// src/app/admin/admin-dashboard/page.tsx - UPDATED WITHOUT AUDIO RECOGNITION
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, CSSProperties } from 'react';
 import Link from 'next/link';
-import { supabase } from 'src/lib/supabaseClient';
+// Fix: Import directly from 'lib' since baseUrl is 'src'
+import { supabase } from 'lib/supabaseClient';
+
+// Define types for state variables
+interface DashboardStats {
+  totalAlbums: number;
+  totalEvents: number;
+  upcomingEvents: number;
+}
+
+interface DashboardEvent {
+  id: number;
+  title: string;
+  date: string;
+  time: string;
+  location: string;
+  // Fix: Use 'unknown' instead of 'any' to satisfy linting rules
+  [key: string]: unknown; 
+}
+
+interface DbTestResults {
+  collection: 'pending' | 'success' | 'error';
+  events: 'pending' | 'success' | 'error';
+}
+
+type AuthStatus = 'checking' | 'authenticated' | 'unauthenticated' | 'error';
 
 export default function AdminDashboardPage() {
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<DashboardStats>({
     totalAlbums: 0,
     totalEvents: 0,
     upcomingEvents: 0
   });
-  const [upcomingEvents, setUpcomingEvents] = useState([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<DashboardEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [authStatus, setAuthStatus] = useState('checking');
-  const [dbTestResults, setDbTestResults] = useState({
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
+  const [dbTestResults, setDbTestResults] = useState<DbTestResults>({
     collection: 'pending',
     events: 'pending'
   });
@@ -40,14 +65,14 @@ export default function AdminDashboardPage() {
       }
 
       // Test database connections
-      const dbTests = {
+      const dbTests: DbTestResults = {
         collection: 'pending',
         events: 'pending'
       };
 
       // Test collection table
       try {
-        await supabase.from('collection').select('id', { head: true, count: 'exact' }).limit(1);
+        await supabase.from('collection').select('id', { count: 'exact', head: true }).limit(1);
         dbTests.collection = 'success';
       } catch (error) {
         dbTests.collection = 'error';
@@ -56,7 +81,7 @@ export default function AdminDashboardPage() {
 
       // Test events table
       try {
-        await supabase.from('events').select('id', { head: true, count: 'exact' }).limit(1);
+        await supabase.from('events').select('id', { count: 'exact', head: true }).limit(1);
         dbTests.events = 'success';
       } catch (error) {
         dbTests.events = 'error';
@@ -93,7 +118,7 @@ export default function AdminDashboardPage() {
         upcomingEvents: upcomingCount || 0
       });
 
-      setUpcomingEvents(upcomingEventsData || []);
+      setUpcomingEvents((upcomingEventsData as unknown as DashboardEvent[]) || []);
 
     } catch (err) {
       console.error('Error loading dashboard data:', err);
@@ -102,7 +127,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return '';
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -119,6 +144,128 @@ export default function AdminDashboardPage() {
     );
   }
 
+  // Styles
+  const externalToolWrapperStyle: CSSProperties = {
+    background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+    color: 'white',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 24
+  };
+
+  const externalToolHeaderStyle: CSSProperties = {
+    marginBottom: 20
+  };
+
+  const externalToolTitleStyle: CSSProperties = {
+    margin: 0,
+    fontSize: 20,
+    fontWeight: 600,
+    marginBottom: 8
+  };
+
+  const externalToolDescStyle: CSSProperties = {
+    margin: 0,
+    opacity: 0.9,
+    fontSize: 14
+  };
+
+  const externalToolGridStyle: CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+    gap: 12
+  };
+
+  const externalLinkStyle: CSSProperties = {
+    background: 'rgba(255,255,255,0.15)',
+    color: 'white',
+    padding: '10px 16px',
+    borderRadius: 8,
+    textDecoration: 'none',
+    fontWeight: 600,
+    fontSize: 13,
+    textAlign: 'center',
+    border: '1px solid rgba(255,255,255,0.2)',
+    transition: 'all 0.2s'
+  };
+
+  const statusBoxStyle: CSSProperties = {
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 24,
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+  };
+
+  const statusHeaderStyle: CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16
+  };
+
+  const statusTitleStyle: CSSProperties = {
+    margin: 0,
+    fontSize: 18,
+    fontWeight: 600,
+    color: '#1f2937'
+  };
+
+  const refreshButtonStyle: CSSProperties = {
+    padding: '4px 8px',
+    background: '#f3f4f6',
+    border: '1px solid #d1d5db',
+    borderRadius: 4,
+    fontSize: 12,
+    cursor: 'pointer'
+  };
+
+  const statusGridStyle: CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: 12
+  };
+
+  const statsGridStyle: CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: 20,
+    marginBottom: 32
+  };
+
+  const mainGridStyle: CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: '2fr 1fr',
+    gap: 24,
+    marginBottom: 32
+  };
+
+  const contentBoxStyle: CSSProperties = {
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 12,
+    padding: 24
+  };
+
+  const contentTitleStyle: CSSProperties = {
+    margin: '0 0 20px 0',
+    fontSize: 18,
+    fontWeight: 600,
+    color: '#1f2937'
+  };
+
+  const actionLinkBaseStyle: CSSProperties = {
+    display: 'block',
+    padding: '12px 16px',
+    color: 'white',
+    borderRadius: 8,
+    textDecoration: 'none',
+    fontWeight: 600,
+    textAlign: 'center',
+    fontSize: 14
+  };
+
   return (
     <div className="p-6 bg-slate-50 min-h-screen max-w-7xl mx-auto font-sans">
       {/* Header */}
@@ -132,53 +279,23 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* External Tools Quick Access */}
-      <div style={{
-        background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-        color: 'white',
-        borderRadius: 16,
-        padding: 24,
-        marginBottom: 24
-      }}>
-        <div style={{ marginBottom: 20 }}>
-          <h3 style={{
-            margin: 0,
-            fontSize: 20,
-            fontWeight: 600,
-            marginBottom: 8
-          }}>
+      <div style={externalToolWrapperStyle}>
+        <div style={externalToolHeaderStyle}>
+          <h3 style={externalToolTitleStyle}>
             🔗 External Admin Tools
           </h3>
-          <p style={{
-            margin: 0,
-            opacity: 0.9,
-            fontSize: 14
-          }}>
+          <p style={externalToolDescStyle}>
             Quick access to all your external services and platforms
           </p>
         </div>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-          gap: 12
-        }}>
+        <div style={externalToolGridStyle}>
           <Link
             href="https://blog.deadwaxdialogues.com/wp-admin/"
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              background: 'rgba(255,255,255,0.15)',
-              color: 'white',
-              padding: '10px 16px',
-              borderRadius: 8,
-              textDecoration: 'none',
-              fontWeight: 600,
-              fontSize: 13,
-              textAlign: 'center',
-              border: '1px solid rgba(255,255,255,0.2)',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+            style={externalLinkStyle}
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
           >
             📝 WordPress Admin
           </Link>
@@ -186,20 +303,9 @@ export default function AdminDashboardPage() {
             href="https://console.hetzner.com/projects"
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              background: 'rgba(255,255,255,0.15)',
-              color: 'white',
-              padding: '10px 16px',
-              borderRadius: 8,
-              textDecoration: 'none',
-              fontWeight: 600,
-              fontSize: 13,
-              textAlign: 'center',
-              border: '1px solid rgba(255,255,255,0.2)',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+            style={externalLinkStyle}
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
           >
             🖥️ Hetzner Console
           </Link>
@@ -207,20 +313,9 @@ export default function AdminDashboardPage() {
             href="https://business.facebook.com/"
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              background: 'rgba(255,255,255,0.15)',
-              color: 'white',
-              padding: '10px 16px',
-              borderRadius: 8,
-              textDecoration: 'none',
-              fontWeight: 600,
-              fontSize: 13,
-              textAlign: 'center',
-              border: '1px solid rgba(255,255,255,0.2)',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+            style={externalLinkStyle}
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
           >
             📘 Facebook Business
           </Link>
@@ -228,20 +323,9 @@ export default function AdminDashboardPage() {
             href="https://login.buffer.com/login?plan=free&cycle=year&cta=bufferSite-globalNav-login-1"
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              background: 'rgba(255,255,255,0.15)',
-              color: 'white',
-              padding: '10px 16px',
-              borderRadius: 8,
-              textDecoration: 'none',
-              fontWeight: 600,
-              fontSize: 13,
-              textAlign: 'center',
-              border: '1px solid rgba(255,255,255,0.2)',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+            style={externalLinkStyle}
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
           >
             📱 Buffer
           </Link>
@@ -249,20 +333,9 @@ export default function AdminDashboardPage() {
             href="https://supabase.com/"
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              background: 'rgba(255,255,255,0.15)',
-              color: 'white',
-              padding: '10px 16px',
-              borderRadius: 8,
-              textDecoration: 'none',
-              fontWeight: 600,
-              fontSize: 13,
-              textAlign: 'center',
-              border: '1px solid rgba(255,255,255,0.2)',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+            style={externalLinkStyle}
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
           >
             🗄️ Supabase
           </Link>
@@ -270,20 +343,9 @@ export default function AdminDashboardPage() {
             href="https://vercel.com/scashbys-projects/vinyl-request-v2"
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              background: 'rgba(255,255,255,0.15)',
-              color: 'white',
-              padding: '10px 16px',
-              borderRadius: 8,
-              textDecoration: 'none',
-              fontWeight: 600,
-              fontSize: 13,
-              textAlign: 'center',
-              border: '1px solid rgba(255,255,255,0.2)',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+            style={externalLinkStyle}
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
           >
             ▲ Vercel
           </Link>
@@ -291,20 +353,9 @@ export default function AdminDashboardPage() {
             href="https://admin.google.com/"
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              background: 'rgba(255,255,255,0.15)',
-              color: 'white',
-              padding: '10px 16px',
-              borderRadius: 8,
-              textDecoration: 'none',
-              fontWeight: 600,
-              fontSize: 13,
-              textAlign: 'center',
-              border: '1px solid rgba(255,255,255,0.2)',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+            style={externalLinkStyle}
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
           >
             🔍 Google Admin
           </Link>
@@ -312,20 +363,9 @@ export default function AdminDashboardPage() {
             href="https://login.squarespace.com/api/1/login/"
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              background: 'rgba(255,255,255,0.15)',
-              color: 'white',
-              padding: '10px 16px',
-              borderRadius: 8,
-              textDecoration: 'none',
-              fontWeight: 600,
-              fontSize: 13,
-              textAlign: 'center',
-              border: '1px solid rgba(255,255,255,0.2)',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+            style={externalLinkStyle}
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
           >
             ⬛ Squarespace
           </Link>
@@ -333,20 +373,9 @@ export default function AdminDashboardPage() {
             href="https://app.dub.co/login"
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              background: 'rgba(255,255,255,0.15)',
-              color: 'white',
-              padding: '10px 16px',
-              borderRadius: 8,
-              textDecoration: 'none',
-              fontWeight: 600,
-              fontSize: 13,
-              textAlign: 'center',
-              border: '1px solid rgba(255,255,255,0.2)',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+            style={externalLinkStyle}
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
           >
             🔗 Dub.co
           </Link>
@@ -354,48 +383,20 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* System Health & Authentication Status */}
-      <div style={{
-        background: '#fff',
-        border: '1px solid #e5e7eb',
-        borderRadius: 12,
-        padding: 20,
-        marginBottom: 24,
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 16
-        }}>
-          <h3 style={{
-            margin: 0,
-            fontSize: 18,
-            fontWeight: 600,
-            color: '#1f2937'
-          }}>
+      <div style={statusBoxStyle}>
+        <div style={statusHeaderStyle}>
+          <h3 style={statusTitleStyle}>
             🔧 System Health Monitor
           </h3>
           <button
             onClick={loadDashboardData}
-            style={{
-              padding: '4px 8px',
-              background: '#f3f4f6',
-              border: '1px solid #d1d5db',
-              borderRadius: 4,
-              fontSize: 12,
-              cursor: 'pointer'
-            }}
+            style={refreshButtonStyle}
           >
             Refresh
           </button>
         </div>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: 12
-        }}>
+        <div style={statusGridStyle}>
           {/* Authentication Status */}
           <div style={{
             padding: 12,
@@ -493,12 +494,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: 20,
-        marginBottom: 32
-      }}>
+      <div style={statsGridStyle}>
         <div style={{
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           color: 'white',
@@ -540,26 +536,11 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Main Content Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '2fr 1fr',
-        gap: 24,
-        marginBottom: 32
-      }}>
+      <div style={mainGridStyle}>
         {/* Left Column - Recent Activity Placeholder */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          <div style={{
-            background: '#fff',
-            border: '1px solid #e5e7eb',
-            borderRadius: 12,
-            padding: 24
-          }}>
-            <h3 style={{
-              margin: '0 0 20px 0',
-              fontSize: 18,
-              fontWeight: 600,
-              color: '#1f2937'
-            }}>
+          <div style={contentBoxStyle}>
+            <h3 style={contentTitleStyle}>
               📊 Recent Activity
             </h3>
             <div style={{
@@ -576,18 +557,8 @@ export default function AdminDashboardPage() {
         {/* Right Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
           {/* Quick Actions */}
-          <div style={{
-            background: '#fff',
-            border: '1px solid #e5e7eb',
-            borderRadius: 12,
-            padding: 24
-          }}>
-            <h3 style={{
-              margin: '0 0 20px 0',
-              fontSize: 18,
-              fontWeight: 600,
-              color: '#1f2937'
-            }}>
+          <div style={contentBoxStyle}>
+            <h3 style={contentTitleStyle}>
               ⚡ Quick Actions
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -596,15 +567,8 @@ export default function AdminDashboardPage() {
                   <Link
                     href="/admin/import-discogs"
                     style={{
-                      display: 'block',
-                      padding: '12px 16px',
+                      ...actionLinkBaseStyle,
                       background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                      color: 'white',
-                      borderRadius: 8,
-                      textDecoration: 'none',
-                      fontWeight: 600,
-                      textAlign: 'center',
-                      fontSize: 14
                     }}
                   >
                     📥 Import from Discogs
@@ -612,15 +576,8 @@ export default function AdminDashboardPage() {
                   <Link
                     href="/admin/manage-events"
                     style={{
-                      display: 'block',
-                      padding: '12px 16px',
+                      ...actionLinkBaseStyle,
                       background: 'linear-gradient(135deg, #10b981, #047857)',
-                      color: 'white',
-                      borderRadius: 8,
-                      textDecoration: 'none',
-                      fontWeight: 600,
-                      textAlign: 'center',
-                      fontSize: 14
                     }}
                   >
                     📅 Manage Events
@@ -628,15 +585,8 @@ export default function AdminDashboardPage() {
                   <Link
                     href="/admin/edit-collection"
                     style={{
-                      display: 'block',
-                      padding: '12px 16px',
+                      ...actionLinkBaseStyle,
                       background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
-                      color: 'white',
-                      borderRadius: 8,
-                      textDecoration: 'none',
-                      fontWeight: 600,
-                      textAlign: 'center',
-                      fontSize: 14
                     }}
                   >
                     📚 Browse Collection
@@ -644,15 +594,8 @@ export default function AdminDashboardPage() {
                   <Link
                     href="/admin/diagnostics"
                     style={{
-                      display: 'block',
-                      padding: '12px 16px',
+                      ...actionLinkBaseStyle,
                       background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                      color: 'white',
-                      borderRadius: 8,
-                      textDecoration: 'none',
-                      fontWeight: 600,
-                      textAlign: 'center',
-                      fontSize: 14
                     }}
                   >
                     🔍 Data Diagnostics
@@ -663,15 +606,8 @@ export default function AdminDashboardPage() {
                   <Link
                     href="/admin/login"
                     style={{
-                      display: 'block',
-                      padding: '12px 16px',
+                      ...actionLinkBaseStyle,
                       background: 'linear-gradient(135deg, #dc2626, #b91c1c)',
-                      color: 'white',
-                      borderRadius: 8,
-                      textDecoration: 'none',
-                      fontWeight: 600,
-                      textAlign: 'center',
-                      fontSize: 14
                     }}
                   >
                     🔑 Login Required
@@ -693,18 +629,8 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Upcoming Events */}
-          <div style={{
-            background: '#fff',
-            border: '1px solid #e5e7eb',
-            borderRadius: 12,
-            padding: 24
-          }}>
-            <h3 style={{
-              margin: '0 0 20px 0',
-              fontSize: 18,
-              fontWeight: 600,
-              color: '#1f2937'
-            }}>
+          <div style={contentBoxStyle}>
+            <h3 style={contentTitleStyle}>
               📅 Upcoming Events
             </h3>
 
