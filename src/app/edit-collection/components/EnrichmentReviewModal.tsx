@@ -1,16 +1,21 @@
 // src/app/edit-collection/components/EnrichmentReviewModal.tsx
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { type ExtendedFieldConflict } from './ImportEnrichModal';
 import { SERVICE_ICONS } from 'lib/enrichment-data-mapping';
 
 interface EnrichmentReviewModalProps {
   conflicts: ExtendedFieldConflict[];
-  onComplete: (
+  /**
+   * Called when the user saves the CURRENT album. 
+   * The parent should save this data to DB and remove the album from the 'conflicts' list.
+   */
+  onSave: (
     resolutions: Record<string, { value: unknown, source: string }>,
-    finalizedFields: Record<string, boolean>
+    finalizedFields: Record<string, boolean>,
+    albumId: number
   ) => void;
   onCancel: () => void;
 }
@@ -32,7 +37,7 @@ function isImageArray(value: unknown): boolean {
   return Array.isArray(value) && value.length > 0 && value.every(v => isImageUrl(v));
 }
 
-// --- COMPONENT: Image Grid Selector (For Galleries) ---
+// --- COMPONENT: Image Grid Selector ---
 function ImageGridSelector({
   images,
   selectedImages,
@@ -84,7 +89,7 @@ function ImageGridSelector({
   );
 }
 
-// --- COMPONENT: Granular Array Selection (Phase 4) ---
+// --- COMPONENT: Array Selector ---
 function ArrayChipSelector({
   items,
   selectedItems,
@@ -103,7 +108,6 @@ function ArrayChipSelector({
   const bgColor = isGreen ? 'bg-[#f0fdf4]' : 'bg-[#eff6ff]';
   const labelColor = isGreen ? 'text-[#047857]' : 'text-[#1d4ed8]';
   
-  // Dynamic styles for chips
   const activeBg = isGreen ? 'bg-[#047857]' : 'bg-[#1d4ed8]';
   const activeBorder = isGreen ? 'border-[#047857]' : 'border-[#1d4ed8]';
 
@@ -134,7 +138,7 @@ function ArrayChipSelector({
   );
 }
 
-// --- HELPER: Standard Value Component ---
+// --- HELPER: Value Component ---
 function ConflictValue({ 
   value, 
   onClick, 
@@ -202,7 +206,6 @@ function ConflictValue({
     return (
       <ContentWrapper>
         <div className="relative w-full aspect-square bg-gray-100 rounded overflow-hidden flex items-center justify-center">
-          {/* Switched to standard img tag to avoid Next.js mixed-content loops and performance overhead on large lists */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img 
             src={value} 
@@ -224,11 +227,8 @@ function ConflictValue({
     ? JSON.stringify(value, null, 2) 
     : String(value ?? '');
 
-  // Detect and render links if the value contains http/https
   const renderContent = () => {
     if (!value) return 'Empty / None';
-    
-    // Simple URL detection
     if (typeof value === 'string' && (value.includes('http://') || value.includes('https://'))) {
       const parts = value.split(/(https?:\/\/[^\s]+)/g);
       return (
@@ -240,7 +240,7 @@ function ConflictValue({
                 href={part} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()} // Prevent selecting the card when clicking link
+                onClick={(e) => e.stopPropagation()} 
                 className="text-blue-600 hover:underline break-all relative z-50"
               >
                 {part}
@@ -262,38 +262,27 @@ function ConflictValue({
   );
 }
 
-export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel }: EnrichmentReviewModalProps) {
-  // State tracks the RESOLVED VALUE, not just the source
+export default function EnrichmentReviewModal({ conflicts, onSave, onCancel }: EnrichmentReviewModalProps) {
+  // STATE: Current Album ID processing (always grab the first one from the queue)
+  const currentAlbumId = conflicts.length > 0 ? conflicts[0].album_id : null;
+  
+  // Calculate conflicts just for this album
+  const currentConflicts = useMemo(() => 
+    conflicts.filter(c => c.album_id === currentAlbumId), 
+    [conflicts, currentAlbumId]
+  );
+
   const [resolutions, setResolutions] = useState<Record<string, { value: unknown, source: string, selectedSources?: string[] }>>({});
   const [finalizedFields, setFinalizedFields] = useState<Record<string, boolean>>({});
-  const [page, setPage] = useState(0);
-  const listRef = useRef<HTMLDivElement>(null);
-  const ITEMS_PER_PAGE = 5;
 
-  // Scroll to top on page change
+  // Reset/Init state when we switch to a new album
   useEffect(() => {
-    if (listRef.current) {
-      listRef.current.scrollTo({ top: 0, behavior: 'auto' });
-    }
-  }, [page]);
+    if (!currentAlbumId) return;
 
-  const groupedConflicts = useMemo(() => {
-    const groups: Record<number, ExtendedFieldConflict[]> = {};
-    conflicts.forEach(c => {
-      // 1. Skip Tracks if DB already has data (User request: don't review if populated)
-      if (c.field_name === 'tracks' && Array.isArray(c.current_value) && c.current_value.length > 0) return;
-
-      if (!groups[c.album_id]) groups[c.album_id] = [];
-      groups[c.album_id].push(c);
-    });
-    return groups;
-  }, [conflicts]);
-
-  useEffect(() => {
     const defaults: Record<string, { value: unknown, source: string }> = {};
     const autoFinalized: Record<string, boolean> = {};
 
-    conflicts.forEach(c => {
+    currentConflicts.forEach(c => {
       const key = `${c.album_id}-${c.field_name}`;
       defaults[key] = { value: c.current_value, source: 'current' };
 
@@ -302,23 +291,21 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
         autoFinalized[key] = true;
       }
     });
+
     setResolutions(defaults);
-    setFinalizedFields(prev => ({ ...prev, ...autoFinalized }));
-  }, [conflicts]);
+    setFinalizedFields(autoFinalized);
+  }, [currentAlbumId, currentConflicts]);
 
   const handleResolve = (conflict: ExtendedFieldConflict, value: unknown, source: string) => {
     const key = `${conflict.album_id}-${conflict.field_name}`;
     
-    // Explicit list of fields that support "Chip Selection" (Merging)
     const MERGEABLE_FIELDS = [
       'genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 
       'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url', 
       'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger', 'songwriters'
     ];
     
-    const isMergeable = MERGEABLE_FIELDS.includes(conflict.field_name);
-
-    if (isMergeable) {
+    if (MERGEABLE_FIELDS.includes(conflict.field_name)) {
       setResolutions(prev => {
         const currentRes = prev[key];
         const currentVal = currentRes ? currentRes.value : conflict.current_value;
@@ -326,10 +313,8 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
         const currentItems = new Set(currentArray.map(String));
 
         if (Array.isArray(value)) {
-            // Add all items from source
             value.forEach(v => currentItems.add(String(v)));
         } else {
-            // Toggle single item
             const strVal = String(value);
             if (currentItems.has(strVal)) currentItems.delete(strVal);
             else currentItems.add(strVal);
@@ -351,7 +336,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
 
   const handleSelectAllNew = () => {
     const newResolutions: Record<string, { value: unknown, source: string, selectedSources?: string[] }> = {};
-    conflicts.forEach(c => {
+    currentConflicts.forEach(c => {
       const key = `${c.album_id}-${c.field_name}`;
       newResolutions[key] = { value: c.new_value, source: c.source || 'enrichment', selectedSources: [c.source || 'enrichment'] };
     });
@@ -360,17 +345,18 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
 
   const handleSelectAllCurrent = () => {
     const newResolutions: Record<string, { value: unknown, source: string, selectedSources?: string[] }> = {};
-    conflicts.forEach(c => {
+    currentConflicts.forEach(c => {
       const key = `${c.album_id}-${c.field_name}`;
       newResolutions[key] = { value: c.current_value, source: 'current', selectedSources: ['current'] };
     });
     setResolutions(newResolutions);
   };
 
-  const totalChanges = Object.keys(groupedConflicts).length;
-  const groups = Object.values(groupedConflicts);
-  const totalPages = Math.ceil(groups.length / ITEMS_PER_PAGE);
-  const visibleGroups = groups.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
+  // If no album is left, the parent should handle closing, but we render nothing
+  if (!currentAlbumId || currentConflicts.length === 0) return null;
+
+  const albumInfo = currentConflicts[0];
+  const uniqueAlbumsLeft = new Set(conflicts.map(c => c.album_id)).size;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30000]">
@@ -384,257 +370,182 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
               Review Enrichment Data
             </h3>
             <div className="text-sm text-gray-500 mt-1">
-              {totalChanges} album{totalChanges !== 1 ? 's' : ''} with conflicting data found
+              <span className="font-bold text-blue-600">{uniqueAlbumsLeft}</span> albums remaining in queue
             </div>
           </div>
           
           <div className="flex gap-3">
-            {/* RESTORED: Finalize All Button */}
-            <button 
-              onClick={() => {
-                const nonMergableFields = ['image_url', 'back_image_url', 'original_release_date', 'country', 'barcode', 'year', 'format', 'catalog_no', 'tracks'];
-                const newFinalized = { ...finalizedFields };
-                conflicts.forEach(c => {
-                  if (nonMergableFields.includes(c.field_name)) {
-                    newFinalized[`${c.album_id}-${c.field_name}`] = true;
-                  }
-                });
-                setFinalizedFields(newFinalized);
-              }}
-              className="px-4 py-2 text-[13px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-md cursor-pointer hover:bg-violet-200 transition-all shadow-sm active:bg-violet-300"
-            >
-              Finalize All (Static Fields)
-            </button>
-            <button onClick={handleSelectAllCurrent} className="px-4 py-2 text-[13px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md cursor-pointer hover:bg-emerald-100">
-              Keep Current
-            </button>
-            <button onClick={handleSelectAllNew} className="px-4 py-2 text-[13px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-md cursor-pointer hover:bg-blue-100">
-              Use All New Data
-            </button>
+             <button onClick={handleSelectAllCurrent} className="px-3 py-2 text-[12px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100">
+               Reset to Current
+             </button>
+             <button onClick={handleSelectAllNew} className="px-3 py-2 text-[12px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100">
+               Use All New
+             </button>
           </div>
         </div>
 
-        {/* LIST CONTENT */}
-        <div className="flex-1 overflow-y-auto bg-gray-50 p-6" ref={listRef}>
-          <div className="flex flex-col gap-6">
-            {visibleGroups.map((group, idx) => {
-              const albumInfo = group[0];
+        {/* LIST CONTENT (Single Album) */}
+        <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm mb-6">
               
-              return (
-                <div key={idx} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-                  
-                  {/* ALBUM CONTEXT HEADER */}
-                  <div className="p-4 border-b border-gray-200 flex gap-4 items-center flex-wrap bg-gray-50/50">
-                    <div className="font-bold text-[15px] mr-auto">
-                      {albumInfo.artist} - {albumInfo.title}
-                    </div>
-                    <div className="flex gap-2 text-xs">
-                      {albumInfo.format && <span className="px-2 py-0.5 rounded bg-gray-200 text-gray-700 border border-gray-300">{albumInfo.format}</span>}
-                      {albumInfo.year && <span className="px-2 py-0.5 rounded bg-gray-200 text-gray-700 border border-gray-300">{albumInfo.year}</span>}
-                    </div>
-                  </div>
+              {/* ALBUM CONTEXT HEADER */}
+              <div className="p-4 border-b border-gray-200 flex gap-4 items-center flex-wrap bg-gray-50/50">
+                <div className="font-bold text-[15px] mr-auto">
+                  {albumInfo.artist} - {albumInfo.title}
+                </div>
+                <div className="flex gap-2 text-xs">
+                  {albumInfo.format && <span className="px-2 py-0.5 rounded bg-gray-200 text-gray-700 border border-gray-300">{albumInfo.format}</span>}
+                  {albumInfo.year && <span className="px-2 py-0.5 rounded bg-gray-200 text-gray-700 border border-gray-300">{albumInfo.year}</span>}
+                </div>
+              </div>
 
-                  {/* CONFLICT ROWS */}
-                  <div className="p-4 flex flex-col gap-6">
-                    {group.map((conflict) => {
-                      const key = `${conflict.album_id}-${conflict.field_name}`;
-                      const selected = resolutions[key] || { value: conflict.current_value, source: 'current' };
-                      const isImageArrayField = isImageArray(conflict.current_value) || isImageArray(conflict.new_value);
-                      
-                      // Define fields that should behave as mergeable lists (Chips)
-                      // Added 'labels' to ensure Multi-Select works for Record Labels
-                      const TEXT_LIST_FIELDS = ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger'];
-                      const isTextListField = TEXT_LIST_FIELDS.includes(conflict.field_name);
+              {/* CONFLICT ROWS */}
+              <div className="p-4 flex flex-col gap-8">
+                {currentConflicts.map((conflict) => {
+                  const key = `${conflict.album_id}-${conflict.field_name}`;
+                  const selected = resolutions[key] || { value: conflict.current_value, source: 'current' };
+                  const isImageArrayField = isImageArray(conflict.current_value) || isImageArray(conflict.new_value);
+                  const TEXT_LIST_FIELDS = ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 'lyricist', 'arranger'];
+                  const isTextListField = TEXT_LIST_FIELDS.includes(conflict.field_name);
+                  const toArray = (v: unknown) => {
+                    if (Array.isArray(v)) return v.map(String);
+                    if (!v) return [];
+                    return String(v).split(/,\s*/).map(s => s.trim()).filter(Boolean);
+                  };
 
-                      // Helper to normalize values to array for Chip Selector
-                      const toArray = (v: unknown): string[] => {
-                        if (Array.isArray(v)) return v.map(String);
-                        if (!v) return [];
-                        return String(v).split(/,\s*/).map(s => s.trim()).filter(Boolean);
-                      };
-
-                      return (
-                        <div key={key}>
-                          <div className="flex justify-between items-center mb-2">
-                            <div className="flex items-center gap-3">
-                              <div className="text-xs font-bold text-gray-600 uppercase">
-                                {['label', 'labels'].includes(conflict.field_name) ? 'RECORD LABELS' : conflict.field_name.replace(/_/g, ' ')}
-                              </div>
-                              {/* Action Bar for merging text fields OR Gallery Mode for images */}
-                              {isImageArrayField ? (
-                                <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
-                                  GALLERY MODE: Click images to Keep/Reject
-                                </span>
-                              ) : (
-                                isTextListField && (
-                                  <div className="flex gap-2 items-center">
-                                    <button 
-                                      onClick={() => handleResolve(conflict, conflict.current_value, 'current')}
-                                      className="px-2 py-0.5 text-[10px] rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold cursor-pointer hover:bg-emerald-100"
-                                    >
-                                      KEEP CURRENT ONLY
-                                    </button>
-                                    <div className="px-2 py-0.5 text-[10px] rounded bg-blue-50 text-blue-700 border border-blue-200 font-bold">
-                                      {selected.selectedSources?.length || 0} SOURCES SELECTED TO MERGE
-                                    </div>
-                                  </div>
-                                )
-                              )}
-                            </div>
-                            <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-500 select-none">
-                              <input 
-                                type="checkbox" 
-                                checked={finalizedFields[key] || false}
-                                onChange={(e) => setFinalizedFields(prev => ({ ...prev, [key]: e.target.checked }))}
-                                className="accent-blue-600"
-                              />
-                              Mark as Finalized
-                            </label>
+                  return (
+                    <div key={key}>
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className="text-xs font-bold text-gray-600 uppercase">
+                            {['label', 'labels'].includes(conflict.field_name) ? 'RECORD LABELS' : conflict.field_name.replace(/_/g, ' ')}
                           </div>
+                          {isImageArrayField ? (
+                            <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
+                              GALLERY MODE
+                            </span>
+                          ) : isTextListField && (
+                            <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                              MERGEABLE LIST
+                            </span>
+                          )}
+                        </div>
+                        <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-500 select-none">
+                          <input 
+                            type="checkbox" 
+                            checked={finalizedFields[key] || false}
+                            onChange={(e) => setFinalizedFields(prev => ({ ...prev, [key]: e.target.checked }))}
+                            className="accent-blue-600"
+                          />
+                          Mark as Finalized
+                        </label>
+                      </div>
 
-                          <div className="grid grid-cols-[1fr_2fr] gap-4 items-stretch">
-                            
-                            {/* CURRENT VALUE */}
-                            <div className="flex flex-col">
-                                {isImageArrayField && Array.isArray(conflict.current_value) ? (
-                                  <ImageGridSelector 
-                                    label="Current Gallery"
-                                    color="green"
-                                    images={conflict.current_value as string[]}
-                                    selectedImages={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
-                                    onToggle={(url) => handleResolve(conflict, url, 'current')}
-                                  />
-                                ) : (isTextListField || isSimpleArray(conflict.current_value)) ? (
-                                  <ArrayChipSelector
-                                    label="Current (DB)"
-                                    color="green"
-                                    items={toArray(conflict.current_value)}
-                                    selectedItems={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
-                                    onToggle={(val) => handleResolve(conflict, val, 'current')}
-                                  />
-                                ) : (
-                                  <ConflictValue 
-                                    label="Current (DB)"
-                                    color="green"
-                                    value={conflict.current_value}
-                                    isSelected={selected.source === 'current' || (selected.selectedSources?.includes('current') ?? false)}
-                                    isMultiSelect={false}
-                                    onClick={() => handleResolve(conflict, conflict.current_value, 'current')}
-                                  />
-                                )}
-                            </div>
+                      <div className="grid grid-cols-[1fr_2fr] gap-4 items-stretch">
+                        
+                        {/* CURRENT VALUE */}
+                        <div className="flex flex-col">
+                            {isImageArrayField && Array.isArray(conflict.current_value) ? (
+                              <ImageGridSelector 
+                                label="Current Gallery"
+                                color="green"
+                                images={conflict.current_value as string[]}
+                                selectedImages={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
+                                onToggle={(url) => handleResolve(conflict, url, 'current')}
+                              />
+                            ) : (isTextListField || isSimpleArray(conflict.current_value)) ? (
+                              <ArrayChipSelector
+                                label="Current (DB)"
+                                color="green"
+                                items={toArray(conflict.current_value)}
+                                selectedItems={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
+                                onToggle={(val) => handleResolve(conflict, val, 'current')}
+                              />
+                            ) : (
+                              <ConflictValue 
+                                label="Current (DB)"
+                                color="green"
+                                value={conflict.current_value}
+                                isSelected={selected.source === 'current' || (selected.selectedSources?.includes('current') ?? false)}
+                                isMultiSelect={false}
+                                onClick={() => handleResolve(conflict, conflict.current_value, 'current')}
+                              />
+                            )}
+                        </div>
 
-                            {/* NEW CANDIDATES */}
-                            <div className={`grid gap-3 ${isImageArrayField ? 'grid-cols-1' : 'grid-cols-[repeat(auto-fill,minmax(200px,1fr))]'}`}>
-                                {conflict.candidates ? (
-                                    Object.entries(conflict.candidates).map(([source, val]) => (
-                                        isImageArrayField && Array.isArray(val) ? (
-                                          <ImageGridSelector 
-                                            key={source}
-                                            label={`${source} Candidates`}
-                                            color="blue"
-                                            images={val as string[]}
-                                            selectedImages={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
-                                            onToggle={(url) => handleResolve(conflict, url, source)}
-                                          />
-                                        ) : (isTextListField || isSimpleArray(val)) ? (
-                                          <ArrayChipSelector
-                                            key={source}
-                                            label={source}
-                                            color="blue"
-                                            items={toArray(val)}
-                                            selectedItems={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
-                                            onToggle={(item) => handleResolve(conflict, item, source)}
-                                          />
-                                        ) : (
-                                          <ConflictValue 
-                                              key={source}
-                                              label={source}
-                                              color="blue"
-                                              value={val}
-                                              isSelected={selected.source === source || (selected.selectedSources?.includes(source) ?? false)}
-                                              isMultiSelect={false}
-                                              onClick={() => handleResolve(conflict, val, source)}
-                                          />
-                                        )
-                                    ))
-                                ) : (
-                                    // Fallback if no detailed candidates map
-                                    isImageArrayField && Array.isArray(conflict.new_value) ? (
+                        {/* NEW CANDIDATES */}
+                        <div className={`grid gap-3 ${isImageArrayField ? 'grid-cols-1' : 'grid-cols-[repeat(auto-fill,minmax(200px,1fr))]'}`}>
+                            {conflict.candidates ? (
+                                Object.entries(conflict.candidates).map(([source, val]) => (
+                                    isImageArrayField && Array.isArray(val) ? (
                                       <ImageGridSelector 
-                                        label="New Candidates"
+                                        key={source}
+                                        label={`${source} Candidates`}
                                         color="blue"
-                                        images={conflict.new_value as string[]}
+                                        images={val as string[]}
                                         selectedImages={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
-                                        onToggle={(url) => handleResolve(conflict, url, 'enrichment')}
+                                        onToggle={(url) => handleResolve(conflict, url, source)}
+                                      />
+                                    ) : (isTextListField || isSimpleArray(val)) ? (
+                                      <ArrayChipSelector
+                                        key={source}
+                                        label={source}
+                                        color="blue"
+                                        items={toArray(val)}
+                                        selectedItems={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
+                                        onToggle={(item) => handleResolve(conflict, item, source)}
                                       />
                                     ) : (
                                       <ConflictValue 
-                                          label={`New (${conflict.source || 'Unknown'})`}
+                                          key={source}
+                                          label={source}
                                           color="blue"
-                                          value={conflict.new_value}
-                                          isSelected={selected.source === (conflict.source || 'enrichment')}
-                                          onClick={() => handleResolve(conflict, conflict.new_value, conflict.source || 'enrichment')}
+                                          value={val}
+                                          isSelected={selected.source === source || (selected.selectedSources?.includes(source) ?? false)}
+                                          isMultiSelect={false}
+                                          onClick={() => handleResolve(conflict, val, source)}
                                       />
                                     )
-                                )}
-                            </div>
-                          </div>
+                                ))
+                            ) : (
+                              <ConflictValue 
+                                  label={`New (${conflict.source || 'Unknown'})`}
+                                  color="blue"
+                                  value={conflict.new_value}
+                                  isSelected={selected.source === (conflict.source || 'enrichment')}
+                                  onClick={() => handleResolve(conflict, conflict.new_value, conflict.source || 'enrichment')}
+                              />
+                            )}
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
         </div>
 
         {/* FOOTER */}
         <div className="p-5 border-t border-gray-200 flex justify-between items-center gap-3 bg-white">
-          <div className="flex flex-col gap-1.5">
-            <div className="flex gap-2 items-center">
-              <button 
-                onClick={() => setPage(p => Math.max(0, p - 1))}
-                disabled={page === 0}
-                className="px-4 py-2 bg-white border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-              >
-                Previous
-              </button>
-              <span className="flex items-center text-sm font-medium text-gray-600">
-                Page {page + 1} of {totalPages || 1}
-              </span>
-              <button 
-                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                disabled={page >= totalPages - 1}
-                className="px-4 py-2 bg-white border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-              >
-                Next
-              </button>
-            </div>
-            <div className="text-[10px] text-gray-500 font-medium italic pl-1">
-              Selections are retained across pages. Save applies to all albums.
-            </div>
+          <div className="text-xs text-gray-500 font-medium italic">
+             Changes are saved to the database immediately upon clicking Save & Next.
           </div>
 
           <div className="flex gap-3">
-            <button onClick={onCancel} className="px-6 py-2 bg-white border-2 border-gray-300 rounded text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-50">Cancel</button>
+            <button onClick={onCancel} className="px-6 py-2 bg-white border-2 border-gray-300 rounded text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-50">
+               Stop Review
+            </button>
             <button 
-              onClick={() => onComplete(resolutions as Record<string, { value: unknown, source: string }>, finalizedFields)}
-              disabled={page < (totalPages || 1) - 1}
-              className={`px-6 py-2 border-none rounded text-sm font-bold shadow-sm transition-colors ${
-                page < (totalPages || 1) - 1
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-amber-500 text-white cursor-pointer hover:bg-amber-600'
-              }`}
+              onClick={() => onSave(resolutions, finalizedFields, currentAlbumId)}
+              className="px-6 py-2 border-none rounded text-sm font-bold shadow-sm transition-colors bg-amber-500 text-white cursor-pointer hover:bg-amber-600"
             >
-              Save Changes
+              Save & Next Album →
             </button>
           </div>
         </div>
 
-      </div> {/* Closes Modal Card */}
-      </div> {/* Closes Scroll Wrapper */}
+      </div> 
+      </div>
     </div>
   );
 }

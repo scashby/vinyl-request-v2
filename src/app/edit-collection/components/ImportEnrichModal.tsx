@@ -168,8 +168,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   // Granular Configuration State
   // Map: FieldName -> Set of Allowed Service IDs
   // If a field is present in this object, it is enabled. The Set contains its allowed sources.
-  
-  
   const [fieldConfig, setFieldConfig] = useState<FieldConfigMap>({});
 
   // Initialize Default State on Load
@@ -850,112 +848,117 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     return 0;
   }
 
-  async function handleApplyChanges(
-    resolutions: Record<string, { value: unknown; source: string }>,
-    finalizedFields?: Record<string, boolean>
+  async function handleSingleAlbumSave(
+    resolutions: Record<string, { value: unknown; source: string; selectedSources?: string[] }>,
+    finalizedFields: Record<string, boolean>,
+    albumId: number
   ) {
-    const updatesByAlbum: Record<number, Record<string, unknown>> = {};
+    const updates: Record<string, unknown> = {};
     const resolutionRecords: Record<string, unknown>[] = [];
     const timestamp = new Date().toISOString();
-    const involvedAlbumIds = new Set<number>();
-    const localSummary: { field: string, album: string, action: string }[] = [];
     const trackSavePromises: Promise<number>[] = [];
 
-    conflicts.forEach((c) => {
-      involvedAlbumIds.add(c.album_id);
-      const baseKey = `${c.album_id}-${c.field_name}`;
-      const decision = resolutions[baseKey] as { value: unknown, source: string, selectedSources?: string[] };
-      
-      if (decision) {
-        if (!updatesByAlbum[c.album_id]) updatesByAlbum[c.album_id] = {};
-        updatesByAlbum[c.album_id][c.field_name] = decision.value;
+    // 1. Process resolutions for THIS album only
+    Object.keys(resolutions).forEach((key) => {
+        // key format is "albumId-fieldName"
+        if (!key.startsWith(`${albumId}-`)) return;
         
-        let actionText = 'Updated';
-        if (decision.source === 'current') actionText = 'Kept Current';
-        if (decision.source === 'merge') actionText = 'Merged';
+        const fieldName = key.split('-').slice(1).join('-'); // Handle fields with dashes if any
+        const decision = resolutions[key];
         
-        localSummary.push({ 
-          field: c.field_name, 
-          album: `${c.artist} - ${c.title}`, 
-          action: actionText 
-        });
-        
-        // ADDED: Logging for manual changes (Commented out to prevent freezing on bulk save)
-        // addLog(`${c.artist} - ${c.title}`, 'conflict-resolved', `${actionText} ${c.field_name}`);
+        updates[fieldName] = decision.value;
 
-        const trackSource = (decision.source === 'current' || decision.source === 'merge') ? null : decision.source;
-        if (trackSource && c.candidates?.[trackSource]) {
-          // Cast to specific type to avoid 'any' error
-          const candidateData = c.candidates[trackSource] as { tracks?: unknown[] };
-          if (candidateData.tracks) {
-            trackSavePromises.push(saveTrackData(c.album_id, candidateData.tracks));
-          }
+        // Log history (optional, keep if you want resolution tracking)
+        // Find original conflict to get candidates for history logging
+        const conflict = conflicts.find(c => c.album_id === albumId && c.field_name === fieldName);
+        if (conflict && conflict.candidates) {
+             Object.entries(conflict.candidates).forEach(([src]) => {
+                const isChosenSource = decision.source === src || decision.selectedSources?.includes(src);
+                resolutionRecords.push({
+                    album_id: albumId, 
+                    field_name: fieldName,
+                    source: src, 
+                    resolution: isChosenSource ? 'use_new' : 'keep_current',
+                    kept_value: decision.value ?? conflict.current_value,
+                    resolved_at: timestamp
+                });
+             });
+             
+             // Check if we need to save Track Data from this source
+             const trackSource = (decision.source === 'current' || decision.source === 'merge') ? null : decision.source;
+             if (trackSource && conflict.candidates[trackSource]) {
+                const cand = conflict.candidates[trackSource] as { tracks?: unknown[] };
+                if (cand.tracks) {
+                    trackSavePromises.push(saveTrackData(albumId, cand.tracks));
+                }
+             }
         }
-      }
-
-      const isFinalized = finalizedFields?.[baseKey] || false;
-      if (isFinalized) {
-        if (!updatesByAlbum[c.album_id]) updatesByAlbum[c.album_id] = {};
-        const finalizedList = c.existing_finalized || [];
-        if (!finalizedList.includes(c.field_name)) {
-          updatesByAlbum[c.album_id].finalized_fields = [...finalizedList, c.field_name];
-        }
-      }
-
-      if (!updatesByAlbum[c.album_id]) updatesByAlbum[c.album_id] = {};
-      updatesByAlbum[c.album_id].last_reviewed_at = timestamp;
-
-      if (c.candidates) {
-        Object.entries(c.candidates).forEach(([src]) => {
-          const isChosenSource = decision?.source === src || decision?.selectedSources?.includes(src);
-          resolutionRecords.push({
-            album_id: c.album_id, 
-            field_name: c.field_name,
-            source: src, 
-            resolution: isChosenSource ? 'use_new' : 'keep_current',
-            kept_value: decision?.value ?? c.current_value,
-            resolved_at: timestamp
-          });
-        });
-      }
     });
 
-    const updatePromises = Array.from(involvedAlbumIds).map(async (albumId) => {
-      const rawUpdates = updatesByAlbum[albumId];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const sanitizedUpdates: Record<string, any> = { ...rawUpdates, last_enriched_at: timestamp };
-
-      // Ensure Array columns (text[]) match the database type to prevent 400 errors
-      const arrayFields = ['labels', 'genres', 'styles', 'finalized_fields', 'enrichment_sources'];
-      arrayFields.forEach(field => {
-        if (sanitizedUpdates[field] !== undefined && sanitizedUpdates[field] !== null) {
-           if (!Array.isArray(sanitizedUpdates[field])) {
-              sanitizedUpdates[field] = [sanitizedUpdates[field]];
-           }
-        }
-      });
-
-      const { error } = await supabase
-        .from('collection')
-        .update(sanitizedUpdates)
-        .eq('id', albumId);
+    // 2. Process Finalized Fields
+    Object.keys(finalizedFields).forEach((key) => {
+        if (!key.startsWith(`${albumId}-`) || !finalizedFields[key]) return;
+        const fieldName = key.split('-').slice(1).join('-');
         
-      if (error) {
-          console.error(`[DB ERROR] Album ${albumId}:`, error.message, error.details);
-          // VISIBILITY: Log why the save failed
-          addLog(`${albumId}`, 'skipped', `Save Failed: ${error.message}`);
-      }
+        // Append to existing finalized array
+        const conflict = conflicts.find(c => c.album_id === albumId && c.field_name === fieldName);
+        const currentList = conflict?.existing_finalized || [];
+        if (!currentList.includes(fieldName)) {
+            // If we are already updating, add to it. If not, create array.
+            const existing = (updates.finalized_fields as string[]) || currentList;
+            updates.finalized_fields = [...new Set([...existing, fieldName])];
+        }
     });
 
-    if (resolutionRecords.length > 0) {
-      await supabase.from('import_conflict_resolutions').upsert(resolutionRecords, { 
-        onConflict: 'album_id,field_name,source' 
-      });
+    // 3. Perform Database Updates
+    if (Object.keys(updates).length > 0) {
+        updates.last_enriched_at = timestamp;
+        updates.last_reviewed_at = timestamp;
+
+        // Ensure Array columns are arrays
+        ['labels', 'genres', 'styles', 'finalized_fields', 'enrichment_sources'].forEach(field => {
+            if (updates[field] !== undefined && !Array.isArray(updates[field])) {
+                updates[field] = [updates[field]];
+            }
+        });
+
+        const { error } = await supabase.from('collection').update(updates).eq('id', albumId);
+        if (error) {
+            console.error(`Failed to save album ${albumId}:`, error);
+            addLog(String(albumId), 'skipped', `Save Error: ${error.message}`);
+            return; // Don't remove from queue if save failed
+        }
+    } else {
+        // Even if no fields changed (all "Keep Current"), update timestamp
+        await supabase.from('collection').update({ last_reviewed_at: timestamp }).eq('id', albumId);
     }
 
-    await Promise.all([...updatePromises, ...trackSavePromises]);
-    setBatchSummary(prev => [...(prev || []), ...localSummary]);
-    setShowReview(false);
+    if (resolutionRecords.length > 0) {
+        await supabase.from('import_conflict_resolutions').upsert(resolutionRecords, { 
+            onConflict: 'album_id,field_name,source' 
+        });
+    }
+
+    await Promise.all(trackSavePromises);
+
+    // 4. CRITICAL: Remove from Queue (This triggers UI update to next album)
+    setConflicts(prev => {
+        const nextQueue = prev.filter(c => c.album_id !== albumId);
+        
+        // If queue is empty, check if we should fetch more
+        if (nextQueue.length === 0) {
+             if (isLoopingRef.current && hasMoreRef.current) {
+                 // Trigger next batch
+                 setTimeout(() => runScanLoop(), 500);
+             } else {
+                 setShowReview(false);
+                 setStatus('All conflicts resolved.');
+                 if (onImportComplete) onImportComplete();
+                 loadStats();
+             }
+        }
+        return nextQueue;
+    });
   }
 
   async function showCategory(category: string, title: string) {
@@ -980,7 +983,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     return (
       <EnrichmentReviewModal 
         conflicts={conflicts} 
-        onComplete={handleApplyChanges}
+        onSave={handleSingleAlbumSave}
         onCancel={() => { 
           setShowReview(false); 
           isLoopingRef.current = false; 
