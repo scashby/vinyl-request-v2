@@ -103,14 +103,12 @@ async function updateSmartList(column: string, oldName: string, newName: string,
 
     if (fetchError || !rows) return false;
 
-    // TypeScript Fix: Cast row to unknown first, then to CollectionRow
     const updates = rows.reduce((acc: { id: string; [key: string]: unknown }[], row) => {
       const collectionRow = row as unknown as CollectionRow;
       const list = collectionRow[column] as SmartListItem[];
       
       let changed = false;
       
-      // Ensure list is actually an array before mapping
       if (!Array.isArray(list)) return acc;
 
       const newList = list.map(item => {
@@ -156,7 +154,6 @@ async function deleteSmartList(column: string, nameToDelete: string): Promise<bo
 
     if (fetchError || !rows) return false;
 
-    // TypeScript Fix: Cast row to unknown first, then to CollectionRow
     const updates = rows.reduce((acc: { id: string; [key: string]: unknown }[], row) => {
       const collectionRow = row as unknown as CollectionRow;
       const list = collectionRow[column] as SmartListItem[];
@@ -193,7 +190,6 @@ async function mergeSmartList(column: string, targetName: string, sourceNames: s
 
     const sourceSet = new Set(sourceNames);
     
-    // TypeScript Fix: Cast row to unknown first, then to CollectionRow
     const updates = rows.reduce((acc: { id: string; [key: string]: unknown }[], row) => {
       const collectionRow = row as unknown as CollectionRow;
       const list = collectionRow[column] as SmartListItem[]; 
@@ -260,12 +256,10 @@ export async function fetchFormats(): Promise<PickerDataItem[]> {
 
 export async function fetchGenres(): Promise<PickerDataItem[]> {
   try {
-    // UPDATED: Select canonical 'genres' instead of discogs/spotify specific ones
     const { data, error } = await supabase.from('collection').select('genres').not('genres', 'is', null);
     if (error) return [];
     const genreCounts = new Map<string, number>();
     data?.forEach(row => {
-      // row.genres is already string[] per your schema
       const allGenres = Array.isArray(row.genres) ? row.genres : [];
       allGenres.forEach(genre => { if (genre) genreCounts.set(genre, (genreCounts.get(genre) || 0) + 1); });
     });
@@ -273,12 +267,13 @@ export async function fetchGenres(): Promise<PickerDataItem[]> {
   } catch { return []; }
 }
 
+// FIXED: 'folder' -> 'location'
 export async function fetchLocations(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('folder').not('folder', 'is', null).not('folder', 'eq', '');
+    const { data, error } = await supabase.from('collection').select('location').not('location', 'is', null).not('location', 'eq', '');
     if (error) return [];
     const locationCounts = new Map<string, number>();
-    data?.forEach(row => { if (row.folder) locationCounts.set(row.folder, (locationCounts.get(row.folder) || 0) + 1); });
+    data?.forEach(row => { if (row.location) locationCounts.set(row.location, (locationCounts.get(row.location) || 0) + 1); });
     return Array.from(locationCounts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
   } catch { return []; }
 }
@@ -305,9 +300,6 @@ export async function fetchArtists(): Promise<PickerDataItem[]> {
       .sort((a, b) => (a.sortName || a.name).localeCompare(b.sortName || b.name));
   } catch { return []; }
 }
-
-// ... (Rest of the file remains unchanged as it doesn't touch genres/styles columns)
-// ... (Media Conditions, Package Conditions, etc.)
 
 export async function fetchMediaConditions(): Promise<PickerDataItem[]> {
   try {
@@ -379,8 +371,10 @@ export async function updateLabel(id: string, newName: string): Promise<boolean>
 export async function updateFormat(id: string, newName: string): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ format: newName }).eq('format', id); return !error; } catch { return false; }
 }
+
+// FIXED: 'folder' -> 'location'
 export async function updateLocation(id: string, newName: string): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ folder: newName }).eq('folder', id); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection').update({ location: newName }).eq('location', id); return !error; } catch { return false; }
 }
 
 export async function updateArtist(id: string, newName: string, newSortName?: string): Promise<boolean> {
@@ -407,8 +401,10 @@ export async function mergeLabels(targetId: string, sourceIds: string[]): Promis
 export async function mergeFormats(targetId: string, sourceIds: string[]): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ format: targetId }).in('format', sourceIds); return !error; } catch { return false; }
 }
+
+// FIXED: 'folder' -> 'location'
 export async function mergeLocations(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ folder: targetId }).in('folder', sourceIds); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection').update({ location: targetId }).in('location', sourceIds); return !error; } catch { return false; }
 }
 
 // Packaging
