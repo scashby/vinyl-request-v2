@@ -1,261 +1,153 @@
-// src/app/dj-sets/page.tsx
+// src/app/admin/dj-tools/page.tsx
 "use client";
 
-import { useEffect, useState } from 'react';
-import { supabase } from 'src/lib/supabaseClient';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { supabase } from 'lib/supabaseClient';
 
-interface Event {
-  id: number;
-  title: string;
-  date: string;
-  location?: string;
-}
+type Stats = {
+  totalTracks: number;
+  totalCrates: number;
+  manualCrates: number;
+  smartCrates: number;
+};
 
-interface DJSet {
-  id: number;
-  title: string;
-  description?: string;
-  tags?: string[];
-  file_url: string;
-  download_url?: string;
-  recorded_at?: string;
-  created_at: string;
-  download_count: number;
-  track_listing?: string[];
-  events?: Event;
-}
-
-export default function DJSetsPage() {
-  const [djSets, setDjSets] = useState<DJSet[]>([]);
+export default function DJToolsPage() {
+  const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterBy, setFilterBy] = useState('all');
 
   useEffect(() => {
-    loadDJSets();
+    loadStats();
   }, []);
 
-  const loadDJSets = async () => {
-    // Timeout failsafe
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Timeout')), 5000)
-    );
-
+  const loadStats = async () => {
     try {
-      const fetchPromise = supabase
-        .from('dj_sets')
-        .select(`
-          *,
-          events(title, date, location)
-        `)
-        .order('recorded_at', { ascending: false });
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
-
+      // Get crate stats from the new 'crates' table
+      const { data: crates, error } = await supabase
+        .from('crates')
+        .select('is_smart');
+      
       if (error) throw error;
-      setDjSets((data as unknown as DJSet[]) || []);
+
+      // Get track count from collection
+      const { count: trackCount } = await supabase
+        .from('collection')
+        .select('id', { count: 'exact', head: true });
+
+      const totalCrates = crates?.length || 0;
+      const smartCrates = crates?.filter(c => c.is_smart).length || 0;
+      const manualCrates = totalCrates - smartCrates;
+
+      setStats({
+        totalTracks: trackCount || 0,
+        totalCrates,
+        manualCrates,
+        smartCrates
+      });
     } catch (error) {
-      console.error('Error loading DJ sets:', error);
+      console.error('Error loading stats:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDownload = async (setId: number, fileUrl: string, title: string) => {
-    try {
-      // Track download
-      await supabase
-        .from('dj_sets')
-        .update({ download_count: (djSets.find(s => s.id === setId)?.download_count || 0) + 1 })
-        .eq('id', setId);
-
-      // Trigger download
-      const link = document.createElement('a');
-      link.href = fileUrl;
-      link.download = `${title}.mp3`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (error) {
-      console.error('Download error:', error);
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
-
-  const filteredSets = djSets.filter(set => {
-    const matchesSearch = set.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         set.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         set.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    if (filterBy === 'all') return matchesSearch;
-    if (filterBy === 'events') return matchesSearch && set.events;
-    if (filterBy === 'standalone') return matchesSearch && !set.events;
-    
-    return matchesSearch;
-  });
-
-  if (loading) {
-    return (
-      <div className="bg-white min-h-screen">
-        <header className="relative w-full h-[300px] flex items-center justify-center bg-[url('/images/event-header-still.jpg')] bg-cover bg-center">
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-8">
-            <h1 className="font-serif-display text-4xl md:text-5xl font-bold text-white text-center m-0">Live Sessions & DJ Sets</h1>
-          </div>
-        </header>
-        <main className="container-responsive py-12">
-          <div className="text-center p-8">
-            <h2 className="text-xl font-semibold text-gray-600">Loading Live Sessions & DJ Sets...</h2>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-white min-h-screen">
-      <header className="relative w-full h-[300px] flex items-center justify-center bg-[url('/images/event-header-still.jpg')] bg-cover bg-center">
-        <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-8">
-          <h1 className="font-serif-display text-4xl md:text-5xl font-bold text-white text-center m-0">DJ Sets</h1>
-        </div>
-      </header>
-      
-      <main className="container-responsive py-8">
-        {/* Search and Filter */}
-        <div className="flex flex-col md:flex-row gap-4 mb-8 justify-center items-center px-4">
-          <input
-            type="text"
-            placeholder="Search sets, events, tags..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full md:w-96 p-3 rounded-lg border border-gray-300 focus:border-blue-500 outline-none transition-colors"
-          />
-          <select
-            value={filterBy}
-            onChange={(e) => setFilterBy(e.target.value)}
-            className="w-full md:w-48 p-3 rounded-lg border border-gray-300 bg-white outline-none cursor-pointer"
-          >
-            <option value="all">All Sets</option>
-            <option value="events">Event Sets</option>
-            <option value="standalone">Standalone Sets</option>
-          </select>
-        </div>
+    <div style={{
+      maxWidth: 1200,
+      margin: '32px auto',
+      padding: 24,
+      background: '#fff',
+      borderRadius: 12,
+      color: '#222',
+      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+    }}>
+      {/* Header */}
+      <div style={{ marginBottom: 32, paddingBottom: 16, borderBottom: '2px solid #e5e7eb' }}>
+        <h1 style={{ fontSize: 32, fontWeight: 'bold', margin: '0 0 8px 0', color: '#111' }}>
+          🎧 DJ Tools
+        </h1>
+        <p style={{ fontSize: 14, color: '#6b7280', margin: 0 }}>
+          Manage your crates and library for events.
+        </p>
+      </div>
 
-        {/* DJ Sets Grid */}
-        <div className="px-4">
-          {filteredSets.length === 0 ? (
-            <div className="text-center py-16 text-gray-500">
-              <div className="text-5xl mb-4">🎧</div>
-              <h2 className="text-2xl font-bold mb-2">No DJ sets found</h2>
-              <p>Try adjusting your search or filter criteria</p>
+      {/* Quick Actions Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+        gap: 20,
+        marginBottom: 32
+      }}>
+        {/* Migration Tool */}
+        <Link
+          href="/admin/dj-tools/migrate"
+          style={{
+            display: 'block',
+            padding: 24,
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            borderRadius: 12,
+            textDecoration: 'none',
+            boxShadow: '0 4px 6px rgba(102, 126, 234, 0.3)',
+            transition: 'transform 0.2s'
+          }}
+          onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+        >
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🔄</div>
+          <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px 0' }}>
+            Track Migration
+          </h3>
+          <p style={{ fontSize: 13, opacity: 0.9, margin: 0 }}>
+            Sync tracks from JSON to database (required for DJ Tools)
+          </p>
+        </Link>
+      </div>
+
+      {/* Stats */}
+      {!loading && stats && (
+        <div style={{
+          background: '#f9fafb',
+          border: '1px solid #e5e7eb',
+          borderRadius: 12,
+          padding: 24,
+          marginBottom: 24
+        }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 16px 0', color: '#111' }}>
+            📊 Library Stats
+          </h2>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gap: 16
+          }}>
+            <div>
+              <div style={{ fontSize: 28, fontWeight: 'bold', color: '#667eea' }}>
+                {stats.totalTracks.toLocaleString()}
+              </div>
+              <div style={{ fontSize: 13, color: '#6b7280' }}>Total Albums</div>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
-              {filteredSets.map((set) => (
-                <div
-                  key={set.id}
-                  className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:-translate-y-1 hover:shadow-lg transition-all duration-300 flex flex-col gap-4"
-                >
-                  {/* Header */}
-                  <div>
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2 leading-tight">
-                      {set.title}
-                    </h3>
-                    
-                    {set.events && (
-                      <div className="text-blue-500 text-sm font-semibold mb-2 flex items-center gap-2">
-                        📍 {set.events.title}
-                        {set.events.location && ` • ${set.events.location}`}
-                      </div>
-                    )}
-
-                    <div className="text-xs text-gray-500 font-medium">
-                      {formatDate(set.recorded_at || set.created_at)}
-                      {set.download_count > 0 && ` • ${set.download_count} downloads`}
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  {set.description && (
-                    <p className="text-sm text-gray-600 leading-relaxed p-3 bg-gray-50 rounded-lg border-l-4 border-gray-200">
-                      {set.description}
-                    </p>
-                  )}
-
-                  {/* Tags */}
-                  {set.tags && set.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {set.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold"
-                        >
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Play Controls */}
-                  <div className="mt-auto flex flex-col sm:flex-row gap-4">
-                    {/* Large Play Button */}
-                    <a
-                      href={set.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 bg-gradient-to-br from-blue-500 to-green-500 hover:to-green-600 text-white rounded-xl py-3 px-6 font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
-                    >
-                      <span className="text-xl">▶</span>
-                      <span>Play</span>
-                    </a>
-
-                    {/* Download Button */}
-                    <a
-                      href={set.download_url || set.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => handleDownload(set.id, set.file_url, set.title)}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-3 px-4 font-semibold flex items-center justify-center gap-2 transition-colors duration-200"
-                    >
-                      ⬇ DL
-                    </a>
-                  </div>
-
-                  {/* Track Listing */}
-                  {set.track_listing && set.track_listing.length > 0 && (
-                    <details className="mt-2 group">
-                      <summary className="cursor-pointer font-semibold text-gray-700 text-sm py-2 border-b border-gray-200 list-none flex items-center justify-between group-open:text-blue-600">
-                        <span>🎵 Track Listing ({set.track_listing.length})</span>
-                        <span className="text-xs text-gray-400 group-open:rotate-180 transition-transform">▼</span>
-                      </summary>
-                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-2 max-h-48 overflow-y-auto">
-                        <ol className="list-decimal list-inside space-y-1">
-                          {set.track_listing.map((track, index) => (
-                            <li
-                              key={index}
-                              className="text-xs text-gray-600 font-mono leading-tight"
-                            >
-                              {track}
-                            </li>
-                          ))}
-                        </ol>
-                      </div>
-                    </details>
-                  )}
-                </div>
-              ))}
+            <div>
+              <div style={{ fontSize: 28, fontWeight: 'bold', color: '#f093fb' }}>
+                {stats.totalCrates}
+              </div>
+              <div style={{ fontSize: 13, color: '#6b7280' }}>Total Crates</div>
             </div>
-          )}
+            <div>
+              <div style={{ fontSize: 28, fontWeight: 'bold', color: '#4facfe' }}>
+                {stats.smartCrates}
+              </div>
+              <div style={{ fontSize: 13, color: '#6b7280' }}>Smart Crates</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 28, fontWeight: 'bold', color: '#fa709a' }}>
+                {stats.manualCrates}
+              </div>
+              <div style={{ fontSize: 13, color: '#6b7280' }}>Manual Crates</div>
+            </div>
+          </div>
         </div>
-      </main>
+      )}
     </div>
   );
 }

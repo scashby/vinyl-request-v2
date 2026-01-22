@@ -55,17 +55,30 @@ export interface Database {
           // Data
           tracks: Json | null
           
-          // Legacy/Optional (Kept if not dropped by SQL)
+          // Legacy/Optional
           owner: string | null
           purchase_price: number | null
           current_value: number | null
+          purchase_date: string | null
+          purchase_store: string | null
+          play_count: number | null
+          last_cleaned_date: string | null
+          my_rating: number | null
+          signed_by: string[] | null
+          sale_price: number | null
+          sale_platform: string | null
+          sale_quantity: number | null
+          sale_notes: string | null
+          wholesale_cost: number | null
+          pricing_notes: string | null
+          spotify_popularity: number | null
         }
         Insert: {
           id?: number
           artist: string
           title: string
           format: string
-          // Allow optional for almost everything else
+          // Optional fields
           sort_artist?: string | null
           secondary_artists?: string[] | null
           personal_notes?: string | null
@@ -86,7 +99,7 @@ export interface Database {
         }
       }
       
-      // NEW: Normalization Rules
+      // Normalization Rules
       artist_rules: {
         Row: {
           id: number
@@ -107,7 +120,7 @@ export interface Database {
         }
       }
 
-      // NEW: DJ Data Sidecar
+      // DJ Data Sidecar
       collection_dj_data: {
         Row: {
           collection_id: number
@@ -131,7 +144,7 @@ export interface Database {
         }
       }
 
-      // NEW: Unified Tagging
+      // Unified Tagging
       master_tags: {
         Row: {
           id: number
@@ -164,7 +177,7 @@ export interface Database {
         }
       }
 
-      // EXISTING: Crates (Merged Target)
+      // Collection Crates (The ONLY Crate system)
       crates: {
         Row: {
           id: number
@@ -173,16 +186,22 @@ export interface Database {
           color: string | null
           is_smart: boolean
           smart_rules: Json | null
+          match_rules: string | null
+          live_update: boolean | null
+          sort_order: number | null
           created_at: string
         }
         Insert: {
-          id?: number
           name: string
-          // ...
+          icon?: string | null
+          color?: string | null
+          is_smart?: boolean
+          smart_rules?: Json | null
+          [key: string]: unknown
         }
         Update: {
           name?: string
-          // ...
+          [key: string]: unknown
         }
       }
       
@@ -197,15 +216,14 @@ export interface Database {
         Insert: {
           crate_id: number
           album_id: number
-          // ...
+          position?: number
         }
         Update: {
           position?: number
-          // ...
         }
       }
 
-      // EXISTING: Support Tables
+      // Support Tables
       events: { Row: { id: number; [key: string]: unknown }; Insert: { [key: string]: unknown }; Update: { [key: string]: unknown } }
       requests: { Row: { id: number; [key: string]: unknown }; Insert: { [key: string]: unknown }; Update: { [key: string]: unknown } }
       dj_sets: { Row: { id: number; [key: string]: unknown }; Insert: { [key: string]: unknown }; Update: { [key: string]: unknown } }
