@@ -20,6 +20,10 @@ import NewSmartCrateModal from './crates/NewSmartCrateModal';
 import { AddToCrateModal } from './crates/AddToCrateModal';
 import { ManageCratesModal } from './crates/ManageCratesModal';
 
+// Phase 3 Management Tools
+import { ManageRulesModal } from './components/ManageRulesModal';
+import { LinkReleaseModal } from './components/LinkReleaseModal';
+
 type SortOption = 
   | 'artist-asc' | 'artist-desc' 
   | 'title-asc' | 'title-desc' 
@@ -87,6 +91,7 @@ function CollectionBrowserPage() {
   const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<number>>(new Set());
   const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null);
   const [editingAlbumId, setEditingAlbumId] = useState<number | null>(null);
+  const [linkingAlbumId, setLinkingAlbumId] = useState<number | null>(null);
   
   // Modals & UI State
   const [showViewModeDropdown, setShowViewModeDropdown] = useState(false);
@@ -94,6 +99,8 @@ function CollectionBrowserPage() {
   const [showNewSmartCrateModal, setShowNewSmartCrateModal] = useState(false);
   const [showAddToCrateModal, setShowAddToCrateModal] = useState(false);
   const [showManageCratesModal, setShowManageCratesModal] = useState(false);
+  const [showManageRulesModal, setShowManageRulesModal] = useState(false); // Phase 3
+  
   const [editingCrate, setEditingCrate] = useState<Crate | null>(null);
   const [returnToAddToCrate, setReturnToAddToCrate] = useState(false);
   const [newlyCreatedCrateId, setNewlyCreatedCrateId] = useState<number | null>(null);
@@ -204,7 +211,7 @@ function CollectionBrowserPage() {
     loadCrates();
   }, [loadAlbums, loadCrates]);
 
-  // Filtering Logic
+  // Filtering Logic (Phase 3.3 Update)
   const filteredAndSortedAlbums = useMemo(() => {
     let filtered = albums.filter(album => {
       if (collectionFilter === 'For Sale' && !album.for_sale) return false;
@@ -224,7 +231,8 @@ function CollectionBrowserPage() {
           if (selectedCrate.is_smart) {
             if (!albumMatchesSmartCrate(album, selectedCrate)) return false;
           } else {
-            // Manual crate logic
+            // Manual crate logic handled mostly by join tables not fully client-side loaded here for large sets
+            // Assuming simplified smart crate logic for now or hybrid
           }
         }
       }
@@ -237,16 +245,20 @@ function CollectionBrowserPage() {
         const q = searchQuery.toLowerCase();
         
         if (searchField === 'artist') {
-          if (!album.artist?.toLowerCase().includes(q)) return false;
+          if (!album.artist?.toLowerCase().includes(q) && 
+              !album.secondary_artists?.some(sa => sa.toLowerCase().includes(q))) return false;
         } else if (searchField === 'title') {
           if (!album.title?.toLowerCase().includes(q)) return false;
         } else if (searchField === 'tags') {
            const tags = toSafeSearchString(album.custom_tags);
            if (!tags.includes(q)) return false;
         } else {
-          // 'all' search
+          // 'all' search - PHASE 3.3 UPDATE: Include secondary_artists
+          const secondaryArtistsStr = album.secondary_artists ? album.secondary_artists.join(' ') : '';
+          
           const searchable = [
             album.artist,
+            secondaryArtistsStr, // Added secondary artists
             album.title,
             album.format,
             album.year,
@@ -404,6 +416,13 @@ function CollectionBrowserPage() {
               <span className="text-[16px]">+</span>
               <span>Add Albums</span>
             </button>
+            <button 
+              onClick={() => setShowManageRulesModal(true)} 
+              title="Manage Artist Rules" 
+              className="bg-[#2a2a2a] text-white border border-[#555] px-3 py-1.5 rounded cursor-pointer text-[13px] hover:bg-[#333] transition-colors"
+            >
+              🛠️ Rules
+            </button>
             <div className="relative">
               <button onClick={() => setShowCollectionDropdown(!showCollectionDropdown)} className="bg-[#2a2a2a] text-white border border-[#555] px-3 py-1.5 rounded cursor-pointer text-[13px] flex items-center gap-1.5 hover:bg-[#333]">
                 <span>📚</span><span>{collectionFilter}</span><span className="text-[10px]">▼</span>
@@ -463,6 +482,14 @@ function CollectionBrowserPage() {
           <div className="bg-[#5BA3D0] text-white px-4 py-2 flex items-center gap-2 h-10 shrink-0">
             <button onClick={() => setSelectedAlbumIds(new Set())} className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">✕ Cancel</button>
             <button onClick={() => setShowAddToCrateModal(true)} className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">📦 Add to Crate</button>
+            {selectedAlbumIds.size === 1 && (
+              <button 
+                onClick={() => setLinkingAlbumId(Array.from(selectedAlbumIds)[0])}
+                className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs flex items-center gap-1"
+              >
+                🔗 Link Discogs
+              </button>
+            )}
             <div className="flex-1" />
             <span className="text-xs font-medium">{selectedAlbumIds.size} selected</span>
           </div>
@@ -585,6 +612,18 @@ function CollectionBrowserPage() {
         {/* Modals */}
         {showColumnSelector && <ColumnSelector visibleColumns={visibleColumns} onColumnsChange={handleColumnsChange} onClose={() => setShowColumnSelector(false)} />}
         {editingAlbumId && <EditAlbumModal albumId={editingAlbumId} onClose={() => setEditingAlbumId(null)} onRefresh={loadAlbums} onNavigate={(newAlbumId) => setEditingAlbumId(newAlbumId)} allAlbumIds={filteredAndSortedAlbums.map(a => a.id)} />}
+        
+        {/* Management Modals (Phase 3) */}
+        {showManageRulesModal && <ManageRulesModal isOpen={showManageRulesModal} onClose={() => setShowManageRulesModal(false)} />}
+        {linkingAlbumId && (
+          <LinkReleaseModal
+            isOpen={true}
+            onClose={() => setLinkingAlbumId(null)}
+            albumId={linkingAlbumId}
+            currentDiscogsId={albums.find(a => a.id === linkingAlbumId)?.discogs_release_id}
+            onLinkSuccess={loadAlbums}
+          />
+        )}
         
         {/* Crate Management Modals */}
         {showNewCrateModal && <NewCrateModal isOpen={showNewCrateModal} onClose={() => { setShowNewCrateModal(false); setEditingCrate(null); if (returnToAddToCrate) { setReturnToAddToCrate(false); setNewlyCreatedCrateId(null); }}} onCrateCreated={async (newCrateId) => { await loadCrates(); setEditingCrate(null); if (returnToAddToCrate) { setNewlyCreatedCrateId(newCrateId); setShowNewCrateModal(false); setShowAddToCrateModal(true); } else { setShowNewCrateModal(false); }}} editingCrate={editingCrate} />}
