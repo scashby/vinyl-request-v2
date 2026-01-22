@@ -76,19 +76,12 @@ export type Album = {
   custom_tags: string[] | null; // Populated from collection_tags via join
 
   // ============================================================================
-  // PEOPLE (Optional - Keep if you use them)
+  // PEOPLE
   // ============================================================================
   musicians: string[] | null;
   producers: string[] | null;
   engineers: string[] | null;
   songwriters: string[] | null;
-
-  // ============================================================================
-  // DEPRECATED / REMOVED (Do not use - kept for reference if needed during refactor)
-  // ============================================================================
-  // folder: never; 
-  // is_1001: never;
-  // notes: never;
 };
 
 // HELPER FUNCTIONS
