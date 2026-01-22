@@ -296,8 +296,30 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
       ['Gatefold', 'Single Sleeve', 'Digipak'].some(p => d.includes(p))
     ) || null,
     notes: data.notes || null,
-    original_release_date: data.released || null,
   };
+
+  // --- DATE FIX: Handle partial dates (YYYY or YYYY-MM) ---
+  if (data.released) {
+      let dateStr = data.released.trim();
+      
+      // Fix 1979-00-00 garbage
+      dateStr = dateStr.replace(/-00/g, ''); 
+
+      // If YYYY, append -01-01
+      if (/^\d{4}$/.test(dateStr)) {
+          dateStr = `${dateStr}-01-01`;
+          enriched.original_release_year = parseInt(data.released); // Save the raw year too
+      } 
+      // If YYYY-MM, append -01
+      else if (/^\d{4}-\d{2}$/.test(dateStr)) {
+          dateStr = `${dateStr}-01`;
+      }
+      
+      // Final validity check
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+          enriched.original_release_date = dateStr;
+      }
+  }
 
   // Extract Labels from companies
   if (data.companies && Array.isArray(data.companies)) {
@@ -317,15 +339,6 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
       soundTypes.some(type => d.includes(type))
     );
     if (sound) enriched.sound = sound;
-  }
-
-  // Validate date format (YYYY-MM-DD)
-  if (typeof enriched.original_release_date === 'string') {
-    // If only Year (YYYY), default to Jan 1st or leave as is depending on DB preference
-    // For now, we only keep it if it looks like a full date or at least YYYY
-    if (!/^\d{4}/.test(enriched.original_release_date)) {
-      delete enriched.original_release_date;
-    }
   }
 
   if (data.identifiers && Array.isArray(data.identifiers)) {
@@ -797,52 +810,26 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           {/* PREVIEW STAGE */}
           {stage === 'preview' && (
             <>
-              {/* Summary Stats */}
-              <div className="p-4 bg-gray-50 rounded-md mb-4">
-                <h3 className="m-0 mb-3 text-[15px] font-semibold text-gray-900">
-                  Import Summary
-                </h3>
-                <div className="text-sm text-gray-500 mb-3">
-                  <strong>{comparedAlbums.filter(a => a.status !== 'REMOVED').length}</strong> albums found in CSV
-                </div>
-                <div className="flex flex-col gap-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-emerald-600 font-semibold">
-                      {syncMode === 'full_replacement' ? 'Albums to import:' : 'New albums to add:'}
-                    </span>
-                    <span className="text-gray-900 font-semibold">{newCount}</span>
-                  </div>
-                  {syncMode !== 'full_replacement' && (
-                    <>
-                      <div className="flex justify-between">
-                        <span className="text-amber-600 font-semibold">Existing albums missing data:</span>
-                        <span className="text-gray-900 font-semibold">
-                          {comparedAlbums.filter(a => a.status === 'CHANGED' && a.needsEnrichment).length}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500 font-semibold">Unchanged albums:</span>
-                        <span className="text-gray-900 font-semibold">{unchangedCount}</span>
-                      </div>
-                    </>
-                  )}
-                  {(syncMode === 'full_sync' || syncMode === 'full_replacement') && removedCount > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-red-600 font-semibold">Albums to remove:</span>
-                      <span className="text-gray-900 font-semibold">{removedCount}</span>
-                    </div>
-                  )}
-                </div>
+              <div className="text-sm mb-4 bg-blue-50 p-3 rounded text-blue-800 border border-blue-200">
+                Found {comparedAlbums.length} potential changes. Review the summary below before proceeding.
               </div>
 
-              {/* Mode Warning */}
-              <div className="p-3 bg-amber-50 border border-amber-300 rounded text-[13px] text-amber-800 mb-4">
-                <strong>Mode: {syncMode.replace(/_/g, ' ').toUpperCase()}</strong>
-                <br />
-                {syncMode === 'full_replacement' && `Will delete all ${removedCount} albums from database and import all ${newCount} albums from CSV.`}
-                {syncMode === 'full_sync' && 'Will scrape missing/changed data for all CSV albums and remove albums not in CSV.'}
-                {syncMode === 'partial_sync' && 'Will only process new and changed albums.'}
-                {syncMode === 'new_only' && 'Will only add albums not currently in database.'}
+              {/* Summary Stats */}
+              <div className="flex justify-between mb-4 text-center gap-2">
+                <div className="flex-1 bg-green-50 p-2 rounded border border-green-200">
+                  <div className="text-xl font-bold text-green-700">{newCount}</div>
+                  <div className="text-xs text-green-600 font-semibold">NEW</div>
+                </div>
+                <div className="flex-1 bg-gray-50 p-2 rounded border border-gray-200">
+                  <div className="text-xl font-bold text-gray-700">{unchangedCount}</div>
+                  <div className="text-xs text-gray-600 font-semibold">UNCHANGED</div>
+                </div>
+                {(syncMode === 'full_sync' || syncMode === 'full_replacement') && (
+                  <div className="flex-1 bg-red-50 p-2 rounded border border-red-200">
+                    <div className="text-xl font-bold text-red-700">{removedCount}</div>
+                    <div className="text-xs text-red-600 font-semibold">REMOVED</div>
+                  </div>
+                )}
               </div>
 
               {/* Preview Table */}

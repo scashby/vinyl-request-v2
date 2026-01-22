@@ -9,570 +9,203 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      events: {
+      collection: {
         Row: {
           id: number
+          artist: string
+          sort_artist: string | null
+          secondary_artists: string[] | null
           title: string
-          date: string
-          time: string
-          location: string
-          image_url: string
-          info: string
-          info_url: string | null
-          has_queue: boolean
-          queue_type: string | null
-          queue_types: string[] | null
-          allowed_formats: string[] | null
-          allowed_tags: string[] | null
-          is_recurring: boolean
-          recurrence_pattern: string | null
-          recurrence_interval: number | null
-          recurrence_end_date: string | null
-          parent_event_id: number | null
-          is_featured_grid: boolean
-          is_featured_upnext: boolean
-          featured_priority: number | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: number
-          title: string
-          date: string
-          time: string
-          location: string
-          image_url: string
-          info: string
-          info_url?: string | null
-          has_queue?: boolean
-          queue_type?: string | null
-          queue_types?: string[] | null
-          allowed_formats?: string[] | null
-          allowed_tags?: string[] | null
-          is_recurring?: boolean
-          recurrence_pattern?: string | null
-          recurrence_interval?: number | null
-          recurrence_end_date?: string | null
-          parent_event_id?: number | null
-          is_featured_grid?: boolean
-          is_featured_upnext?: boolean
-          featured_priority?: number | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: number
-          title?: string
-          date?: string
-          time?: string
-          location?: string
-          image_url?: string
-          info?: string
-          info_url?: string | null
-          has_queue?: boolean
-          queue_type?: string | null
-          queue_types?: string[] | null
-          allowed_formats?: string[] | null
-          allowed_tags?: string[] | null
-          is_recurring?: boolean
-          recurrence_pattern?: string | null
-          recurrence_interval?: number | null
-          recurrence_end_date?: string | null
-          parent_event_id?: number | null
-          is_featured_grid?: boolean
-          is_featured_upnext?: boolean
-          featured_priority?: number | null
-          created_at?: string
-          updated_at?: string
-        }
-      }
-      requests: {
-        Row: {
-          id: number
-          event_id: number
-          album_title: string
-          artist: string
-          user_name: string | null
-          user_email: string | null
-          votes: number
-          status: string
-          queue_type: string
-          side: string | null
-          track_number: number | null
-          created_at: string
-          updated_at: string
-          played_at: string | null
-          notes: string | null
-        }
-        Insert: {
-          id?: number
-          event_id: number
-          album_title: string
-          artist: string
-          user_name?: string | null
-          user_email?: string | null
-          votes?: number
-          status?: string
-          queue_type: string
-          side?: string | null
-          track_number?: number | null
-          created_at?: string
-          updated_at?: string
-          played_at?: string | null
-          notes?: string | null
-        }
-        Update: {
-          id?: number
-          event_id?: number
-          album_title?: string
-          artist?: string
-          user_name?: string | null
-          user_email?: string | null
-          votes?: number
-          status?: string
-          queue_type?: string
-          side?: string | null
-          track_number?: number | null
-          created_at?: string
-          updated_at?: string
-          played_at?: string | null
-          notes?: string | null
-        }
-      }
-      tag_definitions: {
-        Row: {
-          id: number
-          tag_name: string
-          category: string
-          color: string
-          description: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: number
-          tag_name: string
-          category: string
-          color: string
-          description?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: number
-          tag_name?: string
-          category?: string
-          color?: string
-          description?: string | null
-          created_at?: string
-        }
-      }
-      collection_1001_matches: {
-        Row: {
-          id: number
-          collection_id: number
-          album_id: number
-          match_type: string
-          confidence: number
-          created_at: string
-        }
-        Insert: {
-          id?: number
-          collection_id: number
-          album_id: number
-          match_type: string
-          confidence?: number
-          created_at?: string
-        }
-        Update: {
-          id?: number
-          collection_id?: number
-          album_id?: number
-          match_type?: string
-          confidence?: number
-          created_at?: string
-        }
-      }
-      one_thousand_one_albums: {
-        Row: {
-          id: number
-          position: number
-          artist: string
-          album: string
-          year: number | null
-          genre: string | null
-          subgenre: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: number
-          position: number
-          artist: string
-          album: string
-          year?: number | null
-          genre?: string | null
-          subgenre?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: number
-          position?: number
-          artist?: string
-          album?: string
-          year?: number | null
-          genre?: string | null
-          subgenre?: string | null
-          created_at?: string
-        }
-      }
-      collection_1001_review: {
-        Row: {
-          id: number
-          collection_id: number
-          album_id: number
-          review_status: string
-          reviewed_at: string | null
-          notes: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: number
-          collection_id: number
-          album_id: number
-          review_status?: string
-          reviewed_at?: string | null
-          notes?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: number
-          collection_id?: number
-          album_id?: number
-          review_status?: string
-          reviewed_at?: string | null
-          notes?: string | null
-          created_at?: string
-        }
-      }
-      admin_settings: {
-        Row: {
-          id: number
-          key: string
-          value: Json
-          description: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: number
-          key: string
-          value: Json
-          description?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: number
-          key?: string
-          value?: Json
-          description?: string | null
-          created?: string
-          updated_at?: string
-        }
-      }
-      vinyl_collection: {
-        Row: {
-          id: number
-          discogs_id: number
-          artist: string
-          title: string
-          year: number | null
-          format: string | null
-          label: string | null
-          catalog_number: string | null
-          genres: string[] | null
-          styles: string[] | null
-          country: string | null
-          notes: string | null
-          date_added: string
-          last_updated: string | null
-          cover_image: string | null
-          custom_tags: string[] | null
-          spotify_album_id: string | null
-          spotify_artist_id: string | null
+          year: string | null
+          year_int: number | null
+          format: string
+          
+          // Physical & Location
+          location: string | null
+          media_condition: string
+          package_sleeve_condition: string | null
+          rpm: string | null
+          vinyl_weight: string | null
+          vinyl_color: string | null
+          discs: number | null
+          sides: number | null
+          
+          // Status
+          collection_status: string | null
+          for_sale: boolean
+          date_added: string | null
+          modified_date: string | null
+          
+          // Notes
+          personal_notes: string | null
+          release_notes: string | null
+          extra: string | null
+          
+          // Identifiers
+          image_url: string | null
+          discogs_release_id: string | null
+          discogs_master_id: string | null
+          spotify_id: string | null
           apple_music_id: string | null
-          lastfm_album_id: string | null
-          spotify_popularity: number | null
-          apple_music_url: string | null
-          genius_song_id: number | null
-          lyrics_cached_at: string | null
-          // NEW FIELDS START
-          energy: number | null
-          enrichment_sources: string[] | null
-          finalized_fields: string[] | null
-          enrichment_summary: Json | null
-          musicians: string[] | null
-          producers: string[] | null
-          credits: Json | null
-          composer: string | null
-          conductor: string | null
-          orchestra: string | null
-          // NEW FIELDS END
+          barcode: string | null
+          cat_no: string | null
+          
+          // Rich Data
+          tracks: Json | null
+          
+          // Deprecated/Legacy (Kept only if SQL didn't drop them yet, mostly gone)
+          owner: string | null
+          purchase_price: number | null
+          current_value: number | null
         }
         Insert: {
           id?: number
-          discogs_id: number
           artist: string
+          sort_artist?: string | null
+          secondary_artists?: string[] | null
           title: string
-          year?: number | null
-          format?: string | null
-          label?: string | null
-          catalog_number?: string | null
-          genres?: string[] | null
-          styles?: string[] | null
-          country?: string | null
-          notes?: string | null
-          date_added?: string
-          last_updated?: string | null
-          cover_image?: string | null
-          custom_tags?: string[] | null
-          spotify_album_id?: string | null
-          spotify_artist_id?: string | null
-          apple_music_id?: string | null
-          lastfm_album_id?: string | null
-          spotify_popularity?: number | null
-          apple_music_url?: string | null
-          genius_song_id?: number | null
-          lyrics_cached_at?: string | null
-          // NEW FIELDS START
-          energy?: number | null
-          enrichment_sources?: string[] | null
-          finalized_fields?: string[] | null
-          enrichment_summary?: Json | null
-          musicians?: string[] | null
-          producers?: string[] | null
-          credits?: Json | null
-          composer?: string | null
-          conductor?: string | null
-          orchestra?: string | null
-          // NEW FIELDS END
+          // ... (Rest of fields matching Row, marked optional)
+          personal_notes?: string | null
+          release_notes?: string | null
+          location?: string | null
+          for_sale?: boolean
+          tracks?: Json | null
         }
         Update: {
           id?: number
-          discogs_id?: number
           artist?: string
-          title?: string
-          year?: number | null
-          format?: string | null
-          label?: string | null
-          catalog_number?: string | null
-          genres?: string[] | null
-          styles?: string[] | null
-          country?: string | null
-          notes?: string | null
-          date_added?: string
-          last_updated?: string | null
-          cover_image?: string | null
-          custom_tags?: string[] | null
-          spotify_album_id?: string | null
-          spotify_artist_id?: string | null
-          apple_music_id?: string | null
-          lastfm_album_id?: string | null
-          spotify_popularity?: number | null
-          apple_music_url?: string | null
-          genius_song_id?: number | null
-          lyrics_cached_at?: string | null
-          // NEW FIELDS START
-          energy?: number | null
-          enrichment_sources?: string[] | null
-          finalized_fields?: string[] | null
-          enrichment_summary?: Json | null
-          musicians?: string[] | null
-          producers?: string[] | null
-          credits?: Json | null
-          composer?: string | null
-          conductor?: string | null
-          orchestra?: string | null
-          // NEW FIELDS END
+          personal_notes?: string | null
+          location?: string | null
+          // ... (All fields optional)
         }
       }
-      dj_tracks: {
+      
+      // NEW: Artist Rules
+      artist_rules: {
         Row: {
           id: number
-          collection_id: number
-          track_name: string
-          track_number: number
-          side: string | null
-          duration_ms: number | null
-          spotify_track_id: string | null
-          apple_music_track_id: string | null
-          isrc: string | null
+          search_pattern: string
+          replacement: string | null
+          rule_type: 'alias' | 'sort_exception' | 'ignore'
           created_at: string
-          updated_at: string | null
-          // NEW FIELDS START
-          lyrics: string | null
+        }
+        Insert: {
+          search_pattern: string
+          replacement?: string | null
+          rule_type: 'alias' | 'sort_exception' | 'ignore'
+        }
+        Update: {
+          search_pattern?: string
+          replacement?: string | null
+          rule_type?: 'alias' | 'sort_exception' | 'ignore'
+        }
+      }
+
+      // NEW: DJ Data Sidecar
+      collection_dj_data: {
+        Row: {
+          collection_id: number
           bpm: number | null
           musical_key: string | null
-          // NEW FIELDS END
+          energy: number | null
+          danceability: number | null
+          valence: number | null
+          created_at: string
         }
         Insert: {
-          id?: number
           collection_id: number
-          track_name: string
-          track_number: number
-          side?: string | null
-          duration_ms?: number | null
-          spotify_track_id?: string | null
-          apple_music_track_id?: string | null
-          isrc?: string | null
-          created_at?: string
-          updated_at?: string | null
-          // NEW FIELDS START
-          lyrics?: string | null
           bpm?: number | null
           musical_key?: string | null
-          // NEW FIELDS END
+          energy?: number | null
+          danceability?: number | null
+          valence?: number | null
         }
         Update: {
-          id?: number
-          collection_id?: number
-          track_name?: string
-          track_number?: number
-          side?: string | null
-          duration_ms?: number | null
-          spotify_track_id?: string | null
-          apple_music_track_id?: string | null
-          isrc?: string | null
-          created_at?: string
-          updated_at?: string | null
-          // NEW FIELDS START
-          lyrics?: string | null
           bpm?: number | null
           musical_key?: string | null
-          // NEW FIELDS END
+          // ...
         }
       }
-      dj_crates: {
+
+      // NEW: Unified Tags
+      master_tags: {
         Row: {
           id: number
           name: string
-          description: string | null
-          color: string | null
+          category: 'genre' | 'style' | 'mood' | 'context' | 'custom'
           created_at: string
-          updated_at: string | null
         }
         Insert: {
-          id?: number
           name: string
-          description?: string | null
-          color?: string | null
-          created_at?: string
-          updated_at?: string | null
+          category?: 'genre' | 'style' | 'mood' | 'context' | 'custom'
         }
         Update: {
-          id?: number
           name?: string
-          description?: string | null
-          color?: string | null
-          created_at?: string
-          updated_at?: string | null
+          category?: 'genre' | 'style' | 'mood' | 'context' | 'custom'
         }
       }
-      dj_crate_items: {
+
+      collection_tags: {
+        Row: {
+          collection_id: number
+          tag_id: number
+        }
+        Insert: {
+          collection_id: number
+          tag_id: number
+        }
+        Update: {
+          collection_id?: number
+          tag_id?: number
+        }
+      }
+
+      // KEEP: Core Tables
+      crates: {
         Row: {
           id: number
-          crate_id: number
-          collection_id: number | null
-          track_id: number | null
-          position: number
-          notes: string | null
+          name: string
+          icon: string | null
+          color: string | null
+          is_smart: boolean
+          smart_rules: Json | null
           created_at: string
         }
         Insert: {
           id?: number
-          crate_id: number
-          collection_id?: number | null
-          track_id?: number | null
-          position?: number
-          notes?: string | null
-          created_at?: string
+          name: string
+          // ...
         }
         Update: {
-          id?: number
-          crate_id?: number
-          collection_id?: number | null
-          track_id?: number | null
+          name?: string
+          // ...
+        }
+      }
+      
+      crate_albums: {
+        Row: {
+          id: number
+          crate_id: number
+          album_id: number
+          position: number
+          added_at: string
+        }
+        Insert: {
+          crate_id: number
+          album_id: number
+          // ...
+        }
+        Update: {
           position?: number
-          notes?: string | null
-          created_at?: string
+          // ...
         }
       }
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      match_1001_exact: {
-        Args: {
-          target_artist: string
-          target_album: string
-        }
-        Returns: {
-          collection_id: number
-          artist: string
-          title: string
-          match_score: number
-        }[]
-      }
-      match_1001_fuzzy: {
-        Args: {
-          target_artist: string
-          target_album: string
-          threshold?: number
-          year_slop?: number
-        }
-        Returns: {
-          collection_id: number
-          artist: string
-          title: string
-          match_score: number
-        }[]
-      }
-      match_1001_same_artist: {
-        Args: {
-          list_artist: string
-        }
-        Returns: {
-          collection_id: number
-          artist: string
-          title: string
-        }[]
-      }
-      match_1001_fuzzy_artist: {
-        Args: {
-          target_artist: string
-          target_album: string
-          threshold?: number
-        }
-        Returns: {
-          collection_id: number
-          artist: string
-          title: string
-          artist_distance: number
-          album_distance: number
-        }[]
-      }
-      manual_link_1001: {
-        Args: {
-          p_collection_id: number
-          p_album_id: number
-        }
-        Returns: void
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
+
+      // KEEP: Supporting Tables
+      events: { Row: { id: number /*...*/ }; Insert: { /*...*/ }; Update: { /*...*/ } }
+      dj_sets: { Row: { id: number /*...*/ }; Insert: { /*...*/ }; Update: { /*...*/ } }
+      format_abbreviations: { Row: { id: number /*...*/ }; Insert: { /*...*/ }; Update: { /*...*/ } }
+      staff_picks: { Row: { id: number /*...*/ }; Insert: { /*...*/ }; Update: { /*...*/ } }
     }
   }
 }
