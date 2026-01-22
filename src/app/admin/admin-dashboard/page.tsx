@@ -1,12 +1,10 @@
-// src/app/admin/admin-dashboard/page.tsx - UPDATED WITHOUT AUDIO RECOGNITION
+// src/app/admin/admin-dashboard/page.tsx
 "use client";
 
 import { useEffect, useState, CSSProperties } from 'react';
 import Link from 'next/link';
-// Fix: Import directly from 'lib' since baseUrl is 'src'
 import { supabase } from 'lib/supabaseClient';
 
-// Define types for state variables
 interface DashboardStats {
   totalAlbums: number;
   totalEvents: number;
@@ -19,7 +17,6 @@ interface DashboardEvent {
   date: string;
   time: string;
   location: string;
-  // Fix: Use 'unknown' instead of 'any' to satisfy linting rules
   [key: string]: unknown; 
 }
 
@@ -52,7 +49,6 @@ export default function AdminDashboardPage() {
     setLoading(true);
     
     try {
-      // Check authentication status first
       const { data: { session }, error: authError } = await supabase.auth.getSession();
       
       if (authError) {
@@ -64,13 +60,8 @@ export default function AdminDashboardPage() {
         setAuthStatus('unauthenticated');
       }
 
-      // Test database connections
-      const dbTests: DbTestResults = {
-        collection: 'pending',
-        events: 'pending'
-      };
+      const dbTests: DbTestResults = { collection: 'pending', events: 'pending' };
 
-      // Test collection table
       try {
         await supabase.from('collection').select('id', { count: 'exact', head: true }).limit(1);
         dbTests.collection = 'success';
@@ -79,7 +70,6 @@ export default function AdminDashboardPage() {
         console.error('Collection DB test failed:', error);
       }
 
-      // Test events table
       try {
         await supabase.from('events').select('id', { count: 'exact', head: true }).limit(1);
         dbTests.events = 'success';
@@ -90,17 +80,9 @@ export default function AdminDashboardPage() {
 
       setDbTestResults(dbTests);
 
-      // Get collection stats
-      const { count: albumCount } = await supabase
-        .from('collection')
-        .select('id', { count: 'exact', head: true });
+      const { count: albumCount } = await supabase.from('collection').select('id', { count: 'exact', head: true });
+      const { count: totalEventsCount } = await supabase.from('events').select('id', { count: 'exact', head: true });
 
-      // Get events stats
-      const { count: totalEventsCount } = await supabase
-        .from('events')
-        .select('id', { count: 'exact', head: true });
-
-      // Get upcoming events (next 30 days)
       const today = new Date().toISOString().split('T')[0];
       const nextMonth = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       
@@ -144,605 +126,113 @@ export default function AdminDashboardPage() {
     );
   }
 
-  // Styles
-  const externalToolWrapperStyle: CSSProperties = {
-    background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-    color: 'white',
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 24
-  };
-
-  const externalToolHeaderStyle: CSSProperties = {
-    marginBottom: 20
-  };
-
-  const externalToolTitleStyle: CSSProperties = {
-    margin: 0,
-    fontSize: 20,
-    fontWeight: 600,
-    marginBottom: 8
-  };
-
-  const externalToolDescStyle: CSSProperties = {
-    margin: 0,
-    opacity: 0.9,
-    fontSize: 14
-  };
-
-  const externalToolGridStyle: CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-    gap: 12
-  };
-
-  const externalLinkStyle: CSSProperties = {
-    background: 'rgba(255,255,255,0.15)',
-    color: 'white',
-    padding: '10px 16px',
-    borderRadius: 8,
-    textDecoration: 'none',
-    fontWeight: 600,
-    fontSize: 13,
-    textAlign: 'center',
-    border: '1px solid rgba(255,255,255,0.2)',
-    transition: 'all 0.2s'
-  };
-
-  const statusBoxStyle: CSSProperties = {
-    background: '#fff',
-    border: '1px solid #e5e7eb',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-  };
-
-  const statusHeaderStyle: CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16
-  };
-
-  const statusTitleStyle: CSSProperties = {
-    margin: 0,
-    fontSize: 18,
-    fontWeight: 600,
-    color: '#1f2937'
-  };
-
-  const refreshButtonStyle: CSSProperties = {
-    padding: '4px 8px',
-    background: '#f3f4f6',
-    border: '1px solid #d1d5db',
-    borderRadius: 4,
-    fontSize: 12,
-    cursor: 'pointer'
-  };
-
-  const statusGridStyle: CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: 12
-  };
-
-  const statsGridStyle: CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: 20,
-    marginBottom: 32
-  };
-
-  const mainGridStyle: CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: '2fr 1fr',
-    gap: 24,
-    marginBottom: 32
-  };
-
-  const contentBoxStyle: CSSProperties = {
-    background: '#fff',
-    border: '1px solid #e5e7eb',
-    borderRadius: 12,
-    padding: 24
-  };
-
-  const contentTitleStyle: CSSProperties = {
-    margin: '0 0 20px 0',
-    fontSize: 18,
-    fontWeight: 600,
-    color: '#1f2937'
-  };
-
-  const actionLinkBaseStyle: CSSProperties = {
-    display: 'block',
-    padding: '12px 16px',
-    color: 'white',
-    borderRadius: 8,
-    textDecoration: 'none',
-    fontWeight: 600,
-    textAlign: 'center',
-    fontSize: 14
-  };
+  // Styles (Compact for brevity)
+  const externalToolWrapperStyle: CSSProperties = { background: 'linear-gradient(135deg, #059669 0%, #047857 100%)', color: 'white', borderRadius: 16, padding: 24, marginBottom: 24 };
+  const externalLinkStyle: CSSProperties = { background: 'rgba(255,255,255,0.15)', color: 'white', padding: '10px 16px', borderRadius: 8, textDecoration: 'none', fontWeight: 600, fontSize: 13, textAlign: 'center', border: '1px solid rgba(255,255,255,0.2)', transition: 'all 0.2s' };
+  const contentBoxStyle: CSSProperties = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 24 };
+  const actionLinkBaseStyle: CSSProperties = { display: 'block', padding: '12px 16px', color: 'white', borderRadius: 8, textDecoration: 'none', fontWeight: 600, textAlign: 'center', fontSize: 14 };
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen max-w-7xl mx-auto font-sans">
-      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Admin Dashboard
-        </h1>
-        <p className="text-base text-gray-500">
-          Welcome back! Here&apos;s what&apos;s happening with Dead Wax Dialogues.
-        </p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+        <p className="text-base text-gray-500">Welcome back! Here&apos;s what&apos;s happening with Dead Wax Dialogues.</p>
       </div>
 
-      {/* External Tools Quick Access */}
       <div style={externalToolWrapperStyle}>
-        <div style={externalToolHeaderStyle}>
-          <h3 style={externalToolTitleStyle}>
-            🔗 External Admin Tools
-          </h3>
-          <p style={externalToolDescStyle}>
-            Quick access to all your external services and platforms
-          </p>
+        <div style={{ marginBottom: 20 }}>
+          <h3 style={{ margin: 0, fontSize: 20, fontWeight: 600, marginBottom: 8 }}>🔗 External Admin Tools</h3>
+          <p style={{ margin: 0, opacity: 0.9, fontSize: 14 }}>Quick access to all your external services and platforms</p>
         </div>
-        <div style={externalToolGridStyle}>
-          <Link
-            href="https://blog.deadwaxdialogues.com/wp-admin/"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={externalLinkStyle}
-            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-          >
-            📝 WordPress Admin
-          </Link>
-          <Link
-            href="https://console.hetzner.com/projects"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={externalLinkStyle}
-            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-          >
-            🖥️ Hetzner Console
-          </Link>
-          <Link
-            href="https://business.facebook.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={externalLinkStyle}
-            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-          >
-            📘 Facebook Business
-          </Link>
-          <Link
-            href="https://login.buffer.com/login?plan=free&cycle=year&cta=bufferSite-globalNav-login-1"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={externalLinkStyle}
-            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-          >
-            📱 Buffer
-          </Link>
-          <Link
-            href="https://supabase.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={externalLinkStyle}
-            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-          >
-            🗄️ Supabase
-          </Link>
-          <Link
-            href="https://vercel.com/scashbys-projects/vinyl-request-v2"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={externalLinkStyle}
-            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-          >
-            ▲ Vercel
-          </Link>
-          <Link
-            href="https://admin.google.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={externalLinkStyle}
-            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-          >
-            🔍 Google Admin
-          </Link>
-          <Link
-            href="https://login.squarespace.com/api/1/login/"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={externalLinkStyle}
-            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-          >
-            ⬛ Squarespace
-          </Link>
-          <Link
-            href="https://app.dub.co/login"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={externalLinkStyle}
-            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-          >
-            🔗 Dub.co
-          </Link>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+          <Link href="https://blog.deadwaxdialogues.com/wp-admin/" target="_blank" style={externalLinkStyle}>📝 WordPress Admin</Link>
+          <Link href="https://console.hetzner.com/projects" target="_blank" style={externalLinkStyle}>🖥️ Hetzner Console</Link>
+          <Link href="https://business.facebook.com/" target="_blank" style={externalLinkStyle}>📘 Facebook Business</Link>
+          <Link href="https://login.buffer.com/login" target="_blank" style={externalLinkStyle}>📱 Buffer</Link>
+          <Link href="https://supabase.com/" target="_blank" style={externalLinkStyle}>🗄️ Supabase</Link>
+          <Link href="https://vercel.com/" target="_blank" style={externalLinkStyle}>▲ Vercel</Link>
+          <Link href="https://admin.google.com/" target="_blank" style={externalLinkStyle}>🔍 Google Admin</Link>
+          <Link href="https://login.squarespace.com/" target="_blank" style={externalLinkStyle}>⬛ Squarespace</Link>
+          <Link href="https://app.dub.co/login" target="_blank" style={externalLinkStyle}>🔗 Dub.co</Link>
         </div>
       </div>
 
-      {/* System Health & Authentication Status */}
-      <div style={statusBoxStyle}>
-        <div style={statusHeaderStyle}>
-          <h3 style={statusTitleStyle}>
-            🔧 System Health Monitor
-          </h3>
-          <button
-            onClick={loadDashboardData}
-            style={refreshButtonStyle}
-          >
-            Refresh
-          </button>
+      {/* System Health */}
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20, marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#1f2937' }}>🔧 System Health Monitor</h3>
+          <button onClick={loadDashboardData} style={{ padding: '4px 8px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12, cursor: 'pointer' }}>Refresh</button>
         </div>
-
-        <div style={statusGridStyle}>
-          {/* Authentication Status */}
-          <div style={{
-            padding: 12,
-            background: authStatus === 'authenticated' ? '#f0fdf4' : 
-                       authStatus === 'error' ? '#fef2f2' : '#fef3c7',
-            border: `1px solid ${authStatus === 'authenticated' ? '#22c55e' : 
-                                  authStatus === 'error' ? '#ef4444' : '#f59e0b'}`,
-            borderRadius: 6
-          }}>
-            <div style={{
-              fontSize: 14,
-              fontWeight: 600,
-              color: authStatus === 'authenticated' ? '#15803d' : 
-                     authStatus === 'error' ? '#dc2626' : '#d97706',
-              marginBottom: 4
-            }}>
-              {authStatus === 'authenticated' ? '✅ Authentication' : 
-               authStatus === 'error' ? '❌ Auth Error' : 
-               authStatus === 'unauthenticated' ? '⚠️ Not Logged In' : '🔄 Checking Auth'}
-            </div>
-            <div style={{
-              fontSize: 12,
-              color: authStatus === 'authenticated' ? '#16a34a' : 
-                     authStatus === 'error' ? '#dc2626' : '#92400e'
-            }}>
-              {authStatus === 'authenticated' ? 'Admin session active' : 
-               authStatus === 'error' ? 'Authentication failed' : 
-               authStatus === 'unauthenticated' ? 'Please log in to admin' : 'Verifying session...'}
-            </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+          <div style={{ padding: 12, background: authStatus === 'authenticated' ? '#f0fdf4' : '#fef2f2', borderRadius: 6, border: `1px solid ${authStatus === 'authenticated' ? '#22c55e' : '#ef4444'}` }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: authStatus === 'authenticated' ? '#15803d' : '#dc2626' }}>{authStatus === 'authenticated' ? '✅ Authentication' : '❌ Auth Error'}</div>
           </div>
-
-          {/* Database Health Checks */}
-          <div style={{
-            padding: 12,
-            background: dbTestResults.collection === 'success' ? '#f0fdf4' : '#fef2f2',
-            border: `1px solid ${dbTestResults.collection === 'success' ? '#22c55e' : '#ef4444'}`,
-            borderRadius: 6
-          }}>
-            <div style={{
-              fontSize: 14,
-              fontWeight: 600,
-              color: dbTestResults.collection === 'success' ? '#15803d' : '#dc2626',
-              marginBottom: 4
-            }}>
-              {dbTestResults.collection === 'success' ? '✅ Collection DB' : '❌ Collection DB'}
-            </div>
-            <div style={{
-              fontSize: 12,
-              color: dbTestResults.collection === 'success' ? '#16a34a' : '#dc2626'
-            }}>
-              {dbTestResults.collection === 'success' ? 'Database accessible' : 'Connection failed'}
-            </div>
+          <div style={{ padding: 12, background: dbTestResults.collection === 'success' ? '#f0fdf4' : '#fef2f2', borderRadius: 6, border: `1px solid ${dbTestResults.collection === 'success' ? '#22c55e' : '#ef4444'}` }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: dbTestResults.collection === 'success' ? '#15803d' : '#dc2626' }}>{dbTestResults.collection === 'success' ? '✅ Collection DB' : '❌ Collection DB'}</div>
           </div>
-
-          <div style={{
-            padding: 12,
-            background: dbTestResults.events === 'success' ? '#f0fdf4' : '#fef2f2',
-            border: `1px solid ${dbTestResults.events === 'success' ? '#22c55e' : '#ef4444'}`,
-            borderRadius: 6
-          }}>
-            <div style={{
-              fontSize: 14,
-              fontWeight: 600,
-              color: dbTestResults.events === 'success' ? '#15803d' : '#dc2626',
-              marginBottom: 4
-            }}>
-              {dbTestResults.events === 'success' ? '✅ Events DB' : '❌ Events DB'}
-            </div>
-            <div style={{
-              fontSize: 12,
-              color: dbTestResults.events === 'success' ? '#16a34a' : '#dc2626'
-            }}>
-              {dbTestResults.events === 'success' ? 'Database accessible' : 'Connection failed'}
-            </div>
+          <div style={{ padding: 12, background: dbTestResults.events === 'success' ? '#f0fdf4' : '#fef2f2', borderRadius: 6, border: `1px solid ${dbTestResults.events === 'success' ? '#22c55e' : '#ef4444'}` }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: dbTestResults.events === 'success' ? '#15803d' : '#dc2626' }}>{dbTestResults.events === 'success' ? '✅ Events DB' : '❌ Events DB'}</div>
           </div>
         </div>
-
-        {/* Show specific help for authentication issues */}
-        {authStatus !== 'authenticated' && (
-          <div style={{
-            marginTop: 12,
-            padding: 12,
-            background: '#fef3c7',
-            border: '1px solid #f59e0b',
-            borderRadius: 6,
-            fontSize: 12,
-            color: '#92400e'
-          }}>
-            <strong>Authentication Issue:</strong> Please ensure you&apos;re logged into the admin system. 
-            <Link href="/admin/login" style={{ color: '#d97706', marginLeft: 4 }}>
-              Go to login page →
-            </Link>
-          </div>
-        )}
       </div>
 
-      {/* Stats Grid */}
-      <div style={statsGridStyle}>
-        <div style={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          color: 'white',
-          padding: 24,
-          borderRadius: 12,
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-        }}>
-          <div style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 4 }}>
-            {stats.totalAlbums.toLocaleString()}
-          </div>
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20, marginBottom: 32 }}>
+        <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: 24, borderRadius: 12 }}>
+          <div style={{ fontSize: 32, fontWeight: 'bold' }}>{stats.totalAlbums.toLocaleString()}</div>
           <div style={{ opacity: 0.9, fontSize: 14 }}>Total Albums</div>
         </div>
-
-        <div style={{
-          background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-          color: 'white',
-          padding: 24,
-          borderRadius: 12,
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-        }}>
-          <div style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 4 }}>
-            {stats.upcomingEvents}
-          </div>
+        <div style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white', padding: 24, borderRadius: 12 }}>
+          <div style={{ fontSize: 32, fontWeight: 'bold' }}>{stats.upcomingEvents}</div>
           <div style={{ opacity: 0.9, fontSize: 14 }}>Upcoming Events</div>
         </div>
-
-        <div style={{
-          background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-          color: 'white',
-          padding: 24,
-          borderRadius: 12,
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-        }}>
-          <div style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 4 }}>
-            {stats.totalEvents}
-          </div>
+        <div style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white', padding: 24, borderRadius: 12 }}>
+          <div style={{ fontSize: 32, fontWeight: 'bold' }}>{stats.totalEvents}</div>
           <div style={{ opacity: 0.9, fontSize: 14 }}>Total Events</div>
         </div>
       </div>
 
-      {/* Main Content Grid */}
-      <div style={mainGridStyle}>
-        {/* Left Column - Recent Activity Placeholder */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          <div style={contentBoxStyle}>
-            <h3 style={contentTitleStyle}>
-              📊 Recent Activity
-            </h3>
-            <div style={{
-              textAlign: 'center',
-              color: '#6b7280',
-              padding: 24,
-              fontStyle: 'italic'
-            }}>
-              Activity tracking coming soon
-            </div>
-          </div>
+      {/* Main Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24, marginBottom: 32 }}>
+        {/* Left: Recent Activity */}
+        <div style={contentBoxStyle}>
+          <h3 style={{ margin: '0 0 20px 0', fontSize: 18, fontWeight: 600, color: '#1f2937' }}>📊 Recent Activity</h3>
+          <div style={{ textAlign: 'center', color: '#6b7280', padding: 24, fontStyle: 'italic' }}>Activity tracking coming soon</div>
         </div>
 
-        {/* Right Column */}
+        {/* Right: Quick Actions */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {/* Quick Actions */}
           <div style={contentBoxStyle}>
-            <h3 style={contentTitleStyle}>
-              ⚡ Quick Actions
-            </h3>
+            <h3 style={{ margin: '0 0 20px 0', fontSize: 18, fontWeight: 600, color: '#1f2937' }}>⚡ Quick Actions</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {authStatus === 'authenticated' ? (
                 <>
-                  <Link
-                    href="/admin/import-discogs"
-                    style={{
-                      ...actionLinkBaseStyle,
-                      background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                    }}
-                  >
-                    📥 Import from Discogs
-                  </Link>
-                  <Link
-                    href="/admin/manage-events"
-                    style={{
-                      ...actionLinkBaseStyle,
-                      background: 'linear-gradient(135deg, #10b981, #047857)',
-                    }}
-                  >
-                    📅 Manage Events
-                  </Link>
-                  <Link
-                    href="/admin/edit-collection"
-                    style={{
-                      ...actionLinkBaseStyle,
-                      background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
-                    }}
-                  >
-                    📚 Browse Collection
-                  </Link>
-                  <Link
-                    href="/admin/diagnostics"
-                    style={{
-                      ...actionLinkBaseStyle,
-                      background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                    }}
-                  >
-                    🔍 Data Diagnostics
-                  </Link>
+                  <Link href="/admin/manage-events" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #10b981, #047857)' }}>📅 Manage Events</Link>
+                  <Link href="/admin/edit-collection" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>📚 Collection Command Center</Link>
+                  <Link href="/admin/diagnostics" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>🔍 Data Diagnostics</Link>
                 </>
               ) : (
-                <>
-                  <Link
-                    href="/admin/login"
-                    style={{
-                      ...actionLinkBaseStyle,
-                      background: 'linear-gradient(135deg, #dc2626, #b91c1c)',
-                    }}
-                  >
-                    🔑 Login Required
-                  </Link>
-                  <div style={{
-                    padding: '8px 12px',
-                    background: '#fef3c7',
-                    border: '1px solid #f59e0b',
-                    borderRadius: 6,
-                    fontSize: 12,
-                    color: '#92400e',
-                    textAlign: 'center'
-                  }}>
-                    Please log in to access admin features
-                  </div>
-                </>
+                <Link href="/admin/login" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #dc2626, #b91c1c)' }}>🔑 Login Required</Link>
               )}
             </div>
           </div>
 
-          {/* Upcoming Events */}
+          {/* Upcoming Events List */}
           <div style={contentBoxStyle}>
-            <h3 style={contentTitleStyle}>
-              📅 Upcoming Events
-            </h3>
-
+            <h3 style={{ margin: '0 0 20px 0', fontSize: 18, fontWeight: 600, color: '#1f2937' }}>📅 Upcoming Events</h3>
             {upcomingEvents.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                color: '#6b7280',
-                padding: 16,
-                fontStyle: 'italic'
-              }}>
-                No upcoming events
-              </div>
+              <div style={{ textAlign: 'center', color: '#6b7280', padding: 16 }}>No upcoming events</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {upcomingEvents.map((event) => (
-                  <div key={event.id} style={{
-                    padding: 12,
-                    background: '#f8fafc',
-                    borderRadius: 8,
-                    border: '1px solid #e2e8f0'
-                  }}>
-                    <div style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: '#1f2937',
-                      marginBottom: 4
-                    }}>
-                      {event.title}
-                    </div>
-                    <div style={{
-                      fontSize: 12,
-                      color: '#6b7280',
-                      marginBottom: 4
-                    }}>
-                      {formatDate(event.date)} {event.time && `• ${event.time}`}
-                    </div>
-                    {event.location && (
-                      <div style={{
-                        fontSize: 12,
-                        color: '#9ca3af'
-                      }}>
-                        📍 {event.location}
-                      </div>
-                    )}
+                  <div key={event.id} style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>{event.title}</div>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>{formatDate(event.date)}</div>
                   </div>
                 ))}
               </div>
             )}
-
-            <Link
-              href="/admin/manage-events"
-              style={{
-                display: 'block',
-                textAlign: 'center',
-                marginTop: 16,
-                padding: '8px 16px',
-                color: '#3b82f6',
-                textDecoration: 'none',
-                fontSize: 14,
-                fontWeight: 500
-              }}
-            >
-              View All Events →
-            </Link>
           </div>
-        </div>
-      </div>
-
-      {/* System Status Footer */}
-      <div style={{
-        background: '#fff',
-        border: '1px solid #e5e7eb',
-        borderRadius: 12,
-        padding: 20,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <div>
-          <div style={{
-            fontSize: 16,
-            fontWeight: 600,
-            color: '#1f2937',
-            marginBottom: 4
-          }}>
-            System Status
-          </div>
-          <div style={{
-            fontSize: 14,
-            color: '#6b7280'
-          }}>
-            All systems operational • Last updated: {new Date().toLocaleTimeString()}
-          </div>
-        </div>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8
-        }}>
-          <div style={{
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            backgroundColor: '#22c55e'
-          }}></div>
-          <span style={{
-            fontSize: 14,
-            fontWeight: 600,
-            color: '#22c55e'
-          }}>
-            ONLINE
-          </span>
         </div>
       </div>
     </div>
