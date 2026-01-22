@@ -1,6 +1,4 @@
-// Admin Manage Events page ("/admin/manage-events") 
-// Lets admins view, add, edit, and copy events in the Supabase "events" table.
-
+// src/app/admin/manage-events/page.tsx
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -10,34 +8,54 @@ import { Container } from 'components/ui/Container';
 import { Button } from 'components/ui/Button';
 import { Card } from 'components/ui/Card';
 
+// Define the Event interface to satisfy linting
+interface Event {
+  id: number;
+  title: string;
+  date: string;
+  is_recurring?: boolean;
+  parent_event_id?: number | null;
+  crate_id?: number | null;
+  has_queue?: boolean;
+  [key: string]: unknown; // Allow for other dynamic fields
+}
+
 export default function Page() {
-  const [events, setEvents] = useState([]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [crates, setCrates] = useState<Record<number, string>>({});
   const router = useRouter();
 
   useEffect(() => {
-    async function fetchEvents() {
-      const { data, error } = await supabase
+    async function fetchData() {
+      // Fetch Crates Map
+      const { data: cratesData } = await supabase.from('crates').select('id, name');
+      if (cratesData) {
+        const crateMap: Record<number, string> = {};
+        cratesData.forEach(c => crateMap[c.id] = c.name);
+        setCrates(crateMap);
+      }
+
+      // Fetch Events
+      const { data: eventsData, error } = await supabase
         .from('events')
         .select('*')
         .order('date', { ascending: true });
-      if (!error) setEvents(data);
+        
+      if (!error && eventsData) setEvents(eventsData as Event[]);
     }
-    fetchEvents();
+    fetchData();
   }, []);
 
-  const handleCopy = (event) => {
+  const handleCopy = (event: Event) => {
     if (typeof window !== 'undefined') {
-      // Create a copy of the event without the ID and other auto-generated fields
       const eventCopy = {
         ...event,
-        id: undefined, // Remove ID so Supabase generates a new one
-        created_at: undefined, // Remove timestamp fields if they exist
+        id: undefined,
+        created_at: undefined,
         updated_at: undefined,
-        // Reset recurring event fields for copies
         is_recurring: false,
         recurrence_end_date: '',
         parent_event_id: undefined,
-        // Optionally modify the title to indicate it's a copy
         title: `${event.title} (Copy)`
       };
       sessionStorage.setItem('copiedEvent', JSON.stringify(eventCopy));
@@ -45,61 +63,36 @@ export default function Page() {
     router.push('/admin/manage-events/edit');
   };
 
-  const handleDelete = async (event) => {
+  const handleDelete = async (event: Event) => {
     let confirmMessage = `Are you sure you want to delete "${event.title}"?`;
-    
-    // If this is a recurring event (parent) or part of a series, ask about deleting the whole series
     if (event.is_recurring || event.parent_event_id) {
-      if (event.is_recurring) {
-        // This is the parent recurring event
-        confirmMessage = `This is a recurring event. Do you want to delete the entire series including all future occurrences?`;
-      } else {
-        // This is part of a recurring series
-        confirmMessage = `This event is part of a recurring series. Do you want to delete just this occurrence or the entire series?\n\nClick OK to delete the entire series, or Cancel to delete just this occurrence.`;
-      }
+      confirmMessage = event.is_recurring 
+        ? `Delete entire recurring series for "${event.title}"?`
+        : `This is part of a series. Delete all events?`;
     }
     
-    const deleteEntireSeries = confirm(confirmMessage);
+    if (!confirm(confirmMessage)) return;
     
     try {
-      if (event.is_recurring && deleteEntireSeries) {
-        // Delete all events in the series (parent + children)
-        const { error } = await supabase
-          .from('events')
-          .delete()
-          .or(`id.eq.${event.id},parent_event_id.eq.${event.id}`);
-        
-        if (error) throw error;
-        alert('Entire recurring series deleted successfully!');
-      } else if (event.parent_event_id && deleteEntireSeries) {
-        // Delete all events in the series (find parent first)
-        const { error } = await supabase
-          .from('events')
-          .delete()
-          .or(`id.eq.${event.parent_event_id},parent_event_id.eq.${event.parent_event_id}`);
-        
-        if (error) throw error;
-        alert('Entire recurring series deleted successfully!');
+      let query = supabase.from('events').delete();
+      
+      if (event.is_recurring || event.parent_event_id) {
+        const parentId = event.parent_event_id || event.id;
+        query = query.or(`id.eq.${parentId},parent_event_id.eq.${parentId}`);
       } else {
-        // Delete just this single event
-        const { error } = await supabase
-          .from('events')
-          .delete()
-          .eq('id', event.id);
-        
-        if (error) throw error;
-        alert('Event deleted successfully!');
+        query = query.eq('id', event.id);
       }
       
-      // Refresh the events list
-      const { data } = await supabase
-        .from('events')
-        .select('*')
-        .order('date', { ascending: true });
-      setEvents(data || []);
+      const { error } = await query;
+      if (error) throw error;
       
-    } catch (error) {
-      alert(`Error deleting event: ${error.message}`);
+      // Refresh list
+      const { data } = await supabase.from('events').select('*').order('date', { ascending: true });
+      setEvents((data as Event[]) || []);
+      
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Error: ${msg}`);
     }
   };
 
@@ -119,15 +112,20 @@ export default function Page() {
               <span className="font-semibold text-lg text-gray-900 block md:inline">
                 {event.title} <span className="text-gray-500 font-normal">– {event.date}</span>
               </span>
-              <div className="flex gap-2 mt-1">
+              <div className="flex flex-wrap gap-2 mt-1">
                 {event.is_recurring && (
                   <span className="inline-block text-xs font-medium text-blue-700 bg-blue-100 px-2 py-1 rounded-full">
                     Recurring
                   </span>
                 )}
-                {event.parent_event_id && (
+                {event.crate_id && crates[event.crate_id] && (
+                  <span className="inline-block text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded-full">
+                    📦 {crates[event.crate_id]}
+                  </span>
+                )}
+                {event.has_queue && (
                   <span className="inline-block text-xs font-medium text-purple-700 bg-purple-100 px-2 py-1 rounded-full">
-                    Series
+                    Queue Active
                   </span>
                 )}
               </div>
