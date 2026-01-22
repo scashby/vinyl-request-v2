@@ -4,7 +4,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import DeprecationComponent from 'components/DeprecationComponent';
 
 type Album = {
   id: number;
@@ -62,8 +61,6 @@ type AlbumResult = {
 };
 
 export default function MultiSourceEnrichment() {
-  return <DeprecationComponent />;
-
   const [stats, setStats] = useState({
     total: 0,
     needsEnrichment: 0,

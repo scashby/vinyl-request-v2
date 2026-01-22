@@ -195,3 +195,42 @@ export const DEFAULT_LOCKED_COLUMNS: ColumnId[] = [
   'artist',
   'title'
 ];
+
+// ============================================================================
+// HELPER FUNCTIONS & TYPES (Added to fix build errors)
+// ============================================================================
+
+export type SortDirection = 'asc' | 'desc';
+
+export interface SortState {
+  column: ColumnId;
+  direction: SortDirection;
+}
+
+/**
+ * Converts a list of ColumnIds into their full ColumnDefinition objects
+ */
+export function getVisibleColumns(visibleIds: ColumnId[]): ColumnDefinition[] {
+  return visibleIds
+    .map(id => COLUMN_DEFINITIONS[id])
+    .filter((col): col is ColumnDefinition => !!col);
+}
+
+/**
+ * Splits columns into locked (sticky left) and unlocked groups
+ */
+export function splitColumnsByLock(columns: ColumnDefinition[], lockedIds: ColumnId[]) {
+  const lockedSet = new Set(lockedIds);
+  const locked: ColumnDefinition[] = [];
+  const unlocked: ColumnDefinition[] = [];
+
+  columns.forEach(col => {
+    if (lockedSet.has(col.id)) {
+      locked.push(col);
+    } else {
+      unlocked.push(col);
+    }
+  });
+
+  return { locked, unlocked };
+}

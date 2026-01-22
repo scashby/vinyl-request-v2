@@ -6,7 +6,6 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase } from 'lib/supabaseClient'
 import Image from 'next/image';
 import GenreStyleSelector from 'components/GenreStyleSelector';
-import DeprecationComponent from 'components/DeprecationComponent';
 
 type Track = { 
   position: string; 
@@ -139,8 +138,6 @@ function getSideFromPosition(position: string): string {
 }
 
 export default function EditEntryPage() {
-  return <DeprecationComponent />;
-
   const params = useParams();
   const id = params.id as string;
   const router = useRouter();
@@ -1545,7 +1542,7 @@ export default function EditEntryPage() {
                                     fontSize: 18, 
                                     cursor: 'pointer', 
                                     padding: '8px', 
-                                    borderRadius: '6px',
+                                    borderRadius: '6px', 
                                     width: 36,
                                     height: 36,
                                     display: 'flex',
