@@ -6,12 +6,14 @@ import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from 'src/lib/supabaseClient';
 
-interface Track {
-  position?: string;
+// Updated to match new DB Schema
+interface DbTrack {
+  position: string | number;
   title: string;
-  name?: string;
-  artist?: string;
   duration?: string;
+  side?: string;
+  artist?: string;
+  type?: 'track' | 'header';
 }
 
 interface Album {
@@ -21,12 +23,16 @@ interface Album {
   image_url: string;
   year?: string;
   format?: string;
-  folder?: string;
+  
+  // Phase 4 Fixes: New Columns
+  location?: string;        // Was 'folder'
+  personal_notes?: string;  // Was 'notes'
+  release_notes?: string;   // New field
   media_condition?: string;
-  notes?: string;
-  is_1001?: boolean;
-  tracklists?: string;
-  sides?: Record<string, Track[] | string[]>;
+  
+  // Phase 4 Fixes: JSON Data source
+  tracks?: DbTrack[];       // Was 'tracklists' string
+  
   blocked_tracks?: { position: string; reason: string }[];
 }
 
@@ -126,7 +132,7 @@ function AlbumDetailContent() {
     }
   };
 
-  const handleAddTrackToQueue = async (track: Track) => {
+  const handleAddTrackToQueue = async (track: DbTrack) => {
     if (!eventId || !album) return;
     setSubmittingRequest(true);
     try {
@@ -135,7 +141,7 @@ function AlbumDetailContent() {
         .select('id, votes')
         .eq('event_id', eventId)
         .eq('album_id', id)
-        .eq('track_number', track.position || '')
+        .eq('track_number', String(track.position))
         .maybeSingle();
 
       if (error) throw error;
@@ -145,8 +151,8 @@ function AlbumDetailContent() {
         setRequestStatus(`Upvoted: ${track.title}`);
       } else {
         await supabase.from('requests').insert([{
-          album_id: id, artist: track.artist || album.artist, title: track.title || track.name,
-          track_number: track.position || '', track_name: track.title || track.name,
+          album_id: id, artist: track.artist || album.artist, title: track.title,
+          track_number: String(track.position), track_name: track.title,
           track_duration: track.duration || '', event_id: eventId, votes: 1, status: 'open', side: null
         }]);
         setRequestStatus(`Requested: ${track.title}`);
@@ -196,33 +202,29 @@ function AlbumDetailContent() {
   const goToBrowse = () => router.push(`/browse/browse-albums?eventId=${eventId}`);
   const goToQueue = () => router.push(`/browse/browse-queue?eventId=${eventId}`);
 
+  // Fixed: Derive sides from 'tracks' JSON array
   const getAvailableSides = () => {
     const sides = new Set<string>();
-    if (album?.tracklists) {
-      try {
-        const parsed = JSON.parse(album.tracklists);
-        if (Array.isArray(parsed)) parsed.forEach(t => t.position?.match(/^([A-Z])/) && sides.add(t.position.match(/^([A-Z])/)[1]));
-      } catch {
-        album.tracklists.split('\n').forEach(t => t.match(/^([A-Z])\d+/) && sides.add(t.match(/^([A-Z])\d+/)[1]));
-      }
+    if (album?.tracks && Array.isArray(album.tracks)) {
+        album.tracks.forEach(t => {
+            if (t.side) {
+                sides.add(t.side);
+            } else if (typeof t.position === 'string' && t.position.match(/^[A-Z]/)) {
+                // Fallback: extract 'A' from 'A1' if side property is missing
+                sides.add(t.position.charAt(0));
+            }
+        });
     }
-    if (sides.size === 0 && album?.sides) Object.keys(album.sides).forEach(s => sides.add(s.toUpperCase()));
-    if (sides.size === 0) { sides.add('A'); sides.add('B'); }
+    
+    // Default fallback if no side data found
+    if (sides.size === 0) { 
+        sides.add('A'); 
+        sides.add('B'); 
+    }
     return Array.from(sides).sort();
   };
 
-  const getTracksList = (): Track[] => {
-    if (!album?.tracklists) return [];
-    try {
-      const parsed = JSON.parse(album.tracklists);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return album.tracklists.split('\n').filter(t => t.trim()).map((t, i) => {
-        const match = t.trim().match(/^(\d+\.?\s*)?(.+)$/);
-        return { position: String(i + 1), title: match ? match[2] : t.trim(), artist: album.artist, duration: '--:--' };
-      });
-    }
-  };
+  const hasTracks = album?.tracks && Array.isArray(album.tracks) && album.tracks.length > 0;
 
   if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-white"><div className="text-xl font-light tracking-widest animate-pulse">LOADING</div></div>;
   if (error) return <div className="min-h-screen bg-black flex items-center justify-center text-red-500">Error: {error}</div>;
@@ -236,7 +238,6 @@ function AlbumDetailContent() {
     <div className="min-h-screen relative font-sans text-white bg-black selection:bg-blue-500 selection:text-white">
       
       {/* --- BACKGROUND LAYER --- */}
-      {/* 1. The blurred image provides the "smart color" ambience. */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
         <Image
           src={imageUrl}
@@ -246,15 +247,12 @@ function AlbumDetailContent() {
           priority
           unoptimized
         />
-        {/* 2. A gradient overlay ensures text at the bottom is always readable against the color. */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/90" />
       </div>
 
-      {/* Spacer to push content below the Fixed Main Navigation (approx 72px) */}
       <div className="h-[72px]" />
 
       {/* --- SECONDARY HEADER --- */}
-      {/* Sticky positioning at 57px (height of main nav when scrolled) to lock them together */}
       {eventId && (
         <div className="sticky top-[57px] z-40 bg-black/90 border-b border-white/10 shadow-2xl backdrop-blur-md">
           <div className="container mx-auto px-4 py-3 flex gap-4 items-center justify-between">
@@ -281,7 +279,7 @@ function AlbumDetailContent() {
 
       {/* --- ALBUM HEADER CONTENT --- */}
       <div className="relative z-10 container mx-auto px-4 py-12 flex flex-col md:flex-row gap-10 items-start">
-        {/* Cover Art - High Elevation Shadow */}
+        {/* Cover Art */}
         <div className="relative shrink-0 mx-auto md:mx-0 w-[280px] md:w-[350px]">
           <div className="aspect-square relative rounded-lg shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 overflow-hidden">
             <Image
@@ -305,21 +303,19 @@ function AlbumDetailContent() {
           </h2>
           
           <div className="flex flex-wrap gap-2 mb-6">
-            {[album.year, album.format, album.folder].filter(Boolean).map((tag, i) => (
+            {/* Fixed: Use 'location' instead of 'folder' */}
+            {[album.year, album.format, album.location].filter(Boolean).map((tag, i) => (
               <span key={i} className="px-3 py-1 bg-white/10 backdrop-blur-md rounded border border-white/10 text-xs font-bold uppercase tracking-wider text-gray-200">
                 {tag}
               </span>
             ))}
-            {album.is_1001 && (
-              <span className="px-3 py-1 bg-yellow-500/20 border border-yellow-500/50 text-yellow-200 rounded text-xs font-bold uppercase tracking-wider">
-                ★ 1001 Albums
-              </span>
-            )}
           </div>
 
-          {album.notes && (
+          {/* Fixed: Use 'personal_notes' */}
+          {(album.personal_notes || album.release_notes) && (
             <div className="bg-black/30 backdrop-blur-md p-4 rounded-lg border border-white/5 mb-8 text-gray-300 text-sm leading-relaxed max-w-2xl">
-              {album.notes}
+              {album.personal_notes && <p className="mb-2">{album.personal_notes}</p>}
+              {album.release_notes && <p className="text-gray-400 italic">{album.release_notes}</p>}
             </div>
           )}
 
@@ -361,8 +357,7 @@ function AlbumDetailContent() {
       </div>
 
       {/* --- TRACK LISTING --- */}
-      {/* High contrast container: Black background with blur to ensure readability over the colorful background */}
-      {(album?.tracklists || album?.sides) && (
+      {hasTracks && (
         <div className="relative z-10 container mx-auto px-4 pb-24 max-w-5xl">
           <div className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
             <div className="p-5 border-b border-white/10 bg-white/5 flex justify-between items-center">
@@ -373,14 +368,25 @@ function AlbumDetailContent() {
             </div>
             
             <div className="divide-y divide-white/5">
-              {album.tracklists ? (
-                getTracksList().map((track, i) => {
-                  const blocked = album.blocked_tracks?.find(b => b.position === track.position);
-                  return (
-                    <div key={i} className={`group flex items-center p-4 hover:bg-white/5 transition-colors ${blocked ? 'opacity-40 grayscale' : ''}`}>
-                      <span className="w-8 text-sm font-mono text-gray-500 text-center">{track.position || i + 1}</span>
+              {/* Fixed: Map over structured tracks array */}
+              {album.tracks!.map((track, i) => {
+                const blocked = album.blocked_tracks?.find(b => b.position === String(track.position));
+                
+                // Optional: Render Side headers if side changes
+                const prevTrack = i > 0 ? album.tracks![i - 1] : null;
+                const showSideHeader = track.side && (!prevTrack || prevTrack.side !== track.side);
+
+                return (
+                  <div key={i}>
+                    {showSideHeader && (
+                        <div className="px-4 py-2 bg-white/5 text-xs font-bold text-gray-400 uppercase tracking-widest border-y border-white/5">
+                            Side {track.side}
+                        </div>
+                    )}
+                    <div className={`group flex items-center p-4 hover:bg-white/5 transition-colors ${blocked ? 'opacity-40 grayscale' : ''}`}>
+                      <span className="w-10 text-sm font-mono text-gray-500 text-center">{track.position}</span>
                       <div className="flex-1 px-4 min-w-0">
-                        <div className="text-sm font-bold text-white truncate">{track.title || track.name}</div>
+                        <div className="text-sm font-bold text-white truncate">{track.title}</div>
                         <div className="text-xs text-gray-400 truncate">{track.artist || album.artist}</div>
                       </div>
                       <span className="text-xs font-mono text-gray-600 mr-4">{track.duration || '--:--'}</span>
@@ -394,23 +400,9 @@ function AlbumDetailContent() {
                         </button>
                       )}
                     </div>
-                  );
-                })
-              ) : (
-                Object.entries(album.sides || {}).map(([side, tracks]) => (
-                  <div key={side}>
-                    <div className="px-4 py-2 bg-white/5 text-xs font-bold text-gray-400 uppercase tracking-widest border-y border-white/5">Side {side}</div>
-                    {Array.isArray(tracks) && tracks.map((track, i) => (
-                      <div key={i} className="flex items-center p-4 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0">
-                        <span className="w-8 text-sm font-mono text-gray-500 text-center">{i + 1}</span>
-                        <div className="flex-1 px-4 font-medium text-gray-200">
-                          {typeof track === 'string' ? track : (track.title || track.name)}
-                        </div>
-                      </div>
-                    ))}
                   </div>
-                ))
-              )}
+                );
+              })}
             </div>
           </div>
         </div>
