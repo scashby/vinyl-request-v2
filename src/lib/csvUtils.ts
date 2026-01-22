@@ -1,84 +1,91 @@
-// src/lib/csvUtils.ts
-import Papa from 'papaparse';
-import { cleanArtistName, extractSecondaryArtists } from './importUtils';
+// src/lib/importUtils.ts
+// Updated for Phase 2: Strict Normalization & Rules
 
-// Matches the exact headers from your uploaded CSV
-export interface DiscogsCSVRow {
-  'Catalog#': string;
-  Artist: string;
-  Title: string;
-  Label: string;
-  Format: string;
-  Released: string;
-  release_id: string;
-  CollectionFolder: string;
-  'Date Added': string;
-  'Collection Media Condition': string;
-  'Collection Sleeve Condition': string;
-  'Collection Notes': string;
-  [key: string]: string; // Allow for other columns
+/**
+ * Clean artist names by removing Discogs disambiguation numbers.
+ * Example: "John Williams (4)" -> "John Williams"
+ * Example: "Chicago (2)" -> "Chicago"
+ */
+export function cleanArtistName(rawName: string): string {
+  if (!rawName) return '';
+  // 1. Regex to strip " (2)", " (12)", etc. at the end of the string
+  // Matches space + parenthesis + digits + parenthesis + end of string
+  let cleaned = rawName.replace(/\s\(\d+\)$/, '');
+  
+  // 2. Normalize " and " to " & " for consistency
+  cleaned = cleaned.replace(/\s+and\s+/gi, ' & ');
+  
+  return cleaned.trim();
 }
 
-export interface ProcessedRelease {
-  artist: string;
-  sort_artist: string; // We'll generate a default here
-  secondary_artists: string[];
-  title: string;
-  format: string;
-  location: string;
-  for_sale: boolean;
-  year: number | null;
-  media_condition: string;
-  package_sleeve_condition: string;
-  discogs_id: string;
-  personal_notes: string;
-  date_added: string;
+/**
+ * Generate a sort name based on rules.
+ * Default: Moves "The" to the end.
+ * Exception: Returns original name if it's in the exception list (e.g., "The The").
+ */
+export function generateSortName(name: string, exceptions: string[] = []): string {
+  if (!name) return '';
+  
+  // Check strict exceptions (like "The The")
+  if (exceptions.includes(name)) {
+    return name;
+  }
+
+  // Standard Logic: Move leading "The" to the end
+  if (name.match(/^The\s/i)) {
+    return name.substring(4) + ', The';
+  }
+  
+  // Standard Logic: Move leading "A" to the end (Optional, standard library practice)
+  if (name.match(/^A\s/i)) {
+    return name.substring(2) + ', A';
+  }
+
+  return name;
 }
 
-// 🛠 Extract, normalize fields, apply Phase 2 Logic
-export function parseDiscogsCSV(file: File, callback: (rows: ProcessedRelease[]) => void): void {
-  Papa.parse(file, {
-    header: true,
-    skipEmptyLines: true,
-    complete: (results) => {
-      const rows = (results.data as DiscogsCSVRow[]).map((row) => {
-        // 1. Clean Artist & Split Secondary
-        const { primary, secondary } = extractSecondaryArtists(row['Artist'] || '');
-        
-        // 2. Logic: Folder -> Location/Sale
-        const folder = row['CollectionFolder'] || '';
-        const isSale = folder.toLowerCase() === 'sale' || folder.toLowerCase().includes('for sale');
-        const location = isSale ? '' : folder;
+/**
+ * Extract "Featuring" artists from a string.
+ * Returns the main artist and an array of featuring artists.
+ * Example: "Santana feat. Rob Thomas" -> { primary: "Santana", secondary: ["Rob Thomas"] }
+ */
+export function extractSecondaryArtists(artistString: string): { 
+  primary: string; 
+  secondary: string[] 
+} {
+  if (!artistString) return { primary: '', secondary: [] };
 
-        return {
-          artist: primary,
-          sort_artist: primary, // Will be refined by server-side rules later, default to primary
-          secondary_artists: secondary,
-          title: row['Title'] || '',
-          format: row['Format'] || '',
-          
-          // Map Folder Logic
-          location: location,
-          for_sale: isSale,
-          
-          year: parseInt(row['Released'], 10) || null,
-          media_condition: row['Collection Media Condition'] || '',
-          package_sleeve_condition: row['Collection Sleeve Condition'] || '',
-          
-          // Map IDs
-          discogs_id: row['release_id'] || '',
-          
-          // Map Notes (The Fix!)
-          personal_notes: row['Collection Notes'] || '',
-          
-          date_added: row['Date Added'] || new Date().toISOString(),
-        };
-      });
-      callback(rows);
-    },
-    error: (err: Error) => {
-      console.error('CSV parse error:', err);
-      callback([]);
+  const feats = [' feat. ', ' ft. ', ' featuring ', ' with '];
+  let primary = artistString;
+  const secondary: string[] = [];
+
+  for (const separator of feats) {
+    if (primary.toLowerCase().includes(separator)) {
+      const parts = primary.split(new RegExp(separator, 'i'));
+      primary = parts[0].trim();
+      
+      // Split the remainder by commas or & to get individual artists
+      // Example: " feat. Artist A, Artist B & Artist C"
+      if (parts[1]) {
+        const guests = parts[1].split(/,|&/).map(s => cleanArtistName(s.trim()));
+        secondary.push(...guests);
+      }
+      break; // Only handle the first separator found
     }
-  });
+  }
+
+  return { primary: cleanArtistName(primary), secondary };
+}
+
+// Re-export SyncMode types if needed by other components
+export type SyncMode = 'full_replacement' | 'full_sync' | 'partial_sync' | 'new_only';
+
+export function isSameAlbum(
+  album1: { artist: string; title: string },
+  album2: { artist: string; title: string }
+): boolean {
+  return (
+    cleanArtistName(album1.artist).toLowerCase() === cleanArtistName(album2.artist).toLowerCase() &&
+    album1.title.toLowerCase() === album2.title.toLowerCase()
+  );
 }
