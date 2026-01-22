@@ -1,7 +1,7 @@
 // src/app/edit-collection/tabs/PersonalTab.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { Album } from 'types/album';
 import { DatePicker } from 'components/DatePicker';
 import { UniversalPicker } from '../pickers/UniversalPicker';
@@ -17,18 +17,11 @@ interface PersonalTabProps {
   onChange: (field: keyof Album, value: string | number | string[] | null | boolean) => void;
 }
 
-interface PlayedHistoryEntry {
-  year: number;
-  month: number;
-  day: number;
-  count: number;
-}
-
 export function PersonalTab({ album, onChange }: PersonalTabProps) {
   // Date picker state
   const [showPurchaseDatePicker, setShowPurchaseDatePicker] = useState(false);
   const [showCleanedDatePicker, setShowCleanedDatePicker] = useState(false);
-  const [showPlayedDatePicker, setShowPlayedDatePicker] = useState(false);
+  const [showLastPlayedDatePicker, setShowLastPlayedDatePicker] = useState(false);
   const [datePickerPosition, setDatePickerPosition] = useState({ top: 0, left: 0 });
 
   // Picker state
@@ -36,23 +29,6 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
   const [showOwnerPicker, setShowOwnerPicker] = useState(false);
   const [showTagsPicker, setShowTagsPicker] = useState(false);
   const [showSigneesPicker, setShowSigneesPicker] = useState(false);
-
-  // Played History
-  const [playedHistory, setPlayedHistory] = useState<PlayedHistoryEntry[]>([]);
-
-  // Parse played history
-  useEffect(() => {
-    if (album.played_history) {
-      try {
-        const parsed = typeof album.played_history === 'string' 
-          ? JSON.parse(album.played_history)
-          : album.played_history;
-        setPlayedHistory(Array.isArray(parsed) ? parsed : []);
-      } catch {
-        setPlayedHistory([]);
-      }
-    }
-  }, [album.played_history]);
 
   // Date handlers
   const handlePurchaseDateChange = (date: { year: number | null; month: number | null; day: number | null }) => {
@@ -71,19 +47,12 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
     setShowCleanedDatePicker(false);
   };
 
-  const handlePlayedDateChange = (date: { year: number | null; month: number | null; day: number | null }) => {
+  const handleLastPlayedDateChange = (date: { year: number | null; month: number | null; day: number | null }) => {
     if (date.year && date.month && date.day) {
-      const newEntry: PlayedHistoryEntry = {
-        year: date.year,
-        month: date.month,
-        day: date.day,
-        count: 1 // Always add with count of 1
-      };
-      const updated = [...playedHistory, newEntry];
-      setPlayedHistory(updated);
-      onChange('played_history', JSON.stringify(updated));
+      const dateStr = `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`;
+      onChange('last_played_date', dateStr);
     }
-    setShowPlayedDatePicker(false);
+    setShowLastPlayedDatePicker(false);
   };
 
   const handleOpenPurchaseDatePicker = (event: React.MouseEvent) => {
@@ -97,17 +66,17 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
     setDatePickerPosition({ top: rect.bottom + 4, left: rect.left });
     setShowCleanedDatePicker(true);
   };
-
-  const handleOpenPlayedDatePicker = (event: React.MouseEvent) => {
+  
+  const handleOpenLastPlayedDatePicker = (event: React.MouseEvent) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setDatePickerPosition({ top: rect.bottom + 4, left: rect.left });
-    setShowPlayedDatePicker(true);
+    setShowLastPlayedDatePicker(true);
   };
 
   // Parse dates for display
-  const parsePurchaseDate = () => {
-    if (!album.purchase_date) return { year: null, month: null, day: null };
-    const parts = album.purchase_date.split('-');
+  const parseDate = (dateStr: string | null) => {
+    if (!dateStr) return { year: null, month: null, day: null };
+    const parts = dateStr.split('-');
     return {
       year: parts[0] ? parseInt(parts[0]) : null,
       month: parts[1] ? parseInt(parts[1]) : null,
@@ -115,32 +84,14 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
     };
   };
 
-  const parseCleanedDate = () => {
-    if (!album.last_cleaned_date) return { year: null, month: null, day: null };
-    const parts = album.last_cleaned_date.split('-');
-    return {
-      year: parts[0] ? parseInt(parts[0]) : null,
-      month: parts[1] ? parseInt(parts[1]) : null,
-      day: parts[2] ? parseInt(parts[2]) : null
-    };
-  };
-
-  const purchaseDate = parsePurchaseDate();
-  const cleanedDate = parseCleanedDate();
+  const purchaseDate = parseDate(album.purchase_date);
+  const cleanedDate = parseDate(album.last_cleaned_date);
+  const lastPlayedDate = parseDate(album.last_played_date);
 
   // Rating handlers
   const currentRating = album.my_rating || 0;
   const handleRatingChange = (rating: number) => {
     onChange('my_rating', rating === currentRating ? 0 : rating);
-  };
-
-  // Played history handlers
-  const totalPlays = playedHistory.reduce((sum, entry) => sum + entry.count, 0);
-
-  const handleDeletePlayedHistory = (index: number) => {
-    const updated = playedHistory.filter((_, i) => i !== index);
-    setPlayedHistory(updated);
-    onChange('played_history', updated.length > 0 ? JSON.stringify(updated) : null);
   };
 
   // Remove tag
@@ -154,8 +105,6 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
     const updated = (album.signed_by || []).filter(s => s !== signee);
     onChange('signed_by', updated.length > 0 ? updated : null);
   };
-
-  // Styles removed in favor of Tailwind classes
 
   return (
     <>
@@ -216,7 +165,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                 onChange={(e) => onChange('purchase_store', e.target.value)}
                 className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
               >
-                <option value="">Select</option>
+                <option value="">{album.purchase_store || 'Select'}</option>
               </select>
               <button 
                 onClick={() => setShowPurchaseStorePicker(true)}
@@ -243,7 +192,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                 onChange={(e) => onChange('owner', e.target.value)}
                 className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
               >
-                <option value="">Select</option>
+                <option value="">{album.owner || 'Select'}</option>
               </select>
               <button 
                 onClick={() => setShowOwnerPicker(true)}
@@ -353,24 +302,24 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
             </div>
           </div>
 
-          {/* Notes */}
+          {/* Notes - UPDATED FIELD NAME */}
           <div>
-            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Notes</label>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Personal Notes</label>
             <textarea
-              value={album.notes || ''}
-              onChange={(e) => onChange('notes', e.target.value)}
+              value={album.personal_notes || ''} 
+              onChange={(e) => onChange('personal_notes', e.target.value)}
               rows={3}
               className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500 min-h-[40px] resize-y"
             />
           </div>
         </div>
 
-        {/* ROW 4: Last Cleaned | Played History | Signed */}
+        {/* ROW 4: Last Cleaned | Play Stats | Signed */}
         <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3">
           {/* Last Cleaned Date */}
           <div>
             <div className="flex justify-between items-center mb-1.5">
-              <label className="block text-[13px] font-semibold text-gray-500">Last Cleaned Date</label>
+              <label className="block text-[13px] font-semibold text-gray-500">Last Cleaned</label>
               <div 
                 onClick={handleOpenCleanedDatePicker}
                 className="cursor-pointer flex items-center text-gray-500 hover:text-blue-500"
@@ -412,38 +361,34 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
             </div>
           </div>
 
-          {/* Played History */}
+          {/* Play Stats (New simplified UI) */}
           <div>
             <div className="flex justify-between items-center mb-1.5">
-              <label className="block text-[13px] font-semibold text-gray-500">Played History (total plays: {totalPlays})</label>
-              <div 
-                onClick={handleOpenPlayedDatePicker}
-                className="cursor-pointer flex items-center text-gray-500 hover:text-blue-500"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                  <path d="M2 6h12" stroke="currentColor" strokeWidth="1.5"/>
-                  <path d="M5 2v2M11 2v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </div>
+               <label className="block text-[13px] font-semibold text-gray-500">Play Count</label>
+                <div 
+                  onClick={handleOpenLastPlayedDatePicker}
+                  className="cursor-pointer flex items-center text-gray-500 hover:text-blue-500"
+                  title="Set Last Played Date"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M2 6h12" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M5 2v2M11 2v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </div>
             </div>
-            <div className="flex-1 px-2.5 py-2 border border-gray-300 rounded text-sm bg-white min-h-[38px] text-gray-900 max-h-[120px] overflow-y-auto">
-              {playedHistory.length > 0 ? (
-                playedHistory.map((entry, idx) => (
-                  <div key={idx} className="flex items-center justify-between mb-1 last:mb-0 text-xs">
-                    <span>{entry.year}  {String(entry.month).padStart(2, '0')}  {String(entry.day).padStart(2, '0')}</span>
-                    <button
-                      onClick={() => handleDeletePlayedHistory(idx)}
-                      className="bg-transparent border-none text-gray-400 cursor-pointer p-0 text-base leading-none font-light hover:text-red-500"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <span className="text-gray-400 italic">No history</span>
-              )}
+            <div className="flex items-center gap-2">
+               <input 
+                 type="number" 
+                 value={album.play_count || 0} 
+                 onChange={(e) => onChange('play_count', parseInt(e.target.value))}
+                 className="flex-1 px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900"
+                 min="0"
+               />
             </div>
+             <div className="mt-1 text-[11px] text-gray-500 text-right">
+               Last: {album.last_played_date || 'Never'}
+             </div>
           </div>
 
           {/* Signed by */}
@@ -497,11 +442,11 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
         />
       )}
 
-      {showPlayedDatePicker && (
+      {showLastPlayedDatePicker && (
         <DatePicker
-          value={{ year: null, month: null, day: null }}
-          onChange={handlePlayedDateChange}
-          onClose={() => setShowPlayedDatePicker(false)}
+          value={lastPlayedDate}
+          onChange={handleLastPlayedDateChange}
+          onClose={() => setShowLastPlayedDatePicker(false)}
           position={datePickerPosition}
         />
       )}

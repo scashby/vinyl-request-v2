@@ -10,6 +10,7 @@ import { DatePicker } from 'components/DatePicker';
 import { AutoCapSettings, type AutoCapMode } from '../settings/AutoCapSettings';
 import { AutoCapExceptions, applyAutoCap, DEFAULT_EXCEPTIONS } from '../settings/AutoCapExceptions';
 import {
+  fetchLabels,
   fetchFormats,
   fetchGenres,
   fetchLocations,
@@ -19,15 +20,18 @@ import {
 
 interface MainTabProps {
   album: Album;
-  onChange: (field: keyof Album, value: string | number | string[] | null | boolean) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onChange: (field: keyof Album, value: any) => void;
 }
 
 type ModalType = 'picker' | 'manage' | 'edit' | null;
 type FieldType = 
+  | 'labels' 
   | 'format' 
   | 'genre' 
   | 'location' 
-  | 'artist';
+  | 'artist' 
+  | 'secondary_artists';
 
 export interface MainTabRef {
   openLocationPicker: () => void;
@@ -39,6 +43,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   const [activeField, setActiveField] = useState<FieldType | null>(null);
 
   // Data state - real data from Supabase
+  const [labels, setLabels] = useState<PickerDataItem[]>([]);
   const [formats, setFormats] = useState<PickerDataItem[]>([]);
   const [genres, setGenres] = useState<PickerDataItem[]>([]);
   const [locations, setLocations] = useState<PickerDataItem[]>([]);
@@ -47,6 +52,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
 
   // Date picker state
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [datePickerField, setDatePickerField] = useState<'release' | null>(null);
   const [datePickerPosition, setDatePickerPosition] = useState({ top: 0, left: 0 });
 
   // Auto Cap state
@@ -78,12 +84,14 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
 
   const loadAllData = async () => {
     setDataLoading(true);
-    const [formatsData, genresData, locationsData, artistsData] = await Promise.all([
+    const [labelsData, formatsData, genresData, locationsData, artistsData] = await Promise.all([
+      fetchLabels(),
       fetchFormats(),
       fetchGenres(),
       fetchLocations(),
       fetchArtists(),
     ]);
+    setLabels(labelsData);
     setFormats(formatsData);
     setGenres(genresData);
     setLocations(locationsData);
@@ -94,6 +102,9 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   // Reload specific dataset
   const reloadData = async (field: FieldType) => {
     switch (field) {
+      case 'labels':
+        setLabels(await fetchLabels());
+        break;
       case 'format':
         setFormats(await fetchFormats());
         break;
@@ -104,6 +115,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
         setLocations(await fetchLocations());
         break;
       case 'artist':
+      case 'secondary_artists':
         setArtists(await fetchArtists());
         break;
     }
@@ -112,10 +124,12 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   // Get current items based on active field
   const getCurrentItems = () => {
     switch (activeField) {
+      case 'labels': return labels;
       case 'format': return formats;
       case 'genre': return genres;
       case 'location': return locations;
-      case 'artist': return artists;
+      case 'artist': 
+      case 'secondary_artists': return artists;
       default: return [];
     }
   };
@@ -123,10 +137,12 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   // Get current selection based on active field
   const getCurrentSelection = () => {
     switch (activeField) {
+      case 'labels': return album.labels || [];
       case 'format': return album.format || '';
       case 'genre': return album.genres || [];
       case 'location': return album.location || '';
       case 'artist': return album.artist || '';
+      case 'secondary_artists': return album.secondary_artists || [];
       default: return '';
     }
   };
@@ -134,10 +150,12 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   // Get field configuration
   const getFieldConfig = () => {
     switch (activeField) {
+      case 'labels': return { title: 'Select Label', itemLabel: 'Label', mode: 'multi' as const };
       case 'format': return { title: 'Select Format', itemLabel: 'Format', mode: 'single' as const };
       case 'genre': return { title: 'Select Genres', itemLabel: 'Genre', mode: 'multi' as const };
       case 'location': return { title: 'Select Location', itemLabel: 'Location', mode: 'single' as const };
       case 'artist': return { title: 'Select Artists', itemLabel: 'Artist', mode: 'single' as const };
+      case 'secondary_artists': return { title: 'Select Secondary Artists', itemLabel: 'Artist', mode: 'multi' as const };
       default: return { title: '', itemLabel: '', mode: 'single' as const };
     }
   };
@@ -155,20 +173,20 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
     const items = getCurrentItems();
     
     if (Array.isArray(selectedIds)) {
-      // Multi-select (genres only)
-      const selectedNames = selectedIds.map(id => items.find(item => item.id === id)?.name || '');
-      onChange('genres', selectedNames);
+      // Multi-select (genres, labels, secondary artists)
+      // Use ID directly as it matches name for simple string arrays
+      const selectedNames = selectedIds.map(id => items.find(item => item.id === id)?.name || id);
+      
+      if (activeField === 'labels') onChange('labels', selectedNames);
+      if (activeField === 'genre') onChange('genres', selectedNames);
+      if (activeField === 'secondary_artists') onChange('secondary_artists', selectedNames);
     } else {
       // Single-select
       const selectedName = items.find(item => item.id === selectedIds)?.name || '';
       
-      if (activeField === 'format') {
-        onChange('format', selectedName);
-      } else if (activeField === 'location') {
-        onChange('location', selectedName);
-      } else if (activeField === 'artist') {
-        onChange('artist', selectedName);
-      }
+      if (activeField === 'format') onChange('format', selectedName);
+      if (activeField === 'location') onChange('location', selectedName);
+      if (activeField === 'artist') onChange('artist', selectedName);
     }
   };
 
@@ -193,14 +211,18 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   const handleEditSave = async (newName: string, newSortName?: string) => {
     if (!activeField) return;
     
+    // Create new (Local only - db sync handled by reload or future implementation)
     const newItem: PickerDataItem = {
       id: newName,
       name: newName,
       count: 0,
-      sortName: newSortName,
+      sortName: newSortName, // Pass through the sort name
     };
     
     switch (activeField) {
+      case 'labels':
+        setLabels([...labels, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+        break;
       case 'format':
         setFormats([...formats, newItem].sort((a, b) => a.name.localeCompare(b.name)));
         break;
@@ -211,6 +233,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
         setLocations([...locations, newItem].sort((a, b) => a.name.localeCompare(b.name)));
         break;
       case 'artist':
+      case 'secondary_artists':
         setArtists([...artists, newItem].sort((a, b) => a.name.localeCompare(b.name)));
         break;
     }
@@ -222,17 +245,20 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   };
 
   // Date picker handlers
-  const handleOpenDatePicker = (event: React.MouseEvent) => {
+  const handleOpenDatePicker = (field: 'release', event: React.MouseEvent) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setDatePickerPosition({
       top: rect.bottom + 4,
       left: rect.left,
     });
+    setDatePickerField(field);
     setShowDatePicker(true);
   };
 
   const handleDateChange = (date: { year: number | null; month: number | null; day: number | null }) => {
-    if (date.year) onChange('year', date.year.toString());
+    if (datePickerField === 'release') {
+      if (date.year) onChange('year', date.year.toString());
+    }
     setShowDatePicker(false);
   };
 
@@ -262,7 +288,9 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   // Map activeField to ManagePickListsModal config keys
   const getManageListKey = (field: FieldType | null): string => {
     switch (field) {
-      case 'artist': return 'artist';
+      case 'artist': 
+      case 'secondary_artists': return 'artist';
+      case 'labels': return 'label';
       case 'format': return 'format';
       case 'genre': return 'genre';
       case 'location': return 'location';
@@ -331,17 +359,65 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
               </button>
             </div>
           </div>
+          
+          {/* Secondary Artists (New) */}
+          <div>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Secondary Artists</label>
+            <div className="flex items-start">
+              <div className="flex-1 min-h-[38px] p-1.5 border border-gray-300 rounded-l border-r-0 bg-white flex flex-wrap gap-1.5 items-center">
+                {album.secondary_artists && album.secondary_artists.length > 0 ? (
+                  <>
+                    {album.secondary_artists.map((artist, idx) => (
+                      <span
+                        key={idx}
+                        className="bg-purple-50 px-2 py-1 rounded text-xs flex items-center gap-1.5 text-purple-700 border border-purple-100"
+                      >
+                        {artist}
+                        <button
+                          className="bg-transparent border-none text-purple-400 cursor-pointer p-0 text-base leading-none font-light hover:text-red-500"
+                          onClick={() => {
+                            const newArr = album.secondary_artists?.filter((_, i) => i !== idx) || [];
+                            onChange('secondary_artists', newArr);
+                          }}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </>
+                ) : null}
+              </div>
+              <button 
+                onClick={() => handleOpenPicker('secondary_artists')}
+                className="w-9 min-h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50"
+              >
+                +
+              </button>
+            </div>
+          </div>
+          
+          {/* Release Notes (New) */}
+           <div>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Release Notes</label>
+            <textarea
+              value={album.release_notes || ''}
+              onChange={(e) => onChange('release_notes', e.target.value)}
+              className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 min-h-[80px]"
+              placeholder="Specific pressing info, provenance, etc."
+            />
+          </div>
+
         </div>
 
         {/* RIGHT COLUMN */}
         <div className="flex flex-col gap-4">
           {/* Row 1: Release Date (Year) */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             <div>
               <div className="flex justify-between items-center mb-1.5">
                 <label className="block text-[13px] font-semibold text-gray-500">Release Year</label>
                 <div 
-                  onClick={handleOpenDatePicker}
+                  onClick={(e) => handleOpenDatePicker('release', e)}
                   className="cursor-pointer flex items-center text-gray-500 hover:text-blue-500"
                 >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -361,10 +437,46 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
                 />
               </div>
             </div>
-            {/* Removed Original Release Date (Column Deleted) */}
           </div>
 
-          {/* Row 2: Format | Barcode */}
+          {/* Row 2: Labels (Multi-Select) */}
+          <div>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Labels</label>
+            <div className="flex items-start">
+              <div className="flex-1 min-h-[38px] p-1.5 border border-gray-300 rounded-l border-r-0 bg-white flex flex-wrap gap-1.5 items-center">
+                {album.labels && album.labels.length > 0 ? (
+                  <>
+                    {album.labels.map((label, idx) => (
+                      <span
+                        key={idx}
+                        className="bg-blue-50 px-2 py-1 rounded text-xs flex items-center gap-1.5 text-blue-700 border border-blue-100"
+                      >
+                        {label}
+                        <button
+                          className="bg-transparent border-none text-blue-400 cursor-pointer p-0 text-base leading-none font-light hover:text-red-500"
+                          onClick={() => {
+                            const newLabels = album.labels?.filter((_, i) => i !== idx) || [];
+                            onChange('labels', newLabels);
+                          }}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </>
+                ) : null}
+              </div>
+              <button 
+                onClick={() => handleOpenPicker('labels')}
+                disabled={dataLoading}
+                className="w-9 min-h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-wait"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          {/* Row 3: Format | Barcode */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Format</label>
@@ -403,7 +515,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
             </div>
           </div>
 
-          {/* Row 3: Cat No | Location */}
+          {/* Row 4: Cat No | Location */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Cat No</label>
@@ -445,7 +557,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
             </div>
           </div>
 
-          {/* Row 4: Genre */}
+          {/* Row 5: Genre */}
           <div>
             <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Genre</label>
             <div className="flex items-start">

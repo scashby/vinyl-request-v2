@@ -236,10 +236,17 @@ export async function fetchStorageDevices(): Promise<PickerDataItem[]> {
 
 export async function fetchLabels(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('spotify_label').not('spotify_label', 'is', null).not('spotify_label', 'eq', '');
+    const { data, error } = await supabase.from('collection').select('labels').not('labels', 'is', null);
     if (error) return [];
+    
     const labelCounts = new Map<string, number>();
-    data?.forEach(row => { if (row.spotify_label) labelCounts.set(row.spotify_label, (labelCounts.get(row.spotify_label) || 0) + 1); });
+    data?.forEach(row => { 
+      if (Array.isArray(row.labels)) {
+        row.labels.forEach((label: string) => {
+          if (label) labelCounts.set(label, (labelCounts.get(label) || 0) + 1); 
+        });
+      }
+    });
     return Array.from(labelCounts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
   } catch { return []; }
 }
@@ -267,7 +274,6 @@ export async function fetchGenres(): Promise<PickerDataItem[]> {
   } catch { return []; }
 }
 
-// FIXED: 'folder' -> 'location'
 export async function fetchLocations(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase.from('collection').select('location').not('location', 'is', null).not('location', 'eq', '');
@@ -365,14 +371,16 @@ export async function fetchPackageConditions(): Promise<PickerDataItem[]> {
 // WRITE OPERATIONS
 // ============================================================================
 
-export async function updateLabel(id: string, newName: string): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ spotify_label: newName }).eq('spotify_label', id); return !error; } catch { return false; }
+export async function updateLabel(): Promise<boolean> {
+  // Global label rename disabled for array schema
+  console.warn("Global label rename not supported in array schema yet.");
+  return false; 
 }
+
 export async function updateFormat(id: string, newName: string): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ format: newName }).eq('format', id); return !error; } catch { return false; }
 }
 
-// FIXED: 'folder' -> 'location'
 export async function updateLocation(id: string, newName: string): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ location: newName }).eq('location', id); return !error; } catch { return false; }
 }
@@ -385,29 +393,35 @@ export async function updateArtist(id: string, newName: string, newSortName?: st
     return !error;
   } catch { return false; }
 }
+
 export async function deleteArtist(id: string): Promise<boolean> {
   try { const { error } = await supabase.from('collection').delete().eq('artist', id); return !error; } catch { return false; }
 }
+
 export async function mergeArtists(targetId: string, sourceIds: string[]): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ artist: targetId }).in('artist', sourceIds); return !error; } catch { return false; }
 }
 
-export async function deleteLabel(id: string): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ spotify_label: null }).eq('spotify_label', id); return !error; } catch { return false; }
+export async function deleteLabel(): Promise<boolean> {
+  console.warn("Global label delete not supported in array schema yet.");
+  return false;
 }
-export async function mergeLabels(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ spotify_label: targetId }).in('spotify_label', sourceIds); return !error; } catch { return false; }
+
+export async function mergeLabels(): Promise<boolean> {
+  console.warn("Global label merge not supported in array schema yet.");
+  return false; 
 }
+
 export async function mergeFormats(targetId: string, sourceIds: string[]): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ format: targetId }).in('format', sourceIds); return !error; } catch { return false; }
 }
 
-// FIXED: 'folder' -> 'location'
 export async function mergeLocations(targetId: string, sourceIds: string[]): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ location: targetId }).in('location', sourceIds); return !error; } catch { return false; }
 }
 
 // Packaging
+
 export async function fetchPackaging(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase.from('collection').select('packaging').not('packaging', 'is', null).not('packaging', 'eq', '');
@@ -417,17 +431,21 @@ export async function fetchPackaging(): Promise<PickerDataItem[]> {
     return Array.from(packagingCounts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
   } catch { return []; }
 }
+
 export async function updatePackaging(id: string, newName: string): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ packaging: newName }).eq('packaging', id); return !error; } catch { return false; }
 }
+
 export async function deletePackaging(id: string): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ packaging: null }).eq('packaging', id); return !error; } catch { return false; }
 }
+
 export async function mergePackaging(targetId: string, sourceIds: string[]): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ packaging: targetId }).in('packaging', sourceIds); return !error; } catch { return false; }
 }
 
 // Studios
+
 export async function fetchStudios(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase.from('collection').select('studio').not('studio', 'is', null).not('studio', 'eq', '');
@@ -437,14 +455,17 @@ export async function fetchStudios(): Promise<PickerDataItem[]> {
     return Array.from(counts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
   } catch { return []; }
 }
+
 export async function updateStudio(id: string, newName: string): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ studio: newName }).eq('studio', id); return !error; } catch { return false; }
 }
+
 export async function mergeStudios(targetId: string, sourceIds: string[]): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ studio: targetId }).in('studio', sourceIds); return !error; } catch { return false; }
 }
 
 // Countries
+
 export async function fetchCountries(): Promise<PickerDataItem[]> {
   const standardCountries = ['US', 'UK', 'Canada', 'Germany', 'France', 'Italy', 'Spain', 'Netherlands', 'Belgium', 'Sweden', 'Norway', 'Denmark', 'Finland', 'Austria', 'Switzerland', 'Japan', 'Australia', 'New Zealand', 'Brazil', 'Mexico', 'Argentina', 'Russia', 'Poland', 'Czech Republic', 'Hungary', 'Portugal', 'Greece', 'Ireland', 'Israel', 'South Korea', 'China', 'India', 'Europe', 'UK & Europe', 'USA & Canada'];
   try {
@@ -460,6 +481,7 @@ export async function fetchCountries(): Promise<PickerDataItem[]> {
 }
 
 // Sounds
+
 export async function fetchSounds(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase.from('collection').select('sound').not('sound', 'is', null).not('sound', 'eq', '');
@@ -469,14 +491,17 @@ export async function fetchSounds(): Promise<PickerDataItem[]> {
     return Array.from(counts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
   } catch { return []; }
 }
+
 export async function updateSound(id: string, newName: string): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ sound: newName }).eq('sound', id); return !error; } catch { return false; }
 }
+
 export async function mergeSounds(targetId: string, sourceIds: string[]): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ sound: targetId }).in('sound', sourceIds); return !error; } catch { return false; }
 }
 
 // Vinyl Colors
+
 export async function fetchVinylColors(): Promise<PickerDataItem[]> {
   const standardColors = ['Black', 'Red', 'Blue', 'Yellow', 'Orange', 'Green', 'Purple', 'Pink', 'White', 'Transparent', 'Brown', 'Gold', 'Metallic', 'Marbled', 'Swirl', 'Glow-in-the-Dark', 'Picture', 'Color-in-Color', 'Starburst', 'Splatter', 'Liquid-Filled'];
   try {
@@ -492,14 +517,17 @@ export async function fetchVinylColors(): Promise<PickerDataItem[]> {
     return Array.from(new Set([...standardColors, ...counts.keys()])).map(name => ({ id: name, name, count: counts.get(name) || 0 })).sort((a, b) => a.name.localeCompare(b.name));
   } catch { return standardColors.map(name => ({ id: name, name, count: 0 })); }
 }
+
 export async function updateVinylColor(id: string, newName: string): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ vinyl_color: newName }).eq('vinyl_color', id); return !error; } catch { return false; }
 }
+
 export async function mergeVinylColors(targetId: string, sourceIds: string[]): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ vinyl_color: targetId }).in('vinyl_color', sourceIds); return !error; } catch { return false; }
 }
 
 // Vinyl Weights
+
 export async function fetchVinylWeights(): Promise<PickerDataItem[]> {
   const standardWeights = ['80 gram vinyl', '100 gram vinyl', '120 gram vinyl', '140 gram vinyl', '160 gram vinyl', '180 gram vinyl', '200 gram vinyl'];
   try {
@@ -512,6 +540,7 @@ export async function fetchVinylWeights(): Promise<PickerDataItem[]> {
 }
 
 // SPARS
+
 export async function fetchSPARS(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase.from('collection').select('spars_code').not('spars_code', 'is', null).not('spars_code', 'eq', '');
@@ -521,14 +550,17 @@ export async function fetchSPARS(): Promise<PickerDataItem[]> {
     return Array.from(counts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
   } catch { return []; }
 }
+
 export async function updateSPARS(id: string, newName: string): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ spars_code: newName }).eq('spars_code', id); return !error; } catch { return false; }
 }
+
 export async function mergeSPARS(targetId: string, sourceIds: string[]): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ spars_code: targetId }).in('spars_code', sourceIds); return !error; } catch { return false; }
 }
 
 // Box Sets
+
 export async function fetchBoxSets(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase.from('collection').select('box_set').not('box_set', 'is', null).not('box_set', 'eq', '');
@@ -540,6 +572,7 @@ export async function fetchBoxSets(): Promise<PickerDataItem[]> {
 }
 
 // Purchase Stores
+
 export async function fetchPurchaseStores(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase.from('collection').select('purchase_store').not('purchase_store', 'is', null).not('purchase_store', 'eq', '');
@@ -549,17 +582,21 @@ export async function fetchPurchaseStores(): Promise<PickerDataItem[]> {
     return Array.from(counts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
   } catch { return []; }
 }
+
 export async function updatePurchaseStore(id: string, newName: string): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ purchase_store: newName }).eq('purchase_store', id); return !error; } catch { return false; }
 }
+
 export async function deletePurchaseStore(id: string): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ purchase_store: null }).eq('purchase_store', id); return !error; } catch { return false; }
 }
+
 export async function mergePurchaseStores(targetId: string, sourceIds: string[]): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ purchase_store: targetId }).in('purchase_store', sourceIds); return !error; } catch { return false; }
 }
 
 // Owners
+
 export async function fetchOwners(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase.from('collection').select('owner').not('owner', 'is', null).not('owner', 'eq', '');
@@ -569,17 +606,21 @@ export async function fetchOwners(): Promise<PickerDataItem[]> {
     return Array.from(counts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
   } catch { return []; }
 }
+
 export async function updateOwner(id: string, newName: string): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ owner: newName }).eq('owner', id); return !error; } catch { return false; }
 }
+
 export async function deleteOwner(id: string): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ owner: null }).eq('owner', id); return !error; } catch { return false; }
 }
+
 export async function mergeOwners(targetId: string, sourceIds: string[]): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ owner: targetId }).in('owner', sourceIds); return !error; } catch { return false; }
 }
 
 // Signees
+
 export async function fetchSignees(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase.from('collection').select('signed_by').not('signed_by', 'is', null);
@@ -596,6 +637,7 @@ export async function fetchSignees(): Promise<PickerDataItem[]> {
 }
 
 // Tags
+
 export async function fetchTags(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase.from('collection').select('custom_tags').not('custom_tags', 'is', null);
@@ -612,6 +654,7 @@ export async function fetchTags(): Promise<PickerDataItem[]> {
 }
 
 // Composers
+
 export async function fetchComposers(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase.from('collection').select('composer, sort_composer').not('composer', 'is', null).not('composer', 'eq', '');
@@ -638,6 +681,7 @@ export async function fetchComposers(): Promise<PickerDataItem[]> {
       });
   } catch { return []; }
 }
+
 export async function updateComposer(id: string, newName: string, newSortName?: string): Promise<boolean> {
   try {
     const updates: { composer: string; sort_composer?: string } = { composer: newName };
@@ -647,11 +691,13 @@ export async function updateComposer(id: string, newName: string, newSortName?: 
     return true; 
   } catch { return false; }
 }
+
 export async function mergeComposers(targetId: string, sourceIds: string[]): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ composer: targetId }).in('composer', sourceIds); if (error) { console.error(error); return false; } return true; } catch { return false; }
 }
 
 // Conductors
+
 export async function fetchConductors(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase.from('collection').select('conductor, sort_conductor').not('conductor', 'is', null).not('conductor', 'eq', '');
@@ -672,6 +718,7 @@ export async function fetchConductors(): Promise<PickerDataItem[]> {
     return Array.from(map.entries()).map(([name, info]) => ({ id: name, name, count: info.count, sortName: info.sortName })).sort((a, b) => (a.sortName || a.name).localeCompare(b.sortName || b.name));
   } catch { return []; }
 }
+
 export async function updateConductor(id: string, newName: string, newSortName?: string): Promise<boolean> {
   try { 
     const updates: { conductor: string; sort_conductor?: string } = { conductor: newName };
@@ -681,11 +728,13 @@ export async function updateConductor(id: string, newName: string, newSortName?:
     return true; 
   } catch { return false; }
 }
+
 export async function mergeConductors(targetId: string, sourceIds: string[]): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ conductor: targetId }).in('conductor', sourceIds); if (error) { console.error(error); return false; } return true; } catch { return false; }
 }
 
 // Choruses
+
 export async function fetchChoruses(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase.from('collection').select('chorus, sort_chorus').not('chorus', 'is', null).not('chorus', 'eq', '');
@@ -706,6 +755,7 @@ export async function fetchChoruses(): Promise<PickerDataItem[]> {
     return Array.from(map.entries()).map(([name, info]) => ({ id: name, name, count: info.count, sortName: info.sortName })).sort((a, b) => (a.sortName || a.name).localeCompare(b.sortName || b.name));
   } catch { return []; }
 }
+
 export async function updateChorus(id: string, newName: string, newSortName?: string): Promise<boolean> {
   try { 
     const updates: { chorus: string; sort_chorus?: string } = { chorus: newName };
@@ -715,11 +765,13 @@ export async function updateChorus(id: string, newName: string, newSortName?: st
     return true; 
   } catch { return false; }
 }
+
 export async function mergeChorus(targetId: string, sourceIds: string[]): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ chorus: targetId }).in('chorus', sourceIds); if (error) { console.error(error); return false; } return true; } catch { return false; }
 }
 
 // Compositions
+
 export async function fetchCompositions(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase.from('collection').select('composition, sort_composition').not('composition', 'is', null).not('composition', 'eq', '');
@@ -740,6 +792,7 @@ export async function fetchCompositions(): Promise<PickerDataItem[]> {
     return Array.from(map.entries()).map(([name, info]) => ({ id: name, name, count: info.count, sortName: info.sortName })).sort((a, b) => (a.sortName || a.name).localeCompare(b.sortName || b.name));
   } catch { return []; }
 }
+
 export async function updateComposition(id: string, newName: string, newSortName?: string): Promise<boolean> {
   try { 
     const updates: { composition: string; sort_composition?: string } = { composition: newName };
@@ -749,11 +802,13 @@ export async function updateComposition(id: string, newName: string, newSortName
     return true; 
   } catch { return false; }
 }
+
 export async function mergeCompositions(targetId: string, sourceIds: string[]): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ composition: targetId }).in('composition', sourceIds); if (error) { console.error(error); return false; } return true; } catch { return false; }
 }
 
 // Orchestras
+
 export async function fetchOrchestras(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase.from('collection').select('orchestra, sort_orchestra').not('orchestra', 'is', null).not('orchestra', 'eq', '');
@@ -774,6 +829,7 @@ export async function fetchOrchestras(): Promise<PickerDataItem[]> {
     return Array.from(map.entries()).map(([name, info]) => ({ id: name, name, count: info.count, sortName: info.sortName })).sort((a, b) => (a.sortName || a.name).localeCompare(b.sortName || b.name));
   } catch { return []; }
 }
+
 export async function updateOrchestra(id: string, newName: string, newSortName?: string): Promise<boolean> {
   try { 
     const updates: { orchestra: string; sort_orchestra?: string } = { orchestra: newName };
@@ -783,6 +839,7 @@ export async function updateOrchestra(id: string, newName: string, newSortName?:
     return true; 
   } catch { return false; }
 }
+
 export async function mergeOrchestras(targetId: string, sourceIds: string[]): Promise<boolean> {
   try { const { error } = await supabase.from('collection').update({ orchestra: targetId }).in('orchestra', sourceIds); if (error) { console.error(error); return false; } return true; } catch { return false; }
 }

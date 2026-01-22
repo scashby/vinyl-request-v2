@@ -19,7 +19,7 @@ export type ColumnId =
   | 'sides'
   | 'tracks'
   // Details
-  | 'location'  // REPLACED folder
+  | 'location'  // Fixed
   | 'country'
   | 'extra'
   | 'media_condition'
@@ -30,18 +30,19 @@ export type ColumnId =
   // Metadata
   | 'genres'
   | 'styles'
-  | 'master_release_date'
+  | 'labels' // Added
   // People
   | 'engineers'
   | 'musicians'
   | 'producers'
   | 'songwriters'
+  | 'secondary_artists' // Added
   // Personal
   | 'added_date'
   | 'collection_status'
   | 'my_rating'
-  | 'personal_notes' // RENAMED from notes
-  | 'release_notes'  // NEW
+  | 'personal_notes' // Renamed
+  | 'release_notes'  // Added
   | 'owner'
   | 'custom_tags'
   | 'modified_date'
@@ -79,7 +80,7 @@ export const COLUMN_DEFINITIONS: Record<ColumnId, ColumnDefinition> = {
   tracks: { id: 'tracks', label: 'Tracks', width: '80px' },
   
   // Details
-  location: { id: 'location', label: 'Location', width: '150px' }, // NEW
+  location: { id: 'location', label: 'Location', width: '150px' },
   country: { id: 'country', label: 'Country', width: '100px' },
   extra: { id: 'extra', label: 'Extra', width: '150px' },
   media_condition: { id: 'media_condition', label: 'Media Cond', width: '150px' },
@@ -91,20 +92,21 @@ export const COLUMN_DEFINITIONS: Record<ColumnId, ColumnDefinition> = {
   // Metadata
   genres: { id: 'genres', label: 'Genre', width: '150px' },
   styles: { id: 'styles', label: 'Styles', width: '150px' },
-  master_release_date: { id: 'master_release_date', label: 'Release Date', width: '130px' },
+  labels: { id: 'labels', label: 'Labels', width: '150px' },
   
   // People
   engineers: { id: 'engineers', label: 'Engineer', width: '150px' },
   musicians: { id: 'musicians', label: 'Musician', width: '150px' },
   producers: { id: 'producers', label: 'Producer', width: '150px' },
   songwriters: { id: 'songwriters', label: 'Songwriter', width: '150px' },
+  secondary_artists: { id: 'secondary_artists', label: 'Feat. Artists', width: '200px' },
   
   // Personal
   added_date: { id: 'added_date', label: 'Added', width: '120px' },
   collection_status: { id: 'collection_status', label: 'Status', width: '150px' },
   my_rating: { id: 'my_rating', label: 'Rating', width: '100px' },
-  personal_notes: { id: 'personal_notes', label: 'My Notes', width: '250px' }, // RENAMED
-  release_notes: { id: 'release_notes', label: 'Release Notes', width: '250px' }, // NEW
+  personal_notes: { id: 'personal_notes', label: 'My Notes', width: '250px' },
+  release_notes: { id: 'release_notes', label: 'Release Notes', width: '250px' },
   owner: { id: 'owner', label: 'Owner', width: '120px' },
   custom_tags: { id: 'custom_tags', label: 'Tags', width: '200px' },
   modified_date: { id: 'modified_date', label: 'Modified', width: '140px' },
@@ -129,7 +131,7 @@ export const COLUMN_GROUPS = [
     id: 'edition',
     label: 'Edition',
     icon: '💿',
-    columns: ['format', 'discs', 'sides', 'tracks'] as ColumnId[]
+    columns: ['format', 'discs', 'sides', 'tracks', 'labels'] as ColumnId[]
   },
   {
     id: 'details',
@@ -144,13 +146,13 @@ export const COLUMN_GROUPS = [
     id: 'metadata',
     label: 'Metadata',
     icon: '📊',
-    columns: ['genres', 'styles', 'master_release_date'] as ColumnId[]
+    columns: ['genres', 'styles'] as ColumnId[]
   },
   {
     id: 'people',
     label: 'People',
     icon: '👥',
-    columns: ['engineers', 'musicians', 'producers', 'songwriters'] as ColumnId[]
+    columns: ['secondary_artists', 'engineers', 'musicians', 'producers', 'songwriters'] as ColumnId[]
   },
   {
     id: 'personal',
@@ -193,32 +195,3 @@ export const DEFAULT_LOCKED_COLUMNS: ColumnId[] = [
   'artist',
   'title'
 ];
-
-export function getVisibleColumns(visibleIds: ColumnId[]): ColumnDefinition[] {
-  return visibleIds.map(id => COLUMN_DEFINITIONS[id]).filter(Boolean);
-}
-
-export function splitColumnsByLock(visibleColumns: ColumnDefinition[], lockedIds: ColumnId[]): {
-  locked: ColumnDefinition[];
-  unlocked: ColumnDefinition[];
-} {
-  const locked: ColumnDefinition[] = [];
-  const unlocked: ColumnDefinition[] = [];
-  
-  visibleColumns.forEach(col => {
-    if (lockedIds.includes(col.id)) {
-      locked.push(col);
-    } else {
-      unlocked.push(col);
-    }
-  });
-  
-  return { locked, unlocked };
-}
-
-export type SortDirection = 'asc' | 'desc' | null;
-
-export interface SortState {
-  column: ColumnId | null;
-  direction: SortDirection;
-}

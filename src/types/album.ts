@@ -1,6 +1,4 @@
 // src/types/album.ts
-// Updated for Phase 1 Schema Refactor
-
 export type Album = {
   // ============================================================================
   // CORE IDENTIFICATION
@@ -69,11 +67,12 @@ export type Album = {
   musicbrainz_id: string | null;
 
   // ============================================================================
-  // TAGS (Mapped from Relation)
+  // TAGS & LABELS
   // ============================================================================
   genres: string[] | null; 
   styles: string[] | null; 
   custom_tags: string[] | null; 
+  labels: string[] | null; // ADDED: Matches DB array column
 
   // ============================================================================
   // PEOPLE
@@ -84,7 +83,7 @@ export type Album = {
   songwriters: string[] | null;
 
   // ============================================================================
-  // PERSONAL / TRACKING (Restored)
+  // PERSONAL / TRACKING
   // ============================================================================
   owner: string | null;
   purchase_price: number | null;
@@ -92,9 +91,20 @@ export type Album = {
   purchase_date: string | null;
   purchase_store: string | null;
   last_cleaned_date: string | null;
+  last_played_date: string | null; // ADDED: Matches DB column
   play_count: number | null;
   my_rating: number | null;
   signed_by: string[] | null;
+  
+  // ============================================================================
+  // LEGACY / OPTIONAL (Keep for compatibility if needed, but prefer above)
+  // ============================================================================
+  spotify_label?: string | null;
+  apple_music_label?: string | null;
+  sort_title?: string | null;
+  subtitle?: string | null;
+  master_release_date?: string | null;
+  played_history?: string | null; // Kept as optional string to prevent breakage if accessed
 };
 
 // HELPER FUNCTIONS
