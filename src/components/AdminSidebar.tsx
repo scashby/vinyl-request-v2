@@ -84,42 +84,12 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
                 href="/edit-collection"
                 target="_blank"
                 className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-                  pathname === "/admin/edit-collection" 
+                  pathname === "/edit-collection" 
                     ? "bg-purple-700 text-white" 
                     : "bg-purple-600 text-white hover:bg-purple-700"
                 }`}
               >
                 📚 Browse & Edit
-              </Link>
-              <Link 
-                href="/admin/import-discogs"
-                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-                  pathname === "/admin/import-discogs" 
-                    ? "bg-purple-700 text-white" 
-                    : "bg-purple-600 text-white hover:bg-purple-700"
-                }`}
-              >
-                📥 Import from Discogs
-              </Link>
-              <Link 
-                href="/admin/manage-metadata"
-                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-                  pathname === "/admin/manage-metadata" 
-                    ? "bg-purple-700 text-white" 
-                    : "bg-purple-600 text-white hover:bg-purple-700"
-                }`}
-              >
-                🏷️ Manage Metadata
-              </Link>
-              <Link 
-                href="/admin/best-of"
-                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-                  pathname === "/admin/best-of" 
-                    ? "bg-purple-700 text-white" 
-                    : "bg-purple-600 text-white hover:bg-purple-700"
-                }`}
-              >
-                🏆 Best-Of Lists
               </Link>
             </div>
           </div>
@@ -141,38 +111,10 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
               <div className="pt-2 border-t border-emerald-300">
                 <div className="text-xs text-emerald-700 font-semibold mb-1 px-1">External:</div>
                 <div className="grid grid-cols-2 gap-1 text-xs">
-                  <a 
-                    href="https://admin.shopify.com/store/kstusk-d1?ui_locales=en"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors"
-                  >
-                    🛍️ Shopify
-                  </a>
-                  <a 
-                    href="https://www.discogs.com/seller/socialblunders/profile"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors"
-                  >
-                    💿 Discogs
-                  </a>
-                  <a 
-                    href="https://www.moo.com/us/account/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors"
-                  >
-                    🐄 Moo
-                  </a>
-                  <a 
-                    href="https://www.vistaprint.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors"
-                  >
-                    🖨️ Vista
-                  </a>
+                  <a href="https://admin.shopify.com/store/kstusk-d1?ui_locales=en" target="_blank" rel="noopener noreferrer" className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors">🛍️ Shopify</a>
+                  <a href="https://www.discogs.com/seller/socialblunders/profile" target="_blank" rel="noopener noreferrer" className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors">💿 Discogs</a>
+                  <a href="https://www.moo.com/us/account/" target="_blank" rel="noopener noreferrer" className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors">🐄 Moo</a>
+                  <a href="https://www.vistaprint.com/" target="_blank" rel="noopener noreferrer" className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors">🖨️ Vista</a>
                 </div>
               </div>
             </div>
@@ -357,78 +299,15 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
           <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
             <h4 className="text-sm font-semibold text-slate-800 mb-2">🔗 External Tools</h4>
             <div className="grid grid-cols-2 gap-1 text-xs">
-              <a 
-                href="https://blog.deadwaxdialogues.com/wp-admin/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-center bg-slate-600 text-white py-1 px-1 rounded font-medium hover:bg-slate-700 transition-colors"
-              >
-                📝 WP
-              </a>
-              <a 
-                href="https://console.hetzner.com/projects"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-center bg-red-600 text-white py-1 px-1 rounded font-medium hover:bg-red-700 transition-colors"
-              >
-                🖥️ Hetzner
-              </a>
-              <a 
-                href="https://vercel.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-center bg-black text-white py-1 px-1 rounded font-medium hover:bg-gray-900 transition-colors"
-              >
-                ▲ Vercel
-              </a>
-              <a 
-                href="https://supabase.com/dashboard"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-center bg-emerald-600 text-white py-1 px-1 rounded font-medium hover:bg-emerald-700 transition-colors"
-              >
-                🟩 Supabase
-              </a>
-              <a 
-                href="https://business.facebook.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-center bg-blue-600 text-white py-1 px-1 rounded font-medium hover:bg-blue-700 transition-colors"
-              >
-                📘 FB
-              </a>
-              <a 
-                href="https://login.buffer.com/login"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-center bg-sky-600 text-white py-1 px-1 rounded font-medium hover:bg-sky-700 transition-colors"
-              >
-                📱 Buffer
-              </a>
-              <a 
-                href="https://admin.google.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-center bg-red-500 text-white py-1 px-1 rounded font-medium hover:bg-red-600 transition-colors"
-              >
-                🔍 Google
-              </a>
-              <a 
-                href="https://login.squarespace.com/api/1/login/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-center bg-gray-800 text-white py-1 px-1 rounded font-medium hover:bg-gray-900 transition-colors"
-              >
-                ⬛ Square
-              </a>
-              <a 
-                href="https://app.dub.co/login"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-center bg-violet-600 text-white py-1 px-1 rounded font-medium hover:bg-violet-700 transition-colors"
-              >
-                🔗 Dub
-              </a>
+              <a href="https://blog.deadwaxdialogues.com/wp-admin/" target="_blank" rel="noopener noreferrer" className="text-center bg-slate-600 text-white py-1 px-1 rounded font-medium hover:bg-slate-700 transition-colors">📝 WP</a>
+              <a href="https://console.hetzner.com/projects" target="_blank" rel="noopener noreferrer" className="text-center bg-red-600 text-white py-1 px-1 rounded font-medium hover:bg-red-700 transition-colors">🖥️ Hetzner</a>
+              <a href="https://vercel.com" target="_blank" rel="noopener noreferrer" className="text-center bg-black text-white py-1 px-1 rounded font-medium hover:bg-gray-900 transition-colors">▲ Vercel</a>
+              <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" className="text-center bg-emerald-600 text-white py-1 px-1 rounded font-medium hover:bg-emerald-700 transition-colors">🟩 Supabase</a>
+              <a href="https://business.facebook.com/" target="_blank" rel="noopener noreferrer" className="text-center bg-blue-600 text-white py-1 px-1 rounded font-medium hover:bg-blue-700 transition-colors">📘 FB</a>
+              <a href="https://login.buffer.com/login" target="_blank" rel="noopener noreferrer" className="text-center bg-sky-600 text-white py-1 px-1 rounded font-medium hover:bg-sky-700 transition-colors">📱 Buffer</a>
+              <a href="https://admin.google.com/" target="_blank" rel="noopener noreferrer" className="text-center bg-red-500 text-white py-1 px-1 rounded font-medium hover:bg-red-600 transition-colors">🔍 Google</a>
+              <a href="https://login.squarespace.com/api/1/login/" target="_blank" rel="noopener noreferrer" className="text-center bg-gray-800 text-white py-1 px-1 rounded font-medium hover:bg-gray-900 transition-colors">⬛ Square</a>
+              <a href="https://app.dub.co/login" target="_blank" rel="noopener noreferrer" className="text-center bg-violet-600 text-white py-1 px-1 rounded font-medium hover:bg-violet-700 transition-colors">🔗 Dub</a>
             </div>
           </div>
 
