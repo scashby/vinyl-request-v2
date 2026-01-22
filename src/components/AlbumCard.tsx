@@ -1,23 +1,23 @@
 // FILE: src/components/AlbumCard.tsx
-// AlbumCard component with Just Added badge support
-
 "use client";
 
 import Link from "next/link";
 import Image from "next/image";
 
-type Album = {
-  id: string | number;
-  eventId?: string | number;
-  mediaType?: string;
-  image: string;
-  title: string;
-  artist: string;
-  year: string | number;
-  justAdded?: boolean; // NEW: Add this prop
+type AlbumCardProps = {
+  album: {
+    id: string | number;
+    eventId?: string | number;
+    mediaType?: string; // Should be passed by parent based on 'format'
+    image: string;
+    title: string;
+    artist: string;
+    year: string | number;
+    justAdded?: boolean;
+  };
 };
 
-export default function AlbumCard({ album }: { album: Album }) {
+export default function AlbumCard({ album }: AlbumCardProps) {
   const colorMap: Record<string, string> = {
     vinyl: "bg-purple-600/75",
     cassettes: "bg-green-600/75",
@@ -26,10 +26,11 @@ export default function AlbumCard({ album }: { album: Album }) {
     "8-track": "bg-orange-600/75",
   };
 
+  // Safe fallback for mediaType
   const badgeColor =
     colorMap[album.mediaType?.toLowerCase() || ""] || "bg-gray-600/75";
 
-  // Build the album link, passing eventId as a query param if present
+  // Build the album link
   const href =
     album.eventId
       ? `/browse/album-detail/${album.id}?eventId=${album.eventId}`
@@ -40,7 +41,7 @@ export default function AlbumCard({ album }: { album: Album }) {
       <Link href={href}>
         <div className="relative">
           <span className={`absolute top-1.5 left-1.5 text-[0.65rem] px-1.5 py-0.5 rounded font-semibold tracking-wide text-white ${badgeColor}`}>
-            {album.mediaType}
+            {album.mediaType || 'Music'}
           </span>
           {/* Just Added Badge */}
           {album.justAdded && (

@@ -71,9 +71,9 @@ export type Album = {
   // ============================================================================
   // TAGS (Mapped from Relation)
   // ============================================================================
-  genres: string[] | null; // Populated from collection_tags via join
-  styles: string[] | null; // Populated from collection_tags via join
-  custom_tags: string[] | null; // Populated from collection_tags via join
+  genres: string[] | null; 
+  styles: string[] | null; 
+  custom_tags: string[] | null; 
 
   // ============================================================================
   // PEOPLE
@@ -82,6 +82,19 @@ export type Album = {
   producers: string[] | null;
   engineers: string[] | null;
   songwriters: string[] | null;
+
+  // ============================================================================
+  // PERSONAL / TRACKING (Restored)
+  // ============================================================================
+  owner: string | null;
+  purchase_price: number | null;
+  current_value: number | null;
+  purchase_date: string | null;
+  purchase_store: string | null;
+  last_cleaned_date: string | null;
+  play_count: number | null;
+  my_rating: number | null;
+  signed_by: string[] | null;
 };
 
 // HELPER FUNCTIONS

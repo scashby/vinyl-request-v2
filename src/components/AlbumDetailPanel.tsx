@@ -4,99 +4,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-
-type Album = {
-  id: number;
-  artist: string;
-  title: string;
-  year: string | null;
-  format: string;
-  image_url: string | null;
-  folder: string;
-  media_condition: string;
-  for_sale: boolean;
-  sale_price: number | null;
-  sale_platform: string | null;
-  custom_tags: string[] | null;
-  discogs_genres: string[] | null;
-  discogs_styles: string[] | null;
-  spotify_genres: string[] | null;
-  apple_music_genres: string[] | null;
-  spotify_label: string | null;
-  apple_music_label: string | null;
-  apple_music_genre: string | null;
-  decade: number | null;
-  tracklists: string | null;
-  discogs_source: string | null;
-  discogs_notes: string | null;
-  sale_notes: string | null;
-  pricing_notes: string | null;
-  notes: string | null;
-  is_1001: boolean;
-  steves_top_200: boolean;
-  this_weeks_top_10: boolean;
-  inner_circle_preferred: boolean;
-  discogs_master_id: string | null;
-  discogs_release_id: string | null;
-  master_release_id: string | null;
-  spotify_id: string | null;
-  apple_music_id: string | null;
-  sides: number | { count: number } | string[] | null;
-  is_box_set: boolean;
-  parent_id: string | null;
-  blocked: boolean;
-  blocked_sides: string[] | null;
-  child_album_ids: number[] | null;
-  sell_price: string | null;
-  date_added: string | null;
-  master_release_date: string | null;
-  spotify_url: string | null;
-  spotify_popularity: number | null;
-  spotify_release_date: string | null;
-  spotify_total_tracks: number | null;
-  spotify_image_url: string | null;
-  apple_music_url: string | null;
-  apple_music_release_date: string | null;
-  apple_music_track_count: number | null;
-  apple_music_artwork_url: string | null;
-  last_enriched_at: string | null;
-  enrichment_sources: string | null;
-  artist_norm: string | null;
-  album_norm: string | null;
-  artist_album_norm: string | null;
-  year_int: number | null;
-  sale_quantity: number | null;
-  wholesale_cost: number | null;
-  discogs_price_min: number | null;
-  discogs_price_median: number | null;
-  discogs_price_max: number | null;
-  discogs_price_updated_at: string | null;
-  purchase_date: string | null;
-  purchase_store: string | null;
-  purchase_price: number | null;
-  current_value: number | null;
-  owner: string | null;
-  last_cleaned_date: string | null;
-  signed_by: string[] | null;
-  play_count: number | null;
-  // ENRICHMENT FIELDS
-  enrichment_summary: Record<string, string> | null;
-  musicians: string[] | null;
-  producers: string[] | null;
-  companies: string[] | null;
-  tempo_bpm: number | null;
-  musical_key: string | null;
-  energy: number | null;
-  danceability: number | null;
-  mood_acoustic: number | null;
-  mood_happy: number | null;
-  mood_sad: number | null;
-  mood_party: number | null;
-  mood_relaxed: number | null;
-  mood_aggressive: number | null;
-  mood_electronic: number | null;
-  engineers: string[] | null;
-};
+import { Album } from '@/types/album'; // Import the source of truth
 
 interface AlbumDetailPanelProps {
   album: Album;
@@ -120,8 +28,8 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
     { id: 'ids', label: 'IDs', icon: '🔗' }
   ];
 
-  const renderField = (label: string, value: string | number | null, linkUrl?: string) => {
-    if (!value) return null;
+  const renderField = (label: string, value: string | number | null | undefined, linkUrl?: string) => {
+    if (value === null || value === undefined || value === '') return null;
 
     const displayValue = String(value);
     
@@ -144,7 +52,7 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
     );
   };
 
-  const renderArrayField = (label: string, values: string[] | null) => {
+  const renderArrayField = (label: string, values: string[] | null | undefined) => {
     if (!values || values.length === 0) return null;
 
     return (
@@ -162,14 +70,6 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
       </div>
     );
   };
-
-  const getSidesCount = (sides: number | { count: number } | string[] | null): string | null => {
-    if (!sides) return null;
-    if (typeof sides === 'number') return String(sides);
-    if (typeof sides === 'object' && !Array.isArray(sides) && 'count' in sides) return String(sides.count);
-    if (Array.isArray(sides)) return String(sides.length);
-    return null;
-};
 
   return (
     <div className="w-full md:w-[380px] h-full bg-white border-l border-gray-200 flex flex-col shrink-0">
@@ -211,32 +111,26 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
         {activeTab === 'main' && (
           <div>
             {renderField('Format', album.format)}
-            {renderField('Folder', album.folder)}
+            {renderField('Location', album.location)}
             {renderField('Condition', album.media_condition)}
-            {renderField('Sides', getSidesCount(album.sides))}
-            {renderField('Decade', album.decade ? `${album.decade}s` : null)}
+            {renderField('Sleeve', album.package_sleeve_condition)}
+            {renderField('Discs', album.discs)}
+            {renderField('Sides', album.sides)}
             {renderField('Date Added', album.date_added ? new Date(album.date_added).toLocaleDateString() : null)}
             
-            {album.blocked_sides && album.blocked_sides.length > 0 && (
-              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                <div className="text-xs font-semibold text-red-600 mb-1">
-                  ⚠️ Blocked Sides
-                </div>
-                <div className="text-xs text-red-800">
-                  {album.blocked_sides.join(', ')}
-                </div>
-              </div>
-            )}
+            {/* Keeping Extra Info here as it often contains Gatefold/Color details */}
+            {renderField('Features', album.extra)}
 
-            {(album.for_sale || album.wholesale_cost) && (
+            {/* Note: Wholesale Cost removed as it's typically private, but can be added if requested */}
+            {album.for_sale && (
               <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
                 <div className="text-xs font-semibold text-green-600 mb-2">
                   💰 Sale Info
                 </div>
-                {album.for_sale && album.sale_price && renderField('Sale Price', `$${album.sale_price.toFixed(2)}`)}
-                {album.sale_platform && renderField('Platform', album.sale_platform)}
-                {album.wholesale_cost && renderField('Wholesale Cost', `$${album.wholesale_cost.toFixed(2)}`)}
-                {album.sale_quantity && renderField('Quantity', album.sale_quantity)}
+                {/* Note: sale_price removed from type if not migrated, check DB */}
+                <div className="text-sm text-green-800">
+                    Item is marked for sale.
+                </div>
               </div>
             )}
           </div>
@@ -244,105 +138,21 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
 
         {activeTab === 'details' && (
           <div>
-            {renderField('Spotify Label', album.spotify_label)}
-            {renderField('Apple Music Label', album.apple_music_label)}
-            {renderField('Apple Genre', album.apple_music_genre)}
-            {renderField('Spotify Popularity', album.spotify_popularity)}
-            {renderArrayField('Discogs Genres', album.discogs_genres)}
-            {renderArrayField('Discogs Styles', album.discogs_styles)}
-            {renderArrayField('Spotify Genres', album.spotify_genres)}
-            {renderArrayField('Apple Music Genres', album.apple_music_genres)}
-
-            {(!album.spotify_label && !album.discogs_genres?.length && !album.spotify_genres?.length) && (
-              <div className="p-5 text-center text-gray-400 text-[13px]">
-                <div className="text-[32px] mb-2">📋</div>
-                No detailed metadata available
-              </div>
-            )}
+            {/* Note: These label fields might need to be populated from tags in Phase 4 */}
+            {renderArrayField('Genres', album.genres)}
+            {renderArrayField('Styles', album.styles)}
+            {renderField('Catalog #', album.cat_no)}
+            {renderField('Barcode', album.barcode)}
+            {renderField('RPM', album.rpm)}
+            {renderField('Weight', album.vinyl_weight)}
+            {renderField('Color', album.vinyl_color)}
           </div>
         )}
 
         {activeTab === 'enrichment' && (
           <div className="flex flex-col gap-6">
             
-            {/* 1. EXTERNAL FACTS */}
-            {album.enrichment_summary && Object.keys(album.enrichment_summary).length > 0 && (
-              <div>
-                <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
-                  External Facts
-                </div>
-                <div className="bg-gray-50 border border-gray-200 rounded-md p-3 flex flex-col gap-2">
-                  {Object.entries(album.enrichment_summary).map(([source, text], idx) => (
-                    <div key={idx} className="text-sm text-gray-800 border-b last:border-0 border-gray-200 pb-2 last:pb-0">
-                      <span className="font-semibold text-gray-600 capitalize mr-1">
-                        {source.replace(/_/g, ' ')}:
-                      </span>
-                      {text.includes('http') ? (
-                        <span>
-                          {text.split(/(https?:\/\/[^\s]+)/g).map((part, i) => 
-                            part.match(/^https?:\/\//) ? (
-                              <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                                {part.includes('whosampled') ? 'WhoSampled' : 
-                                 part.includes('secondhandsongs') ? 'SecondHandSongs' :
-                                 part.includes('setlist') ? 'Setlist.fm' : 
-                                 'Link'} →
-                              </a>
-                            ) : part
-                          )}
-                        </span>
-                      ) : (
-                        <span>{text}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 2. SONIC DNA */}
-            {(album.tempo_bpm || album.musical_key || album.energy) && (
-              <div>
-                <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
-                  Sonic DNA
-                </div>
-                <div className="flex gap-3 mb-4">
-                  {album.tempo_bpm && (
-                    <div className="px-3 py-1.5 bg-gray-100 rounded-full text-xs font-semibold text-gray-700 border border-gray-200">
-                      ⏱ {album.tempo_bpm} BPM
-                    </div>
-                  )}
-                  {album.musical_key && (
-                    <div className="px-3 py-1.5 bg-gray-100 rounded-full text-xs font-semibold text-gray-700 border border-gray-200">
-                      🎹 {album.musical_key}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-3">
-                  {[
-                    { label: 'Energy', val: album.energy, color: 'bg-orange-500' },
-                    { label: 'Danceability', val: album.danceability, color: 'bg-purple-500' },
-                  ].map(feat => (
-                    typeof feat.val === 'number' && (
-                      <div key={feat.label} className="flex items-center gap-2 text-xs">
-                        <div className="w-20 text-gray-500 font-medium">{feat.label}</div>
-                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full ${feat.color}`} 
-                            style={{ width: `${feat.val * 100}%` }} 
-                          />
-                        </div>
-                        <div className="w-8 text-right font-mono text-gray-500">
-                          {Math.round(feat.val * 100)}%
-                        </div>
-                      </div>
-                    )
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 3. CREDITS (SIMPLE TEXT LISTS) */}
+            {/* 3. CREDITS (You requested to KEEP these) */}
             {(album.musicians?.length || album.producers?.length || album.engineers?.length) && (
               <div>
                 <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
@@ -370,29 +180,16 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
                 </div>
               </div>
             )}
-
-            {/* Fallback */}
-            {!album.enrichment_summary && !album.tempo_bpm && !album.musicians && (
-              <div className="p-5 text-center text-gray-400 text-[13px]">
-                <div className="text-[32px] mb-2">⚡</div>
-                No enrichment data found.
-              </div>
-            )}
           </div>
         )}
 
         {activeTab === 'personal' && (
           <div>
-            {renderField('Purchase Date', album.purchase_date ? new Date(album.purchase_date).toLocaleDateString() : null)}
-            {renderField('Purchase Store', album.purchase_store)}
-            {album.purchase_price && renderField('Purchase Price', `$${album.purchase_price.toFixed(2)}`)}
-            {album.current_value && renderField('Current Value', `$${album.current_value.toFixed(2)}`)}
+            {renderField('Purchase Price', album.purchase_price ? `$${album.purchase_price.toFixed(2)}` : null)}
+            {renderField('Current Value', album.current_value ? `$${album.current_value.toFixed(2)}` : null)}
             {renderField('Owner', album.owner)}
-            {album.play_count !== null && renderField('Play Count', album.play_count)}
-            {renderField('Last Cleaned', album.last_cleaned_date ? new Date(album.last_cleaned_date).toLocaleDateString() : null)}
-            {renderArrayField('Signed By', album.signed_by)}
-
-            {(!album.purchase_date && !album.purchase_store && !album.owner && !album.play_count) && (
+            
+            {(!album.owner && !album.purchase_price) && (
               <div className="p-5 text-center text-gray-400 text-[13px]">
                 <div className="text-[32px] mb-2">👤</div>
                 No personal tracking info
@@ -426,51 +223,29 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
 
         {activeTab === 'notes' && (
           <div>
-            {album.notes && (
+            {album.personal_notes && (
               <div className="mb-4">
                 <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.5px] mb-1.5">
-                  General Notes
+                  Personal Notes
                 </div>
                 <div className="text-[13px] text-gray-700 leading-relaxed p-3 bg-gray-50 rounded-md whitespace-pre-wrap">
-                  {album.notes}
+                  {album.personal_notes}
                 </div>
               </div>
             )}
 
-            {album.discogs_notes && (
+            {album.release_notes && (
               <div className="mb-4">
                 <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.5px] mb-1.5">
-                  Discogs Notes
+                  Release Notes
                 </div>
                 <div className="text-[13px] text-gray-700 leading-relaxed p-3 bg-gray-50 rounded-md whitespace-pre-wrap">
-                  {album.discogs_notes}
+                  {album.release_notes}
                 </div>
               </div>
             )}
 
-            {album.sale_notes && (
-              <div className="mb-4">
-                <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.5px] mb-1.5">
-                  Sale Notes
-                </div>
-                <div className="text-[13px] text-gray-700 leading-relaxed p-3 bg-gray-50 rounded-md whitespace-pre-wrap">
-                  {album.sale_notes}
-                </div>
-              </div>
-            )}
-
-            {album.pricing_notes && (
-              <div className="mb-4">
-                <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.5px] mb-1.5">
-                  Pricing Notes
-                </div>
-                <div className="text-[13px] text-gray-700 leading-relaxed p-3 bg-gray-50 rounded-md whitespace-pre-wrap">
-                  {album.pricing_notes}
-                </div>
-              </div>
-            )}
-
-            {(!album.notes && !album.discogs_notes && !album.sale_notes && !album.pricing_notes) && (
+            {(!album.personal_notes && !album.release_notes) && (
               <div className="p-5 text-center text-gray-400 text-[13px]">
                 <div className="text-[32px] mb-2">📝</div>
                 No notes available
@@ -483,8 +258,9 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
           <div>
             {renderField('Discogs Master ID', album.discogs_master_id, album.discogs_master_id ? `https://www.discogs.com/master/${album.discogs_master_id}` : undefined)}
             {renderField('Discogs Release ID', album.discogs_release_id, album.discogs_release_id ? `https://www.discogs.com/release/${album.discogs_release_id}` : undefined)}
-            {renderField('Spotify ID', album.spotify_id, album.spotify_url || undefined)}
-            {renderField('Apple Music ID', album.apple_music_id, album.apple_music_url || undefined)}
+            {renderField('Spotify ID', album.spotify_id)}
+            {renderField('Apple Music ID', album.apple_music_id)}
+            {renderField('MusicBrainz ID', album.musicbrainz_id)}
 
             {(!album.discogs_master_id && !album.discogs_release_id && !album.spotify_id && !album.apple_music_id) && (
               <div className="p-5 text-center text-gray-400 text-[13px]">

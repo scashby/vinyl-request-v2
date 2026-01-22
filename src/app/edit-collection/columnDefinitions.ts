@@ -13,42 +13,24 @@ export type ColumnId =
   | 'cat_no'
   | 'sort_title'
   | 'subtitle'
-  | 'index_number'
   // Edition
   | 'format'
   | 'discs'
+  | 'sides'
   | 'tracks'
-  | 'length'
   // Details
-  | 'box_set'
+  | 'location'  // REPLACED folder
   | 'country'
   | 'extra'
-  | 'is_live'
   | 'media_condition'
   | 'package_sleeve_condition'
-  | 'packaging'
   | 'rpm'
-  | 'sound'
-  | 'spars_code'
-  | 'storage_device_slot'
-  | 'studio'
   | 'vinyl_color'
   | 'vinyl_weight'
   // Metadata
   | 'genres'
   | 'styles'
-  | 'label'
-  | 'original_release_date'
-  | 'original_release_year'
-  | 'recording_date'
-  | 'recording_year'
   | 'master_release_date'
-  // Classical
-  | 'chorus'
-  | 'composer'
-  | 'composition'
-  | 'conductor'
-  | 'orchestra'
   // People
   | 'engineers'
   | 'musicians'
@@ -57,37 +39,16 @@ export type ColumnId =
   // Personal
   | 'added_date'
   | 'collection_status'
-  | 'folder'
-  | 'location'
   | 'my_rating'
-  | 'notes'
+  | 'personal_notes' // RENAMED from notes
+  | 'release_notes'  // NEW
   | 'owner'
-  | 'play_count'
-  | 'last_played_date'
-  | 'last_cleaned_date'
-  | 'signed_by'
   | 'custom_tags'
   | 'modified_date'
-  // Loan
-  | 'due_date'
-  | 'loan_date'
-  | 'loaned_to'
   // Value
   | 'for_sale'
-  | 'purchase_date'
-  | 'purchase_store'
   | 'purchase_price'
-  | 'current_value'
-  | 'sale_price'
-  | 'sale_platform'
-  | 'sale_quantity'
-  | 'wholesale_cost'
-  | 'discogs_price_min'
-  | 'discogs_price_median'
-  | 'discogs_price_max'
-  | 'pricing_notes'
-  // Popularity
-  | 'spotify_popularity';
+  | 'current_value';
 
 export interface ColumnDefinition {
   id: ColumnId;
@@ -110,46 +71,27 @@ export const COLUMN_DEFINITIONS: Record<ColumnId, ColumnDefinition> = {
   cat_no: { id: 'cat_no', label: 'Cat No', width: '120px' },
   sort_title: { id: 'sort_title', label: 'Sort Title', width: '200px' },
   subtitle: { id: 'subtitle', label: 'Subtitle', width: '200px' },
-  index_number: { id: 'index_number', label: 'Index', width: '80px' },
   
   // Edition
   format: { id: 'format', label: 'Format', width: '180px' },
   discs: { id: 'discs', label: 'Discs', width: '70px' },
+  sides: { id: 'sides', label: 'Sides', width: '70px' },
   tracks: { id: 'tracks', label: 'Tracks', width: '80px' },
-  length: { id: 'length', label: 'Length', width: '90px' },
   
   // Details
-  box_set: { id: 'box_set', label: 'Box Set', width: '90px' },
+  location: { id: 'location', label: 'Location', width: '150px' }, // NEW
   country: { id: 'country', label: 'Country', width: '100px' },
   extra: { id: 'extra', label: 'Extra', width: '150px' },
-  is_live: { id: 'is_live', label: 'Is Live', width: '80px' },
-  media_condition: { id: 'media_condition', label: 'Media Condition', width: '150px' },
-  package_sleeve_condition: { id: 'package_sleeve_condition', label: 'Package/Sleeve Condition', width: '200px' },
-  packaging: { id: 'packaging', label: 'Packaging', width: '120px' },
+  media_condition: { id: 'media_condition', label: 'Media Cond', width: '150px' },
+  package_sleeve_condition: { id: 'package_sleeve_condition', label: 'Sleeve Cond', width: '150px' },
   rpm: { id: 'rpm', label: 'RPM', width: '80px' },
-  sound: { id: 'sound', label: 'Sound', width: '100px' },
-  spars_code: { id: 'spars_code', label: 'SPARS', width: '80px' },
-  storage_device_slot: { id: 'storage_device_slot', label: 'Storage Device Slot', width: '160px' },
-  studio: { id: 'studio', label: 'Studio', width: '150px' },
-  vinyl_color: { id: 'vinyl_color', label: 'Vinyl Color', width: '120px' },
-  vinyl_weight: { id: 'vinyl_weight', label: 'Vinyl Weight', width: '120px' },
+  vinyl_color: { id: 'vinyl_color', label: 'Color', width: '120px' },
+  vinyl_weight: { id: 'vinyl_weight', label: 'Weight', width: '120px' },
   
   // Metadata
   genres: { id: 'genres', label: 'Genre', width: '150px' },
   styles: { id: 'styles', label: 'Styles', width: '150px' },
-  label: { id: 'label', label: 'Label', width: '150px' },
-  original_release_date: { id: 'original_release_date', label: 'Original Release Date', width: '160px' },
-  original_release_year: { id: 'original_release_year', label: 'Original Release Year', width: '160px' },
-  recording_date: { id: 'recording_date', label: 'Recording Date', width: '140px' },
-  recording_year: { id: 'recording_year', label: 'Recording Year', width: '140px' },
   master_release_date: { id: 'master_release_date', label: 'Release Date', width: '130px' },
-  
-  // Classical
-  chorus: { id: 'chorus', label: 'Chorus', width: '150px' },
-  composer: { id: 'composer', label: 'Composer', width: '150px' },
-  composition: { id: 'composition', label: 'Composition', width: '200px' },
-  conductor: { id: 'conductor', label: 'Conductor', width: '150px' },
-  orchestra: { id: 'orchestra', label: 'Orchestra', width: '150px' },
   
   // People
   engineers: { id: 'engineers', label: 'Engineer', width: '150px' },
@@ -158,42 +100,19 @@ export const COLUMN_DEFINITIONS: Record<ColumnId, ColumnDefinition> = {
   songwriters: { id: 'songwriters', label: 'Songwriter', width: '150px' },
   
   // Personal
-  added_date: { id: 'added_date', label: 'Added Date', width: '120px' },
-  collection_status: { id: 'collection_status', label: 'Collection Status', width: '150px' },
-  folder: { id: 'folder', label: 'Folder', width: '150px' },
-  location: { id: 'location', label: 'Location', width: '120px' },
-  my_rating: { id: 'my_rating', label: 'My Rating', width: '100px' },
-  notes: { id: 'notes', label: 'Notes', width: '200px' },
+  added_date: { id: 'added_date', label: 'Added', width: '120px' },
+  collection_status: { id: 'collection_status', label: 'Status', width: '150px' },
+  my_rating: { id: 'my_rating', label: 'Rating', width: '100px' },
+  personal_notes: { id: 'personal_notes', label: 'My Notes', width: '250px' }, // RENAMED
+  release_notes: { id: 'release_notes', label: 'Release Notes', width: '250px' }, // NEW
   owner: { id: 'owner', label: 'Owner', width: '120px' },
-  play_count: { id: 'play_count', label: 'Play Count', width: '100px' },
-  last_played_date: { id: 'last_played_date', label: 'Last Played Date', width: '140px' },
-  last_cleaned_date: { id: 'last_cleaned_date', label: 'Last Cleaned Date', width: '150px' },
-  signed_by: { id: 'signed_by', label: 'Signed by', width: '150px' },
   custom_tags: { id: 'custom_tags', label: 'Tags', width: '200px' },
-  modified_date: { id: 'modified_date', label: 'Modified Date', width: '140px' },
-  
-  // Loan
-  due_date: { id: 'due_date', label: 'Due Date', width: '120px' },
-  loan_date: { id: 'loan_date', label: 'Loan Date', width: '120px' },
-  loaned_to: { id: 'loaned_to', label: 'Loaned To', width: '150px' },
+  modified_date: { id: 'modified_date', label: 'Modified', width: '140px' },
   
   // Value
   for_sale: { id: 'for_sale', label: 'For Sale', width: '90px' },
-  purchase_date: { id: 'purchase_date', label: 'Purchase Date', width: '130px' },
-  purchase_store: { id: 'purchase_store', label: 'Purchase Store', width: '150px' },
-  purchase_price: { id: 'purchase_price', label: 'Purchase Price', width: '130px' },
-  current_value: { id: 'current_value', label: 'Current Value', width: '130px' },
-  sale_price: { id: 'sale_price', label: 'Sale Price', width: '120px' },
-  sale_platform: { id: 'sale_platform', label: 'Sale Platform', width: '130px' },
-  sale_quantity: { id: 'sale_quantity', label: 'Quantity', width: '90px' },
-  wholesale_cost: { id: 'wholesale_cost', label: 'Wholesale Cost', width: '140px' },
-  discogs_price_min: { id: 'discogs_price_min', label: 'Discogs Min', width: '120px' },
-  discogs_price_median: { id: 'discogs_price_median', label: 'Discogs Median', width: '140px' },
-  discogs_price_max: { id: 'discogs_price_max', label: 'Discogs Max', width: '120px' },
-  pricing_notes: { id: 'pricing_notes', label: 'Pricing Notes', width: '200px' },
-  
-  // Popularity
-  spotify_popularity: { id: 'spotify_popularity', label: 'Spotify Popularity', width: '160px' }
+  purchase_price: { id: 'purchase_price', label: 'Purch Price', width: '130px' },
+  current_value: { id: 'current_value', label: 'Value', width: '130px' },
 };
 
 export const COLUMN_GROUPS = [
@@ -203,39 +122,29 @@ export const COLUMN_GROUPS = [
     icon: '📋',
     columns: [
       'checkbox', 'owned', 'for_sale_indicator', 'menu', 'artist', 'title', 
-      'year', 'barcode', 'cat_no', 'sort_title', 'subtitle', 'index_number'
+      'year', 'barcode', 'cat_no', 'sort_title', 'subtitle'
     ] as ColumnId[]
   },
   {
     id: 'edition',
     label: 'Edition',
     icon: '💿',
-    columns: ['format', 'discs', 'tracks', 'length'] as ColumnId[]
+    columns: ['format', 'discs', 'sides', 'tracks'] as ColumnId[]
   },
   {
     id: 'details',
     label: 'Details',
     icon: '📝',
     columns: [
-      'box_set', 'country', 'extra', 'is_live', 'media_condition', 
-      'package_sleeve_condition', 'packaging', 'rpm', 'sound', 'spars_code',
-      'storage_device_slot', 'studio', 'vinyl_color', 'vinyl_weight'
+      'location', 'country', 'extra', 'media_condition', 
+      'package_sleeve_condition', 'rpm', 'vinyl_color', 'vinyl_weight'
     ] as ColumnId[]
   },
   {
     id: 'metadata',
     label: 'Metadata',
     icon: '📊',
-    columns: [
-      'genres', 'styles', 'label', 'original_release_date', 'original_release_year',
-      'recording_date', 'recording_year', 'master_release_date'
-    ] as ColumnId[]
-  },
-  {
-    id: 'classical',
-    label: 'Classical',
-    icon: '🎻',
-    columns: ['chorus', 'composer', 'composition', 'conductor', 'orchestra'] as ColumnId[]
+    columns: ['genres', 'styles', 'master_release_date'] as ColumnId[]
   },
   {
     id: 'people',
@@ -248,32 +157,17 @@ export const COLUMN_GROUPS = [
     label: 'Personal',
     icon: '👤',
     columns: [
-      'added_date', 'collection_status', 'folder', 'location', 'my_rating', 'notes',
-      'owner', 'play_count', 'last_played_date', 'last_cleaned_date', 'signed_by',
-      'custom_tags', 'modified_date'
+      'added_date', 'collection_status', 'location', 'my_rating', 'personal_notes', 'release_notes',
+      'owner', 'custom_tags', 'modified_date'
     ] as ColumnId[]
-  },
-  {
-    id: 'loan',
-    label: 'Loan',
-    icon: '📤',
-    columns: ['due_date', 'loan_date', 'loaned_to'] as ColumnId[]
   },
   {
     id: 'value',
     label: 'Value',
     icon: '💰',
     columns: [
-      'for_sale', 'purchase_date', 'purchase_store', 'purchase_price', 'current_value',
-      'sale_price', 'sale_platform', 'sale_quantity', 'wholesale_cost', 'discogs_price_min',
-      'discogs_price_median', 'discogs_price_max', 'pricing_notes'
+      'for_sale', 'purchase_price', 'current_value'
     ] as ColumnId[]
-  },
-  {
-    id: 'popularity',
-    label: 'Popularity',
-    icon: '🔥',
-    columns: ['spotify_popularity'] as ColumnId[]
   }
 ];
 
@@ -284,13 +178,10 @@ export const DEFAULT_VISIBLE_COLUMNS: ColumnId[] = [
   'menu',
   'artist',
   'title',
-  'master_release_date',
   'format',
-  'discs',
-  'tracks',
-  'length',
+  'location',
+  'personal_notes',
   'genres',
-  'label',
   'added_date'
 ];
 
