@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabaseClient';
 import CollectionTable from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
 import { ColumnId, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
-import { Album, toSafeStringArray, toSafeSearchString } from '../../types/album';
+import { Album, toSafeSearchString } from '../../types/album';
 import EditAlbumModal from './EditAlbumModal';
 import Header from './Header';
 import type { Crate } from '../../types/crate';
@@ -14,7 +14,7 @@ import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import AlbumDetailPanel from '../../components/AlbumDetailPanel';
 import { BoxIcon } from '../../components/BoxIcon';
 
-// Crate Management Components (Restored)
+// Crate Management Components
 import NewCrateModal from './crates/NewCrateModal';
 import NewSmartCrateModal from './crates/NewSmartCrateModal';
 import { AddToCrateModal } from './crates/AddToCrateModal';
@@ -64,8 +64,12 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
 function CollectionBrowserPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Search State
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchField, setSearchField] = useState<string>('all'); // Restored search field state
   const [showSearchTypeDropdown, setShowSearchTypeDropdown] = useState(false);
+  
   const [selectedLetter, setSelectedLetter] = useState<string>('All');
   
   // View State
@@ -220,8 +224,7 @@ function CollectionBrowserPage() {
           if (selectedCrate.is_smart) {
             if (!albumMatchesSmartCrate(album, selectedCrate)) return false;
           } else {
-            // Manual crate logic to be implemented with relation check
-            // For now, partial sync
+            // Manual crate logic would go here
           }
         }
       }
@@ -232,17 +235,29 @@ function CollectionBrowserPage() {
 
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
-        const searchable = [
-          album.artist,
-          album.title,
-          album.format,
-          album.year,
-          album.location,
-          toSafeSearchString(album.custom_tags),
-          toSafeSearchString(album.genres)
-        ].join(' ').toLowerCase();
         
-        if (!searchable.includes(q)) return false;
+        // Search field logic restored
+        if (searchField === 'artist') {
+          if (!album.artist?.toLowerCase().includes(q)) return false;
+        } else if (searchField === 'title') {
+          if (!album.title?.toLowerCase().includes(q)) return false;
+        } else if (searchField === 'tags') {
+           const tags = toSafeSearchString(album.custom_tags);
+           if (!tags.includes(q)) return false;
+        } else {
+          // 'all' search
+          const searchable = [
+            album.artist,
+            album.title,
+            album.format,
+            album.year,
+            album.location,
+            toSafeSearchString(album.custom_tags),
+            toSafeSearchString(album.genres)
+          ].join(' ').toLowerCase();
+          
+          if (!searchable.includes(q)) return false;
+        }
       }
 
       return true;
@@ -256,7 +271,6 @@ function CollectionBrowserPage() {
       filtered = [...filtered].sort((a, b) => {
         if (column === 'artist') return multiplier * (a.artist || '').localeCompare(b.artist || '');
         if (column === 'title') return multiplier * (a.title || '').localeCompare(b.title || '');
-        // Add more column specific sorts here if needed
         return 0;
       });
     } else {
@@ -280,7 +294,7 @@ function CollectionBrowserPage() {
     }
 
     return filtered;
-  }, [albums, collectionFilter, selectedLetter, selectedGroupValue, selectedCrateId, viewMode, crates, searchQuery, sortBy, tableSortState]);
+  }, [albums, collectionFilter, selectedLetter, selectedGroupValue, selectedCrateId, viewMode, crates, searchQuery, searchField, sortBy, tableSortState]);
 
   useEffect(() => {
     if (filteredAndSortedAlbums.length > 0 && !selectedAlbumId) {
@@ -367,7 +381,6 @@ function CollectionBrowserPage() {
 
   return (
     <>
-      {/* Disable default layout headers/footers */}
       <style>{`
         body > div:first-child > nav, body > div:first-child > header:not(.clz-header), body > nav, body > header:not(.clz-header),
         [class*="navigation"], [class*="Navigation"], [class*="navbar"], [class*="NavBar"],
@@ -418,7 +431,31 @@ function CollectionBrowserPage() {
           </div>
 
           <div className="flex items-center shrink-0">
-            <input type="text" placeholder="Search albums..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="bg-[#2a2a2a] text-white border border-[#555] px-3 py-1.5 rounded text-[13px] w-[220px] h-8 outline-none" />
+            <div className="relative">
+              <button onClick={() => setShowSearchTypeDropdown(!showSearchTypeDropdown)} title="Search type" className="bg-[#2a2a2a] text-white border border-[#555] border-r-0 px-2.5 py-1.5 cursor-pointer text-[13px] rounded-l flex items-center gap-1 h-8 hover:bg-[#333] transition-colors">
+                <span>🔍</span>
+                <span className="text-[10px]">▼</span>
+              </button>
+              
+              {/* RESTORED DROPDOWN UI */}
+              {showSearchTypeDropdown && (
+                <>
+                  <div onClick={() => setShowSearchTypeDropdown(false)} className="fixed inset-0 z-[99]" />
+                  <div className="absolute top-full left-0 mt-1 bg-[#2a2a2a] border border-[#555] rounded z-[100] min-w-[120px] shadow-lg">
+                    {['all', 'artist', 'title', 'tags'].map(type => (
+                      <button 
+                        key={type} 
+                        onClick={() => { setSearchField(type); setShowSearchTypeDropdown(false); }} 
+                        className={`w-full px-4 py-2 bg-transparent border-none text-left cursor-pointer text-[13px] text-white capitalize hover:bg-[#3a3a3a] ${searchField === type ? 'bg-[#5A9BD5]' : ''}`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            <input type="text" placeholder={`Search ${searchField === 'all' ? 'collection' : searchField}...`} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="bg-[#2a2a2a] text-white border border-[#555] border-l-0 px-3 py-1.5 rounded-r text-[13px] w-[220px] h-8 outline-none" />
           </div>
         </div>
 
@@ -452,7 +489,7 @@ function CollectionBrowserPage() {
                   </>
                 )}
               </div>
-              {/* Manage Crates Button (Visible only in Crate Mode) */}
+              {/* Manage Crates Button */}
               {viewMode === 'crates' && (
                 <button onClick={() => setShowManageCratesModal(true)} title="Manage Crates" className="bg-transparent text-white border-none cursor-pointer text-base p-1 hover:text-[#5A9BD5]">
                   ⚙️
@@ -550,7 +587,7 @@ function CollectionBrowserPage() {
         {showColumnSelector && <ColumnSelector visibleColumns={visibleColumns} onColumnsChange={handleColumnsChange} onClose={() => setShowColumnSelector(false)} />}
         {editingAlbumId && <EditAlbumModal albumId={editingAlbumId} onClose={() => setEditingAlbumId(null)} onRefresh={loadAlbums} onNavigate={(newAlbumId) => setEditingAlbumId(newAlbumId)} allAlbumIds={filteredAndSortedAlbums.map(a => a.id)} />}
         
-        {/* Crate Modals (Restored) */}
+        {/* Crate Management Modals */}
         {showNewCrateModal && <NewCrateModal isOpen={showNewCrateModal} onClose={() => { setShowNewCrateModal(false); setEditingCrate(null); if (returnToAddToCrate) { setReturnToAddToCrate(false); setNewlyCreatedCrateId(null); }}} onCrateCreated={async (newCrateId) => { await loadCrates(); setEditingCrate(null); if (returnToAddToCrate) { setNewlyCreatedCrateId(newCrateId); setShowNewCrateModal(false); setShowAddToCrateModal(true); } else { setShowNewCrateModal(false); }}} editingCrate={editingCrate} />}
         {showNewSmartCrateModal && <NewSmartCrateModal isOpen={showNewSmartCrateModal} onClose={() => { setShowNewSmartCrateModal(false); setEditingCrate(null); }} onCrateCreated={() => { loadCrates(); setShowNewSmartCrateModal(false); setEditingCrate(null); }} editingCrate={editingCrate} />}
         {showAddToCrateModal && <AddToCrateModal isOpen={showAddToCrateModal} onClose={() => { setShowAddToCrateModal(false); setReturnToAddToCrate(false); setNewlyCreatedCrateId(null); }} crates={cratesWithCounts} onAddToCrates={handleAddToCrates} selectedCount={selectedAlbumIds.size} onOpenNewCrate={() => { setReturnToAddToCrate(true); setShowAddToCrateModal(false); setEditingCrate(null); setShowNewCrateModal(true); }} autoSelectCrateId={newlyCreatedCrateId} />}
