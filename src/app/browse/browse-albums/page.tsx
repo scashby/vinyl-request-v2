@@ -14,24 +14,21 @@ interface BrowseAlbum {
   title: string;
   artist: string;
   year: string | number;
-  folder?: string;
-  mediaType?: string;
+  format: string;           // Replaces 'folder' for media type
+  location?: string;
   dateAdded?: string;
   justAdded?: boolean;
-  steves_top_200?: boolean;
-  this_weeks_top_10?: boolean;
-  inner_circle_preferred?: boolean;
-  is_1001?: boolean;
-  tracklists?: string;
+  
+  // Cleaned up obsolete boolean flags (1001, Steve's, etc.)
+  
+  // Metadata for search
+  personal_notes?: string;  // Replaces 'notes'
+  release_notes?: string;
   media_condition?: string;
-  discogs_notes?: string;
-  discogs_genres?: string[];
-  discogs_styles?: string[];
-  spotify_genres?: string[];
-  spotify_label?: string;
-  apple_music_genre?: string;
-  apple_music_genres?: string[];
-  apple_music_label?: string;
+  genres?: string[];        // Replaces separate genre arrays
+  styles?: string[];
+  custom_tags?: string[];
+  
   image: string;
 }
 
@@ -49,10 +46,10 @@ function BrowseAlbumsContent() {
   const [mediaFilter, setMediaFilter] = useState('');
   const [sortField, setSortField] = useState('date_added');
   const [sortAsc, setSortAsc] = useState(false);
+  
+  // Only "Just Added" remains as a dynamic filter
   const [showJustAdded, setShowJustAdded] = useState(false);
-  const [showStevesTop200, setShowStevesTop200] = useState(false);
-  const [showThisWeeksTop10, setShowThisWeeksTop10] = useState(false);
-  const [showInnerCirclePreferred, setShowInnerCirclePreferred] = useState(false);
+  
   const [showSuggestionBox, setShowSuggestionBox] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -68,7 +65,6 @@ function BrowseAlbumsContent() {
   // Helper function to format date
   const formatDate = (dateString?: string) => {
     if (!dateString || dateString === '9999-12-31') return '';
-    // Append T00:00:00 to force local time interpretation instead of UTC
     const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('en-US', { 
       weekday: 'long',
@@ -123,13 +119,11 @@ function BrowseAlbumsContent() {
         const batchSize = 1000;
         let keepGoing = true;
         
-        // Removed the artificial 5-second timeout Promise.race logic
         while (keepGoing && isMounted) {
             const { data: batch, error } = await supabase
               .from('collection')
               .select('*')
-              .or('blocked.is.null,blocked.eq.false')
-              .neq('folder', 'Sale')
+              .eq('for_sale', false) // New Logic: Exclude items marked for sale
               .range(from, from + batchSize - 1);
 
             if (error) {
@@ -140,7 +134,6 @@ function BrowseAlbumsContent() {
             
             allRows = allRows.concat(batch);
             
-            // If we got fewer results than requested, we've hit the end
             if (batch.length < batchSize) {
                 keepGoing = false;
             } else {
@@ -155,24 +148,19 @@ function BrowseAlbumsContent() {
           title: album.title,
           artist: album.artist,
           year: album.year ? String(album.year) : '',
-          folder: album.folder,
-          mediaType: album.folder,
+          format: album.format,
+          location: album.location,
           dateAdded: album.date_added,
           justAdded: isJustAdded(album.date_added),
-          steves_top_200: album.steves_top_200,
-          this_weeks_top_10: album.this_weeks_top_10,
-          inner_circle_preferred: album.inner_circle_preferred,
-          is_1001: album.is_1001,
-          tracklists: album.tracklists,
+          
+          // Map new fields
+          personal_notes: album.personal_notes,
+          release_notes: album.release_notes,
           media_condition: album.media_condition,
-          discogs_notes: album.discogs_notes,
-          discogs_genres: album.discogs_genres,
-          discogs_styles: album.discogs_styles,
-          spotify_genres: album.spotify_genres,
-          spotify_label: album.spotify_label,
-          apple_music_genre: album.apple_music_genre,
-          apple_music_genres: album.apple_music_genres,
-          apple_music_label: album.apple_music_label,
+          genres: album.genres,
+          styles: album.styles,
+          custom_tags: album.custom_tags,
+          
           image:
             (album.image_url && album.image_url.trim().toLowerCase() !== 'no')
               ? album.image_url.trim()
@@ -198,7 +186,7 @@ function BrowseAlbumsContent() {
     if (f === "cassette" || f === "cassettes") return ["cassette", "cassettes"];
     if (f === "45" || f === "45s") return ["45", "45s"];
     if (f === "8-track" || f === "8tracks" || f === "8-track tape" || f === "8 track") return ["8-track", "8tracks", "8-track tape", "8 track"];
-    if (f === "vinyl") return ["vinyl"];
+    if (f === "vinyl") return ["vinyl", "lp", "12\""];
     return [f];
   };
 
@@ -212,7 +200,8 @@ function BrowseAlbumsContent() {
 
   const filteredAlbums = useMemo(() => {
     let fa = albums.filter(album => {
-      const folder = (album.folder || '').trim().toLowerCase();
+      // Use 'format' for media type filtering
+      const formatStr = (album.format || '').trim().toLowerCase();
       
       const searchLower = searchTerm.toLowerCase();
 
@@ -224,34 +213,25 @@ function BrowseAlbumsContent() {
       const matchesSearch =
         (album.title || '').toLowerCase().includes(searchLower) ||
         (album.artist || '').toLowerCase().includes(searchLower) ||
-        (album.tracklists || '').toLowerCase().includes(searchLower) ||
         (album.media_condition || '').toLowerCase().includes(searchLower) ||
-        (album.discogs_notes || '').toLowerCase().includes(searchLower) ||
-        (album.spotify_label || '').toLowerCase().includes(searchLower) ||
-        (album.apple_music_genre || '').toLowerCase().includes(searchLower) ||
-        (album.apple_music_label || '').toLowerCase().includes(searchLower) ||
-        searchInArray(album.discogs_genres) ||
-        searchInArray(album.discogs_styles) ||
-        searchInArray(album.spotify_genres) ||
-        searchInArray(album.apple_music_genres);
+        (album.personal_notes || '').toLowerCase().includes(searchLower) ||
+        (album.release_notes || '').toLowerCase().includes(searchLower) ||
+        searchInArray(album.genres) ||
+        searchInArray(album.styles) ||
+        searchInArray(album.custom_tags);
       
       const isAllowed =
         !allowedFormats ||
-        normalizedFormats.includes(folder);
+        normalizedFormats.includes(formatStr);
+        
       const matchesFilter =
         !mediaFilter ||
-        formatVariants(mediaFilter).includes(folder);
+        formatVariants(mediaFilter).includes(formatStr);
+        
       const matchesJustAdded =
         !showJustAdded || album.justAdded;
-      const matchesStevesTop200 =
-        !showStevesTop200 || album.steves_top_200;
-      const matchesThisWeeksTop10 =
-        !showThisWeeksTop10 || album.this_weeks_top_10;
-      const matchesInnerCirclePreferred =
-        !showInnerCirclePreferred || album.inner_circle_preferred;
         
-      return matchesSearch && isAllowed && matchesFilter && matchesJustAdded && 
-             matchesStevesTop200 && matchesThisWeeksTop10 && matchesInnerCirclePreferred;
+      return matchesSearch && isAllowed && matchesFilter && matchesJustAdded;
     });
     
     fa = [...fa].sort((a: BrowseAlbum, b: BrowseAlbum) => {
@@ -262,8 +242,8 @@ function BrowseAlbumsContent() {
         vb = new Date(b.dateAdded || '1970-01-01');
         return sortAsc ? va.getTime() - vb.getTime() : vb.getTime() - va.getTime();
       } else {
-        va = (a[sortField] || '').toString().toLowerCase();
-        vb = (b[sortField] || '').toString().toLowerCase();
+        va = (a[sortField as keyof BrowseAlbum] || '').toString().toLowerCase();
+        vb = (b[sortField as keyof BrowseAlbum] || '').toString().toLowerCase();
         if (va > vb) return sortAsc ? 1 : -1;
         if (va < vb) return sortAsc ? -1 : 1;
         return 0;
@@ -271,14 +251,9 @@ function BrowseAlbumsContent() {
     });
     
     return fa;
-  }, [albums, searchTerm, mediaFilter, allowedFormats, normalizedFormats, sortField, sortAsc, 
-      showJustAdded, showStevesTop200, showThisWeeksTop10, showInnerCirclePreferred]);
+  }, [albums, searchTerm, mediaFilter, allowedFormats, normalizedFormats, sortField, sortAsc, showJustAdded]);
 
   const justAddedCount = albums.filter(album => album.justAdded).length;
-  const stevesTop200Count = albums.filter(album => album.steves_top_200).length;
-  const thisWeeksTop10Count = albums.filter(album => album.this_weeks_top_10).length;
-  const innerCirclePreferredCount = albums.filter(album => album.inner_circle_preferred).length;
-
   const hasSearchQuery = searchTerm.trim().length > 0;
   const hasNoResults = hasSearchQuery && filteredAlbums.length === 0;
 
@@ -317,7 +292,7 @@ function BrowseAlbumsContent() {
             <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6">
               <input
                 type="text"
-                placeholder="Search by artist or title"
+                placeholder="Search by artist, title, or notes"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full md:flex-[2] p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
@@ -380,51 +355,6 @@ function BrowseAlbumsContent() {
                 />
                 {justAddedCount > 0 && <span className="animate-pulse">✨</span>} Just Added ({justAddedCount})
               </label>
-
-              <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold cursor-pointer transition-all ${
-                stevesTop200Count > 0 
-                  ? "bg-red-50 border-red-500 text-red-700 hover:bg-red-100" 
-                  : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60"
-              }`}>
-                <input
-                  type="checkbox"
-                  checked={showStevesTop200}
-                  onChange={(e) => setShowStevesTop200(e.target.checked)}
-                  disabled={stevesTop200Count === 0}
-                  className="accent-red-600 w-4 h-4"
-                />
-                🏆 Steve&apos;s Top 200 ({stevesTop200Count})
-              </label>
-
-              <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold cursor-pointer transition-all ${
-                thisWeeksTop10Count > 0 
-                  ? "bg-purple-50 border-purple-500 text-purple-700 hover:bg-purple-100" 
-                  : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60"
-              }`}>
-                <input
-                  type="checkbox"
-                  checked={showThisWeeksTop10}
-                  onChange={(e) => setShowThisWeeksTop10(e.target.checked)}
-                  disabled={thisWeeksTop10Count === 0}
-                  className="accent-purple-600 w-4 h-4"
-                />
-                📈 This Week&apos;s Top 10 ({thisWeeksTop10Count})
-              </label>
-
-              <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold cursor-pointer transition-all ${
-                innerCirclePreferredCount > 0 
-                  ? "bg-orange-50 border-orange-500 text-orange-700 hover:bg-orange-100" 
-                  : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60"
-              }`}>
-                <input
-                  type="checkbox"
-                  checked={showInnerCirclePreferred}
-                  onChange={(e) => setShowInnerCirclePreferred(e.target.checked)}
-                  disabled={innerCirclePreferredCount === 0}
-                  className="accent-orange-600 w-4 h-4"
-                />
-                ⭐ Inner Circle Preferred ({innerCirclePreferredCount})
-              </label>
             </div>
 
             <div className="text-gray-500 text-sm mb-6 px-1">
@@ -454,6 +384,7 @@ function BrowseAlbumsContent() {
                   album={{
                     ...album,
                     eventId: eventId,
+                    mediaType: album.format, // Pass format correctly for badge
                     justAdded: album.justAdded
                   }}
                 />
