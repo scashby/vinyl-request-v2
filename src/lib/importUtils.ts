@@ -9,7 +9,6 @@
 export function cleanArtistName(rawName: string): string {
   if (!rawName) return '';
   // 1. Regex to strip " (2)", " (12)", etc. at the end of the string
-  // Matches space + parenthesis + digits + parenthesis + end of string
   let cleaned = rawName.replace(/\s\(\d+\)$/, '');
   
   // 2. Normalize " and " to " & " for consistency
@@ -65,8 +64,8 @@ export function extractSecondaryArtists(artistString: string): {
       primary = parts[0].trim();
       
       // Split the remainder by commas or & to get individual artists
-      // Example: " feat. Artist A, Artist B & Artist C"
       if (parts[1]) {
+        // Handle "feat. X, Y & Z"
         const guests = parts[1].split(/,|&/).map(s => cleanArtistName(s.trim()));
         secondary.push(...guests);
       }
@@ -75,6 +74,23 @@ export function extractSecondaryArtists(artistString: string): {
   }
 
   return { primary: cleanArtistName(primary), secondary };
+}
+
+// ============================================================================
+// COMPATIBILITY LAYER (Fixes ImportDiscogsModal build errors)
+// ============================================================================
+
+export function normalizeArtist(artist: string): string {
+  return cleanArtistName(artist).toLowerCase();
+}
+
+export function normalizeTitle(title: string): string {
+  if (!title) return '';
+  return title.trim().toLowerCase();
+}
+
+export function normalizeArtistAlbum(artist: string, album: string): string {
+  return `${normalizeArtist(artist)} ${normalizeTitle(album)}`;
 }
 
 // Re-export SyncMode types if needed by other components

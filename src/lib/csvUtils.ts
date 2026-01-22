@@ -1,6 +1,6 @@
 // src/lib/csvUtils.ts
 import Papa from 'papaparse';
-import { cleanArtistName, extractSecondaryArtists } from './importUtils';
+import { extractSecondaryArtists } from './importUtils';
 
 // Matches the exact headers from your uploaded CSV
 export interface DiscogsCSVRow {
@@ -30,7 +30,7 @@ export interface ProcessedRelease {
   year: number | null;
   media_condition: string;
   package_sleeve_condition: string;
-  discogs_release_id: string; // Changed from discogs_id to match DB column roughly
+  discogs_release_id: string;
   personal_notes: string;
   date_added: string;
 }
