@@ -11,13 +11,16 @@ export type Album = {
   year: string | null;
   year_int: number | null;
   image_url: string | null;
+  index_number: number | null; // ADDED: Fixes FindDuplicatesModal error
   
   // ============================================================================
   // STATUS & LOCATION
   // ============================================================================
   collection_status: 'in_collection' | 'for_sale' | 'wish_list' | 'on_order' | 'sold' | 'not_in_collection' | null;
   for_sale: boolean;
+  folder: string | null;        // Keep folder for compatibility
   location: string | null;      // Physical location (shelf, box)
+  storage_device_slot: string | null; // Specific slot in storage
   date_added: string | null;
   modified_date: string | null;
 
@@ -25,8 +28,10 @@ export type Album = {
   // NOTES
   // ============================================================================
   personal_notes: string | null; // From CSV "Collection Notes"
+  notes?: string | null;         // Alias for legacy components
   release_notes: string | null;  // From Discogs "Notes"
   extra: string | null;          // Format details (gatefold, colored)
+  discogs_notes: string | null;
 
   // ============================================================================
   // PHYSICAL METADATA
@@ -36,6 +41,7 @@ export type Album = {
   package_sleeve_condition: string | null;
   barcode: string | null;
   cat_no: string | null;
+  packaging: string | null;
   
   // Vinyl Specifics
   rpm: string | null;
@@ -44,6 +50,13 @@ export type Album = {
   discs: number | null;
   sides: number | null;
   
+  // Audio / Content
+  length_seconds: number | null;
+  sound: string | null;
+  spars_code: string | null;
+  is_live: boolean | null;
+  is_box_set: boolean | null;
+
   // ============================================================================
   // TRACKS (The Source of Truth)
   // ============================================================================
@@ -58,13 +71,22 @@ export type Album = {
   }> | null;
 
   // ============================================================================
-  // EXTERNAL LINKS
+  // EXTERNAL LINKS & IDs
   // ============================================================================
   discogs_release_id: string | null;
   discogs_master_id: string | null;
   spotify_id: string | null;
   apple_music_id: string | null;
   musicbrainz_id: string | null;
+  
+  // ============================================================================
+  // DATES
+  // ============================================================================
+  original_release_date: string | null;
+  original_release_year: string | null;
+  recording_date: string | null;
+  recording_year: string | null;
+  master_release_date: string | null;
 
   // ============================================================================
   // TAGS & LABELS
@@ -81,20 +103,52 @@ export type Album = {
   producers: string[] | null;
   engineers: string[] | null;
   songwriters: string[] | null;
+  chorus: string | null;
+  composer: string | null;
+  composition: string | null;
+  conductor: string | null;
+  orchestra: string | null;
 
   // ============================================================================
-  // PERSONAL / TRACKING
+  // PERSONAL / TRACKING / LOANS
   // ============================================================================
   owner: string | null;
+  due_date: string | null;
+  loan_date: string | null;
+  loaned_to: string | null;
+  
+  last_cleaned_date: string | null;
+  last_played_date: string | null;
+  play_count: number | null;
+  my_rating: number | null;
+  signed_by: string[] | null;
+  
+  // ============================================================================
+  // VALUE & SALES
+  // ============================================================================
   purchase_price: number | null;
   current_value: number | null;
   purchase_date: string | null;
   purchase_store: string | null;
-  last_cleaned_date: string | null;
-  last_played_date: string | null; // ADDED: Matches DB column
-  play_count: number | null;
-  my_rating: number | null;
-  signed_by: string[] | null;
+  
+  sale_price: number | null;
+  sale_platform: string | null;
+  sale_quantity: number | null;
+  wholesale_cost: number | null;
+  pricing_notes: string | null;
+  
+  discogs_price_min: number | null;
+  discogs_price_median: number | null;
+  discogs_price_max: number | null;
+  discogs_price_updated_at: string | null;
+
+  // ============================================================================
+  // SYSTEM / ENRICHMENT
+  // ============================================================================
+  spotify_popularity: number | null;
+  discogs_source: string | null;
+  enrichment_sources: string | null;
+  last_enriched_at: string | null;
   
   // ============================================================================
   // LEGACY / OPTIONAL (Keep for compatibility if needed, but prefer above)
@@ -103,8 +157,10 @@ export type Album = {
   apple_music_label?: string | null;
   sort_title?: string | null;
   subtitle?: string | null;
-  master_release_date?: string | null;
   played_history?: string | null; // Kept as optional string to prevent breakage if accessed
+  
+  spotify_total_tracks?: number | null;
+  apple_music_track_count?: number | null;
 
   // ============================================================================
   // EXTRA METADATA (JSONB)
@@ -113,6 +169,12 @@ export type Album = {
   disc_metadata?: any | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   matrix_numbers?: any | null;
+
+  // ============================================================================
+  // HIERARCHY (Box Sets)
+  // ============================================================================
+  parent_id?: number | null;
+  child_album_ids?: string | null;
 
   // ============================================================================
   // GENERATED / NORMALIZED (System Columns)
