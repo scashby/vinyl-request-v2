@@ -9,7 +9,7 @@ XML_FILE = 'music_2025-12-18_14-38-58-export.xml'
 CLZ_CSV = 'model_data (3).csv'
 SUPABASE_CSV = 'collection_rows (3).csv'
 OUTPUT_PREFIX = 'migration_part'
-BATCH_SIZE = 100  # Reduced to 100 to avoid "Query too large" errors in Supabase
+BATCH_SIZE = 100
 
 def format_duration_clz(seconds_int):
     """Converts integer seconds to MM:SS string for frontend compatibility."""
@@ -20,17 +20,11 @@ def format_duration_clz(seconds_int):
     return f"{minutes}:{seconds:02d}"
 
 def clean_position(pos_str):
-    """
-    Converts string positions (A1, 1, 1.1) to numbers for the frontend.
-    If it's non-numeric (like 'A1'), it strips letters.
-    """
     if not pos_str: return 0
-    # Remove letters to get the numeric part (e.g., A1 -> 1)
     nums = re.findall(r'\d+', str(pos_str))
     return int(nums[0]) if nums else 0
 
 def normalize_clz_text(text):
-    """Normalizes CLZ strings to match Supabase's stored *_norm columns."""
     if not text or text == 'N/A' or str(text).lower() == 'none':
         return ""
     text = str(text).lower()
@@ -67,6 +61,13 @@ def parse_clz_xml(xml_path):
         title = music.findtext('title', 'Unknown Title')
         year = music.findtext('releaseyear', '')
         
+        # New: Get Notes
+        notes = music.findtext('notes', '')
+        # New: Get Location (Storage Device + Slot)
+        storage = music.findtext('storagedevice', '')
+        slot = music.findtext('slot', '')
+        location = f"{storage} {slot}".strip()
+
         tracks_json = []
         disc_metadata = []
         discs = music.findall('.//discs/disc')
@@ -125,7 +126,9 @@ def parse_clz_xml(xml_path):
                 "songwriters": [s.findtext('displayname') for s in music.findall('.//songwriters/songwriter') if s.findtext('displayname')]
             },
             "barcode": music.findtext('barcode', ''),
-            "cat_no": music.findtext('labelnumber', '')
+            "cat_no": music.findtext('labelnumber', ''),
+            "personal_notes": notes,
+            "location": location
         })
     return clz_data
 
@@ -169,18 +172,20 @@ def generate_sql():
                     return f"'{{{joined}}}'"
 
                 tracks_json_str = json.dumps(data['tracks']).replace("'", "''")
-                disc_meta_json_str = json.dumps(data['disc_metadata']).replace("'", "''")
+                # Removed disc_metadata column update if it's not in new schema, but sticking to collection updates
+                # Note: 'disc_metadata' might be part of JSONB 'tracks' or separate. Assuming separate or ignored if unused.
                 
                 sql = f"""UPDATE public.collection SET 
     tracks = '{tracks_json_str}'::jsonb, 
-    disc_metadata = '{disc_meta_json_str}'::jsonb, 
     discs = {data['disc_count']}, 
     musicians = {to_arr(data['credits']['musicians'])}, 
     producers = {to_arr(data['credits']['producers'])}, 
     engineers = {to_arr(data['credits']['engineers'])}, 
     songwriters = {to_arr(data['credits']['songwriters'])}, 
     barcode = '{esc(data['barcode'])}', 
-    cat_no = '{esc(data['cat_no'])}' 
+    cat_no = '{esc(data['cat_no'])}',
+    personal_notes = '{esc(data['personal_notes'])}',
+    location = '{esc(data['location'])}'
 WHERE id = {s_id};"""
                 f.write(sql + "\n")
             f.write("\nCOMMIT;")

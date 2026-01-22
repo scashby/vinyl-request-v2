@@ -67,7 +67,7 @@ function CollectionBrowserPage() {
   
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchField, setSearchField] = useState<string>('all'); // Restored search field state
+  const [searchField, setSearchField] = useState<string>('all');
   const [showSearchTypeDropdown, setShowSearchTypeDropdown] = useState(false);
   
   const [selectedLetter, setSelectedLetter] = useState<string>('All');
@@ -224,7 +224,7 @@ function CollectionBrowserPage() {
           if (selectedCrate.is_smart) {
             if (!albumMatchesSmartCrate(album, selectedCrate)) return false;
           } else {
-            // Manual crate logic would go here
+            // Manual crate logic
           }
         }
       }
@@ -236,7 +236,6 @@ function CollectionBrowserPage() {
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         
-        // Search field logic restored
         if (searchField === 'artist') {
           if (!album.artist?.toLowerCase().includes(q)) return false;
         } else if (searchField === 'title') {
@@ -271,6 +270,7 @@ function CollectionBrowserPage() {
       filtered = [...filtered].sort((a, b) => {
         if (column === 'artist') return multiplier * (a.artist || '').localeCompare(b.artist || '');
         if (column === 'title') return multiplier * (a.title || '').localeCompare(b.title || '');
+        // Add more column specific sorts here if needed
         return 0;
       });
     } else {
@@ -437,7 +437,6 @@ function CollectionBrowserPage() {
                 <span className="text-[10px]">▼</span>
               </button>
               
-              {/* RESTORED DROPDOWN UI */}
               {showSearchTypeDropdown && (
                 <>
                   <div onClick={() => setShowSearchTypeDropdown(false)} className="fixed inset-0 z-[99]" />
