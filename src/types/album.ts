@@ -105,6 +105,22 @@ export type Album = {
   subtitle?: string | null;
   master_release_date?: string | null;
   played_history?: string | null; // Kept as optional string to prevent breakage if accessed
+
+  // ============================================================================
+  // EXTRA METADATA (JSONB)
+  // ============================================================================
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  disc_metadata?: any | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  matrix_numbers?: any | null;
+
+  // ============================================================================
+  // GENERATED / NORMALIZED (System Columns)
+  // ============================================================================
+  album_norm?: string | null;
+  artist_norm?: string | null;
+  title_norm?: string | null;
+  artist_album_norm?: string | null;
 };
 
 // HELPER FUNCTIONS
