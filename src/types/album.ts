@@ -11,7 +11,7 @@ export type Album = {
   year: string | null;
   year_int: number | null;
   image_url: string | null;
-  index_number: number | null; // ADDED: Fixes FindDuplicatesModal error
+  index_number: number | null;
   
   // ============================================================================
   // STATUS & LOCATION
@@ -21,6 +21,8 @@ export type Album = {
   folder: string | null;        // Keep folder for compatibility
   location: string | null;      // Physical location (shelf, box)
   storage_device_slot: string | null; // Specific slot in storage
+  country: string | null;       // ADDED: Fixes build error
+  studio: string | null;        // ADDED: Often paired with country/location
   date_added: string | null;
   modified_date: string | null;
 
@@ -94,7 +96,7 @@ export type Album = {
   genres: string[] | null; 
   styles: string[] | null; 
   custom_tags: string[] | null; 
-  labels: string[] | null; // ADDED: Matches DB array column
+  labels: string[] | null;
 
   // ============================================================================
   // PEOPLE
