@@ -51,6 +51,17 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
           {/* Desktop title - hidden on mobile */}
           <h2 className="hidden lg:block text-lg font-bold mb-6 text-gray-800">Admin Panel</h2>
           
+          {/* Public Site Link */}
+          <div className="mb-6">
+            <Link 
+              href="/" 
+              target="_blank"
+              className="block w-full text-center py-2 px-3 bg-blue-600 text-white rounded-md text-sm font-bold hover:bg-blue-700 transition-colors"
+            >
+              ↗ View Public Site
+            </Link>
+          </div>
+          
           {/* Core Navigation */}
           <div className="mb-6">
             <ul className="space-y-2">
@@ -135,16 +146,6 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
                 🔍 Diagnostics
               </Link>
               <Link 
-                href="/admin/enrich-sources"
-                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-                  pathname === "/admin/enrich-sources" 
-                    ? "bg-indigo-700 text-white" 
-                    : "bg-indigo-600 text-white hover:bg-indigo-700"
-                }`}
-              >
-                🎵 Multi-Source Enrich
-              </Link>
-              <Link 
                 href="/admin/media-grading"
                 className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
                   pathname === "/admin/media-grading" 
@@ -171,45 +172,8 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
               >
                 🗂️ Advanced Search
               </Link>
-              <Link 
-                href="/admin/specialized-searches"
-                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-                  pathname === "/admin/specialized-searches" 
-                    ? "bg-amber-700 text-white" 
-                    : "bg-amber-600 text-white hover:bg-amber-700"
-                }`}
-              >
-                🔎 Specialized Searches
-              </Link>
             </div>
           </div>
-
-          {/* DJ Tools */}
-            <div className="mb-4 p-3 bg-pink-50 border border-pink-200 rounded-lg">
-              <h4 className="text-sm font-semibold text-pink-800 mb-2">🎧 DJ Tools</h4>
-              <div className="space-y-2">
-                <Link 
-                  href="/admin/dj-tools"
-                  className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-                    pathname === "/admin/dj-tools" 
-                      ? "bg-pink-700 text-white" 
-                      : "bg-pink-600 text-white hover:bg-pink-700"
-                  }`}
-                >
-                  🎧 Dashboard
-                </Link>
-                <Link 
-                  href="/admin/dj-tools/migrate"
-                  className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-                    pathname === "/admin/dj-tools/migrate" 
-                      ? "bg-pink-700 text-white" 
-                      : "bg-pink-600 text-white hover:bg-pink-700"
-                  }`}
-                >
-                  🔄 Migration
-                </Link>
-              </div>
-            </div>
 
           {/* Event Management */}
           <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
@@ -298,16 +262,6 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
               <a href="https://admin.google.com/" target="_blank" rel="noopener noreferrer" className="text-center bg-red-500 text-white py-1 px-1 rounded font-medium hover:bg-red-600 transition-colors">🔍 Google</a>
               <a href="https://login.squarespace.com/api/1/login/" target="_blank" rel="noopener noreferrer" className="text-center bg-gray-800 text-white py-1 px-1 rounded font-medium hover:bg-gray-900 transition-colors">⬛ Square</a>
               <a href="https://app.dub.co/login" target="_blank" rel="noopener noreferrer" className="text-center bg-violet-600 text-white py-1 px-1 rounded font-medium hover:bg-violet-700 transition-colors">🔗 Dub</a>
-            </div>
-          </div>
-
-          {/* Quick Stats */}
-          <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-            <h4 className="text-sm font-semibold text-gray-800 mb-2">📊 Status</h4>
-            <div className="space-y-1 text-xs text-gray-600">
-              <div>🗳️ Voting: Active</div>
-              <div>💡 Suggestions: Active</div>
-              <div>💸 Venmo: @deadwaxdialogues</div>
             </div>
           </div>
         </div>
