@@ -5,14 +5,14 @@ export type Album = {
   // ============================================================================
   id: number;
   artist: string;
-  secondary_artists: string[] | null;
+  secondary_artists: string[] | null; 
   sort_artist: string | null;
   title: string;
   year: string | null;
   year_int: number | null;
   image_url: string | null;
-  back_image_url: string | null; // ADDED: In DB
-  index_number: number | null;   // ADDED: In DB
+  back_image_url: string | null;
+  index_number: number | null;
   
   // ============================================================================
   // STATUS & LOCATION
@@ -21,11 +21,12 @@ export type Album = {
   for_sale: boolean;
   folder: string | null;
   location: string | null;
-  storage_device_slot: string | null; // ADDED: In DB
-  country: string | null;             // ADDED: In DB
-  studio: string | null;              // ADDED: In DB
+  storage_device_slot: string | null;
+  country: string | null;
+  studio: string | null;
   date_added: string | null;
   modified_date: string | null;
+  decade: number | null;
 
   // ============================================================================
   // NOTES
@@ -44,12 +45,15 @@ export type Album = {
   package_sleeve_condition: string | null;
   barcode: string | null;
   cat_no: string | null;
-  packaging: string | null;      // ADDED: In DB
+  packaging: string | null;
   
   // Vinyl Specifics
   rpm: string | null;
   vinyl_weight: string | null;
-  vinyl_color: string | null;
+  
+  // CONFLICT RESOLUTION: Defined as string[] because DB needs correction to match UI
+  vinyl_color: string[] | null;
+  
   discs: number | null;
   sides: number | null;
   
@@ -59,11 +63,12 @@ export type Album = {
   spars_code: string | null;
   is_live: boolean | null;
   is_box_set: boolean | null;
-  box_set: string | null;        // ADDED: Text field in DB
+  box_set: string | null; // Name of the box set
 
   // ============================================================================
   // TRACKS
   // ============================================================================
+  // The JSONB source of truth
   tracks: Array<{
     position: string;
     title: string;
@@ -73,24 +78,27 @@ export type Album = {
     disc_number: number;
     side?: string;
   }> | null;
-  tracklists?: string | null; // Legacy field referenced in columns
+  
+  // Legacy text column present in DB
+  tracklists: string | null;
 
   // ============================================================================
   // EXTERNAL LINKS & IDs
   // ============================================================================
-  discogs_id: string | null;          // ADDED: In DB
+  discogs_id: string | null;
   discogs_release_id: string | null;
   discogs_master_id: string | null;
   
   spotify_id: string | null;
   spotify_url: string | null;
-  spotify_album_id: string | null;    // ADDED: In DB
+  spotify_album_id: string | null;
   spotify_popularity: number | null;
   
   apple_music_id: string | null;
   apple_music_url: string | null;
   
   musicbrainz_id: string | null;
+  musicbrainz_url: string | null;
   
   // ============================================================================
   // DATES
@@ -116,6 +124,7 @@ export type Album = {
   producers: string[] | null;
   engineers: string[] | null;
   songwriters: string[] | null;
+  writers: string[] | null;
   chorus: string | null;
   composer: string | null;
   composition: string | null;
@@ -144,10 +153,10 @@ export type Album = {
   purchase_date: string | null;
   purchase_store: string | null;
   
-  for_sale_indicator?: boolean; // UI Helper
+  for_sale_indicator?: boolean; 
   
   sale_price: number | null;
-  sell_price?: string | null; // Legacy text field
+  sell_price: string | null; // Legacy text field in DB
   sale_platform: string | null;
   sale_quantity: number | null;
   sale_notes: string | null;
@@ -171,7 +180,7 @@ export type Album = {
   spotify_total_tracks?: number | null;
   apple_music_track_count?: number | null;
   
-  // Missing fields referenced in columnDefinitions (likely from backup/legacy)
+  // Legacy / Backup fields present in backup tables or UI logic
   is_1001?: boolean | null;
   steves_top_200?: boolean | null;
   this_weeks_top_10?: boolean | null;
@@ -183,8 +192,7 @@ export type Album = {
   spotify_image_url?: string | null;
   apple_music_release_date?: string | null;
   apple_music_artwork_url?: string | null;
-  apple_music_genre?: string | null;
-
+  
   // ============================================================================
   // EXTRA METADATA (JSONB)
   // ============================================================================
@@ -192,8 +200,12 @@ export type Album = {
   disc_metadata?: any | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   matrix_numbers?: any | null;
+  
+  enrichment_sources?: string[] | null; 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  enrichment_summary?: any | null;
+  enriched_metadata?: any | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  metadata_sources?: any | null;
 
   // ============================================================================
   // DJ DATA
@@ -223,6 +235,13 @@ export type Album = {
   artist_norm?: string | null;
   title_norm?: string | null;
   artist_album_norm?: string | null;
+  
+  // Social/Embeds
+  lastfm_id: string | null;
+  lastfm_url: string | null;
+  allmusic_id: string | null;
+  allmusic_url: string | null;
+  wikipedia_url: string | null;
 };
 
 // HELPER FUNCTIONS
