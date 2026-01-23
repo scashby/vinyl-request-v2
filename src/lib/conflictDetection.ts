@@ -12,7 +12,7 @@ export const IDENTIFYING_FIELDS = [
   'barcode',
   'country',
   'year',
-  'folder',
+  'location', // FIXED: Was 'folder'
   'discogs_release_id',
   'discogs_master_id',
   'date_added',
@@ -35,8 +35,8 @@ export const CONFLICTABLE_FIELDS = [
   'matrix_numbers',
   'image_url',
   'back_image_url',
-  'discogs_genres',
-  'discogs_styles',
+  'genres', // FIXED: Was discogs_genres (legacy)
+  'styles', // FIXED: Was discogs_styles (legacy)
   'notes',
   'studio',
   'my_rating',
@@ -70,7 +70,7 @@ export interface CollectionRow extends Record<string, unknown> {
   title: string;
   year?: string;
   format: string;
-  folder: string;
+  location: string; // FIXED: Was folder
   media_condition: string;
   barcode?: string;
   cat_no?: string;
@@ -81,7 +81,7 @@ export interface CollectionRow extends Record<string, unknown> {
   package_sleeve_condition?: string;
   vinyl_weight?: string;
   rpm?: string;
-  vinyl_color?: string;
+  vinyl_color?: string[]; // FIXED: Updated to string[] based on DB
   packaging?: string;
   sound?: string;
   spars_code?: string;
@@ -107,8 +107,8 @@ export interface CollectionRow extends Record<string, unknown> {
   length_seconds?: number;
   image_url?: string;
   back_image_url?: string;
-  discogs_genres?: string[];
-  discogs_styles?: string[];
+  genres?: string[]; // FIXED: Was discogs_genres
+  styles?: string[]; // FIXED: Was discogs_styles
   matrix_numbers?: unknown;
   discogs_release_id?: string;
   discogs_master_id?: string;
@@ -270,7 +270,7 @@ export function detectConflicts(existingAlbum: Record<string, unknown>, imported
   const resolutionMap = new Map<string, PreviousResolution>();
   for (const res of previousResolutions) resolutionMap.set(res.field_name, res);
   
-  const TAG_LIKE_FIELDS = ['genres', 'styles', 'tags', 'discogs_genres', 'discogs_styles', 'custom_tags', 'labels', 'musicians', 'producers', 'engineers', 'songwriters'];
+  const TAG_LIKE_FIELDS = ['genres', 'styles', 'tags', 'custom_tags', 'labels', 'musicians', 'producers', 'engineers', 'songwriters'];
 
   for (const field of CONFLICTABLE_FIELDS) {
     const existingValue = existingAlbum[field];
@@ -310,6 +310,8 @@ export function detectConflicts(existingAlbum: Record<string, unknown>, imported
   }
   return { safeUpdates, conflicts };
 }
+
+// ... (Rest of file remains unchanged: smartMergeTracks, mergeArrays, applyResolution, getRejectedValue, getFieldDisplayName, canMergeField, normalizeText, findMatchingAlbum, getSafeUpdates)
 /**
  * Smart track merging - preserves enriched data from current DB
  */
@@ -420,8 +422,8 @@ export function getFieldDisplayName(fieldName: string): string {
     matrix_numbers: 'Matrix Numbers',
     image_url: 'Cover Image',
     back_image_url: 'Back Cover Image',
-    discogs_genres: 'Genres',
-    discogs_styles: 'Styles',
+    genres: 'Genres',
+    styles: 'Styles',
     notes: 'Notes',
     studio: 'Studio',
     my_rating: 'Rating',
