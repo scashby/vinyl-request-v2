@@ -246,6 +246,16 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
               >
                 🎶 Playlists
               </Link>
+              <Link 
+                href="/admin/socials"
+                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+                  pathname === "/admin/socials" 
+                    ? "bg-green-700 text-white" 
+                    : "bg-green-600 text-white hover:bg-green-700"
+                }`}
+              >
+                🌐 Social Embeds
+              </Link>
             </div>
           </div>
 

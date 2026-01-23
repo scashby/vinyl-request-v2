@@ -1,15 +1,22 @@
 // src/app/layout.tsx
-import "./globals.css";
-import { Inter, Playfair_Display } from "next/font/google";
-import Layout from "components/Layout";
-import { Analytics } from "@vercel/analytics/next"
+import './globals.css';
+import { Inter, Playfair_Display } from 'next/font/google';
+// FIXED: Named import
+import { AuthProvider } from '../components/AuthProvider'; 
+import NavigationMenu from '../components/NavigationMenu';
+// FIXED: Named import
+import { UniversalBottomBar } from '../components/UniversalBottomBar';
 
-const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
-const playfair = Playfair_Display({ subsets: ["latin"], variable: '--font-playfair' });
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const playfair = Playfair_Display({ 
+  subsets: ['latin'], 
+  variable: '--font-serif-display',
+  weight: ['400', '700', '900'] 
+});
 
 export const metadata = {
-  title: "Dead Wax Dialogues",
-  description: "Drop the needle. Let the side play.",
+  title: 'Vinyl Request',
+  description: 'Request vinyl tracks for the next set',
 };
 
 export default function RootLayout({
@@ -19,12 +26,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${playfair.variable} font-sans antialiased bg-white text-black`}>
-        {/* REQUIRED for Facebook SDK to function without errors */}
-        <div id="fb-root"></div> 
-        
-        <Layout>{children}</Layout>
-        <Analytics />
+      <body className={`${inter.variable} ${playfair.variable} font-sans bg-black text-white min-h-screen pb-24 md:pb-0`}>
+        <AuthProvider>
+          {/* REMOVED: AlbumContextManager wrapper (Audio Recognition) */}
+          <NavigationMenu />
+          <main className="min-h-screen">
+            {children}
+          </main>
+          <UniversalBottomBar />
+        </AuthProvider>
       </body>
     </html>
   );
