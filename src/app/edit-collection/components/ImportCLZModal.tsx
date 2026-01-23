@@ -43,6 +43,8 @@ interface ParsedCLZAlbum {
   artist_norm: string;
   title_norm: string;
   labels: string[];
+  personal_notes: string;
+  location: string;
 }
 
 // Use Record type for existing albums since we need all fields for conflict detection
@@ -161,6 +163,12 @@ function parseCLZXML(xmlText: string): ParsedCLZAlbum[] {
       if (node.textContent) songwriters.push(node.textContent);
     });
 
+    // FIXED: Added notes and location parsing
+    const notes = music.querySelector('notes')?.textContent || '';
+    const storage = music.querySelector('storagedevice')?.textContent || '';
+    const slot = music.querySelector('slot')?.textContent || '';
+    const location = `${storage} ${slot}`.trim();
+
     albums.push({
       artist,
       title,
@@ -177,6 +185,8 @@ function parseCLZXML(xmlText: string): ParsedCLZAlbum[] {
       labels,
       artist_norm: normalizeArtist(artist),
       title_norm: normalizeTitle(title),
+      personal_notes: notes,
+      location: location,
     });
   });
 
@@ -354,6 +364,9 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
             barcode: album.barcode,
             cat_no: album.cat_no,
             labels: album.labels,
+            // FIXED: Included personal_notes and location
+            personal_notes: album.personal_notes,
+            location: album.location,
           };
 
           // Step 1: Handle identifying fields (only fill if NULL)

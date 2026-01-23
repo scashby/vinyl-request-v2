@@ -597,7 +597,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               date_added: album.date_added,
               media_condition: album.media_condition,
               package_sleeve_condition: album.package_sleeve_condition,
-              notes: album.notes,
+              // FIXED: Map to personal_notes column
+              personal_notes: album.notes,
               my_rating: album.my_rating,
               decade: album.decade,
             };
