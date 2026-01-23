@@ -5,35 +5,35 @@ export type Album = {
   // ============================================================================
   id: number;
   artist: string;               // Normalized: "John Williams"
-  secondary_artists: string[] | null; // ["London Symphony Orchestra"]
+  secondary_artists: string[] | null; // Matches DB: secondary_artists ARRAY
   sort_artist: string | null;   // "Williams, John"
   title: string;
   year: string | null;
   year_int: number | null;
   image_url: string | null;
-  index_number: number | null;
+  index_number: number | null;  // Matches DB: index_number integer
   
   // ============================================================================
   // STATUS & LOCATION
   // ============================================================================
   collection_status: 'in_collection' | 'for_sale' | 'wish_list' | 'on_order' | 'sold' | 'not_in_collection' | null;
   for_sale: boolean;
-  folder: string | null;        // Keep folder for compatibility
-  location: string | null;      // Physical location (shelf, box)
-  storage_device_slot: string | null; // Specific slot in storage
-  country: string | null;       // ADDED: Fixes build error
-  studio: string | null;        // ADDED: Often paired with country/location
+  folder: string | null;        // Matches DB: folder text
+  location: string | null;      // Matches DB: location text
+  storage_device_slot: string | null; // Matches DB: storage_device_slot text
+  country: string | null;       // Matches DB: country text
+  studio: string | null;        // Matches DB: studio text
   date_added: string | null;
   modified_date: string | null;
 
   // ============================================================================
   // NOTES
   // ============================================================================
-  personal_notes: string | null; // From CSV "Collection Notes"
-  notes?: string | null;         // Alias for legacy components
-  release_notes: string | null;  // From Discogs "Notes"
-  extra: string | null;          // Format details (gatefold, colored)
-  discogs_notes: string | null;
+  personal_notes: string | null; // Matches DB: personal_notes text
+  notes?: string | null;         // Legacy alias
+  release_notes: string | null;  // Matches DB: release_notes text
+  extra: string | null;          // Matches DB: extra text
+  discogs_notes: string | null;  // Matches DB: pricing_notes text (or implied)
 
   // ============================================================================
   // PHYSICAL METADATA
@@ -53,11 +53,11 @@ export type Album = {
   sides: number | null;
   
   // Audio / Content
-  length_seconds: number | null;
+  length_seconds: number | null; // Matches DB: length_seconds integer
   sound: string | null;
   spars_code: string | null;
-  is_live: boolean | null;
-  is_box_set: boolean | null;
+  is_live: boolean | null;       // Matches DB: is_live boolean
+  is_box_set: boolean | null;    // Matches DB: is_box_set boolean
 
   // ============================================================================
   // TRACKS (The Source of Truth)
@@ -93,10 +93,10 @@ export type Album = {
   // ============================================================================
   // TAGS & LABELS
   // ============================================================================
-  genres: string[] | null; 
-  styles: string[] | null; 
+  genres: string[] | null; // Matches DB: genres ARRAY
+  styles: string[] | null; // Matches DB: styles ARRAY
   custom_tags: string[] | null; 
-  labels: string[] | null;
+  labels: string[] | null; // Matches DB: labels ARRAY
 
   // ============================================================================
   // PEOPLE
@@ -153,13 +153,13 @@ export type Album = {
   last_enriched_at: string | null;
   
   // ============================================================================
-  // LEGACY / OPTIONAL (Keep for compatibility if needed, but prefer above)
+  // LEGACY / OPTIONAL
   // ============================================================================
   spotify_label?: string | null;
   apple_music_label?: string | null;
   sort_title?: string | null;
   subtitle?: string | null;
-  played_history?: string | null; // Kept as optional string to prevent breakage if accessed
+  played_history?: string | null;
   
   spotify_total_tracks?: number | null;
   apple_music_track_count?: number | null;
