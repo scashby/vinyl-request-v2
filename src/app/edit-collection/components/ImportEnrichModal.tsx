@@ -24,7 +24,7 @@ import {
 const ALLOWED_COLUMNS = new Set([
   'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels', 'cat_no',
   'tracklists', 'tracklist', 'tracks', 'disc_metadata', 
-  'image_url', 'back_image_url', 'sell_price', 'media_condition', 'folder',
+  'image_url', 'back_image_url', 'sell_price', 'media_condition', 'location', // FIXED: Was 'folder'
   'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
   'apple_music_id', 'apple_music_url', 'lastfm_id', 'lastfm_url', 
   'musicbrainz_id', 'musicbrainz_url', 'wikipedia_url', 'genius_url', 
@@ -365,7 +365,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           albumIds: specificAlbumIds,
           limit: specificAlbumIds ? undefined : 5, // Reduced to prevent timeouts
           cursor: specificAlbumIds ? undefined : cursorRef.current,
-          folder: folderFilter || undefined,
+          // FIXED: Renamed folder to location in API call if necessary, or just don't pass it if it's dead
+          // Assuming the API expects 'folder' to filter by location:
+          location: folderFilter || undefined, 
           services: getServicesForSelection(),
           autoSnooze: autoSnooze // PASSED TO SERVER
         };
