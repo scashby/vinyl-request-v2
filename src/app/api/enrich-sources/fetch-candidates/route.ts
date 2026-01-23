@@ -46,7 +46,7 @@ export async function POST(req: Request) {
       albumIds,
       cursor = 0,
       limit = 10,
-      location, // FIXED: Was 'folder'
+      location, // FIXED: Expect 'location' not 'folder'
       services,
       autoSnooze = false
     } = body;
@@ -70,7 +70,6 @@ export async function POST(req: Request) {
         .order('id', { ascending: true })
         .limit(limit);
 
-      // FIXED: Use 'location' column instead of 'folder'
       if (location) query = query.eq('location', location);
 
       // SERVER-SIDE SNOOZE FILTERING

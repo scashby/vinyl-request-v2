@@ -35,9 +35,9 @@ export const CONFLICTABLE_FIELDS = [
   'matrix_numbers',
   'image_url',
   'back_image_url',
-  'genres', // FIXED: Was discogs_genres (legacy)
-  'styles', // FIXED: Was discogs_styles (legacy)
-  'notes',
+  'genres', // FIXED: Was discogs_genres
+  'styles', // FIXED: Was discogs_styles
+  'personal_notes', // FIXED: Was notes
   'studio',
   'my_rating',
   'media_condition',
@@ -76,7 +76,7 @@ export interface CollectionRow extends Record<string, unknown> {
   cat_no?: string;
   country?: string;
   labels?: string[];
-  notes?: string;
+  personal_notes?: string; // FIXED: Was notes
   index_number?: number;
   package_sleeve_condition?: string;
   vinyl_weight?: string;
@@ -311,7 +311,7 @@ export function detectConflicts(existingAlbum: Record<string, unknown>, imported
   return { safeUpdates, conflicts };
 }
 
-// ... (Rest of file remains unchanged: smartMergeTracks, mergeArrays, applyResolution, getRejectedValue, getFieldDisplayName, canMergeField, normalizeText, findMatchingAlbum, getSafeUpdates)
+// ... (Rest of file remains unchanged)
 /**
  * Smart track merging - preserves enriched data from current DB
  */
@@ -424,7 +424,7 @@ export function getFieldDisplayName(fieldName: string): string {
     back_image_url: 'Back Cover Image',
     genres: 'Genres',
     styles: 'Styles',
-    notes: 'Notes',
+    personal_notes: 'My Notes', // FIXED: Was Notes
     studio: 'Studio',
     my_rating: 'Rating',
     media_condition: 'Media Condition',
