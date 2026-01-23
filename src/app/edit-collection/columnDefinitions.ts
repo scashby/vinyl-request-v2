@@ -18,8 +18,9 @@ export type ColumnId =
   | 'discs'
   | 'sides'
   | 'tracks'
+  | 'length' // ADDED: Fixes pdfGenerator error
   // Details
-  | 'location'  // Fixed
+  | 'location'
   | 'country'
   | 'extra'
   | 'media_condition'
@@ -30,26 +31,27 @@ export type ColumnId =
   // Metadata
   | 'genres'
   | 'styles'
-  | 'labels' // Added
+  | 'labels'
   // People
   | 'engineers'
   | 'musicians'
   | 'producers'
   | 'songwriters'
-  | 'secondary_artists' // Added
+  | 'secondary_artists'
   // Personal
   | 'added_date'
   | 'collection_status'
   | 'my_rating'
-  | 'personal_notes' // Renamed
-  | 'release_notes'  // Added
+  | 'personal_notes'
+  | 'release_notes'
   | 'owner'
   | 'custom_tags'
   | 'modified_date'
   // Value
   | 'for_sale'
   | 'purchase_price'
-  | 'current_value';
+  | 'current_value'
+  | 'sale_price'; // UPDATED from sell_price
 
 export interface ColumnDefinition {
   id: ColumnId;
@@ -78,6 +80,7 @@ export const COLUMN_DEFINITIONS: Record<ColumnId, ColumnDefinition> = {
   discs: { id: 'discs', label: 'Discs', width: '70px' },
   sides: { id: 'sides', label: 'Sides', width: '70px' },
   tracks: { id: 'tracks', label: 'Tracks', width: '80px' },
+  length: { id: 'length', label: 'Length', width: '80px' }, // ADDED
   
   // Details
   location: { id: 'location', label: 'Location', width: '150px' },
@@ -115,6 +118,7 @@ export const COLUMN_DEFINITIONS: Record<ColumnId, ColumnDefinition> = {
   for_sale: { id: 'for_sale', label: 'For Sale', width: '90px' },
   purchase_price: { id: 'purchase_price', label: 'Purch Price', width: '130px' },
   current_value: { id: 'current_value', label: 'Value', width: '130px' },
+  sale_price: { id: 'sale_price', label: 'Sale Price', width: '130px' }, // UPDATED
 };
 
 export const COLUMN_GROUPS = [
@@ -131,7 +135,7 @@ export const COLUMN_GROUPS = [
     id: 'edition',
     label: 'Edition',
     icon: '💿',
-    columns: ['format', 'discs', 'sides', 'tracks', 'labels'] as ColumnId[]
+    columns: ['format', 'discs', 'sides', 'tracks', 'length', 'labels'] as ColumnId[]
   },
   {
     id: 'details',
@@ -168,7 +172,7 @@ export const COLUMN_GROUPS = [
     label: 'Value',
     icon: '💰',
     columns: [
-      'for_sale', 'purchase_price', 'current_value'
+      'for_sale', 'purchase_price', 'current_value', 'sale_price'
     ] as ColumnId[]
   }
 ];
@@ -197,7 +201,7 @@ export const DEFAULT_LOCKED_COLUMNS: ColumnId[] = [
 ];
 
 // ============================================================================
-// HELPER FUNCTIONS & TYPES (Added to fix build errors)
+// HELPER FUNCTIONS & TYPES
 // ============================================================================
 
 export type SortDirection = 'asc' | 'desc';
@@ -207,18 +211,12 @@ export interface SortState {
   direction: SortDirection;
 }
 
-/**
- * Converts a list of ColumnIds into their full ColumnDefinition objects
- */
 export function getVisibleColumns(visibleIds: ColumnId[]): ColumnDefinition[] {
   return visibleIds
     .map(id => COLUMN_DEFINITIONS[id])
     .filter((col): col is ColumnDefinition => !!col);
 }
 
-/**
- * Splits columns into locked (sticky left) and unlocked groups
- */
 export function splitColumnsByLock(columns: ColumnDefinition[], lockedIds: ColumnId[]) {
   const lockedSet = new Set(lockedIds);
   const locked: ColumnDefinition[] = [];

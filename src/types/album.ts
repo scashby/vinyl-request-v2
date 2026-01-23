@@ -4,36 +4,37 @@ export type Album = {
   // CORE IDENTIFICATION
   // ============================================================================
   id: number;
-  artist: string;               // Normalized: "John Williams"
-  secondary_artists: string[] | null; // Matches DB: secondary_artists ARRAY
-  sort_artist: string | null;   // "Williams, John"
+  artist: string;
+  secondary_artists: string[] | null;
+  sort_artist: string | null;
   title: string;
   year: string | null;
   year_int: number | null;
   image_url: string | null;
-  index_number: number | null;  // Matches DB: index_number integer
+  back_image_url: string | null; // ADDED: In DB
+  index_number: number | null;   // ADDED: In DB
   
   // ============================================================================
   // STATUS & LOCATION
   // ============================================================================
   collection_status: 'in_collection' | 'for_sale' | 'wish_list' | 'on_order' | 'sold' | 'not_in_collection' | null;
   for_sale: boolean;
-  folder: string | null;        // Matches DB: folder text
-  location: string | null;      // Matches DB: location text
-  storage_device_slot: string | null; // Matches DB: storage_device_slot text
-  country: string | null;       // Matches DB: country text
-  studio: string | null;        // Matches DB: studio text
+  folder: string | null;
+  location: string | null;
+  storage_device_slot: string | null; // ADDED: In DB
+  country: string | null;             // ADDED: In DB
+  studio: string | null;              // ADDED: In DB
   date_added: string | null;
   modified_date: string | null;
 
   // ============================================================================
   // NOTES
   // ============================================================================
-  personal_notes: string | null; // Matches DB: personal_notes text
-  notes?: string | null;         // Legacy alias
-  release_notes: string | null;  // Matches DB: release_notes text
-  extra: string | null;          // Matches DB: extra text
-  discogs_notes: string | null;  // Matches DB: pricing_notes text (or implied)
+  personal_notes: string | null;
+  notes?: string | null;         // Alias
+  release_notes: string | null;
+  extra: string | null;
+  discogs_notes: string | null;
 
   // ============================================================================
   // PHYSICAL METADATA
@@ -43,7 +44,7 @@ export type Album = {
   package_sleeve_condition: string | null;
   barcode: string | null;
   cat_no: string | null;
-  packaging: string | null;
+  packaging: string | null;      // ADDED: In DB
   
   // Vinyl Specifics
   rpm: string | null;
@@ -53,14 +54,15 @@ export type Album = {
   sides: number | null;
   
   // Audio / Content
-  length_seconds: number | null; // Matches DB: length_seconds integer
+  length_seconds: number | null;
   sound: string | null;
   spars_code: string | null;
-  is_live: boolean | null;       // Matches DB: is_live boolean
-  is_box_set: boolean | null;    // Matches DB: is_box_set boolean
+  is_live: boolean | null;
+  is_box_set: boolean | null;
+  box_set: string | null;        // ADDED: Text field in DB
 
   // ============================================================================
-  // TRACKS (The Source of Truth)
+  // TRACKS
   // ============================================================================
   tracks: Array<{
     position: string;
@@ -71,14 +73,23 @@ export type Album = {
     disc_number: number;
     side?: string;
   }> | null;
+  tracklists?: string | null; // Legacy field referenced in columns
 
   // ============================================================================
   // EXTERNAL LINKS & IDs
   // ============================================================================
+  discogs_id: string | null;          // ADDED: In DB
   discogs_release_id: string | null;
   discogs_master_id: string | null;
+  
   spotify_id: string | null;
+  spotify_url: string | null;
+  spotify_album_id: string | null;    // ADDED: In DB
+  spotify_popularity: number | null;
+  
   apple_music_id: string | null;
+  apple_music_url: string | null;
+  
   musicbrainz_id: string | null;
   
   // ============================================================================
@@ -93,10 +104,10 @@ export type Album = {
   // ============================================================================
   // TAGS & LABELS
   // ============================================================================
-  genres: string[] | null; // Matches DB: genres ARRAY
-  styles: string[] | null; // Matches DB: styles ARRAY
+  genres: string[] | null; 
+  styles: string[] | null; 
   custom_tags: string[] | null; 
-  labels: string[] | null; // Matches DB: labels ARRAY
+  labels: string[] | null;
 
   // ============================================================================
   // PEOPLE
@@ -133,9 +144,13 @@ export type Album = {
   purchase_date: string | null;
   purchase_store: string | null;
   
+  for_sale_indicator?: boolean; // UI Helper
+  
   sale_price: number | null;
+  sell_price?: string | null; // Legacy text field
   sale_platform: string | null;
   sale_quantity: number | null;
+  sale_notes: string | null;
   wholesale_cost: number | null;
   pricing_notes: string | null;
   
@@ -145,15 +160,7 @@ export type Album = {
   discogs_price_updated_at: string | null;
 
   // ============================================================================
-  // SYSTEM / ENRICHMENT
-  // ============================================================================
-  spotify_popularity: number | null;
-  discogs_source: string | null;
-  enrichment_sources: string | null;
-  last_enriched_at: string | null;
-  
-  // ============================================================================
-  // LEGACY / OPTIONAL
+  // LEGACY / OPTIONAL / UI HELPERS
   // ============================================================================
   spotify_label?: string | null;
   apple_music_label?: string | null;
@@ -163,6 +170,20 @@ export type Album = {
   
   spotify_total_tracks?: number | null;
   apple_music_track_count?: number | null;
+  
+  // Missing fields referenced in columnDefinitions (likely from backup/legacy)
+  is_1001?: boolean | null;
+  steves_top_200?: boolean | null;
+  this_weeks_top_10?: boolean | null;
+  inner_circle_preferred?: boolean | null;
+  blocked?: boolean | null;
+  blocked_sides?: string[] | null;
+  blocked_tracks?: unknown | null;
+  spotify_release_date?: string | null;
+  spotify_image_url?: string | null;
+  apple_music_release_date?: string | null;
+  apple_music_artwork_url?: string | null;
+  apple_music_genre?: string | null;
 
   // ============================================================================
   // EXTRA METADATA (JSONB)
@@ -171,9 +192,26 @@ export type Album = {
   disc_metadata?: any | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   matrix_numbers?: any | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  enrichment_summary?: any | null;
 
   // ============================================================================
-  // HIERARCHY (Box Sets)
+  // DJ DATA
+  // ============================================================================
+  tempo_bpm?: number | null;
+  musical_key?: string | null;
+  energy?: number | null;
+  danceability?: number | null;
+  mood_acoustic?: number | null;
+  mood_electronic?: number | null;
+  mood_happy?: number | null;
+  mood_sad?: number | null;
+  mood_aggressive?: number | null;
+  mood_relaxed?: number | null;
+  mood_party?: number | null;
+
+  // ============================================================================
+  // HIERARCHY
   // ============================================================================
   parent_id?: number | null;
   child_album_ids?: string | null;

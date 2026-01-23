@@ -113,8 +113,8 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
       // Genre data
       const genreCounts: Record<string, number> = {};
       albums.forEach(album => {
-        // FIXED: Use canonical 'genres' field
-        const genreList = album.genres || album.spotify_genres || [];
+        // FIXED: Only use canonical 'genres' field (removed spotify_genres)
+        const genreList = album.genres || [];
         const genres = (Array.isArray(genreList) ? genreList : []).map((g: string) => g.trim()).filter(Boolean);
         if (genres.length === 0) genres.push('Unknown');
         genres.forEach(genre => {
