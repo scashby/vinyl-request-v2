@@ -38,7 +38,7 @@ export const CONFLICTABLE_FIELDS = [
   'genres', // FIXED: Was discogs_genres
   'styles', // FIXED: Was discogs_styles
   'personal_notes', // FIXED: Was notes
-  'release_notes', // ADDED: New field in schema
+  'release_notes',
   'studio',
   'my_rating',
   'media_condition',
@@ -65,26 +65,25 @@ export interface Track {
   lyrics_source?: string;
 }
 
-// Updated to match public.collection schema
 export interface CollectionRow extends Record<string, unknown> {
   id: number;
   artist: string;
   title: string;
   year?: string;
   format: string;
-  location: string; // FIXED
+  location: string;
   media_condition: string;
   barcode?: string;
   cat_no?: string;
   country?: string;
   labels?: string[];
-  personal_notes?: string; // FIXED
-  release_notes?: string; // ADDED
+  personal_notes?: string;
+  release_notes?: string;
   index_number?: number;
   package_sleeve_condition?: string;
   vinyl_weight?: string;
   rpm?: string;
-  vinyl_color?: string[]; // Fixed to array
+  vinyl_color?: string[]; 
   packaging?: string;
   sound?: string;
   spars_code?: string;
@@ -110,8 +109,8 @@ export interface CollectionRow extends Record<string, unknown> {
   length_seconds?: number;
   image_url?: string;
   back_image_url?: string;
-  genres?: string[]; // FIXED
-  styles?: string[]; // FIXED
+  genres?: string[];
+  styles?: string[];
   matrix_numbers?: unknown;
   discogs_release_id?: string;
   discogs_master_id?: string;
@@ -180,7 +179,7 @@ function isEqual(a: unknown, b: unknown): boolean {
 }
 
 /**
- * Normalizes string arrays for case-insensitive comparison (e.g., "Blues" vs "blues")
+ * Normalizes string arrays for case-insensitive comparison
  */
 function areStringArraysEqual(a: unknown, b: unknown): boolean {
   if (!Array.isArray(a) || !Array.isArray(b)) return false;
@@ -314,8 +313,9 @@ export function detectConflicts(existingAlbum: Record<string, unknown>, imported
   return { safeUpdates, conflicts };
 }
 
-// ... (Rest of utils: smartMergeTracks, mergeArrays etc. are logic-only and don't reference columns)
-// Re-exporting them to maintain file validity
+/**
+ * Smart track merging - preserves enriched data from current DB
+ */
 export function smartMergeTracks(
   currentTracks: Track[] | null,
   newTracks: Track[] | null
@@ -354,6 +354,9 @@ export function smartMergeTracks(
   return merged;
 }
 
+/**
+ * Merge two arrays - combines both and removes duplicates
+ */
 export function mergeArrays(current: string[], incoming: string[]): string[] {
   const merged = [...incoming];
   for (const item of current) {
@@ -362,6 +365,9 @@ export function mergeArrays(current: string[], incoming: string[]): string[] {
   return merged;
 }
 
+/**
+ * Apply a resolution to get the final value
+ */
 export function applyResolution(
   currentValue: unknown,
   newValue: unknown,
@@ -381,6 +387,9 @@ export function applyResolution(
   }
 }
 
+/**
+ * Get the rejected value for resolution tracking
+ */
 export function getRejectedValue(
   currentValue: unknown,
   newValue: unknown,
@@ -393,6 +402,9 @@ export function getRejectedValue(
   }
 }
 
+/**
+ * Get human-readable field name for display
+ */
 export function getFieldDisplayName(fieldName: string): string {
   const nameMap: Record<string, string> = {
     tracks: 'Tracks',
@@ -414,7 +426,7 @@ export function getFieldDisplayName(fieldName: string): string {
     genres: 'Genres',
     styles: 'Styles',
     personal_notes: 'My Notes', // FIXED
-    release_notes: 'Release Notes', // ADDED
+    release_notes: 'Release Notes',
     studio: 'Studio',
     my_rating: 'Rating',
     media_condition: 'Media Condition',
@@ -429,6 +441,9 @@ export function getFieldDisplayName(fieldName: string): string {
   return nameMap[fieldName] || fieldName;
 }
 
+/**
+ * Check if a field can be merged
+ */
 export function canMergeField(value: unknown): boolean {
   return Array.isArray(value);
 }
@@ -441,6 +456,10 @@ function normalizeText(text: string): string {
     .trim();
 }
 
+/**
+ * Find matching album in collection by artist + title + format
+ * Used for CLZ/Discogs import matching
+ */
 export function findMatchingAlbum<T extends { artist: string; title: string; format: string }>(
   importedAlbum: { artist: string; title: string; format: string },
   existingAlbums: T[]
@@ -462,14 +481,23 @@ export function findMatchingAlbum<T extends { artist: string; title: string; for
   });
 }
 
+/**
+ * Get safe updates for an album (combining identifying field updates and non-conflicting updates)
+ * This is a convenience wrapper combining buildIdentifyingFieldUpdates and the safeUpdates from detectConflicts
+ */
 export function getSafeUpdates(
   existingAlbum: Record<string, unknown>,
   importedData: Record<string, unknown>,
   source: ImportSource,
   previousResolutions: PreviousResolution[] = []
 ): Record<string, unknown> {
+  // Get identifying field updates (NULL -> value)
   const identifyingUpdates = buildIdentifyingFieldUpdates(existingAlbum, importedData);
+  
+  // Get safe updates for conflictable fields
   const { safeUpdates } = detectConflicts(existingAlbum, importedData, source, previousResolutions);
+  
+  // Combine both
   return {
     ...identifyingUpdates,
     ...safeUpdates
