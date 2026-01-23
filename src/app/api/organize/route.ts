@@ -1,4 +1,4 @@
-// Fixed API route: src/app/api/organize/route.ts
+// src/app/api/organize/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -10,7 +10,7 @@ type Body = {
   cursor?: number | null;
   limit?: number;
   scope?: {
-    folderExact?: string;
+    locationExact?: string; // FIXED: Was folderExact
     artistSearch?: string;
     titleSearch?: string;
   };
@@ -33,17 +33,19 @@ export async function POST(req: Request) {
   const unknown = body.unknownLabel ?? "(unknown)";
   const dry = !!body.dryRun;
 
+  // FIXED: Removed is_1001, updated columns to match schema
   let q = supabase
     .from("collection")
-    .select("id,discogs_genres,folder,artist,title,is_1001")
+    .select("id,genres,location,artist,title") // FIXED: genres, location
     .gt("id", cursor)
     .order("id", { ascending: true })
     .limit(limit);
 
   // Apply user-friendly filters
   const s = body.scope ?? {};
-  if (s.folderExact && s.folderExact !== 'all') {
-    q = q.eq("folder", s.folderExact);
+  // FIXED: Filter by location
+  if (s.locationExact && s.locationExact !== 'all') {
+    q = q.eq("location", s.locationExact);
   }
   if (s.artistSearch) {
     q = q.ilike("artist", `%${s.artistSearch}%`);
@@ -69,8 +71,9 @@ export async function POST(req: Request) {
     scanned++;
     lastId = r.id as number;
 
-    const first = Array.isArray(r.discogs_genres) && r.discogs_genres.length
-      ? String(r.discogs_genres[0])
+    // FIXED: Use genres array
+    const first = Array.isArray(r.genres) && r.genres.length
+      ? String(r.genres[0])
       : null;
 
     const group = first ? sanitize(first) : unknown;
@@ -81,9 +84,10 @@ export async function POST(req: Request) {
       continue;
     }
 
+    // FIXED: Update location column
     const { error: upErr } = await supabase
       .from("collection")
-      .update({ folder: dest })
+      .update({ location: dest })
       .eq("id", r.id as number);
 
     if (!upErr) {
