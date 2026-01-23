@@ -19,23 +19,29 @@ export type Album = {
   // ============================================================================
   collection_status: 'in_collection' | 'for_sale' | 'wish_list' | 'on_order' | 'sold' | 'not_in_collection' | null;
   for_sale: boolean;
-  folder: string | null;
+  
+  // Location
   location: string | null;
+  storage_device: string | null;
   storage_device_slot: string | null;
+  slot: string | null;
   country: string | null;
   studio: string | null;
+  recording_location: string | null;
+
+  // Dates
   date_added: string | null;
   modified_date: string | null;
+  last_reviewed_at: string | null;
   decade: number | null;
 
   // ============================================================================
   // NOTES
   // ============================================================================
   personal_notes: string | null;
-  notes?: string | null;         // Alias
+  notes?: string | null; // UI Alias for personal_notes
   release_notes: string | null;
   extra: string | null;
-  discogs_notes: string | null;
 
   // ============================================================================
   // PHYSICAL METADATA
@@ -50,9 +56,7 @@ export type Album = {
   // Vinyl Specifics
   rpm: string | null;
   vinyl_weight: string | null;
-  
-  // CONFLICT RESOLUTION: Defined as string[] because DB needs correction to match UI
-  vinyl_color: string[] | null;
+  vinyl_color: string[] | null; // Corrected to match SQL ARRAY
   
   discs: number | null;
   sides: number | null;
@@ -63,12 +67,12 @@ export type Album = {
   spars_code: string | null;
   is_live: boolean | null;
   is_box_set: boolean | null;
-  box_set: string | null; // Name of the box set
+  box_set: string | null;
+  time_signature: string | null;
 
   // ============================================================================
-  // TRACKS
+  // TRACKS (JSONB)
   // ============================================================================
-  // The JSONB source of truth
   tracks: Array<{
     position: string;
     title: string;
@@ -78,9 +82,6 @@ export type Album = {
     disc_number: number;
     side?: string;
   }> | null;
-  
-  // Legacy text column present in DB
-  tracklists: string | null;
 
   // ============================================================================
   // EXTERNAL LINKS & IDs
@@ -92,7 +93,6 @@ export type Album = {
   spotify_id: string | null;
   spotify_url: string | null;
   spotify_album_id: string | null;
-  spotify_popularity: number | null;
   
   apple_music_id: string | null;
   apple_music_url: string | null;
@@ -100,13 +100,20 @@ export type Album = {
   musicbrainz_id: string | null;
   musicbrainz_url: string | null;
   
+  lastfm_id: string | null;
+  lastfm_url: string | null;
+  allmusic_id: string | null;
+  allmusic_url: string | null;
+  wikipedia_url: string | null;
+  dbpedia_uri: string | null;
+  
   // ============================================================================
   // DATES
   // ============================================================================
   original_release_date: string | null;
-  original_release_year: string | null;
+  original_release_year: number | null; // SQL is integer
   recording_date: string | null;
-  recording_year: string | null;
+  recording_year: number | null; // SQL is integer
   master_release_date: string | null;
 
   // ============================================================================
@@ -116,15 +123,19 @@ export type Album = {
   styles: string[] | null; 
   custom_tags: string[] | null; 
   labels: string[] | null;
+  enrichment_sources: string[] | null;
+  finalized_fields: string[] | null;
 
   // ============================================================================
   // PEOPLE
   // ============================================================================
-  musicians: string[] | null;
-  producers: string[] | null;
-  engineers: string[] | null;
-  songwriters: string[] | null;
-  writers: string[] | null;
+  // These are JSONB in SQL, but usually parsed to strings or objects in UI
+  musicians: any | null;
+  producers: any | null;
+  engineers: any | null;
+  songwriters: any | null;
+  writers: any | null;
+  
   chorus: string | null;
   composer: string | null;
   composition: string | null;
@@ -153,10 +164,10 @@ export type Album = {
   purchase_date: string | null;
   purchase_store: string | null;
   
-  for_sale_indicator?: boolean; 
+  for_sale_indicator?: boolean; // UI Helper
   
   sale_price: number | null;
-  sell_price: string | null; // Legacy text field in DB
+  sell_price: string | null; // Legacy text field
   sale_platform: string | null;
   sale_quantity: number | null;
   sale_notes: string | null;
@@ -169,79 +180,50 @@ export type Album = {
   discogs_price_updated_at: string | null;
 
   // ============================================================================
-  // LEGACY / OPTIONAL / UI HELPERS
+  // UI HELPERS / OPTIONAL
   // ============================================================================
   spotify_label?: string | null;
   apple_music_label?: string | null;
-  sort_title?: string | null;
   subtitle?: string | null;
   played_history?: string | null;
   
   spotify_total_tracks?: number | null;
   apple_music_track_count?: number | null;
   
-  // Legacy / Backup fields present in backup tables or UI logic
-  is_1001?: boolean | null;
-  steves_top_200?: boolean | null;
-  this_weeks_top_10?: boolean | null;
-  inner_circle_preferred?: boolean | null;
   blocked?: boolean | null;
   blocked_sides?: string[] | null;
-  blocked_tracks?: unknown | null;
-  spotify_release_date?: string | null;
-  spotify_image_url?: string | null;
-  apple_music_release_date?: string | null;
-  apple_music_artwork_url?: string | null;
+  blocked_tracks?: any | null;
   
   // ============================================================================
   // EXTRA METADATA (JSONB)
   // ============================================================================
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   disc_metadata?: any | null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   matrix_numbers?: any | null;
-  
-  enrichment_sources?: string[] | null; 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  inner_sleeve_images?: any | null;
   enriched_metadata?: any | null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  metadata_sources?: any | null;
+  cultural_significance?: string | null;
 
   // ============================================================================
-  // DJ DATA
+  // DJ DATA (Mapped from collection_dj_data)
   // ============================================================================
   tempo_bpm?: number | null;
   musical_key?: string | null;
   energy?: number | null;
   danceability?: number | null;
-  mood_acoustic?: number | null;
-  mood_electronic?: number | null;
-  mood_happy?: number | null;
-  mood_sad?: number | null;
-  mood_aggressive?: number | null;
-  mood_relaxed?: number | null;
-  mood_party?: number | null;
 
   // ============================================================================
   // HIERARCHY
   // ============================================================================
-  parent_id?: number | null;
-  child_album_ids?: string | null;
+  parent_id?: string | null; // UUID in SQL
+  child_album_ids?: string[] | null;
 
   // ============================================================================
-  // GENERATED / NORMALIZED (System Columns)
+  // NORMALIZED
   // ============================================================================
   album_norm?: string | null;
   artist_norm?: string | null;
   title_norm?: string | null;
   artist_album_norm?: string | null;
-  
-  // Social/Embeds
-  lastfm_id: string | null;
-  lastfm_url: string | null;
-  allmusic_id: string | null;
-  allmusic_url: string | null;
-  wikipedia_url: string | null;
 };
 
 // HELPER FUNCTIONS

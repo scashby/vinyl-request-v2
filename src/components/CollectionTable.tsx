@@ -124,9 +124,9 @@ const CollectionTable = memo(function CollectionTable({
       spars_code: (album: Album) => album.spars_code || '—',
       storage_device_slot: (album: Album) => album.storage_device_slot || '—',
       studio: (album: Album) => album.studio || '—',
-      vinyl_color: (album: Album) => album.vinyl_color || '—',
+      vinyl_color: (album: Album) => formatArray(album.vinyl_color), // FIXED: Now uses formatArray
       vinyl_weight: (album: Album) => album.vinyl_weight || '—',
-      // UPDATED: Use canonical genres and styles
+      
       genres: (album: Album) => formatArray(album.genres),
       styles: (album: Album) => formatArray(album.styles),
       label: (album: Album) => album.spotify_label || album.apple_music_label || '—',
@@ -140,7 +140,7 @@ const CollectionTable = memo(function CollectionTable({
       composition: (album: Album) => album.composition || '—',
       conductor: (album: Album) => album.conductor || '—',
       orchestra: (album: Album) => album.orchestra || '—',
-      engineers: (album: Album) => formatArray(album.engineers),
+      engineers: (album: Album) => formatArray(album.engineers), // Assumes parsed to string[]
       musicians: (album: Album) => formatArray(album.musicians),
       producers: (album: Album) => formatArray(album.producers),
       songwriters: (album: Album) => formatArray(album.songwriters),
@@ -287,19 +287,14 @@ const CollectionTable = memo(function CollectionTable({
 
   return (
     <div ref={scrollRef} className="w-full h-full overflow-auto relative">
-      {/* Header - Sticky */}
       <div className="sticky top-0 z-[2] flex items-stretch bg-[#e8e8e8] min-w-fit">
-        {/* Locked Headers */}
         {locked.map((col, index) => {
           const leftPosition = locked.slice(0, index).reduce((sum, c) => sum + parseInt(c.width), 0);
           return renderHeaderCell(col, leftPosition);
         })}
-        
-        {/* Unlocked Headers */}
         {unlocked.map(col => renderHeaderCell(col))}
       </div>
       
-      {/* Body */}
       <div 
         className="relative min-w-fit"
         style={{
@@ -345,7 +340,6 @@ const CollectionTable = memo(function CollectionTable({
                 }
               }}
             >
-              {/* Locked Cells */}
               {locked.map((col, index) => {
                 const leftPosition = locked.slice(0, index).reduce((sum, c) => sum + parseInt(c.width), 0);
                 const isLastLocked = index === locked.length - 1;
@@ -372,7 +366,6 @@ const CollectionTable = memo(function CollectionTable({
                 );
               })}
               
-              {/* Unlocked Cells */}
               {unlocked.map(col => (
                 <div
                   key={col.id}
