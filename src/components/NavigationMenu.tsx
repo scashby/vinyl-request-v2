@@ -11,6 +11,11 @@ export default function NavigationMenu() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
+  // 1. Hide on Admin and Edit Collection pages
+  if (pathname?.startsWith('/admin') || pathname?.startsWith('/edit-collection')) {
+    return null;
+  }
+
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
@@ -23,7 +28,6 @@ export default function NavigationMenu() {
   const navLinks = [
     { name: 'About', path: '/about' },
     { name: 'Events', path: '/events/events-page' },
-    // Restored 'Browse Collection' to the right of Events
     { name: 'Browse Collection', path: '/browse/browse-albums' },
     { name: 'DJ Sets', path: '/dj-sets' },
     { name: 'Dialogues', path: '/dialogues' },

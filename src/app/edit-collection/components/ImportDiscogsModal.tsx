@@ -19,7 +19,7 @@ interface ParsedAlbum {
   barcode: string | null;
   country: string | null;
   year: string | null;
-  folder: string;
+  location: string; // FIXED: Renamed from folder to location
   discogs_release_id: string;
   discogs_master_id: string | null;
   date_added: string;
@@ -44,7 +44,7 @@ interface ExistingAlbum {
   discogs_release_id: string | null;
   image_url: string | null;
   tracks: unknown[] | null;
-  genres: string[] | null; // FIXED: Was discogs_genres
+  genres: string[] | null;
   packaging: string | null;
 }
 
@@ -67,7 +67,8 @@ function sanitizeMediaCondition(condition: string | null | undefined): string {
   return condition.trim();
 }
 
-function sanitizeFolder(folder: string | null | undefined): string {
+// FIXED: Renamed to sanitizeLocation to match DB
+function sanitizeLocation(folder: string | null | undefined): string {
   if (!folder || folder.trim() === '') return 'Uncategorized';
   return folder.trim();
 }
@@ -146,7 +147,8 @@ function parseDiscogsCSV(csvText: string): ParsedAlbum[] {
       barcode: row['Barcode'] || row['barcode'] || null,
       country: row['Country'] || row['country'] || null,
       year,
-      folder: sanitizeFolder(row['CollectionFolder'] || row['Folder'] || row['folder']),
+      // FIXED: Map CSV 'Folder' to DB 'location'
+      location: sanitizeLocation(row['CollectionFolder'] || row['Folder'] || row['folder']),
       discogs_release_id: row['release_id'] || row['Release ID'] || row['discogs_release_id'] || '',
       discogs_master_id: row['Master ID'] || row['master_id'] || row['discogs_master_id'] || null,
       date_added: parseDiscogsDate(row['Date Added'] || row['date_added'] || ''),
@@ -209,7 +211,6 @@ function compareAlbums(
       
       if (!existingAlbum.image_url) missingFields.push('cover images');
       if (!existingAlbum.tracks || existingAlbum.tracks.length === 0) missingFields.push('tracks');
-      // FIXED: Check genres instead of discogs_genres
       if (!existingAlbum.genres || existingAlbum.genres.length === 0) missingFields.push('genres');
       if (!existingAlbum.packaging) missingFields.push('packaging');
 
@@ -250,7 +251,8 @@ function compareAlbums(
       barcode: null,
       country: null,
       year: null,
-      folder: 'Unknown',
+      // FIXED: Use location for removed items too
+      location: 'Unknown',
       discogs_release_id: existingAlbum.discogs_release_id || '',
       discogs_master_id: null,
       date_added: new Date().toISOString(),
@@ -289,7 +291,6 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
   const enriched: Record<string, unknown> = {
     image_url: data.images?.[0]?.uri || null,
     back_image_url: data.images?.[1]?.uri || null,
-    // FIXED: Map to canonical columns
     genres: data.genres || [],
     styles: data.styles || [],
     packaging: data.formats?.[0]?.descriptions?.find((d: string) => 
@@ -298,30 +299,21 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     notes: data.notes || null,
   };
 
-  // --- DATE FIX: Handle partial dates (YYYY or YYYY-MM) ---
   if (data.released) {
       let dateStr = data.released.trim();
-      
-      // Fix 1979-00-00 garbage
       dateStr = dateStr.replace(/-00/g, ''); 
-
-      // If YYYY, append -01-01
       if (/^\d{4}$/.test(dateStr)) {
           dateStr = `${dateStr}-01-01`;
-          enriched.original_release_year = parseInt(data.released); // Save the raw year too
+          enriched.original_release_year = parseInt(data.released);
       } 
-      // If YYYY-MM, append -01
       else if (/^\d{4}-\d{2}$/.test(dateStr)) {
           dateStr = `${dateStr}-01`;
       }
-      
-      // Final validity check
       if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
           enriched.original_release_date = dateStr;
       }
   }
 
-  // Extract Labels from companies
   if (data.companies && Array.isArray(data.companies)) {
     const labels = data.companies
       .filter((c: { entity_type_name: string; name: string }) => c.entity_type_name === 'Label')
@@ -503,7 +495,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           return;
         }
 
-        // FIXED: Select genres instead of discogs_genres
         const { data: existing, error: dbError } = await supabase
           .from('collection')
           .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, image_url, tracks, genres, packaging');
@@ -599,7 +590,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               barcode: album.barcode,
               country: album.country,
               year: album.year,
-              folder: album.folder,
+              // FIXED: Map to location column
+              location: album.location,
               discogs_release_id: album.discogs_release_id,
               discogs_master_id: album.discogs_master_id,
               date_added: album.date_added,
@@ -624,7 +616,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               } else {
                 album.missingFields.forEach(field => {
                   if (enrichedData[field]) {
-                    // FIXED: Handle mapping correctly
                     if (field === 'genres') albumData.genres = enrichedData.genres;
                     else if (field === 'styles') albumData.styles = enrichedData.styles;
                     else albumData[field] = enrichedData[field];
