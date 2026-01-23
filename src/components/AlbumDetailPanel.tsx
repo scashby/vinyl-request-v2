@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Album } from '@/types/album'; // Import the source of truth
+import { Album } from '@/types/album';
 
 interface AlbumDetailPanelProps {
   album: Album;
@@ -117,17 +117,13 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
             {renderField('Discs', album.discs)}
             {renderField('Sides', album.sides)}
             {renderField('Date Added', album.date_added ? new Date(album.date_added).toLocaleDateString() : null)}
-            
-            {/* Keeping Extra Info here as it often contains Gatefold/Color details */}
             {renderField('Features', album.extra)}
 
-            {/* Note: Wholesale Cost removed as it's typically private, but can be added if requested */}
             {album.for_sale && (
               <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
                 <div className="text-xs font-semibold text-green-600 mb-2">
                   💰 Sale Info
                 </div>
-                {/* Note: sale_price removed from type if not migrated, check DB */}
                 <div className="text-sm text-green-800">
                     Item is marked for sale.
                 </div>
@@ -138,21 +134,18 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
 
         {activeTab === 'details' && (
           <div>
-            {/* Note: These label fields might need to be populated from tags in Phase 4 */}
             {renderArrayField('Genres', album.genres)}
             {renderArrayField('Styles', album.styles)}
             {renderField('Catalog #', album.cat_no)}
             {renderField('Barcode', album.barcode)}
             {renderField('RPM', album.rpm)}
             {renderField('Weight', album.vinyl_weight)}
-            {renderField('Color', album.vinyl_color)}
+            {renderArrayField('Color', album.vinyl_color)}
           </div>
         )}
 
         {activeTab === 'enrichment' && (
           <div className="flex flex-col gap-6">
-            
-            {/* 3. CREDITS (You requested to KEEP these) */}
             {(album.musicians?.length || album.producers?.length || album.engineers?.length) && (
               <div>
                 <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">

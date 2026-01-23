@@ -124,7 +124,7 @@ const CollectionTable = memo(function CollectionTable({
       spars_code: (album: Album) => album.spars_code || '—',
       storage_device_slot: (album: Album) => album.storage_device_slot || '—',
       studio: (album: Album) => album.studio || '—',
-      vinyl_color: (album: Album) => formatArray(album.vinyl_color), // FIXED: Now uses formatArray
+      vinyl_color: (album: Album) => formatArray(album.vinyl_color),
       vinyl_weight: (album: Album) => album.vinyl_weight || '—',
       
       genres: (album: Album) => formatArray(album.genres),
@@ -140,13 +140,12 @@ const CollectionTable = memo(function CollectionTable({
       composition: (album: Album) => album.composition || '—',
       conductor: (album: Album) => album.conductor || '—',
       orchestra: (album: Album) => album.orchestra || '—',
-      engineers: (album: Album) => formatArray(album.engineers), // Assumes parsed to string[]
+      engineers: (album: Album) => formatArray(album.engineers),
       musicians: (album: Album) => formatArray(album.musicians),
       producers: (album: Album) => formatArray(album.producers),
       songwriters: (album: Album) => formatArray(album.songwriters),
       added_date: (album: Album) => formatDate(album.date_added),
       collection_status: (album: Album) => album.collection_status || '—',
-      folder: (album: Album) => album.folder || '—',
       location: (album: Album) => album.location || '—',
       my_rating: (album: Album) => album.my_rating ? '⭐'.repeat(album.my_rating) : '—',
       notes: (album: Album) => album.notes || '—',
@@ -173,7 +172,6 @@ const CollectionTable = memo(function CollectionTable({
       discogs_price_median: (album: Album) => formatCurrency(album.discogs_price_median),
       discogs_price_max: (album: Album) => formatCurrency(album.discogs_price_max),
       pricing_notes: (album: Album) => album.pricing_notes || '—',
-      spotify_popularity: (album: Album) => album.spotify_popularity || '—'
     } as Record<string, (album: Album) => React.ReactNode>;
   }, [onEditAlbum]);
 

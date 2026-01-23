@@ -35,50 +35,28 @@ export function EnrichmentTab({ album, onChange }: EnrichmentTabProps) {
   return (
     <div className="max-w-3xl mx-auto space-y-8">
       
-      {/* SECTION 1: EXTERNAL FACTS */}
+      {/* SECTION 1: EXTERNAL SOURCES */}
       <div className="bg-blue-50 border border-blue-100 rounded-lg overflow-hidden">
         <div className="px-4 py-3 bg-blue-100/50 border-b border-blue-200 flex justify-between items-center">
           <h3 className="text-sm font-bold text-blue-800 uppercase tracking-wide">
-            External Data Sources
+            Enrichment Sources
           </h3>
           <span className="text-xs text-blue-600">
-            {album.enrichment_summary ? Object.keys(album.enrichment_summary).length : 0} Sources
+            {album.enrichment_sources?.length || 0} Sources
           </span>
         </div>
         
-        <div className="p-4 space-y-3">
-          {album.enrichment_summary && Object.keys(album.enrichment_summary).length > 0 ? (
-            Object.entries(album.enrichment_summary).map(([source, text]) => (
-              <div key={source} className="flex gap-3 bg-white p-3 rounded border border-blue-100 shadow-sm">
-                <div className="w-32 shrink-0">
-                  <span className="text-xs font-bold text-gray-500 uppercase bg-gray-100 px-2 py-1 rounded">
-                    {source.replace(/_/g, ' ')}
+        <div className="p-4">
+          {album.enrichment_sources && album.enrichment_sources.length > 0 ? (
+             <div className="flex flex-wrap gap-2">
+                {album.enrichment_sources.map((source) => (
+                  <span key={source} className="text-xs font-bold text-blue-700 uppercase bg-white border border-blue-200 px-2 py-1 rounded shadow-sm">
+                    {source}
                   </span>
-                </div>
-                <div className="text-sm text-gray-800 break-words flex-1">
-                  {String(text).startsWith('http') ? (
-                    <a href={String(text)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                      {String(text)}
-                    </a>
-                  ) : (
-                    String(text)
-                  )}
-                </div>
-                <button 
-                  onClick={() => {
-                    const newSummary = { ...album.enrichment_summary };
-                    delete newSummary[source];
-                    onChange('enrichment_summary', newSummary);
-                  }}
-                  className="text-gray-400 hover:text-red-500 text-lg leading-none"
-                  title="Remove this fact"
-                >
-                  ×
-                </button>
-              </div>
-            ))
+                ))}
+             </div>
           ) : (
-            <div className="text-center text-gray-400 text-sm py-4 italic">
+            <div className="text-center text-gray-400 text-sm py-2 italic">
               No external enrichment data found. Run &quot;Enrich Collection&quot; to populate.
             </div>
           )}
@@ -86,15 +64,12 @@ export function EnrichmentTab({ album, onChange }: EnrichmentTabProps) {
       </div>
 
       {/* SECTION 2: SONIC DNA */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* LEFT: Basic Stats */}
-        <div className="space-y-4">
-          <h3 className="text-sm font-bold text-gray-700 border-b border-gray-200 pb-2">
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-sm font-bold text-gray-700 border-b border-gray-200 pb-2 mb-4">
             Musical Properties
           </h3>
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-6 mb-6">
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">BPM (Tempo)</label>
               <input 
@@ -117,28 +92,12 @@ export function EnrichmentTab({ album, onChange }: EnrichmentTabProps) {
             </div>
           </div>
 
-          <div className="pt-2">
+          <div className="space-y-4">
              {renderSlider('Energy', 'energy', 'accent-orange-500')}
              {renderSlider('Danceability', 'danceability', 'accent-purple-500')}
+             {/* Valence exists in DB if you want to add it later: renderSlider('Valence', 'valence', 'accent-green-500') */}
           </div>
-        </div>
-
-        {/* RIGHT: Moods */}
-        <div className="space-y-2">
-          <h3 className="text-sm font-bold text-gray-700 border-b border-gray-200 pb-2 mb-4">
-            Mood & Atmosphere
-          </h3>
-          
-          {renderSlider('Acoustic', 'mood_acoustic', 'accent-amber-600')}
-          {renderSlider('Electronic', 'mood_electronic', 'accent-cyan-500')}
-          {renderSlider('Happy', 'mood_happy', 'accent-yellow-400')}
-          {renderSlider('Sad', 'mood_sad', 'accent-blue-400')}
-          {renderSlider('Aggressive', 'mood_aggressive', 'accent-red-500')}
-          {renderSlider('Relaxed', 'mood_relaxed', 'accent-indigo-400')}
-          {renderSlider('Party', 'mood_party', 'accent-pink-500')}
-        </div>
       </div>
-
     </div>
   );
 }
