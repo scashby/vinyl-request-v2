@@ -179,7 +179,7 @@ export async function POST(req: Request) {
 
     const { data: album, error: dbError } = await supabase
       .from('collection')
-      .select('id, apple_music_id, tracklists')
+      .select('id, apple_music_id, tracks')
       .eq('id', albumId)
       .single();
 
@@ -202,15 +202,15 @@ export async function POST(req: Request) {
     }
 
     let existingTracks: Track[] = [];
-    if (album.tracklists) {
+    if (album.tracks) {
       try {
-        const parsed = typeof album.tracklists === 'string'
-          ? JSON.parse(album.tracklists)
-          : album.tracklists;
+        const parsed = typeof album.tracks === 'string'
+          ? JSON.parse(album.tracks)
+          : album.tracks;
         existingTracks = Array.isArray(parsed) ? parsed : [];
         console.log(`✓ Parsed ${existingTracks.length} existing tracks`);
       } catch (err) {
-        console.log('❌ ERROR: Failed to parse tracklists', err);
+        console.log('❌ ERROR: Failed to parse tracks', err);
         existingTracks = [];
       }
     }
@@ -283,7 +283,7 @@ export async function POST(req: Request) {
     const { error: updateError } = await supabase
       .from('collection')
       .update({
-        tracklists: JSON.stringify(enrichedTracks)
+        tracks: JSON.stringify(enrichedTracks)
       })
       .eq('id', albumId);
 

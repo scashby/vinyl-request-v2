@@ -208,12 +208,12 @@ export async function POST(req: Request) {
       console.log(`ℹ️ No cache, starting fresh search...`);
     }
 
-    // Get albums with tracklists
+    // Get albums with tracks
     console.log(`📀 Querying albums...`);
     let query = supabase
       .from('collection')
-      .select('id, artist, title, image_url, folder, tracklists')
-      .not('tracklists', 'is', null);
+      .select('id, artist, title, image_url, folder, tracks')
+      .not('tracks', 'is', null);
 
     if (body.folder) {
       query = query.eq('folder', body.folder);
@@ -234,7 +234,7 @@ export async function POST(req: Request) {
         term: body.term,
         results: [],
         count: 0,
-        message: 'No albums with tracklists found'
+        message: 'No albums with tracks found'
       });
     }
 
@@ -250,16 +250,16 @@ export async function POST(req: Request) {
     for (const album of albums) {
       console.log(`\n📀 Album ${album.id}: ${album.artist} - ${album.title}`);
       try {
-        const tracklists: Track[] = typeof album.tracklists === 'string'
-          ? JSON.parse(album.tracklists) as Track[]
-          : album.tracklists as Track[];
+        const tracks: Track[] = typeof album.tracks === 'string'
+          ? JSON.parse(album.tracks) as Track[]
+          : album.tracks as Track[];
 
-        if (!Array.isArray(tracklists)) {
-          console.log(`⚠️ Invalid tracklists`);
+        if (!Array.isArray(tracks)) {
+          console.log(`⚠️ Invalid tracks`);
           continue;
         }
 
-        for (const track of tracklists) {
+        for (const track of tracks) {
           if (!track.lyrics_url || !track.title) {
             continue;
           }
