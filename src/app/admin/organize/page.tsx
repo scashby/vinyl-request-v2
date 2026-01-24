@@ -14,10 +14,8 @@ type Row = {
   master_release_date: string | null;
   format: string;
   image_url: string | null;
-  discogs_genres: string | string[] | null;
-  discogs_styles: string | string[] | null;
-  spotify_genres: string | string[] | null;
-  apple_music_genres: string | string[] | null;
+  genres: string[] | string | null;
+  styles: string[] | string | null;
   decade: number | null;
   folder: string;
   custom_tags: string[] | null;
@@ -42,8 +40,8 @@ type TagDefinition = {
 
 function parseGenres(value: string | string[] | null): string[] {
   if (!value) return [];
-  if (Array.isArray(value)) return value;
-  return [];
+  if (Array.isArray(value)) return value.map(entry => entry.trim()).filter(Boolean);
+  return value.split(',').map(entry => entry.trim()).filter(Boolean);
 }
 
 export default function FlexibleOrganizePage() {
@@ -94,7 +92,7 @@ export default function FlexibleOrganizePage() {
     while (keepGoing) {
       const { data: batch, error } = await supabase
         .from('collection')
-        .select('id,artist,title,year,master_release_date,format,image_url,discogs_genres,discogs_styles,spotify_genres,apple_music_genres,decade,folder,custom_tags')
+        .select('id,artist,title,year,master_release_date,format,image_url,genres,styles,decade,folder,custom_tags')
         .order('artist', { ascending: true })
         .range(from, from + batchSize - 1);
       
@@ -118,10 +116,8 @@ export default function FlexibleOrganizePage() {
     const genresStyles = new Set<string>();
     
     allRows.forEach(r => {
-      parseGenres(r.discogs_genres).forEach(g => genresStyles.add(g));
-      parseGenres(r.discogs_styles).forEach(s => genresStyles.add(s));
-      parseGenres(r.spotify_genres).forEach(g => genresStyles.add(g));
-      parseGenres(r.apple_music_genres).forEach(g => genresStyles.add(g));
+      parseGenres(r.genres).forEach(g => genresStyles.add(g));
+      parseGenres(r.styles).forEach(s => genresStyles.add(s));
     });
     
     setAvailableGenresStyles(Array.from(genresStyles).sort());
@@ -190,10 +186,8 @@ export default function FlexibleOrganizePage() {
       
       if (selectedGenresStyles.length > 0) {
         const albumGenresStyles = [
-          ...parseGenres(row.discogs_genres),
-          ...parseGenres(row.discogs_styles),
-          ...parseGenres(row.spotify_genres),
-          ...parseGenres(row.apple_music_genres)
+          ...parseGenres(row.genres),
+          ...parseGenres(row.styles)
         ];
         if (!albumGenresStyles.some(gs => selectedGenresStyles.includes(gs))) return false;
       }
