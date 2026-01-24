@@ -468,6 +468,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   
   const [progress, setProgress] = useState({ current: 0, total: 0, status: '' });
   const [error, setError] = useState<string | null>(null);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
   
   const [results, setResults] = useState({
     added: 0,
@@ -532,6 +533,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   const handleStartImport = async () => {
     setStage('importing');
     setError(null);
+    setImportErrors([]);
 
     try {
       let albumsToProcess: ComparedAlbum[] = [];
@@ -638,6 +640,11 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           } catch (err) {
             console.error(`Error processing ${album.artist} - ${album.title}:`, err);
             resultCounts.errors++;
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            setImportErrors(prev => ([
+              ...prev,
+              `${album.artist} — ${album.title}: ${message}`
+            ]));
           }
         }
       }
@@ -658,6 +665,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     setTotalDatabaseCount(0);
     setProgress({ current: 0, total: 0, status: '' });
     setError(null);
+    setImportErrors([]);
     setResults({ added: 0, updated: 0, removed: 0, unchanged: 0, errors: 0 });
     onClose();
   };
@@ -931,8 +939,15 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 {results.removed > 0 && <div><strong>{results.removed}</strong> albums removed</div>}
                 <div><strong>{results.unchanged}</strong> albums unchanged</div>
                 {results.errors > 0 && (
-                  <div className="text-red-600 mt-2">
-                    <strong>{results.errors}</strong> errors occurred
+                  <div className="text-red-600 mt-2 text-left">
+                    <div><strong>{results.errors}</strong> errors occurred</div>
+                    {importErrors.length > 0 && (
+                      <ul className="mt-2 max-h-[140px] overflow-y-auto list-disc pl-5 text-[12px] text-red-700">
+                        {importErrors.map((importError, index) => (
+                          <li key={`${importError}-${index}`}>{importError}</li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 )}
               </div>
