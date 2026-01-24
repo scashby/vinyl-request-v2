@@ -119,10 +119,10 @@ export default function MultiSourceEnrichment() {
   }, [selectedServices, stats.needsAppleLyrics, stats.needsEnrichment, stats.unenriched, stats.spotifyOnly, stats.appleOnly]);
 
   useEffect(() => {
-    loadStatsAndFolders();
+    loadStatsAndLocations();
   }, []);
 
-  async function loadStatsAndFolders() {
+  async function loadStatsAndLocations() {
     try {
       const res = await fetch('/api/enrich-sources/stats');
       const data = await res.json();
@@ -279,7 +279,7 @@ export default function MultiSourceEnrichment() {
           console.log('ENRICHMENT COMPLETE');
           console.log('Total albums processed:', totalProcessed);
           console.log('========================================');
-          await loadStatsAndFolders();
+          await loadStatsAndLocations();
           break;
         }
 
@@ -574,7 +574,7 @@ export default function MultiSourceEnrichment() {
           </div>
 
           <button
-            onClick={loadStatsAndFolders}
+            onClick={loadStatsAndLocations}
             disabled={enriching}
             style={{
               padding: '12px 24px',
