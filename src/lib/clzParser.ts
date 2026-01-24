@@ -31,8 +31,9 @@ export interface CLZAlbumData extends Record<string, unknown> {
   cat_no?: string;
   country?: string;
   labels?: string[];
-  notes?: string;
+  personal_notes?: string; // CHANGED: Renamed from 'notes'
   index_number?: number;
+  location?: string; // ADDED: New field for storage location
   
   // Condition & Physical
   media_condition?: string;
@@ -396,9 +397,14 @@ export async function parseCLZXML(xmlContent: string): Promise<CLZAlbumData[]> {
       const ratingStr = getTextValue(album.myrating);
       const my_rating = ratingStr ? parseInt(ratingStr, 10) : undefined;
       
-      // Notes (may be in CDATA)
+      // Notes (may be in CDATA) - UPDATED: Map to personal_notes
       const notes = getTextValue(album.notes);
       
+      // UPDATED: Logic to construct location from Storage + Slot
+      const storage = getTextValue(album.storagedevice) || '';
+      const slot = getTextValue(album.slot) || '';
+      const location = `${storage} ${slot}`.trim();
+
       // Index number
       const indexStr = getTextValue(album.index);
       const index_number = indexStr ? parseInt(indexStr, 10) : undefined;
@@ -438,8 +444,11 @@ export async function parseCLZXML(xmlContent: string): Promise<CLZAlbumData[]> {
         cat_no: getTextValue(album.labelnumber),
         country: getDisplayName(album.country),
         labels,
-        notes,
+        // CHANGED: Map to personal_notes
+        personal_notes: notes,
         index_number,
+        // CHANGED: Map to location
+        location: location || undefined,
         
         // Condition & Physical
         media_condition: getDisplayName(album.mediacondition),
@@ -498,18 +507,20 @@ export async function parseCLZXML(xmlContent: string): Promise<CLZAlbumData[]> {
 /**
  * Helper to convert CLZ album data to collection table insert format
  */
-export function clzToCollectionRow(clzData: CLZAlbumData, folder: string = 'All Albums'): Record<string, unknown> {
+export function clzToCollectionRow(clzData: CLZAlbumData, defaultFolder: string = 'All Albums'): Record<string, unknown> {
   return {
     artist: clzData.artist,
     title: clzData.title,
     year: clzData.year,
     format: clzData.format,
-    folder, // Default or user-specified folder
+    // CHANGED: Use location, fallback to defaultFolder (which essentially acts as a default location now)
+    location: clzData.location || defaultFolder,
     barcode: clzData.barcode,
     cat_no: clzData.cat_no,
     country: clzData.country,
     labels: clzData.labels,
-    notes: clzData.notes,
+    // CHANGED: Map to personal_notes column
+    personal_notes: clzData.personal_notes,
     index_number: clzData.index_number,
     
     media_condition: clzData.media_condition || 'Unknown',
