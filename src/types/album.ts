@@ -182,18 +182,23 @@ export type Album = {
   // ============================================================================
   // UI HELPERS / OPTIONAL
   // ============================================================================
-  spotify_label?: string | null;
-  apple_music_label?: string | null;
   subtitle?: string | null;
   played_history?: string | null;
-  
-  spotify_total_tracks?: number | null;
-  apple_music_track_count?: number | null;
   
   blocked?: boolean | null;
   blocked_sides?: string[] | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   blocked_tracks?: any | null;
+
+  // ============================================================================
+  // LEGACY ENRICHMENT FIELDS (NOT SCHEMA-BACKED)
+  // ============================================================================
+  // These values may be present in API responses from enrichment jobs but are not
+  // persisted as first-class album columns.
+  spotify_label?: string | null;
+  apple_music_label?: string | null;
+  spotify_total_tracks?: number | null;
+  apple_music_track_count?: number | null;
   
   // ============================================================================
   // EXTRA METADATA (JSONB)

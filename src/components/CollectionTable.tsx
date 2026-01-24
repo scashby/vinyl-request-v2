@@ -79,6 +79,12 @@ const CollectionTable = memo(function CollectionTable({
       return arr.join(', ');
     };
 
+    const formatTrackCount = (album: Album): string | number => {
+      if (!album.tracks || album.tracks.length === 0) return '—';
+      const countedTracks = album.tracks.filter((track) => track.type === 'track').length;
+      return countedTracks > 0 ? countedTracks : album.tracks.length;
+    };
+
     return {
       checkbox: () => null,
       owned: () => <span className="text-green-500 text-sm">✓</span>,
@@ -110,7 +116,7 @@ const CollectionTable = memo(function CollectionTable({
       index_number: (album: Album) => album.index_number || '—',
       format: (album: Album) => album.format || '—',
       discs: (album: Album) => album.discs || '—',
-      tracks: (album: Album) => album.spotify_total_tracks || album.apple_music_track_count || '—',
+      tracks: (album: Album) => formatTrackCount(album),
       length: (album: Album) => formatLength(album.length_seconds),
       box_set: (album: Album) => album.is_box_set ? 'Yes' : 'No',
       country: (album: Album) => album.country || '—',
@@ -129,7 +135,7 @@ const CollectionTable = memo(function CollectionTable({
       
       genres: (album: Album) => formatArray(album.genres),
       styles: (album: Album) => formatArray(album.styles),
-      label: (album: Album) => album.spotify_label || album.apple_music_label || '—',
+      label: (album: Album) => formatArray(album.labels),
       original_release_date: (album: Album) => formatDate(album.original_release_date),
       original_release_year: (album: Album) => album.original_release_year || '—',
       recording_date: (album: Album) => formatDate(album.recording_date),
