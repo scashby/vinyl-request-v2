@@ -14,7 +14,7 @@ export async function GET() {
     const { data: albums, error } = await supabase
       .from('collection')
       .select(`
-        id, folder,
+        id, location,
         image_url, back_image_url, inner_sleeve_images,
         musicians, producers, engineers, songwriters,
         tempo_bpm, musical_key, danceability, energy,
@@ -91,10 +91,10 @@ export async function GET() {
     let missingOriginalDate = 0;
     let missingCatalogNumber = 0;
 
-    const folders = new Set<string>();
+    const locations = new Set<string>();
 
     albums.forEach(album => {
-      if (album.folder) folders.add(album.folder);
+      if (album.location) locations.add(album.location);
       const albumIdStr = String(album.id);
 
       // 1. ARTWORK
@@ -240,7 +240,7 @@ export async function GET() {
     return NextResponse.json({ 
       success: true, 
       stats,
-      folders: Array.from(folders).sort()
+      locations: Array.from(locations).sort()
     });
 
   } catch (error) {

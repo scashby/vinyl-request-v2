@@ -19,7 +19,7 @@ type Row = {
   spotify_genres: string | string[] | null;
   apple_music_genres: string | string[] | null;
   decade: number | null;
-  folder: string;
+  location: string | null;
   custom_tags: string[] | null;
 };
 
@@ -52,12 +52,12 @@ export default function FlexibleOrganizePage() {
   const [enrichStatus, setEnrichStatus] = useState<string>('');
 
   const [lyricSearchTerm, setLyricSearchTerm] = useState('');
-  const [lyricSearchFolder, setLyricSearchFolder] = useState('');
+  const [lyricSearchLocation, setLyricSearchLocation] = useState('');
   const [lyricSearching, setLyricSearching] = useState(false);
   const [lyricResults, setLyricResults] = useState<LyricSearchResult[]>([]);
   const [lyricSearchMessage, setLyricSearchMessage] = useState('');
 
-  const [selectedFolders, setSelectedFolders] = useState<string[]>([]);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedGenresStyles, setSelectedGenresStyles] = useState<string[]>([]);
   const [selectedDecades, setSelectedDecades] = useState<number[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -66,7 +66,7 @@ export default function FlexibleOrganizePage() {
   const [artistSearch, setArtistSearch] = useState<string>('');
   const [titleSearch, setTitleSearch] = useState<string>('');
 
-  const [availableFolders, setAvailableFolders] = useState<string[]>([]);
+  const [availableLocations, setAvailableLocations] = useState<string[]>([]);
   const [availableGenresStyles, setAvailableGenresStyles] = useState<string[]>([]);
   const [availableDecades, setAvailableDecades] = useState<number[]>([]);
   const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
@@ -94,7 +94,7 @@ export default function FlexibleOrganizePage() {
     while (keepGoing) {
       const { data: batch, error } = await supabase
         .from('collection')
-        .select('id,artist,title,year,master_release_date,format,image_url,discogs_genres,discogs_styles,spotify_genres,apple_music_genres,decade,folder,custom_tags')
+        .select('id,artist,title,year,master_release_date,format,image_url,discogs_genres,discogs_styles,spotify_genres,apple_music_genres,decade,location,custom_tags')
         .order('artist', { ascending: true })
         .range(from, from + batchSize - 1);
       
@@ -112,8 +112,8 @@ export default function FlexibleOrganizePage() {
     
     setRows(allRows);
     
-    const folders = Array.from(new Set(allRows.map(r => r.folder).filter(Boolean)));
-    setAvailableFolders(folders.sort());
+    const locations = Array.from(new Set(allRows.map(r => r.location).filter(Boolean)));
+    setAvailableLocations(locations.sort());
     
     const genresStyles = new Set<string>();
     
@@ -147,12 +147,12 @@ export default function FlexibleOrganizePage() {
     setLyricResults([]);
 
     try {
-      const body: { term: string; folder?: string } = {
+      const body: { term: string; location?: string } = {
         term: lyricSearchTerm.trim()
       };
       
-      if (lyricSearchFolder) {
-        body.folder = lyricSearchFolder;
+      if (lyricSearchLocation) {
+        body.location = lyricSearchLocation;
       }
 
       const res = await fetch('/api/search-lyrics', {
@@ -186,7 +186,7 @@ export default function FlexibleOrganizePage() {
 
   const filteredAlbums = useMemo(() => {
     return rows.filter(row => {
-      if (selectedFolders.length > 0 && !selectedFolders.includes(row.folder)) return false;
+      if (selectedLocations.length > 0 && !selectedLocations.includes(row.location ?? '')) return false;
       
       if (selectedGenresStyles.length > 0) {
         const albumGenresStyles = [
@@ -228,10 +228,10 @@ export default function FlexibleOrganizePage() {
       
       return true;
     });
-  }, [rows, selectedFolders, selectedGenresStyles, selectedDecades, selectedTags, yearRangeStart, yearRangeEnd, artistSearch, titleSearch]);
+  }, [rows, selectedLocations, selectedGenresStyles, selectedDecades, selectedTags, yearRangeStart, yearRangeEnd, artistSearch, titleSearch]);
 
   const clearAllFilters = () => {
-    setSelectedFolders([]);
+    setSelectedLocations([]);
     setSelectedGenresStyles([]);
     setSelectedDecades([]);
     setSelectedTags([]);
@@ -241,15 +241,15 @@ export default function FlexibleOrganizePage() {
     setTitleSearch('');
   };
 
-  const hasActiveFilters = selectedFolders.length > 0 || selectedGenresStyles.length > 0 || 
+  const hasActiveFilters = selectedLocations.length > 0 || selectedGenresStyles.length > 0 || 
                           selectedDecades.length > 0 || selectedTags.length > 0 || 
                           yearRangeStart || yearRangeEnd || artistSearch || titleSearch;
 
-  const toggleFolder = (folder: string) => {
-    setSelectedFolders(prev => 
-      prev.includes(folder) 
-        ? prev.filter(f => f !== folder)
-        : [...prev, folder]
+  const toggleLocation = (location: string) => {
+    setSelectedLocations(prev => 
+      prev.includes(location) 
+        ? prev.filter(loc => loc !== location)
+        : [...prev, location]
     );
   };
 
@@ -493,8 +493,8 @@ export default function FlexibleOrganizePage() {
           />
 
           <select
-            value={lyricSearchFolder}
-            onChange={e => setLyricSearchFolder(e.target.value)}
+            value={lyricSearchLocation}
+            onChange={e => setLyricSearchLocation(e.target.value)}
             style={{
               padding: '12px 16px',
               border: 'none',
@@ -506,9 +506,9 @@ export default function FlexibleOrganizePage() {
             }}
             disabled={lyricSearching}
           >
-            <option value="">All Folders</option>
-            {availableFolders.map(folder => (
-              <option key={folder} value={folder}>{folder}</option>
+            <option value="">All Locations</option>
+            {availableLocations.map(location => (
+              <option key={location} value={location}>{location}</option>
             ))}
           </select>
 
@@ -804,7 +804,7 @@ export default function FlexibleOrganizePage() {
               marginBottom: 12,
               margin: 0
             }}>
-              📁 Folders ({selectedFolders.length} selected)
+              📍 Locations ({selectedLocations.length} selected)
             </h4>
             <div style={{
               maxHeight: 200,
@@ -813,8 +813,8 @@ export default function FlexibleOrganizePage() {
               flexDirection: 'column',
               gap: 8
             }}>
-              {availableFolders.map(folder => (
-                <label key={folder} style={{
+              {availableLocations.map(location => (
+                <label key={location} style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
@@ -825,14 +825,14 @@ export default function FlexibleOrganizePage() {
                 }}>
                   <input
                     type="checkbox"
-                    checked={selectedFolders.includes(folder)}
-                    onChange={() => toggleFolder(folder)}
+                    checked={selectedLocations.includes(location)}
+                    onChange={() => toggleLocation(location)}
                     style={{
                       transform: 'scale(1.2)',
                       accentColor: '#3b82f6'
                     }}
                   />
-                  {folder}
+                  {location}
                 </label>
               ))}
             </div>
@@ -1148,7 +1148,7 @@ export default function FlexibleOrganizePage() {
                   ) : (
                     album.year && <span>{album.year}</span>
                   )}
-                  {album.folder && <span>• {album.folder}</span>}
+                  {album.location && <span>• {album.location}</span>}
                 </div>
                 
                 {/* Show tags on album cards */}

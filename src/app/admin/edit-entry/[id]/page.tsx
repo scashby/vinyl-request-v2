@@ -22,7 +22,7 @@ type CollectionEntry = {
   artist: string | null;
   title: string | null;
   year: string | null;
-  folder: string | null;
+  location: string | null;
   format: string | null;
   image_url: string | null;
   media_condition: string | null;
@@ -627,7 +627,7 @@ export default function EditEntryPage() {
       artist: entry.artist || '',
       title: entry.title || '',
       year: entry.year || '',
-      folder: entry.folder || '',
+      location: entry.location || '',
       format: entry.format || '',
       image_url: entry.image_url || '',
       media_condition: entry.media_condition || '',
@@ -870,8 +870,8 @@ export default function EditEntryPage() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Folder</label>
-                  <input style={inputStyle} value={entry.folder || ''} onChange={e => handleChange('folder', e.target.value)} placeholder="Collection folder" />
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Location</label>
+                  <input style={inputStyle} value={entry.location || ''} onChange={e => handleChange('location', e.target.value)} placeholder="Collection location" />
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Format</label>

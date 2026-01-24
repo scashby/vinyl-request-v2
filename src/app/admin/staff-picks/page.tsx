@@ -24,7 +24,7 @@ interface StaffSubmission {
   title?: string;
   year?: string;
   image_url?: string;
-  folder?: string;
+  location?: string;
 }
 
 interface StaffSummary {
@@ -35,8 +35,8 @@ interface StaffSummary {
   isApproved: boolean;
 }
 
-interface FolderSettings {
-  [folder: string]: boolean;
+interface LocationSettings {
+  [location: string]: boolean;
 }
 
 export default function AdminStaffPicksPage() {
@@ -46,7 +46,7 @@ export default function AdminStaffPicksPage() {
   const [status, setStatus] = useState('');
   const [selectedStaff, setSelectedStaff] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'summary' | 'detailed' | 'settings'>('summary');
-  const [folderSettings, setFolderSettings] = useState<FolderSettings>({
+  const [locationSettings, setLocationSettings] = useState<LocationSettings>({
     'Vinyl': true,
     'Cassettes': true,
     'CDs': false,
@@ -59,7 +59,7 @@ export default function AdminStaffPicksPage() {
 
   useEffect(() => {
     loadStaffSubmissions();
-    loadFolderSettings();
+    loadLocationSettings();
   }, []);
 
   const loadStaffSubmissions = async () => {
@@ -73,7 +73,7 @@ export default function AdminStaffPicksPage() {
             title,
             year,
             image_url,
-            folder
+            location
           )
         `)
         .order('staff_name')
@@ -88,7 +88,7 @@ export default function AdminStaffPicksPage() {
         title: pick.collection?.title,
         year: pick.collection?.year,
         image_url: pick.collection?.image_url,
-        folder: pick.collection?.folder
+        location: pick.collection?.location
       })) || [];
 
       setSubmissions(picks);
@@ -100,7 +100,7 @@ export default function AdminStaffPicksPage() {
     }
   };
 
-  const loadFolderSettings = async () => {
+  const loadLocationSettings = async () => {
     try {
       // Try to load from a settings table, or use defaults
       const { data } = await supabase
@@ -110,15 +110,15 @@ export default function AdminStaffPicksPage() {
         .single();
 
       if (data?.value) {
-        setFolderSettings(JSON.parse(data.value));
+        setLocationSettings(JSON.parse(data.value));
       }
     } catch {
       // If no settings exist, use defaults
-      console.log('Using default folder settings');
+      console.log('Using default location settings');
     }
   };
 
-  const saveFolderSettings = async () => {
+  const saveLocationSettings = async () => {
     setSavingSettings(true);
     try {
       // Save to admin_settings table (create if doesn't exist)
@@ -126,16 +126,16 @@ export default function AdminStaffPicksPage() {
         .from('admin_settings')
         .upsert({
           key: 'staff_picks_folders',
-          value: JSON.stringify(folderSettings),
+          value: JSON.stringify(locationSettings),
           updated_at: new Date().toISOString()
         });
 
       if (error) throw error;
 
-      setStatus('✅ Folder settings saved! These will be used for future staff picks selections.');
+      setStatus('✅ Location settings saved! These will be used for future staff picks selections.');
       setTimeout(() => setStatus(''), 5000);
     } catch (error) {
-      console.error('Error saving folder settings:', error);
+      console.error('Error saving location settings:', error);
       setStatus(`❌ Error saving settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSavingSettings(false);
@@ -232,9 +232,9 @@ export default function AdminStaffPicksPage() {
     isApproved: picks.every(p => p.is_active)
   }));
 
-  const enabledFolders = Object.entries(folderSettings)
+  const enabledLocations = Object.entries(locationSettings)
     .filter(([, enabled]) => enabled)
-    .map(([folder]) => folder);
+    .map(([location]) => location);
 
   if (loading) {
     return (
@@ -386,11 +386,11 @@ export default function AdminStaffPicksPage() {
             borderBottom: '1px solid #e5e7eb'
           }}>
             <h3 style={{ margin: '0 0 8px 0', fontSize: 20, fontWeight: 'bold' }}>
-              ⚙️ Collection Folder Settings
+              ⚙️ Collection Location Settings
             </h3>
             <p style={{ margin: 0, fontSize: 14, color: '#6b7280' }}>
-              Choose which folders staff can select from when making their picks. 
-              Currently enabled: <strong>{enabledFolders.join(', ')}</strong>
+              Choose which locations staff can select from when making their picks. 
+              Currently enabled: <strong>{enabledLocations.join(', ')}</strong>
             </p>
           </div>
 
@@ -401,8 +401,8 @@ export default function AdminStaffPicksPage() {
               gap: 16,
               marginBottom: 24
             }}>
-              {Object.entries(folderSettings).map(([folder, enabled]) => (
-                <label key={folder} style={{
+              {Object.entries(locationSettings).map(([location, enabled]) => (
+                <label key={location} style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: 12,
@@ -416,9 +416,9 @@ export default function AdminStaffPicksPage() {
                   <input
                     type="checkbox"
                     checked={enabled}
-                    onChange={e => setFolderSettings(prev => ({
+                    onChange={e => setLocationSettings(prev => ({
                       ...prev,
-                      [folder]: e.target.checked
+                      [location]: e.target.checked
                     }))}
                     style={{
                       transform: 'scale(1.2)',
@@ -427,7 +427,7 @@ export default function AdminStaffPicksPage() {
                   />
                   <div>
                     <div style={{ fontWeight: 'bold', fontSize: 16 }}>
-                      {folder}
+                      {location}
                     </div>
                     <div style={{ fontSize: 12, color: '#6b7280' }}>
                       {enabled ? 'Available for staff picks' : 'Hidden from staff picks'}
@@ -448,16 +448,16 @@ export default function AdminStaffPicksPage() {
                 💡 How This Works:
               </h4>
               <ul style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: '#92400e', lineHeight: 1.5 }}>
-                <li>Staff will only see albums from enabled folders when making their picks</li>
+                <li>Staff will only see albums from enabled locations when making their picks</li>
                 <li>Default is Vinyl + Cassettes (most popular physical formats)</li>
-                <li>Enable CDs, 45s, or other folders as needed for your collection</li>
+                <li>Enable CDs, 45s, or other locations as needed for your collection</li>
                 <li>Changes only affect new staff pick submissions</li>
               </ul>
             </div>
 
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <button
-                onClick={saveFolderSettings}
+                onClick={saveLocationSettings}
                 disabled={savingSettings}
                 style={{
                   background: savingSettings ? '#9ca3af' : '#2563eb',
@@ -470,11 +470,11 @@ export default function AdminStaffPicksPage() {
                   cursor: savingSettings ? 'not-allowed' : 'pointer'
                 }}
               >
-                {savingSettings ? '⏳ Saving...' : '💾 Save Folder Settings'}
+                {savingSettings ? '⏳ Saving...' : '💾 Save Location Settings'}
               </button>
 
               <div style={{ fontSize: 14, color: '#6b7280' }}>
-                {enabledFolders.length} of {Object.keys(folderSettings).length} folders enabled
+                {enabledLocations.length} of {Object.keys(locationSettings).length} locations enabled
               </div>
             </div>
           </div>
@@ -780,7 +780,7 @@ export default function AdminStaffPicksPage() {
                               {pick.artist} - {pick.title}
                             </div>
                             <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
-                              {pick.year} • {pick.folder}
+                              {pick.year} • {pick.location}
                               {pick.favorite_track && ` • Favorite: ${pick.favorite_track}`}
                             </div>
                             <div style={{

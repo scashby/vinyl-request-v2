@@ -170,11 +170,11 @@ const isValidDate = (dateStr: unknown): boolean => {
 // --- 3. MAIN COMPONENT ---
 export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }: ImportEnrichModalProps) {
   const [stats, setStats] = useState<EnrichmentStats | null>(null);
-  const [folders, setFolders] = useState<string[]>([]);
+  const [locations, setLocations] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [status, setStatus] = useState('');
-  const [folderFilter, setFolderFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
   const [batchSize, setBatchSize] = useState('10');
   const [autoSnooze, setAutoSnooze] = useState(true); // Default to true (30-day skip)
   
@@ -233,7 +233,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const data = await res.json();
       if (data.success) {
         setStats(data.stats);
-        setFolders(data.folders || []);
+        setLocations(data.locations || []);
       }
     } catch (error) {
       console.error('Failed to load stats:', error);
@@ -367,7 +367,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           cursor: specificAlbumIds ? undefined : cursorRef.current,
           // FIXED: Renamed folder to location in API call if necessary, or just don't pass it if it's dead
           // Assuming the API expects 'folder' to filter by location:
-          location: folderFilter || undefined, 
+          location: locationFilter || undefined, 
           services: getServicesForSelection(),
           autoSnooze: autoSnooze // PASSED TO SERVER
         };
@@ -1128,10 +1128,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               {/* 3. FILTERS */}
               <div className="bg-white border-2 border-[#D8D8D8] rounded-md p-5 mb-6 flex gap-4 flex-wrap items-center">
                 <div className="flex items-center gap-2">
-                  <label className="font-semibold text-sm">Folder:</label>
-                  <select value={folderFilter} onChange={(e) => setFolderFilter(e.target.value)} disabled={enriching} className="p-1.5 rounded border border-gray-300 text-gray-900">
-                    <option value="">All Folders</option>
-                    {folders.map(f => <option key={f} value={f}>{f}</option>)}
+                  <label className="font-semibold text-sm">Location:</label>
+                  <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} disabled={enriching} className="p-1.5 rounded border border-gray-300 text-gray-900">
+                    <option value="">All Locations</option>
+                    {locations.map(location => <option key={location} value={location}>{location}</option>)}
                   </select>
                 </div>
                 <div className="flex items-center gap-2">

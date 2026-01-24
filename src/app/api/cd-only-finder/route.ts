@@ -18,7 +18,7 @@ type Album = {
   image_url: string | null;
   discogs_release_id: string | null;
   discogs_genres: string[] | null;
-  folder: string | null;
+  location: string | null;
   notes: string | null;
 };
 
@@ -157,7 +157,7 @@ export async function POST(req: Request) {
     // Get all CD releases from collection
     const { data: albums, error } = await supabase
       .from('collection')
-      .select('id, artist, title, year, format, image_url, discogs_release_id, discogs_genres, folder, notes')
+      .select('id, artist, title, year, format, image_url, discogs_release_id, discogs_genres, location, notes')
       .or('format.ilike.%CD%,format.ilike.%Compact Disc%')
       .order('artist', { ascending: true });
 
