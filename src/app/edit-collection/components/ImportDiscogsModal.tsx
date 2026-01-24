@@ -25,7 +25,7 @@ interface ParsedAlbum {
   date_added: string;
   media_condition: string;
   package_sleeve_condition: string | null;
-  notes: string | null;
+  personal_notes: string | null;
   my_rating: number | null;
   decade: number | null;
   artist_norm: string;
@@ -154,7 +154,7 @@ function parseDiscogsCSV(csvText: string): ParsedAlbum[] {
       date_added: parseDiscogsDate(row['Date Added'] || row['date_added'] || ''),
       media_condition: sanitizeMediaCondition(row['Collection Media Condition'] || row['media_condition']),
       package_sleeve_condition: row['Collection Sleeve Condition'] || row['package_sleeve_condition'] || null,
-      notes: row['Collection Notes'] || row['notes'] || null,
+      personal_notes: row['Collection Notes'] || row['notes'] || null,
       my_rating,
       decade: calculateDecade(year),
       artist_norm: normalizeArtist(artist),
@@ -258,7 +258,7 @@ function compareAlbums(
       date_added: new Date().toISOString(),
       media_condition: 'Unknown',
       package_sleeve_condition: null,
-      notes: null,
+      personal_notes: null,
       my_rating: null,
       decade: null,
       artist_norm: normalizeArtist(existingAlbum.artist),
@@ -296,7 +296,7 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     packaging: data.formats?.[0]?.descriptions?.find((d: string) => 
       ['Gatefold', 'Single Sleeve', 'Digipak'].some(p => d.includes(p))
     ) || null,
-    notes: data.notes || null,
+    release_notes: data.notes || null,
   };
 
   if (data.released) {
@@ -598,7 +598,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               media_condition: album.media_condition,
               package_sleeve_condition: album.package_sleeve_condition,
               // FIXED: Map to personal_notes column
-              personal_notes: album.notes,
+              personal_notes: album.personal_notes,
               my_rating: album.my_rating,
               decade: album.decade,
             };

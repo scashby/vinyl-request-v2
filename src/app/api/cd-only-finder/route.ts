@@ -19,7 +19,7 @@ type Album = {
   discogs_release_id: string | null;
   discogs_genres: string[] | null;
   folder: string | null;
-  notes: string | null;
+  release_notes: string | null;
 };
 
 type DiscogsSearchResult = {
@@ -87,17 +87,17 @@ async function tagAlbumsAsCDOnly(albumIds: number[]): Promise<{ success: boolean
     let updated = 0;
     
     for (const id of albumIds) {
-      // Get current notes
+      // Get current release notes
       const { data: album } = await supabase
         .from('collection')
-        .select('notes')
+        .select('release_notes')
         .eq('id', id)
         .single();
 
       if (!album) continue;
 
-      // Add CD-Only tag to notes
-      const currentNotes = album.notes || '';
+      // Add CD-Only tag to release notes
+      const currentNotes = album.release_notes || '';
       const cdOnlyTag = '[CD-ONLY]';
       
       // Don't add if already tagged
@@ -113,7 +113,7 @@ async function tagAlbumsAsCDOnly(albumIds: number[]): Promise<{ success: boolean
       // Update album
       const { error } = await supabase
         .from('collection')
-        .update({ notes: newNotes })
+        .update({ release_notes: newNotes })
         .eq('id', id);
 
       if (!error) {
@@ -157,7 +157,7 @@ export async function POST(req: Request) {
     // Get all CD releases from collection
     const { data: albums, error } = await supabase
       .from('collection')
-      .select('id, artist, title, year, format, image_url, discogs_release_id, discogs_genres, folder, notes')
+      .select('id, artist, title, year, format, image_url, discogs_release_id, discogs_genres, folder, release_notes')
       .or('format.ilike.%CD%,format.ilike.%Compact Disc%')
       .order('artist', { ascending: true });
 
@@ -186,7 +186,7 @@ export async function POST(req: Request) {
       console.log(`\n[${scanned}/${albums.length}] Checking: ${album.artist} - ${album.title}`);
 
       const hasVinyl = await checkVinylAvailability(album.artist, album.title);
-      const isTagged = album.notes?.includes('[CD-ONLY]') || false;
+      const isTagged = album.release_notes?.includes('[CD-ONLY]') || false;
       
       if (!hasVinyl) {
         console.log(`  ✅ CD-ONLY: No vinyl release found`);

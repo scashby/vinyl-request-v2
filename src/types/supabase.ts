@@ -321,7 +321,8 @@ export interface Database {
           folder: string | null;
           media_condition: string | null;
           image_url: string | null;
-          notes: string | null;
+          personal_notes: string | null;
+          release_notes: string | null;
           date_added: string | null;
           inner_circle_preferred: boolean | null;
           blocked: boolean | null;
@@ -348,7 +349,8 @@ export interface Database {
           folder?: string | null;
           media_condition?: string | null;
           image_url?: string | null;
-          notes?: string | null;
+          personal_notes?: string | null;
+          release_notes?: string | null;
           date_added?: string | null;
           inner_circle_preferred?: boolean | null;
           blocked?: boolean | null;
@@ -375,7 +377,8 @@ export interface Database {
           folder?: string | null;
           media_condition?: string | null;
           image_url?: string | null;
-          notes?: string | null;
+          personal_notes?: string | null;
+          release_notes?: string | null;
           date_added?: string | null;
           inner_circle_preferred?: boolean | null;
           blocked?: boolean | null;
