@@ -81,7 +81,6 @@ export async function importCLZData(
         
         if (!matchingAlbum) {
           // New album - prepare for insert
-          // CHANGED: Pass defaultFolder as "location" fallback if needed, though parser now handles location
           const newAlbum = clzToCollectionRow(clzData, defaultFolder);
           albumsToInsert.push(newAlbum);
           continue;
@@ -173,9 +172,6 @@ export async function importCLZData(
     }
     
     // Record import history
-    // CHANGED: Ensure history notes use 'personal_notes' if we were to log detail, 
-    // but the 'import_history' table uses a generic 'notes' column which IS correct.
-    // The import_history table schema wasn't changed in the refactor, only 'collection'.
     const { error: historyError } = await supabase
       .from('import_history')
       .insert({

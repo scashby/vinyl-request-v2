@@ -397,14 +397,16 @@ export async function parseCLZXML(xmlContent: string): Promise<CLZAlbumData[]> {
       const ratingStr = getTextValue(album.myrating);
       const my_rating = ratingStr ? parseInt(ratingStr, 10) : undefined;
       
-      // Notes (may be in CDATA) - UPDATED: Map to personal_notes
+      // Notes (may be in CDATA)
+      // CHANGED: Mapped directly to internal variable for clean assignment
       const notes = getTextValue(album.notes);
       
-      // UPDATED: Logic to construct location from Storage + Slot
+      // Location (Storage + Slot)
+      // ADDED: Logic to combine storage and slot into one location string
       const storage = getTextValue(album.storagedevice) || '';
       const slot = getTextValue(album.slot) || '';
       const location = `${storage} ${slot}`.trim();
-
+      
       // Index number
       const indexStr = getTextValue(album.index);
       const index_number = indexStr ? parseInt(indexStr, 10) : undefined;
@@ -444,11 +446,11 @@ export async function parseCLZXML(xmlContent: string): Promise<CLZAlbumData[]> {
         cat_no: getTextValue(album.labelnumber),
         country: getDisplayName(album.country),
         labels,
-        // CHANGED: Map to personal_notes
+        // CHANGED: Map XML notes to personal_notes property
         personal_notes: notes,
-        index_number,
-        // CHANGED: Map to location
+        // ADDED: Map combined string to location property
         location: location || undefined,
+        index_number,
         
         // Condition & Physical
         media_condition: getDisplayName(album.mediacondition),
@@ -513,13 +515,13 @@ export function clzToCollectionRow(clzData: CLZAlbumData, defaultFolder: string 
     title: clzData.title,
     year: clzData.year,
     format: clzData.format,
-    // CHANGED: Use location, fallback to defaultFolder (which essentially acts as a default location now)
+    // CHANGED: Use location, fallback to defaultFolder (which acts as a location string)
     location: clzData.location || defaultFolder,
     barcode: clzData.barcode,
     cat_no: clzData.cat_no,
     country: clzData.country,
     labels: clzData.labels,
-    // CHANGED: Map to personal_notes column
+    // CHANGED: Write to personal_notes, removed deprecated 'notes'
     personal_notes: clzData.personal_notes,
     index_number: clzData.index_number,
     
