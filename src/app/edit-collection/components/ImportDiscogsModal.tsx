@@ -540,7 +540,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     setStage('importing');
     setError(null);
     setImportErrors([]);
-    setImportWarnings([]);
 
     try {
       let albumsToProcess: ComparedAlbum[] = [];
@@ -687,7 +686,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     setProgress({ current: 0, total: 0, status: '' });
     setError(null);
     setImportErrors([]);
-    setImportWarnings([]);
     setResults({ added: 0, updated: 0, removed: 0, unchanged: 0, errors: 0 });
     onClose();
   };
