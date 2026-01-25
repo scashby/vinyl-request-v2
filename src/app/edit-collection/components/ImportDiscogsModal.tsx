@@ -25,7 +25,7 @@ interface ParsedAlbum {
   date_added: string;
   media_condition: string;
   package_sleeve_condition: string | null;
-  notes: string | null;
+  personal_notes: string | null;
   my_rating: number | null;
   decade: number | null;
   artist_norm: string;
@@ -154,7 +154,7 @@ function parseDiscogsCSV(csvText: string): ParsedAlbum[] {
       date_added: parseDiscogsDate(row['Date Added'] || row['date_added'] || ''),
       media_condition: sanitizeMediaCondition(row['Collection Media Condition'] || row['media_condition']),
       package_sleeve_condition: row['Collection Sleeve Condition'] || row['package_sleeve_condition'] || null,
-      notes: row['Collection Notes'] || row['notes'] || null,
+      personal_notes: row['Collection Notes'] || row['notes'] || null,
       my_rating,
       decade: calculateDecade(year),
       artist_norm: normalizeArtist(artist),
@@ -258,7 +258,7 @@ function compareAlbums(
       date_added: new Date().toISOString(),
       media_condition: 'Unknown',
       package_sleeve_condition: null,
-      notes: null,
+      personal_notes: null,
       my_rating: null,
       decade: null,
       artist_norm: normalizeArtist(existingAlbum.artist),
@@ -296,7 +296,7 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     packaging: data.formats?.[0]?.descriptions?.find((d: string) => 
       ['Gatefold', 'Single Sleeve', 'Digipak'].some(p => d.includes(p))
     ) || null,
-    notes: data.notes || null,
+    release_notes: data.notes || null,
   };
 
   if (data.released) {
@@ -468,6 +468,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   
   const [progress, setProgress] = useState({ current: 0, total: 0, status: '' });
   const [error, setError] = useState<string | null>(null);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [importWarnings, setImportWarnings] = useState<string[]>([]);
   
   const [results, setResults] = useState({
     added: 0,
@@ -532,6 +534,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   const handleStartImport = async () => {
     setStage('importing');
     setError(null);
+    setImportErrors([]);
+    setImportWarnings([]);
 
     try {
       let albumsToProcess: ComparedAlbum[] = [];
@@ -598,7 +602,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               media_condition: album.media_condition,
               package_sleeve_condition: album.package_sleeve_condition,
               // FIXED: Map to personal_notes column
-              personal_notes: album.notes,
+              personal_notes: album.personal_notes,
               my_rating: album.my_rating,
               decade: album.decade,
             };
@@ -623,6 +627,20 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                   }
                 });
               }
+
+              const missingAfterEnrichment = [
+                !albumData.image_url ? 'image_url' : null,
+                Array.isArray(albumData.tracks) && albumData.tracks.length > 0 ? null : 'tracks',
+                Array.isArray(albumData.genres) && albumData.genres.length > 0 ? null : 'genres',
+                typeof albumData.packaging === 'string' && albumData.packaging.trim() !== '' ? null : 'packaging',
+              ].filter((field): field is string => field !== null);
+
+              if (missingAfterEnrichment.length > 0) {
+                setImportWarnings(prev => ([
+                  ...prev,
+                  `${album.artist} — ${album.title}: missing ${missingAfterEnrichment.join(', ')} after enrichment`
+                ]));
+              }
             }
 
             if (album.status === 'NEW') {
@@ -638,6 +656,11 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           } catch (err) {
             console.error(`Error processing ${album.artist} - ${album.title}:`, err);
             resultCounts.errors++;
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            setImportErrors(prev => ([
+              ...prev,
+              `${album.artist} — ${album.title}: ${message}`
+            ]));
           }
         }
       }
@@ -658,6 +681,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     setTotalDatabaseCount(0);
     setProgress({ current: 0, total: 0, status: '' });
     setError(null);
+    setImportErrors([]);
+    setImportWarnings([]);
     setResults({ added: 0, updated: 0, removed: 0, unchanged: 0, errors: 0 });
     onClose();
   };
@@ -930,9 +955,26 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 <div><strong>{results.updated}</strong> albums updated</div>
                 {results.removed > 0 && <div><strong>{results.removed}</strong> albums removed</div>}
                 <div><strong>{results.unchanged}</strong> albums unchanged</div>
+                {importWarnings.length > 0 && (
+                  <div className="text-amber-700 mt-3 text-left">
+                    <div><strong>{importWarnings.length}</strong> albums missing metadata after enrichment</div>
+                    <ul className="mt-2 max-h-[140px] overflow-y-auto list-disc pl-5 text-[12px] text-amber-700">
+                      {importWarnings.map((warning, index) => (
+                        <li key={`${warning}-${index}`}>{warning}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {results.errors > 0 && (
-                  <div className="text-red-600 mt-2">
-                    <strong>{results.errors}</strong> errors occurred
+                  <div className="text-red-600 mt-2 text-left">
+                    <div><strong>{results.errors}</strong> errors occurred</div>
+                    {importErrors.length > 0 && (
+                      <ul className="mt-2 max-h-[140px] overflow-y-auto list-disc pl-5 text-[12px] text-red-700">
+                        {importErrors.map((importError, index) => (
+                          <li key={`${importError}-${index}`}>{importError}</li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 )}
               </div>
