@@ -291,6 +291,7 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
   const enriched: Record<string, unknown> = {
     image_url: data.images?.[0]?.uri || null,
     back_image_url: data.images?.[1]?.uri || null,
+    discogs_master_id: data.master_id ? String(data.master_id) : null,
     genres: data.genres || [],
     styles: data.styles || [],
     packaging: data.formats?.[0]?.descriptions?.find((d: string) => 
