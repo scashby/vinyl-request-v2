@@ -14,7 +14,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid callback parameters' }, { status: 400 });
   }
 
-  const oAuth = new Client({ userAgent: 'DeadwaxDialogues/1.0' }).oauth();
+  // FIXED: Initialize Client with Consumer Key/Secret so getAccessToken can sign the request
+  const oAuth = new Client({
+    userAgent: 'DeadwaxDialogues/1.0',
+    consumerKey: process.env.DISCOGS_CONSUMER_KEY,
+    consumerSecret: process.env.DISCOGS_CONSUMER_SECRET,
+  }).oauth();
 
   try {
     const accessData = await new Promise<{ token: string; tokenSecret: string; results: { screen_name: string } }>((resolve, reject) => {
@@ -22,7 +27,7 @@ export async function GET(req: NextRequest) {
         oauthToken,
         requestSecret,
         oauthVerifier,
-        (err: unknown, data: unknown) => { // Changed 'any' to 'unknown'
+        (err: unknown, data: unknown) => {
           if (err) return reject(err);
           resolve(data as { token: string; tokenSecret: string; results: { screen_name: string } });
         }
