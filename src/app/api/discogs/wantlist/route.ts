@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { Client } from 'disconnect';
 
 export async function GET(req: Request) {
   const cookieStore = await cookies();
@@ -14,26 +13,32 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const page = searchParams.get('page') || '1';
+
+  const nonce = Math.floor(Math.random() * 1000000000).toString();
+  const timestamp = Math.floor(Date.now() / 1000).toString();
   
-  const dis = new Client({
-    userAgent: 'DeadwaxDialogues/1.0',
-    consumerKey: process.env.DISCOGS_CONSUMER_KEY,
-    consumerSecret: process.env.DISCOGS_CONSUMER_SECRET,
-    userToken: token,
-    userTokenSecret: secret
-  });
+  const signature = `${process.env.DISCOGS_CONSUMER_SECRET}&${secret}`;
+
+  const authHeader = `OAuth oauth_consumer_key="${process.env.DISCOGS_CONSUMER_KEY}", ` +
+    `oauth_nonce="${nonce}", ` +
+    `oauth_signature="${signature}", ` +
+    `oauth_signature_method="PLAINTEXT", ` +
+    `oauth_timestamp="${timestamp}", ` +
+    `oauth_token="${token}"`;
 
   try {
-    const data = await new Promise((resolve, reject) => {
-      dis.user().wantlist().getReleases(username, { 
-        page: parseInt(page), 
-        per_page: 50 
-      }, (err: unknown, data: unknown) => {
-        if (err) return reject(err);
-        resolve(data);
-      });
+    const response = await fetch(`https://api.discogs.com/users/${username}/wants?page=${page}&per_page=50`, {
+      headers: {
+        'Authorization': authHeader,
+        'User-Agent': 'DeadwaxDialogues/1.0'
+      }
     });
-    
+
+    if (!response.ok) {
+        throw new Error(`Discogs API Error: ${response.status}`);
+    }
+
+    const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
