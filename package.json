@@ -21,6 +21,7 @@
     "@vercel/analytics": "^1.5.0",
     "axios": "^1.10.0",
     "crypto": "^1.0.1",
+    "disconnect": "^1.2.2",
     "genius-lyrics": "^4.4.7",
     "googleapis": "^160.0.0",
     "jsonwebtoken": "^9.0.3",
