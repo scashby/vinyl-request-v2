@@ -16,9 +16,8 @@ export async function GET() {
         process.env.DISCOGS_CONSUMER_KEY!,
         process.env.DISCOGS_CONSUMER_SECRET!,
         callbackUrl,
-        (err: unknown, data: unknown) => {
+        (err: unknown, data: unknown) => { // Changed 'any' to 'unknown'
           if (err) return reject(err);
-          // Cast the unknown data to the expected type
           resolve(data as { tokenSecret: string; authorizeUrl: string });
         }
       );
