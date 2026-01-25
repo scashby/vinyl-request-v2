@@ -16,6 +16,7 @@ export async function GET(req: Request) {
   const page = searchParams.get('page') || '1';
   
   const dis = new Client({
+    userAgent: 'DeadwaxDialogues/1.0',
     consumerKey: process.env.DISCOGS_CONSUMER_KEY,
     consumerSecret: process.env.DISCOGS_CONSUMER_SECRET,
     userToken: token,
@@ -23,10 +24,16 @@ export async function GET(req: Request) {
   });
 
   try {
-    const data = await dis.user().wantlist().getReleases(username, { 
-      page: parseInt(page), 
-      per_page: 50 
+    const data = await new Promise((resolve, reject) => {
+      dis.user().wantlist().getReleases(username, { 
+        page: parseInt(page), 
+        per_page: 50 
+      }, (err: unknown, data: unknown) => {
+        if (err) return reject(err);
+        resolve(data);
+      });
     });
+    
     return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });

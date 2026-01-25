@@ -16,6 +16,7 @@ export async function GET(req: Request) {
   const page = searchParams.get('page') || '1';
   
   const dis = new Client({
+    userAgent: 'DeadwaxDialogues/1.0',
     consumerKey: process.env.DISCOGS_CONSUMER_KEY,
     consumerSecret: process.env.DISCOGS_CONSUMER_SECRET,
     userToken: token,
@@ -25,12 +26,16 @@ export async function GET(req: Request) {
   const user = dis.user();
   
   try {
-    // 0 is the "All" folder
-    const data = await user.collection().getReleases(username, 0, { 
-      page: parseInt(page), 
-      per_page: 50,
-      sort: 'added',
-      sort_order: 'desc'
+    const data = await new Promise((resolve, reject) => {
+      user.collection().getReleases(username, 0, { 
+        page: parseInt(page), 
+        per_page: 50,
+        sort: 'added',
+        sort_order: 'desc'
+      }, (err: unknown, data: unknown) => {
+        if (err) return reject(err);
+        resolve(data);
+      });
     });
     
     return NextResponse.json(data);

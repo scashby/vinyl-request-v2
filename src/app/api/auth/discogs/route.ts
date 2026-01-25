@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { Client } from 'disconnect';
 
 export async function GET() {
-  const dis = new Client();
+  const dis = new Client({ userAgent: 'DeadwaxDialogues/1.0' });
   const oAuth = dis.oauth();
 
   const callbackUrl = process.env.NODE_ENV === 'production'
@@ -11,16 +11,21 @@ export async function GET() {
     : 'http://localhost:3000/api/auth/callback/discogs';
 
   try {
-    const requestData = await oAuth.getRequestToken(
-      process.env.DISCOGS_CONSUMER_KEY!,
-      process.env.DISCOGS_CONSUMER_SECRET!,
-      callbackUrl
-    );
+    const requestData = await new Promise<{ tokenSecret: string; authorizeUrl: string }>((resolve, reject) => {
+      oAuth.getRequestToken(
+        process.env.DISCOGS_CONSUMER_KEY!,
+        process.env.DISCOGS_CONSUMER_SECRET!,
+        callbackUrl,
+        (err: unknown, data: unknown) => {
+          if (err) return reject(err);
+          // Cast the unknown data to the expected type
+          resolve(data as { tokenSecret: string; authorizeUrl: string });
+        }
+      );
+    });
 
-    // Removed 'token' to fix ESLint unused var warning
     const { tokenSecret, authorizeUrl } = requestData;
 
-    // Store secret in cookie to verify callback later
     const cookieStore = await cookies();
     cookieStore.set('discogs_request_secret', tokenSecret, { 
       httpOnly: true, 
