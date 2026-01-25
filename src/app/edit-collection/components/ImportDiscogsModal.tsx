@@ -96,7 +96,12 @@ function parseDiscogsCSV(csvText: string): ParsedAlbum[] {
   const lines = csvText.split('\n');
   if (lines.length < 2) return [];
 
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  const headers = lines[0].split(',').map(h =>
+    h
+      .trim()
+      .replace(/^"|"$/g, '')
+      .replace(/^\uFEFF/, '')
+  );
   const albums: ParsedAlbum[] = [];
 
   for (let i = 1; i < lines.length; i++) {
@@ -123,7 +128,9 @@ function parseDiscogsCSV(csvText: string): ParsedAlbum[] {
 
     const row: Record<string, string> = {};
     headers.forEach((header, index) => {
-      row[header] = values[index] || '';
+      const value = values[index] || '';
+      row[header] = value;
+      row[header.toLowerCase()] = value;
     });
 
     const artist = row['Artist'] || row['artist'] || '';
