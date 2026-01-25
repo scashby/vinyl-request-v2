@@ -1,14 +1,65 @@
 // src/app/edit-collection/components/ImportDiscogsModal.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { parseDiscogsFormat } from '../../../lib/formatParser';
 import { normalizeArtist, normalizeTitle, normalizeArtistAlbum } from '../../../lib/importUtils';
 
 type SyncMode = 'full_replacement' | 'full_sync' | 'partial_sync' | 'new_only';
-type ImportStage = 'upload' | 'preview' | 'importing' | 'complete';
+type ImportStage = 'select_mode' | 'fetching' | 'preview' | 'importing' | 'complete';
 type AlbumStatus = 'NEW' | 'CHANGED' | 'UNCHANGED' | 'REMOVED';
+type DiscogsSourceType = 'collection' | 'wantlist';
+
+// --- Interfaces for Discogs API Responses ---
+interface DiscogsEntity {
+  name: string;
+  catno?: string;
+  entity_type_name?: string;
+}
+
+interface DiscogsNote {
+  field_id: number;
+  value: string;
+}
+
+interface DiscogsBasicInfo {
+  id: number;
+  master_id?: number;
+  title: string;
+  year?: number;
+  artists?: { name: string }[];
+  labels?: DiscogsEntity[];
+  formats?: { name: string; descriptions?: string[] }[];
+  thumb?: string;
+}
+
+interface DiscogsItem {
+  id: number;
+  instance_id: number;
+  folder_id: number;
+  date_added: string;
+  rating: number;
+  notes?: DiscogsNote[];
+  basic_information: DiscogsBasicInfo;
+}
+
+interface DiscogsCollectionResponse {
+  pagination: {
+    pages: number;
+    items: number;
+  };
+  releases: DiscogsItem[];
+}
+
+interface DiscogsWantlistResponse {
+  pagination: {
+    pages: number;
+    items: number;
+  };
+  wants: DiscogsItem[];
+}
+// --------------------------------------------
 
 interface ParsedAlbum {
   artist: string;
@@ -19,7 +70,7 @@ interface ParsedAlbum {
   barcode: string | null;
   country: string | null;
   year: string | null;
-  location: string; // FIXED: Renamed from folder to location
+  location: string;
   discogs_release_id: string;
   discogs_master_id: string | null;
   date_added: string;
@@ -32,6 +83,9 @@ interface ParsedAlbum {
   title_norm: string;
   artist_album_norm: string;
   album_norm: string;
+  for_sale: boolean;
+  index_number: number | null;
+  cover_image: string | null;
 }
 
 interface ExistingAlbum {
@@ -62,28 +116,6 @@ interface ImportDiscogsModalProps {
 }
 
 // Helper functions
-function sanitizeMediaCondition(condition: string | null | undefined): string {
-  if (!condition || condition.trim() === '') return 'Unknown';
-  return condition.trim();
-}
-
-// FIXED: Renamed to sanitizeLocation to match DB
-function sanitizeLocation(folder: string | null | undefined): string {
-  if (!folder || folder.trim() === '') return 'Uncategorized';
-  return folder.trim();
-}
-
-function parseDiscogsDate(dateString: string): string {
-  if (!dateString || dateString.trim() === '') return new Date().toISOString();
-  try {
-    const parsed = new Date(dateString);
-    if (isNaN(parsed.getTime())) return new Date().toISOString();
-    return parsed.toISOString();
-  } catch {
-    return new Date().toISOString();
-  }
-}
-
 function calculateDecade(year: string | null): number | null {
   if (!year) return null;
   const yearNum = parseInt(year);
@@ -91,92 +123,7 @@ function calculateDecade(year: string | null): number | null {
   return Math.floor(yearNum / 10) * 10;
 }
 
-// CSV parsing
-function parseDiscogsCSV(csvText: string): ParsedAlbum[] {
-  const lines = csvText.split('\n');
-  if (lines.length < 2) return [];
-
-  const headers = lines[0].split(',').map(h =>
-    h
-      .trim()
-      .replace(/^"|"$/g, '')
-      .replace(/^\uFEFF/, '')
-  );
-  const albums: ParsedAlbum[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-
-    // Handle CSV with quotes
-    const values: string[] = [];
-    let current = '';
-    let inQuotes = false;
-
-    for (let j = 0; j < line.length; j++) {
-      const char = line[j];
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-        values.push(current.trim());
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-    values.push(current.trim());
-
-    const row: Record<string, string> = {};
-    headers.forEach((header, index) => {
-      const value = values[index] || '';
-      row[header] = value;
-      row[header.toLowerCase()] = value;
-    });
-
-    const artist = row['Artist'] || row['artist'] || '';
-    const title = row['Title'] || row['title'] || '';
-    
-    if (!artist || !title) continue;
-
-    const labelsText = row['Label'] || row['label'] || '';
-    const labels = labelsText ? labelsText.split(',').map(l => l.trim()) : [];
-
-    const year = row['Released'] || row['Year'] || row['year'] || null;
-    const ratingText = row['Rating'] || row['rating'] || '';
-    const my_rating = ratingText ? parseInt(ratingText) : null;
-
-    const album: ParsedAlbum = {
-      artist,
-      title,
-      format: row['Format'] || row['format'] || '',
-      labels,
-      cat_no: row['Catalog#'] || row['Catalog #'] || row['catalog'] || row['cat_no'] || null,
-      barcode: row['Barcode'] || row['barcode'] || null,
-      country: row['Country'] || row['country'] || null,
-      year,
-      // FIXED: Map CSV 'Folder' to DB 'location'
-      location: sanitizeLocation(row['CollectionFolder'] || row['Folder'] || row['folder']),
-      discogs_release_id: row['release_id'] || row['Release ID'] || row['discogs_release_id'] || '',
-      discogs_master_id: row['Master ID'] || row['master_id'] || row['discogs_master_id'] || null,
-      date_added: parseDiscogsDate(row['Date Added'] || row['date_added'] || ''),
-      media_condition: sanitizeMediaCondition(row['Collection Media Condition'] || row['media_condition']),
-      package_sleeve_condition: row['Collection Sleeve Condition'] || row['package_sleeve_condition'] || null,
-      personal_notes: row['Collection Notes'] || row['notes'] || null,
-      my_rating,
-      decade: calculateDecade(year),
-      artist_norm: normalizeArtist(artist),
-      title_norm: normalizeTitle(title),
-      artist_album_norm: normalizeArtistAlbum(artist, title),
-      album_norm: normalizeTitle(title),
-    };
-
-    albums.push(album);
-  }
-
-  return albums;
-}
-
-// Compare albums
+// Compare albums logic
 function compareAlbums(
   parsed: ParsedAlbum[],
   existing: ExistingAlbum[]
@@ -258,7 +205,6 @@ function compareAlbums(
       barcode: null,
       country: null,
       year: null,
-      // FIXED: Use location for removed items too
       location: 'Unknown',
       discogs_release_id: existingAlbum.discogs_release_id || '',
       discogs_master_id: null,
@@ -276,6 +222,9 @@ function compareAlbums(
       existingId: existingAlbum.id,
       needsEnrichment: false,
       missingFields: [],
+      for_sale: false,
+      index_number: null,
+      cover_image: existingAlbum.image_url
     });
   }
 
@@ -323,14 +272,15 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
 
   if (data.companies && Array.isArray(data.companies)) {
     const labels = data.companies
-      .filter((c: { entity_type_name: string; name: string }) => c.entity_type_name === 'Label')
-      .map((c: { name: string }) => c.name);
+      .filter((c: DiscogsEntity) => c.entity_type_name === 'Label')
+      .map((c: DiscogsEntity) => c.name);
     
     if (labels.length > 0) {
       enriched.labels = labels;
     }
   }
 
+  // Format & Sound parsing
   if (data.formats && Array.isArray(data.formats)) {
     const soundDescriptions = data.formats[0]?.descriptions || [];
     const soundTypes = ['Stereo', 'Mono', 'Quadraphonic', 'Surround'];
@@ -340,6 +290,7 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     if (sound) enriched.sound = sound;
   }
 
+  // Matrix & Identifiers parsing
   if (data.identifiers && Array.isArray(data.identifiers)) {
     const matrixEntries: Record<string, string> = {};
     
@@ -369,6 +320,7 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     }
   }
 
+  // Track parsing
   if (data.tracklist && Array.isArray(data.tracklist)) {
     const tracks: unknown[] = [];
     const discMetadata: { disc_number: number; title: string | null }[] = [];
@@ -439,6 +391,7 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     }
   }
 
+  // Credits parsing
   const engineers: string[] = [];
   const producers: string[] = [];
   const musicians: string[] = [];
@@ -466,12 +419,13 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
 }
 
 export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }: ImportDiscogsModalProps) {
-  const [stage, setStage] = useState<ImportStage>('upload');
+  const [stage, setStage] = useState<ImportStage>('select_mode');
+  const [sourceType, setSourceType] = useState<DiscogsSourceType>('collection');
   const [syncMode, setSyncMode] = useState<SyncMode>('partial_sync');
-  const [file, setFile] = useState<File | null>(null);
   
   const [comparedAlbums, setComparedAlbums] = useState<ComparedAlbum[]>([]);
   const [totalDatabaseCount, setTotalDatabaseCount] = useState<number>(0);
+  const [isConnected, setIsConnected] = useState(false);
   
   const [progress, setProgress] = useState({ current: 0, total: 0, status: '' });
   const [error, setError] = useState<string | null>(null);
@@ -485,56 +439,126 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     errors: 0,
   });
 
-  if (!isOpen) return null;
+  // Check connection on open
+  useEffect(() => {
+    if (isOpen) {
+      checkConnection();
+    }
+  }, [isOpen]);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-      setError(null);
-      
-      try {
-        const text = await selectedFile.text();
-        const parsed = parseDiscogsCSV(text);
-
-        if (parsed.length === 0) {
-          setError('No albums found in CSV file');
-          setComparedAlbums([]);
-          return;
-        }
-
-        const { data: existing, error: dbError } = await supabase
-          .from('collection')
-          .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, image_url, tracks, genres, packaging');
-
-        if (dbError) {
-          setError(`Database error: ${dbError.message}`);
-          setComparedAlbums([]);
-          return;
-        }
-
-        if (!existing) {
-          setError('No data returned from database');
-          setComparedAlbums([]);
-          return;
-        }
-
-        setTotalDatabaseCount(existing.length);
-        const compared = compareAlbums(parsed, existing as ExistingAlbum[]);
-        setComparedAlbums(compared);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to parse CSV');
-        setComparedAlbums([]);
+  const checkConnection = async () => {
+    try {
+      const res = await fetch('/api/discogs/collection?page=1');
+      if (res.status === 401) {
+        setIsConnected(false);
+      } else if (res.ok) {
+        setIsConnected(true);
+      } else {
+        // Connected but maybe empty
+        setIsConnected(true);
       }
+    } catch {
+      setIsConnected(false);
     }
   };
 
-  const handleParseCSV = async () => {
-    if (!file || comparedAlbums.length === 0) {
-      setError('Please select a valid CSV file');
-      return;
+  const handleConnect = () => {
+    window.location.href = '/api/auth/discogs';
+  };
+
+  const handleFetchFromDiscogs = async () => {
+    setStage('fetching');
+    setError(null);
+    setComparedAlbums([]);
+    
+    try {
+        // 1. Fetch from API pages
+        let page = 1;
+        let hasMore = true;
+        const allFetchedItems: ParsedAlbum[] = [];
+        const endpoint = sourceType === 'collection' ? '/api/discogs/collection' : '/api/discogs/wantlist';
+
+        while (hasMore) {
+            setProgress({ current: allFetchedItems.length, total: 0, status: `Fetching page ${page} from Discogs...` });
+            
+            const res = await fetch(`${endpoint}?page=${page}`);
+            if (!res.ok) throw new Error('Failed to fetch from Discogs API');
+            
+            const data: DiscogsCollectionResponse | DiscogsWantlistResponse = await res.json();
+            const items = sourceType === 'collection' 
+              ? (data as DiscogsCollectionResponse).releases 
+              : (data as DiscogsWantlistResponse).wants;
+            
+            if (!items || items.length === 0) {
+                hasMore = false;
+                break;
+            }
+
+            for (const item of items) {
+                const info = item.basic_information;
+                const artist = info.artists?.[0]?.name || 'Unknown';
+                const title = info.title || 'Unknown';
+                const year = info.year?.toString() || null;
+                
+                // Map API data to ParsedAlbum structure
+                allFetchedItems.push({
+                    artist,
+                    title,
+                    format: info.formats?.[0]?.name || '',
+                    // Fix: Use typed interface for map callback
+                    labels: info.labels?.map((l: DiscogsEntity) => l.name) || [],
+                    cat_no: info.labels?.[0]?.catno || null,
+                    barcode: null, 
+                    country: null,
+                    year,
+                    // Determine location based on folder
+                    location: sourceType === 'collection' && item.folder_id === 0 ? 'All' : 'Uncategorized',
+                    for_sale: false,
+                    discogs_release_id: item.id.toString(),
+                    discogs_master_id: info.master_id?.toString() || null,
+                    date_added: item.date_added || new Date().toISOString(),
+                    // Fix: Use typed interface for find callback
+                    media_condition: item.notes?.find((n: DiscogsNote) => n.field_id === 1)?.value || 'Unknown',
+                    package_sleeve_condition: null,
+                    // Fix: Use typed interface for map callback
+                    personal_notes: item.notes?.map((n: DiscogsNote) => n.value).join('; ') || '',
+                    my_rating: item.rating || null,
+                    decade: calculateDecade(year),
+                    artist_norm: normalizeArtist(artist),
+                    title_norm: normalizeTitle(title),
+                    artist_album_norm: normalizeArtistAlbum(artist, title),
+                    album_norm: normalizeTitle(title),
+                    index_number: item.instance_id,
+                    cover_image: info.thumb || null
+                });
+            }
+
+            if (page >= data.pagination.pages) {
+                hasMore = false;
+            } else {
+                page++;
+            }
+        }
+
+        // 2. Fetch Existing from DB to Compare
+        const targetTable = sourceType === 'collection' ? 'collection' : 'wantlist';
+        const { data: existing, error: dbError } = await supabase
+          .from(targetTable)
+          .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, image_url, tracks, genres, packaging'); 
+
+        if (dbError) throw dbError;
+
+        setTotalDatabaseCount(existing?.length || 0);
+
+        // 3. Run Comparison Logic
+        const compared = compareAlbums(allFetchedItems, (existing || []) as unknown as ExistingAlbum[]);
+        setComparedAlbums(compared);
+        setStage('preview');
+
+    } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch from Discogs');
+        setStage('select_mode');
     }
-    setStage('preview');
   };
 
   const handleStartImport = async () => {
@@ -545,18 +569,18 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     try {
       let albumsToProcess: ComparedAlbum[] = [];
 
+      // Determine which albums to process based on Sync Mode
       if (syncMode === 'full_replacement') {
-        await supabase.from('collection').delete().gt('id', 0);
+        const targetTable = sourceType === 'collection' ? 'collection' : 'wantlist';
+        await supabase.from(targetTable).delete().gt('id', 0); 
         albumsToProcess = comparedAlbums.filter(a => a.status !== 'REMOVED');
       } else if (syncMode === 'full_sync') {
+        // Handle removals
         const removed = comparedAlbums.filter(a => a.status === 'REMOVED' && a.existingId);
         if (removed.length > 0) {
           const idsToDelete = removed.map(a => a.existingId!);
-          const batchSize = 100;
-          for (let i = 0; i < idsToDelete.length; i += batchSize) {
-            const batch = idsToDelete.slice(i, i + batchSize);
-            await supabase.from('collection').delete().in('id', batch);
-          }
+          const targetTable = sourceType === 'collection' ? 'collection' : 'wantlist';
+          await supabase.from(targetTable).delete().in('id', idsToDelete);
         }
         albumsToProcess = comparedAlbums.filter(a => a.status !== 'REMOVED');
       } else if (syncMode === 'partial_sync') {
@@ -578,7 +602,10 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         errors: 0,
       };
 
-      const batchSize = 25;
+      const targetTable = sourceType === 'collection' ? 'collection' : 'wantlist';
+
+      // Process in batches
+      const batchSize = 10; // Smaller batch for API calls
       for (let i = 0; i < albumsToProcess.length; i += batchSize) {
         const batch = albumsToProcess.slice(i, i + batchSize);
 
@@ -590,40 +617,54 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           });
 
           try {
+            // Fix: Use Record<string, unknown> instead of any
             const albumData: Record<string, unknown> = {
               artist: album.artist,
               title: album.title,
-              format: album.format,
-              labels: album.labels,
-              cat_no: album.cat_no,
-              barcode: album.barcode,
-              country: album.country,
               year: album.year,
-              // FIXED: Map to location column
-              location: album.location,
+              format: album.format,
               discogs_release_id: album.discogs_release_id,
               discogs_master_id: album.discogs_master_id,
-              date_added: album.date_added,
-              media_condition: album.media_condition,
-              package_sleeve_condition: album.package_sleeve_condition,
-              // FIXED: Map to personal_notes column
-              personal_notes: album.personal_notes,
-              my_rating: album.my_rating,
-              decade: album.decade,
+              artist_norm: album.artist_norm,
+              title_norm: album.title_norm,
+              artist_album_norm: album.artist_album_norm,
             };
 
-            const formatData = parseDiscogsFormat(album.format);
-            Object.assign(albumData, formatData);
+            // Table specific fields
+            if (sourceType === 'collection') {
+                albumData.cat_no = album.cat_no;
+                albumData.labels = album.labels;
+                albumData.location = album.location;
+                albumData.date_added = album.date_added;
+                albumData.media_condition = album.media_condition;
+                albumData.personal_notes = album.personal_notes;
+                albumData.my_rating = album.my_rating;
+                albumData.decade = album.decade;
+                albumData.for_sale = album.for_sale;
+                albumData.index_number = album.index_number;
+                
+                // Parse format string for extra details
+                const formatData = parseDiscogsFormat(album.format);
+                Object.assign(albumData, formatData);
+            } else {
+                // Wantlist specific
+                albumData.date_added_to_wantlist = album.date_added;
+                albumData.notes = album.personal_notes;
+                albumData.cover_image = album.cover_image;
+            }
 
-            if (album.status === 'NEW' || 
+            // Enrichment Logic (Only if NEW or Full Sync/Partial Sync needs it)
+            if (sourceType === 'collection' && (
+                album.status === 'NEW' || 
                 syncMode === 'full_sync' || 
-                (syncMode === 'partial_sync' && album.needsEnrichment)) {
-              
+                (syncMode === 'partial_sync' && album.needsEnrichment)
+            )) {
               const enrichedData = await enrichFromDiscogs(album.discogs_release_id);
               
               if (syncMode === 'full_sync' || album.status === 'NEW') {
                 Object.assign(albumData, enrichedData);
               } else {
+                // Smart merge for partial sync
                 album.missingFields.forEach(field => {
                   if (enrichedData[field]) {
                     if (field === 'genres') albumData.genres = enrichedData.genres;
@@ -634,12 +675,13 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               }
             }
 
+            // Database Operations
             if (album.status === 'NEW') {
-              const { error: insertError } = await supabase.from('collection').insert(albumData);
+              const { error: insertError } = await supabase.from(targetTable).insert(albumData);
               if (insertError) throw insertError;
               resultCounts.added++;
             } else {
-              const { error: updateError } = await supabase.from('collection').update(albumData).eq('id', album.existingId!);
+              const { error: updateError } = await supabase.from(targetTable).update(albumData).eq('id', album.existingId!);
               if (updateError) throw updateError;
               if (album.status === 'CHANGED') resultCounts.updated++;
               else resultCounts.unchanged++;
@@ -666,8 +708,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   };
 
   const handleClose = () => {
-    setStage('upload');
-    setFile(null);
+    setStage('select_mode');
     setComparedAlbums([]);
     setTotalDatabaseCount(0);
     setProgress({ current: 0, total: 0, status: '' });
@@ -676,6 +717,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     setResults({ added: 0, updated: 0, removed: 0, unchanged: 0, errors: 0 });
     onClose();
   };
+
+  if (!isOpen) return null;
 
   const newCount = syncMode === 'full_replacement' 
     ? comparedAlbums.filter(a => a.status !== 'REMOVED').length 
@@ -713,112 +756,91 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
             </div>
           )}
 
-          {/* UPLOAD STAGE */}
-          {stage === 'upload' && (
+          {/* SELECT MODE STAGE */}
+          {stage === 'select_mode' && (
             <>
-              <div className="mb-5">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Sync Mode
-                </label>
-                <div className="flex flex-col gap-2">
-                  {[
-                    { value: 'full_replacement', label: 'Full Replacement', desc: 'Delete all, import everything fresh' },
-                    { value: 'full_sync', label: 'Full Sync', desc: 'Scrape missing/changed data for all albums' },
-                    { value: 'partial_sync', label: 'Partial Sync', desc: 'Only process new & changed albums (recommended)' },
-                    { value: 'new_only', label: 'New Only', desc: 'Only import albums not in database' },
-                  ].map(mode => (
-                    <label key={mode.value} className={`flex items-start p-3 border-2 rounded-md cursor-pointer ${syncMode === mode.value ? 'border-orange-500 bg-orange-50' : 'border-gray-200 bg-white'}`}>
-                      <input
-                        type="radio"
-                        name="syncMode"
-                        value={mode.value}
-                        checked={syncMode === mode.value}
-                        onChange={(e) => setSyncMode(e.target.value as SyncMode)}
-                        className="mr-3 mt-0.5"
-                      />
-                      <div>
-                        <div className="font-semibold text-gray-900 mb-0.5">
-                          {mode.label}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {mode.desc}
-                        </div>
-                      </div>
-                    </label>
-                  ))}
+              {!isConnected ? (
+                <div className="text-center py-8">
+                  <p className="mb-4 text-gray-600">Connect your Discogs account to sync directly.</p>
+                  <button 
+                    onClick={handleConnect}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-bold transition-colors cursor-pointer"
+                  >
+                    Connect Discogs
+                  </button>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 text-green-600 bg-green-50 p-3 rounded text-sm font-medium">
+                    <span>●</span> Connected to Discogs API
+                  </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Discogs CSV File
-                </label>
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileChange}
-                  className="block w-full p-2 border border-gray-300 rounded text-sm"
-                />
-                {file && (
-                  <div className="mt-2 text-xs text-gray-500">
-                    Selected: {file.name} ({(file.size / 1024).toFixed(1)} KB)
-                  </div>
-                )}
-                
-                {file && comparedAlbums.length > 0 && (
-                  <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-md">
-                    <div className="text-sm font-semibold text-gray-900 mb-3">
-                      CSV Analysis
-                    </div>
-                    <div className="flex flex-col gap-2 text-[13px]">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Total albums in CSV:</span>
-                        <span className="font-semibold text-gray-900">
-                          {comparedAlbums.filter(a => a.status !== 'REMOVED').length}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-emerald-600">New albums (not in database):</span>
-                        <span className="font-semibold text-emerald-600">
-                          {comparedAlbums.filter(a => a.status === 'NEW').length}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-amber-600">Existing albums missing data:</span>
-                        <span className="font-semibold text-amber-600">
-                          {comparedAlbums.filter(a => a.status === 'CHANGED' && a.needsEnrichment).length}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Unchanged albums:</span>
-                        <span className="font-semibold text-gray-500">
-                          {comparedAlbums.filter(a => a.status === 'UNCHANGED').length}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-red-600">Albums in DB but not in CSV:</span>
-                        <span className="font-semibold text-red-600">
-                          {comparedAlbums.filter(a => a.status === 'REMOVED').length}
-                        </span>
-                      </div>
-                      <div className="mt-2 pt-2 border-t border-gray-200 flex justify-between">
-                        <span className="text-gray-500">Current database total:</span>
-                        <span className="font-semibold text-gray-900">
-                          {totalDatabaseCount}
-                        </span>
-                      </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Import Source</label>
+                    <div className="grid grid-cols-2 gap-3">
+                        <button
+                            onClick={() => setSourceType('collection')}
+                            className={`p-3 border rounded text-left ${sourceType === 'collection' ? 'border-orange-500 bg-orange-50 text-orange-900' : 'border-gray-200 hover:border-gray-300'}`}
+                        >
+                            <div className="font-bold">Collection</div>
+                            <div className="text-xs opacity-70">Your owned releases</div>
+                        </button>
+                        <button
+                            onClick={() => setSourceType('wantlist')}
+                            className={`p-3 border rounded text-left ${sourceType === 'wantlist' ? 'border-pink-500 bg-pink-50 text-pink-900' : 'border-gray-200 hover:border-gray-300'}`}
+                        >
+                            <div className="font-bold">Wantlist</div>
+                            <div className="text-xs opacity-70">Items you want</div>
+                        </button>
                     </div>
                   </div>
-                )}
-              </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Sync Mode</label>
+                    <div className="flex flex-col gap-2">
+                      {[
+                        { value: 'partial_sync', label: 'Partial Sync', desc: 'Add new & enrich items missing data (Recommended)' },
+                        { value: 'new_only', label: 'New Only', desc: 'Only import albums not in database' },
+                        { value: 'full_sync', label: 'Full Sync', desc: 'Update everything, remove deleted items' },
+                        { value: 'full_replacement', label: 'Full Replacement', desc: 'Wipe database and re-import' },
+                      ].map(mode => (
+                        <label key={mode.value} className={`flex items-start p-3 border rounded-md cursor-pointer ${syncMode === mode.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'}`}>
+                          <input
+                            type="radio"
+                            name="syncMode"
+                            value={mode.value}
+                            checked={syncMode === mode.value}
+                            onChange={(e) => setSyncMode(e.target.value as SyncMode)}
+                            className="mr-3 mt-0.5"
+                          />
+                          <div>
+                            <div className="font-semibold text-gray-900 mb-0.5">{mode.label}</div>
+                            <div className="text-xs text-gray-500">{mode.desc}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
+          )}
+
+          {/* FETCHING STAGE */}
+          {stage === 'fetching' && (
+             <div className="text-center py-10 px-5">
+                <div className="text-2xl mb-4">📡</div>
+                <div className="text-gray-900 font-medium mb-2">Fetching from Discogs...</div>
+                <div className="text-sm text-gray-500">{progress.status}</div>
+                <div className="text-xs text-gray-400 mt-2">{progress.current} items found</div>
+             </div>
           )}
 
           {/* PREVIEW STAGE */}
           {stage === 'preview' && (
             <>
               <div className="text-sm mb-4 bg-blue-50 p-3 rounded text-blue-800 border border-blue-200">
-                Found {comparedAlbums.length} potential changes. Review the summary below before proceeding.
+                Analyzed <strong>{comparedAlbums.length}</strong> items from your {sourceType}.
               </div>
 
               {/* Summary Stats */}
@@ -842,7 +864,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               {/* Preview Table */}
               <div className="border border-gray-200 rounded-md overflow-hidden">
                 <div className="px-3 py-2.5 bg-gray-50 border-b border-gray-200 font-semibold text-[13px] text-gray-500">
-                  Preview (first 10 albums that will be processed)
+                  Preview (first 10 affected items)
                 </div>
                 <div className="max-h-[300px] overflow-y-auto">
                   <table className="w-full text-[13px] border-collapse">
@@ -851,63 +873,26 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                         <th className="px-3 py-2 text-left font-semibold text-gray-500">Artist</th>
                         <th className="px-3 py-2 text-left font-semibold text-gray-500">Title</th>
                         <th className="px-3 py-2 text-left font-semibold text-gray-500">Status</th>
-                        <th className="px-3 py-2 text-left font-semibold text-gray-500">Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {(() => {
-                        let albumsToShow = comparedAlbums;
-                        if (syncMode === 'new_only') albumsToShow = comparedAlbums.filter(a => a.status === 'NEW');
-                        else if (syncMode === 'partial_sync') albumsToShow = comparedAlbums.filter(a => a.status === 'NEW' || (a.status === 'CHANGED' && a.needsEnrichment));
-                        else if (syncMode === 'full_sync') albumsToShow = comparedAlbums.filter(a => a.status !== 'UNCHANGED');
-                        
-                        return albumsToShow.slice(0, 10).map((album, idx) => {
+                      {comparedAlbums.slice(0, 10).map((album, idx) => {
                           let statusColor = 'text-gray-500';
-                          let statusDisplay: string = album.status;
-                          let actionText = 'No action';
-
-                          if (syncMode === 'full_replacement') {
-                            if (album.status === 'REMOVED') {
-                              statusColor = 'text-red-600';
-                              statusDisplay = 'WILL DELETE';
-                              actionText = 'Delete from database';
-                            } else {
-                              statusColor = 'text-emerald-600';
-                              statusDisplay = 'WILL IMPORT';
-                              actionText = 'Import + enrich';
-                            }
-                          } else if (album.status === 'NEW') {
-                            statusColor = 'text-emerald-600';
-                            statusDisplay = 'NEW';
-                            actionText = 'Add + enrich';
-                          } else if (album.status === 'CHANGED' && album.needsEnrichment) {
-                            statusColor = 'text-amber-600';
-                            statusDisplay = 'MISSING DATA';
-                            actionText = album.missingFields.join(', ');
-                          } else if (album.status === 'UNCHANGED') {
-                            statusColor = 'text-gray-500';
-                            statusDisplay = 'UNCHANGED';
-                            actionText = 'Skip';
-                          } else if (album.status === 'REMOVED') {
-                            statusColor = 'text-red-600';
-                            statusDisplay = 'REMOVED';
-                            actionText = syncMode === 'full_sync' ? 'Delete' : 'Keep';
-                          }
+                          if (album.status === 'NEW') statusColor = 'text-emerald-600';
+                          if (album.status === 'REMOVED') statusColor = 'text-red-600';
+                          if (album.status === 'CHANGED') statusColor = 'text-amber-600';
 
                           return (
                             <tr key={idx} className="border-b border-gray-100 last:border-none">
                               <td className="px-3 py-2 text-gray-900">{album.artist}</td>
                               <td className="px-3 py-2 text-gray-900">{album.title}</td>
                               <td className={`px-3 py-2 font-semibold ${statusColor}`}>
-                                {statusDisplay}
-                              </td>
-                              <td className="px-3 py-2 text-gray-500 text-xs">
-                                {actionText}
+                                {album.status}
                               </td>
                             </tr>
                           );
-                        });
-                      })()}
+                        })
+                      }
                     </tbody>
                   </table>
                 </div>
@@ -921,7 +906,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               <div className="w-full h-2 bg-gray-200 rounded overflow-hidden mb-3">
                 <div 
                   className="h-full bg-orange-500 transition-all duration-300"
-                  style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                  style={{ width: `${(progress.current / Math.max(progress.total, 1)) * 100}%` }}
                 />
               </div>
               <div className="text-sm text-gray-500 mb-2">
@@ -938,13 +923,12 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
             <div className="p-5 bg-green-50 border border-green-200 rounded-md text-center">
               <div className="text-5xl mb-3">✓</div>
               <h3 className="m-0 mb-4 text-lg font-semibold text-green-700">
-                Import Complete
+                Sync Complete
               </h3>
               <div className="text-sm text-gray-500">
-                <div><strong>{results.added}</strong> albums added</div>
-                <div><strong>{results.updated}</strong> albums updated</div>
-                {results.removed > 0 && <div><strong>{results.removed}</strong> albums removed</div>}
-                <div><strong>{results.unchanged}</strong> albums unchanged</div>
+                <div><strong>{results.added}</strong> added</div>
+                <div><strong>{results.updated}</strong> updated</div>
+                {results.removed > 0 && <div><strong>{results.removed}</strong> removed</div>}
                 {results.errors > 0 && (
                   <div className="text-red-600 mt-2 text-left">
                     <div><strong>{results.errors}</strong> errors occurred</div>
@@ -964,7 +948,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
         {/* Footer */}
         <div className="px-5 py-4 border-t border-gray-200 flex justify-end gap-3">
-          {stage === 'upload' && (
+          {stage === 'select_mode' && (
             <>
               <button
                 onClick={handleClose}
@@ -973,15 +957,15 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 Cancel
               </button>
               <button
-                onClick={handleParseCSV}
-                disabled={!file || comparedAlbums.length === 0}
+                onClick={handleFetchFromDiscogs}
+                disabled={!isConnected}
                 className={`px-4 py-2 border-none rounded text-sm font-semibold text-white ${
-                  (file && comparedAlbums.length > 0) 
+                  isConnected 
                     ? 'bg-orange-500 cursor-pointer hover:bg-orange-600' 
                     : 'bg-gray-300 cursor-not-allowed'
                 }`}
               >
-                Continue
+                Analyze {sourceType === 'collection' ? 'Collection' : 'Wantlist'}
               </button>
             </>
           )}
@@ -989,7 +973,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           {stage === 'preview' && (
             <>
               <button
-                onClick={() => setStage('upload')}
+                onClick={() => setStage('select_mode')}
                 className="px-4 py-2 bg-gray-100 border border-gray-300 rounded text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-200"
               >
                 Back
@@ -998,7 +982,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 onClick={handleStartImport}
                 className="px-4 py-2 bg-orange-500 border-none rounded text-sm font-semibold cursor-pointer text-white hover:bg-orange-600"
               >
-                Start Import
+                Start Sync
               </button>
             </>
           )}
