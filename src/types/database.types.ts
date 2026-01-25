@@ -180,6 +180,38 @@ export interface Database {
           [key: string]: unknown
         }
       }
+
+      wantlist: {
+        Row: {
+          id: number
+          artist: string
+          title: string
+          year: string | null
+          format: string | null
+          cover_image: string | null
+          notes: string | null
+          
+          // IDs
+          discogs_release_id: string | null
+          discogs_master_id: string | null
+          
+          // Normalized
+          artist_norm: string | null
+          title_norm: string | null
+          artist_album_norm: string | null
+          
+          date_added_to_wantlist: string
+        }
+        Insert: {
+          artist: string
+          title: string
+          // allow other optional fields
+          [key: string]: unknown
+        }
+        Update: {
+          [key: string]: unknown
+        }
+      }
       
       artist_rules: {
         Row: {

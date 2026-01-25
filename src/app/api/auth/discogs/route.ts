@@ -6,7 +6,6 @@ export async function GET() {
   const dis = new Client();
   const oAuth = dis.oauth();
 
-  // Use production URL based on where the app is running
   const callbackUrl = process.env.NODE_ENV === 'production'
     ? 'https://deadwaxdialogues.com/api/auth/callback/discogs'
     : 'http://localhost:3000/api/auth/callback/discogs';
@@ -18,7 +17,8 @@ export async function GET() {
       callbackUrl
     );
 
-    const { token, tokenSecret, authorizeUrl } = requestData;
+    // Removed 'token' to fix ESLint unused var warning
+    const { tokenSecret, authorizeUrl } = requestData;
 
     // Store secret in cookie to verify callback later
     const cookieStore = await cookies();
