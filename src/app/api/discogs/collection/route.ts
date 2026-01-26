@@ -13,11 +13,9 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const page = searchParams.get('page') || '1';
-
+  
   const nonce = Math.floor(Math.random() * 1000000000).toString();
   const timestamp = Math.floor(Date.now() / 1000).toString();
-  
-  // PLAINTEXT signature for resources: ConsumerSecret&TokenSecret
   const signature = `${process.env.DISCOGS_CONSUMER_SECRET}&${secret}`;
 
   const authHeader = `OAuth oauth_consumer_key="${process.env.DISCOGS_CONSUMER_KEY}", ` +
@@ -37,7 +35,8 @@ export async function GET(req: Request) {
     });
 
     if (!response.ok) {
-        throw new Error(`Discogs API Error: ${response.status}`);
+        // Return the actual error from Discogs (e.g. 429 Rate Limit) instead of crashing with 500
+        return NextResponse.json({ error: response.statusText }, { status: response.status });
     }
 
     const data = await response.json();

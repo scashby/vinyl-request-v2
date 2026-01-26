@@ -1,162 +1,48 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 
-interface DiscogsImage {
-  uri: string;
-  height?: number;
-  width?: number;
-  resource_url?: string;
-  type?: string;
-  uri150?: string;
-}
+export async function GET(req: Request) {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('discogs_access_token')?.value;
+  const secret = cookieStore.get('discogs_access_secret')?.value;
 
-interface DiscogsArtist {
-  name: string;
-  anv?: string;
-  join?: string;
-  role?: string;
-  tracks?: string;
-  id?: number;
-  resource_url?: string;
-}
+  if (!token || !secret) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
 
-interface DiscogsTrack {
-  position: string;
-  title: string;
-  duration: string;
-  artists?: DiscogsArtist[];
-  type_?: string;
-}
+  const { searchParams } = new URL(req.url);
+  const releaseId = searchParams.get('releaseId');
 
-interface DiscogsRelease {
-  id: number;
-  title: string;
-  artists?: DiscogsArtist[];
-  images?: DiscogsImage[];
-  tracklist?: DiscogsTrack[];
-  year?: number;
-  master_id?: number;
-  master_url?: string;
-  genres?: string[];
-  styles?: string[];
-}
+  if (!releaseId) {
+      return NextResponse.json({ error: 'Release ID missing' }, { status: 400 });
+  }
 
-interface DiscogsVersion {
-  id: number;
-  title: string;
-  format?: string;
-  label?: string;
-  country?: string;
-  released?: string;
-  catno?: string;
-  resource_url?: string;
-  thumb?: string;
-  status?: string;
-}
+  const nonce = Math.floor(Math.random() * 1000000000).toString();
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const signature = `${process.env.DISCOGS_CONSUMER_SECRET}&${secret}`;
 
-interface MasterVersionsResponse {
-  pagination: {
-    per_page: number;
-    pages: number;
-    page: number;
-    items: number;
-    urls: {
-      last?: string;
-      next?: string;
-    }
-  };
-  versions: DiscogsVersion[];
-}
+  const authHeader = `OAuth oauth_consumer_key="${process.env.DISCOGS_CONSUMER_KEY}", ` +
+    `oauth_nonce="${nonce}", ` +
+    `oauth_signature="${signature}", ` +
+    `oauth_signature_method="PLAINTEXT", ` +
+    `oauth_timestamp="${timestamp}", ` +
+    `oauth_token="${token}"`;
 
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const releaseId = searchParams.get("releaseId");
-    const masterId = searchParams.get("masterId");
-    const checkVersions = searchParams.get("checkVersions") === "true";
-    
-    console.log("Proxy called with:", { releaseId, masterId, checkVersions });
-    
-    // Get token
-    const token = process.env.NEXT_PUBLIC_DISCOGS_TOKEN || 
-                  process.env.DISCOGS_TOKEN;
-    
-    if (!token) {
-      console.log("No Discogs token found");
-      return new NextResponse("Missing Discogs token", { status: 500 });
-    }
-
-    // NEW: Handle master release versions request
-    if (masterId && checkVersions) {
-      console.log("Fetching master release versions for masterId:", masterId);
-      
-      // Rate limiting
-      await sleep(1000);
-      
-      const url = `https://api.discogs.com/masters/${masterId}/versions?per_page=100`;
-      console.log("Fetching URL:", url);
-
-      const res = await fetch(url, {
-        headers: {
-          "Authorization": `Discogs token=${token}`,
-          "User-Agent": "DeadwaxDialogues/1.0 +https://yourwebsite.com",
-        },
-      });
-
-      console.log("Discogs master versions response status:", res.status);
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.log("Discogs error response:", errorText);
-        return new NextResponse(errorText, { status: res.status });
+    const response = await fetch(`https://api.discogs.com/releases/${releaseId}`, {
+      headers: {
+        'Authorization': authHeader,
+        'User-Agent': 'DeadwaxDialogues/1.0'
       }
+    });
 
-      const data = (await res.json()) as MasterVersionsResponse;
-      console.log("Master versions received, count:", data.versions?.length || 0);
-      
-      return NextResponse.json(data);
+    if (!response.ok) {
+        return NextResponse.json({ error: response.statusText }, { status: response.status });
     }
 
-    // EXISTING: Handle single release request (backward compatible)
-    if (releaseId) {
-      console.log("Fetching single release for releaseId:", releaseId);
-      
-      // Rate limiting
-      await sleep(1000);
-      
-      const url = `https://api.discogs.com/releases/${releaseId}`;
-      console.log("Fetching URL:", url);
-
-      const res = await fetch(url, {
-        headers: {
-          "Authorization": `Discogs token=${token}`,
-          "User-Agent": "DeadwaxDialogues/1.0 +https://yourwebsite.com",
-        },
-      });
-
-      console.log("Discogs release response status:", res.status);
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.log("Discogs error response:", errorText);
-        return new NextResponse(errorText, { status: res.status });
-      }
-
-      const data = (await res.json()) as DiscogsRelease;
-      console.log("Release data received, has images:", !!data.images);
-      console.log("Release data received, has tracklist:", !!data.tracklist);
-      
-      return NextResponse.json(data);
-    }
-
-    // Neither releaseId nor masterId provided
-    console.log("Missing required parameters");
-    return new NextResponse("Missing releaseId or masterId parameter", { status: 400 });
-
-  } catch (err: unknown) {
-    console.error("Proxy error:", err);
-    const msg = err instanceof Error ? err.message : 'Unknown error';
-    return new NextResponse(`Server error: ${msg}`, { status: 500 });
+    const data = await response.json();
+    return NextResponse.json(data);
+  } catch (error) {
+    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }
 }
