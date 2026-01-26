@@ -717,7 +717,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           });
 
           try {
-            // FIX: EXPLICIT MAPPING to avoid inserting generated columns or invalid fields
+            // Use Record<string, unknown> instead of any
+            // Base Data
             const albumData: Record<string, unknown> = {
               artist: album.artist,
               title: album.title,
@@ -741,7 +742,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 albumData.decade = album.decade;
                 albumData.for_sale = album.for_sale;
                 albumData.index_number = album.index_number;
-                // Note: year_int is generated, DO NOT insert it.
                 
                 // Important: Map cover image directly in case enrichment is skipped
                 if (album.cover_image) albumData.image_url = album.cover_image;
@@ -751,7 +751,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 const formatData = await parseDiscogsFormat(album.format);
                 
                 // FIX: EXPLICIT MAPPING to avoid unknown keys
-                // We do NOT spread formatData to avoid injecting 'unknownElements' or 'extraText'
+                // We do NOT spread formatData to avoid injecting 'unknownElements'
                 const mappedFormatData = {
                     discs: formatData.discs,
                     rpm: formatData.rpm,
@@ -950,7 +950,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           )}
 
           {/* FETCHING STAGE */}
-          {stage === 'fetching' || stage === 'fetching_definitions' && (
+          {(stage === 'fetching' || stage === 'fetching_definitions') && (
              <div className="text-center py-10 px-5">
                 <div className="text-2xl mb-4">📡</div>
                 <div className="text-gray-900 font-medium mb-2">Fetching from Discogs...</div>
