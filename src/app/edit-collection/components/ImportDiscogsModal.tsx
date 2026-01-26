@@ -7,7 +7,7 @@ import { parseDiscogsFormat } from '../../../lib/formatParser';
 import { normalizeArtist, normalizeTitle, normalizeArtistAlbum } from '../../../lib/importUtils';
 
 type SyncMode = 'full_replacement' | 'full_sync' | 'partial_sync' | 'new_only';
-type ImportStage = 'select_mode' | 'fetching' | 'preview' | 'importing' | 'complete';
+type ImportStage = 'select_mode' | 'fetching_definitions' | 'fetching' | 'preview' | 'importing' | 'complete';
 type AlbumStatus = 'NEW' | 'CHANGED' | 'UNCHANGED' | 'REMOVED';
 type DiscogsSourceType = 'collection' | 'wantlist';
 
@@ -23,6 +23,12 @@ interface DiscogsNote {
   value: string;
 }
 
+interface DiscogsFormat {
+  name: string;
+  qty: string;
+  descriptions?: string[];
+}
+
 interface DiscogsBasicInfo {
   id: number;
   master_id?: number;
@@ -30,8 +36,9 @@ interface DiscogsBasicInfo {
   year?: number;
   artists?: { name: string }[];
   labels?: DiscogsEntity[];
-  formats?: { name: string; descriptions?: string[] }[];
+  formats?: DiscogsFormat[];
   thumb?: string;
+  cover_image?: string;
 }
 
 interface DiscogsItem {
@@ -59,6 +66,19 @@ interface DiscogsWantlistResponse {
   };
   wants: DiscogsItem[];
 }
+
+// Interfaces for Metadata Lookups
+interface DiscogsField {
+    id: number;
+    name: string;
+    position: number;
+}
+
+interface DiscogsFolder {
+    id: number;
+    name: string;
+    count: number;
+}
 // --------------------------------------------
 
 interface ParsedAlbum {
@@ -70,6 +90,7 @@ interface ParsedAlbum {
   barcode: string | null;
   country: string | null;
   year: string | null;
+  year_int: number | null;
   location: string;
   discogs_release_id: string;
   discogs_master_id: string | null;
@@ -86,7 +107,6 @@ interface ParsedAlbum {
   for_sale: boolean;
   index_number: number | null;
   cover_image: string | null;
-  year_int: number | null;
 }
 
 interface ExistingAlbum {
@@ -184,9 +204,6 @@ function compareAlbums(
       if (existingAlbum.discogs_release_id) {
         releaseIdMap.delete(existingAlbum.discogs_release_id);
       }
-      const existingNormalizedKey = existingAlbum.artist_album_norm || 
-        normalizeArtistAlbum(existingAlbum.artist, existingAlbum.title);
-      artistAlbumMap.delete(existingNormalizedKey);
     }
   }
 
@@ -206,6 +223,7 @@ function compareAlbums(
       barcode: null,
       country: null,
       year: null,
+      year_int: null,
       location: 'Unknown',
       discogs_release_id: existingAlbum.discogs_release_id || '',
       discogs_master_id: null,
@@ -225,8 +243,7 @@ function compareAlbums(
       missingFields: [],
       for_sale: false,
       index_number: null,
-      cover_image: existingAlbum.image_url,
-      year_int: null
+      cover_image: existingAlbum.image_url
     });
   }
 
@@ -235,7 +252,7 @@ function compareAlbums(
 
 // Discogs API enrichment
 async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unknown>> {
-  await new Promise(resolve => setTimeout(resolve, 1000)); // Rate limiting
+  await new Promise(resolve => setTimeout(resolve, 1100)); // Rate limiting
 
   const response = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);
 
@@ -255,6 +272,7 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
       ['Gatefold', 'Single Sleeve', 'Digipak'].some(p => d.includes(p))
     ) || null,
     release_notes: data.notes || null,
+    country: data.country || null,
   };
 
   if (data.released) {
@@ -270,6 +288,18 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
       if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
           enriched.original_release_date = dateStr;
       }
+      // Also set original_release_year if we parsed it
+      const year = parseInt(data.released.substring(0, 4));
+      if (!isNaN(year)) {
+          enriched.original_release_year = year;
+      }
+  }
+
+  if (data.identifiers && Array.isArray(data.identifiers)) {
+    const barcode = data.identifiers.find((i: { type: string; value: string }) => i.type === 'Barcode');
+    if (barcode) {
+        enriched.barcode = barcode.value;
+    }
   }
 
   if (data.companies && Array.isArray(data.companies)) {
@@ -340,18 +370,15 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
       const positionStr = track.position || '';
       let discNumber = 1;
       let side = '';
-      let trackPosition = position;
-
+      
       const sideMatch = positionStr.match(/^([A-Z])(\d+)?/);
       if (sideMatch) {
         side = sideMatch[1];
-        trackPosition = parseInt(sideMatch[2] || '1');
         discNumber = Math.ceil((side.charCodeAt(0) - 64) / 2);
       } else {
         const discMatch = positionStr.match(/^(\d+)-(\d+)?/);
         if (discMatch) {
           discNumber = parseInt(discMatch[1]);
-          trackPosition = parseInt(discMatch[2] || position.toString());
         }
       }
 
@@ -374,7 +401,7 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
       }
 
       tracks.push({
-        position: trackPosition.toString(),
+        position: position.toString(),
         title: track.title || '',
         artist: track.artists?.[0]?.name || null,
         duration: track.duration || null,
@@ -429,6 +456,10 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   const [totalDatabaseCount, setTotalDatabaseCount] = useState<number>(0);
   const [isConnected, setIsConnected] = useState(false);
   
+  // New State for Metadata Maps
+  const [folders, setFolders] = useState<Record<number, string>>({});
+  const [fields, setFields] = useState<{media: number, sleeve: number, notes: number}>({ media: 0, sleeve: 0, notes: 0 });
+
   const [progress, setProgress] = useState({ current: 0, total: 0, status: '' });
   const [error, setError] = useState<string | null>(null);
   const [importErrors, setImportErrors] = useState<string[]>([]);
@@ -468,7 +499,40 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     window.location.href = '/api/auth/discogs';
   };
 
+  const fetchDefinitions = async () => {
+      setStage('fetching_definitions');
+      try {
+          // Fetch Folders
+          const folderRes = await fetch('/api/discogs/folders');
+          if (folderRes.ok) {
+              const folderData = await folderRes.json();
+              const folderMap: Record<number, string> = {};
+              folderData.folders?.forEach((f: DiscogsFolder) => folderMap[f.id] = f.name);
+              setFolders(folderMap);
+          }
+
+          // Fetch Fields
+          const fieldRes = await fetch('/api/discogs/fields');
+          if (fieldRes.ok) {
+              const fieldData = await fieldRes.json();
+              const mapping = { media: 0, sleeve: 0, notes: 0 };
+              fieldData.fields?.forEach((f: DiscogsField) => {
+                  const name = f.name.toLowerCase();
+                  if (name.includes('media')) mapping.media = f.id;
+                  else if (name.includes('sleeve')) mapping.sleeve = f.id;
+                  else if (name.includes('notes')) mapping.notes = f.id;
+              });
+              setFields(mapping);
+          }
+          return true;
+      } catch (e) {
+          console.warn("Could not fetch definitions", e);
+          return false;
+      }
+  };
+
   const handleFetchFromDiscogs = async () => {
+    await fetchDefinitions();
     setStage('fetching');
     setError(null);
     setComparedAlbums([]);
@@ -503,39 +567,55 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 const year = info.year?.toString() || null;
                 const yearInt = year ? parseInt(year) : null;
                 
-                // Heuristic for Media/Sleeve Condition
-                const conditionRegex = /^(Mint|Near Mint|Very Good|Good|Fair|Poor)/i;
-                let mediaCond = ''; // Default to empty string instead of 'Unknown' to match CSV behavior
+                // Extract values using fetched field IDs or Heuristic regex fallback
+                let mediaCond = '';
                 let sleeveCond = null;
                 let personalNoteStr = '';
+                const conditionRegex = /^(Mint|Near Mint|Very Good|Good|Fair|Poor)/i;
 
                 if (item.notes) {
                     for (const note of item.notes) {
-                        if (conditionRegex.test(note.value)) {
-                            if (mediaCond === '') mediaCond = note.value;
-                            else if (!sleeveCond) sleeveCond = note.value; 
+                        if (fields.media && note.field_id === fields.media) mediaCond = note.value;
+                        else if (fields.sleeve && note.field_id === fields.sleeve) sleeveCond = note.value;
+                        else if (fields.notes && note.field_id === fields.notes) personalNoteStr = note.value;
+                        // Fallback Regex
+                        else if (conditionRegex.test(note.value)) {
+                             if (mediaCond === '') mediaCond = note.value;
+                             else if (!sleeveCond) sleeveCond = note.value;
                         } else {
-                            if (personalNoteStr) personalNoteStr += '; ';
-                            personalNoteStr += note.value;
+                             if (personalNoteStr) personalNoteStr += '; ';
+                             personalNoteStr += note.value;
                         }
                     }
                 }
                 
+                // Reconstruct Full Format String for parser
+                let fullFormat = '';
+                if (info.formats && info.formats.length > 0) {
+                    const f = info.formats[0];
+                    fullFormat = `${f.qty}x${f.name}`;
+                    if (f.descriptions) fullFormat += `, ${f.descriptions.join(', ')}`;
+                }
+
+                // Map Folder to Location & For Sale
+                const folderName = folders[item.folder_id] || 'Uncategorized';
+                const isForSale = folderName.toLowerCase().includes('sale') || folderName.toLowerCase().includes('sell');
+
                 // Ensure date is YYYY-MM-DD
                 const dateAdded = item.date_added ? item.date_added.split('T')[0] : new Date().toISOString().split('T')[0];
 
                 allFetchedItems.push({
                     artist,
                     title,
-                    format: info.formats?.[0]?.name || '',
+                    format: fullFormat,
                     labels: info.labels?.map((l: DiscogsEntity) => l.name) || [],
                     cat_no: info.labels?.[0]?.catno || null,
                     barcode: null, 
                     country: null,
                     year,
                     year_int: isNaN(yearInt!) ? null : yearInt,
-                    location: sourceType === 'collection' && item.folder_id === 0 ? 'All' : 'Uncategorized',
-                    for_sale: false,
+                    location: isForSale ? 'For Sale' : folderName,
+                    for_sale: isForSale,
                     discogs_release_id: item.id.toString(),
                     discogs_master_id: info.master_id?.toString() || null,
                     date_added: dateAdded,
@@ -549,7 +629,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     artist_album_norm: normalizeArtistAlbum(artist, title),
                     album_norm: normalizeTitle(title),
                     index_number: item.instance_id,
-                    cover_image: info.thumb || null
+                    cover_image: info.thumb || info.cover_image || null
                 });
             }
 
@@ -589,11 +669,13 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     try {
       let albumsToProcess: ComparedAlbum[] = [];
 
+      // Determine which albums to process based on Sync Mode
       if (syncMode === 'full_replacement') {
         const targetTable = sourceType === 'collection' ? 'collection' : 'wantlist';
         await supabase.from(targetTable).delete().gt('id', 0); 
         albumsToProcess = comparedAlbums.filter(a => a.status !== 'REMOVED');
       } else if (syncMode === 'full_sync') {
+        // Handle removals
         const removed = comparedAlbums.filter(a => a.status === 'REMOVED' && a.existingId);
         if (removed.length > 0) {
           const idsToDelete = removed.map(a => a.existingId!);
@@ -622,7 +704,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
       const targetTable = sourceType === 'collection' ? 'collection' : 'wantlist';
 
-      const batchSize = 10;
+      // Process in batches
+      const batchSize = 10; // Smaller batch for API calls
       for (let i = 0; i < albumsToProcess.length; i += batchSize) {
         const batch = albumsToProcess.slice(i, i + batchSize);
 
@@ -634,6 +717,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           });
 
           try {
+            // Fix: Use Record<string, unknown> instead of any
             const albumData: Record<string, unknown> = {
               artist: album.artist,
               title: album.title,
@@ -646,6 +730,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               artist_album_norm: album.artist_album_norm,
             };
 
+            // Table specific fields
             if (sourceType === 'collection') {
                 albumData.cat_no = album.cat_no;
                 albumData.labels = album.labels;
@@ -659,17 +744,18 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 albumData.for_sale = album.for_sale;
                 albumData.index_number = album.index_number;
                 albumData.year_int = album.year_int;
-                // Important: Map cover image directly in case enrichment is skipped
-                if (album.cover_image) albumData.image_url = album.cover_image;
                 
+                // Parse format string for extra details
                 const formatData = parseDiscogsFormat(album.format);
                 Object.assign(albumData, formatData);
             } else {
+                // Wantlist specific
                 albumData.date_added_to_wantlist = album.date_added;
                 albumData.notes = album.personal_notes;
                 albumData.cover_image = album.cover_image;
             }
 
+            // Enrichment Logic (Only if NEW or Full Sync/Partial Sync needs it)
             if (sourceType === 'collection' && (
                 album.status === 'NEW' || 
                 syncMode === 'full_sync' || 
@@ -680,6 +766,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               if (syncMode === 'full_sync' || album.status === 'NEW') {
                 Object.assign(albumData, enrichedData);
               } else {
+                // Smart merge for partial sync
                 album.missingFields.forEach(field => {
                   if (enrichedData[field]) {
                     if (field === 'genres') albumData.genres = enrichedData.genres;
@@ -688,8 +775,14 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                   }
                 });
               }
+              
+              // Ensure image is set if enrichment didn't return one but the basic info did
+              if (!albumData.image_url && album.cover_image) {
+                 albumData.image_url = album.cover_image;
+              }
             }
 
+            // Database Operations
             if (album.status === 'NEW') {
               const { error: insertError } = await supabase.from(targetTable).insert(albumData);
               if (insertError) throw insertError;
@@ -748,6 +841,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30000]">
+      {/* FIXED: Added text-gray-900 to ensure text is visible on white background */}
       <div className="bg-white text-gray-900 rounded-lg w-[600px] max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-5 py-4 border-b border-gray-200 bg-orange-500 text-white flex justify-between items-center">
@@ -841,11 +935,11 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           )}
 
           {/* FETCHING STAGE */}
-          {stage === 'fetching' && (
+          {stage === 'fetching' || stage === 'fetching_definitions' && (
              <div className="text-center py-10 px-5">
                 <div className="text-2xl mb-4">📡</div>
                 <div className="text-gray-900 font-medium mb-2">Fetching from Discogs...</div>
-                <div className="text-sm text-gray-500">{progress.status}</div>
+                <div className="text-sm text-gray-500">{progress.status || (stage === 'fetching_definitions' ? 'Loading definitions...' : '')}</div>
                 <div className="text-xs text-gray-400 mt-2">{progress.current} items found</div>
              </div>
           )}
