@@ -569,7 +569,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 const yearInt = year ? parseInt(year) : null;
                 
                 // Extract values using fetched field IDs or Heuristic regex fallback
-                let mediaCond = '';
+                let mediaCond = ''; // Default to empty string per schema audit
                 let sleeveCond = null;
                 let personalNoteStr = '';
                 const conditionRegex = /^(Mint|Near Mint|Very Good|Good|Fair|Poor)/i;
@@ -579,13 +579,13 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                         if (fields.media && note.field_id === fields.media) mediaCond = note.value;
                         else if (fields.sleeve && note.field_id === fields.sleeve) sleeveCond = note.value;
                         else if (fields.notes && note.field_id === fields.notes) personalNoteStr = note.value;
-                        // Fallback Regex
                         else if (conditionRegex.test(note.value)) {
-                             if (mediaCond === '') mediaCond = note.value;
-                             else if (!sleeveCond) sleeveCond = note.value;
+                            // If fields map failed, use regex fallback
+                            if (mediaCond === '') mediaCond = note.value;
+                            else if (!sleeveCond) sleeveCond = note.value; 
                         } else {
-                             if (personalNoteStr) personalNoteStr += '; ';
-                             personalNoteStr += note.value;
+                            if (personalNoteStr) personalNoteStr += '; ';
+                            personalNoteStr += note.value;
                         }
                     }
                 }
@@ -615,7 +615,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     country: null,
                     year,
                     year_int: isNaN(yearInt!) ? null : yearInt,
-                    location: isForSale ? 'For Sale' : folderName,
+                    location: sourceType === 'collection' && item.folder_id === 0 ? 'All' : 'Uncategorized',
                     for_sale: isForSale,
                     discogs_release_id: item.id.toString(),
                     discogs_master_id: info.master_id?.toString() || null,
@@ -630,7 +630,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     artist_album_norm: normalizeArtistAlbum(artist, title),
                     album_norm: normalizeTitle(title),
                     index_number: item.instance_id,
-                    cover_image: info.thumb || info.cover_image || null
+                    cover_image: info.thumb || null
                 });
             }
 
@@ -719,6 +719,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
           try {
             // Use Record<string, unknown> instead of any
+            // Base Data
             const albumData: Record<string, unknown> = {
               artist: album.artist,
               title: album.title,
@@ -729,6 +730,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               artist_norm: album.artist_norm,
               title_norm: album.title_norm,
               artist_album_norm: album.artist_album_norm,
+              // Added discogs_id to match schema availability
+              discogs_id: album.discogs_release_id, 
             };
 
             // Table specific fields
@@ -753,10 +756,16 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 // ADDED: Await to fix the Promise error
                 const formatData = await parseDiscogsFormat(album.format);
                 
-                // FIX: SCHEMA VIOLATION for vinyl_color (Must be array)
+                // FIX: EXPLICIT MAPPING to avoid unknown keys
+                // We do NOT spread formatData to avoid injecting 'unknownElements'
                 const mappedFormatData = {
-                    ...formatData,
-                    vinyl_color: formatData.vinyl_color ? [formatData.vinyl_color] : null
+                    discs: formatData.discs,
+                    rpm: formatData.rpm,
+                    sound: formatData.sound,
+                    vinyl_weight: formatData.vinyl_weight,
+                    packaging: formatData.packaging,
+                    extra: formatData.extraText, // Map extraText to 'extra' DB column
+                    vinyl_color: formatData.vinyl_color ? [formatData.vinyl_color] : null // Map to ARRAY type
                 };
                 
                 Object.assign(albumData, mappedFormatData);
