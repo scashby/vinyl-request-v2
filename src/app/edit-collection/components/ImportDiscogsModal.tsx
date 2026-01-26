@@ -569,7 +569,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 const yearInt = year ? parseInt(year) : null;
                 
                 // Extract values using fetched field IDs or Heuristic regex fallback
-                let mediaCond = ''; // Default to empty string per schema audit
+                let mediaCond = ''; // Default to empty string
                 let sleeveCond = null;
                 let personalNoteStr = '';
                 const conditionRegex = /^(Mint|Near Mint|Very Good|Good|Fair|Poor)/i;
@@ -580,7 +580,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                         else if (fields.sleeve && note.field_id === fields.sleeve) sleeveCond = note.value;
                         else if (fields.notes && note.field_id === fields.notes) personalNoteStr = note.value;
                         else if (conditionRegex.test(note.value)) {
-                            // If fields map failed, use regex fallback
                             if (mediaCond === '') mediaCond = note.value;
                             else if (!sleeveCond) sleeveCond = note.value; 
                         } else {
@@ -590,7 +589,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     }
                 }
                 
-                // Reconstruct Full Format String for parser
                 let fullFormat = '';
                 if (info.formats && info.formats.length > 0) {
                     const f = info.formats[0];
@@ -598,11 +596,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     if (f.descriptions) fullFormat += `, ${f.descriptions.join(', ')}`;
                 }
 
-                // Map Folder to Location & For Sale
                 const folderName = folders[item.folder_id] || 'Uncategorized';
                 const isForSale = folderName.toLowerCase().includes('sale') || folderName.toLowerCase().includes('sell');
-
-                // Ensure date is YYYY-MM-DD
                 const dateAdded = item.date_added ? item.date_added.split('T')[0] : new Date().toISOString().split('T')[0];
 
                 allFetchedItems.push({
@@ -641,7 +636,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
             }
         }
 
-        // 2. Fetch Existing from DB to Compare
         const targetTable = sourceType === 'collection' ? 'collection' : 'wantlist';
         // Use unknown casting to satisfy TS without using 'any'
         const { data: existing, error: dbError } = await supabase
@@ -652,9 +646,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
         setTotalDatabaseCount(existing?.length || 0);
 
-        // 3. Run Comparison Logic
-        const compared = compareAlbums(allFetchedItems, (existing || []) as unknown as ExistingAlbum[]);
-        setComparedAlbums(compared);
+        setComparedAlbums(compareAlbums(allFetchedItems, (existing || []) as unknown as ExistingAlbum[]));
         setStage('preview');
 
     } catch (err) {
@@ -671,13 +663,11 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     try {
       let albumsToProcess: ComparedAlbum[] = [];
 
-      // Determine which albums to process based on Sync Mode
       if (syncMode === 'full_replacement') {
         const targetTable = sourceType === 'collection' ? 'collection' : 'wantlist';
         await supabase.from(targetTable).delete().gt('id', 0); 
         albumsToProcess = comparedAlbums.filter(a => a.status !== 'REMOVED');
       } else if (syncMode === 'full_sync') {
-        // Handle removals
         const removed = comparedAlbums.filter(a => a.status === 'REMOVED' && a.existingId);
         if (removed.length > 0) {
           const idsToDelete = removed.map(a => a.existingId!);
@@ -706,7 +696,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
       const targetTable = sourceType === 'collection' ? 'collection' : 'wantlist';
 
-      const batchSize = 1; // Process one by one to avoid rate limiting on enrichment
+      const batchSize = 1;
       for (let i = 0; i < albumsToProcess.length; i += batchSize) {
         const batch = albumsToProcess.slice(i, i + batchSize);
 
@@ -718,8 +708,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           });
 
           try {
-            // Use Record<string, unknown> instead of any
-            // Base Data
+            // FIX: Removed GENERATED ALWAYS columns (artist_norm, title_norm, album_norm, artist_album_norm, year_int)
             const albumData: Record<string, unknown> = {
               artist: album.artist,
               title: album.title,
@@ -727,14 +716,9 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               format: album.format,
               discogs_release_id: album.discogs_release_id,
               discogs_master_id: album.discogs_master_id,
-              artist_norm: album.artist_norm,
-              title_norm: album.title_norm,
-              artist_album_norm: album.artist_album_norm,
-              // Added discogs_id to match schema availability
               discogs_id: album.discogs_release_id, 
             };
 
-            // Table specific fields
             if (sourceType === 'collection') {
                 albumData.cat_no = album.cat_no;
                 albumData.labels = album.labels;
@@ -747,17 +731,13 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 albumData.decade = album.decade;
                 albumData.for_sale = album.for_sale;
                 albumData.index_number = album.index_number;
-                albumData.year_int = album.year_int;
                 
-                // Important: Map cover image directly in case enrichment is skipped
+                // Do NOT insert year_int (Generated)
+                
                 if (album.cover_image) albumData.image_url = album.cover_image;
                 
-                // Parse format string for extra details (vinyl color etc)
-                // ADDED: Await to fix the Promise error
                 const formatData = await parseDiscogsFormat(album.format);
                 
-                // FIX: EXPLICIT MAPPING to avoid unknown keys
-                // We do NOT spread formatData to avoid injecting 'unknownElements'
                 const mappedFormatData = {
                     discs: formatData.discs,
                     rpm: formatData.rpm,
@@ -770,40 +750,24 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 
                 Object.assign(albumData, mappedFormatData);
             } else {
-                // Wantlist specific
                 albumData.date_added_to_wantlist = album.date_added;
                 albumData.notes = album.personal_notes;
                 albumData.cover_image = album.cover_image;
             }
 
-            // Enrichment Logic (Only if NEW or Full Sync/Partial Sync needs it)
             if (sourceType === 'collection' && (
                 album.status === 'NEW' || 
                 syncMode === 'full_sync' || 
                 (syncMode === 'partial_sync' && album.needsEnrichment)
             )) {
               const enrichedData = await enrichFromDiscogs(album.discogs_release_id);
+              Object.assign(albumData, enrichedData);
               
-              if (syncMode === 'full_sync' || album.status === 'NEW') {
-                Object.assign(albumData, enrichedData);
-              } else {
-                // Smart merge for partial sync
-                album.missingFields.forEach(field => {
-                  if (enrichedData[field]) {
-                    if (field === 'genres') albumData.genres = enrichedData.genres;
-                    else if (field === 'styles') albumData.styles = enrichedData.styles;
-                    else albumData[field] = enrichedData[field];
-                  }
-                });
-              }
-              
-              // Double check image url after enrichment
               if (!albumData.image_url && album.cover_image) {
                  albumData.image_url = album.cover_image;
               }
             }
 
-            // Database Operations
             if (album.status === 'NEW') {
               const { error: insertError } = await supabase.from(targetTable).insert(albumData);
               if (insertError) throw insertError;
@@ -864,7 +828,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30000]">
       {/* FIXED: Added text-gray-900 to ensure text is visible on white background */}
       <div className="bg-white text-gray-900 rounded-lg w-[600px] max-h-[90vh] flex flex-col overflow-hidden">
-        {/* Header */}
         <div className="px-5 py-4 border-b border-gray-200 bg-orange-500 text-white flex justify-between items-center">
           <h2 className="m-0 text-lg font-semibold">
             Import from Discogs
@@ -877,7 +840,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           </button>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-auto p-5">
           {error && (
             <div className="p-3 bg-red-100 border border-red-300 rounded mb-4 text-red-800 text-sm">
@@ -885,7 +847,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
             </div>
           )}
 
-          {/* SELECT MODE STAGE */}
           {stage === 'select_mode' && (
             <>
               {!isConnected ? (
@@ -955,7 +916,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
             </>
           )}
 
-          {/* FETCHING STAGE */}
           {stage === 'fetching' || stage === 'fetching_definitions' && (
              <div className="text-center py-10 px-5">
                 <div className="text-2xl mb-4">📡</div>
@@ -965,14 +925,12 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
              </div>
           )}
 
-          {/* PREVIEW STAGE */}
           {stage === 'preview' && (
             <>
               <div className="text-sm mb-4 bg-blue-50 p-3 rounded text-blue-800 border border-blue-200">
                 Analyzed <strong>{comparedAlbums.length}</strong> items from your {sourceType}.
               </div>
 
-              {/* Summary Stats */}
               <div className="flex justify-between mb-4 text-center gap-2">
                 <div className="flex-1 bg-green-50 p-2 rounded border border-green-200">
                   <div className="text-xl font-bold text-green-700">{newCount}</div>
@@ -990,7 +948,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 )}
               </div>
 
-              {/* Preview Table */}
               <div className="border border-gray-200 rounded-md overflow-hidden">
                 <div className="px-3 py-2.5 bg-gray-50 border-b border-gray-200 font-semibold text-[13px] text-gray-500">
                   Preview (first 10 affected items)
@@ -1029,7 +986,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
             </>
           )}
 
-          {/* IMPORTING STAGE */}
           {stage === 'importing' && (
             <div className="text-center py-10 px-5">
               <div className="w-full h-2 bg-gray-200 rounded overflow-hidden mb-3">
@@ -1047,7 +1003,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
             </div>
           )}
 
-          {/* COMPLETE STAGE */}
           {stage === 'complete' && (
             <div className="p-5 bg-green-50 border border-green-200 rounded-md text-center">
               <div className="text-5xl mb-3">✓</div>
@@ -1075,7 +1030,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           )}
         </div>
 
-        {/* Footer */}
         <div className="px-5 py-4 border-t border-gray-200 flex justify-end gap-3">
           {stage === 'select_mode' && (
             <>
