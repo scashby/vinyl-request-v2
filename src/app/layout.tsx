@@ -26,7 +26,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${playfair.variable} font-sans bg-black text-white min-h-screen pb-24 md:pb-0`}>
+      {/* FIXED: Removed 'bg-black text-white' to stop forced dark mode.
+          The app will now use the defaults from globals.css.
+      */}
+      <body className={`${inter.variable} ${playfair.variable} font-sans min-h-screen pb-24 md:pb-0`}>
         <AuthProvider>
           {/* REMOVED: AlbumContextManager wrapper (Audio Recognition) */}
           <NavigationMenu />
