@@ -454,7 +454,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
       } else if (res.ok) {
         setIsConnected(true);
       } else {
-        // Connected but maybe empty
         setIsConnected(true);
       }
     } catch {
@@ -500,28 +499,52 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 const title = info.title || 'Unknown';
                 const year = info.year?.toString() || null;
                 
+                // Heuristic for Media/Sleeve Condition
+                // The API stores these in 'notes', we must parse them.
+                // Regex looks for standard grading terms (Mint, Near Mint, VG+, etc)
+                const conditionRegex = /^(Mint|Near Mint|Very Good|Good|Fair|Poor)/i;
+                let mediaCond = 'Unknown';
+                let sleeveCond = null;
+                let personalNoteStr = '';
+
+                if (item.notes) {
+                    for (const note of item.notes) {
+                        if (conditionRegex.test(note.value)) {
+                            // Assume first match is Media, second is Sleeve
+                            if (mediaCond === 'Unknown') mediaCond = note.value;
+                            else if (!sleeveCond) sleeveCond = note.value; 
+                        } else {
+                            // Everything else is a personal note
+                            if (personalNoteStr) personalNoteStr += '; ';
+                            personalNoteStr += note.value;
+                        }
+                    }
+                }
+
                 // Map API data to ParsedAlbum structure
                 allFetchedItems.push({
                     artist,
                     title,
                     format: info.formats?.[0]?.name || '',
-                    // Fix: Use typed interface for map callback
+                    // Map Labels
                     labels: info.labels?.map((l: DiscogsEntity) => l.name) || [],
+                    // Map Catalog Number
                     cat_no: info.labels?.[0]?.catno || null,
                     barcode: null, 
                     country: null,
                     year,
                     // Determine location based on folder
                     location: sourceType === 'collection' && item.folder_id === 0 ? 'All' : 'Uncategorized',
-                    for_sale: false,
+                    // Default for_sale to false unless explicitly known (requires folder fetch which we lack)
+                    for_sale: false, 
                     discogs_release_id: item.id.toString(),
                     discogs_master_id: info.master_id?.toString() || null,
                     date_added: item.date_added || new Date().toISOString(),
-                    // Fix: Use typed interface for find callback
-                    media_condition: item.notes?.find((n: DiscogsNote) => n.field_id === 1)?.value || 'Unknown',
-                    package_sleeve_condition: null,
-                    // Fix: Use typed interface for map callback
-                    personal_notes: item.notes?.map((n: DiscogsNote) => n.value).join('; ') || '',
+                    
+                    media_condition: mediaCond,
+                    package_sleeve_condition: sleeveCond,
+                    personal_notes: personalNoteStr,
+                    
                     my_rating: item.rating || null,
                     decade: calculateDecade(year),
                     artist_norm: normalizeArtist(artist),
@@ -637,6 +660,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 albumData.location = album.location;
                 albumData.date_added = album.date_added;
                 albumData.media_condition = album.media_condition;
+                albumData.package_sleeve_condition = album.package_sleeve_condition;
                 albumData.personal_notes = album.personal_notes;
                 albumData.my_rating = album.my_rating;
                 albumData.decade = album.decade;
@@ -734,7 +758,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30000]">
-      <div className="bg-white rounded-lg w-[600px] max-h-[90vh] flex flex-col overflow-hidden">
+      {/* FIXED: Added text-gray-900 to ensure text is visible on white background */}
+      <div className="bg-white text-gray-900 rounded-lg w-[600px] max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-5 py-4 border-b border-gray-200 bg-orange-500 text-white flex justify-between items-center">
           <h2 className="m-0 text-lg font-semibold">
@@ -780,14 +805,14 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     <div className="grid grid-cols-2 gap-3">
                         <button
                             onClick={() => setSourceType('collection')}
-                            className={`p-3 border rounded text-left ${sourceType === 'collection' ? 'border-orange-500 bg-orange-50 text-orange-900' : 'border-gray-200 hover:border-gray-300'}`}
+                            className={`p-3 border rounded text-left ${sourceType === 'collection' ? 'border-orange-500 bg-orange-50 text-orange-900' : 'border-gray-200 hover:border-gray-300 text-gray-700'}`}
                         >
                             <div className="font-bold">Collection</div>
                             <div className="text-xs opacity-70">Your owned releases</div>
                         </button>
                         <button
                             onClick={() => setSourceType('wantlist')}
-                            className={`p-3 border rounded text-left ${sourceType === 'wantlist' ? 'border-pink-500 bg-pink-50 text-pink-900' : 'border-gray-200 hover:border-gray-300'}`}
+                            className={`p-3 border rounded text-left ${sourceType === 'wantlist' ? 'border-pink-500 bg-pink-50 text-pink-900' : 'border-gray-200 hover:border-gray-300 text-gray-700'}`}
                         >
                             <div className="font-bold">Wantlist</div>
                             <div className="text-xs opacity-70">Items you want</div>
