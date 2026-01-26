@@ -1,4 +1,3 @@
-// src/app/api/pricing/discogs-prices/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { enrichDiscogsPricing } from '../../../../lib/enrichment-service';
 import { cookies } from 'next/headers';
@@ -38,7 +37,16 @@ export async function POST(request: NextRequest) {
     const result = await enrichDiscogsPricing(albumId || null, releaseId, authHeader);
 
     if (!result.success) {
-        return NextResponse.json({ success: false, error: result.error }, { status: 500 });
+        // Fix: Return exact error status if possible, otherwise 500
+        // This allows the frontend to handle 429 Rate Limits properly
+        let status = 500;
+        if (result.error) {
+            if (result.error.includes('429')) status = 429;
+            else if (result.error.includes('404')) status = 404;
+            else if (result.error.includes('401')) status = 401;
+        }
+        
+        return NextResponse.json({ success: false, error: result.error }, { status });
     }
 
     return NextResponse.json({

@@ -273,44 +273,19 @@ function compareAlbums(
 
 // Discogs API enrichment
 async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unknown>> {
-  // SLOW DOWN: Pricing API hits Discogs multiple times, so we must be gentle.
-  await new Promise(resolve => setTimeout(resolve, 2500)); 
+  await new Promise(resolve => setTimeout(resolve, 1100)); // Rate limiting
 
-  // 1. Fetch Metadata from Proxy
   const response = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);
+
   if (!response.ok) {
     throw new Error(`Discogs API error: ${response.status}`);
   }
-  
-  // Cast to defined interface
-  const data = (await response.json()) as DiscogsReleaseData;
 
-  // 2. Fetch Pricing from Pricing Route
-  let priceData = {};
-  try {
-      const priceRes = await fetch('/api/pricing/discogs-prices', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ releaseId })
-      });
-      if (priceRes.ok) {
-          const priceJson = await priceRes.json();
-          if (priceJson.success && priceJson.data?.prices) {
-              priceData = {
-                  discogs_price_min: priceJson.data.prices.min,
-                  discogs_price_median: priceJson.data.prices.median,
-                  discogs_price_max: priceJson.data.prices.max,
-                  discogs_price_updated_at: new Date().toISOString()
-              };
-          }
-      }
-  } catch (e) {
-      console.warn('Failed to fetch pricing:', e);
-  }
+  // Cast response to defined interface
+  const data = (await response.json()) as DiscogsReleaseData;
 
   // Extract data
   const enriched: Record<string, unknown> = {
-    ...priceData,
     image_url: data.images?.[0]?.uri || null,
     back_image_url: data.images?.[1]?.uri || null,
     genres: data.genres || [],
@@ -625,7 +600,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 const yearInt = year ? parseInt(year) : null;
                 
                 // Extract values using fetched field IDs or Heuristic regex fallback
-                let mediaCond = ''; // Default to empty string
+                let mediaCond = ''; // Default to empty string per schema audit
                 let sleeveCond = null;
                 let personalNoteStr = '';
                 const conditionRegex = /^(Mint|Near Mint|Very Good|Good|Fair|Poor)/i;
@@ -636,6 +611,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                         else if (fields.sleeve && note.field_id === fields.sleeve) sleeveCond = note.value;
                         else if (fields.notes && note.field_id === fields.notes) personalNoteStr = note.value;
                         else if (conditionRegex.test(note.value)) {
+                            // If fields map failed, use regex fallback
                             if (mediaCond === '') mediaCond = note.value;
                             else if (!sleeveCond) sleeveCond = note.value; 
                         } else {
@@ -778,18 +754,26 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
             // SPECIAL MODE: Pricing Update
             if (syncMode === 'price_update') {
                 if (album.existingId && album.discogs_release_id) {
-                     await new Promise(r => setTimeout(r, 2500)); // 2.5s Delay
-                     await fetch('/api/pricing/discogs-prices', {
+                     await new Promise(r => setTimeout(r, 3500)); // Increased safety delay to 3.5s
+                     const priceRes = await fetch('/api/pricing/discogs-prices', {
                          method: 'POST',
                          body: JSON.stringify({ releaseId: album.discogs_release_id, albumId: album.existingId })
                      });
-                     resultCounts.updated++;
+                     
+                     if (!priceRes.ok) {
+                         // Gracefully handle error without crashing loop
+                         const errText = await priceRes.text();
+                         console.warn(`Pricing fetch failed for ${album.discogs_release_id}: ${priceRes.status} ${errText}`);
+                         setImportErrors(prev => [...prev, `${album.artist} - ${album.title}: Pricing failed (${priceRes.status})`]);
+                         resultCounts.errors++;
+                     } else {
+                         resultCounts.updated++;
+                     }
                 }
                 continue; // Skip the rest of standard import logic
             }
 
-            // Use Record<string, unknown> instead of any
-            // Base Data
+            // STANDARD IMPORT LOGIC
             const albumData: Record<string, unknown> = {
               artist: album.artist,
               title: album.title,
@@ -817,6 +801,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 albumData.decade = album.decade;
                 albumData.for_sale = album.for_sale;
                 albumData.index_number = album.index_number;
+                // Note: year_int is generated, DO NOT insert it.
                 
                 // Important: Map cover image directly in case enrichment is skipped
                 if (album.cover_image) albumData.image_url = album.cover_image;
@@ -826,7 +811,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 const formatData = await parseDiscogsFormat(album.format);
                 
                 // FIX: EXPLICIT MAPPING to avoid unknown keys
-                // We do NOT spread formatData to avoid injecting 'unknownElements'
                 const mappedFormatData = {
                     discs: formatData.discs,
                     rpm: formatData.rpm,
@@ -1026,6 +1010,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           )}
 
           {/* FETCHING STAGE */}
+          {/* FIX: Wrapped condition in parens to fix rendering bug */}
           {(stage === 'fetching' || stage === 'fetching_definitions') && (
              <div className="text-center py-10 px-5">
                 <div className="text-2xl mb-4">📡</div>

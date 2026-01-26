@@ -316,10 +316,20 @@ export async function enrichDiscogsPricing(albumId: number | null, releaseId: st
   try {
     if (!isValidDiscogsId(releaseId)) return { success: false, error: 'Invalid Release ID' };
 
-    const headers = {
-        'User-Agent': MB_USER_AGENT,
-        'Authorization': userAuthHeader || `Discogs token=${DISCOGS_TOKEN}`
+    // Construct headers securely
+    const headers: HeadersInit = {
+        'User-Agent': MB_USER_AGENT
     };
+
+    // Use User Header if provided (Rate Limit: 60/min per user)
+    // Fallback to Server Token (Rate Limit: 60/min per IP)
+    if (userAuthHeader) {
+        headers['Authorization'] = userAuthHeader;
+    } else if (DISCOGS_TOKEN) {
+        headers['Authorization'] = `Discogs token=${DISCOGS_TOKEN}`;
+    } else {
+        return { success: false, error: 'No Discogs Token Available' };
+    }
 
     // 1. Fetch Marketplace Stats
     const statsUrl = `https://api.discogs.com/marketplace/stats/${releaseId}?curr=USD`;
