@@ -65,9 +65,12 @@ function CollectionBrowserPage() {
   const [selectedFolderValue, setSelectedFolderValue] = useState<string | null>(null);
   const [selectedCrateId, setSelectedCrateId] = useState<number | null>(null);
   const [crates, setCrates] = useState<Crate[]>([]);
+  
   const [collectionFilter, setCollectionFilter] = useState<string>('All');
   const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
+  
   const [folderSearch, setFolderSearch] = useState('');
+  
   const [folderSortByCount, setFolderSortByCount] = useState(false);
   const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<number>>(new Set());
   const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null);
@@ -81,6 +84,7 @@ function CollectionBrowserPage() {
   const [newlyCreatedCrateId, setNewlyCreatedCrateId] = useState<number | null>(null);
   
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
+  
   const [showSortDropdown, setShowSortDropdown] = useState(false);
 
   const [tableSortState, setTableSortState] = useState<SortState>({
@@ -238,6 +242,7 @@ function CollectionBrowserPage() {
           album.format,
           album.year,
           toSafeSearchString(album.custom_tags),
+          // FIXED: Search canonical genres instead of discogs_genres
           toSafeSearchString(album.genres),
           toSafeSearchString(album.spotify_label),
           toSafeSearchString(album.apple_music_label)
@@ -659,19 +664,28 @@ function CollectionBrowserPage() {
             </div>
           </div>
 
-          <div className="hidden lg:flex h-full shrink-0 w-[380px] bg-white border-l border-[#ddd]">
-            {selectedAlbum ? (
-                <CollectionInfoPanel 
-                    album={selectedAlbum} 
-                    onClose={() => setSelectedAlbumId(null)}
-                    onEditTags={() => handleEditAlbum(selectedAlbum.id)}
-                    onMarkForSale={() => handleMarkForSale(selectedAlbum.id)}
-                />
-            ) : (
-                <div className="flex items-center justify-center text-gray-400 text-sm h-full w-full">
-                    Select an album to view details
-                </div>
-            )}
+          <div className="hidden lg:flex w-[380px] bg-white border-l border-[#ddd] overflow-auto flex-col shrink-0">
+            {/* Action Toolbar */}
+            <div className="px-3 py-1.5 border-b border-[#555] flex items-center justify-between bg-[#4a4a4a] h-10 shrink-0">
+              <div className="flex gap-1.5 items-center">
+                <button onClick={() => selectedAlbumId && handleEditAlbum(selectedAlbumId)} title="Edit album details" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-sm text-white">✏️</button>
+                <button title="Share album" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-sm text-white">↗️</button>
+                <button title="Search on eBay" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-xs text-white font-semibold">eBay</button>
+                <button title="More actions" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-sm text-white">⋮</button>
+              </div>
+              
+              <button title="Select visible fields" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
+                <span>⊞</span>
+                <span className="text-[9px]">▼</span>
+              </button>
+            </div>
+            
+            <CollectionInfoPanel 
+                album={selectedAlbum} 
+                onClose={() => setSelectedAlbumId(null)}
+                onEditTags={() => selectedAlbumId && handleEditAlbum(selectedAlbumId)}
+                onMarkForSale={() => selectedAlbumId && handleMarkForSale(selectedAlbumId)}
+            />
           </div>
         </div>
       </div>
