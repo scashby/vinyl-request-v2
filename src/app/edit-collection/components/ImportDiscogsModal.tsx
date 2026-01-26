@@ -16,6 +16,7 @@ interface DiscogsEntity {
   name: string;
   catno?: string;
   entity_type_name?: string;
+  role?: string;
 }
 
 interface DiscogsNote {
@@ -65,6 +66,27 @@ interface DiscogsWantlistResponse {
     items: number;
   };
   wants: DiscogsItem[];
+}
+
+// Interface for Enrichment Data (Detailed Release)
+interface DiscogsReleaseData {
+  images?: { uri: string }[];
+  genres?: string[];
+  styles?: string[];
+  notes?: string;
+  country?: string;
+  released?: string;
+  identifiers?: { type: string; value: string; description?: string }[];
+  tracklist?: {
+    position?: string;
+    title?: string;
+    duration?: string;
+    artists?: { name: string }[];
+    type_?: string;
+  }[];
+  formats?: { descriptions?: string[] }[];
+  extraartists?: { name: string; role: string }[];
+  companies?: DiscogsEntity[];
 }
 
 // Interfaces for Metadata Lookups
@@ -187,8 +209,7 @@ function compareAlbums(
       if (!existingAlbum.image_url) missingFields.push('cover images');
       if (!existingAlbum.tracks || existingAlbum.tracks.length === 0) missingFields.push('tracks');
       if (!existingAlbum.genres || existingAlbum.genres.length === 0) missingFields.push('genres');
-      if (!existingAlbum.packaging) missingFields.push('packaging');
-
+      
       const isChanged = parsedAlbum.discogs_release_id !== existingAlbum.discogs_release_id;
 
       compared.push({
@@ -260,7 +281,8 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     throw new Error(`Discogs API error: ${response.status}`);
   }
 
-  const data = await response.json();
+  // Cast response to defined interface
+  const data = (await response.json()) as DiscogsReleaseData;
 
   // Extract data
   const enriched: Record<string, unknown> = {
@@ -268,7 +290,7 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     back_image_url: data.images?.[1]?.uri || null,
     genres: data.genres || [],
     styles: data.styles || [],
-    packaging: data.formats?.[0]?.descriptions?.find((d: string) => 
+    packaging: data.formats?.[0]?.descriptions?.find((d) => 
       ['Gatefold', 'Single Sleeve', 'Digipak'].some(p => d.includes(p))
     ) || null,
     release_notes: data.notes || null,
@@ -288,15 +310,12 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
       if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
           enriched.original_release_date = dateStr;
       }
-      // Also set original_release_year if we parsed it
       const year = parseInt(data.released.substring(0, 4));
-      if (!isNaN(year)) {
-          enriched.original_release_year = year;
-      }
+      if (!isNaN(year)) enriched.original_release_year = year;
   }
 
   if (data.identifiers && Array.isArray(data.identifiers)) {
-    const barcode = data.identifiers.find((i: { type: string; value: string }) => i.type === 'Barcode');
+    const barcode = data.identifiers.find((i) => i.type === 'Barcode');
     if (barcode) {
         enriched.barcode = barcode.value;
     }
@@ -304,8 +323,8 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
 
   if (data.companies && Array.isArray(data.companies)) {
     const labels = data.companies
-      .filter((c: DiscogsEntity) => c.entity_type_name === 'Label')
-      .map((c: DiscogsEntity) => c.name);
+      .filter((c) => c.entity_type_name === 'Label')
+      .map((c) => c.name);
     
     if (labels.length > 0) {
       enriched.labels = labels;
@@ -316,7 +335,7 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
   if (data.formats && Array.isArray(data.formats)) {
     const soundDescriptions = data.formats[0]?.descriptions || [];
     const soundTypes = ['Stereo', 'Mono', 'Quadraphonic', 'Surround'];
-    const sound = soundDescriptions.find((d: string) => 
+    const sound = soundDescriptions.find((d) => 
       soundTypes.some(type => d.includes(type))
     );
     if (sound) enriched.sound = sound;
@@ -326,7 +345,7 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
   if (data.identifiers && Array.isArray(data.identifiers)) {
     const matrixEntries: Record<string, string> = {};
     
-    data.identifiers.forEach((identifier: { type: string; value: string; description?: string }) => {
+    data.identifiers.forEach((identifier) => {
       if (identifier.type === 'Matrix / Runout') {
         const desc = identifier.description || '';
         if (desc.toLowerCase().includes('side a') || desc.toLowerCase().includes('a-side')) {
@@ -360,13 +379,7 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     let currentDiscNumber = 1;
     let currentDiscTitle: string | null = null;
 
-    data.tracklist.forEach((track: {
-      position?: string;
-      title?: string;
-      duration?: string;
-      artists?: { name: string }[];
-      type_?: string;
-    }) => {
+    data.tracklist.forEach((track) => {
       const positionStr = track.position || '';
       let discNumber = 1;
       let side = '';
@@ -382,20 +395,13 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
         }
       }
 
-      const isHeader = track.type_ === 'heading';
-
-      if (isHeader) {
+      if (track.type_ === 'heading') {
         if (discNumber !== currentDiscNumber) {
-          currentDiscNumber = discNumber;
-          currentDiscTitle = track.title || null;
-          
-          const existingDisc = discMetadata.find(d => d.disc_number === discNumber);
-          if (!existingDisc) {
-            discMetadata.push({
-              disc_number: discNumber,
-              title: currentDiscTitle,
-            });
-          }
+            currentDiscNumber = discNumber;
+            currentDiscTitle = track.title || null;
+            if (!discMetadata.find(d => d.disc_number === discNumber)) {
+                discMetadata.push({ disc_number: discNumber, title: currentDiscTitle });
+            }
         }
         return;
       }
@@ -420,29 +426,24 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     }
   }
 
-  // Credits parsing
-  const engineers: string[] = [];
-  const producers: string[] = [];
-  const musicians: string[] = [];
-  const songwriters: string[] = [];
-  let studio: string | null = null;
-
+  // Credits parsing - Map to Objects for JSONB
   if (data.extraartists && Array.isArray(data.extraartists)) {
-    data.extraartists.forEach((artist: { name: string; role: string }) => {
-      const role = artist.role.toLowerCase();
-      if (role.includes('engineer')) engineers.push(artist.name);
-      if (role.includes('producer')) producers.push(artist.name);
-      if (role.includes('musician') || role.includes('performer')) musicians.push(artist.name);
-      if (role.includes('written-by') || role.includes('songwriter')) songwriters.push(artist.name);
-      if ((role.includes('recorded at') || role.includes('studio')) && !studio) studio = artist.name;
-    });
+    enriched.musicians = data.extraartists
+      .filter((a) => a.role && (a.role.toLowerCase().includes('musician') || a.role.toLowerCase().includes('performer')))
+      .map((a) => ({ name: a.name, role: a.role }));
+      
+    enriched.producers = data.extraartists
+      .filter((a) => a.role && a.role.toLowerCase().includes('producer'))
+      .map((a) => ({ name: a.name, role: a.role }));
+      
+    enriched.engineers = data.extraartists
+      .filter((a) => a.role && a.role.toLowerCase().includes('engineer'))
+      .map((a) => ({ name: a.name, role: a.role }));
+      
+    enriched.songwriters = data.extraartists
+      .filter((a) => a.role && (a.role.toLowerCase().includes('written-by') || a.role.toLowerCase().includes('songwriter')))
+      .map((a) => ({ name: a.name, role: a.role }));
   }
-
-  if (engineers.length > 0) enriched.engineers = engineers;
-  if (producers.length > 0) enriched.producers = producers;
-  if (musicians.length > 0) enriched.musicians = musicians;
-  if (songwriters.length > 0) enriched.songwriters = songwriters;
-  if (studio) enriched.studio = studio;
 
   return enriched;
 }
@@ -456,7 +457,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   const [totalDatabaseCount, setTotalDatabaseCount] = useState<number>(0);
   const [isConnected, setIsConnected] = useState(false);
   
-  // New State for Metadata Maps
+  // Metadata Definitions
   const [folders, setFolders] = useState<Record<number, string>>({});
   const [fields, setFields] = useState<{media: number, sleeve: number, notes: number}>({ media: 0, sleeve: 0, notes: 0 });
 
@@ -642,6 +643,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
         // 2. Fetch Existing from DB to Compare
         const targetTable = sourceType === 'collection' ? 'collection' : 'wantlist';
+        // Use unknown casting to satisfy TS without using 'any'
         const { data: existing, error: dbError } = await supabase
           .from(targetTable)
           .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, image_url, tracks, genres, packaging'); 
@@ -704,8 +706,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
       const targetTable = sourceType === 'collection' ? 'collection' : 'wantlist';
 
-      // Process in batches
-      const batchSize = 10; // Smaller batch for API calls
+      const batchSize = 1; // Process one by one to avoid rate limiting on enrichment
       for (let i = 0; i < albumsToProcess.length; i += batchSize) {
         const batch = albumsToProcess.slice(i, i + batchSize);
 
@@ -717,7 +718,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           });
 
           try {
-            // Fix: Use Record<string, unknown> instead of any
+            // Use Record<string, unknown> instead of any
             const albumData: Record<string, unknown> = {
               artist: album.artist,
               title: album.title,
@@ -745,9 +746,20 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 albumData.index_number = album.index_number;
                 albumData.year_int = album.year_int;
                 
-                // Parse format string for extra details
-                const formatData = parseDiscogsFormat(album.format);
-                Object.assign(albumData, formatData);
+                // Important: Map cover image directly in case enrichment is skipped
+                if (album.cover_image) albumData.image_url = album.cover_image;
+                
+                // Parse format string for extra details (vinyl color etc)
+                // ADDED: Await to fix the Promise error
+                const formatData = await parseDiscogsFormat(album.format);
+                
+                // FIX: SCHEMA VIOLATION for vinyl_color (Must be array)
+                const mappedFormatData = {
+                    ...formatData,
+                    vinyl_color: formatData.vinyl_color ? [formatData.vinyl_color] : null
+                };
+                
+                Object.assign(albumData, mappedFormatData);
             } else {
                 // Wantlist specific
                 albumData.date_added_to_wantlist = album.date_added;
@@ -776,7 +788,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 });
               }
               
-              // Ensure image is set if enrichment didn't return one but the basic info did
+              // Double check image url after enrichment
               if (!albumData.image_url && album.cover_image) {
                  albumData.image_url = album.cover_image;
               }
