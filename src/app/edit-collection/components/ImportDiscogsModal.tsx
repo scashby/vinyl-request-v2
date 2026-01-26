@@ -6,9 +6,9 @@ import { supabase } from '../../../lib/supabaseClient';
 import { parseDiscogsFormat } from '../../../lib/formatParser';
 import { normalizeArtist, normalizeTitle, normalizeArtistAlbum } from '../../../lib/importUtils';
 
-type SyncMode = 'full_replacement' | 'full_sync' | 'partial_sync' | 'new_only';
+type SyncMode = 'full_replacement' | 'full_sync' | 'partial_sync' | 'new_only' | 'price_update';
 type ImportStage = 'select_mode' | 'fetching_definitions' | 'fetching' | 'preview' | 'importing' | 'complete';
-type AlbumStatus = 'NEW' | 'CHANGED' | 'UNCHANGED' | 'REMOVED';
+type AlbumStatus = 'NEW' | 'CHANGED' | 'UNCHANGED' | 'REMOVED' | 'PRICE_UPDATE';
 type DiscogsSourceType = 'collection' | 'wantlist';
 
 // --- Interfaces for Discogs API Responses ---
@@ -273,19 +273,44 @@ function compareAlbums(
 
 // Discogs API enrichment
 async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unknown>> {
-  await new Promise(resolve => setTimeout(resolve, 1100)); // Rate limiting
+  // SLOW DOWN: Pricing API hits Discogs multiple times, so we must be gentle.
+  await new Promise(resolve => setTimeout(resolve, 2500)); 
 
+  // 1. Fetch Metadata from Proxy
   const response = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);
-
   if (!response.ok) {
     throw new Error(`Discogs API error: ${response.status}`);
   }
-
-  // Cast response to defined interface
+  
+  // Cast to defined interface
   const data = (await response.json()) as DiscogsReleaseData;
+
+  // 2. Fetch Pricing from Pricing Route
+  let priceData = {};
+  try {
+      const priceRes = await fetch('/api/pricing/discogs-prices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ releaseId })
+      });
+      if (priceRes.ok) {
+          const priceJson = await priceRes.json();
+          if (priceJson.success && priceJson.data?.prices) {
+              priceData = {
+                  discogs_price_min: priceJson.data.prices.min,
+                  discogs_price_median: priceJson.data.prices.median,
+                  discogs_price_max: priceJson.data.prices.max,
+                  discogs_price_updated_at: new Date().toISOString()
+              };
+          }
+      }
+  } catch (e) {
+      console.warn('Failed to fetch pricing:', e);
+  }
 
   // Extract data
   const enriched: Record<string, unknown> = {
+    ...priceData,
     image_url: data.images?.[0]?.uri || null,
     back_image_url: data.images?.[1]?.uri || null,
     genres: data.genres || [],
@@ -539,6 +564,37 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     setComparedAlbums([]);
     
     try {
+        if (syncMode === 'price_update') {
+             // NEW MODE: Update Prices Only (Skip Discogs API Fetch loop)
+             const { data: existing, error: dbError } = await supabase
+              .from('collection')
+              .select('*') // Select all to populate table
+              .not('discogs_release_id', 'is', null);
+
+             if (dbError) throw dbError;
+             
+             // Map existing DB entries to compared format for display
+             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             const forPricing = (existing || []).map((album: any) => ({
+                 ...album,
+                 // Ensure required fields are present for UI
+                 artist: album.artist,
+                 title: album.title,
+                 format: album.format || '',
+                 labels: album.labels || [],
+                 cat_no: album.cat_no,
+                 year: album.year,
+                 status: 'PRICE_UPDATE',
+                 existingId: album.id,
+                 needsEnrichment: false,
+                 missingFields: []
+             }));
+             
+             setComparedAlbums(forPricing as unknown as ComparedAlbum[]);
+             setStage('preview');
+             return;
+        }
+
         // 1. Fetch from API pages
         let page = 1;
         let hasMore = true;
@@ -690,6 +746,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         );
       } else if (syncMode === 'new_only') {
         albumsToProcess = comparedAlbums.filter(a => a.status === 'NEW');
+      } else if (syncMode === 'price_update') {
+          albumsToProcess = comparedAlbums; // Process all fetched for pricing
       }
 
       setProgress({ current: 0, total: albumsToProcess.length, status: 'Processing...' });
@@ -717,6 +775,19 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           });
 
           try {
+            // SPECIAL MODE: Pricing Update
+            if (syncMode === 'price_update') {
+                if (album.existingId && album.discogs_release_id) {
+                     await new Promise(r => setTimeout(r, 2500)); // 2.5s Delay
+                     await fetch('/api/pricing/discogs-prices', {
+                         method: 'POST',
+                         body: JSON.stringify({ releaseId: album.discogs_release_id, albumId: album.existingId })
+                     });
+                     resultCounts.updated++;
+                }
+                continue; // Skip the rest of standard import logic
+            }
+
             // Use Record<string, unknown> instead of any
             // Base Data
             const albumData: Record<string, unknown> = {
@@ -726,6 +797,10 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               format: album.format,
               discogs_release_id: album.discogs_release_id,
               discogs_master_id: album.discogs_master_id,
+              artist_norm: album.artist_norm,
+              title_norm: album.title_norm,
+              artist_album_norm: album.artist_album_norm,
+              // Added discogs_id to match schema availability
               discogs_id: album.discogs_release_id, 
             };
 
@@ -926,6 +1001,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                         { value: 'new_only', label: 'New Only', desc: 'Only import albums not in database' },
                         { value: 'full_sync', label: 'Full Sync', desc: 'Update everything, remove deleted items' },
                         { value: 'full_replacement', label: 'Full Replacement', desc: 'Wipe database and re-import' },
+                        { value: 'price_update', label: 'Update Prices Only', desc: 'Refresh market value for existing collection' },
                       ].map(mode => (
                         <label key={mode.value} className={`flex items-start p-3 border rounded-md cursor-pointer ${syncMode === mode.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'}`}>
                           <input
@@ -1004,6 +1080,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                           if (album.status === 'NEW') statusColor = 'text-emerald-600';
                           if (album.status === 'REMOVED') statusColor = 'text-red-600';
                           if (album.status === 'CHANGED') statusColor = 'text-amber-600';
+                          if (album.status === 'PRICE_UPDATE') statusColor = 'text-blue-600';
 
                           return (
                             <tr key={idx} className="border-b border-gray-100 last:border-none">

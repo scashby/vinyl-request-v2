@@ -183,7 +183,7 @@ export async function enrichMusicBrainz(albumId: number, artist: string, title: 
 
 const DISCOGS_TOKEN = process.env.DISCOGS_ACCESS_TOKEN!;
 
-async function searchDiscogs(artist: string, title: string): Promise<Record<string, unknown>> {
+async function searchDiscogs(artist: string, title: string): Promise<Record<string, unknown> | null> {
   const query = `${artist} ${title}`;
   const url = `https://api.discogs.com/database/search?q=${encodeURIComponent(query)}&type=release&token=${DISCOGS_TOKEN}`;
   const response = await fetch(url);
@@ -217,29 +217,17 @@ export async function enrichDiscogsMetadata(albumId: number, artist: string, tit
     const release = await getDiscogsRelease(releaseId);
     if (!release) return { success: false, error: 'Failed to fetch release' };
 
-    // 1. PROCESS IMAGES (Gallery Logic)
     const allImages = (release.images as Array<{ uri: string; type?: string }> | undefined) || [];
-    // Primary is strictly the first image
     const primaryImage = allImages.length > 0 ? allImages[0].uri : existing?.image_url;
-    // Secondary (Back Cover) is the second image, if it exists
     const backImage = allImages.length > 1 ? allImages[1].uri : null;
-    // Gallery (Inner Sleeves/Other) is everything else
     const galleryImages = allImages.length > 2 ? allImages.slice(2).map(img => img.uri) : [];
 
-    // 2. PROCESS EXTENDED CREDITS
     const engineers = new Set<string>();
     const songwriters = new Set<string>();
     const producers = new Set<string>();
 
     const extraArtists = (release.extraartists as Array<{ name: string; role: string }> | undefined) || [];
     
-    // DEBUG LOG: Check if we are finding artists
-    if (extraArtists.length > 0) {
-      console.log(`[Discogs] Found ${extraArtists.length} extra artists for ${title}`);
-    } else {
-      console.log(`[Discogs] No extra artists found for ${title} (Release ID: ${releaseId})`);
-    }
-
     extraArtists.forEach(artist => {
       const role = artist.role.toLowerCase();
       if (role.includes('producer')) producers.add(artist.name);
@@ -300,6 +288,110 @@ export async function enrichDiscogsTracklist(albumId: number): Promise<{ success
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+// --- Pricing Logic ---
+
+interface DiscogsListing {
+  price: { value: string };
+  condition: string;
+  sleeve_condition: string;
+  seller: { username: string };
+}
+
+// Defined interface for pricing return data
+interface PricingResult {
+  prices: {
+    min: number | null;
+    median: number | null;
+    max: number | null;
+    count: number;
+    suggested: number | null;
+  };
+  sampleListings: DiscogsListing[];
+}
+
+export async function enrichDiscogsPricing(albumId: number | null, releaseId: string, userAuthHeader?: string): Promise<{ success: boolean; data?: PricingResult; error?: string }> {
+  try {
+    if (!isValidDiscogsId(releaseId)) return { success: false, error: 'Invalid Release ID' };
+
+    const headers = {
+        'User-Agent': MB_USER_AGENT,
+        'Authorization': userAuthHeader || `Discogs token=${DISCOGS_TOKEN}`
+    };
+
+    // 1. Fetch Marketplace Stats
+    const statsUrl = `https://api.discogs.com/marketplace/stats/${releaseId}?curr=USD`;
+    const statsRes = await fetch(statsUrl, { headers });
+
+    if (!statsRes.ok && statsRes.status !== 404) {
+      throw new Error(`Discogs Stats API error: ${statsRes.status}`);
+    }
+    const stats = statsRes.ok ? await statsRes.json() : {};
+
+    // 2. Fetch Active Listings (for better median calculation)
+    const listingsUrl = `https://api.discogs.com/marketplace/search?release_id=${releaseId}&per_page=100&sort=price&sort_order=asc&currency=USD`;
+    const listingsRes = await fetch(listingsUrl, { headers });
+
+    let currentListings: DiscogsListing[] = [];
+    if (listingsRes.ok) {
+        const listingsData = await listingsRes.json();
+        currentListings = listingsData.listings || [];
+    }
+
+    // 3. Calculate Prices
+    const priceData = {
+      min: null as number | null,
+      median: null as number | null,
+      max: null as number | null,
+      count: 0,
+      suggested: null as number | null
+    };
+
+    const prices = currentListings
+      .map((l) => parseFloat(l.price?.value || '0'))
+      .filter((p) => p > 0)
+      .sort((a, b) => a - b);
+
+    if (prices.length > 0) {
+      priceData.count = prices.length;
+      priceData.min = prices[0];
+      priceData.max = prices[prices.length - 1];
+      const mid = Math.floor(prices.length / 2);
+      priceData.median = prices.length % 2 === 0 ? (prices[mid - 1] + prices[mid]) / 2 : prices[mid];
+      const suggestedIndex = Math.floor(prices.length * 0.4);
+      priceData.suggested = prices[suggestedIndex];
+    } else if (stats.lowest_price) {
+      // Fallback to Stats
+      priceData.min = parseFloat(stats.lowest_price.value);
+      priceData.median = parseFloat(stats.median?.value || stats.lowest_price.value);
+      priceData.max = parseFloat(stats.highest_price?.value || stats.lowest_price.value);
+      priceData.count = stats.num_for_sale || 0;
+      priceData.suggested = priceData.median ? priceData.median * 0.95 : priceData.min;
+    }
+
+    // 4. Update Database (if albumId provided)
+    if (albumId && (priceData.min || priceData.median)) {
+      const updatePayload = {
+        discogs_price_min: priceData.min,
+        discogs_price_median: priceData.median,
+        discogs_price_max: priceData.max,
+        discogs_price_updated_at: new Date().toISOString(),
+      };
+      await supabase.from('collection').update(updatePayload).eq('id', albumId);
+    }
+
+    return { 
+      success: true, 
+      data: {
+         prices: priceData,
+         sampleListings: currentListings.slice(0, 5)
+      } 
+    };
+
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown Pricing Error' };
   }
 }
 
