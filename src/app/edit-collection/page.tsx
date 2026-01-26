@@ -26,8 +26,7 @@ type SortOption =
   | 'tags-count-desc' | 'tags-count-asc' 
   | 'sale-price-desc' | 'sale-price-asc' 
   | 'condition-asc' | 'condition-desc'
-  | 'folder-asc' | 'folder-desc'
-  | 'popularity-desc' | 'popularity-asc'
+  | 'location-asc' | 'location-desc'
   | 'sides-desc' | 'sides-asc'
   | 'decade-desc' | 'decade-asc';
 
@@ -44,16 +43,14 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
   { value: 'added-asc', label: 'Date Added (Oldest)', category: 'Time' },
   { value: 'format-asc', label: 'Format (A→Z)', category: 'Physical' },
   { value: 'format-desc', label: 'Format (Z→A)', category: 'Physical' },
-  { value: 'folder-asc', label: 'Folder (A→Z)', category: 'Physical' },
-  { value: 'folder-desc', label: 'Folder (Z→A)', category: 'Physical' },
+  { value: 'location-asc', label: 'Location (A→Z)', category: 'Physical' },
+  { value: 'location-desc', label: 'Location (Z→A)', category: 'Physical' },
   { value: 'condition-asc', label: 'Condition (A→Z)', category: 'Physical' },
   { value: 'condition-desc', label: 'Condition (Z→A)', category: 'Physical' },
   { value: 'sides-desc', label: 'Most Sides First)', category: 'Physical' },
   { value: 'sides-asc', label: 'Fewest Sides First', category: 'Physical' },
   { value: 'tags-count-desc', label: 'Most Tags', category: 'Metadata' },
   { value: 'tags-count-asc', label: 'Fewest Tags', category: 'Metadata' },
-  { value: 'popularity-desc', label: 'Most Popular (Spotify)', category: 'Metadata' },
-  { value: 'popularity-asc', label: 'Least Popular (Spotify)', category: 'Metadata' },
   { value: 'sale-price-desc', label: 'Highest Price', category: 'Sales' },
   { value: 'sale-price-asc', label: 'Lowest Price', category: 'Sales' }
 ];
@@ -241,7 +238,6 @@ function CollectionBrowserPage() {
           album.format,
           album.year,
           toSafeSearchString(album.custom_tags),
-          // FIXED: Search canonical genres instead of discogs_genres
           toSafeSearchString(album.genres),
           toSafeSearchString(album.spotify_label),
           toSafeSearchString(album.apple_music_label)
@@ -280,16 +276,14 @@ function CollectionBrowserPage() {
           case 'added-asc': return (a.date_added || '').localeCompare(b.date_added || '');
           case 'format-asc': return (a.format || '').localeCompare(b.format || '');
           case 'format-desc': return (b.format || '').localeCompare(a.format || '');
-          case 'folder-asc': return (a.folder || '').localeCompare(b.folder || '');
-          case 'folder-desc': return (b.folder || '').localeCompare(a.folder || '');
+          case 'location-asc': return (a.location || '').localeCompare(b.location || '');
+          case 'location-desc': return (b.location || '').localeCompare(a.location || '');
           case 'condition-asc': return (a.media_condition || '').localeCompare(b.media_condition || '');
           case 'condition-desc': return (b.media_condition || '').localeCompare(a.media_condition || '');
           case 'tags-count-desc': return toSafeStringArray(b.custom_tags).length - toSafeStringArray(a.custom_tags).length;
           case 'tags-count-asc': return toSafeStringArray(a.custom_tags).length - toSafeStringArray(b.custom_tags).length;
           case 'sale-price-desc': return (b.sale_price || 0) - (a.sale_price || 0);
           case 'sale-price-asc': return (a.sale_price || 0) - (b.sale_price || 0);
-          case 'popularity-desc': return (b.spotify_popularity || 0) - (a.spotify_popularity || 0);
-          case 'popularity-asc': return (a.spotify_popularity || 0) - (b.spotify_popularity || 0);
           case 'sides-desc':
             const bSides = typeof b.sides === 'number' ? b.sides : 0;
             const aSides = typeof a.sides === 'number' ? a.sides : 0;
@@ -430,7 +424,6 @@ function CollectionBrowserPage() {
       .eq('id', albumId);
     
     if (!error) {
-      // Optimistic update or reload
       setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, for_sale: true } : a));
     } else {
       console.error('Error marking album for sale:', error);
@@ -439,7 +432,6 @@ function CollectionBrowserPage() {
 
   return (
     <>
-      {/* Styles preserved from your original upload */}
       <style>{`
         body > div:first-child > nav,
         body > div:first-child > header:not(.clz-header),
@@ -469,82 +461,204 @@ function CollectionBrowserPage() {
           selectedAlbumIds={selectedAlbumIds}
         />
 
-        {/* Toolbar */}
         <div className="bg-[#3A3A3A] text-white px-4 py-2 flex items-center justify-between gap-5 h-[48px] shrink-0">
-          {/* ... Toolbar content same as before ... */}
           <div className="flex gap-2 items-center shrink-0">
-            <button title="Add new albums" className="bg-[#368CF8] hover:bg-[#2c72c9] text-white border-none px-3 py-1.5 rounded cursor-pointer text-[13px] font-medium flex items-center gap-1 whitespace-nowrap transition-colors">
+            <button title="Add new albums to collection" className="bg-[#368CF8] hover:bg-[#2c72c9] text-white border-none px-3 py-1.5 rounded cursor-pointer text-[13px] font-medium flex items-center gap-1 whitespace-nowrap transition-colors">
               <span className="text-[16px]">+</span>
               <span>Add Albums</span>
             </button>
+
             <div className="relative">
-              <button onClick={() => setShowCollectionDropdown(!showCollectionDropdown)} className="bg-[#2a2a2a] text-white border border-[#555] px-3 py-1.5 rounded cursor-pointer text-[13px] flex items-center gap-1.5 hover:bg-[#333] transition-colors">
+              <button onClick={() => setShowCollectionDropdown(!showCollectionDropdown)} title="Filter by collection status" className="bg-[#2a2a2a] text-white border border-[#555] px-3 py-1.5 rounded cursor-pointer text-[13px] flex items-center gap-1.5 hover:bg-[#333] transition-colors">
                 <span>📚</span>
                 <span>{collectionFilter}</span>
                 <span className="text-[10px]">▼</span>
               </button>
+              
+              {showCollectionDropdown && (
+                <>
+                  <div onClick={() => setShowCollectionDropdown(false)} className="fixed inset-0 z-[99]" />
+                  <div className="absolute top-full left-0 mt-1 bg-[#2a2a2a] border border-[#555] rounded z-[100] min-w-[150px] shadow-lg">
+                    {['All', 'For Sale'].map(filter => (
+                      <button 
+                        key={filter}
+                        onClick={() => { setCollectionFilter(filter); setShowCollectionDropdown(false); }}
+                        className={`w-full px-4 py-2 text-left text-[13px] hover:bg-[#3a3a3a] ${collectionFilter === filter ? 'text-[#5A9BD5] font-bold' : 'text-white'}`}
+                      >
+                        {filter}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </div>
+
           <div className="flex gap-0.5 items-center flex-1 justify-center">
-            {['All', '0-9', ...alphabet].map(letter => (
-              <button key={letter} onClick={() => setSelectedLetter(letter)} className={`bg-transparent text-white border-none px-2 py-1 cursor-pointer text-xs rounded-sm transition-colors ${selectedLetter === letter ? 'bg-[#5A9BD5]' : 'hover:bg-white/10'}`}>{letter}</button>
+            <button onClick={() => setSelectedLetter('All')} title="Show all albums" className={`bg-transparent text-white border-none px-2 py-1 cursor-pointer text-xs rounded-sm transition-colors ${selectedLetter === 'All' ? 'bg-[#5A9BD5]' : 'hover:bg-white/10'}`}>All</button>
+            <button onClick={() => setSelectedLetter('0-9')} title="Filter by numbers" className={`bg-transparent text-white border-none px-2 py-1 cursor-pointer text-xs rounded-sm transition-colors ${selectedLetter === '0-9' ? 'bg-[#5A9BD5]' : 'hover:bg-white/10'}`}>0-9</button>
+            {alphabet.map(letter => (
+              <button key={letter} onClick={() => setSelectedLetter(letter)} title={`Filter by letter ${letter}`} className={`bg-transparent text-white border-none px-2 py-1 cursor-pointer text-xs rounded-sm transition-colors ${selectedLetter === letter ? 'bg-[#5A9BD5]' : 'hover:bg-white/10'}`}>{letter}</button>
             ))}
           </div>
+
           <div className="flex items-center shrink-0">
             <div className="relative">
-              <button onClick={() => setShowSearchTypeDropdown(!showSearchTypeDropdown)} className="bg-[#2a2a2a] text-white border border-[#555] border-r-0 px-2.5 py-1.5 cursor-pointer text-[13px] rounded-l flex items-center gap-1 h-8 hover:bg-[#333] transition-colors">
+              <button onClick={() => setShowSearchTypeDropdown(!showSearchTypeDropdown)} title="Search type" className="bg-[#2a2a2a] text-white border border-[#555] border-r-0 px-2.5 py-1.5 cursor-pointer text-[13px] rounded-l flex items-center gap-1 h-8 hover:bg-[#333] transition-colors">
                 <span>🔍</span>
                 <span className="text-[10px]">▼</span>
               </button>
             </div>
-            <input type="text" placeholder="Search albums..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="bg-[#2a2a2a] text-white border border-[#555] border-l-0 px-3 py-1.5 rounded-r text-[13px] w-[220px] h-8 outline-none" />
+            <input type="text" placeholder="Search albums..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} title="Search your collection" className="bg-[#2a2a2a] text-white border border-[#555] border-l-0 px-3 py-1.5 rounded-r text-[13px] w-[220px] h-8 outline-none" />
           </div>
         </div>
 
-        {/* Selection Bar */}
         {selectedAlbumIds.size > 0 && (
           <div className="bg-[#5BA3D0] text-white px-4 py-2 flex items-center gap-2 h-10 shrink-0">
-            <button onClick={() => setSelectedAlbumIds(new Set())} className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">✕ Cancel</button>
-            <span className="text-xs font-medium">{selectedAlbumIds.size} selected</span>
+            <button onClick={() => setSelectedAlbumIds(new Set())} title="Clear selection" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">✕ Cancel</button>
+            <button title="Select all albums" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">☑ All</button>
+            <button title="Edit selected albums" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">✏️ Edit</button>
+            <button title="Remove selected albums" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">🗑 Remove</button>
+            <button onClick={() => setShowAddToCrateModal(true)} title="Add selected albums to a crate" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">📦 Add to Crate</button>
+            <button title="Export selected to PDF" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">🖨 Print to PDF</button>
+            <button title="More actions" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">⋮</button>
+            <div className="flex-1" />
+            <span className="text-xs font-medium">{selectedAlbumIds.size} of {filteredAndSortedAlbums.length} selected</span>
           </div>
         )}
 
         <div className="flex flex-1 overflow-hidden min-h-0">
-          {/* Left Sidebar (Folders/Crates) */}
           <div className="hidden md:flex w-[220px] bg-[#2C2C2C] text-white flex-col overflow-hidden border-r border-[#1a1a1a] shrink-0">
-             <div className="p-2.5 border-b border-[#1a1a1a] flex justify-between items-center shrink-0">
-               <button onClick={() => setShowFolderModeDropdown(!showFolderModeDropdown)} className="bg-[#3a3a3a] text-white border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-xs flex items-center gap-1.5">
+            <div className="p-2.5 border-b border-[#1a1a1a] flex justify-between items-center shrink-0">
+              <div className="relative">
+                <button onClick={() => setShowFolderModeDropdown(!showFolderModeDropdown)} title="Change view mode" className="bg-[#3a3a3a] text-white border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-xs flex items-center gap-1.5">
                   <span>{folderMode === 'crates' ? '📦' : '📁'}</span>
                   <span>{folderMode === 'crates' ? 'Crates' : 'Format'}</span>
-               </button>
-               {showFolderModeDropdown && (
-                  <div className="absolute top-[100px] left-2 bg-[#2a2a2a] border border-[#555] z-[100] min-w-[180px]">
-                      <button onClick={() => handleFolderModeChange('format')} className="w-full px-4 py-2 text-left text-white hover:bg-[#3a3a3a]">Format</button>
-                      <button onClick={() => handleFolderModeChange('crates')} className="w-full px-4 py-2 text-left text-white hover:bg-[#3a3a3a]">Crates</button>
-                  </div>
-               )}
-             </div>
-             
-             <div className="flex-1 overflow-y-auto p-1.5 min-h-0">
-               {folderMode === 'format' ? sortedFolderItems.map(([format, count]) => (
-                   <button key={format} onClick={() => setSelectedFolderValue(format)} className={`w-full flex justify-between px-2 py-1.5 text-xs text-white ${selectedFolderValue === format ? 'bg-[#5A9BD5]' : ''}`}>
-                      <span>{format}</span><span>{count}</span>
-                   </button>
-               )) : cratesWithCounts.map(crate => (
-                   <button key={crate.id} onClick={() => setSelectedCrateId(crate.id)} className={`w-full flex justify-between px-2 py-1.5 text-xs text-white ${selectedCrateId === crate.id ? 'bg-[#5A9BD5]' : ''}`}>
-                      <span>{crate.name}</span><span>{crate.album_count}</span>
-                   </button>
-               ))}
-             </div>
+                  <span className="text-[10px]">▼</span>
+                </button>
+
+                {showFolderModeDropdown && (
+                  <>
+                    <div onClick={() => setShowFolderModeDropdown(false)} className="fixed inset-0 z-[99]" />
+                    <div className="absolute top-full left-0 mt-1 bg-[#2a2a2a] border border-[#555] rounded z-[100] min-w-[180px] shadow-lg">
+                      <div className="px-3 py-2 text-[10px] font-semibold text-[#999] uppercase tracking-wider">Favorites</div>
+                      <button onClick={() => handleFolderModeChange('format')} className={`w-full px-4 py-2 bg-transparent border-none text-left cursor-pointer text-[13px] text-white flex items-center gap-2 hover:bg-[#3a3a3a] ${folderMode === 'format' ? 'bg-[#5A9BD5]' : ''}`}>
+                        <span>📁</span>
+                        <span>Format</span>
+                      </button>
+
+                      <div className="px-3 py-2 text-[10px] font-semibold text-[#999] uppercase tracking-wider mt-1 border-t border-[#444]">Crates</div>
+                      <button onClick={() => handleFolderModeChange('crates')} className={`w-full px-4 py-2 bg-transparent border-none text-left cursor-pointer text-[13px] text-white flex items-center gap-2 hover:bg-[#3a3a3a] ${folderMode === 'crates' ? 'bg-[#5A9BD5]' : ''}`}>
+                        <span>📦</span>
+                        <span>Crates</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+              <button title="View options" className="bg-transparent text-white border-none cursor-pointer text-base p-1">☰</button>
+            </div>
+
+            <div className="p-2.5 border-b border-[#1a1a1a] shrink-0">
+              <input type="text" placeholder={folderMode === 'crates' ? 'Search crates...' : 'Search format...'} value={folderSearch} onChange={(e) => setFolderSearch(e.target.value)} title={folderMode === 'crates' ? 'Filter crates' : 'Filter formats'} className="w-full px-2 py-1.5 bg-[#3a3a3a] text-white border border-[#555] rounded text-xs outline-none" />
+              <div className="mt-2 flex gap-1.5">
+                <button onClick={() => setFolderSortByCount(!folderSortByCount)} title={folderSortByCount ? "Sort alphabetically" : "Sort by count"} className="bg-[#3a3a3a] text-white border border-[#555] px-2 py-1 rounded cursor-pointer text-xs">{folderSortByCount ? '🔢' : '🔤'}</button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-1.5 min-h-0">
+              {folderMode === 'format' ? (
+                <>
+                  <button onClick={() => setSelectedFolderValue(null)} title="Show all albums" className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${!selectedFolderValue ? 'bg-[#5A9BD5]' : ''}`}>
+                    <span>[All Albums]</span>
+                    <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${!selectedFolderValue ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{albums.length}</span>
+                  </button>
+
+                  {sortedFolderItems.map(([format, count]) => (
+                    <button key={format} onClick={() => setSelectedFolderValue(format)} title={`Filter by ${format}`} className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${selectedFolderValue === format ? 'bg-[#5A9BD5]' : ''}`}>
+                      <span>{format}</span>
+                      <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${selectedFolderValue === format ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{count}</span>
+                    </button>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <button onClick={() => setSelectedCrateId(null)} title="Show all albums" className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${selectedCrateId === null ? 'bg-[#5A9BD5]' : ''}`}>
+                    <span>📚 [All Albums]</span>
+                    <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${selectedCrateId === null ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{albums.length}</span>
+                  </button>
+
+                  {cratesWithCounts
+                    .filter(crate => !folderSearch || crate.name.toLowerCase().includes(folderSearch.toLowerCase()))
+                    .map(crate => (
+                    <button key={crate.id} onClick={() => setSelectedCrateId(crate.id)} title={`Filter by ${crate.name}`} className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${selectedCrateId === crate.id ? 'bg-[#5A9BD5]' : ''}`}>
+                      <span className="flex items-center gap-1.5">
+                        {crate.is_smart ? (
+                          <BoxIcon color={crate.icon} size={16} />
+                        ) : (
+                          <span>{crate.icon}</span>
+                        )}
+                        <span>{crate.name}</span>
+                      </span>
+                      <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${selectedCrateId === crate.id ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{crate.album_count || 0}</span>
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>
           </div>
 
-          {/* Main Table */}
           <div className="flex-1 flex flex-col overflow-hidden bg-white min-w-0">
-             {loading ? <div className="p-10 text-center text-[#666]">Loading albums...</div> : 
-             <CollectionTable albums={filteredAndSortedAlbums} visibleColumns={visibleColumns} lockedColumns={lockedColumns} onAlbumClick={handleAlbumClick} selectedAlbums={selectedAlbumsAsStrings} onSelectionChange={handleSelectionChange} sortState={tableSortState} onSortChange={handleTableSortChange} onEditAlbum={handleEditAlbum} />}
+            <div className="px-3 py-1.5 border-b border-[#555] flex items-center justify-between bg-[#4a4a4a] h-10 shrink-0">
+              <div className="flex gap-1.5 items-center">
+                <button title="Change view mode" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
+                  <span>☰</span>
+                  <span style={{ fontSize: '9px' }}>▼</span>
+                </button>
+                
+                <div className="relative">
+                  <button onClick={() => setShowSortDropdown(!showSortDropdown)} title="Change sort order" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
+                    <span>↕️</span>
+                    <span className="text-[9px]">▼</span>
+                  </button>
+                  
+                  {showSortDropdown && (
+                    <>
+                      <div onClick={() => setShowSortDropdown(false)} className="fixed inset-0 z-[99]" />
+                      <div className="absolute top-full left-0 mt-1 bg-white border border-[#ddd] rounded shadow-lg z-[100] min-w-[240px] max-h-[400px] overflow-y-auto">
+                        {Object.entries(sortOptionsByCategory).map(([category, options]) => (
+                          <div key={category}>
+                            <div className="px-3 py-2 text-[11px] font-semibold text-[#999] uppercase tracking-wider bg-[#f8f8f8] border-b border-[#e8e8e8]">{category}</div>
+                            {options.map(opt => (
+                              <button key={opt.value} onClick={() => handleSortChange(opt.value)} className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${sortBy === opt.value ? 'bg-[#e3f2fd]' : ''}`}>
+                                <span>{opt.label}</span>
+                                {sortBy === opt.value && <span className="text-[#2196F3]">✓</span>}
+                              </button>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+                
+                <button onClick={() => setShowColumnSelector(true)} title="Select visible columns" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
+                  <span>⊞</span>
+                  <span className="text-[9px]">▼</span>
+                </button>
+              </div>
+              <div className="text-xs text-[#ddd] font-semibold">{loading ? 'Loading...' : `${filteredAndSortedAlbums.length} albums`}</div>
+            </div>
+
+            <div className="flex-1 overflow-hidden bg-white min-h-0">
+              {loading ? (
+                <div className="p-10 text-center text-[#666]">Loading albums...</div>
+              ) : (
+                <CollectionTable albums={filteredAndSortedAlbums} visibleColumns={visibleColumns} lockedColumns={lockedColumns} onAlbumClick={handleAlbumClick} selectedAlbums={selectedAlbumsAsStrings} onSelectionChange={handleSelectionChange} sortState={tableSortState} onSortChange={handleTableSortChange} onEditAlbum={handleEditAlbum} />
+              )}
+            </div>
           </div>
 
-          {/* Right Sidebar (Album Detail) - Using the restored CollectionInfoPanel */}
           <div className="hidden lg:flex h-full shrink-0 w-[380px] bg-white border-l border-[#ddd]">
             {selectedAlbum ? (
                 <CollectionInfoPanel 
@@ -573,7 +687,11 @@ function CollectionBrowserPage() {
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-screen text-base text-gray-500">Loading...</div>}>
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-screen text-base text-gray-500">
+        Loading...
+      </div>
+    }>
       <CollectionBrowserPage />
     </Suspense>
   );

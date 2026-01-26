@@ -101,14 +101,21 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
   const totalTracks = album.tracks?.filter((t) => t.type === 'track').length || album.spotify_total_tracks || album.apple_music_track_count || 0;
   const totalRuntime = getTotalRuntime();
 
+  // Handle genres safely - using canonical 'genres' and 'styles'
+  const displayGenres = toSafeStringArray(album.genres || []);
+  if (album.styles) {
+    displayGenres.push(...toSafeStringArray(album.styles));
+  }
+  // Deduplicate
+  const uniqueGenres = Array.from(new Set(displayGenres));
+
   return (
     <div className="w-full h-full bg-white border-l border-gray-200 flex flex-col shrink-0">
-      <div className="p-4 border-b border-gray-200 flex items-start gap-3">
-         {/* Close Button Mobile/Desktop */}
-         <div className="flex-1 min-w-0"></div>
+      <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-white sticky top-0 z-10">
+         <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Album Details</span>
          <button 
            onClick={onClose} 
-           className="bg-transparent border-none text-xl text-gray-500 cursor-pointer p-1 leading-none shrink-0 hover:text-gray-700"
+           className="bg-transparent border-none text-xl text-gray-500 cursor-pointer p-1 leading-none hover:text-gray-700"
          >
            ✕
          </button>
@@ -148,9 +155,9 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
           {album.year && ` (${album.year})`}
         </div>
 
-        {(album.genres || album.styles || album.spotify_genres) && (
+        {uniqueGenres.length > 0 && (
           <div className="text-[13px] text-[#666] mb-3 font-normal">
-            {toSafeStringArray(album.genres || album.styles || album.spotify_genres).join(' | ')}
+            {uniqueGenres.join(' | ')}
           </div>
         )}
 
@@ -161,6 +168,10 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
           {' | '}{album.discs ? `${album.discs} Disc${album.discs > 1 ? 's' : ''}` : '—'}
           {' | '}{totalTracks > 0 ? `${totalTracks} Tracks` : '—'}
           {' | '}{totalRuntime}
+        </div>
+
+        <div className="text-[13px] text-[#333] mb-3 font-normal">
+           <span className="font-semibold">Location:</span> {album.location || 'Unknown'}
         </div>
 
         <div className="text-[13px] text-[#666] mb-3 font-normal">
