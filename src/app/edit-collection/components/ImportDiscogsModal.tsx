@@ -86,6 +86,7 @@ interface ParsedAlbum {
   for_sale: boolean;
   index_number: number | null;
   cover_image: string | null;
+  year_int: number | null;
 }
 
 interface ExistingAlbum {
@@ -209,7 +210,7 @@ function compareAlbums(
       discogs_release_id: existingAlbum.discogs_release_id || '',
       discogs_master_id: null,
       date_added: new Date().toISOString(),
-      media_condition: 'Unknown',
+      media_condition: '',
       package_sleeve_condition: null,
       personal_notes: null,
       my_rating: null,
@@ -224,7 +225,8 @@ function compareAlbums(
       missingFields: [],
       for_sale: false,
       index_number: null,
-      cover_image: existingAlbum.image_url
+      cover_image: existingAlbum.image_url,
+      year_int: null
     });
   }
 
@@ -454,6 +456,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
       } else if (res.ok) {
         setIsConnected(true);
       } else {
+        // Connected but maybe empty
         setIsConnected(true);
       }
     } catch {
@@ -498,53 +501,47 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 const artist = info.artists?.[0]?.name || 'Unknown';
                 const title = info.title || 'Unknown';
                 const year = info.year?.toString() || null;
+                const yearInt = year ? parseInt(year) : null;
                 
                 // Heuristic for Media/Sleeve Condition
-                // The API stores these in 'notes', we must parse them.
-                // Regex looks for standard grading terms (Mint, Near Mint, VG+, etc)
                 const conditionRegex = /^(Mint|Near Mint|Very Good|Good|Fair|Poor)/i;
-                let mediaCond = 'Unknown';
+                let mediaCond = ''; // Default to empty string instead of 'Unknown' to match CSV behavior
                 let sleeveCond = null;
                 let personalNoteStr = '';
 
                 if (item.notes) {
                     for (const note of item.notes) {
                         if (conditionRegex.test(note.value)) {
-                            // Assume first match is Media, second is Sleeve
-                            if (mediaCond === 'Unknown') mediaCond = note.value;
+                            if (mediaCond === '') mediaCond = note.value;
                             else if (!sleeveCond) sleeveCond = note.value; 
                         } else {
-                            // Everything else is a personal note
                             if (personalNoteStr) personalNoteStr += '; ';
                             personalNoteStr += note.value;
                         }
                     }
                 }
+                
+                // Ensure date is YYYY-MM-DD
+                const dateAdded = item.date_added ? item.date_added.split('T')[0] : new Date().toISOString().split('T')[0];
 
-                // Map API data to ParsedAlbum structure
                 allFetchedItems.push({
                     artist,
                     title,
                     format: info.formats?.[0]?.name || '',
-                    // Map Labels
                     labels: info.labels?.map((l: DiscogsEntity) => l.name) || [],
-                    // Map Catalog Number
                     cat_no: info.labels?.[0]?.catno || null,
                     barcode: null, 
                     country: null,
                     year,
-                    // Determine location based on folder
+                    year_int: isNaN(yearInt!) ? null : yearInt,
                     location: sourceType === 'collection' && item.folder_id === 0 ? 'All' : 'Uncategorized',
-                    // Default for_sale to false unless explicitly known (requires folder fetch which we lack)
-                    for_sale: false, 
+                    for_sale: false,
                     discogs_release_id: item.id.toString(),
                     discogs_master_id: info.master_id?.toString() || null,
-                    date_added: item.date_added || new Date().toISOString(),
-                    
+                    date_added: dateAdded,
                     media_condition: mediaCond,
                     package_sleeve_condition: sleeveCond,
                     personal_notes: personalNoteStr,
-                    
                     my_rating: item.rating || null,
                     decade: calculateDecade(year),
                     artist_norm: normalizeArtist(artist),
@@ -592,13 +589,11 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     try {
       let albumsToProcess: ComparedAlbum[] = [];
 
-      // Determine which albums to process based on Sync Mode
       if (syncMode === 'full_replacement') {
         const targetTable = sourceType === 'collection' ? 'collection' : 'wantlist';
         await supabase.from(targetTable).delete().gt('id', 0); 
         albumsToProcess = comparedAlbums.filter(a => a.status !== 'REMOVED');
       } else if (syncMode === 'full_sync') {
-        // Handle removals
         const removed = comparedAlbums.filter(a => a.status === 'REMOVED' && a.existingId);
         if (removed.length > 0) {
           const idsToDelete = removed.map(a => a.existingId!);
@@ -627,8 +622,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
       const targetTable = sourceType === 'collection' ? 'collection' : 'wantlist';
 
-      // Process in batches
-      const batchSize = 10; // Smaller batch for API calls
+      const batchSize = 10;
       for (let i = 0; i < albumsToProcess.length; i += batchSize) {
         const batch = albumsToProcess.slice(i, i + batchSize);
 
@@ -640,7 +634,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           });
 
           try {
-            // Fix: Use Record<string, unknown> instead of any
             const albumData: Record<string, unknown> = {
               artist: album.artist,
               title: album.title,
@@ -653,7 +646,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               artist_album_norm: album.artist_album_norm,
             };
 
-            // Table specific fields
             if (sourceType === 'collection') {
                 albumData.cat_no = album.cat_no;
                 albumData.labels = album.labels;
@@ -666,18 +658,18 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 albumData.decade = album.decade;
                 albumData.for_sale = album.for_sale;
                 albumData.index_number = album.index_number;
+                albumData.year_int = album.year_int;
+                // Important: Map cover image directly in case enrichment is skipped
+                if (album.cover_image) albumData.image_url = album.cover_image;
                 
-                // Parse format string for extra details
                 const formatData = parseDiscogsFormat(album.format);
                 Object.assign(albumData, formatData);
             } else {
-                // Wantlist specific
                 albumData.date_added_to_wantlist = album.date_added;
                 albumData.notes = album.personal_notes;
                 albumData.cover_image = album.cover_image;
             }
 
-            // Enrichment Logic (Only if NEW or Full Sync/Partial Sync needs it)
             if (sourceType === 'collection' && (
                 album.status === 'NEW' || 
                 syncMode === 'full_sync' || 
@@ -688,7 +680,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               if (syncMode === 'full_sync' || album.status === 'NEW') {
                 Object.assign(albumData, enrichedData);
               } else {
-                // Smart merge for partial sync
                 album.missingFields.forEach(field => {
                   if (enrichedData[field]) {
                     if (field === 'genres') albumData.genres = enrichedData.genres;
@@ -699,7 +690,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               }
             }
 
-            // Database Operations
             if (album.status === 'NEW') {
               const { error: insertError } = await supabase.from(targetTable).insert(albumData);
               if (insertError) throw insertError;
@@ -758,7 +748,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30000]">
-      {/* FIXED: Added text-gray-900 to ensure text is visible on white background */}
       <div className="bg-white text-gray-900 rounded-lg w-[600px] max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-5 py-4 border-b border-gray-200 bg-orange-500 text-white flex justify-between items-center">
