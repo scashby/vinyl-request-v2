@@ -64,12 +64,15 @@ export function EnrichmentTab({ album, onChange }: EnrichmentTabProps) {
       </div>
 
       {/* SECTION 2: SONIC DNA */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="text-sm font-bold text-gray-700 border-b border-gray-200 pb-2 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        {/* LEFT: Basic Stats */}
+        <div className="space-y-4">
+          <h3 className="text-sm font-bold text-gray-700 border-b border-gray-200 pb-2">
             Musical Properties
           </h3>
           
-          <div className="grid grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">BPM (Tempo)</label>
               <input 
@@ -92,12 +95,28 @@ export function EnrichmentTab({ album, onChange }: EnrichmentTabProps) {
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="pt-2">
              {renderSlider('Energy', 'energy', 'accent-orange-500')}
              {renderSlider('Danceability', 'danceability', 'accent-purple-500')}
-             {/* Valence exists in DB if you want to add it later: renderSlider('Valence', 'valence', 'accent-green-500') */}
           </div>
+        </div>
+
+        {/* RIGHT: Moods */}
+        <div className="space-y-2">
+          <h3 className="text-sm font-bold text-gray-700 border-b border-gray-200 pb-2 mb-4">
+            Mood & Atmosphere
+          </h3>
+          
+          {renderSlider('Acoustic', 'mood_acoustic', 'accent-amber-600')}
+          {renderSlider('Electronic', 'mood_electronic', 'accent-cyan-500')}
+          {renderSlider('Happy', 'mood_happy', 'accent-yellow-400')}
+          {renderSlider('Sad', 'mood_sad', 'accent-blue-400')}
+          {renderSlider('Aggressive', 'mood_aggressive', 'accent-red-500')}
+          {renderSlider('Relaxed', 'mood_relaxed', 'accent-indigo-400')}
+          {renderSlider('Party', 'mood_party', 'accent-pink-500')}
+        </div>
       </div>
+
     </div>
   );
 }

@@ -1,134 +1,152 @@
-// src/components/UniversalBottomBar.tsx
+// components/UniversalBottomBar.tsx
 'use client';
 
-import React from 'react';
-import type { Album } from '@/types/album';
+import type { Album } from 'types/album';
 
 interface UniversalBottomBarProps {
-  album?: Album | null;
-  
-  // Navigation
-  onPrevious?: () => void;
-  onNext?: () => void;
+  album: Album;
+  onChange: (field: keyof Album, value: string | number | null | boolean) => void;
+  onPrevious: () => void;
+  onNext: () => void;
   hasPrevious?: boolean;
   hasNext?: boolean;
-  
-  // Actions
-  onSave?: () => void;
-  onCancel?: () => void;
-  
-  // State
-  isSaving?: boolean;
-  hasChanges?: boolean;
-  
-  // Extra Tools
+  onCancel: () => void;
+  onSave: () => void;
   onOpenLocationPicker?: () => void;
-  onChange?: <K extends keyof Album>(field: K, value: Album[K]) => void;
 }
 
 export function UniversalBottomBar({ 
   album, 
-  onSave, 
-  onCancel,
+  onChange, 
   onPrevious, 
-  onNext, 
-  hasPrevious,
-  hasNext,
-  isSaving = false, 
-  hasChanges = false,
-  onOpenLocationPicker
+  onNext,
+  hasPrevious = true,
+  hasNext = true,
+  onCancel, 
+  onSave,
+  onOpenLocationPicker,
 }: UniversalBottomBarProps) {
-  
-  // If no album data is passed (e.g. root layout), render nothing
-  if (!album) {
-    return null;
-  }
-
-  // Determine disabled states based on explicit flags or callback existence
-  const prevDisabled = hasPrevious === false || !onPrevious;
-  const nextDisabled = hasNext === false || !onNext;
-
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-50 flex items-center justify-between">
-      
-      {/* LEFT: Navigation & Tools */}
-      <div className="flex gap-3">
-        <div className="flex bg-gray-100 rounded-lg p-1">
-          <button 
+    <div>
+      <div className="bg-gray-50 p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_2fr] gap-4 items-end">
+        {/* Collection Status */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 mb-1.5">Collection Status</label>
+          <select
+            value={album.collection_status || 'in_collection'}
+            onChange={(e) => onChange('collection_status', e.target.value)}
+            className="w-full px-2.5 py-2 border border-gray-300 rounded text-[13px] bg-white text-gray-900 focus:outline-none focus:border-blue-500 cursor-pointer"
+          >
+            <optgroup label="Collection">
+              <option value="in_collection">In Collection</option>
+              <option value="for_sale">For Sale</option>
+            </optgroup>
+            <optgroup label="Wish List">
+              <option value="wish_list">On Wish List</option>
+              <option value="on_order">On Order</option>
+            </optgroup>
+            <optgroup label="Not in Collection">
+              <option value="sold">Sold</option>
+              <option value="not_in_collection">Not in Collection</option>
+            </optgroup>
+          </select>
+        </div>
+
+        {/* Index */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 mb-1.5">Index</label>
+          <input
+            type="number"
+            value={album.index_number || ''}
+            onChange={(e) => onChange('index_number', e.target.value ? parseInt(e.target.value) : null)}
+            placeholder="Index number"
+            className="w-full px-2.5 py-2 border border-gray-300 rounded text-[13px] bg-white text-gray-900 focus:outline-none focus:border-blue-500"
+          />
+        </div>
+
+        {/* Quantity */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 mb-1.5">Quantity</label>
+          <input
+            type="number"
+            min="1"
+            value={album.sale_quantity || 1}
+            onChange={(e) => onChange('sale_quantity', e.target.value ? parseInt(e.target.value) : 1)}
+            className="w-full px-2.5 py-2 border border-gray-300 rounded text-[13px] bg-white text-gray-900 focus:outline-none focus:border-blue-500"
+          />
+        </div>
+
+        {/* Location */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 mb-1.5">Location</label>
+          <div className="flex items-stretch">
+            <input
+              type="text"
+              value={album.location || ''}
+              onChange={(e) => onChange('location', e.target.value)}
+              placeholder="Storage location"
+              className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-[13px] bg-white text-gray-900 focus:outline-none focus:border-blue-500 border-r-0"
+            />
+            <button 
+              onClick={onOpenLocationPicker}
+              className="w-9 flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                <circle cx="1.5" cy="2.5" r="1"/>
+                <rect x="4" y="2" width="10" height="1"/>
+                <circle cx="1.5" cy="7" r="1"/>
+                <rect x="4" y="6.5" width="10" height="1"/>
+                <circle cx="1.5" cy="11.5" r="1"/>
+                <rect x="4" y="11" width="10" height="1"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom buttons row */}
+      <div className="flex justify-between items-center px-5 py-4 border-t border-gray-200 bg-gray-50">
+        {/* Left: Previous/Next */}
+        <div className="flex gap-2">
+          <button
             onClick={onPrevious}
-            disabled={prevDisabled}
-            className="px-3 py-1.5 text-sm font-medium text-gray-700 rounded-md hover:bg-white hover:shadow-sm disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:shadow-none transition-all"
-            title="Previous Album"
+            disabled={!hasPrevious}
+            className={`px-4 py-2 border-none rounded text-[13px] font-medium transition-colors ${
+              hasPrevious 
+                ? 'bg-gray-500 text-white hover:bg-gray-600 cursor-pointer' 
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'
+            }`}
           >
-            ← Prev
+            ◀ Previous
           </button>
-          <div className="w-px bg-gray-300 my-1 mx-1"></div>
-          <button 
+          <button
             onClick={onNext}
-            disabled={nextDisabled}
-            className="px-3 py-1.5 text-sm font-medium text-gray-700 rounded-md hover:bg-white hover:shadow-sm disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:shadow-none transition-all"
-            title="Next Album"
+            disabled={!hasNext}
+            className={`px-4 py-2 border-none rounded text-[13px] font-medium transition-colors ${
+              hasNext 
+                ? 'bg-gray-500 text-white hover:bg-gray-600 cursor-pointer' 
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'
+            }`}
           >
-            Next →
+            Next ▶
           </button>
         </div>
 
-        {onOpenLocationPicker && (
+        {/* Right: Cancel/Save */}
+        <div className="flex gap-2">
           <button
-            onClick={onOpenLocationPicker}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
-          >
-            📍 Location
-          </button>
-        )}
-      </div>
-
-      {/* CENTER: Status Indicator */}
-      <div className="hidden md:flex flex-col items-center">
-        {hasChanges ? (
-          <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-100">
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-            <span className="text-xs font-bold uppercase tracking-wide">Unsaved Changes</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-gray-400">
-            <span className="text-xs font-medium uppercase tracking-wide">All saved</span>
-          </div>
-        )}
-      </div>
-
-      {/* RIGHT: Main Actions */}
-      <div className="flex gap-3">
-        {onCancel && (
-          <button 
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-gray-600 bg-transparent hover:bg-gray-100 rounded-md transition-colors"
+            className="px-5 py-2 bg-gray-400 text-white border-none rounded text-[13px] font-medium cursor-pointer hover:bg-gray-500"
           >
-            Close
+            Cancel
           </button>
-        )}
-        
-        <button 
-          onClick={onSave}
-          disabled={!hasChanges || isSaving}
-          className={`px-6 py-2 text-sm font-bold text-white rounded-md shadow-sm transition-all flex items-center gap-2 ${
-            hasChanges 
-              ? 'bg-blue-600 hover:bg-blue-700 hover:shadow-md hover:-translate-y-0.5' 
-              : 'bg-gray-300 cursor-not-allowed text-gray-500'
-          }`}
-        >
-          {isSaving ? (
-            <>
-              <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span>Saving...</span>
-            </>
-          ) : (
-            'Save Changes'
-          )}
-        </button>
+          <button
+            onClick={onSave}
+            className="px-5 py-2 bg-blue-500 text-white border-none rounded text-[13px] font-bold cursor-pointer hover:bg-blue-600"
+          >
+            Save
+          </button>
+        </div>
       </div>
     </div>
   );

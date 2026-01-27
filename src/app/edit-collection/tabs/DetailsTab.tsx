@@ -27,7 +27,8 @@ import {
 
 interface DetailsTabProps {
   album: Album;
-  onChange: (field: keyof Album, value: string | number | string[] | null | boolean) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onChange: (field: keyof Album, value: any) => void;
 }
 
 type ModalType = 'picker' | 'manage' | 'edit' | 'boxset' | null;
@@ -379,8 +380,6 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
     setEditingItemId(null);
   };
 
-  // Styles replaced by Tailwind classes
-
   const fieldConfig = getFieldConfig();
   const currentItems = getCurrentItems();
   const editingItem = editingItemId ? currentItems.find(item => item.id === editingItemId) : null;
@@ -686,6 +685,17 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
               onChange={(e) => onChange('extra', e.target.value)}
               className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500 min-h-[80px] resize-y"
               placeholder="Additional details..."
+            />
+          </div>
+
+           {/* Release Notes - Added Back Here */}
+           <div>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Release Notes</label>
+            <textarea
+              value={album.release_notes || ''}
+              onChange={(e) => onChange('release_notes', e.target.value)}
+              className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500 min-h-[80px] resize-y"
+              placeholder="Specific pressing info, provenance, etc."
             />
           </div>
 

@@ -1,4 +1,3 @@
-// src/app/edit-collection/EditAlbumModal.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -8,13 +7,12 @@ import type { Album } from 'types/album';
 import { MainTab, type MainTabRef } from './tabs/MainTab';
 import { DetailsTab } from './tabs/DetailsTab';
 import { PeopleTab } from './tabs/PeopleTab';
-import { type TracksTabRef } from './tabs/TracksTab';
+import { TracksTab, type TracksTabRef } from './tabs/TracksTab';
 import { PersonalTab } from './tabs/PersonalTab';
 import { LinksTab } from './tabs/LinksTab';
 import { UniversalBottomBar } from 'components/UniversalBottomBar';
 
 const ClassicalTab = dynamic(() => import('./tabs/ClassicalTab').then(mod => mod.ClassicalTab));
-const TracksTab = dynamic(() => import('./tabs/TracksTab').then(mod => mod.TracksTab));
 const CoverTab = dynamic(() => import('./tabs/CoverTab').then(mod => mod.CoverTab));
 const EnrichmentTab = dynamic(() => import('./tabs/EnrichmentTab').then(mod => mod.EnrichmentTab));
 import { PickerModal } from './pickers/PickerModal';
@@ -431,38 +429,38 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         </div>
 
         {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto p-4 bg-white">
-          {activeTab === 'main' && (
+        <div className="flex-1 overflow-y-auto p-4 bg-white relative">
+          <div className={activeTab === 'main' ? 'block h-full' : 'hidden'}>
             <MainTab ref={mainTabRef} album={editedAlbum} onChange={handleFieldChange} />
-          )}
-          {activeTab === 'details' && (
+          </div>
+          <div className={activeTab === 'details' ? 'block h-full' : 'hidden'}>
             <DetailsTab album={editedAlbum} onChange={handleFieldChange} />
-          )}
-          {activeTab === 'enrichment' && (
+          </div>
+          <div className={activeTab === 'enrichment' ? 'block h-full' : 'hidden'}>
             <EnrichmentTab album={editedAlbum} onChange={handleFieldChange} />
-          )}
-          {activeTab === 'classical' && (
+          </div>
+          <div className={activeTab === 'classical' ? 'block h-full' : 'hidden'}>
             <ClassicalTab album={editedAlbum} onChange={handleFieldChange} />
-          )}
-          {activeTab === 'people' && (
+          </div>
+          <div className={activeTab === 'people' ? 'block h-full' : 'hidden'}>
             <PeopleTab album={editedAlbum} onChange={handleFieldChange} />
-          )}
-          {activeTab === 'tracks' && (
+          </div>
+          <div className={activeTab === 'tracks' ? 'block h-full' : 'hidden'}>
             <TracksTab ref={tracksTabRef} album={editedAlbum} onChange={handleFieldChange} />
-          )}
-          {activeTab === 'personal' && (
+          </div>
+          <div className={activeTab === 'personal' ? 'block h-full' : 'hidden'}>
             <PersonalTab album={editedAlbum} onChange={handleFieldChange} />
-          )}
-          {activeTab === 'cover' && (
+          </div>
+          <div className={activeTab === 'cover' ? 'block h-full' : 'hidden'}>
             <CoverTab album={editedAlbum} onChange={handleFieldChange} />
-          )}
-          {activeTab === 'links' && (
+          </div>
+          <div className={activeTab === 'links' ? 'block h-full' : 'hidden'}>
             <LinksTab album={editedAlbum} onChange={handleFieldChange} />
-          )}
+          </div>
         </div>
 
         {/* Bottom Bar */}
-        <div className="border-t border-gray-200 p-3 bg-white shrink-0">
+        <div className="border-t border-gray-200 p-0 bg-white shrink-0">
           <UniversalBottomBar
             album={editedAlbum}
             onChange={handleFieldChange}

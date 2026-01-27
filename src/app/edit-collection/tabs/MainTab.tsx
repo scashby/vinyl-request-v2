@@ -26,12 +26,12 @@ interface MainTabProps {
 
 type ModalType = 'picker' | 'manage' | 'edit' | null;
 type FieldType = 
-  | 'labels' 
+  | 'spotify_label' 
   | 'format' 
   | 'genre' 
   | 'location' 
-  | 'artist' 
-  | 'secondary_artists';
+  | 'artist'
+  | 'secondary_artists'; // Preserved New Feature
 
 export interface MainTabRef {
   openLocationPicker: () => void;
@@ -52,7 +52,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
 
   // Date picker state
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [datePickerField, setDatePickerField] = useState<'release' | null>(null);
+  const [datePickerField, setDatePickerField] = useState<'release' | 'original' | 'recording' | null>(null);
   const [datePickerPosition, setDatePickerPosition] = useState({ top: 0, left: 0 });
 
   // Auto Cap state
@@ -102,7 +102,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   // Reload specific dataset
   const reloadData = async (field: FieldType) => {
     switch (field) {
-      case 'labels':
+      case 'spotify_label':
         setLabels(await fetchLabels());
         break;
       case 'format':
@@ -124,7 +124,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   // Get current items based on active field
   const getCurrentItems = () => {
     switch (activeField) {
-      case 'labels': return labels;
+      case 'spotify_label': return labels;
       case 'format': return formats;
       case 'genre': return genres;
       case 'location': return locations;
@@ -137,7 +137,10 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   // Get current selection based on active field
   const getCurrentSelection = () => {
     switch (activeField) {
-      case 'labels': return album.labels || [];
+      case 'spotify_label': 
+        return album.labels && album.labels.length > 0 
+          ? album.labels[0] // Return single label string for picker selection
+          : (album.spotify_label || album.apple_music_label || '');
       case 'format': return album.format || '';
       case 'genre': return album.genres || [];
       case 'location': return album.location || '';
@@ -150,7 +153,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   // Get field configuration
   const getFieldConfig = () => {
     switch (activeField) {
-      case 'labels': return { title: 'Select Label', itemLabel: 'Label', mode: 'multi' as const };
+      case 'spotify_label': return { title: 'Select Label', itemLabel: 'Label', mode: 'single' as const };
       case 'format': return { title: 'Select Format', itemLabel: 'Format', mode: 'single' as const };
       case 'genre': return { title: 'Select Genres', itemLabel: 'Genre', mode: 'multi' as const };
       case 'location': return { title: 'Select Location', itemLabel: 'Location', mode: 'single' as const };
@@ -173,20 +176,30 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
     const items = getCurrentItems();
     
     if (Array.isArray(selectedIds)) {
-      // Multi-select (genres, labels, secondary artists)
-      // Use ID directly as it matches name for simple string arrays
+      // Multi-select (genres only)
       const selectedNames = selectedIds.map(id => items.find(item => item.id === id)?.name || id);
       
-      if (activeField === 'labels') onChange('labels', selectedNames);
-      if (activeField === 'genre') onChange('genres', selectedNames);
-      if (activeField === 'secondary_artists') onChange('secondary_artists', selectedNames);
+      if (activeField === 'genre') {
+         onChange('genres', selectedNames);
+      } else if (activeField === 'secondary_artists') {
+         onChange('secondary_artists', selectedNames);
+      }
     } else {
       // Single-select
       const selectedName = items.find(item => item.id === selectedIds)?.name || '';
       
-      if (activeField === 'format') onChange('format', selectedName);
-      if (activeField === 'location') onChange('location', selectedName);
-      if (activeField === 'artist') onChange('artist', selectedName);
+      if (activeField === 'spotify_label') {
+        // Update all label fields
+        onChange('spotify_label', selectedName);
+        onChange('apple_music_label', selectedName);
+        onChange('labels', selectedName ? [selectedName] : null); // Sync to labels array
+      } else if (activeField === 'format') {
+        onChange('format', selectedName);
+      } else if (activeField === 'location') {
+        onChange('location', selectedName);
+      } else if (activeField === 'artist') {
+        onChange('artist', selectedName);
+      }
     }
   };
 
@@ -220,7 +233,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
     };
     
     switch (activeField) {
-      case 'labels':
+      case 'spotify_label':
         setLabels([...labels, newItem].sort((a, b) => a.name.localeCompare(b.name)));
         break;
       case 'format':
@@ -245,7 +258,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   };
 
   // Date picker handlers
-  const handleOpenDatePicker = (field: 'release', event: React.MouseEvent) => {
+  const handleOpenDatePicker = (field: 'release' | 'original' | 'recording', event: React.MouseEvent) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setDatePickerPosition({
       top: rect.bottom + 4,
@@ -258,6 +271,20 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   const handleDateChange = (date: { year: number | null; month: number | null; day: number | null }) => {
     if (datePickerField === 'release') {
       if (date.year) onChange('year', date.year.toString());
+    } else if (datePickerField === 'original') {
+      if (date.year) onChange('original_release_year', date.year);
+      // Construct date string if full date available
+      if (date.year && date.month && date.day) {
+        const dateStr = `${date.year}-${date.month.toString().padStart(2, '0')}-${date.day.toString().padStart(2, '0')}`;
+        onChange('master_release_date', dateStr);
+      }
+    } else if (datePickerField === 'recording') {
+      if (date.year) onChange('recording_year', date.year);
+      // Construct date string if full date available
+      if (date.year && date.month && date.day) {
+        const dateStr = `${date.year}-${date.month.toString().padStart(2, '0')}-${date.day.toString().padStart(2, '0')}`;
+        onChange('recording_date', dateStr);
+      }
     }
     setShowDatePicker(false);
   };
@@ -290,7 +317,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
     switch (field) {
       case 'artist': 
       case 'secondary_artists': return 'artist';
-      case 'labels': return 'label';
+      case 'spotify_label': return 'label';
       case 'format': return 'format';
       case 'genre': return 'genre';
       case 'location': return 'location';
@@ -327,13 +354,24 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
             />
           </div>
 
-          {/* Sort Artist */}
+          {/* Sort Title */}
           <div>
-            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Sort Artist</label>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Sort Title</label>
             <input
               type="text"
-              value={album.sort_artist || ''}
-              onChange={(e) => onChange('sort_artist', e.target.value)}
+              value={album.sort_title || ''}
+              onChange={(e) => onChange('sort_title', e.target.value)}
+              className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          {/* Subtitle */}
+          <div>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Subtitle</label>
+            <input
+              type="text"
+              value={album.subtitle || ''}
+              onChange={(e) => onChange('subtitle', e.target.value)}
               className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500"
             />
           </div>
@@ -359,8 +397,8 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
               </button>
             </div>
           </div>
-          
-          {/* Secondary Artists (New) */}
+
+          {/* Secondary Artists (Added) */}
           <div>
             <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Secondary Artists</label>
             <div className="flex items-start">
@@ -395,27 +433,15 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
               </button>
             </div>
           </div>
-          
-          {/* Release Notes (New) */}
-           <div>
-            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Release Notes</label>
-            <textarea
-              value={album.release_notes || ''}
-              onChange={(e) => onChange('release_notes', e.target.value)}
-              className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 min-h-[80px]"
-              placeholder="Specific pressing info, provenance, etc."
-            />
-          </div>
-
         </div>
 
         {/* RIGHT COLUMN */}
         <div className="flex flex-col gap-4">
-          {/* Row 1: Release Date (Year) */}
-          <div className="grid grid-cols-1 gap-3">
+          {/* Row 1: Release Date | Original Release Date */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <div className="flex justify-between items-center mb-1.5">
-                <label className="block text-[13px] font-semibold text-gray-500">Release Year</label>
+                <label className="block text-[13px] font-semibold text-gray-500">Release Date</label>
                 <div 
                   onClick={(e) => handleOpenDatePicker('release', e)}
                   className="cursor-pointer flex items-center text-gray-500 hover:text-blue-500"
@@ -433,46 +459,133 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
                   value={album.year || ''}
                   onChange={(e) => onChange('year', e.target.value)}
                   placeholder="YYYY"
-                  className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
+                  className="w-[92px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
+                />
+                <div className="w-[10px] h-px bg-gray-300" />
+                <input
+                  type="text"
+                  placeholder="MM"
+                  className="w-[56px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
+                />
+                <div className="w-[10px] h-px bg-gray-300" />
+                <input
+                  type="text"
+                  placeholder="DD"
+                  className="w-[56px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="block text-[13px] font-semibold text-gray-500">Original Release Date</label>
+                <div 
+                  onClick={(e) => handleOpenDatePicker('original', e)}
+                  className="cursor-pointer flex items-center text-gray-500 hover:text-blue-500"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M2 6h12" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M5 2v2M11 2v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </div>
+              </div>
+              <div className="flex items-center justify-between w-full">
+                <input
+                  type="text"
+                  value={album.master_release_date || ''}
+                  onChange={(e) => onChange('master_release_date', e.target.value)}
+                  placeholder="YYYY"
+                  className="w-[92px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
+                />
+                <div className="w-[10px] h-px bg-gray-300" />
+                <input
+                  type="text"
+                  placeholder="MM"
+                  className="w-[56px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
+                />
+                <div className="w-[10px] h-px bg-gray-300" />
+                <input
+                  type="text"
+                  placeholder="DD"
+                  className="w-[56px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
                 />
               </div>
             </div>
           </div>
 
-          {/* Row 2: Labels (Multi-Select) */}
-          <div>
-            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Labels</label>
-            <div className="flex items-start">
-              <div className="flex-1 min-h-[38px] p-1.5 border border-gray-300 rounded-l border-r-0 bg-white flex flex-wrap gap-1.5 items-center">
-                {album.labels && album.labels.length > 0 ? (
-                  <>
-                    {album.labels.map((label, idx) => (
-                      <span
-                        key={idx}
-                        className="bg-blue-50 px-2 py-1 rounded text-xs flex items-center gap-1.5 text-blue-700 border border-blue-100"
-                      >
-                        {label}
-                        <button
-                          className="bg-transparent border-none text-blue-400 cursor-pointer p-0 text-base leading-none font-light hover:text-red-500"
-                          onClick={() => {
-                            const newLabels = album.labels?.filter((_, i) => i !== idx) || [];
-                            onChange('labels', newLabels);
-                          }}
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </>
-                ) : null}
+          {/* Row 2: Label | Recording Date */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Label</label>
+              <div className="flex items-stretch">
+                <select 
+                  value={
+                    album.labels && album.labels.length > 0 
+                      ? album.labels[0] 
+                      : (album.spotify_label || album.apple_music_label || '')
+                  }
+                  onChange={(e) => {
+                    onChange('spotify_label', e.target.value);
+                    onChange('apple_music_label', e.target.value);
+                    onChange('labels', e.target.value ? [e.target.value] : null);
+                  }}
+                  className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
+                >
+                  <option>
+                    {album.labels && album.labels.length > 0 
+                      ? album.labels.join(', ') 
+                      : (album.spotify_label || album.apple_music_label || 'Select label')}
+                  </option>
+                </select>
+                <button 
+                  onClick={() => handleOpenPicker('spotify_label')}
+                  disabled={dataLoading}
+                  className="w-9 h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-wait"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                    <circle cx="1.5" cy="2.5" r="1"/>
+                    <rect x="4" y="2" width="10" height="1"/>
+                    <circle cx="1.5" cy="7" r="1"/>
+                    <rect x="4" y="6.5" width="10" height="1"/>
+                    <circle cx="1.5" cy="11.5" r="1"/>
+                    <rect x="4" y="11" width="10" height="1"/>
+                  </svg>
+                </button>
               </div>
-              <button 
-                onClick={() => handleOpenPicker('labels')}
-                disabled={dataLoading}
-                className="w-9 min-h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-wait"
-              >
-                +
-              </button>
+            </div>
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="block text-[13px] font-semibold text-gray-500">Recording Date</label>
+                <div 
+                  onClick={(e) => handleOpenDatePicker('recording', e)}
+                  className="cursor-pointer flex items-center text-gray-500 hover:text-blue-500"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M2 6h12" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M5 2v2M11 2v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </div>
+              </div>
+              <div className="flex items-center justify-between w-full">
+                <input
+                  type="text"
+                  placeholder="YYYY"
+                  className="w-[92px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
+                />
+                <div className="w-[10px] h-px bg-gray-300" />
+                <input
+                  type="text"
+                  placeholder="MM"
+                  className="w-[56px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
+                />
+                <div className="w-[10px] h-px bg-gray-300" />
+                <input
+                  type="text"
+                  placeholder="DD"
+                  className="w-[56px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
+                />
+              </div>
             </div>
           </div>
 
@@ -515,46 +628,15 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
             </div>
           </div>
 
-          {/* Row 4: Cat No | Location */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Cat No</label>
-              <input
-                type="text"
-                value={album.cat_no || ''}
-                onChange={(e) => onChange('cat_no', e.target.value)}
-                className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Location</label>
-              <div className="flex items-stretch">
-                <select 
-                  value={album.location || ''}
-                  onChange={(e) => onChange('location', e.target.value)}
-                  className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
-                >
-                  <option value="">{album.location || 'Select Location'}</option>
-                  {locations.map(loc => (
-                    <option key={loc.id} value={loc.name}>{loc.name}</option>
-                  ))}
-                </select>
-                <button 
-                  onClick={() => handleOpenPicker('location')}
-                  disabled={dataLoading}
-                  className="w-9 h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-wait"
-                >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-                    <circle cx="1.5" cy="2.5" r="1"/>
-                    <rect x="4" y="2" width="10" height="1"/>
-                    <circle cx="1.5" cy="7" r="1"/>
-                    <rect x="4" y="6.5" width="10" height="1"/>
-                    <circle cx="1.5" cy="11.5" r="1"/>
-                    <rect x="4" y="11" width="10" height="1"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
+          {/* Row 4: Cat No */}
+          <div>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Cat No</label>
+            <input
+              type="text"
+              value={album.cat_no || ''}
+              onChange={(e) => onChange('cat_no', e.target.value)}
+              className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500"
+            />
           </div>
 
           {/* Row 5: Genre */}
@@ -572,10 +654,6 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
                         {genre}
                         <button
                           className="bg-transparent border-none text-gray-500 cursor-pointer p-0 text-base leading-none font-light hover:text-red-500"
-                          onClick={() => {
-                            const newGenres = album.genres?.filter((_, i) => i !== idx) || [];
-                            onChange('genres', newGenres);
-                          }}
                         >
                           ×
                         </button>
@@ -626,7 +704,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
           isOpen={true}
           onClose={handleManageClose}
           initialList={getManageListKey(activeField)}
-          hideListSelector={true}
+          hideListSelector={true} // Hide selector when opened from here
         />
       )}
 
@@ -638,7 +716,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
           itemName={''}
           onSave={handleEditSave}
           itemLabel={fieldConfig.itemLabel}
-          showSortName={activeField === 'artist'}
+          showSortName={activeField === 'artist'} // Show Sort Name for Artists
         />
       )}
 
