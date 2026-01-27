@@ -166,6 +166,23 @@ function calculateDecade(year: string | null): number | null {
   return Math.floor(yearNum / 10) * 10;
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null) {
+    const typedError = error as {
+      message?: string;
+      details?: string;
+      hint?: string;
+      code?: string;
+    };
+    const parts = [typedError.message, typedError.details, typedError.hint]
+      .filter((part): part is string => Boolean(part));
+    if (parts.length > 0) return parts.join(' ');
+    if (typedError.code) return `Error code: ${typedError.code}`;
+  }
+  return String(error);
+}
+
 // Compare albums logic
 function compareAlbums(
   parsed: ParsedAlbum[],
@@ -589,7 +606,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                         }
                     }
                 }
-                
                 // Reconstruct Full Format String for parser
                 let fullFormat = '';
                 if (info.formats && info.formats.length > 0) {
@@ -658,7 +674,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         setStage('preview');
 
     } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch from Discogs');
+        setError(getErrorMessage(err) || 'Failed to fetch from Discogs');
         setStage('select_mode');
     }
   };
@@ -719,15 +735,28 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
             const albumData: Record<string, unknown> = {
               artist: album.artist,
               title: album.title,
-              year: album.year,
-              format: album.format,
-              discogs_release_id: album.discogs_release_id,
-              discogs_master_id: album.discogs_master_id,
               artist_norm: album.artist_norm,
               title_norm: album.title_norm,
               // Added discogs_id to match schema availability
               discogs_id: album.discogs_release_id, 
             };
+            const normalizedFormat = album.format?.trim() || '';
+            if (album.status === 'NEW' || normalizedFormat) {
+              albumData.format = normalizedFormat || 'Unknown';
+            }
+            const normalizedMediaCondition = album.media_condition?.trim() || '';
+            if (album.status === 'NEW' || normalizedMediaCondition) {
+              albumData.media_condition = normalizedMediaCondition || 'Unknown';
+            }
+            if (album.year) {
+              albumData.year = album.year;
+            }
+            if (album.discogs_release_id) {
+              albumData.discogs_release_id = album.discogs_release_id;
+            }
+            if (album.discogs_master_id) {
+              albumData.discogs_master_id = album.discogs_master_id;
+            }
 
             // Table specific fields
             if (sourceType === 'collection') {
@@ -735,7 +764,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 albumData.labels = album.labels;
                 albumData.location = album.location;
                 albumData.date_added = album.date_added;
-                albumData.media_condition = album.media_condition;
                 albumData.package_sleeve_condition = album.package_sleeve_condition;
                 albumData.personal_notes = album.personal_notes;
                 albumData.my_rating = album.my_rating;
@@ -811,7 +839,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         } catch (err) {
           console.error(`Error processing ${album.artist} - ${album.title}:`, err);
           resultCounts.errors++;
-          const message = err instanceof Error ? err.message : 'Unknown error';
+          const message = getErrorMessage(err);
           setImportErrors(prev => ([
             ...prev,
             `${album.artist} — ${album.title}: ${message}`
@@ -823,7 +851,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
       setStage('complete');
       if (onImportComplete) onImportComplete();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Import failed');
+      setError(getErrorMessage(err) || 'Import failed');
       setStage('preview');
     }
   };
