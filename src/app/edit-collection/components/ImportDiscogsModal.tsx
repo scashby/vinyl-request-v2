@@ -139,10 +139,11 @@ interface ExistingAlbum {
   title_norm: string;
   artist_album_norm: string;
   discogs_release_id: string | null;
-  image_url: string | null;
-  tracks: unknown[] | null;
-  genres: string[] | null;
-  packaging: string | null;
+  image_url?: string | null;
+  cover_image?: string | null;
+  tracks?: unknown[] | null;
+  genres?: string[] | null;
+  packaging?: string | null;
 }
 
 interface ComparedAlbum extends ParsedAlbum {
@@ -186,7 +187,8 @@ function getErrorMessage(error: unknown): string {
 // Compare albums logic
 function compareAlbums(
   parsed: ParsedAlbum[],
-  existing: ExistingAlbum[]
+  existing: ExistingAlbum[],
+  sourceType: DiscogsSourceType
 ): ComparedAlbum[] {
   const releaseIdMap = new Map<string, ExistingAlbum>();
   const artistAlbumMap = new Map<string, ExistingAlbum>();
@@ -223,9 +225,12 @@ function compareAlbums(
     } else {
       const missingFields: string[] = [];
       
-      if (!existingAlbum.image_url) missingFields.push('cover images');
-      if (!existingAlbum.tracks || existingAlbum.tracks.length === 0) missingFields.push('tracks');
-      if (!existingAlbum.genres || existingAlbum.genres.length === 0) missingFields.push('genres');
+      const existingCoverImage = existingAlbum.image_url ?? existingAlbum.cover_image;
+      if (!existingCoverImage) missingFields.push('cover images');
+      if (sourceType === 'collection') {
+        if (!existingAlbum.tracks || existingAlbum.tracks.length === 0) missingFields.push('tracks');
+        if (!existingAlbum.genres || existingAlbum.genres.length === 0) missingFields.push('genres');
+      }
       
       const isChanged = parsedAlbum.discogs_release_id !== existingAlbum.discogs_release_id;
 
@@ -281,7 +286,7 @@ function compareAlbums(
       missingFields: [],
       for_sale: false,
       index_number: null,
-      cover_image: existingAlbum.image_url
+      cover_image: existingAlbum.image_url ?? existingAlbum.cover_image ?? null
     });
   }
 
@@ -659,17 +664,34 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
         // 2. Fetch Existing from DB to Compare
         const targetTable = sourceType === 'collection' ? 'collection' : 'wantlist';
+        const selectFields = sourceType === 'collection'
+          ? 'id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, image_url, tracks, genres, packaging'
+          : 'id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, cover_image';
         // Use unknown casting to satisfy TS without using 'any'
-        const { data: existing, error: dbError } = await supabase
+        const { data: existingRaw, error: dbError } = await supabase
           .from(targetTable)
-          .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, image_url, tracks, genres, packaging'); 
+          .select(selectFields); 
 
         if (dbError) throw dbError;
 
-        setTotalDatabaseCount(existing?.length || 0);
+        const existing = (existingRaw || []).map((album) => {
+          if (sourceType === 'collection') {
+            return album as ExistingAlbum;
+          }
+          const wantlistAlbum = album as ExistingAlbum;
+          return {
+            ...wantlistAlbum,
+            image_url: wantlistAlbum.cover_image ?? null,
+            tracks: null,
+            genres: null,
+            packaging: null,
+          };
+        });
+
+        setTotalDatabaseCount(existing.length);
 
         // 3. Run Comparison Logic
-        const compared = compareAlbums(allFetchedItems, (existing || []) as unknown as ExistingAlbum[]);
+        const compared = compareAlbums(allFetchedItems, existing, sourceType);
         setComparedAlbums(compared);
         setStage('preview');
 
