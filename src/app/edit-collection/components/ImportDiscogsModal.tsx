@@ -663,30 +663,31 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         }
 
         // 2. Fetch Existing from DB to Compare
-        const targetTable = sourceType === 'collection' ? 'collection' : 'wantlist';
-        const selectFields = sourceType === 'collection'
-          ? 'id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, image_url, tracks, genres, packaging'
-          : 'id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, cover_image';
-        // Use unknown casting to satisfy TS without using 'any'
-        const { data: existingRaw, error: dbError } = await supabase
-          .from(targetTable)
-          .select(selectFields); 
-
-        if (dbError) throw dbError;
-
-        const existing = (existingRaw || []).map((album) => {
-          if (sourceType === 'collection') {
-            return album as ExistingAlbum;
-          }
-          const wantlistAlbum = album as ExistingAlbum;
-          return {
-            ...wantlistAlbum,
-            image_url: wantlistAlbum.cover_image ?? null,
-            tracks: null,
-            genres: null,
-            packaging: null,
-          };
-        });
+        let existing: ExistingAlbum[] = [];
+        if (sourceType === 'collection') {
+          const { data: existingRaw, error: dbError } = await supabase
+            .from('collection')
+            .select(
+              'id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, image_url, tracks, genres, packaging'
+            );
+          if (dbError) throw dbError;
+          existing = (existingRaw ?? []) as unknown as ExistingAlbum[];
+        } else {
+          const { data: existingRaw, error: dbError } = await supabase
+            .from('wantlist')
+            .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, cover_image');
+          if (dbError) throw dbError;
+          existing = (existingRaw ?? []).map((album) => {
+            const wantlistAlbum = album as ExistingAlbum;
+            return {
+              ...wantlistAlbum,
+              image_url: wantlistAlbum.cover_image ?? null,
+              tracks: null,
+              genres: null,
+              packaging: null,
+            };
+          });
+        }
 
         setTotalDatabaseCount(existing.length);
 
