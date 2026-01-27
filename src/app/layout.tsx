@@ -5,7 +5,6 @@ import { Inter, Playfair_Display } from 'next/font/google';
 import { AuthProvider } from '../components/AuthProvider'; 
 import NavigationMenu from '../components/NavigationMenu';
 // FIXED: Named import
-import { UniversalBottomBar } from '../components/UniversalBottomBar';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const playfair = Playfair_Display({ 
@@ -36,7 +35,6 @@ export default function RootLayout({
           <main className="min-h-screen">
             {children}
           </main>
-          <UniversalBottomBar />
         </AuthProvider>
       </body>
     </html>
