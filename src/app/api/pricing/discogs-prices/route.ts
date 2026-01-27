@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
         let status = 500;
         if (result.error) {
             if (result.error.includes('429')) status = 429;
+            else if (result.error.includes('403')) status = 403;
             else if (result.error.includes('404')) status = 404;
             else if (result.error.includes('401')) status = 401;
         }

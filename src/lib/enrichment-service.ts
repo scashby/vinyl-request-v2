@@ -336,6 +336,9 @@ export async function enrichDiscogsPricing(albumId: number | null, releaseId: st
     const statsRes = await fetch(statsUrl, { headers });
 
     if (!statsRes.ok && statsRes.status !== 404) {
+      if (statsRes.status === 403) {
+        throw new Error(`Discogs Stats API error: 403`);
+      }
       throw new Error(`Discogs Stats API error: ${statsRes.status}`);
     }
     const stats = statsRes.ok ? await statsRes.json() : {};
