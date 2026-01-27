@@ -174,9 +174,6 @@ const CollectionTable = memo(function CollectionTable({
       sale_platform: (album: Album) => album.sale_platform || '—',
       sale_quantity: (album: Album) => album.sale_quantity || '—',
       wholesale_cost: (album: Album) => formatCurrency(album.wholesale_cost),
-      discogs_price_min: (album: Album) => formatCurrency(album.discogs_price_min),
-      discogs_price_median: (album: Album) => formatCurrency(album.discogs_price_median),
-      discogs_price_max: (album: Album) => formatCurrency(album.discogs_price_max),
       pricing_notes: (album: Album) => album.pricing_notes || '—',
     } as Record<string, (album: Album) => React.ReactNode>;
   }, [onEditAlbum]);

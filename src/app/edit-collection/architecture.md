@@ -185,7 +185,6 @@ PickerModal (shows location picker)
 
 **Value:**
 - wholesale_cost
-- discogs_price_min, discogs_price_median, discogs_price_max
 - current_value, purchase_price
 
 ---

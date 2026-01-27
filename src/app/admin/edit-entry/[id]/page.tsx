@@ -671,9 +671,6 @@ export default function EditEntryPage() {
       discogs_notes: entry.discogs_notes || null,
       pricing_notes: entry.pricing_notes || null,
       wholesale_cost: entry.wholesale_cost || null,
-      discogs_price_min: entry.discogs_price_min || null,
-      discogs_price_median: entry.discogs_price_median || null,
-      discogs_price_max: entry.discogs_price_max || null,
       sides: entry.sides || null,
       is_box_set: !!entry.is_box_set,
       parent_id: entry.parent_id || null,
@@ -1826,58 +1823,6 @@ export default function EditEntryPage() {
                     onChange={e => handleChange('wholesale_cost', e.target.value ? parseFloat(e.target.value) : null)} 
                     placeholder="0.00" 
                   />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
-                    Discogs Price Min
-                  </label>
-                  <input 
-                    type="number"
-                    step="0.01"
-                    style={inputStyle} 
-                    value={(entry.discogs_price_min as number) || ''} 
-                    onChange={e => handleChange('discogs_price_min', e.target.value ? parseFloat(e.target.value) : null)} 
-                    placeholder="0.00" 
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
-                    Discogs Price Median
-                  </label>
-                  <input 
-                    type="number"
-                    step="0.01"
-                    style={inputStyle} 
-                    value={(entry.discogs_price_median as number) || ''} 
-                    onChange={e => handleChange('discogs_price_median', e.target.value ? parseFloat(e.target.value) : null)} 
-                    placeholder="0.00" 
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
-                    Discogs Price Max
-                  </label>
-                  <input 
-                    type="number"
-                    step="0.01"
-                    style={inputStyle} 
-                    value={(entry.discogs_price_max as number) || ''} 
-                    onChange={e => handleChange('discogs_price_max', e.target.value ? parseFloat(e.target.value) : null)} 
-                    placeholder="0.00" 
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
-                    Price Updated At
-                  </label>
-                  <input 
-                    type="text"
-                    style={{...inputStyle, background: '#f9fafb'}} 
-                    value={(entry.discogs_price_updated_at as string) || ''} 
-                    readOnly
-                    placeholder="Not updated" 
-                  />
-                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Read-only timestamp</div>
                 </div>
               </div>
             </div>

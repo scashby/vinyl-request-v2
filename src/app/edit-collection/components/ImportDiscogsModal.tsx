@@ -6,9 +6,9 @@ import { supabase } from '../../../lib/supabaseClient';
 import { parseDiscogsFormat } from '../../../lib/formatParser';
 import { normalizeArtist, normalizeTitle, normalizeArtistAlbum } from '../../../lib/importUtils';
 
-type SyncMode = 'full_replacement' | 'full_sync' | 'partial_sync' | 'new_only' | 'price_update';
+type SyncMode = 'full_replacement' | 'full_sync' | 'partial_sync' | 'new_only';
 type ImportStage = 'select_mode' | 'fetching_definitions' | 'fetching' | 'preview' | 'importing' | 'complete';
-type AlbumStatus = 'NEW' | 'CHANGED' | 'UNCHANGED' | 'REMOVED' | 'PRICE_UPDATE';
+type AlbumStatus = 'NEW' | 'CHANGED' | 'UNCHANGED' | 'REMOVED';
 type DiscogsSourceType = 'collection' | 'wantlist';
 
 // --- Interfaces for Discogs API Responses ---
@@ -539,37 +539,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     setComparedAlbums([]);
     
     try {
-        if (syncMode === 'price_update') {
-             // NEW MODE: Update Prices Only (Skip Discogs API Fetch loop)
-             const { data: existing, error: dbError } = await supabase
-              .from('collection')
-              .select('*') // Select all to populate table
-              .not('discogs_release_id', 'is', null);
-
-             if (dbError) throw dbError;
-             
-             // Map existing DB entries to compared format for display
-             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-             const forPricing = (existing || []).map((album: any) => ({
-                 ...album,
-                 // Ensure required fields are present for UI
-                 artist: album.artist,
-                 title: album.title,
-                 format: album.format || '',
-                 labels: album.labels || [],
-                 cat_no: album.cat_no,
-                 year: album.year,
-                 status: 'PRICE_UPDATE',
-                 existingId: album.id,
-                 needsEnrichment: false,
-                 missingFields: []
-             }));
-             
-             setComparedAlbums(forPricing as unknown as ComparedAlbum[]);
-             setStage('preview');
-             return;
-        }
-
         // 1. Fetch from API pages
         let page = 1;
         let hasMore = true;
@@ -722,8 +691,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         );
       } else if (syncMode === 'new_only') {
         albumsToProcess = comparedAlbums.filter(a => a.status === 'NEW');
-      } else if (syncMode === 'price_update') {
-          albumsToProcess = comparedAlbums; // Process all fetched for pricing
       }
 
       setProgress({ current: 0, total: albumsToProcess.length, status: 'Processing...' });
@@ -739,96 +706,15 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
       const targetTable = sourceType === 'collection' ? 'collection' : 'wantlist';
 
-      // --- ADAPTIVE TIMING VARIABLES ---
-      let currentDelay = 1200; // Start reasonably fast (1.2s)
-      const minDelay = 1000;
-      const maxDelay = 5000;
-      const batchSize = 1;
+      for (let i = 0; i < albumsToProcess.length; i += 1) {
+        const album = albumsToProcess[i];
+        setProgress({
+          current: i + 1,
+          total: albumsToProcess.length,
+          status: `Processing ${album.artist} - ${album.title}`,
+        });
 
-      for (let i = 0; i < albumsToProcess.length; i += batchSize) {
-        const batch = albumsToProcess.slice(i, i + batchSize);
-
-        for (const album of batch) {
-          setProgress({
-            current: i + batch.indexOf(album) + 1,
-            total: albumsToProcess.length,
-            status: `Processing ${album.artist} - ${album.title}`,
-          });
-
-          try {
-            // SPECIAL MODE: Pricing Update
-            if (syncMode === 'price_update') {
-                if (album.existingId && album.discogs_release_id) {
-                     // 1. Dynamic Politeness Delay
-                     await new Promise(r => setTimeout(r, currentDelay)); 
-
-                     const fetchPrice = async () => {
-                        return fetch('/api/pricing/discogs-prices', {
-                             method: 'POST',
-                             headers: { 'Content-Type': 'application/json' },
-                             body: JSON.stringify({ releaseId: album.discogs_release_id, albumId: album.existingId })
-                         });
-                     };
-
-                     const readPricingError = async (response: Response) => {
-                         try {
-                             const payload = await response.json();
-                             return payload?.error ? String(payload.error) : `HTTP ${response.status}`;
-                         } catch {
-                             return response.text();
-                         }
-                     };
-
-                     let priceRes = await fetchPrice();
-
-                     // 2. ADAPTIVE HANDLING: 429 (Too Many Requests) or 403 (Forbidden)
-                     if (priceRes.status === 429 || priceRes.status === 403) {
-                         const isForbidden = priceRes.status === 403;
-                         const cooldown = isForbidden ? 65000 : 15000; // 65s for 403, 15s for 429
-                         const msg = isForbidden ? '⛔ 403 Block (Cooling down 65s)...' : '⏳ Rate Limit (Cooling down 15s)...';
-                         
-                         // Warn User
-                         setImportErrors(prev => [...prev, `${album.artist}: ${msg}`]);
-                         
-                         // Increase future delay significantly to avoid immediate repeat
-                         currentDelay = Math.min(currentDelay + 1000, maxDelay);
-                         
-                         // Wait
-                         await new Promise(r => setTimeout(r, cooldown));
-                         
-                         // Retry EXACTLY ONCE
-                         priceRes = await fetchPrice();
-
-                         // If it fails again with 403, it's likely a RESTRICTED ITEM (Bootleg/Unofficial)
-                         if (priceRes.status === 403) {
-                             const details = await readPricingError(priceRes);
-                             setImportErrors(prev => [...prev, `${album.artist}: SKIPPED (Pricing Forbidden) ${details}`]);
-                             resultCounts.errors++;
-                             continue; // SKIP ITEM, DO NOT CRASH
-                         }
-                     } else {
-                         // Success: Gently speed up if we are going very slow
-                         if (currentDelay > minDelay) {
-                             currentDelay = Math.max(minDelay, currentDelay - 100);
-                         }
-                     }
-                     
-                     if (!priceRes.ok) {
-                         // Gracefully handle error without crashing loop
-                         const errText = await readPricingError(priceRes);
-                         console.warn(`Pricing fetch failed for ${album.discogs_release_id}: ${priceRes.status} ${errText}`);
-                         // Only log unexpected errors
-                         if (priceRes.status !== 403) {
-                             setImportErrors(prev => [...prev, `${album.artist} - ${album.title}: Error (${priceRes.status})`]);
-                         }
-                         resultCounts.errors++;
-                     } else {
-                         resultCounts.updated++;
-                     }
-                }
-                continue; // Skip the rest of standard import logic
-            }
-
+        try {
             // STANDARD IMPORT LOGIC
             const albumData: Record<string, unknown> = {
               artist: album.artist,
@@ -922,15 +808,14 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               if (album.status === 'CHANGED') resultCounts.updated++;
               else resultCounts.unchanged++;
             }
-          } catch (err) {
-            console.error(`Error processing ${album.artist} - ${album.title}:`, err);
-            resultCounts.errors++;
-            const message = err instanceof Error ? err.message : 'Unknown error';
-            setImportErrors(prev => ([
-              ...prev,
-              `${album.artist} — ${album.title}: ${message}`
-            ]));
-          }
+        } catch (err) {
+          console.error(`Error processing ${album.artist} - ${album.title}:`, err);
+          resultCounts.errors++;
+          const message = err instanceof Error ? err.message : 'Unknown error';
+          setImportErrors(prev => ([
+            ...prev,
+            `${album.artist} — ${album.title}: ${message}`
+          ]));
         }
       }
 
@@ -1040,7 +925,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                         { value: 'new_only', label: 'New Only', desc: 'Only import albums not in database' },
                         { value: 'full_sync', label: 'Full Sync', desc: 'Update everything, remove deleted items' },
                         { value: 'full_replacement', label: 'Full Replacement', desc: 'Wipe database and re-import' },
-                        { value: 'price_update', label: 'Update Prices Only', desc: 'Refresh market value for existing collection' },
                       ].map(mode => (
                         <label key={mode.value} className={`flex items-start p-3 border rounded-md cursor-pointer ${syncMode === mode.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'}`}>
                           <input
@@ -1120,7 +1004,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                           if (album.status === 'NEW') statusColor = 'text-emerald-600';
                           if (album.status === 'REMOVED') statusColor = 'text-red-600';
                           if (album.status === 'CHANGED') statusColor = 'text-amber-600';
-                          if (album.status === 'PRICE_UPDATE') statusColor = 'text-blue-600';
 
                           return (
                             <tr key={idx} className="border-b border-gray-100 last:border-none">
