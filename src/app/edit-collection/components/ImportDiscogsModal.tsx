@@ -739,7 +739,12 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
       const targetTable = sourceType === 'collection' ? 'collection' : 'wantlist';
 
-      const batchSize = 1; // Process one by one to avoid rate limiting on enrichment
+      // --- ADAPTIVE TIMING VARIABLES ---
+      let currentDelay = 1200; // Start reasonably fast (1.2s)
+      const minDelay = 1000;
+      const maxDelay = 5000;
+      const batchSize = 1;
+
       for (let i = 0; i < albumsToProcess.length; i += batchSize) {
         const batch = albumsToProcess.slice(i, i + batchSize);
 
@@ -754,8 +759,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
             // SPECIAL MODE: Pricing Update
             if (syncMode === 'price_update') {
                 if (album.existingId && album.discogs_release_id) {
-                     // 1. Initial politeness delay (2s is safer default)
-                     await new Promise(r => setTimeout(r, 2000)); 
+                     // 1. Dynamic Politeness Delay
+                     await new Promise(r => setTimeout(r, currentDelay)); 
 
                      const fetchPrice = async () => {
                         return fetch('/api/pricing/discogs-prices', {
@@ -766,27 +771,45 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
                      let priceRes = await fetchPrice();
 
-                     // 2. Handle Rate Limits (429) or WAF Blocks (403)
+                     // 2. ADAPTIVE HANDLING: 429 (Too Many Requests) or 403 (Forbidden)
                      if (priceRes.status === 429 || priceRes.status === 403) {
                          const isForbidden = priceRes.status === 403;
-                         const delay = isForbidden ? 60000 : 10000; // 60s for 403, 10s for 429
-                         const msg = isForbidden ? '⛔ 403 Forbidden (Cooling down 60s)...' : '⏳ Rate Limit (Cooling down 10s)...';
+                         const cooldown = isForbidden ? 65000 : 15000; // 65s for 403, 15s for 429
+                         const msg = isForbidden ? '⛔ 403 Block (Cooling down 65s)...' : '⏳ Rate Limit (Cooling down 15s)...';
                          
-                         // Update UI with warning
+                         // Warn User
                          setImportErrors(prev => [...prev, `${album.artist}: ${msg}`]);
                          
-                         // Wait
-                         await new Promise(r => setTimeout(r, delay));
+                         // Increase future delay significantly to avoid immediate repeat
+                         currentDelay = Math.min(currentDelay + 1000, maxDelay);
                          
-                         // Retry once
+                         // Wait
+                         await new Promise(r => setTimeout(r, cooldown));
+                         
+                         // Retry EXACTLY ONCE
                          priceRes = await fetchPrice();
+
+                         // If it fails again with 403, it's likely a RESTRICTED ITEM (Bootleg/Unofficial)
+                         if (priceRes.status === 403) {
+                             setImportErrors(prev => [...prev, `${album.artist}: SKIPPED (Restricted Item - Pricing Unavailable)`]);
+                             resultCounts.errors++;
+                             continue; // SKIP ITEM, DO NOT CRASH
+                         }
+                     } else {
+                         // Success: Gently speed up if we are going very slow
+                         if (currentDelay > minDelay) {
+                             currentDelay = Math.max(minDelay, currentDelay - 100);
+                         }
                      }
                      
                      if (!priceRes.ok) {
                          // Gracefully handle error without crashing loop
                          const errText = await priceRes.text();
                          console.warn(`Pricing fetch failed for ${album.discogs_release_id}: ${priceRes.status} ${errText}`);
-                         setImportErrors(prev => [...prev, `${album.artist} - ${album.title}: Pricing failed (${priceRes.status})`]);
+                         // Only log unexpected errors
+                         if (priceRes.status !== 403) {
+                             setImportErrors(prev => [...prev, `${album.artist} - ${album.title}: Error (${priceRes.status})`]);
+                         }
                          resultCounts.errors++;
                      } else {
                          resultCounts.updated++;
