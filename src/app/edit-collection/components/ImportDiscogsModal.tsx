@@ -770,6 +770,15 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                          });
                      };
 
+                     const readPricingError = async (response: Response) => {
+                         try {
+                             const payload = await response.json();
+                             return payload?.error ? String(payload.error) : `HTTP ${response.status}`;
+                         } catch {
+                             return response.text();
+                         }
+                     };
+
                      let priceRes = await fetchPrice();
 
                      // 2. ADAPTIVE HANDLING: 429 (Too Many Requests) or 403 (Forbidden)
@@ -792,7 +801,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
                          // If it fails again with 403, it's likely a RESTRICTED ITEM (Bootleg/Unofficial)
                          if (priceRes.status === 403) {
-                             setImportErrors(prev => [...prev, `${album.artist}: SKIPPED (Restricted Item - Pricing Unavailable)`]);
+                             const details = await readPricingError(priceRes);
+                             setImportErrors(prev => [...prev, `${album.artist}: SKIPPED (Pricing Forbidden) ${details}`]);
                              resultCounts.errors++;
                              continue; // SKIP ITEM, DO NOT CRASH
                          }
@@ -805,7 +815,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                      
                      if (!priceRes.ok) {
                          // Gracefully handle error without crashing loop
-                         const errText = await priceRes.text();
+                         const errText = await readPricingError(priceRes);
                          console.warn(`Pricing fetch failed for ${album.discogs_release_id}: ${priceRes.status} ${errText}`);
                          // Only log unexpected errors
                          if (priceRes.status !== 403) {
