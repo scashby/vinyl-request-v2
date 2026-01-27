@@ -754,11 +754,33 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
             // SPECIAL MODE: Pricing Update
             if (syncMode === 'price_update') {
                 if (album.existingId && album.discogs_release_id) {
-                     await new Promise(r => setTimeout(r, 3500)); // Increased safety delay to 3.5s
-                     const priceRes = await fetch('/api/pricing/discogs-prices', {
-                         method: 'POST',
-                         body: JSON.stringify({ releaseId: album.discogs_release_id, albumId: album.existingId })
-                     });
+                     // 1. Initial politeness delay (2s is safer default)
+                     await new Promise(r => setTimeout(r, 2000)); 
+
+                     const fetchPrice = async () => {
+                        return fetch('/api/pricing/discogs-prices', {
+                             method: 'POST',
+                             body: JSON.stringify({ releaseId: album.discogs_release_id, albumId: album.existingId })
+                         });
+                     };
+
+                     let priceRes = await fetchPrice();
+
+                     // 2. Handle Rate Limits (429) or WAF Blocks (403)
+                     if (priceRes.status === 429 || priceRes.status === 403) {
+                         const isForbidden = priceRes.status === 403;
+                         const delay = isForbidden ? 60000 : 10000; // 60s for 403, 10s for 429
+                         const msg = isForbidden ? '⛔ 403 Forbidden (Cooling down 60s)...' : '⏳ Rate Limit (Cooling down 10s)...';
+                         
+                         // Update UI with warning
+                         setImportErrors(prev => [...prev, `${album.artist}: ${msg}`]);
+                         
+                         // Wait
+                         await new Promise(r => setTimeout(r, delay));
+                         
+                         // Retry once
+                         priceRes = await fetchPrice();
+                     }
                      
                      if (!priceRes.ok) {
                          // Gracefully handle error without crashing loop
