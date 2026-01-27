@@ -735,8 +735,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
             const albumData: Record<string, unknown> = {
               artist: album.artist,
               title: album.title,
-              artist_norm: album.artist_norm,
-              title_norm: album.title_norm,
               // Added discogs_id to match schema availability
               discogs_id: album.discogs_release_id, 
             };
@@ -793,6 +791,9 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 Object.assign(albumData, mappedFormatData);
             } else {
                 // Wantlist specific
+                albumData.artist_norm = album.artist_norm;
+                albumData.title_norm = album.title_norm;
+                albumData.artist_album_norm = album.artist_album_norm;
                 albumData.date_added_to_wantlist = album.date_added;
                 albumData.notes = album.personal_notes;
                 albumData.cover_image = album.cover_image;
