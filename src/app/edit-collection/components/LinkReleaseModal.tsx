@@ -60,7 +60,7 @@ export function LinkReleaseModal({ isOpen, onClose, albumId, currentDiscogsId, o
 
         <div className="p-6">
           <p className="text-sm text-gray-600 mb-4">
-            Manually paste a Discogs Release ID to link this album. This will enable pricing and metadata lookups.
+            Manually paste a Discogs Release ID to link this album. This will enable metadata lookups.
           </p>
 
           {error && (

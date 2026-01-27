@@ -162,11 +162,6 @@ export type Album = {
   sale_notes: string | null;
   wholesale_cost: number | null;
   pricing_notes: string | null;
-  
-  discogs_price_min: number | null;
-  discogs_price_median: number | null;
-  discogs_price_max: number | null;
-  discogs_price_updated_at: string | null;
 
   // ============================================================================
   // LEGACY / OPTIONAL / UI HELPERS

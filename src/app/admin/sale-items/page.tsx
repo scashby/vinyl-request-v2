@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { supabase } from 'lib/supabaseClient'; // Updated import path
-import PricingCalculator from 'components/PricingCalculator'; // Updated import path
 
 type SaleItem = {
   id: number;
@@ -44,7 +43,6 @@ export default function SaleItemsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValues, setEditValues] = useState<Partial<SaleItem>>({});
   const [saving, setSaving] = useState(false);
-  const [pricingModalItem, setPricingModalItem] = useState<SaleItem | null>(null);
 
   const [availableLocations, setAvailableLocations] = useState<string[]>([]);
 
@@ -323,7 +321,6 @@ export default function SaleItemsPage() {
                         </div>
                       ) : (
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                          <button onClick={() => setPricingModalItem(item)} style={{ padding: '6px 12px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>💰 Price</button>
                           <Link href={`/admin/edit-entry/${item.id}`} style={{ padding: '6px 12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 4, fontSize: 12, fontWeight: 600, textDecoration: 'none', display: 'inline-block' }}>Edit Full</Link>
                           <button onClick={() => startEdit(item)} style={{ padding: '6px 12px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Quick Edit</button>
                           <button onClick={() => removeFromSale(item.id)} style={{ padding: '6px 12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Remove</button>
@@ -337,37 +334,6 @@ export default function SaleItemsPage() {
           </div>
         )}
       </div>
-
-      {/* Pricing Modal */}
-      {pricingModalItem && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
-          <div style={{ background: 'white', borderRadius: 12, width: '100%', maxWidth: 900, maxHeight: '90vh', overflow: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
-            <div style={{ padding: 24, borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: 20, fontWeight: 'bold', color: '#1f2937' }}>Pricing Tools</div>
-                <div style={{ fontSize: 14, color: '#6b7280', marginTop: 4 }}>{pricingModalItem.artist} - {pricingModalItem.title}</div>
-              </div>
-              <button onClick={() => setPricingModalItem(null)} style={{ padding: '8px 12px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Close</button>
-            </div>
-            <div style={{ padding: 24 }}>
-              <PricingCalculator
-                albumId={pricingModalItem.id}
-                discogsReleaseId={pricingModalItem.discogs_release_id}
-                currentPrice={pricingModalItem.sale_price}
-                wholesaleCost={pricingModalItem.wholesale_cost}
-                onApplyPrice={async (price) => {
-                  const { error } = await supabase.from('collection').update({ sale_price: price }).eq('id', pricingModalItem.id);
-                  if (!error) { await loadItems(); setPricingModalItem(null); }
-                }}
-                onSaveWholesaleCost={async (cost) => {
-                  const { error } = await supabase.from('collection').update({ wholesale_cost: cost }).eq('id', pricingModalItem.id);
-                  if (!error) { await loadItems(); }
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
