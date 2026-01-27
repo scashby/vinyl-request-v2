@@ -1,152 +1,128 @@
-// src/app/edit-collection/tabs/PeopleTab.tsx
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { Album } from 'types/album';
-import { UniversalPicker } from '../pickers/UniversalPicker';
-import {
-  fetchSongwriters,
-  fetchProducers,
-  fetchEngineers,
-  fetchMusicians,
-} from '../pickers/pickerDataUtils';
 
 interface PeopleTabProps {
   album: Album;
-  onChange: <K extends keyof Album>(field: K, value: Album[K]) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onChange: (field: keyof Album, value: any) => void;
 }
 
-type PeopleField = 'songwriters' | 'producers' | 'engineers' | 'musicians';
+// Helper to render a list of people with simple add/remove
+function PersonList({ 
+  title, 
+  people, 
+  onAdd, 
+  onRemove 
+}: { 
+  title: string; 
+  people: string[] | null; 
+  onAdd: (name: string) => void;
+  onRemove: (index: number) => void;
+}) {
+  const [newName, setNewName] = useState('');
 
-export function PeopleTab({ album, onChange }: PeopleTabProps) {
-  const [showPicker, setShowPicker] = useState(false);
-  const [currentField, setCurrentField] = useState<PeopleField | null>(null);
-
-  const handleOpenPicker = (field: PeopleField) => {
-    setCurrentField(field);
-    setShowPicker(true);
-  };
-
-  const handlePickerSelect = (selectedItems: string[]) => {
-    if (currentField) {
-      onChange(currentField, selectedItems.length > 0 ? selectedItems : null as Album[PeopleField]);
-    }
-    setShowPicker(false);
-    setCurrentField(null);
-  };
-
-  const getFieldConfig = () => {
-    switch (currentField) {
-      case 'songwriters':
-        return {
-          title: 'Select Songwriters',
-          fetchItems: fetchSongwriters,
-          label: 'Songwriter',
-          showSortName: true, // Proper names
-          showDefaultInstrument: false,
-        };
-      case 'producers':
-        return {
-          title: 'Select Producers',
-          fetchItems: fetchProducers,
-          label: 'Producer',
-          showSortName: true, // Proper names
-          showDefaultInstrument: false,
-        };
-      case 'engineers':
-        return {
-          title: 'Select Engineers',
-          fetchItems: fetchEngineers,
-          label: 'Engineer',
-          showSortName: true, // Proper names
-          showDefaultInstrument: false,
-        };
-      case 'musicians':
-        return {
-          title: 'Select Musicians',
-          fetchItems: fetchMusicians,
-          label: 'Musician',
-          showSortName: true, // Proper names
-          showDefaultInstrument: true, // Musicians need default instrument
-        };
-      default:
-        return null;
+  const handleAdd = () => {
+    if (newName.trim()) {
+      onAdd(newName.trim());
+      setNewName('');
     }
   };
 
-  const renderField = (label: string, field: PeopleField) => {
-    const values = (album[field] as string[]) || [];
-    const displayText = values.length > 0 ? values.join(', ') : '';
-    
-    return (
-      <div className="mb-4">
-        <div className="flex justify-between items-center mb-1.5">
-          <label className="text-[13px] font-semibold text-gray-500">
-            {label}
-          </label>
-          <span 
-            onClick={() => handleOpenPicker(field)}
-            className="text-gray-400 text-xl font-light cursor-pointer select-none hover:text-blue-500"
-          >
-            +
-          </span>
-        </div>
-        <div 
-          className={`px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 min-h-[38px] ${
-            values.length === 0 ? 'cursor-pointer hover:border-blue-400' : 'cursor-default'
-          }`}
-          onClick={() => values.length === 0 && handleOpenPicker(field)}
-        >
-          {displayText}
-        </div>
-      </div>
-    );
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAdd();
+    }
   };
-
-  const fieldConfig = getFieldConfig();
 
   return (
-    <div className="p-5">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 max-w-[900px]">
-        {/* LEFT COLUMN - Credits */}
-        <div className="border border-gray-200 rounded-md p-4 bg-gray-50">
-          <h3 className="text-sm font-semibold text-gray-500 mb-4 mt-0">
-            Credits
-          </h3>
-          {renderField('Songwriter', 'songwriters')}
-          {renderField('Producer', 'producers')}
-          {renderField('Engineer', 'engineers')}
-        </div>
-
-        {/* RIGHT COLUMN - Musicians */}
-        <div className="border border-gray-200 rounded-md p-4 bg-gray-50">
-          <h3 className="text-sm font-semibold text-gray-500 mb-4 mt-0">
-            Musicians
-          </h3>
-          {renderField('Musician', 'musicians')}
-        </div>
+    <div className="mb-5">
+      <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">{title}</label>
+      <div className="flex flex-wrap gap-2 mb-2 min-h-[32px] p-2 bg-gray-50 border border-gray-200 rounded">
+        {people && people.length > 0 ? (
+          people.map((person, idx) => (
+            <span key={idx} className="bg-white border border-gray-300 rounded px-2 py-1 text-sm flex items-center gap-1.5">
+              {person}
+              <button 
+                onClick={() => onRemove(idx)}
+                className="bg-transparent border-none text-gray-400 hover:text-red-500 cursor-pointer p-0 leading-none"
+              >
+                ×
+              </button>
+            </span>
+          ))
+        ) : (
+          <span className="text-gray-400 text-sm italic">No {title.toLowerCase()} added</span>
+        )}
       </div>
-
-      {/* Universal Picker */}
-      {showPicker && currentField && fieldConfig && (
-        <UniversalPicker
-          title={fieldConfig.title}
-          isOpen={showPicker}
-          onClose={() => {
-            setShowPicker(false);
-            setCurrentField(null);
-          }}
-          fetchItems={fieldConfig.fetchItems}
-          selectedItems={(album[currentField] as string[]) || []}
-          onSelect={handlePickerSelect}
-          multiSelect={true}
-          canManage={true}
-          newItemLabel={fieldConfig.label}
-          manageItemsLabel={`Manage ${fieldConfig.label}s`}
-          showSortName={fieldConfig.showSortName}
-          showDefaultInstrument={fieldConfig.showDefaultInstrument}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={`Add ${title}...`}
+          className="flex-1 px-2.5 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500"
         />
-      )}
+        <button 
+          onClick={handleAdd}
+          className="px-4 py-2 bg-blue-500 text-white rounded text-sm font-medium hover:bg-blue-600 border-none cursor-pointer"
+        >
+          Add
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function PeopleTab({ album, onChange }: PeopleTabProps) {
+  
+  const handleAddPerson = (field: keyof Album, name: string) => {
+    const currentList = (album[field] as string[]) || [];
+    onChange(field, [...currentList, name]);
+  };
+
+  const handleRemovePerson = (field: keyof Album, index: number) => {
+    const currentList = (album[field] as string[]) || [];
+    onChange(field, currentList.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 w-full">
+      <div className="col-span-1">
+        <PersonList
+          title="Musicians"
+          people={album.musicians}
+          onAdd={(name) => handleAddPerson('musicians', name)}
+          onRemove={(idx) => handleRemovePerson('musicians', idx)}
+        />
+      </div>
+      <div className="col-span-1">
+        <PersonList
+          title="Songwriters"
+          people={album.songwriters}
+          onAdd={(name) => handleAddPerson('songwriters', name)}
+          onRemove={(idx) => handleRemovePerson('songwriters', idx)}
+        />
+      </div>
+      <div className="col-span-1">
+        <PersonList
+          title="Producers"
+          people={album.producers}
+          onAdd={(name) => handleAddPerson('producers', name)}
+          onRemove={(idx) => handleRemovePerson('producers', idx)}
+        />
+      </div>
+      <div className="col-span-1">
+        <PersonList
+          title="Engineers"
+          people={album.engineers}
+          onAdd={(name) => handleAddPerson('engineers', name)}
+          onRemove={(idx) => handleRemovePerson('engineers', idx)}
+        />
+      </div>
     </div>
   );
 }

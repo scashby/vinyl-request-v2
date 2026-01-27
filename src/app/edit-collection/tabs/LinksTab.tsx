@@ -1,149 +1,67 @@
-// src/app/edit-collection/tabs/LinksTab.tsx
 'use client';
 
-import React, { useState } from 'react';
 import type { Album } from 'types/album';
-
-interface Link {
-  id: string;
-  url: string;
-  description?: string;
-}
 
 interface LinksTabProps {
   album: Album;
-  onChange: <K extends keyof Album>(field: K, value: Album[K]) => void;
+  onChange: (field: keyof Album, value: string | null) => void;
 }
 
 export function LinksTab({ album, onChange }: LinksTabProps) {
-  const [links, setLinks] = useState<Link[]>(() => {
-    if (!album.extra) return [{ id: '1', url: '', description: '' }];
-    try {
-      const parsed = JSON.parse(album.extra);
-      const parsedLinks = Array.isArray(parsed) ? parsed : [];
-      return parsedLinks.length > 0 ? parsedLinks : [{ id: '1', url: '', description: '' }];
-    } catch {
-      return [{ id: '1', url: '', description: '' }];
-    }
-  });
   
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-
-  const updateLinks = (newLinks: Link[]) => {
-    setLinks(newLinks);
-    // Filter out completely empty links before saving
-    const nonEmptyLinks = newLinks.filter(link => link.url || link.description);
-    const jsonString = nonEmptyLinks.length > 0 ? JSON.stringify(nonEmptyLinks) : null;
-    onChange('extra', jsonString as Album['extra']);
-  };
-
-  const handleDragStart = (index: number) => {
-    setDraggedIndex(index);
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (dropIndex: number) => {
-    if (draggedIndex === null || draggedIndex === dropIndex) {
-      setDraggedIndex(null);
-      return;
-    }
-
-    const newLinks = [...links];
-    const [removed] = newLinks.splice(draggedIndex, 1);
-    newLinks.splice(dropIndex, 0, removed);
-    
-    updateLinks(newLinks);
-    setDraggedIndex(null);
-  };
-
-  const handleUpdateLink = (index: number, field: 'url' | 'description', value: string) => {
-    const newLinks = links.map((link, i) => 
-      i === index ? { ...link, [field]: value } : link
-    );
-    updateLinks(newLinks);
-  };
-
-  const handleAddLink = () => {
-    const newLink: Link = {
-      id: Date.now().toString(),
-      url: '',
-      description: '',
-    };
-    updateLinks([...links, newLink]);
-  };
+  const renderLinkInput = (label: string, field: keyof Album, icon?: React.ReactNode) => (
+    <div className="mb-4">
+      <label className="block text-[13px] font-semibold text-gray-500 mb-1.5 flex items-center gap-2">
+        {icon} {label}
+      </label>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={(album[field] as string) || ''}
+          onChange={(e) => onChange(field, e.target.value)}
+          placeholder={`https://...`}
+          className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500"
+        />
+        <a
+          href={(album[field] as string) || '#'}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`px-3 py-2 border border-gray-300 rounded bg-white flex items-center justify-center transition-colors ${
+            album[field] ? 'text-blue-600 hover:bg-blue-50 cursor-pointer' : 'text-gray-300 cursor-not-allowed pointer-events-none'
+          }`}
+          title="Open Link"
+        >
+          ↗
+        </a>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="p-5">
-      {/* Table Header */}
-      <div className="grid grid-cols-[40px_40px_1fr_1fr] gap-2 px-2 py-2 border-b-2 border-gray-200 text-[13px] font-semibold text-gray-500 mb-1">
-        <div></div>
-        <div></div>
-        <div>URL</div>
-        <div>Description</div>
-      </div>
-
-      {/* Links Table */}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+      {/* Streaming Services */}
       <div className="flex flex-col">
-        {links.map((link, index) => (
-          <div
-            key={link.id}
-            draggable
-            onDragStart={() => handleDragStart(index)}
-            onDragOver={handleDragOver}
-            onDrop={() => handleDrop(index)}
-            className={`grid grid-cols-[40px_40px_1fr_1fr] gap-2 px-2 py-2 border-b border-gray-200 items-center ${
-              draggedIndex === index ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
-            }`}
-          >
-            {/* Drag Handle */}
-            <div className="flex justify-center text-gray-400 text-lg cursor-grab active:cursor-grabbing">
-              ≡
-            </div>
-
-            {/* Checkbox */}
-            <div className="flex justify-center">
-              <input
-                type="checkbox"
-                className="cursor-pointer"
-              />
-            </div>
-
-            {/* URL Input */}
-            <div>
-              <input
-                type="text"
-                value={link.url}
-                onChange={(e) => handleUpdateLink(index, 'url', e.target.value)}
-                placeholder="https://"
-                className="w-full px-2 py-1.5 border border-gray-300 rounded text-[13px] text-gray-900 bg-white focus:outline-none focus:border-blue-500"
-              />
-            </div>
-
-            {/* Description Input */}
-            <div>
-              <input
-                type="text"
-                value={link.description || ''}
-                onChange={(e) => handleUpdateLink(index, 'description', e.target.value)}
-                placeholder="Description"
-                className="w-full px-2 py-1.5 border border-gray-300 rounded text-[13px] text-gray-900 bg-white focus:outline-none focus:border-blue-500"
-              />
-            </div>
-          </div>
+        <h3 className="text-sm font-bold text-gray-900 border-b border-gray-200 pb-2 mb-4">Streaming</h3>
+        
+        {renderLinkInput('Spotify URL', 'spotify_url', (
+           <span className="text-[#1DB954]">●</span>
+        ))}
+        {renderLinkInput('Apple Music URL', 'apple_music_url', (
+           <span className="text-[#FA243C]">●</span>
+        ))}
+        {renderLinkInput('Last.fm URL', 'lastfm_url', (
+           <span className="text-[#D51007]">●</span>
         ))}
       </div>
 
-      {/* New Link Button */}
-      <div className="mt-4">
-        <button
-          onClick={handleAddLink}
-          className="px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded text-[13px] font-medium cursor-pointer hover:bg-gray-200"
-        >
-          + New Link
-        </button>
+      {/* Database & Info */}
+      <div className="flex flex-col">
+        <h3 className="text-sm font-bold text-gray-900 border-b border-gray-200 pb-2 mb-4">Databases</h3>
+
+        {renderLinkInput('Discogs Release ID', 'discogs_release_id')}
+        {renderLinkInput('MusicBrainz ID', 'musicbrainz_id')}
+        {renderLinkInput('AllMusic URL', 'allmusic_url')}
+        {renderLinkInput('Wikipedia URL', 'wikipedia_url')}
       </div>
     </div>
   );

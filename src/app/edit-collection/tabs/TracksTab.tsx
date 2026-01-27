@@ -1,4 +1,3 @@
-// src/app/edit-collection/tabs/TracksTab.tsx
 'use client';
 
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
@@ -307,7 +306,8 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
         const loadedDiscs: Disc[] = album.disc_metadata.map((dbDisc: any) => {
           if (!dbDisc) return null; // Skip null entries
           const discNum = dbDisc.disc_number || 1;
-          const matrixData = album.matrix_numbers?.[discNum.toString()];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const matrixData = (album.matrix_numbers as any)?.[discNum.toString()];
           
           return {
             disc_number: discNum,
@@ -591,7 +591,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
         {discs.map(disc => (
           <button
             key={disc.disc_number}
-            className={`px-4 py-2 text-sm flex items-center gap-2 border-t border-l border-r rounded-t transition-colors whitespace-nowrap ${
+            className={`px-4 py-2 text-sm flex items-center gap-2 border-t border-l border-r rounded-t transition-colors whitespace-nowrap cursor-pointer ${
               activeDisc === disc.disc_number
                 ? 'bg-white border-gray-200 border-b-white -mb-px font-medium text-gray-900'
                 : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
@@ -613,7 +613,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
           </button>
         ))}
         <button 
-          className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-t whitespace-nowrap" 
+          className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-t whitespace-nowrap cursor-pointer bg-transparent border-none" 
           onClick={handleAddDisc}
         >
           + Add Disc
@@ -621,7 +621,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
       </div>
 
       {/* Disc Metadata */}
-      <div className="bg-gray-50 p-4 rounded-md flex flex-col gap-3">
+      <div className="bg-gray-50 p-4 rounded-md flex flex-col gap-3 border border-gray-200">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 flex flex-col gap-1">
             <label className="text-xs font-medium text-gray-500">Disc Title</label>
@@ -654,7 +654,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
                 <option value="__manage__">Manage Storage Devices...</option>
               </select>
               <button
-                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded text-gray-700"
+                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded text-gray-700 cursor-pointer"
                 onClick={() => setShowStoragePicker(true)}
               >
                 ≡
@@ -698,11 +698,11 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
 
       {/* Selection Toolbar (appears when tracks selected) */}
       {selectedTracks.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2 bg-blue-500 rounded text-white text-sm flex-wrap">
-          <button className="text-white hover:bg-blue-600 px-2 py-1 rounded font-medium" onClick={handleCancelSelection}>
+        <div className="flex items-center gap-3 px-4 py-2 bg-blue-500 rounded text-white text-sm flex-wrap shadow-md">
+          <button className="text-white hover:bg-blue-600 px-2 py-1 rounded font-medium cursor-pointer bg-transparent border-none" onClick={handleCancelSelection}>
             × Cancel
           </button>
-          <label className="flex items-center gap-1 cursor-pointer">
+          <label className="flex items-center gap-1 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={selectedTracks.size === activeDiscTracks.length}
@@ -715,13 +715,13 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
             {selectedTracks.size} of {activeDiscTracks.length}
           </span>
           <div className="flex gap-2 ml-auto">
-            <button className="bg-white text-gray-700 px-3 py-1 rounded hover:bg-gray-100 border border-transparent text-xs font-medium" onClick={handleAutoCapSelected}>
+            <button className="bg-white text-gray-700 px-3 py-1 rounded hover:bg-gray-100 border-none text-xs font-medium cursor-pointer" onClick={handleAutoCapSelected}>
               Aa Autocap
             </button>
-            <button className="bg-white text-gray-700 px-3 py-1 rounded hover:bg-gray-100 border border-transparent text-xs font-medium" onClick={handleMoveToOtherDisc}>
+            <button className="bg-white text-gray-700 px-3 py-1 rounded hover:bg-gray-100 border-none text-xs font-medium cursor-pointer" onClick={handleMoveToOtherDisc}>
               ↻ Move to other disc
             </button>
-            <button className="bg-white text-gray-700 px-3 py-1 rounded hover:bg-red-50 hover:text-red-600 border border-transparent text-xs font-medium" onClick={handleDeleteSelected}>
+            <button className="bg-white text-gray-700 px-3 py-1 rounded hover:bg-red-50 hover:text-red-600 border-none text-xs font-medium cursor-pointer" onClick={handleDeleteSelected}>
               🗑 Remove
             </button>
           </div>
@@ -761,18 +761,18 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
         </DndContext>
 
         {/* Add Buttons */}
-        <div className="flex gap-3 py-4 flex-wrap">
-          <button className="px-4 py-2 bg-gray-100 border border-gray-300 rounded text-gray-700 text-sm hover:bg-gray-200" onClick={handleAddHeader}>
+        <div className="flex gap-3 p-4 flex-wrap border-t border-gray-100 bg-gray-50">
+          <button className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 text-sm hover:bg-gray-50 cursor-pointer shadow-sm" onClick={handleAddHeader}>
             ▬ Add Header
           </button>
-          <button className="px-4 py-2 bg-blue-500 border border-blue-600 rounded text-white text-sm hover:bg-blue-600" onClick={handleAddTrack}>
+          <button className="px-4 py-2 bg-blue-500 border border-blue-600 rounded text-white text-sm hover:bg-blue-600 cursor-pointer shadow-sm" onClick={handleAddTrack}>
             + Add Track
           </button>
           <button 
-            className="px-4 py-2 bg-emerald-600 border border-emerald-700 rounded text-white text-sm hover:bg-emerald-700 ml-auto font-medium" 
+            className="px-4 py-2 bg-emerald-600 border border-emerald-700 rounded text-white text-sm hover:bg-emerald-700 ml-auto font-medium cursor-pointer shadow-sm flex items-center gap-2" 
             onClick={() => setShowImportModal(true)}
           >
-            📥 Import Tracks
+            <span>📥</span> Import Tracks
           </button>
         </div>
       </div>
@@ -813,15 +813,12 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
           title="Manage Storage Devices"
           items={storageDevices}
           onEdit={() => {
-            // TODO: Edit storage device
             alert('Edit storage device will be implemented with database integration');
           }}
           onDelete={async () => {
-            // TODO: Delete storage device from database
             await loadStorageDevices();
           }}
           onMerge={() => {
-            // TODO: Merge storage devices
             alert('Merge storage devices will be implemented with database integration');
           }}
           itemLabel="Storage Device"
@@ -856,72 +853,30 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
 
       {/* Import Tracks Modal */}
       {showImportModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 30000,
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '8px',
-            padding: '24px',
-            maxWidth: '550px',
-            width: '90%',
-          }}>
-            <h3 style={{ margin: '0 0 16px 0', color: '#111827', fontSize: '18px', fontWeight: '600' }}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30000]">
+          <div className="bg-white rounded-lg p-6 max-w-[550px] w-[90%] shadow-2xl">
+            <h3 className="m-0 mb-4 text-gray-900 text-lg font-semibold">
               Import Tracks
             </h3>
 
             {importError && (
-              <div style={{
-                padding: '12px',
-                background: '#fee2e2',
-                border: '1px solid #fca5a5',
-                borderRadius: '4px',
-                marginBottom: '16px',
-                color: '#991b1b',
-                fontSize: '14px',
-              }}>
+              <div className="p-3 bg-red-100 border border-red-300 rounded mb-4 text-red-800 text-sm">
                 {importError}
               </div>
             )}
 
             {/* Preview Links */}
-            <div style={{ 
-              marginBottom: '20px', 
-              padding: '12px', 
-              background: '#f9fafb', 
-              borderRadius: '6px',
-              border: '1px solid #e5e7eb'
-            }}>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+            <div className="mb-5 p-3 bg-gray-50 rounded-md border border-gray-200">
+              <div className="text-xs font-semibold text-gray-700 mb-2">
                 Preview track listings:
               </div>
-              <div style={{ display: 'flex', gap: '12px' }}>
+              <div className="flex gap-3">
                 {(album.discogs_release_id || album.discogs_id) && (
                   <a
                     href={`https://www.discogs.com/release/${album.discogs_release_id || album.discogs_id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{
-                      flex: 1,
-                      padding: '8px 12px',
-                      background: 'white',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '4px',
-                      textDecoration: 'none',
-                      color: '#3b82f6',
-                      fontSize: '13px',
-                      textAlign: 'center',
-                      fontWeight: '500',
-                    }}
+                    className="flex-1 py-2 px-3 bg-white border border-gray-300 rounded text-center text-blue-600 text-xs font-medium hover:bg-gray-50 decoration-none"
                   >
                     🎵 View on Discogs
                   </a>
@@ -931,18 +886,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
                     href={`https://open.spotify.com/album/${album.spotify_id || album.spotify_album_id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{
-                      flex: 1,
-                      padding: '8px 12px',
-                      background: 'white',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '4px',
-                      textDecoration: 'none',
-                      color: '#1ed760',
-                      fontSize: '13px',
-                      textAlign: 'center',
-                      fontWeight: '500',
-                    }}
+                    className="flex-1 py-2 px-3 bg-white border border-gray-300 rounded text-center text-emerald-600 text-xs font-medium hover:bg-gray-50 decoration-none"
                   >
                     🎧 View on Spotify
                   </a>
@@ -950,61 +894,49 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
               </div>
             </div>
 
-            <div style={{ marginBottom: '20px' }}>
-              <p style={{ margin: '0 0 12px 0', color: '#6b7280', fontSize: '14px' }}>
+            <div className="mb-5">
+              <p className="m-0 mb-3 text-gray-600 text-sm">
                 Choose a source to import track listings:
               </p>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '12px',
-                  border: `2px solid ${importSource === 'discogs' ? '#3b82f6' : '#e5e7eb'}`,
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  backgroundColor: importSource === 'discogs' ? '#eff6ff' : 'white',
-                }}>
+              <div className="flex flex-col gap-3">
+                <label className={`flex items-center p-3 border rounded-md cursor-pointer transition-colors ${
+                  importSource === 'discogs' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:bg-gray-50'
+                }`}>
                   <input
                     type="radio"
                     name="importSource"
                     value="discogs"
                     checked={importSource === 'discogs'}
                     onChange={(e) => setImportSource(e.target.value as 'discogs')}
-                    style={{ marginRight: '12px' }}
+                    className="mr-3 mt-0.5"
                   />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: '600', color: '#111827', marginBottom: '4px' }}>
+                  <div className="flex-1">
+                    <div className="font-semibold text-gray-900 mb-1">
                       Discogs (Recommended)
                     </div>
-                    <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                    <div className="text-xs text-gray-500">
                       Most accurate for vinyl - exact pressing-specific track listings
                     </div>
                   </div>
                 </label>
 
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '12px',
-                  border: `2px solid ${importSource === 'spotify' ? '#3b82f6' : '#e5e7eb'}`,
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  backgroundColor: importSource === 'spotify' ? '#eff6ff' : 'white',
-                }}>
+                <label className={`flex items-center p-3 border rounded-md cursor-pointer transition-colors ${
+                  importSource === 'spotify' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:bg-gray-50'
+                }`}>
                   <input
                     type="radio"
                     name="importSource"
                     value="spotify"
                     checked={importSource === 'spotify'}
                     onChange={(e) => setImportSource(e.target.value as 'spotify')}
-                    style={{ marginRight: '12px' }}
+                    className="mr-3 mt-0.5"
                   />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: '600', color: '#111827', marginBottom: '4px' }}>
+                  <div className="flex-1">
+                    <div className="font-semibold text-gray-900 mb-1">
                       Spotify (Fallback)
                     </div>
-                    <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                    <div className="text-xs text-gray-500">
                       Generic CD/streaming version - may differ from vinyl
                     </div>
                   </div>
@@ -1012,51 +944,25 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
               </div>
             </div>
 
-            <div style={{
-              padding: '12px',
-              background: '#fef3c7',
-              border: '1px solid #fde68a',
-              borderRadius: '4px',
-              marginBottom: '20px',
-              fontSize: '13px',
-              color: '#92400e',
-            }}>
-              ⚠️ This will replace all existing tracks for this album
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded mb-5 text-xs text-amber-800 flex items-center gap-2">
+              <span>⚠️</span> This will replace all existing tracks for this album
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <div className="flex gap-3 justify-end">
               <button
                 onClick={() => {
                   setShowImportModal(false);
                   setImportError(null);
                 }}
                 disabled={importing}
-                style={{
-                  padding: '8px 16px',
-                  background: '#f3f4f6',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  cursor: importing ? 'not-allowed' : 'pointer',
-                  fontSize: '14px',
-                  color: '#374151',
-                  opacity: importing ? 0.5 : 1,
-                }}
+                className="px-4 py-2 bg-gray-100 border border-gray-300 rounded text-sm text-gray-700 cursor-pointer hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
                 onClick={handleImportTracks}
                 disabled={importing}
-                style={{
-                  padding: '8px 16px',
-                  background: importing ? '#9ca3af' : '#3b82f6',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: importing ? 'not-allowed' : 'pointer',
-                  fontSize: '14px',
-                  color: 'white',
-                  fontWeight: '500',
-                }}
+                className="px-4 py-2 bg-blue-600 border-none rounded text-sm text-white font-medium cursor-pointer hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 {importing ? 'Importing...' : 'Import Tracks'}
               </button>
