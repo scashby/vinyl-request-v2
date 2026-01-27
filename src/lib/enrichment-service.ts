@@ -40,7 +40,8 @@ function formatMusicalKey(key: number, mode: number): string | null {
 // ============================================================================
 
 const MB_BASE = 'https://musicbrainz.org/ws/2';
-const MB_USER_AGENT = 'DeadwaxDialogues/1.0 (https://deadwaxdialogues.com; contact@deadwaxdialogues.com)';
+// UPDATED: More specific User-Agent to satisfy Discogs strictness
+const APP_USER_AGENT = 'DeadwaxDialogues/2.0 +https://deadwaxdialogues.com'; 
 const MB_RATE_LIMIT = 1000;
 
 interface MusicBrainzRelease {
@@ -75,7 +76,7 @@ async function searchMusicBrainz(artist: string, title: string): Promise<string 
   const query = `artist:"${artist}" AND release:"${title}"`;
   const url = `${MB_BASE}/release/?query=${encodeURIComponent(query)}&fmt=json&limit=5`;
 
-  const response = await fetch(url, { headers: { 'User-Agent': MB_USER_AGENT } });
+  const response = await fetch(url, { headers: { 'User-Agent': APP_USER_AGENT } });
   if (!response.ok) return null;
 
   const data = await response.json();
@@ -91,14 +92,14 @@ async function searchMusicBrainz(artist: string, title: string): Promise<string 
 
 async function getMusicBrainzRelease(mbid: string): Promise<MusicBrainzRelease | null> {
   const url = `${MB_BASE}/release/${mbid}?inc=artists+labels+recordings+release-groups+media&fmt=json`;
-  const response = await fetch(url, { headers: { 'User-Agent': MB_USER_AGENT } });
+  const response = await fetch(url, { headers: { 'User-Agent': APP_USER_AGENT } });
   if (!response.ok) return null;
   return response.json();
 }
 
 async function getMusicBrainzRecording(recordingId: string): Promise<MusicBrainzRecording | null> {
   const url = `${MB_BASE}/recording/${recordingId}?inc=artist-rels+work-rels&fmt=json`;
-  const response = await fetch(url, { headers: { 'User-Agent': MB_USER_AGENT } });
+  const response = await fetch(url, { headers: { 'User-Agent': APP_USER_AGENT } });
   if (!response.ok) return null;
   return response.json();
 }
@@ -316,9 +317,9 @@ export async function enrichDiscogsPricing(albumId: number | null, releaseId: st
   try {
     if (!isValidDiscogsId(releaseId)) return { success: false, error: 'Invalid Release ID' };
 
-    // Construct headers securely with REQUIRED Discogs User-Agent
+    // Construct headers securely
     const headers: HeadersInit = {
-        'User-Agent': MB_USER_AGENT,
+        'User-Agent': APP_USER_AGENT, // UPDATED constant
         'Accept': 'application/json'
     };
 
@@ -336,23 +337,12 @@ export async function enrichDiscogsPricing(albumId: number | null, releaseId: st
     const statsUrl = `https://api.discogs.com/marketplace/stats/${releaseId}?curr=USD`;
     const statsRes = await fetch(statsUrl, { headers });
 
+    // CRITICAL FIX: Read the body to understand the 403
     if (!statsRes.ok && statsRes.status !== 404) {
-      // CAPTURE THE ACTUAL ERROR BODY
       const errorText = await statsRes.text();
-      let errorJson;
-      try { errorJson = JSON.parse(errorText); } catch { /* ignore */ }
-      
-      const message = errorJson?.message || errorText || 'Unknown error';
-      
-      if (statsRes.status === 403) {
-        throw new Error(`Discogs 403 Forbidden: ${message}`);
-      }
-      if (statsRes.status === 429) {
-        throw new Error(`Discogs 429 Rate Limit: ${message}`);
-      }
-      throw new Error(`Discogs Stats API error: ${statsRes.status} - ${message}`);
+      // Throw the actual error so we know if it's "User Agent" or "Signature" issue
+      throw new Error(`Discogs Stats API error: ${statsRes.status} - ${errorText}`);
     }
-    
     const stats = statsRes.ok ? await statsRes.json() : {};
 
     // 2. Fetch Active Listings (for better median calculation)
