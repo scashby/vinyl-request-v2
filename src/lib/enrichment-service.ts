@@ -40,7 +40,7 @@ function formatMusicalKey(key: number, mode: number): string | null {
 // ============================================================================
 
 const MB_BASE = 'https://musicbrainz.org/ws/2';
-const MB_USER_AGENT = 'DeadwaxDialogues/1.0 (https://deadwaxdialogues.com)';
+const MB_USER_AGENT = 'DeadwaxDialogues/1.0 (https://deadwaxdialogues.com; contact@deadwaxdialogues.com)';
 const MB_RATE_LIMIT = 1000;
 
 interface MusicBrainzRelease {
@@ -316,9 +316,10 @@ export async function enrichDiscogsPricing(albumId: number | null, releaseId: st
   try {
     if (!isValidDiscogsId(releaseId)) return { success: false, error: 'Invalid Release ID' };
 
-    // Construct headers securely
+    // Construct headers securely with REQUIRED Discogs User-Agent
     const headers: HeadersInit = {
-        'User-Agent': MB_USER_AGENT
+        'User-Agent': MB_USER_AGENT,
+        'Accept': 'application/json'
     };
 
     // Use User Header if provided (Rate Limit: 60/min per user)
@@ -336,11 +337,22 @@ export async function enrichDiscogsPricing(albumId: number | null, releaseId: st
     const statsRes = await fetch(statsUrl, { headers });
 
     if (!statsRes.ok && statsRes.status !== 404) {
+      // CAPTURE THE ACTUAL ERROR BODY
+      const errorText = await statsRes.text();
+      let errorJson;
+      try { errorJson = JSON.parse(errorText); } catch { /* ignore */ }
+      
+      const message = errorJson?.message || errorText || 'Unknown error';
+      
       if (statsRes.status === 403) {
-        throw new Error(`Discogs Stats API error: 403`);
+        throw new Error(`Discogs 403 Forbidden: ${message}`);
       }
-      throw new Error(`Discogs Stats API error: ${statsRes.status}`);
+      if (statsRes.status === 429) {
+        throw new Error(`Discogs 429 Rate Limit: ${message}`);
+      }
+      throw new Error(`Discogs Stats API error: ${statsRes.status} - ${message}`);
     }
+    
     const stats = statsRes.ok ? await statsRes.json() : {};
 
     // 2. Fetch Active Listings (for better median calculation)
