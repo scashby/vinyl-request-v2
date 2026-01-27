@@ -460,7 +460,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         </div>
 
         {/* Bottom Bar */}
-        <div className="border-t border-gray-200 p-0 bg-white shrink-0">
+        <div className="border-t border-gray-200 p-3 bg-white shrink-0">
           <UniversalBottomBar
             album={editedAlbum}
             onChange={handleFieldChange}
