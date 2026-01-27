@@ -11,7 +11,7 @@ export function LinksTab({ album, onChange }: LinksTabProps) {
   
   const renderLinkInput = (label: string, field: keyof Album, icon?: React.ReactNode) => (
     <div className="mb-4">
-      <label className="block text-[13px] font-semibold text-gray-500 mb-1.5 flex items-center gap-2">
+      <label className="text-[13px] font-semibold text-gray-500 mb-1.5 flex items-center gap-2">
         {icon} {label}
       </label>
       <div className="flex gap-2">
