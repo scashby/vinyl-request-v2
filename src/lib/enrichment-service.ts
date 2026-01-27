@@ -354,12 +354,12 @@ export async function enrichDiscogsPricing(albumId: number | null, releaseId: st
         if (status === 403) {
             return {
                 success: false,
-                error: `Discogs marketplace access forbidden (403). ${errorText.substring(0, 200)}`
+                error: `Discogs marketplace access forbidden (403) using ${authMethod}. ${errorText.substring(0, 200)}`
             };
         }
 
-        console.error(`[Discogs] Error ${status} for ${releaseId}:`, errorText);
-        throw new Error(`Discogs API ${status}: ${errorText.substring(0, 200)}`);
+        console.error(`[Discogs] Error ${status} for ${releaseId} (${authMethod}):`, errorText);
+        throw new Error(`Discogs API ${status} (${authMethod}): ${errorText.substring(0, 200)}`);
     }
 
     const stats = await statsRes.json();
