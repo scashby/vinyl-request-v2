@@ -758,8 +758,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
             const albumData: Record<string, unknown> = {
               artist: album.artist,
               title: album.title,
-              // Added discogs_id to match schema availability
-              discogs_id: album.discogs_release_id, 
             };
             const normalizedFormat = album.format?.trim() || '';
             if (album.status === 'NEW' || normalizedFormat) {
@@ -781,6 +779,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
             // Table specific fields
             if (sourceType === 'collection') {
+                albumData.discogs_id = album.discogs_release_id;
                 albumData.cat_no = album.cat_no;
                 albumData.labels = album.labels;
                 albumData.location = album.location;
