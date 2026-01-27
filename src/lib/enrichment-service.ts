@@ -1,9 +1,4 @@
 // src/lib/enrichment-service.ts
-/**
- * Complete Multi-Source Enrichment Service
- * Matches exact database schema for public.collection table
- */
-
 import { createClient } from '@supabase/supabase-js';
 import Genius from 'genius-lyrics';
 
@@ -40,7 +35,6 @@ function formatMusicalKey(key: number, mode: number): string | null {
 // ============================================================================
 
 const MB_BASE = 'https://musicbrainz.org/ws/2';
-// UPDATED: More specific User-Agent to satisfy Discogs strictness
 const APP_USER_AGENT = 'DeadwaxDialogues/2.0 +https://deadwaxdialogues.com'; 
 const MB_RATE_LIMIT = 1000;
 
@@ -301,7 +295,6 @@ interface DiscogsListing {
   seller: { username: string };
 }
 
-// Defined interface for pricing return data
 interface PricingResult {
   prices: {
     min: number | null;
@@ -319,12 +312,10 @@ export async function enrichDiscogsPricing(albumId: number | null, releaseId: st
 
     // Construct headers securely
     const headers: HeadersInit = {
-        'User-Agent': APP_USER_AGENT, // UPDATED constant
-        'Accept': 'application/json'
+        'User-Agent': APP_USER_AGENT, // Updated Agent
+        'Accept': 'application/json' // Critical Fix
     };
 
-    // Use User Header if provided (Rate Limit: 60/min per user)
-    // Fallback to Server Token (Rate Limit: 60/min per IP)
     if (userAuthHeader) {
         headers['Authorization'] = userAuthHeader;
     } else if (DISCOGS_TOKEN) {
@@ -345,7 +336,7 @@ export async function enrichDiscogsPricing(albumId: number | null, releaseId: st
     }
     const stats = statsRes.ok ? await statsRes.json() : {};
 
-    // 2. Fetch Active Listings (for better median calculation)
+    // 2. Fetch Active Listings
     const listingsUrl = `https://api.discogs.com/marketplace/search?release_id=${releaseId}&per_page=100&sort=price&sort_order=asc&currency=USD`;
     const listingsRes = await fetch(listingsUrl, { headers });
 
@@ -378,7 +369,6 @@ export async function enrichDiscogsPricing(albumId: number | null, releaseId: st
       const suggestedIndex = Math.floor(prices.length * 0.4);
       priceData.suggested = prices[suggestedIndex];
     } else if (stats.lowest_price) {
-      // Fallback to Stats
       priceData.min = parseFloat(stats.lowest_price.value);
       priceData.median = parseFloat(stats.median?.value || stats.lowest_price.value);
       priceData.max = parseFloat(stats.highest_price?.value || stats.lowest_price.value);
@@ -386,7 +376,6 @@ export async function enrichDiscogsPricing(albumId: number | null, releaseId: st
       priceData.suggested = priceData.median ? priceData.median * 0.95 : priceData.min;
     }
 
-    // 4. Update Database (if albumId provided)
     if (albumId && (priceData.min || priceData.median)) {
       const updatePayload = {
         discogs_price_min: priceData.min,

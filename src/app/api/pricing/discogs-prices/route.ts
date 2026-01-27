@@ -13,6 +13,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // DEBUG: Ensure Env Vars are present (This logs to your server console, not browser)
+    if (!process.env.DISCOGS_CONSUMER_KEY || !process.env.DISCOGS_CONSUMER_SECRET) {
+        console.error('MISSING DISCOGS KEYS in Environment');
+        return NextResponse.json(
+            { success: false, error: 'Server Config Error: Missing Discogs Keys' },
+            { status: 500 }
+        );
+    }
+
     // 1. Get User Cookies for Rate Limit Safety
     const cookieStore = await cookies();
     const token = cookieStore.get('discogs_access_token')?.value;
