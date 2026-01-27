@@ -765,6 +765,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                      const fetchPrice = async () => {
                         return fetch('/api/pricing/discogs-prices', {
                              method: 'POST',
+                             headers: { 'Content-Type': 'application/json' },
                              body: JSON.stringify({ releaseId: album.discogs_release_id, albumId: album.existingId })
                          });
                      };
@@ -828,7 +829,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               discogs_master_id: album.discogs_master_id,
               artist_norm: album.artist_norm,
               title_norm: album.title_norm,
-              artist_album_norm: album.artist_album_norm,
               // Added discogs_id to match schema availability
               discogs_id: album.discogs_release_id, 
             };
