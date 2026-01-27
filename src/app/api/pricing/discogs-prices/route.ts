@@ -27,14 +27,14 @@ export async function POST(request: NextRequest) {
     const token = cookieStore.get('discogs_access_token')?.value;
     const secret = cookieStore.get('discogs_access_secret')?.value;
 
-    let authHeader: string | undefined = undefined;
+    let userAuthHeader: string | undefined = undefined;
 
     if (token && secret) {
         const nonce = Math.floor(Math.random() * 1000000000).toString();
         const timestamp = Math.floor(Date.now() / 1000).toString();
         const signature = `${process.env.DISCOGS_CONSUMER_SECRET}&${secret}`;
 
-        authHeader = `OAuth oauth_consumer_key="${process.env.DISCOGS_CONSUMER_KEY}", ` +
+        userAuthHeader = `OAuth oauth_consumer_key="${process.env.DISCOGS_CONSUMER_KEY}", ` +
             `oauth_nonce="${nonce}", ` +
             `oauth_signature="${signature}", ` +
             `oauth_signature_method="PLAINTEXT", ` +
@@ -42,8 +42,24 @@ export async function POST(request: NextRequest) {
             `oauth_token="${token}"`;
     }
 
-    // 2. Call Service with User Auth
-    const result = await enrichDiscogsPricing(albumId || null, releaseId, authHeader);
+    // 2. Call Service with User Auth (if available)
+    let result = await enrichDiscogsPricing(albumId || null, releaseId, userAuthHeader);
+
+    // 3. FALLBACK: If User Auth failed (403/401), retry with Server Token
+    // This handles the case where user cookies are stale or invalid
+    if (!result.success && (result.error?.includes('403') || result.error?.includes('401'))) {
+        if (userAuthHeader) {
+            console.warn(`User Auth failed for release ${releaseId} (${result.error}). Retrying with Server Token.`);
+        }
+        
+        // Pass 'undefined' to force the service to use the Server Token (DISCOGS_ACCESS_TOKEN)
+        const fallbackResult = await enrichDiscogsPricing(albumId || null, releaseId, undefined);
+        
+        // If fallback succeeded, use it. Otherwise, keep the original error.
+        if (fallbackResult.success) {
+            result = fallbackResult;
+        }
+    }
 
     if (!result.success) {
         // Fix: Return exact error status if possible, otherwise 500

@@ -176,20 +176,22 @@ export async function enrichMusicBrainz(albumId: number, artist: string, title: 
 // 2. DISCOGS SERVICE
 // ============================================================================
 
-const DISCOGS_TOKEN = process.env.DISCOGS_ACCESS_TOKEN!;
+const DISCOGS_TOKEN = process.env.DISCOGS_ACCESS_TOKEN;
 
 async function searchDiscogs(artist: string, title: string): Promise<Record<string, unknown> | null> {
+  if (!DISCOGS_TOKEN) return null;
   const query = `${artist} ${title}`;
   const url = `https://api.discogs.com/database/search?q=${encodeURIComponent(query)}&type=release&token=${DISCOGS_TOKEN}`;
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: { 'User-Agent': APP_USER_AGENT } });
   if (!response.ok) return null;
   const data = await response.json();
   return data.results?.[0] || null;
 }
 
 async function getDiscogsRelease(releaseId: string): Promise<Record<string, unknown> | null> {
+  if (!DISCOGS_TOKEN) return null;
   const url = `https://api.discogs.com/releases/${releaseId}?token=${DISCOGS_TOKEN}`;
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: { 'User-Agent': APP_USER_AGENT } });
   if (!response.ok) return null;
   return response.json();
 }
@@ -310,34 +312,53 @@ export async function enrichDiscogsPricing(albumId: number | null, releaseId: st
   try {
     if (!isValidDiscogsId(releaseId)) return { success: false, error: 'Invalid Release ID' };
 
-    // Construct headers securely
-    const headers: HeadersInit = {
-        'User-Agent': APP_USER_AGENT, // Updated Agent
-        'Accept': 'application/json' // Critical Fix
-    };
+    // 1. DETERMINE AUTH METHOD
+    let authHeaderValue = '';
+    let authMethod = '';
 
     if (userAuthHeader) {
-        headers['Authorization'] = userAuthHeader;
+        authHeaderValue = userAuthHeader;
+        authMethod = 'User OAuth';
     } else if (DISCOGS_TOKEN) {
-        headers['Authorization'] = `Discogs token=${DISCOGS_TOKEN}`;
+        authHeaderValue = `Discogs token=${DISCOGS_TOKEN}`;
+        authMethod = 'Server Token';
     } else {
-        return { success: false, error: 'No Discogs Token Available' };
+        return { success: false, error: 'No Discogs Credentials Available' };
     }
 
-    // 1. Fetch Marketplace Stats
+    // 2. CONSTRUCT HEADERS
+    const headers: HeadersInit = {
+        'User-Agent': APP_USER_AGENT,
+        'Authorization': authHeaderValue,
+        // REQUIRED: Vendor format to bypass WAF on Marketplace API
+        'Accept': 'application/vnd.discogs.v2.plaintext+json'
+    };
+
+    console.log(`[Discogs] Fetching pricing for ${releaseId} using ${authMethod}...`);
+
+    // 3. FETCH STATS
     const statsUrl = `https://api.discogs.com/marketplace/stats/${releaseId}?curr=USD`;
     const statsRes = await fetch(statsUrl, { headers });
 
-    // CRITICAL FIX: Read the body to understand the 403
-    if (!statsRes.ok && statsRes.status !== 404) {
-      const errorText = await statsRes.text();
-      // Throw the actual error so we know if it's "User Agent" or "Signature" issue
-      throw new Error(`Discogs Stats API error: ${statsRes.status} - ${errorText}`);
-    }
-    const stats = statsRes.ok ? await statsRes.json() : {};
+    if (!statsRes.ok) {
+        const errorText = await statsRes.text();
+        const status = statsRes.status;
+        
+        if (status === 404) {
+            return { 
+                success: true, 
+                data: { prices: { min: null, median: null, max: null, count: 0, suggested: null }, sampleListings: [] } 
+            };
+        }
 
-    // 2. Fetch Active Listings
-    const listingsUrl = `https://api.discogs.com/marketplace/search?release_id=${releaseId}&per_page=100&sort=price&sort_order=asc&currency=USD`;
+        console.error(`[Discogs] Error ${status} for ${releaseId}:`, errorText);
+        throw new Error(`Discogs API ${status}: ${errorText.substring(0, 200)}`);
+    }
+
+    const stats = await statsRes.json();
+
+    // 4. FETCH ACTIVE LISTINGS
+    const listingsUrl = `https://api.discogs.com/marketplace/search?release_id=${releaseId}&per_page=5&sort=price&sort_order=asc&currency=USD`;
     const listingsRes = await fetch(listingsUrl, { headers });
 
     let currentListings: DiscogsListing[] = [];
@@ -346,7 +367,7 @@ export async function enrichDiscogsPricing(albumId: number | null, releaseId: st
         currentListings = listingsData.listings || [];
     }
 
-    // 3. Calculate Prices
+    // 5. CALCULATE PRICES
     const priceData = {
       min: null as number | null,
       median: null as number | null,
@@ -355,42 +376,44 @@ export async function enrichDiscogsPricing(albumId: number | null, releaseId: st
       suggested: null as number | null
     };
 
+    if (stats.lowest_price) {
+        priceData.min = parseFloat(stats.lowest_price.value);
+        priceData.median = parseFloat(stats.median?.value || stats.lowest_price.value);
+        priceData.max = parseFloat(stats.highest_price?.value || stats.lowest_price.value);
+        priceData.count = stats.num_for_sale || 0;
+        priceData.suggested = priceData.median ? priceData.median * 0.95 : priceData.min;
+    }
+
     const prices = currentListings
       .map((l) => parseFloat(l.price?.value || '0'))
       .filter((p) => p > 0)
       .sort((a, b) => a - b);
 
     if (prices.length > 0) {
-      priceData.count = prices.length;
-      priceData.min = prices[0];
-      priceData.max = prices[prices.length - 1];
-      const mid = Math.floor(prices.length / 2);
-      priceData.median = prices.length % 2 === 0 ? (prices[mid - 1] + prices[mid]) / 2 : prices[mid];
-      const suggestedIndex = Math.floor(prices.length * 0.4);
-      priceData.suggested = prices[suggestedIndex];
-    } else if (stats.lowest_price) {
-      priceData.min = parseFloat(stats.lowest_price.value);
-      priceData.median = parseFloat(stats.median?.value || stats.lowest_price.value);
-      priceData.max = parseFloat(stats.highest_price?.value || stats.lowest_price.value);
-      priceData.count = stats.num_for_sale || 0;
-      priceData.suggested = priceData.median ? priceData.median * 0.95 : priceData.min;
+      priceData.count = prices.length + (stats.num_for_sale || 0);
+      if (!priceData.min || prices[0] < priceData.min) priceData.min = prices[0];
+      
+      // Calculate suggested based on median stats and lowest active listing
+      if (priceData.median) {
+          priceData.suggested = (priceData.median + prices[0]) / 2;
+      }
     }
 
+    // 6. UPDATE DB
     if (albumId && (priceData.min || priceData.median)) {
-      const updatePayload = {
+      await supabase.from('collection').update({
         discogs_price_min: priceData.min,
         discogs_price_median: priceData.median,
         discogs_price_max: priceData.max,
         discogs_price_updated_at: new Date().toISOString(),
-      };
-      await supabase.from('collection').update(updatePayload).eq('id', albumId);
+      }).eq('id', albumId);
     }
 
     return { 
       success: true, 
       data: {
          prices: priceData,
-         sampleListings: currentListings.slice(0, 5)
+         sampleListings: currentListings
       } 
     };
 
