@@ -484,7 +484,14 @@ ConflictRow.displayName = 'ConflictRow';
 
 // --- MAIN COMPONENT ---
 
-export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCancel }: EnrichmentReviewModalProps) {
+export default function EnrichmentReviewModal({
+  conflicts,
+  batchSummary,
+  statusMessage,
+  onSave,
+  onSkip,
+  onCancel
+}: EnrichmentReviewModalProps) {
   const currentAlbumId = conflicts.length > 0 ? conflicts[0].album_id : null;
   
   const currentConflicts = useMemo(() => 
