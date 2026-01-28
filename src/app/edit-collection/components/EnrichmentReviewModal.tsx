@@ -332,6 +332,16 @@ const ConflictRow = React.memo(({
         // Calculate selected items for chips
         const selectedChipSet = new Set(toArray(selected.value));
 
+        const handleToggleChip = (val: string) => {
+            const updated = new Set(selectedChipSet);
+            if (updated.has(val)) {
+                updated.delete(val);
+            } else {
+                updated.add(val);
+            }
+            onResolve(conflict, Array.from(updated), 'custom_merge');
+        };
+
         return (
             <div className="mb-8">
             <div className="flex justify-between items-center mb-2">
@@ -359,7 +369,7 @@ const ConflictRow = React.memo(({
                     color="green"
                     items={allCurrent}
                     selectedItems={selectedChipSet}
-                    onToggle={(val) => onResolve(conflict, val, 'custom_merge')}
+                    onToggle={handleToggleChip}
                 />
                 {actualNewItems.length > 0 && (
                 <ArrayChipSelector
@@ -367,7 +377,7 @@ const ConflictRow = React.memo(({
                     color="blue"
                     items={actualNewItems}
                     selectedItems={selectedChipSet}
-                    onToggle={(val) => onResolve(conflict, val, 'custom_merge')}
+                    onToggle={handleToggleChip}
                 />
                 )}
             </div>
