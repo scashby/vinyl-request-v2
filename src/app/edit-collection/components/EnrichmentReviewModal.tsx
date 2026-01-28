@@ -8,6 +8,8 @@ import { SERVICE_ICONS } from 'lib/enrichment-data-mapping';
 
 interface EnrichmentReviewModalProps {
   conflicts: ExtendedFieldConflict[];
+  batchSummary?: { album: string; field: string; action: string }[] | null;
+  statusMessage?: string;
   onSave: (
     resolutions: Record<string, { value: unknown, source: string, selectedSources?: string[] }>,
     finalizedFields: Record<string, boolean>,
@@ -482,7 +484,14 @@ ConflictRow.displayName = 'ConflictRow';
 
 // --- MAIN COMPONENT ---
 
-export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCancel }: EnrichmentReviewModalProps) {
+export default function EnrichmentReviewModal({
+  conflicts,
+  batchSummary,
+  statusMessage,
+  onSave,
+  onSkip,
+  onCancel
+}: EnrichmentReviewModalProps) {
   const currentAlbumId = conflicts.length > 0 ? conflicts[0].album_id : null;
   
   const currentConflicts = useMemo(() => 
@@ -711,7 +720,57 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
     setFinalizedFields(newFinalized);
   }, [currentConflicts, finalizedFields]);
 
-  if (!currentAlbumId || currentConflicts.length === 0) return null;
+  if (!currentAlbumId || currentConflicts.length === 0) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30000]">
+        <div className="flex-1 overflow-auto p-5 h-full flex justify-center items-center">
+          <div className="bg-white rounded-xl w-[900px] max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+            <div className="flex justify-between items-center p-5 border-b border-gray-200 bg-white">
+              <div>
+                <h3 className="m-0 text-xl font-bold">
+                  Review Enrichment Data
+                </h3>
+                <div className="text-sm text-gray-500 mt-1">
+                  {statusMessage || 'Review queue is empty. Scanning for the next batch...'}
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={onCancel} className="px-3 py-2 text-[12px] font-semibold text-gray-700 bg-gray-100 border border-gray-200 rounded-md hover:bg-gray-200">
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
+              <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                <div className="text-sm text-gray-700">
+                  Auto-updated fields and skipped items from the last pass are listed below.
+                </div>
+                {batchSummary && batchSummary.length > 0 ? (
+                  <div className="mt-4 space-y-2">
+                    {batchSummary.map((item, idx) => (
+                      <div key={`${item.album}-${item.field}-${idx}`} className="text-xs text-gray-700 border border-gray-200 rounded-md p-2">
+                        <div className="font-semibold">{item.album}</div>
+                        <div>{item.field}: {item.action}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-4 text-xs text-gray-500 italic">
+                    No auto-updates recorded yet.
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="p-5 border-t border-gray-200 flex justify-end bg-white">
+              <button onClick={onCancel} className="px-4 py-2 bg-white border border-gray-300 rounded text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-50">
+                Stop Review
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const albumInfo = currentConflicts[0];
   const uniqueAlbumsLeft = new Set(conflicts.map(c => c.album_id)).size;

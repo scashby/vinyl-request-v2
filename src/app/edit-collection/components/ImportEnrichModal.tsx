@@ -828,6 +828,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const nextQueue = prev.filter(c => c.album_id !== albumId);
         if (nextQueue.length === 0) {
              if (isLoopingRef.current && hasMoreRef.current) {
+                 setStatus('Scanning for the next batch of reviews...');
                  setTimeout(() => runScanLoop(), 500);
              } else {
                  setShowReview(false);
@@ -931,6 +932,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         
         if (nextQueue.length === 0) {
              if (isLoopingRef.current && hasMoreRef.current) {
+                 setStatus('Scanning for the next batch of reviews...');
                  setTimeout(() => runScanLoop(), 500);
              } else {
                  setShowReview(false);
@@ -965,6 +967,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     return (
       <EnrichmentReviewModal 
         conflicts={conflicts} 
+        batchSummary={batchSummary}
+        statusMessage={status}
         onSave={handleSingleAlbumSave}
         onSkip={handleSkip}
         onCancel={() => { 
