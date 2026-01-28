@@ -371,7 +371,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           // Assuming the API expects 'folder' to filter by location:
           location: folderFilter || undefined, 
           services: getServicesForSelection(),
-          autoSnooze: autoSnooze // PASSED TO SERVER
+          fields: Object.keys(fieldConfig),
+          autoSnooze: autoSnooze, // PASSED TO SERVER
+          missingDataOnly: missingDataOnly
         };
 
         const res = await fetch('/api/enrich-sources/fetch-candidates', {
@@ -481,9 +483,13 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         }
       });
       
-      if (foundKeys.size > 0) {
-         const summary = Array.from(foundKeys)
-            .filter(k => !['artist', 'title'].includes(k))
+      const allowedSummaryKeys = Array.from(foundKeys)
+        .filter(k => !['artist', 'title'].includes(k))
+        .filter(k => ALLOWED_COLUMNS.has(k))
+        .filter(k => !!fieldConfig[k]);
+
+      if (allowedSummaryKeys.length > 0) {
+         const summary = allowedSummaryKeys
             .map(k => k.replace(/_/g, ' '))
             .join(', ');
             
