@@ -109,13 +109,15 @@ export default function ConflictResolutionModal({
       if (!resolutionTableMissing) {
         const { error: resolutionError } = await supabase
           .from('import_conflict_resolutions')
-          .insert({
+          .upsert({
             album_id: conflict.album_id,
             field_name: conflict.field_name,
             kept_value: finalValue,
             rejected_value: rejectedValue,
             resolution: strategyResolution,
             source: source,
+          }, {
+            onConflict: 'album_id,field_name,source',
           });
 
         if (resolutionError) {
