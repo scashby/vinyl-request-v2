@@ -249,6 +249,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
   
   const [comparedAlbums, setComparedAlbums] = useState<ComparedCLZAlbum[]>([]);
   const [existingAlbums, setExistingAlbums] = useState<ExistingAlbum[]>([]);
+  const [linkQueries, setLinkQueries] = useState<Record<number, string>>({});
   
   const [progress, setProgress] = useState({ current: 0, total: 0, status: '' });
   const [error, setError] = useState<string | null>(null);
@@ -300,6 +301,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
       const compared = compareCLZAlbums(parsed, existing as ExistingAlbum[]);
       setComparedAlbums(compared);
       setExistingAlbums(existing as ExistingAlbum[]);
+      setLinkQueries({});
       setStage('preview');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to parse XML');
@@ -343,11 +345,15 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
           if (!existingAlbum) continue;
 
           // Load previous conflict resolutions
-          const { data: resolutions } = await supabase
+          const { data: resolutions, error: resolutionsError } = await supabase
             .from('import_conflict_resolutions')
             .select('*')
             .eq('album_id', album.existingId!)
             .eq('source', 'clz');
+          if (resolutionsError && !isMissingResolutionTable(resolutionsError)) {
+            throw resolutionsError;
+          }
+          const safeResolutions = isMissingResolutionTable(resolutionsError) ? [] : resolutions;
 
           // Build CLZ data object
           const clzData: Record<string, unknown> = {
@@ -380,7 +386,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
             existingAlbum,
             clzData,
             'clz',
-            (resolutions || []) as PreviousResolution[]
+            (safeResolutions || []) as PreviousResolution[]
           );
 
           // Combine identifying updates and safe updates
@@ -447,6 +453,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
     setFile(null);
     setComparedAlbums([]);
     setExistingAlbums([]);
+    setLinkQueries({});
     setProgress({ current: 0, total: 0, status: '' });
     setError(null);
     setAllConflicts([]);
@@ -456,6 +463,41 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
 
   const matchedCount = comparedAlbums.filter(a => a.status === 'MATCHED').length;
   const noMatchCount = comparedAlbums.filter(a => a.status === 'NO_MATCH').length;
+  const unmatchedAlbums = comparedAlbums
+    .map((album, index) => ({ album, index }))
+    .filter(({ album }) => album.status === 'NO_MATCH');
+
+  const isMissingResolutionTable = (err?: { message?: string; code?: string } | null) => {
+    if (!err) return false;
+    if (err.code === '42P01') return true;
+    return err.message?.includes('import_conflict_resolutions') ?? false;
+  };
+
+  const handleLinkQueryChange = (index: number, value: string) => {
+    setLinkQueries(prev => ({
+      ...prev,
+      [index]: value,
+    }));
+  };
+
+  const handleLinkAlbum = (index: number, selectedId: number) => {
+    if (!selectedId) return;
+    setComparedAlbums(prev =>
+      prev.map((album, idx) =>
+        idx === index
+          ? {
+              ...album,
+              status: 'MATCHED',
+              existingId: selectedId,
+            }
+          : album
+      )
+    );
+    setLinkQueries(prev => ({
+      ...prev,
+      [index]: '',
+    }));
+  };
 
   // Show conflict resolution modal
   if (stage === 'conflicts') {
@@ -537,6 +579,80 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                   </div>
                 </div>
               </div>
+
+              {unmatchedAlbums.length > 0 && (
+                <div className="p-4 bg-white border border-gray-200 rounded-md mb-4">
+                  <h3 className="m-0 mb-2 text-[15px] font-semibold text-gray-900">
+                    Link unmatched albums
+                  </h3>
+                  <p className="text-[13px] text-gray-500 mb-3">
+                    Search for a matching album in your collection and link it so the CLZ entry can be imported instead of skipped.
+                  </p>
+                  <div className="max-h-[220px] overflow-y-auto border border-gray-200 rounded">
+                    <table className="w-full text-[13px] border-collapse">
+                      <thead className="sticky top-0 bg-gray-50 z-[1]">
+                        <tr className="border-b border-gray-200">
+                          <th className="px-3 py-2 text-left font-semibold text-gray-500">CLZ Artist</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-500">CLZ Title</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-500">Search matches</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {unmatchedAlbums.map(({ album, index }) => {
+                          const query = linkQueries[index] ?? '';
+                          const normalizedQuery = normalizeTitle(query.trim());
+                          const candidates = normalizedQuery.length > 1
+                            ? existingAlbums
+                                .filter(existing => {
+                                  const haystack = normalizeTitle(`${existing.artist} ${existing.title}`);
+                                  return haystack.includes(normalizedQuery);
+                                })
+                                .slice(0, 6)
+                            : [];
+
+                          return (
+                            <tr key={`${album.artist}-${album.title}-${index}`} className="border-b border-gray-100 last:border-none align-top">
+                              <td className="px-3 py-2 text-gray-900">{album.artist}</td>
+                              <td className="px-3 py-2 text-gray-900">{album.title}</td>
+                              <td className="px-3 py-2">
+                                <div className="mb-2">
+                                  <input
+                                    type="text"
+                                    value={query}
+                                    onChange={(event) => handleLinkQueryChange(index, event.target.value)}
+                                    placeholder={`${album.artist} ${album.title}`}
+                                    className="w-full border border-gray-300 rounded px-2 py-1 text-[12px]"
+                                  />
+                                </div>
+                                {normalizedQuery.length <= 1 && (
+                                  <div className="text-[11px] text-gray-400">Type at least 2 characters to search.</div>
+                                )}
+                                {normalizedQuery.length > 1 && candidates.length === 0 && (
+                                  <div className="text-[11px] text-gray-400">No matches found.</div>
+                                )}
+                                {candidates.length > 0 && (
+                                  <div className="space-y-1">
+                                    {candidates.map(candidate => (
+                                      <button
+                                        key={candidate.id}
+                                        type="button"
+                                        onClick={() => handleLinkAlbum(index, candidate.id)}
+                                        className="w-full text-left px-2 py-1 rounded border border-emerald-200 bg-emerald-50 text-[12px] text-emerald-700 hover:bg-emerald-100"
+                                      >
+                                        Link: {candidate.artist} — {candidate.title} (#{candidate.id})
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               <div className="p-3 bg-amber-50 border border-amber-300 rounded text-[13px] text-amber-800 mb-4">
                 <strong>Safe Import Mode</strong>
