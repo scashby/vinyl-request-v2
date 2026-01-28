@@ -684,7 +684,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               
               sources.forEach(src => {
                  historyUpdates.push({
-                    album_id: album.id, field_name: key, source: src, resolution: 'auto_fill', kept_value: proposedValue, resolved_at: new Date().toISOString()
+                    album_id: album.id, field_name: key, source: src, resolution: 'use_new', kept_value: proposedValue, resolved_at: new Date().toISOString()
                  });
               });
           } 
@@ -723,8 +723,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
       // ALWAYS update timestamps, even if no conflicts, to prevent infinite loops
       const timestamp = new Date().toISOString();
-      updatesForAlbum.last_enriched_at = timestamp;
-      
       // FIX: Mark as reviewed even if we only found "No Conflicts"
       const hasConflicts = newConflicts.some(c => c.album_id === album.id);
       if (!hasConflicts) {
@@ -775,7 +773,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     if (untouchedIds.length > 0) {
       const now = new Date().toISOString();
       await supabase.from('collection')
-        .update({ last_enriched_at: now, last_reviewed_at: now }) // Mark as reviewed!
+        .update({ last_reviewed_at: now }) // Mark as reviewed!
         .in('id', untouchedIds);
     }
 
@@ -830,6 +828,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const nextQueue = prev.filter(c => c.album_id !== albumId);
         if (nextQueue.length === 0) {
              if (isLoopingRef.current && hasMoreRef.current) {
+                 setStatus('Scanning for the next batch of reviews...');
                  setTimeout(() => runScanLoop(), 500);
              } else {
                  setShowReview(false);
@@ -865,17 +864,18 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         if (conflict && conflict.candidates) {
              Object.entries(conflict.candidates).forEach(([src]) => {
                 const isChosenSource = decision.source === src || decision.selectedSources?.includes(src);
+                const isMerge = decision.source === 'custom_merge';
                 resolutionRecords.push({
                     album_id: albumId, 
                     field_name: fieldName,
                     source: src, 
-                    resolution: isChosenSource ? 'use_new' : 'keep_current',
+                    resolution: isChosenSource ? (isMerge ? 'merge' : 'use_new') : 'keep_current',
                     kept_value: decision.value ?? conflict.current_value,
                     resolved_at: timestamp
                 });
              });
              
-             const trackSource = (decision.source === 'current' || decision.source === 'merge') ? null : decision.source;
+             const trackSource = (decision.source === 'current' || decision.source === 'merge' || decision.source === 'custom_merge') ? null : decision.source;
              if (trackSource && conflict.candidates[trackSource]) {
                 const cand = conflict.candidates[trackSource] as { tracks?: unknown[] };
                 if (cand.tracks) {
@@ -900,7 +900,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     // 3. Database Updates
     if (Object.keys(updates).length > 0) {
-        updates.last_enriched_at = timestamp;
         updates.last_reviewed_at = timestamp;
 
         ['labels', 'genres', 'styles', 'finalized_fields', 'enrichment_sources'].forEach(field => {
@@ -933,6 +932,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         
         if (nextQueue.length === 0) {
              if (isLoopingRef.current && hasMoreRef.current) {
+                 setStatus('Scanning for the next batch of reviews...');
                  setTimeout(() => runScanLoop(), 500);
              } else {
                  setShowReview(false);
@@ -967,6 +967,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     return (
       <EnrichmentReviewModal 
         conflicts={conflicts} 
+        batchSummary={batchSummary}
+        statusMessage={status}
         onSave={handleSingleAlbumSave}
         onSkip={handleSkip}
         onCancel={() => { 
