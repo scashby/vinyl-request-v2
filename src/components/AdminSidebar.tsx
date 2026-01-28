@@ -190,6 +190,16 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
                 📅 Manage Events
               </Link>
               <Link 
+                href="/admin/event-types"
+                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+                  pathname === "/admin/event-types" 
+                    ? "bg-orange-700 text-white" 
+                    : "bg-orange-600 text-white hover:bg-orange-700"
+                }`}
+              >
+                🧩 Event Types
+              </Link>
+              <Link 
                 href="/admin/manage-dj-sets"
                 className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
                   pathname === "/admin/manage-dj-sets" 

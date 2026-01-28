@@ -8,37 +8,14 @@ import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from 'src/lib/supabaseClient';
 import type { Crate } from 'src/types/crate';
+import {
+  defaultEventTypeConfig,
+  type EventSubtypeDefaults,
+  type EventTypeConfigState,
+} from 'src/lib/eventTypeConfig';
 
 const formatList = ['Vinyl', 'Cassettes', 'CD', '45s', '8-Track'];
-const eventTypeOptions = [
-  {
-    value: 'brewery',
-    label: 'Brewery Event',
-    description: "Hosted at Devil's Purse Brewing Company.",
-  },
-  {
-    value: 'public-dj',
-    label: 'Public DJ Event',
-    description: 'Off-site DJ events with public details.',
-  },
-  {
-    value: 'private-dj',
-    label: 'Private DJ Event',
-    description: 'Displays publicly as “Private Event.”',
-  },
-  {
-    value: 'other',
-    label: 'Other Event',
-    description: 'General appearances or non-DJ events.',
-  },
-];
-
-const brewerySubtypes = [
-  { value: 'live-jukebox', label: 'Live Jukebox' },
-  { value: 'vinyl-sundays', label: 'Vinyl Sundays' },
-  { value: 'vinyl-trivia', label: 'Vinyl Trivia' },
-  { value: 'vinyl-bingo', label: 'Vinyl Music Bingo' },
-];
+const EVENT_TYPE_SETTINGS_KEY = 'event_type_config';
 
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
 const EVENT_SUBTYPE_TAG_PREFIX = 'event_subtype:';
@@ -153,6 +130,7 @@ export default function EditEventForm() {
   const [isPartOfSeries, setIsPartOfSeries] = useState(false);
   const [isParentEvent, setIsParentEvent] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [eventTypeConfig, setEventTypeConfig] = useState<EventTypeConfigState>(defaultEventTypeConfig);
   
   const [eventData, setEventData] = useState<EventData>({
     event_type: '',
@@ -191,6 +169,33 @@ export default function EditEventForm() {
     };
     
     fetchCrates();
+  }, []);
+
+  useEffect(() => {
+    const fetchEventTypeConfig = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('admin_settings')
+          .select('value')
+          .eq('key', EVENT_TYPE_SETTINGS_KEY)
+          .single();
+
+        if (error) {
+          if (error.code !== 'PGRST116') {
+            console.error('Error loading event type config:', error);
+          }
+          return;
+        }
+
+        if (data?.value) {
+          setEventTypeConfig(JSON.parse(data.value));
+        }
+      } catch (err) {
+        console.error('Error loading event type config:', err);
+      }
+    };
+
+    fetchEventTypeConfig();
   }, []);
 
   // Fetch Event Data
@@ -276,7 +281,7 @@ export default function EditEventForm() {
             : name === 'crate_id'
               ? (value === '' ? null : parseInt(value))
               : value,
-      ...(name === 'event_type' && value !== 'brewery' ? { event_subtype: '' } : {}),
+      ...(name === 'event_type' ? { event_subtype: '' } : {}),
       ...(name === 'date' && !value ? { is_recurring: false, recurrence_end_date: '' } : {})
     }));
   };
@@ -304,6 +309,19 @@ export default function EditEventForm() {
       if (checked) return { ...prev, queue_types: [...types, queueType] };
       return { ...prev, queue_types: types.filter((t) => t !== queueType) };
     });
+  };
+
+  const applySubtypeDefaults = (defaults?: EventSubtypeDefaults) => {
+    if (!defaults) return;
+    setEventData((prev) => ({
+      ...prev,
+      ...(defaults.time ? { time: defaults.time } : {}),
+      ...(typeof defaults.has_queue === 'boolean' ? { has_queue: defaults.has_queue } : {}),
+      ...(defaults.queue_types ? { queue_types: defaults.queue_types } : {}),
+      ...(typeof defaults.is_recurring === 'boolean' ? { is_recurring: defaults.is_recurring } : {}),
+      ...(defaults.recurrence_pattern ? { recurrence_pattern: defaults.recurrence_pattern } : {}),
+      ...(defaults.recurrence_interval ? { recurrence_interval: defaults.recurrence_interval } : {}),
+    }));
   };
 
   const handleImageUpload = () => {
@@ -347,18 +365,6 @@ export default function EditEventForm() {
     };
 
     input.click();
-  };
-
-  const applyVinylSundaysDefaults = () => {
-    setEventData((prev) => ({
-      ...prev,
-      time: '12:00 PM - 6:00 PM',
-      has_queue: true,
-      queue_types: prev.queue_types.length ? prev.queue_types : ['side', 'track'],
-      is_recurring: !!prev.date,
-      recurrence_pattern: 'weekly',
-      recurrence_interval: 1,
-    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -530,43 +536,53 @@ export default function EditEventForm() {
                 className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
               >
                 <option value="">Select a category</option>
-                {eventTypeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
+                {eventTypeConfig.types.map((option) => (
+                  <option key={option.id} value={option.id}>
                     {option.label}
                   </option>
                 ))}
               </select>
               {eventData.event_type && (
                 <p className="text-xs text-gray-500 mt-2">
-                  {eventTypeOptions.find((option) => option.value === eventData.event_type)?.description}
+                  {eventTypeConfig.types.find((option) => option.id === eventData.event_type)?.description}
                 </p>
               )}
             </div>
-            {eventData.event_type === 'brewery' && (
+            {eventTypeConfig.types.find((option) => option.id === eventData.event_type)?.subtypes && (
               <div>
-                <label className="text-sm font-medium text-gray-700">Brewery format</label>
+                <label className="text-sm font-medium text-gray-700">Event subtype</label>
                 <select
                   name="event_subtype"
                   value={eventData.event_subtype}
                   onChange={handleChange}
                   className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
                 >
-                  <option value="">Select a brewery format</option>
-                  {brewerySubtypes.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
+                  <option value="">Select a subtype</option>
+                  {(eventTypeConfig.types.find((option) => option.id === eventData.event_type)?.subtypes || []).map(
+                    (option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    )
+                  )}
                 </select>
-                {eventData.event_subtype === 'vinyl-sundays' && (
-                  <button
-                    type="button"
-                    onClick={applyVinylSundaysDefaults}
-                    className="mt-3 inline-flex items-center gap-2 rounded-full bg-purple-100 px-4 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-200 transition-colors"
-                  >
-                    Apply Vinyl Sundays defaults
-                  </button>
-                )}
+              </div>
+            )}
+            {eventData.event_type && eventData.event_subtype && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Defaults</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const subtype = eventTypeConfig.types
+                      .find((option) => option.id === eventData.event_type)
+                      ?.subtypes?.find((item) => item.id === eventData.event_subtype);
+                    applySubtypeDefaults(subtype?.defaults);
+                  }}
+                  className="mt-2 inline-flex items-center gap-2 rounded-full bg-purple-100 px-4 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-200 transition-colors"
+                >
+                  Apply subtype defaults
+                </button>
               </div>
             )}
             {eventData.event_type === 'private-dj' && (
