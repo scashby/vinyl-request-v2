@@ -754,71 +754,65 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         });
 
         try {
-            // STANDARD IMPORT LOGIC
-            const albumData: Record<string, unknown> = {
-              artist: album.artist,
-              title: album.title,
-            };
-            const normalizedFormat = album.format?.trim() || '';
-            if (album.status === 'NEW' || normalizedFormat) {
-              albumData.format = normalizedFormat || 'Unknown';
-            }
-            const normalizedMediaCondition = album.media_condition?.trim() || '';
-            if (album.status === 'NEW' || normalizedMediaCondition) {
-              albumData.media_condition = normalizedMediaCondition || 'Unknown';
-            }
-            if (album.year) {
-              albumData.year = album.year;
-            }
-            if (album.discogs_release_id) {
-              albumData.discogs_release_id = album.discogs_release_id;
-            }
-            if (album.discogs_master_id) {
-              albumData.discogs_master_id = album.discogs_master_id;
-            }
+            let albumData: Record<string, unknown> = {};
 
-            // Table specific fields
             if (sourceType === 'collection') {
-                albumData.discogs_id = album.discogs_release_id;
-                albumData.cat_no = album.cat_no;
-                albumData.labels = album.labels;
-                albumData.location = album.location;
-                albumData.date_added = album.date_added;
-                albumData.package_sleeve_condition = album.package_sleeve_condition;
-                albumData.personal_notes = album.personal_notes;
-                albumData.my_rating = album.my_rating;
-                albumData.decade = album.decade;
-                albumData.for_sale = album.for_sale;
-                albumData.index_number = album.index_number;
-                // Note: year_int is generated, DO NOT insert it.
-                
+              // Collection-specific payload
+              const normalizedFormat = album.format?.trim() || '';
+              const normalizedMediaCondition = album.media_condition?.trim() || '';
+
+              albumData = {
+                artist: album.artist,
+                title: album.title,
+                format: album.status === 'NEW' || normalizedFormat ? normalizedFormat || 'Unknown' : undefined,
+                media_condition: album.status === 'NEW' || normalizedMediaCondition ? normalizedMediaCondition || 'Unknown' : undefined,
+                year: album.year || undefined,
+                discogs_release_id: album.discogs_release_id || undefined,
+                discogs_master_id: album.discogs_master_id || undefined,
+                discogs_id: album.discogs_release_id,
+                cat_no: album.cat_no,
+                labels: album.labels,
+                location: album.location,
+                date_added: album.date_added,
+                package_sleeve_condition: album.package_sleeve_condition,
+                personal_notes: album.personal_notes,
+                my_rating: album.my_rating,
+                decade: album.decade,
+                for_sale: album.for_sale,
+                index_number: album.index_number,
                 // Important: Map cover image directly in case enrichment is skipped
-                if (album.cover_image) albumData.image_url = album.cover_image;
-                
-                // Parse format string for extra details (vinyl color etc)
-                // ADDED: Await to fix the Promise error
-                const formatData = await parseDiscogsFormat(album.format);
-                
-                // FIX: EXPLICIT MAPPING to avoid unknown keys
-                const mappedFormatData = {
-                    discs: formatData.discs,
-                    rpm: formatData.rpm,
-                    sound: formatData.sound,
-                    vinyl_weight: formatData.vinyl_weight,
-                    packaging: formatData.packaging,
-                    extra: formatData.extraText, // Map extraText to 'extra' DB column
-                    vinyl_color: formatData.vinyl_color ? [formatData.vinyl_color] : null // Map to ARRAY type
-                };
-                
-                Object.assign(albumData, mappedFormatData);
+                image_url: album.cover_image || undefined,
+              };
+
+              // Parse format string for extra details (vinyl color etc)
+              const formatData = await parseDiscogsFormat(album.format);
+              const mappedFormatData = {
+                discs: formatData.discs,
+                rpm: formatData.rpm,
+                sound: formatData.sound,
+                vinyl_weight: formatData.vinyl_weight,
+                packaging: formatData.packaging,
+                extra: formatData.extraText,
+                vinyl_color: formatData.vinyl_color ? [formatData.vinyl_color] : null,
+              };
+
+              Object.assign(albumData, mappedFormatData);
             } else {
-                // Wantlist specific
-                albumData.artist_norm = album.artist_norm;
-                albumData.title_norm = album.title_norm;
-                albumData.artist_album_norm = album.artist_album_norm;
-                albumData.date_added_to_wantlist = album.date_added;
-                albumData.notes = album.personal_notes;
-                albumData.cover_image = album.cover_image;
+              // Wantlist-specific payload
+              albumData = {
+                artist: album.artist,
+                title: album.title,
+                format: album.format?.trim() || 'Unknown',
+                year: album.year || undefined,
+                discogs_release_id: album.discogs_release_id || undefined,
+                discogs_master_id: album.discogs_master_id || undefined,
+                artist_norm: album.artist_norm,
+                title_norm: album.title_norm,
+                artist_album_norm: album.artist_album_norm,
+                date_added_to_wantlist: album.date_added,
+                notes: album.personal_notes,
+                cover_image: album.cover_image,
+              };
             }
 
             // Enrichment Logic (Only if NEW or Full Sync/Partial Sync needs it)
