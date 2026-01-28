@@ -1,4 +1,5 @@
 export type EventSubtypeDefaults = {
+  enabled_fields?: string[];
   time?: string;
   location?: string;
   image_url?: string;
@@ -38,6 +39,7 @@ export const defaultEventTypeConfig: EventTypeConfigState = {
           id: 'vinyl-sundays',
           label: 'Vinyl Sundays',
           defaults: {
+            enabled_fields: ['time', 'location', 'queue', 'recurrence'],
             time: '12:00 PM - 6:00 PM',
             location: "Devil's Purse Brewing Company",
             has_queue: true,

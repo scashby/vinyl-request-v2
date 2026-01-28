@@ -313,16 +313,27 @@ export default function EditEventForm() {
 
   const applySubtypeDefaults = (defaults?: EventSubtypeDefaults) => {
     if (!defaults) return;
+    const enabledFields = defaults.enabled_fields?.length
+      ? defaults.enabled_fields
+      : ['time', 'location', 'image_url', 'queue', 'recurrence'];
     setEventData((prev) => ({
       ...prev,
-      ...(defaults.time ? { time: defaults.time } : {}),
-      ...(defaults.location ? { location: defaults.location } : {}),
-      ...(defaults.image_url ? { image_url: defaults.image_url } : {}),
-      ...(typeof defaults.has_queue === 'boolean' ? { has_queue: defaults.has_queue } : {}),
-      ...(defaults.queue_types ? { queue_types: defaults.queue_types } : {}),
-      ...(typeof defaults.is_recurring === 'boolean' ? { is_recurring: defaults.is_recurring } : {}),
-      ...(defaults.recurrence_pattern ? { recurrence_pattern: defaults.recurrence_pattern } : {}),
-      ...(defaults.recurrence_interval ? { recurrence_interval: defaults.recurrence_interval } : {}),
+      ...(enabledFields.includes('time') && defaults.time ? { time: defaults.time } : {}),
+      ...(enabledFields.includes('location') && defaults.location ? { location: defaults.location } : {}),
+      ...(enabledFields.includes('image_url') && defaults.image_url ? { image_url: defaults.image_url } : {}),
+      ...(enabledFields.includes('queue') && typeof defaults.has_queue === 'boolean'
+        ? { has_queue: defaults.has_queue }
+        : {}),
+      ...(enabledFields.includes('queue') && defaults.queue_types ? { queue_types: defaults.queue_types } : {}),
+      ...(enabledFields.includes('recurrence') && typeof defaults.is_recurring === 'boolean'
+        ? { is_recurring: defaults.is_recurring }
+        : {}),
+      ...(enabledFields.includes('recurrence') && defaults.recurrence_pattern
+        ? { recurrence_pattern: defaults.recurrence_pattern }
+        : {}),
+      ...(enabledFields.includes('recurrence') && defaults.recurrence_interval
+        ? { recurrence_interval: defaults.recurrence_interval }
+        : {}),
     }));
   };
 
