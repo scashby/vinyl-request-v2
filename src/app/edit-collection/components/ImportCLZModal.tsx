@@ -249,6 +249,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
   
   const [comparedAlbums, setComparedAlbums] = useState<ComparedCLZAlbum[]>([]);
   const [existingAlbums, setExistingAlbums] = useState<ExistingAlbum[]>([]);
+  const [linkSelections, setLinkSelections] = useState<Record<number, string>>({});
   
   const [progress, setProgress] = useState({ current: 0, total: 0, status: '' });
   const [error, setError] = useState<string | null>(null);
@@ -300,6 +301,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
       const compared = compareCLZAlbums(parsed, existing as ExistingAlbum[]);
       setComparedAlbums(compared);
       setExistingAlbums(existing as ExistingAlbum[]);
+      setLinkSelections({});
       setStage('preview');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to parse XML');
@@ -343,11 +345,15 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
           if (!existingAlbum) continue;
 
           // Load previous conflict resolutions
-          const { data: resolutions } = await supabase
+          const { data: resolutions, error: resolutionsError } = await supabase
             .from('import_conflict_resolutions')
             .select('*')
             .eq('album_id', album.existingId!)
             .eq('source', 'clz');
+          if (resolutionsError && !isMissingResolutionTable(resolutionsError)) {
+            throw resolutionsError;
+          }
+          const safeResolutions = isMissingResolutionTable(resolutionsError) ? [] : resolutions;
 
           // Build CLZ data object
           const clzData: Record<string, unknown> = {
@@ -380,7 +386,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
             existingAlbum,
             clzData,
             'clz',
-            (resolutions || []) as PreviousResolution[]
+            (safeResolutions || []) as PreviousResolution[]
           );
 
           // Combine identifying updates and safe updates
@@ -447,6 +453,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
     setFile(null);
     setComparedAlbums([]);
     setExistingAlbums([]);
+    setLinkSelections({});
     setProgress({ current: 0, total: 0, status: '' });
     setError(null);
     setAllConflicts([]);
@@ -456,6 +463,40 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
 
   const matchedCount = comparedAlbums.filter(a => a.status === 'MATCHED').length;
   const noMatchCount = comparedAlbums.filter(a => a.status === 'NO_MATCH').length;
+  const unmatchedAlbums = comparedAlbums
+    .map((album, index) => ({ album, index }))
+    .filter(({ album }) => album.status === 'NO_MATCH');
+
+  const isMissingResolutionTable = (err?: { message?: string; code?: string } | null) => {
+    if (!err) return false;
+    if (err.code === '42P01') return true;
+    return err.message?.includes('import_conflict_resolutions') ?? false;
+  };
+
+  const handleLinkSelection = (index: number, value: string) => {
+    setLinkSelections(prev => ({
+      ...prev,
+      [index]: value,
+    }));
+  };
+
+  const handleLinkAlbum = (index: number) => {
+    const selected = linkSelections[index];
+    if (!selected) return;
+    const selectedId = Number(selected);
+    if (!selectedId) return;
+    setComparedAlbums(prev =>
+      prev.map((album, idx) =>
+        idx === index
+          ? {
+              ...album,
+              status: 'MATCHED',
+              existingId: selectedId,
+            }
+          : album
+      )
+    );
+  };
 
   // Show conflict resolution modal
   if (stage === 'conflicts') {
@@ -537,6 +578,65 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                   </div>
                 </div>
               </div>
+
+              {unmatchedAlbums.length > 0 && (
+                <div className="p-4 bg-white border border-gray-200 rounded-md mb-4">
+                  <h3 className="m-0 mb-2 text-[15px] font-semibold text-gray-900">
+                    Link unmatched albums
+                  </h3>
+                  <p className="text-[13px] text-gray-500 mb-3">
+                    Select an existing album to link each CLZ entry so it can be imported instead of skipped.
+                  </p>
+                  <div className="max-h-[220px] overflow-y-auto border border-gray-200 rounded">
+                    <table className="w-full text-[13px] border-collapse">
+                      <thead className="sticky top-0 bg-gray-50 z-[1]">
+                        <tr className="border-b border-gray-200">
+                          <th className="px-3 py-2 text-left font-semibold text-gray-500">CLZ Artist</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-500">CLZ Title</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-500">Link to</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-500">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {unmatchedAlbums.map(({ album, index }) => (
+                          <tr key={`${album.artist}-${album.title}-${index}`} className="border-b border-gray-100 last:border-none">
+                            <td className="px-3 py-2 text-gray-900">{album.artist}</td>
+                            <td className="px-3 py-2 text-gray-900">{album.title}</td>
+                            <td className="px-3 py-2">
+                              <select
+                                value={linkSelections[index] ?? ''}
+                                onChange={(event) => handleLinkSelection(index, event.target.value)}
+                                className="w-full border border-gray-300 rounded px-2 py-1 text-[12px]"
+                              >
+                                <option value="">Select existing album</option>
+                                {existingAlbums.map(existing => (
+                                  <option key={existing.id} value={existing.id}>
+                                    {existing.artist} — {existing.title} (#{existing.id})
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="px-3 py-2">
+                              <button
+                                type="button"
+                                onClick={() => handleLinkAlbum(index)}
+                                disabled={!linkSelections[index]}
+                                className={`px-3 py-1.5 rounded text-xs font-semibold ${
+                                  linkSelections[index]
+                                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                }`}
+                              >
+                                Link
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               <div className="p-3 bg-amber-50 border border-amber-300 rounded text-[13px] text-amber-800 mb-4">
                 <strong>Safe Import Mode</strong>
