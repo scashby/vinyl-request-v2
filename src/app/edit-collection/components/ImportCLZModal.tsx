@@ -238,6 +238,7 @@ function compareCLZAlbums(
       compared.push({
         ...clzAlbum,
         status: 'NO_MATCH',
+        manualLink: false,
       });
     }
   }
@@ -317,13 +318,9 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
 
     try {
       // Process ALL MATCHED albums (auto matches first, manual links after)
-      const autoMatchedAlbums = comparedAlbums.filter(
-        album => album.status === 'MATCHED' && !album.manualLink
-      );
-      const linkedAlbums = comparedAlbums.filter(
-        album => album.status === 'MATCHED' && album.manualLink
-      );
-      const albumsToProcess = [...autoMatchedAlbums, ...linkedAlbums];
+      const albumsToProcess = comparedAlbums
+        .filter(album => album.status === 'MATCHED')
+        .sort((a, b) => Number(Boolean(a.manualLink)) - Number(Boolean(b.manualLink)));
 
       setProgress({ current: 0, total: albumsToProcess.length, status: 'Processing...' });
 
@@ -336,6 +333,8 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
       };
 
       const conflicts: FieldConflict[] = [];
+
+      let missingResolutionTable = resolutionTableMissing;
 
       // Process albums
       for (let i = 0; i < albumsToProcess.length; i++) {
@@ -354,7 +353,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
 
           // Load previous conflict resolutions
           let safeResolutions: PreviousResolution[] = [];
-          if (!resolutionTableMissing) {
+          if (!missingResolutionTable) {
             const { data: resolutions, error: resolutionsError } = await supabase
               .from('import_conflict_resolutions')
               .select('*')
@@ -362,6 +361,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
               .eq('source', 'clz');
             if (resolutionsError) {
               if (isMissingResolutionTable(resolutionsError)) {
+                missingResolutionTable = true;
                 setResolutionTableMissing(true);
               } else {
                 throw resolutionsError;
