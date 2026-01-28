@@ -24,7 +24,30 @@ interface EventData {
   info?: string;
   info_url?: string;
   has_queue?: boolean;
+  allowed_tags?: string[] | string | null;
 }
+
+const EVENT_TYPE_TAG_PREFIX = 'event_type:';
+
+const normalizeStringArray = (value: unknown): string[] => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    return value.replace(/[{}]/g, '').split(',').map((item) => item.trim()).filter(Boolean);
+  }
+  return [];
+};
+
+const getTagValue = (tags: string[], prefix: string): string => {
+  const match = tags.find((tag) => tag.startsWith(prefix));
+  return match ? match.replace(prefix, '') : '';
+};
+
+const getDisplayTitle = (eventData: EventData): string => {
+  const tags = normalizeStringArray(eventData.allowed_tags);
+  const eventType = getTagValue(tags, EVENT_TYPE_TAG_PREFIX);
+  if (eventType === 'private-dj') return 'Private Event';
+  return eventData.title;
+};
 
 export default function Page() {
   const params = useParams();
@@ -90,8 +113,11 @@ export default function Page() {
     image_url,
     info,
     info_url,
-    has_queue
+    has_queue,
+    allowed_tags
   } = event;
+
+  const displayTitle = getDisplayTitle({ ...event, allowed_tags });
 
   const formatDate = (dateString: string) => {
     const [year, month, day] = dateString.split('-');
@@ -127,7 +153,7 @@ export default function Page() {
         <div className="relative z-10 px-8 py-6 bg-black/40 rounded-xl backdrop-blur-sm">
           <h1 
             className="text-4xl md:text-5xl font-bold text-white font-serif-display text-center"
-            dangerouslySetInnerHTML={{ __html: formatEventText(title) }} 
+            dangerouslySetInnerHTML={{ __html: formatEventText(displayTitle) }} 
           />
         </div>
       </header>
@@ -163,14 +189,14 @@ export default function Page() {
               <div className="relative aspect-square w-full">
                 <Image
                   src={imageSrc}
-                  alt={title}
+                  alt={displayTitle}
                   fill
                   className="object-cover"
                   unoptimized
                 />
               </div>
-              <div className="p-6">
-                <h2 className="text-2xl font-bold text-purple-700 mb-2">{title}</h2>
+                <div className="p-6">
+                <h2 className="text-2xl font-bold text-purple-700 mb-2">{displayTitle}</h2>
                 {location && (
                   <div className="mb-4">
                     <a
