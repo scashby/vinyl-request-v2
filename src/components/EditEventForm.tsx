@@ -155,6 +155,21 @@ export default function EditEventForm() {
     featured_priority: null,
   });
 
+  const selectedSubtypeDefaults = eventTypeConfig.types
+    .find((option) => option.id === eventData.event_type)
+    ?.subtypes?.find((item) => item.id === eventData.event_subtype)?.defaults;
+
+  const enabledFields = selectedSubtypeDefaults?.enabled_fields?.length
+    ? selectedSubtypeDefaults.enabled_fields
+    : ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'queue', 'recurrence', 'crate', 'formats'];
+
+  const isFieldEnabled = (field: string) => enabledFields.includes(field);
+  const showDate = isFieldEnabled('date');
+  const showTime = isFieldEnabled('time');
+  const showLocation = isFieldEnabled('location');
+  const showInfo = isFieldEnabled('info');
+  const showInfoUrl = isFieldEnabled('info_url');
+
   // Fetch Available Crates
   useEffect(() => {
     const fetchCrates = async () => {
@@ -181,6 +196,8 @@ export default function EditEventForm() {
           .single();
 
         if (error) {
+          const errorStatus = 'status' in error ? error.status : null;
+          if (error.code !== 'PGRST116' && errorStatus !== 404) {
           if (error.code !== 'PGRST116') {
             console.error('Error loading event type config:', error);
           }
@@ -195,6 +212,7 @@ export default function EditEventForm() {
       }
     };
 
+    void fetchEventTypeConfig();
     fetchEventTypeConfig();
   }, []);
 
@@ -315,6 +333,11 @@ export default function EditEventForm() {
     if (!defaults) return;
     const enabledFields = defaults.enabled_fields?.length
       ? defaults.enabled_fields
+      : ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'queue', 'recurrence', 'crate', 'formats'];
+    setEventData((prev) => ({
+      ...prev,
+      ...(enabledFields.includes('info') && defaults.info ? { info: defaults.info } : {}),
+      ...(enabledFields.includes('info_url') && defaults.info_url ? { info_url: defaults.info_url } : {}),
       : ['time', 'location', 'image_url', 'queue', 'recurrence'];
     setEventData((prev) => ({
       ...prev,
@@ -622,6 +645,207 @@ export default function EditEventForm() {
                     className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
                   />
                 </div>
+                {(showDate || showTime) && (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {showDate && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-700">Date</label>
+                        <input
+                          name="date"
+                          type="date"
+                          value={eventData.date === '9999-12-31' ? '' : eventData.date}
+                          onChange={handleChange}
+                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
+                        />
+                        <p className="text-xs text-gray-500 mt-2">Leave empty for “Date To Be Announced.”</p>
+                      </div>
+                    )}
+                    {showTime && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-700">Time</label>
+                        <input
+                          name="time"
+                          value={eventData.time}
+                          onChange={handleChange}
+                          placeholder="3:00 PM - 6:00 PM"
+                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+                {showLocation && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Location</label>
+                    <input
+                      name="location"
+                      value={eventData.location}
+                      onChange={handleChange}
+                      placeholder="Venue or address"
+                      className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
+                    />
+                    {eventData.location && (
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(eventData.location)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                      >
+                        Search in Google Maps
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-5 border border-gray-200 rounded-2xl bg-white shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Description &amp; links</h3>
+              <div className="space-y-4">
+                {showInfo && (
+                  <textarea
+                    name="info"
+                    value={eventData.info}
+                    onChange={handleChange}
+                    placeholder="Event description, lineup, cover, or quick notes."
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm min-h-[120px]"
+                  />
+                )}
+                {showInfoUrl && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Primary event link</label>
+                    <input
+                      name="info_url"
+                      value={eventData.info_url || ''}
+                      onChange={handleChange}
+                      placeholder="https://facebook.com/events/..."
+                      className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-2">
+                      Add a Facebook event link or external landing page here.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            {isFieldEnabled('image_url') && (
+              <div className="p-5 border border-gray-200 rounded-2xl bg-white shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Event media</h3>
+              <div className="flex flex-col gap-4">
+                <div className="relative w-full aspect-[4/3] rounded-xl border border-dashed border-gray-300 bg-gray-50 overflow-hidden">
+                  {eventData.image_url ? (
+                    <Image
+                      src={eventData.image_url}
+                      alt="Event"
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center text-sm text-gray-400">
+                      Upload a featured image
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={handleImageUpload}
+                    disabled={uploadingImage}
+                    className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                  >
+                    {uploadingImage ? 'Uploading…' : 'Upload image'}
+                  </button>
+                  <input
+                    name="image_url"
+                    value={eventData.image_url}
+                    onChange={handleChange}
+                    placeholder="Paste image URL"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
+                    disabled={!isFieldEnabled('image_url')}
+                  />
+                </div>
+              </div>
+              </div>
+            )}
+
+            <div className="p-5 border border-gray-200 rounded-2xl bg-white shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Featured placement</h3>
+              <div className="space-y-3 text-sm text-gray-600">
+                <label className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    name="is_featured_grid"
+                    checked={!!eventData.is_featured_grid}
+                    onChange={handleCheckboxChange}
+                    className="h-4 w-4"
+                  />
+                  Show in Featured Grid
+                </label>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500">Featured priority</label>
+                  <input
+                    type="number"
+                    name="featured_priority"
+                    value={eventData.featured_priority ?? ''}
+                    onChange={handleChange}
+                    placeholder="1"
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* CRATE SELECTION (Replacing Tags) */}
+        {isFieldEnabled('crate') && (
+          <section className="p-5 border border-gray-200 rounded-2xl bg-gray-50/40">
+            <label className="block text-sm font-bold text-gray-700 mb-2">Limit Requests to Crate (Optional)</label>
+            <select 
+              name="crate_id" 
+              value={eventData.crate_id || ''} 
+              onChange={handleChange}
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
+            >
+              <option value="">-- Allow Entire Collection --</option>
+              {crates.map(crate => (
+                <option key={crate.id} value={crate.id}>
+                  {crate.icon} {crate.name}
+                </option>
+              ))}
+            </select>
+            <small className="block mt-2 text-gray-500 text-xs">
+              If selected, attendees can only see/request songs from this Crate.
+            </small>
+          </section>
+        )}
+
+        {/* ALLOWED FORMATS */}
+        {isFieldEnabled('formats') && (
+          <section className="p-5 border border-gray-200 rounded-2xl bg-white shadow-sm">
+            <label className="block text-sm font-bold text-gray-700 mb-2">Allowed Formats</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {formatList.map((format) => (
+                <label key={format} className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={eventData.allowed_formats.includes(format)}
+                    onChange={(e) => handleFormatChange(format, e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  {format}
+                </label>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* RECURRING LOGIC */}
+        {isFieldEnabled('recurrence') && eventData.date && eventData.date !== '9999-12-31' && !isPartOfSeries && (
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
                     <label className="text-sm font-medium text-gray-700">Date</label>
@@ -855,6 +1079,8 @@ export default function EditEventForm() {
         )}
         
         {/* QUEUE LOGIC */}
+        {isFieldEnabled('queue') && (
+          <section className="p-5 bg-blue-50 border border-blue-200 rounded-2xl">
         <section className="p-5 bg-blue-50 border border-blue-200 rounded-2xl">
           <label className="flex items-center gap-2 mb-4 font-bold text-blue-800">
             <input
@@ -898,6 +1124,8 @@ export default function EditEventForm() {
               </label>
             </div>
           )}
+          </section>
+        )}
         </section>
 
         <button
