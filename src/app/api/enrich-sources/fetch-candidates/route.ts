@@ -48,7 +48,9 @@ export async function POST(req: Request) {
       limit = 10,
       location, // FIXED: Expect 'location' not 'folder'
       services,
-      autoSnooze = false
+      autoSnooze = false,
+      fields = [],
+      missingDataOnly = false
     } = body;
 
     let targetAlbums: Record<string, unknown>[] = [];
@@ -109,6 +111,27 @@ export async function POST(req: Request) {
     const CHUNK_SIZE = 5;
     const chunks = chunkArray(targetAlbums, CHUNK_SIZE);
 
+    const isEmptyValue = (value: unknown) => {
+      if (value === null || value === undefined) return true;
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed || trimmed === '[]' || trimmed === 'null') return true;
+      }
+      if (Array.isArray(value)) {
+        return value.length === 0 || value.every(v => v === null || v === undefined || String(v).trim() === '');
+      }
+      if (typeof value === 'object') return Object.keys(value as Record<string, unknown>).length === 0;
+      return false;
+    };
+
+    const hasMissingSelectedField = (album: Record<string, unknown>) => {
+      if (!missingDataOnly || !fields.length) return true;
+      return fields.some((field: string) => {
+        const [rootField] = field.split('.');
+        return isEmptyValue((album as Record<string, unknown>)[rootField]);
+      });
+    };
+
     for (const chunk of chunks) {
        const chunkPromises = chunk.map(async (album) => {
           const candidates: Record<string, CandidateData> = {};
@@ -116,6 +139,10 @@ export async function POST(req: Request) {
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const typedAlbum = album as any;
+
+          if (!hasMissingSelectedField(typedAlbum)) {
+            return null;
+          }
 
           // Always fetch requested services
           if (services.musicbrainz) promises.push(fetchMusicBrainzData(typedAlbum));

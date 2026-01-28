@@ -61,6 +61,7 @@ export async function GET() {
     
     // Artwork
     let missingArtwork = 0;
+    let missingFrontCover = 0;
     let missingBackCover = 0;
     let missingInnerSleeve = 0;
     
@@ -101,9 +102,33 @@ export async function GET() {
 
     const folders = new Set<string>();
 
+    const parseTracklists = (tracklists: unknown) => {
+      if (!tracklists) return null;
+      if (Array.isArray(tracklists)) return tracklists;
+      if (typeof tracklists === 'string') {
+        try {
+          const parsed = JSON.parse(tracklists);
+          return Array.isArray(parsed) ? parsed : null;
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    };
+
     albums.forEach(album => {
       if (album.folder) folders.add(album.folder);
       const albumIdStr = String(album.id);
+      const tracklists = parseTracklists(album.tracklists);
+      const hasTracklists = Array.isArray(tracklists) && tracklists.length > 0;
+      const tracklistsMissingDurations = hasTracklists
+        ? tracklists.some(track => {
+          const durationValue = track?.duration === null || track?.duration === undefined
+            ? ''
+            : String(track.duration).trim();
+          return durationValue === '';
+        })
+        : false;
 
       // 1. ARTWORK
       const hasFront = !!album.image_url;
@@ -112,6 +137,7 @@ export async function GET() {
 
       if (!hasFront || !hasBack) {
         missingArtwork++; 
+        if (!hasFront) missingFrontCover++;
         if (!hasBack) missingBackCover++;
       }
       if (!hasInner) missingInnerSleeve++;
@@ -131,9 +157,11 @@ export async function GET() {
       if (!hasSongwriters) missingSongwriters++;
 
       // 3. TRACKLISTS & DURATIONS
-      const hasTracks = albumsWithTracks.has(albumIdStr);
-      // It has missing durations if it has tracks AND is in the missing set
-      const hasMissingDurations = hasTracks && albumsWithMissingDurations.has(albumIdStr);
+      const hasTracks = albumsWithTracks.has(albumIdStr) || hasTracklists;
+      // It has missing durations if it has tracks AND is in the missing set,
+      // or if tracklists exist but have missing durations.
+      const hasMissingDurations = (albumsWithTracks.has(albumIdStr) && albumsWithMissingDurations.has(albumIdStr))
+        || (!albumsWithTracks.has(albumIdStr) && tracklistsMissingDurations);
 
       if (!hasTracks) {
         missingTracklists++;
@@ -212,6 +240,7 @@ export async function GET() {
       needsEnrichment,
       
       missingArtwork,
+      missingFrontCover,
       missingBackCover,
       missingInnerSleeve,
       

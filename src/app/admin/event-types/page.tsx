@@ -72,6 +72,7 @@ export default function Page() {
         if (error) {
           const errorStatus = "status" in error ? error.status : null;
           if (error.code !== "PGRST116" && errorStatus !== 404) {
+          if (error.code !== "PGRST116") {
             throw error;
           }
           setConfig(defaultEventTypeConfig);
@@ -93,6 +94,11 @@ export default function Page() {
     loadConfig();
   }, []);
 
+  useEffect(() => {
+    if (!selectedTypeId && config.types.length > 0) {
+      setSelectedTypeId(config.types[0]?.id || "");
+    }
+  }, [config.types, selectedTypeId]);
 
   const saveConfig = async () => {
     setSaving(true);
@@ -204,6 +210,7 @@ export default function Page() {
           if (sIdx !== subtypeIndex) return subtype;
           const currentFields =
             subtype.defaults?.enabled_fields?.length ? subtype.defaults.enabled_fields : ALL_TEMPLATE_FIELDS;
+          const currentFields = subtype.defaults?.enabled_fields || [];
           const nextFields = enabled
             ? Array.from(new Set([...currentFields, field]))
             : currentFields.filter((item) => item !== field);
@@ -438,6 +445,16 @@ export default function Page() {
                             ? selectedSubtype.defaults.enabled_fields
                             : ALL_TEMPLATE_FIELDS
                           ).includes(field.id);
+                      <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Defaults included</h5>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2 text-sm text-gray-700">
+                        {[
+                          { id: "time", label: "Time" },
+                          { id: "location", label: "Location" },
+                          { id: "image_url", label: "Image" },
+                          { id: "queue", label: "Queue" },
+                          { id: "recurrence", label: "Recurrence" },
+                        ].map((field) => {
+                          const enabled = selectedSubtype.defaults?.enabled_fields?.includes(field.id) || false;
                           return (
                             <label key={field.id} className="flex items-center gap-2">
                               <input
@@ -505,6 +522,7 @@ export default function Page() {
                             ? selectedSubtype.defaults.enabled_fields
                             : ALL_TEMPLATE_FIELDS
                           ).includes("time"))}
+                          disabled={!selectedSubtype.defaults?.enabled_fields?.includes("time")}
                         />
                       </div>
                       <div>
@@ -520,6 +538,7 @@ export default function Page() {
                             ? selectedSubtype.defaults.enabled_fields
                             : ALL_TEMPLATE_FIELDS
                           ).includes("location"))}
+                          disabled={!selectedSubtype.defaults?.enabled_fields?.includes("location")}
                         />
                       </div>
                       <div>
@@ -535,6 +554,7 @@ export default function Page() {
                             ? selectedSubtype.defaults.enabled_fields
                             : ALL_TEMPLATE_FIELDS
                           ).includes("image_url"))}
+                          disabled={!selectedSubtype.defaults?.enabled_fields?.includes("image_url")}
                         />
                       </div>
                       <div className="flex items-center gap-2 mt-4">
@@ -549,6 +569,7 @@ export default function Page() {
                             ? selectedSubtype.defaults.enabled_fields
                             : ALL_TEMPLATE_FIELDS
                           ).includes("queue"))}
+                          disabled={!selectedSubtype.defaults?.enabled_fields?.includes("queue")}
                         />
                         <span className="text-sm text-gray-700">Enable queue</span>
                       </div>
@@ -564,6 +585,7 @@ export default function Page() {
                             ? selectedSubtype.defaults.enabled_fields
                             : ALL_TEMPLATE_FIELDS
                           ).includes("recurrence"))}
+                          disabled={!selectedSubtype.defaults?.enabled_fields?.includes("recurrence")}
                         />
                         <span className="text-sm text-gray-700">Recurring by default</span>
                       </div>
@@ -579,6 +601,7 @@ export default function Page() {
                             ? selectedSubtype.defaults.enabled_fields
                             : ALL_TEMPLATE_FIELDS
                           ).includes("recurrence"))}
+                          disabled={!selectedSubtype.defaults?.enabled_fields?.includes("recurrence")}
                         >
                           <option value="daily">Daily</option>
                           <option value="weekly">Weekly</option>
@@ -601,6 +624,7 @@ export default function Page() {
                             ? selectedSubtype.defaults.enabled_fields
                             : ALL_TEMPLATE_FIELDS
                           ).includes("recurrence"))}
+                          disabled={!selectedSubtype.defaults?.enabled_fields?.includes("recurrence")}
                         />
                       </div>
                       <div>
@@ -625,6 +649,7 @@ export default function Page() {
                                     ? selectedSubtype.defaults.enabled_fields
                                     : ALL_TEMPLATE_FIELDS
                                   ).includes("queue"))}
+                                  disabled={!selectedSubtype.defaults?.enabled_fields?.includes("queue")}
                                 />
                                 {queueType}
                               </label>
@@ -661,6 +686,18 @@ export default function Page() {
               </div>
             </>
           )}
+          {status && (
+            <div className="text-sm text-gray-600">{status}</div>
+          )}
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-end">
+            <Button variant="secondary" onClick={handleCancel} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={saveConfig} disabled={saving}>
+              {saving ? "Saving…" : "Save Changes"}
+            </Button>
+          </div>
         </div>
       )}
     </Container>
