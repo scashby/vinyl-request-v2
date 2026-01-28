@@ -316,6 +316,8 @@ export default function EditEventForm() {
     setEventData((prev) => ({
       ...prev,
       ...(defaults.time ? { time: defaults.time } : {}),
+      ...(defaults.location ? { location: defaults.location } : {}),
+      ...(defaults.image_url ? { image_url: defaults.image_url } : {}),
       ...(typeof defaults.has_queue === 'boolean' ? { has_queue: defaults.has_queue } : {}),
       ...(defaults.queue_types ? { queue_types: defaults.queue_types } : {}),
       ...(typeof defaults.is_recurring === 'boolean' ? { is_recurring: defaults.is_recurring } : {}),

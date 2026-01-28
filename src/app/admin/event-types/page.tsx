@@ -18,6 +18,8 @@ const createEmptySubtype = (): EventSubtypeConfig => ({
   label: "",
   defaults: {
     time: "",
+    location: "",
+    image_url: "",
     has_queue: false,
     queue_types: [],
     is_recurring: false,
@@ -38,6 +40,8 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
+  const [selectedTypeId, setSelectedTypeId] = useState<string>("");
+  const [selectedSubtypeId, setSelectedSubtypeId] = useState<string>("");
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -74,6 +78,12 @@ export default function Page() {
     loadConfig();
   }, []);
 
+  useEffect(() => {
+    if (!selectedTypeId && config.types.length > 0) {
+      setSelectedTypeId(config.types[0]?.id || "");
+    }
+  }, [config.types, selectedTypeId]);
+
   const saveConfig = async () => {
     setSaving(true);
     setStatus("");
@@ -96,9 +106,12 @@ export default function Page() {
   };
 
   const addType = () => {
+    const newType = createEmptyType();
     setConfig((prev) => ({
-      types: [...prev.types, createEmptyType()],
+      types: [...prev.types, newType],
     }));
+    setSelectedTypeId(newType.id);
+    setSelectedSubtypeId("");
   };
 
   const updateType = (index: number, updates: Partial<EventTypeConfig>) => {
@@ -113,16 +126,19 @@ export default function Page() {
     setConfig((prev) => ({
       types: prev.types.filter((_, idx) => idx !== index),
     }));
+    setSelectedSubtypeId("");
   };
 
   const addSubtype = (typeIndex: number) => {
+    const newSubtype = createEmptySubtype();
     setConfig((prev) => ({
       types: prev.types.map((type, idx) =>
         idx === typeIndex
-          ? { ...type, subtypes: [...(type.subtypes || []), createEmptySubtype()] }
+          ? { ...type, subtypes: [...(type.subtypes || []), newSubtype] }
           : type
       ),
     }));
+    setSelectedSubtypeId(newSubtype.id);
   };
 
   const updateSubtype = (
@@ -174,18 +190,27 @@ export default function Page() {
         };
       }),
     }));
+    setSelectedSubtypeId("");
   };
 
-  const flattenedIds = useMemo(() => {
-    const ids = new Set<string>();
-    config.types.forEach((type) => {
-      if (type.id) ids.add(type.id);
-      type.subtypes?.forEach((subtype) => {
-        if (subtype.id) ids.add(`${type.id}:${subtype.id}`);
-      });
-    });
-    return ids;
-  }, [config.types]);
+  const selectedTypeIndex = useMemo(
+    () => config.types.findIndex((type) => type.id === selectedTypeId),
+    [config.types, selectedTypeId]
+  );
+
+  const selectedType = selectedTypeIndex >= 0 ? config.types[selectedTypeIndex] : null;
+  const selectedSubtypeIndex = selectedType
+    ? selectedType.subtypes?.findIndex((subtype) => subtype.id === selectedSubtypeId) ?? -1
+    : -1;
+  const selectedSubtype =
+    selectedType && selectedSubtypeIndex >= 0
+      ? selectedType.subtypes?.[selectedSubtypeIndex] || null
+      : null;
+
+  const typeOptions = config.types.map((type) => ({
+    value: type.id,
+    label: type.label || "(Untitled type)",
+  }));
 
   return (
     <Container size="md" className="py-8 min-h-screen">
@@ -198,7 +223,7 @@ export default function Page() {
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={addType}>
-            Add Event Type
+            Create New Type
           </Button>
           <Button onClick={saveConfig} disabled={saving}>
             {saving ? "Saving…" : "Save Changes"}
@@ -210,183 +235,249 @@ export default function Page() {
         <div>Loading settings…</div>
       ) : (
         <div className="space-y-6">
-          {config.types.map((type, typeIndex) => (
-            <div key={`${type.id}-${typeIndex}`} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
-                <div className="flex-1 grid gap-3 md:grid-cols-2">
-                  <div>
-                    <label className="text-xs font-semibold text-gray-500">Type ID</label>
-                    <input
-                      value={type.id}
-                      onChange={(e) => updateType(typeIndex, { id: e.target.value })}
-                      className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                      placeholder="brewery"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-500">Label</label>
-                    <input
-                      value={type.label}
-                      onChange={(e) => updateType(typeIndex, { label: e.target.value })}
-                      className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                      placeholder="Brewery Event"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-xs font-semibold text-gray-500">Description</label>
-                    <input
-                      value={type.description || ""}
-                      onChange={(e) => updateType(typeIndex, { description: e.target.value })}
-                      className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                      placeholder="Short helper text for admins."
-                    />
-                  </div>
-                </div>
-                <Button variant="danger" size="sm" onClick={() => removeType(typeIndex)}>
-                  Remove Type
-                </Button>
-              </div>
-
-              <div className="border-t border-gray-100 pt-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-gray-700">Subtypes & defaults</h4>
-                  <Button size="sm" variant="secondary" onClick={() => addSubtype(typeIndex)}>
-                    Add Subtype
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Select Event Type</label>
+                <div className="mt-2 flex flex-col sm:flex-row gap-2">
+                  <select
+                    value={selectedTypeId}
+                    onChange={(e) => {
+                      setSelectedTypeId(e.target.value);
+                      setSelectedSubtypeId("");
+                    }}
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                  >
+                    {typeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                    <option value="">Create new type…</option>
+                  </select>
+                  <Button variant="secondary" onClick={addType}>
+                    Add Type
                   </Button>
                 </div>
-                {(type.subtypes || []).length === 0 ? (
-                  <div className="text-sm text-gray-500">No subtypes yet.</div>
-                ) : (
-                  <div className="space-y-4">
-                    {(type.subtypes || []).map((subtype, subtypeIndex) => (
-                      <div key={`${subtype.id}-${subtypeIndex}`} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
-                          <div className="flex-1 grid gap-3 md:grid-cols-2">
-                            <div>
-                              <label className="text-xs font-semibold text-gray-500">Subtype ID</label>
-                              <input
-                                value={subtype.id}
-                                onChange={(e) => updateSubtype(typeIndex, subtypeIndex, { id: e.target.value })}
-                                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                                placeholder="vinyl-sundays"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs font-semibold text-gray-500">Label</label>
-                              <input
-                                value={subtype.label}
-                                onChange={(e) => updateSubtype(typeIndex, subtypeIndex, { label: e.target.value })}
-                                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                                placeholder="Vinyl Sundays"
-                              />
-                            </div>
-                          </div>
-                          <Button variant="danger" size="sm" onClick={() => removeSubtype(typeIndex, subtypeIndex)}>
-                            Remove
-                          </Button>
-                        </div>
+              </div>
+              {selectedType && (
+                <Button variant="danger" size="sm" onClick={() => removeType(selectedTypeIndex)}>
+                  Remove Type
+                </Button>
+              )}
+            </div>
+          </div>
 
-                        <div className="grid gap-3 md:grid-cols-3">
-                          <div>
-                            <label className="text-xs font-semibold text-gray-500">Default time</label>
-                            <input
-                              value={subtype.defaults?.time || ""}
-                              onChange={(e) =>
-                                updateSubtypeDefaults(typeIndex, subtypeIndex, { time: e.target.value })
-                              }
-                              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                              placeholder="12:00 PM - 6:00 PM"
-                            />
-                          </div>
-                          <div className="flex items-center gap-2 mt-6 md:mt-0">
-                            <input
-                              type="checkbox"
-                              checked={subtype.defaults?.has_queue || false}
-                              onChange={(e) =>
-                                updateSubtypeDefaults(typeIndex, subtypeIndex, { has_queue: e.target.checked })
-                              }
-                              className="h-4 w-4"
-                            />
-                            <span className="text-sm text-gray-700">Enable queue</span>
-                          </div>
-                          <div className="flex items-center gap-2 mt-6 md:mt-0">
-                            <input
-                              type="checkbox"
-                              checked={subtype.defaults?.is_recurring || false}
-                              onChange={(e) =>
-                                updateSubtypeDefaults(typeIndex, subtypeIndex, { is_recurring: e.target.checked })
-                              }
-                              className="h-4 w-4"
-                            />
-                            <span className="text-sm text-gray-700">Recurring by default</span>
-                          </div>
-                          <div>
-                            <label className="text-xs font-semibold text-gray-500">Recurrence pattern</label>
-                            <select
-                              value={subtype.defaults?.recurrence_pattern || "weekly"}
-                              onChange={(e) =>
-                                updateSubtypeDefaults(typeIndex, subtypeIndex, { recurrence_pattern: e.target.value })
-                              }
-                              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                            >
-                              <option value="daily">Daily</option>
-                              <option value="weekly">Weekly</option>
-                              <option value="monthly">Monthly</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-xs font-semibold text-gray-500">Recurrence interval</label>
-                            <input
-                              type="number"
-                              min="1"
-                              value={subtype.defaults?.recurrence_interval ?? 1}
-                              onChange={(e) =>
-                                updateSubtypeDefaults(typeIndex, subtypeIndex, {
-                                  recurrence_interval: parseInt(e.target.value) || 1,
-                                })
-                              }
-                              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs font-semibold text-gray-500">Queue types</label>
-                            <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-700">
-                              {["side", "track", "album"].map((queueType) => {
-                                const current = subtype.defaults?.queue_types || [];
-                                const checked = current.includes(queueType);
-                                return (
-                                  <label key={queueType} className="flex items-center gap-2">
-                                    <input
-                                      type="checkbox"
-                                      checked={checked}
-                                      onChange={(e) => {
-                                        const next = e.target.checked
-                                          ? [...current, queueType]
-                                          : current.filter((item) => item !== queueType);
-                                        updateSubtypeDefaults(typeIndex, subtypeIndex, { queue_types: next });
-                                      }}
-                                      className="h-4 w-4"
-                                    />
-                                    {queueType}
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </div>
-
-                        {subtype.id && type.id && flattenedIds.has(`${type.id}:${subtype.id}`) && (
-                          <p className="text-xs text-gray-400 mt-3">
-                            Tag saved as: event_subtype:{subtype.id}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+          {selectedType && (
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="text-xs font-semibold text-gray-500">Type ID</label>
+                  <input
+                    value={selectedType.id}
+                    onChange={(e) => updateType(selectedTypeIndex, { id: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    placeholder="brewery"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500">Label</label>
+                  <input
+                    value={selectedType.label}
+                    onChange={(e) => updateType(selectedTypeIndex, { label: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    placeholder="Brewery Event"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs font-semibold text-gray-500">Description</label>
+                  <input
+                    value={selectedType.description || ""}
+                    onChange={(e) => updateType(selectedTypeIndex, { description: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    placeholder="Short helper text for admins."
+                  />
+                </div>
               </div>
             </div>
-          ))}
+          )}
+
+          {selectedType && (
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-800">Subtypes</h3>
+                  <p className="text-sm text-gray-500">Manage the subtypes for this event type.</p>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => addSubtype(selectedTypeIndex)}>
+                  Add Subtype
+                </Button>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <select
+                  value={selectedSubtypeId}
+                  onChange={(e) => setSelectedSubtypeId(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                >
+                  <option value="">Select a subtype…</option>
+                  {(selectedType.subtypes || []).map((subtype) => (
+                    <option key={subtype.id} value={subtype.id}>
+                      {subtype.label || subtype.id || "Untitled subtype"}
+                    </option>
+                  ))}
+                </select>
+                {selectedSubtype && (
+                  <Button variant="danger" size="sm" onClick={() => removeSubtype(selectedTypeIndex, selectedSubtypeIndex)}>
+                    Remove Subtype
+                  </Button>
+                )}
+              </div>
+
+              {selectedSubtype && (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-4">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500">Subtype ID</label>
+                      <input
+                        value={selectedSubtype.id}
+                        onChange={(e) => updateSubtype(selectedTypeIndex, selectedSubtypeIndex, { id: e.target.value })}
+                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                        placeholder="vinyl-sundays"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500">Label</label>
+                      <input
+                        value={selectedSubtype.label}
+                        onChange={(e) =>
+                          updateSubtype(selectedTypeIndex, selectedSubtypeIndex, { label: e.target.value })
+                        }
+                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                        placeholder="Vinyl Sundays"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500">Default time</label>
+                      <input
+                        value={selectedSubtype.defaults?.time || ""}
+                        onChange={(e) =>
+                          updateSubtypeDefaults(selectedTypeIndex, selectedSubtypeIndex, { time: e.target.value })
+                        }
+                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                        placeholder="12:00 PM - 6:00 PM"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500">Default location</label>
+                      <input
+                        value={selectedSubtype.defaults?.location || ""}
+                        onChange={(e) =>
+                          updateSubtypeDefaults(selectedTypeIndex, selectedSubtypeIndex, { location: e.target.value })
+                        }
+                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                        placeholder="Devil's Purse Brewing Company"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500">Default image URL</label>
+                      <input
+                        value={selectedSubtype.defaults?.image_url || ""}
+                        onChange={(e) =>
+                          updateSubtypeDefaults(selectedTypeIndex, selectedSubtypeIndex, { image_url: e.target.value })
+                        }
+                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                        placeholder="https://..."
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedSubtype.defaults?.has_queue || false}
+                        onChange={(e) =>
+                          updateSubtypeDefaults(selectedTypeIndex, selectedSubtypeIndex, { has_queue: e.target.checked })
+                        }
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm text-gray-700">Enable queue</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedSubtype.defaults?.is_recurring || false}
+                        onChange={(e) =>
+                          updateSubtypeDefaults(selectedTypeIndex, selectedSubtypeIndex, { is_recurring: e.target.checked })
+                        }
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm text-gray-700">Recurring by default</span>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500">Recurrence pattern</label>
+                      <select
+                        value={selectedSubtype.defaults?.recurrence_pattern || "weekly"}
+                        onChange={(e) =>
+                          updateSubtypeDefaults(selectedTypeIndex, selectedSubtypeIndex, { recurrence_pattern: e.target.value })
+                        }
+                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                      >
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500">Recurrence interval</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={selectedSubtype.defaults?.recurrence_interval ?? 1}
+                        onChange={(e) =>
+                          updateSubtypeDefaults(selectedTypeIndex, selectedSubtypeIndex, {
+                            recurrence_interval: parseInt(e.target.value) || 1,
+                          })
+                        }
+                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500">Queue types</label>
+                      <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-700">
+                        {["side", "track", "album"].map((queueType) => {
+                          const current = selectedSubtype.defaults?.queue_types || [];
+                          const checked = current.includes(queueType);
+                          return (
+                            <label key={queueType} className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => {
+                                  const next = e.target.checked
+                                    ? [...current, queueType]
+                                    : current.filter((item) => item !== queueType);
+                                  updateSubtypeDefaults(selectedTypeIndex, selectedSubtypeIndex, { queue_types: next });
+                                }}
+                                className="h-4 w-4"
+                              />
+                              {queueType}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedSubtype.id && selectedType.id && (
+                    <p className="text-xs text-gray-400">
+                      Tag saved as: event_subtype:{selectedSubtype.id}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {status && (
             <div className="text-sm text-gray-600">{status}</div>
