@@ -77,8 +77,8 @@ export default function MultiSourceEnrichment() {
   const [enriching, setEnriching] = useState(false);
   const [status, setStatus] = useState('');
   const [batchSize, setBatchSize] = useState('all');
-  const [folderFilter, setFolderFilter] = useState('');
-  const [folders, setFolders] = useState([]);
+  const [locationFilter, setLocationFilter] = useState('');
+  const [locations, setLocations] = useState([]);
   const [selectedServices, setSelectedServices] = useState({
     discogsTracklist: true,
     spotify: true,
@@ -119,17 +119,17 @@ export default function MultiSourceEnrichment() {
   }, [selectedServices, stats.needsAppleLyrics, stats.needsEnrichment, stats.unenriched, stats.spotifyOnly, stats.appleOnly]);
 
   useEffect(() => {
-    loadStatsAndFolders();
+    loadStatsAndLocations();
   }, []);
 
-  async function loadStatsAndFolders() {
+  async function loadStatsAndLocations() {
     try {
       const res = await fetch('/api/enrich-sources/stats');
       const data = await res.json();
       if (data.success) {
         setStats(data.stats);
-        if (data.folders) {
-          setFolders(data.folders);
+        if (data.locations) {
+          setLocations(data.locations);
         }
       }
     } catch (error) {
@@ -170,7 +170,7 @@ export default function MultiSourceEnrichment() {
     if (selectedServices.genius) serviceNames.push('Genius');
     if (selectedServices.appleLyrics) serviceNames.push('Apple Lyrics');
 
-    if (!confirm(`This will enrich up to ${albumsToEnrich} albums with: ${serviceNames.join(', ')}${folderFilter ? `\nFolder: "${folderFilter}"` : ' (all folders)'}\n\nThis may take a while and consume API quota. Continue?`)) {
+    if (!confirm(`This will enrich up to ${albumsToEnrich} albums with: ${serviceNames.join(', ')}${locationFilter ? `\nLocation: "${locationFilter}"` : ' (all locations)'}\n\nThis may take a while and consume API quota. Continue?`)) {
       return;
     }
 
@@ -188,12 +188,12 @@ export default function MultiSourceEnrichment() {
     console.log('========================================');
     console.log('Selected services:', selectedServices);
     console.log('Batch size:', batchSize, '(limit:', limit, ')');
-    console.log('Folder filter:', folderFilter || 'none');
+    console.log('Location filter:', locationFilter || 'none');
     console.log('Albums needing enrichment:', albumsToEnrich);
 
     try {
       while (true) {
-        setStatus(`Processing${folderFilter ? ` folder "${folderFilter}"` : ''} from ID ${cursor}...`);
+        setStatus(`Processing${locationFilter ? ` location "${locationFilter}"` : ''} from ID ${cursor}...`);
         
         console.log(`Starting batch from cursor ${cursor}, limit ${limit}`);
         
@@ -203,7 +203,7 @@ export default function MultiSourceEnrichment() {
           body: JSON.stringify({ 
             cursor, 
             limit,
-            folder: folderFilter || undefined,
+            location: locationFilter || undefined,
             services: selectedServices
           })
         });
@@ -279,7 +279,7 @@ export default function MultiSourceEnrichment() {
           console.log('ENRICHMENT COMPLETE');
           console.log('Total albums processed:', totalProcessed);
           console.log('========================================');
-          await loadStatsAndFolders();
+          await loadStatsAndLocations();
           break;
         }
 
@@ -522,11 +522,11 @@ export default function MultiSourceEnrichment() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <label style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>
-              Folder:
+              Location:
             </label>
             <select
-              value={folderFilter}
-              onChange={e => setFolderFilter(e.target.value)}
+              value={locationFilter}
+              onChange={e => setLocationFilter(e.target.value)}
               disabled={enriching}
               style={{
                 padding: '8px 12px',
@@ -539,9 +539,9 @@ export default function MultiSourceEnrichment() {
                 minWidth: 150
               }}
             >
-              <option value="" style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>All Folders</option>
-              {folders.map(folder => (
-                <option key={folder} value={folder} style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>{folder}</option>
+              <option value="" style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>All Locations</option>
+              {locations.map(location => (
+                <option key={location} value={location} style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>{location}</option>
               ))}
             </select>
           </div>
@@ -574,7 +574,7 @@ export default function MultiSourceEnrichment() {
           </div>
 
           <button
-            onClick={loadStatsAndFolders}
+            onClick={loadStatsAndLocations}
             disabled={enriching}
             style={{
               padding: '12px 24px',

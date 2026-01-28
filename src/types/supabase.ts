@@ -318,7 +318,7 @@ export interface Database {
           title: string;
           year: string | null;
           format: string | null;
-          folder: string | null;
+          location: string | null;
           media_condition: string | null;
           image_url: string | null;
           notes: string | null;
@@ -345,7 +345,7 @@ export interface Database {
           title: string;
           year?: string | null;
           format?: string | null;
-          folder?: string | null;
+          location?: string | null;
           media_condition?: string | null;
           image_url?: string | null;
           notes?: string | null;
@@ -372,7 +372,7 @@ export interface Database {
           title?: string;
           year?: string | null;
           format?: string | null;
-          folder?: string | null;
+          location?: string | null;
           media_condition?: string | null;
           image_url?: string | null;
           notes?: string | null;

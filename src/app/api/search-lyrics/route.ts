@@ -45,7 +45,7 @@ type TagQueryResult = {
 
 type Body = {
   term: string;
-  folder?: string;
+  location?: string;
   forceRefresh?: boolean;
 };
 
@@ -164,7 +164,7 @@ export async function POST(req: Request) {
     }
 
     const searchTerm = body.term.trim().toLowerCase();
-    console.log(`\n🔍 LYRICS SEARCH: "${searchTerm}"${body.folder ? ` in folder "${body.folder}"` : ''}`);
+    console.log(`\n🔍 LYRICS SEARCH: "${searchTerm}"${body.location ? ` in location "${body.location}"` : ''}`);
     
     // Check cache first
     if (!body.forceRefresh) {
@@ -212,11 +212,11 @@ export async function POST(req: Request) {
     console.log(`📀 Querying albums...`);
     let query = supabase
       .from('collection')
-      .select('id, artist, title, image_url, folder, tracklists')
+      .select('id, artist, title, image_url, location, tracklists')
       .not('tracklists', 'is', null);
 
-    if (body.folder) {
-      query = query.eq('folder', body.folder);
+    if (body.location) {
+      query = query.eq('location', body.location);
     }
 
     const { data: albums, error: albumError } = await query;

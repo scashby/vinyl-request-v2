@@ -22,7 +22,7 @@ interface StaffPick {
   title?: string;
   year?: string;
   image_url?: string;
-  folder?: string;
+  location?: string;
 }
 
 export default function StaffPicksPage() {
@@ -45,7 +45,7 @@ export default function StaffPicksPage() {
             title,
             year,
             image_url,
-            folder
+            location
           )
         `)
         .eq('is_active', true)
@@ -61,7 +61,7 @@ export default function StaffPicksPage() {
         title: pick.collection?.title,
         year: pick.collection?.year,
         image_url: pick.collection?.image_url,
-        folder: pick.collection?.folder
+        location: pick.collection?.location
       })) || [];
 
       setStaffPicks(picks);
@@ -231,7 +231,7 @@ export default function StaffPicksPage() {
                           
                           <div className="text-sm opacity-80 mb-3 flex gap-4 flex-wrap justify-center md:justify-start">
                             <span>🗓️ {pick.year}</span>
-                            <span>💿 {pick.folder}</span>
+                            <span>💿 {pick.location}</span>
                             {pick.favorite_track && (
                               <span>⭐ Favorite: &ldquo;{pick.favorite_track}&rdquo;</span>
                             )}
