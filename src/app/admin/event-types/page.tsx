@@ -25,6 +25,9 @@ const ALL_TEMPLATE_FIELDS = [
   "formats",
 ];
 
+const getEnabledFields = (defaults?: EventSubtypeConfig["defaults"]) =>
+  defaults?.enabled_fields ?? ALL_TEMPLATE_FIELDS;
+
 const createEmptySubtype = (): EventSubtypeConfig => ({
   id: "",
   label: "",
@@ -47,6 +50,19 @@ const createEmptyType = (): EventTypeConfig => ({
   id: "",
   label: "",
   description: "",
+  defaults: {
+    enabled_fields: [...ALL_TEMPLATE_FIELDS],
+    info: "",
+    info_url: "",
+    time: "",
+    location: "",
+    image_url: "",
+    has_queue: false,
+    queue_types: [],
+    is_recurring: false,
+    recurrence_pattern: "weekly",
+    recurrence_interval: 1,
+  },
   subtypes: [],
 });
 
@@ -129,6 +145,24 @@ export default function Page() {
     }));
   };
 
+  const updateTypeDefaults = (
+    index: number,
+    updates: Partial<EventSubtypeConfig["defaults"]>
+  ) => {
+    setConfig((prev) => ({
+      types: prev.types.map((type, idx) => {
+        if (idx !== index) return type;
+        return {
+          ...type,
+          defaults: {
+            ...(type.defaults ?? {}),
+            ...updates,
+          },
+        };
+      }),
+    }));
+  };
+
   const removeType = (index: number) => {
     setConfig((prev) => ({
       types: prev.types.filter((_, idx) => idx !== index),
@@ -147,6 +181,42 @@ export default function Page() {
       ),
     }));
     setSelectedSubtypeId(newSubtype.id);
+  };
+
+  const toggleTypeField = (typeIndex: number, field: string, enabled: boolean) => {
+    setConfig((prev) => ({
+      types: prev.types.map((type, idx) => {
+        if (idx !== typeIndex) return type;
+        const currentFields = type.defaults?.enabled_fields ?? ALL_TEMPLATE_FIELDS;
+        const nextFields = enabled
+          ? Array.from(new Set([...currentFields, field]))
+          : currentFields.filter((item) => item !== field);
+        const nextDefaults = {
+          ...(type.defaults ?? {}),
+          enabled_fields: nextFields,
+        };
+        if (!enabled) {
+          if (field === "time") nextDefaults.time = "";
+          if (field === "location") nextDefaults.location = "";
+          if (field === "image_url") nextDefaults.image_url = "";
+          if (field === "info") nextDefaults.info = "";
+          if (field === "info_url") nextDefaults.info_url = "";
+          if (field === "queue") {
+            nextDefaults.has_queue = false;
+            nextDefaults.queue_types = [];
+          }
+          if (field === "recurrence") {
+            nextDefaults.is_recurring = false;
+            nextDefaults.recurrence_pattern = "weekly";
+            nextDefaults.recurrence_interval = 1;
+          }
+        }
+        return {
+          ...type,
+          defaults: nextDefaults,
+        };
+      }),
+    }));
   };
 
   const updateSubtype = (
@@ -197,12 +267,14 @@ export default function Page() {
     setConfig((prev) => ({
       types: prev.types.map((type, idx) => {
         if (idx !== typeIndex) return type;
+        const typeEnabledFields = getEnabledFields(type.defaults);
         const subtypes = (type.subtypes || []).map((subtype, sIdx) => {
           if (sIdx !== subtypeIndex) return subtype;
-          const currentFields =
-            subtype.defaults?.enabled_fields?.length ? subtype.defaults.enabled_fields : ALL_TEMPLATE_FIELDS;
+          const currentFields = subtype.defaults?.enabled_fields ?? [];
           const nextFields = enabled
-            ? Array.from(new Set([...currentFields, field]))
+            ? Array.from(new Set([...currentFields, field])).filter(
+                (item) => !typeEnabledFields.includes(item)
+              )
             : currentFields.filter((item) => item !== field);
           const nextDefaults = {
             ...subtype.defaults,
@@ -267,6 +339,12 @@ export default function Page() {
     selectedType && selectedSubtypeIndex >= 0
       ? selectedType.subtypes?.[selectedSubtypeIndex] || null
       : null;
+
+  const typeEnabledFields = selectedType ? getEnabledFields(selectedType.defaults) : ALL_TEMPLATE_FIELDS;
+  const remainingSubtypeFields = ALL_TEMPLATE_FIELDS.filter(
+    (field) => !typeEnabledFields.includes(field)
+  );
+  const subtypeEnabledFields = selectedSubtype?.defaults?.enabled_fields ?? [];
 
   const typeOptions = config.types.map((type) => ({
     value: type.id,
@@ -347,21 +425,195 @@ export default function Page() {
                       placeholder="Brewery Event"
                     />
                   </div>
-                  <div className="md:col-span-2">
-                    <label className="text-xs font-semibold text-gray-500">Description</label>
+              <div className="md:col-span-2">
+                <label className="text-xs font-semibold text-gray-500">Description</label>
+                <input
+                  value={selectedType.description || ""}
+                  onChange={(e) => updateType(selectedTypeIndex, { description: e.target.value })}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  placeholder="Short helper text for admins."
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+            <h3 className="text-base font-semibold text-gray-800">Type template fields</h3>
+            <p className="text-xs text-gray-500">
+              Choose which fields appear for this event type, and set the default values for the template.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 text-sm text-gray-700">
+              {[
+                { id: "date", label: "Date" },
+                { id: "time", label: "Time" },
+                { id: "location", label: "Location" },
+                { id: "image_url", label: "Image" },
+                { id: "info", label: "Description" },
+                { id: "info_url", label: "Link" },
+                { id: "queue", label: "Queue" },
+                { id: "recurrence", label: "Recurrence" },
+                { id: "crate", label: "Crate restriction" },
+                { id: "formats", label: "Allowed formats" },
+              ].map((field) => {
+                const enabled = typeEnabledFields.includes(field.id);
+                return (
+                  <label key={field.id} className="flex items-center gap-2">
                     <input
-                      value={selectedType.description || ""}
-                      onChange={(e) => updateType(selectedTypeIndex, { description: e.target.value })}
-                      className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                      placeholder="Short helper text for admins."
+                      type="checkbox"
+                      checked={enabled}
+                      onChange={(e) =>
+                        toggleTypeField(selectedTypeIndex, field.id, e.target.checked)
+                      }
+                      className="h-4 w-4"
                     />
-                  </div>
+                    {field.label}
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Default description</label>
+                <textarea
+                  value={selectedType.defaults?.info || ""}
+                  onChange={(e) => updateTypeDefaults(selectedTypeIndex, { info: e.target.value })}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  placeholder="Short description shown on events."
+                  rows={3}
+                  disabled={!typeEnabledFields.includes("info")}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Default link</label>
+                <input
+                  value={selectedType.defaults?.info_url || ""}
+                  onChange={(e) => updateTypeDefaults(selectedTypeIndex, { info_url: e.target.value })}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  placeholder="https://..."
+                  disabled={!typeEnabledFields.includes("info_url")}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Default time</label>
+                <input
+                  value={selectedType.defaults?.time || ""}
+                  onChange={(e) => updateTypeDefaults(selectedTypeIndex, { time: e.target.value })}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  placeholder="12:00 PM - 6:00 PM"
+                  disabled={!typeEnabledFields.includes("time")}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Default location</label>
+                <input
+                  value={selectedType.defaults?.location || ""}
+                  onChange={(e) =>
+                    updateTypeDefaults(selectedTypeIndex, { location: e.target.value })
+                  }
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  placeholder="Devil's Purse Brewing Company"
+                  disabled={!typeEnabledFields.includes("location")}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Default image URL</label>
+                <input
+                  value={selectedType.defaults?.image_url || ""}
+                  onChange={(e) =>
+                    updateTypeDefaults(selectedTypeIndex, { image_url: e.target.value })
+                  }
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  placeholder="https://..."
+                  disabled={!typeEnabledFields.includes("image_url")}
+                />
+              </div>
+              <div className="flex items-center gap-2 mt-4">
+                <input
+                  type="checkbox"
+                  checked={selectedType.defaults?.has_queue || false}
+                  onChange={(e) =>
+                    updateTypeDefaults(selectedTypeIndex, { has_queue: e.target.checked })
+                  }
+                  className="h-4 w-4"
+                  disabled={!typeEnabledFields.includes("queue")}
+                />
+                <span className="text-sm text-gray-700">Enable queue</span>
+              </div>
+              <div className="flex items-center gap-2 mt-4">
+                <input
+                  type="checkbox"
+                  checked={selectedType.defaults?.is_recurring || false}
+                  onChange={(e) =>
+                    updateTypeDefaults(selectedTypeIndex, { is_recurring: e.target.checked })
+                  }
+                  className="h-4 w-4"
+                  disabled={!typeEnabledFields.includes("recurrence")}
+                />
+                <span className="text-sm text-gray-700">Recurring by default</span>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Recurrence pattern</label>
+                <select
+                  value={selectedType.defaults?.recurrence_pattern || "weekly"}
+                  onChange={(e) =>
+                    updateTypeDefaults(selectedTypeIndex, { recurrence_pattern: e.target.value })
+                  }
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  disabled={!typeEnabledFields.includes("recurrence")}
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Recurrence interval</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={selectedType.defaults?.recurrence_interval ?? 1}
+                  onChange={(e) =>
+                    updateTypeDefaults(selectedTypeIndex, {
+                      recurrence_interval: parseInt(e.target.value) || 1,
+                    })
+                  }
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  disabled={!typeEnabledFields.includes("recurrence")}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Queue types</label>
+                <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-700">
+                  {["side", "track", "album"].map((queueType) => {
+                    const current = selectedType.defaults?.queue_types || [];
+                    const checked = current.includes(queueType);
+                    return (
+                      <label key={queueType} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            const next = e.target.checked
+                              ? [...current, queueType]
+                              : current.filter((item) => item !== queueType);
+                            updateTypeDefaults(selectedTypeIndex, { queue_types: next });
+                          }}
+                          className="h-4 w-4"
+                          disabled={!typeEnabledFields.includes("queue")}
+                        />
+                        {queueType}
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
+            </div>
+          </div>
 
-              <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
-                <label className="text-xs font-semibold text-gray-500">Select Subtype</label>
-                <select
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+            <label className="text-xs font-semibold text-gray-500">Select Subtype</label>
+            <select
                   value={selectedSubtypeId}
                   onChange={(e) => {
                     if (e.target.value === "__create__") {
@@ -414,47 +666,54 @@ export default function Page() {
                     </div>
 
                     <div className="rounded-lg border border-gray-200 bg-white p-4">
-                      <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Template fields</h5>
+                      <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        Subtype template fields
+                      </h5>
                       <p className="text-xs text-gray-500 mt-1">
-                        Choose which fields appear when creating events for this subtype.
+                        Add the remaining fields you want to show and pre-fill for this subtype.
                       </p>
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2 text-sm text-gray-700">
-                        {[
-                          { id: "date", label: "Date" },
-                          { id: "time", label: "Time" },
-                          { id: "location", label: "Location" },
-                          { id: "image_url", label: "Image" },
-                          { id: "info", label: "Description" },
-                          { id: "info_url", label: "Link" },
-                          { id: "queue", label: "Queue" },
-                          { id: "recurrence", label: "Recurrence" },
-                          { id: "crate", label: "Crate restriction" },
-                          { id: "formats", label: "Allowed formats" },
-                        ].map((field) => {
-                          const enabled = (selectedSubtype.defaults?.enabled_fields?.length
-                            ? selectedSubtype.defaults.enabled_fields
-                            : ALL_TEMPLATE_FIELDS
-                          ).includes(field.id);
-                          return (
-                            <label key={field.id} className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={enabled}
-                                onChange={(e) =>
-                                  toggleSubtypeField(
-                                    selectedTypeIndex,
-                                    selectedSubtypeIndex,
-                                    field.id,
-                                    e.target.checked
-                                  )
-                                }
-                                className="h-4 w-4"
-                              />
-                              {field.label}
-                            </label>
-                          );
-                        })}
-                      </div>
+                      {remainingSubtypeFields.length === 0 ? (
+                        <p className="mt-3 text-sm text-gray-500">
+                          All template fields are already enabled at the type level.
+                        </p>
+                      ) : (
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2 text-sm text-gray-700">
+                          {[
+                            { id: "date", label: "Date" },
+                            { id: "time", label: "Time" },
+                            { id: "location", label: "Location" },
+                            { id: "image_url", label: "Image" },
+                            { id: "info", label: "Description" },
+                            { id: "info_url", label: "Link" },
+                            { id: "queue", label: "Queue" },
+                            { id: "recurrence", label: "Recurrence" },
+                            { id: "crate", label: "Crate restriction" },
+                            { id: "formats", label: "Allowed formats" },
+                          ]
+                            .filter((field) => remainingSubtypeFields.includes(field.id))
+                            .map((field) => {
+                              const enabled = subtypeEnabledFields.includes(field.id);
+                              return (
+                                <label key={field.id} className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={enabled}
+                                    onChange={(e) =>
+                                      toggleSubtypeField(
+                                        selectedTypeIndex,
+                                        selectedSubtypeIndex,
+                                        field.id,
+                                        e.target.checked
+                                      )
+                                    }
+                                    className="h-4 w-4"
+                                  />
+                                  {field.label}
+                                </label>
+                              );
+                            })}
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
@@ -468,10 +727,7 @@ export default function Page() {
                           className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                           placeholder="Short description shown on events."
                           rows={3}
-                          disabled={!((selectedSubtype.defaults?.enabled_fields?.length
-                            ? selectedSubtype.defaults.enabled_fields
-                            : ALL_TEMPLATE_FIELDS
-                          ).includes("info"))}
+                          disabled={!subtypeEnabledFields.includes("info")}
                         />
                       </div>
                       <div>
@@ -483,10 +739,7 @@ export default function Page() {
                           }
                           className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                           placeholder="https://..."
-                          disabled={!((selectedSubtype.defaults?.enabled_fields?.length
-                            ? selectedSubtype.defaults.enabled_fields
-                            : ALL_TEMPLATE_FIELDS
-                          ).includes("info_url"))}
+                          disabled={!subtypeEnabledFields.includes("info_url")}
                         />
                       </div>
                       <div>
@@ -498,10 +751,7 @@ export default function Page() {
                           }
                           className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                           placeholder="12:00 PM - 6:00 PM"
-                          disabled={!((selectedSubtype.defaults?.enabled_fields?.length
-                            ? selectedSubtype.defaults.enabled_fields
-                            : ALL_TEMPLATE_FIELDS
-                          ).includes("time"))}
+                          disabled={!subtypeEnabledFields.includes("time")}
                         />
                       </div>
                       <div>
@@ -513,10 +763,7 @@ export default function Page() {
                           }
                           className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                           placeholder="Devil's Purse Brewing Company"
-                          disabled={!((selectedSubtype.defaults?.enabled_fields?.length
-                            ? selectedSubtype.defaults.enabled_fields
-                            : ALL_TEMPLATE_FIELDS
-                          ).includes("location"))}
+                          disabled={!subtypeEnabledFields.includes("location")}
                         />
                       </div>
                       <div>
@@ -528,10 +775,7 @@ export default function Page() {
                           }
                           className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                           placeholder="https://..."
-                          disabled={!((selectedSubtype.defaults?.enabled_fields?.length
-                            ? selectedSubtype.defaults.enabled_fields
-                            : ALL_TEMPLATE_FIELDS
-                          ).includes("image_url"))}
+                          disabled={!subtypeEnabledFields.includes("image_url")}
                         />
                       </div>
                       <div className="flex items-center gap-2 mt-4">
@@ -542,10 +786,7 @@ export default function Page() {
                             updateSubtypeDefaults(selectedTypeIndex, selectedSubtypeIndex, { has_queue: e.target.checked })
                           }
                           className="h-4 w-4"
-                          disabled={!((selectedSubtype.defaults?.enabled_fields?.length
-                            ? selectedSubtype.defaults.enabled_fields
-                            : ALL_TEMPLATE_FIELDS
-                          ).includes("queue"))}
+                          disabled={!subtypeEnabledFields.includes("queue")}
                         />
                         <span className="text-sm text-gray-700">Enable queue</span>
                       </div>
@@ -557,10 +798,7 @@ export default function Page() {
                             updateSubtypeDefaults(selectedTypeIndex, selectedSubtypeIndex, { is_recurring: e.target.checked })
                           }
                           className="h-4 w-4"
-                          disabled={!((selectedSubtype.defaults?.enabled_fields?.length
-                            ? selectedSubtype.defaults.enabled_fields
-                            : ALL_TEMPLATE_FIELDS
-                          ).includes("recurrence"))}
+                          disabled={!subtypeEnabledFields.includes("recurrence")}
                         />
                         <span className="text-sm text-gray-700">Recurring by default</span>
                       </div>
@@ -572,10 +810,7 @@ export default function Page() {
                             updateSubtypeDefaults(selectedTypeIndex, selectedSubtypeIndex, { recurrence_pattern: e.target.value })
                           }
                           className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                          disabled={!((selectedSubtype.defaults?.enabled_fields?.length
-                            ? selectedSubtype.defaults.enabled_fields
-                            : ALL_TEMPLATE_FIELDS
-                          ).includes("recurrence"))}
+                          disabled={!subtypeEnabledFields.includes("recurrence")}
                         >
                           <option value="daily">Daily</option>
                           <option value="weekly">Weekly</option>
@@ -594,10 +829,7 @@ export default function Page() {
                             })
                           }
                           className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                          disabled={!((selectedSubtype.defaults?.enabled_fields?.length
-                            ? selectedSubtype.defaults.enabled_fields
-                            : ALL_TEMPLATE_FIELDS
-                          ).includes("recurrence"))}
+                          disabled={!subtypeEnabledFields.includes("recurrence")}
                         />
                       </div>
                       <div>
@@ -618,10 +850,7 @@ export default function Page() {
                                     updateSubtypeDefaults(selectedTypeIndex, selectedSubtypeIndex, { queue_types: next });
                                   }}
                                   className="h-4 w-4"
-                                  disabled={!((selectedSubtype.defaults?.enabled_fields?.length
-                                    ? selectedSubtype.defaults.enabled_fields
-                                    : ALL_TEMPLATE_FIELDS
-                                  ).includes("queue"))}
+                                  disabled={!subtypeEnabledFields.includes("queue")}
                                 />
                                 {queueType}
                               </label>

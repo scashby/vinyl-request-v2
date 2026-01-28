@@ -22,6 +22,7 @@ export type EventTypeConfig = {
   id: string;
   label: string;
   description?: string;
+  defaults?: EventSubtypeDefaults;
   subtypes?: EventSubtypeConfig[];
 };
 

@@ -155,13 +155,19 @@ export default function EditEventForm() {
     featured_priority: null,
   });
 
+  const templateFields = ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'queue', 'recurrence', 'crate', 'formats'];
+
+  const selectedTypeDefaults = eventTypeConfig.types
+    .find((option) => option.id === eventData.event_type)
+    ?.defaults;
+
   const selectedSubtypeDefaults = eventTypeConfig.types
     .find((option) => option.id === eventData.event_type)
     ?.subtypes?.find((item) => item.id === eventData.event_subtype)?.defaults;
 
-  const enabledFields = selectedSubtypeDefaults?.enabled_fields?.length
-    ? selectedSubtypeDefaults.enabled_fields
-    : ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'queue', 'recurrence', 'crate', 'formats'];
+  const typeEnabledFields = selectedTypeDefaults?.enabled_fields ?? templateFields;
+  const subtypeEnabledFields = selectedSubtypeDefaults?.enabled_fields ?? [];
+  const enabledFields = Array.from(new Set([...typeEnabledFields, ...subtypeEnabledFields]));
 
   const isFieldEnabled = (field: string) => enabledFields.includes(field);
   const showDate = isFieldEnabled('date');
@@ -325,11 +331,9 @@ export default function EditEventForm() {
     });
   };
 
-  const applySubtypeDefaults = (defaults?: EventSubtypeDefaults) => {
+  const applyDefaults = (defaults?: EventSubtypeDefaults, enabledList?: string[]) => {
     if (!defaults) return;
-    const enabledFields = defaults.enabled_fields?.length
-      ? defaults.enabled_fields
-      : ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'queue', 'recurrence', 'crate', 'formats'];
+    const enabledFields = enabledList ?? defaults.enabled_fields ?? templateFields;
     setEventData((prev) => ({
       ...prev,
       ...(enabledFields.includes('info') && defaults.info ? { info: defaults.info } : {}),
@@ -597,21 +601,27 @@ export default function EditEventForm() {
                 </select>
               </div>
             )}
-            {eventData.event_type && eventData.event_subtype && (
+            {eventData.event_type && (
               <div>
                 <label className="text-sm font-medium text-gray-700">Defaults</label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const subtype = eventTypeConfig.types
-                      .find((option) => option.id === eventData.event_type)
-                      ?.subtypes?.find((item) => item.id === eventData.event_subtype);
-                    applySubtypeDefaults(subtype?.defaults);
-                  }}
-                  className="mt-2 inline-flex items-center gap-2 rounded-full bg-purple-100 px-4 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-200 transition-colors"
-                >
-                  Apply subtype defaults
-                </button>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => applyDefaults(selectedTypeDefaults, typeEnabledFields)}
+                    className="inline-flex items-center gap-2 rounded-full bg-purple-100 px-4 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-200 transition-colors"
+                  >
+                    Apply type defaults
+                  </button>
+                  {eventData.event_subtype && (
+                    <button
+                      type="button"
+                      onClick={() => applyDefaults(selectedSubtypeDefaults, subtypeEnabledFields)}
+                      className="inline-flex items-center gap-2 rounded-full bg-purple-100 px-4 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-200 transition-colors"
+                    >
+                      Apply subtype defaults
+                    </button>
+                  )}
+                </div>
               </div>
             )}
             {eventData.event_type === 'private-dj' && (
