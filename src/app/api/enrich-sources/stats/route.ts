@@ -61,6 +61,7 @@ export async function GET() {
     
     // Artwork
     let missingArtwork = 0;
+    let missingFrontCover = 0;
     let missingBackCover = 0;
     let missingInnerSleeve = 0;
     
@@ -136,6 +137,7 @@ export async function GET() {
 
       if (!hasFront || !hasBack) {
         missingArtwork++; 
+        if (!hasFront) missingFrontCover++;
         if (!hasBack) missingBackCover++;
       }
       if (!hasInner) missingInnerSleeve++;
@@ -238,6 +240,7 @@ export async function GET() {
       needsEnrichment,
       
       missingArtwork,
+      missingFrontCover,
       missingBackCover,
       missingInnerSleeve,
       
