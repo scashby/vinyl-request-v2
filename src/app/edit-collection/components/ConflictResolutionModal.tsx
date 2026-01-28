@@ -24,6 +24,12 @@ export default function ConflictResolutionModal({
   onComplete,
   onCancel,
 }: ConflictResolutionModalProps) {
+  const isMissingResolutionTable = (err?: { message?: string; code?: string } | null) => {
+    if (!err) return false;
+    if (err.code === '42P01') return true;
+    return err.message?.includes('import_conflict_resolutions') ?? false;
+  };
+
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(
     Object.keys(conflicts.reduce((acc, conflict) => {
       const key = `${conflict.artist} - ${conflict.title}`;
@@ -108,8 +114,10 @@ export default function ConflictResolutionModal({
           resolution: strategyResolution,
           source: source,
         });
-      
-      if (resolutionError) throw resolutionError;
+
+      if (resolutionError && !isMissingResolutionTable(resolutionError)) {
+        throw resolutionError;
+      }
       
       setAppliedConflicts(prev => new Set([...prev, conflictId]));
     } catch (error) {
