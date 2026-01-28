@@ -57,6 +57,7 @@ type ExistingAlbum = Record<string, unknown> & {
 interface ComparedCLZAlbum extends ParsedCLZAlbum {
   status: AlbumStatus;
   existingId?: number;
+  manualLink?: boolean;
 }
 
 interface ImportCLZModalProps {
@@ -230,6 +231,7 @@ function compareCLZAlbums(
         ...clzAlbum,
         status: 'MATCHED',
         existingId: existingAlbum.id,
+        manualLink: false,
       });
     } else {
       // NO MATCH
@@ -250,6 +252,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
   const [comparedAlbums, setComparedAlbums] = useState<ComparedCLZAlbum[]>([]);
   const [existingAlbums, setExistingAlbums] = useState<ExistingAlbum[]>([]);
   const [linkQueries, setLinkQueries] = useState<Record<number, string>>({});
+  const [resolutionTableMissing, setResolutionTableMissing] = useState(false);
   
   const [progress, setProgress] = useState({ current: 0, total: 0, status: '' });
   const [error, setError] = useState<string | null>(null);
@@ -313,9 +316,14 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
     setError(null);
 
     try {
-      // Process ALL MATCHED albums
-      const matchedAlbums = comparedAlbums.filter(a => a.status === 'MATCHED');
-      const albumsToProcess = matchedAlbums; // Process all matched albums
+      // Process ALL MATCHED albums (auto matches first, manual links after)
+      const autoMatchedAlbums = comparedAlbums.filter(
+        album => album.status === 'MATCHED' && !album.manualLink
+      );
+      const linkedAlbums = comparedAlbums.filter(
+        album => album.status === 'MATCHED' && album.manualLink
+      );
+      const albumsToProcess = [...autoMatchedAlbums, ...linkedAlbums];
 
       setProgress({ current: 0, total: albumsToProcess.length, status: 'Processing...' });
 
@@ -345,15 +353,23 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
           if (!existingAlbum) continue;
 
           // Load previous conflict resolutions
-          const { data: resolutions, error: resolutionsError } = await supabase
-            .from('import_conflict_resolutions')
-            .select('*')
-            .eq('album_id', album.existingId!)
-            .eq('source', 'clz');
-          if (resolutionsError && !isMissingResolutionTable(resolutionsError)) {
-            throw resolutionsError;
+          let safeResolutions: PreviousResolution[] = [];
+          if (!resolutionTableMissing) {
+            const { data: resolutions, error: resolutionsError } = await supabase
+              .from('import_conflict_resolutions')
+              .select('*')
+              .eq('album_id', album.existingId!)
+              .eq('source', 'clz');
+            if (resolutionsError) {
+              if (isMissingResolutionTable(resolutionsError)) {
+                setResolutionTableMissing(true);
+              } else {
+                throw resolutionsError;
+              }
+            } else {
+              safeResolutions = (resolutions || []) as PreviousResolution[];
+            }
           }
-          const safeResolutions = isMissingResolutionTable(resolutionsError) ? [] : resolutions;
 
           // Build CLZ data object
           const clzData: Record<string, unknown> = {
@@ -386,7 +402,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
             existingAlbum,
             clzData,
             'clz',
-            (safeResolutions || []) as PreviousResolution[]
+            safeResolutions
           );
 
           // Combine identifying updates and safe updates
@@ -454,6 +470,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
     setComparedAlbums([]);
     setExistingAlbums([]);
     setLinkQueries({});
+    setResolutionTableMissing(false);
     setProgress({ current: 0, total: 0, status: '' });
     setError(null);
     setAllConflicts([]);
@@ -489,6 +506,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
               ...album,
               status: 'MATCHED',
               existingId: selectedId,
+              manualLink: true,
             }
           : album
       )

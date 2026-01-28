@@ -40,6 +40,7 @@ export default function ConflictResolutionModal({
   const [resolutions, setResolutions] = useState<Map<string, 'current' | 'new' | 'merge'>>(new Map());
   const [appliedConflicts, setAppliedConflicts] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
+  const [resolutionTableMissing, setResolutionTableMissing] = useState(false);
 
   const getConflictId = (conflict: FieldConflict): string => {
     return `${conflict.album_id}-${conflict.field_name}`;
@@ -104,19 +105,25 @@ export default function ConflictResolutionModal({
       
       const rejectedValue = getRejectedValue(conflict.current_value, conflict.new_value, strategyResolution);
       
-      const { error: resolutionError } = await supabase
-        .from('import_conflict_resolutions')
-        .insert({
-          album_id: conflict.album_id,
-          field_name: conflict.field_name,
-          kept_value: finalValue,
-          rejected_value: rejectedValue,
-          resolution: strategyResolution,
-          source: source,
-        });
+      if (!resolutionTableMissing) {
+        const { error: resolutionError } = await supabase
+          .from('import_conflict_resolutions')
+          .insert({
+            album_id: conflict.album_id,
+            field_name: conflict.field_name,
+            kept_value: finalValue,
+            rejected_value: rejectedValue,
+            resolution: strategyResolution,
+            source: source,
+          });
 
-      if (resolutionError && !isMissingResolutionTable(resolutionError)) {
-        throw resolutionError;
+        if (resolutionError) {
+          if (isMissingResolutionTable(resolutionError)) {
+            setResolutionTableMissing(true);
+          } else {
+            throw resolutionError;
+          }
+        }
       }
       
       setAppliedConflicts(prev => new Set([...prev, conflictId]));
