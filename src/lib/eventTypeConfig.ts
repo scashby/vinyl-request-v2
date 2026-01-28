@@ -1,5 +1,7 @@
 export type EventSubtypeDefaults = {
   enabled_fields?: string[];
+  info?: string;
+  info_url?: string;
   time?: string;
   location?: string;
   image_url?: string;

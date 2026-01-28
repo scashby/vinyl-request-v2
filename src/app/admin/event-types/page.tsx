@@ -12,12 +12,26 @@ import {
 } from "src/lib/eventTypeConfig";
 
 const SETTINGS_KEY = "event_type_config";
+const ALL_TEMPLATE_FIELDS = [
+  "date",
+  "time",
+  "location",
+  "image_url",
+  "info",
+  "info_url",
+  "queue",
+  "recurrence",
+  "crate",
+  "formats",
+];
 
 const createEmptySubtype = (): EventSubtypeConfig => ({
   id: "",
   label: "",
   defaults: {
     enabled_fields: [],
+    info: "",
+    info_url: "",
     time: "",
     location: "",
     image_url: "",
@@ -46,7 +60,7 @@ export default function Page() {
   const [selectedSubtypeId, setSelectedSubtypeId] = useState<string>("");
 
   useEffect(() => {
-    const loadConfig = async () => {
+    void (async () => {
       setLoading(true);
       try {
         const { data, error } = await supabase
@@ -56,7 +70,8 @@ export default function Page() {
           .single();
 
         if (error) {
-          if (error.code !== "PGRST116") {
+          const errorStatus = "status" in error ? error.status : null;
+          if (error.code !== "PGRST116" && errorStatus !== 404) {
             throw error;
           }
           setConfig(defaultEventTypeConfig);
@@ -73,16 +88,8 @@ export default function Page() {
       } finally {
         setLoading(false);
       }
-    };
-
-    loadConfig();
+    })();
   }, []);
-
-  useEffect(() => {
-    if (!selectedTypeId && config.types.length > 0) {
-      setSelectedTypeId(config.types[0]?.id || "");
-    }
-  }, [config.types, selectedTypeId]);
 
   const saveConfig = async () => {
     setSaving(true);
@@ -192,7 +199,8 @@ export default function Page() {
         if (idx !== typeIndex) return type;
         const subtypes = (type.subtypes || []).map((subtype, sIdx) => {
           if (sIdx !== subtypeIndex) return subtype;
-          const currentFields = subtype.defaults?.enabled_fields || [];
+          const currentFields =
+            subtype.defaults?.enabled_fields?.length ? subtype.defaults.enabled_fields : ALL_TEMPLATE_FIELDS;
           const nextFields = enabled
             ? Array.from(new Set([...currentFields, field]))
             : currentFields.filter((item) => item !== field);
@@ -204,6 +212,8 @@ export default function Page() {
             if (field === "time") nextDefaults.time = "";
             if (field === "location") nextDefaults.location = "";
             if (field === "image_url") nextDefaults.image_url = "";
+            if (field === "info") nextDefaults.info = "";
+            if (field === "info_url") nextDefaults.info_url = "";
             if (field === "queue") {
               nextDefaults.has_queue = false;
               nextDefaults.queue_types = [];
@@ -404,16 +414,27 @@ export default function Page() {
                     </div>
 
                     <div className="rounded-lg border border-gray-200 bg-white p-4">
-                      <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Defaults included</h5>
+                      <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Template fields</h5>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Choose which fields appear when creating events for this subtype.
+                      </p>
                       <div className="mt-3 grid gap-3 sm:grid-cols-2 text-sm text-gray-700">
                         {[
+                          { id: "date", label: "Date" },
                           { id: "time", label: "Time" },
                           { id: "location", label: "Location" },
                           { id: "image_url", label: "Image" },
+                          { id: "info", label: "Description" },
+                          { id: "info_url", label: "Link" },
                           { id: "queue", label: "Queue" },
                           { id: "recurrence", label: "Recurrence" },
+                          { id: "crate", label: "Crate restriction" },
+                          { id: "formats", label: "Allowed formats" },
                         ].map((field) => {
-                          const enabled = selectedSubtype.defaults?.enabled_fields?.includes(field.id) || false;
+                          const enabled = (selectedSubtype.defaults?.enabled_fields?.length
+                            ? selectedSubtype.defaults.enabled_fields
+                            : ALL_TEMPLATE_FIELDS
+                          ).includes(field.id);
                           return (
                             <label key={field.id} className="flex items-center gap-2">
                               <input
@@ -438,6 +459,37 @@ export default function Page() {
 
                     <div className="grid gap-4 md:grid-cols-2">
                       <div>
+                        <label className="text-xs font-semibold text-gray-500">Default description</label>
+                        <textarea
+                          value={selectedSubtype.defaults?.info || ""}
+                          onChange={(e) =>
+                            updateSubtypeDefaults(selectedTypeIndex, selectedSubtypeIndex, { info: e.target.value })
+                          }
+                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                          placeholder="Short description shown on events."
+                          rows={3}
+                          disabled={!((selectedSubtype.defaults?.enabled_fields?.length
+                            ? selectedSubtype.defaults.enabled_fields
+                            : ALL_TEMPLATE_FIELDS
+                          ).includes("info"))}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500">Default link</label>
+                        <input
+                          value={selectedSubtype.defaults?.info_url || ""}
+                          onChange={(e) =>
+                            updateSubtypeDefaults(selectedTypeIndex, selectedSubtypeIndex, { info_url: e.target.value })
+                          }
+                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                          placeholder="https://..."
+                          disabled={!((selectedSubtype.defaults?.enabled_fields?.length
+                            ? selectedSubtype.defaults.enabled_fields
+                            : ALL_TEMPLATE_FIELDS
+                          ).includes("info_url"))}
+                        />
+                      </div>
+                      <div>
                         <label className="text-xs font-semibold text-gray-500">Default time</label>
                         <input
                           value={selectedSubtype.defaults?.time || ""}
@@ -446,7 +498,10 @@ export default function Page() {
                           }
                           className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                           placeholder="12:00 PM - 6:00 PM"
-                          disabled={!selectedSubtype.defaults?.enabled_fields?.includes("time")}
+                          disabled={!((selectedSubtype.defaults?.enabled_fields?.length
+                            ? selectedSubtype.defaults.enabled_fields
+                            : ALL_TEMPLATE_FIELDS
+                          ).includes("time"))}
                         />
                       </div>
                       <div>
@@ -458,7 +513,10 @@ export default function Page() {
                           }
                           className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                           placeholder="Devil's Purse Brewing Company"
-                          disabled={!selectedSubtype.defaults?.enabled_fields?.includes("location")}
+                          disabled={!((selectedSubtype.defaults?.enabled_fields?.length
+                            ? selectedSubtype.defaults.enabled_fields
+                            : ALL_TEMPLATE_FIELDS
+                          ).includes("location"))}
                         />
                       </div>
                       <div>
@@ -470,7 +528,10 @@ export default function Page() {
                           }
                           className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                           placeholder="https://..."
-                          disabled={!selectedSubtype.defaults?.enabled_fields?.includes("image_url")}
+                          disabled={!((selectedSubtype.defaults?.enabled_fields?.length
+                            ? selectedSubtype.defaults.enabled_fields
+                            : ALL_TEMPLATE_FIELDS
+                          ).includes("image_url"))}
                         />
                       </div>
                       <div className="flex items-center gap-2 mt-4">
@@ -481,7 +542,10 @@ export default function Page() {
                             updateSubtypeDefaults(selectedTypeIndex, selectedSubtypeIndex, { has_queue: e.target.checked })
                           }
                           className="h-4 w-4"
-                          disabled={!selectedSubtype.defaults?.enabled_fields?.includes("queue")}
+                          disabled={!((selectedSubtype.defaults?.enabled_fields?.length
+                            ? selectedSubtype.defaults.enabled_fields
+                            : ALL_TEMPLATE_FIELDS
+                          ).includes("queue"))}
                         />
                         <span className="text-sm text-gray-700">Enable queue</span>
                       </div>
@@ -493,7 +557,10 @@ export default function Page() {
                             updateSubtypeDefaults(selectedTypeIndex, selectedSubtypeIndex, { is_recurring: e.target.checked })
                           }
                           className="h-4 w-4"
-                          disabled={!selectedSubtype.defaults?.enabled_fields?.includes("recurrence")}
+                          disabled={!((selectedSubtype.defaults?.enabled_fields?.length
+                            ? selectedSubtype.defaults.enabled_fields
+                            : ALL_TEMPLATE_FIELDS
+                          ).includes("recurrence"))}
                         />
                         <span className="text-sm text-gray-700">Recurring by default</span>
                       </div>
@@ -505,7 +572,10 @@ export default function Page() {
                             updateSubtypeDefaults(selectedTypeIndex, selectedSubtypeIndex, { recurrence_pattern: e.target.value })
                           }
                           className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                          disabled={!selectedSubtype.defaults?.enabled_fields?.includes("recurrence")}
+                          disabled={!((selectedSubtype.defaults?.enabled_fields?.length
+                            ? selectedSubtype.defaults.enabled_fields
+                            : ALL_TEMPLATE_FIELDS
+                          ).includes("recurrence"))}
                         >
                           <option value="daily">Daily</option>
                           <option value="weekly">Weekly</option>
@@ -524,7 +594,10 @@ export default function Page() {
                             })
                           }
                           className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                          disabled={!selectedSubtype.defaults?.enabled_fields?.includes("recurrence")}
+                          disabled={!((selectedSubtype.defaults?.enabled_fields?.length
+                            ? selectedSubtype.defaults.enabled_fields
+                            : ALL_TEMPLATE_FIELDS
+                          ).includes("recurrence"))}
                         />
                       </div>
                       <div>
@@ -545,7 +618,10 @@ export default function Page() {
                                     updateSubtypeDefaults(selectedTypeIndex, selectedSubtypeIndex, { queue_types: next });
                                   }}
                                   className="h-4 w-4"
-                                  disabled={!selectedSubtype.defaults?.enabled_fields?.includes("queue")}
+                                  disabled={!((selectedSubtype.defaults?.enabled_fields?.length
+                                    ? selectedSubtype.defaults.enabled_fields
+                                    : ALL_TEMPLATE_FIELDS
+                                  ).includes("queue"))}
                                 />
                                 {queueType}
                               </label>
@@ -566,18 +642,22 @@ export default function Page() {
             </>
           )}
 
-          {status && (
-            <div className="text-sm text-gray-600">{status}</div>
-          )}
+          {selectedType && (
+            <>
+              {status && (
+                <div className="text-sm text-gray-600">{status}</div>
+              )}
 
-          <div className="flex flex-col sm:flex-row gap-3 justify-end">
-            <Button variant="secondary" onClick={handleCancel} disabled={saving}>
-              Cancel
-            </Button>
-            <Button onClick={saveConfig} disabled={saving}>
-              {saving ? "Saving…" : "Save Changes"}
-            </Button>
-          </div>
+              <div className="flex flex-col sm:flex-row gap-3 justify-end">
+                <Button variant="secondary" onClick={handleCancel} disabled={saving}>
+                  Cancel
+                </Button>
+                <Button onClick={saveConfig} disabled={saving}>
+                  {saving ? "Saving…" : "Save Changes"}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </Container>
