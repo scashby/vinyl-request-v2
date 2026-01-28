@@ -330,7 +330,18 @@ const ConflictRow = React.memo(({
         const actualNewItems = Array.from(allNewItems).filter(item => !currentSet.has(item));
 
         // Calculate selected items for chips
-        const selectedChipSet = new Set(toArray(selected.value));
+        const selectedChipSet = new Set(toArray(selected.value).map(toTitleCase));
+
+        const handleToggleChip = (val: string) => {
+            const updated = new Set(selectedChipSet);
+            const normalizedVal = toTitleCase(val);
+            if (updated.has(normalizedVal)) {
+                updated.delete(normalizedVal);
+            } else {
+                updated.add(normalizedVal);
+            }
+            onResolve(conflict, Array.from(updated), 'custom_merge');
+        };
 
         return (
             <div className="mb-8">
@@ -359,7 +370,7 @@ const ConflictRow = React.memo(({
                     color="green"
                     items={allCurrent}
                     selectedItems={selectedChipSet}
-                    onToggle={(val) => onResolve(conflict, val, 'custom_merge')}
+                    onToggle={handleToggleChip}
                 />
                 {actualNewItems.length > 0 && (
                 <ArrayChipSelector
@@ -367,7 +378,7 @@ const ConflictRow = React.memo(({
                     color="blue"
                     items={actualNewItems}
                     selectedItems={selectedChipSet}
-                    onToggle={(val) => onResolve(conflict, val, 'custom_merge')}
+                    onToggle={handleToggleChip}
                 />
                 )}
             </div>
@@ -617,9 +628,58 @@ export default function EnrichmentReviewModal({ conflicts, onSave, onSkip, onCan
 
   const handleSelectAllNew = useCallback(() => {
     const newResolutions: Record<string, { value: unknown, source: string, selectedSources?: string[] }> = {};
+    const mergeableArrayFields = new Set([
+      'genres', 'styles', 'musicians', 'credits', 'producers', 'engineers', 'tags',
+      'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url',
+      'label', 'labels', 'writers', 'mixers', 'composer', 'lyricist',
+      'arranger', 'songwriters', 'samples', 'sampled_by', 'awards', 'certifications'
+    ]);
+
+    const toArray = (val: unknown) => {
+      if (Array.isArray(val)) return val;
+      if (val === null || val === undefined || val === '') return [];
+      return String(val)
+        .split(/,\s*/)
+        .map(item => item.trim())
+        .filter(Boolean);
+    };
+
     currentConflicts.forEach(c => {
       const key = `${c.album_id}-${c.field_name}`;
-      newResolutions[key] = { value: c.new_value, source: c.source || 'enrichment', selectedSources: [c.source || 'enrichment'] };
+      const defaultSource = c.source || 'enrichment';
+
+      if (mergeableArrayFields.has(c.field_name)) {
+        const merged = new Set<string>();
+        toArray(c.current_value).forEach(item => merged.add(toTitleCase(String(item))));
+
+        if (c.candidates) {
+          Object.values(c.candidates).forEach(val => {
+            toArray(val).forEach(item => merged.add(toTitleCase(String(item))));
+          });
+        } else {
+          toArray(c.new_value).forEach(item => merged.add(toTitleCase(String(item))));
+        }
+
+        const selectedSources = new Set<string>(['current']);
+        if (c.candidates) {
+          Object.keys(c.candidates).forEach(source => selectedSources.add(source));
+        } else {
+          selectedSources.add(defaultSource);
+        }
+
+        newResolutions[key] = {
+          value: Array.from(merged),
+          source: 'custom_merge',
+          selectedSources: Array.from(selectedSources)
+        };
+        return;
+      }
+
+      newResolutions[key] = {
+        value: c.new_value,
+        source: defaultSource,
+        selectedSources: [defaultSource]
+      };
     });
     setResolutions(newResolutions);
   }, [currentConflicts]);
