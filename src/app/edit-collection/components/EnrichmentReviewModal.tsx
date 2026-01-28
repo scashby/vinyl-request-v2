@@ -332,23 +332,13 @@ const ConflictRow = React.memo(({
         // Calculate selected items for chips
         const selectedChipSet = new Set(toArray(selected.value).map(toTitleCase));
 
-        const handleToggleChip = (val: string) => {
+        const handleToggleTagChip = (val: string) => {
             const updated = new Set(selectedChipSet);
             const normalizedVal = toTitleCase(val);
             if (updated.has(normalizedVal)) {
                 updated.delete(normalizedVal);
             } else {
                 updated.add(normalizedVal);
-            }
-            onResolve(conflict, Array.from(updated), 'custom_merge');
-        };
-
-        const handleToggleChip = (val: string) => {
-            const updated = new Set(selectedChipSet);
-            if (updated.has(val)) {
-                updated.delete(val);
-            } else {
-                updated.add(val);
             }
             onResolve(conflict, Array.from(updated), 'custom_merge');
         };
@@ -380,7 +370,7 @@ const ConflictRow = React.memo(({
                     color="green"
                     items={allCurrent}
                     selectedItems={selectedChipSet}
-                    onToggle={handleToggleChip}
+                    onToggle={handleToggleTagChip}
                 />
                 {actualNewItems.length > 0 && (
                 <ArrayChipSelector
@@ -388,7 +378,7 @@ const ConflictRow = React.memo(({
                     color="blue"
                     items={actualNewItems}
                     selectedItems={selectedChipSet}
-                    onToggle={handleToggleChip}
+                    onToggle={handleToggleTagChip}
                 />
                 )}
             </div>
