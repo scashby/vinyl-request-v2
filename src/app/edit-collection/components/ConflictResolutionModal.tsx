@@ -24,6 +24,12 @@ export default function ConflictResolutionModal({
   onComplete,
   onCancel,
 }: ConflictResolutionModalProps) {
+  const isMissingResolutionTable = (err?: { message?: string; code?: string } | null) => {
+    if (!err) return false;
+    if (err.code === '42P01') return true;
+    return err.message?.includes('import_conflict_resolutions') ?? false;
+  };
+
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(
     Object.keys(conflicts.reduce((acc, conflict) => {
       const key = `${conflict.artist} - ${conflict.title}`;
@@ -34,6 +40,7 @@ export default function ConflictResolutionModal({
   const [resolutions, setResolutions] = useState<Map<string, 'current' | 'new' | 'merge'>>(new Map());
   const [appliedConflicts, setAppliedConflicts] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
+  const [resolutionTableMissing, setResolutionTableMissing] = useState(false);
 
   const getConflictId = (conflict: FieldConflict): string => {
     return `${conflict.album_id}-${conflict.field_name}`;
@@ -98,18 +105,26 @@ export default function ConflictResolutionModal({
       
       const rejectedValue = getRejectedValue(conflict.current_value, conflict.new_value, strategyResolution);
       
-      const { error: resolutionError } = await supabase
-        .from('import_conflict_resolutions')
-        .insert({
-          album_id: conflict.album_id,
-          field_name: conflict.field_name,
-          kept_value: finalValue,
-          rejected_value: rejectedValue,
-          resolution: strategyResolution,
-          source: source,
-        });
-      
-      if (resolutionError) throw resolutionError;
+      if (!resolutionTableMissing) {
+        const { error: resolutionError } = await supabase
+          .from('import_conflict_resolutions')
+          .insert({
+            album_id: conflict.album_id,
+            field_name: conflict.field_name,
+            kept_value: finalValue,
+            rejected_value: rejectedValue,
+            resolution: strategyResolution,
+            source: source,
+          });
+
+        if (resolutionError) {
+          if (isMissingResolutionTable(resolutionError)) {
+            setResolutionTableMissing(true);
+          } else {
+            throw resolutionError;
+          }
+        }
+      }
       
       setAppliedConflicts(prev => new Set([...prev, conflictId]));
     } catch (error) {
