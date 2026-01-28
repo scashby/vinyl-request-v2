@@ -23,18 +23,10 @@ export async function GET() {
   );
 
   try {
-    // 1. Fetch Albums with all relevant columns
+    // 1. Fetch Albums
     const { data: albums, error } = await supabase
       .from('collection')
-      .select(`
-        id, folder,
-        image_url, back_image_url, inner_sleeve_images,
-        musicians, producers, engineers, songwriters,
-        tempo_bpm, musical_key, danceability, energy,
-        genres, styles,
-        spotify_id, apple_music_id, lastfm_url,
-        barcode, labels, original_release_date, cat_no
-      `);
+      .select('*');
 
     if (error) throw error;
     if (!albums) return NextResponse.json({ success: true, stats: null });
@@ -43,7 +35,7 @@ export async function GET() {
     // UPGRADE: Fetch duration to check for missing times
     const { data: trackRows, error: trackError } = await supabase
       .from('tracks')
-      .select('album_id, duration');
+      .select('*');
     
     if (trackError) console.error("Track Fetch Error:", trackError);
 
@@ -55,7 +47,10 @@ export async function GET() {
       const aId = String(t.album_id);
       albumsWithTracks.add(aId);
       // If duration is missing/empty, flag this album
-      if (!t.duration || t.duration.trim() === '') {
+      const durationValue = t.duration === null || t.duration === undefined
+        ? ''
+        : String(t.duration).trim();
+      if (durationValue === '') {
         albumsWithMissingDurations.add(aId);
       }
     });
