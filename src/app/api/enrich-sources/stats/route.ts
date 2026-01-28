@@ -3,12 +3,25 @@ import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = 'force-dynamic';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export async function GET() {
+  if (!supabaseUrl || (!serviceRoleKey && !anonKey)) {
+    console.error("Stats Error: Missing Supabase credentials.");
+    return NextResponse.json(
+      { success: false, error: "Missing Supabase credentials." },
+      { status: 500 }
+    );
+  }
+
+  const supabase = createClient(
+    supabaseUrl,
+    serviceRoleKey ?? anonKey!,
+    { auth: { persistSession: false } }
+  );
+
   try {
     // 1. Fetch Albums with all relevant columns
     const { data: albums, error } = await supabase
