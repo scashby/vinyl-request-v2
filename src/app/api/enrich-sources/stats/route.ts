@@ -3,25 +3,30 @@ import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = 'force-dynamic';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export async function GET() {
+  if (!supabaseUrl || (!serviceRoleKey && !anonKey)) {
+    console.error("Stats Error: Missing Supabase credentials.");
+    return NextResponse.json(
+      { success: false, error: "Missing Supabase credentials." },
+      { status: 500 }
+    );
+  }
+
+  const supabase = createClient(
+    supabaseUrl,
+    serviceRoleKey ?? anonKey!,
+    { auth: { persistSession: false } }
+  );
+
   try {
-    // 1. Fetch Albums with all relevant columns
+    // 1. Fetch Albums
     const { data: albums, error } = await supabase
       .from('collection')
-      .select(`
-        id, folder,
-        image_url, back_image_url, inner_sleeve_images,
-        musicians, producers, engineers, songwriters,
-        tempo_bpm, musical_key, danceability, energy,
-        genres, styles,
-        spotify_id, apple_music_id, lastfm_url,
-        barcode, labels, original_release_date, cat_no
-      `);
+      .select('*');
 
     if (error) throw error;
     if (!albums) return NextResponse.json({ success: true, stats: null });
@@ -30,7 +35,7 @@ export async function GET() {
     // UPGRADE: Fetch duration to check for missing times
     const { data: trackRows, error: trackError } = await supabase
       .from('tracks')
-      .select('album_id, duration');
+      .select('*');
     
     if (trackError) console.error("Track Fetch Error:", trackError);
 
@@ -42,7 +47,10 @@ export async function GET() {
       const aId = String(t.album_id);
       albumsWithTracks.add(aId);
       // If duration is missing/empty, flag this album
-      if (!t.duration || t.duration.trim() === '') {
+      const durationValue = t.duration === null || t.duration === undefined
+        ? ''
+        : String(t.duration).trim();
+      if (durationValue === '') {
         albumsWithMissingDurations.add(aId);
       }
     });
