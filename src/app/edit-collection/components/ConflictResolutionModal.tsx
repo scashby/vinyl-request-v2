@@ -24,9 +24,10 @@ export default function ConflictResolutionModal({
   onComplete,
   onCancel,
 }: ConflictResolutionModalProps) {
-  const isMissingResolutionTable = (err?: { message?: string; code?: string } | null) => {
+  const isMissingResolutionTable = (err?: { message?: string; code?: string; status?: number } | null) => {
     if (!err) return false;
     if (err.code === '42P01') return true;
+    if (err.status === 404) return true;
     return err.message?.includes('import_conflict_resolutions') ?? false;
   };
 

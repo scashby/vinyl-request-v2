@@ -318,9 +318,13 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
 
     try {
       // Process ALL MATCHED albums (auto matches first, manual links after)
-      const albumsToProcess = comparedAlbums
-        .filter(album => album.status === 'MATCHED')
-        .sort((a, b) => Number(Boolean(a.manualLink)) - Number(Boolean(b.manualLink)));
+      const autoMatchedAlbums = comparedAlbums.filter(
+        album => album.status === 'MATCHED' && !album.manualLink
+      );
+      const linkedAlbums = comparedAlbums.filter(
+        album => album.status === 'MATCHED' && album.manualLink
+      );
+      const albumsToProcess = [...autoMatchedAlbums, ...linkedAlbums];
 
       setProgress({ current: 0, total: albumsToProcess.length, status: 'Processing...' });
 
@@ -336,12 +340,10 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
 
       let missingResolutionTable = resolutionTableMissing;
 
-      // Process albums
-      for (let i = 0; i < albumsToProcess.length; i++) {
-        const album = albumsToProcess[i];
+      const processAlbum = async (album: ComparedCLZAlbum, index: number) => {
         
         setProgress({
-          current: i + 1,
+          current: index + 1,
           total: albumsToProcess.length,
           status: `Processing ${album.artist} - ${album.title}`,
         });
@@ -349,7 +351,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
         try {
           // Find existing album
           const existingAlbum = existingAlbums.find(e => e.id === album.existingId);
-          if (!existingAlbum) continue;
+          if (!existingAlbum) return;
 
           // Load previous conflict resolutions
           let safeResolutions: PreviousResolution[] = [];
@@ -437,6 +439,17 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
           console.error(`Error processing ${album.artist} - ${album.title}:`, err);
           resultCounts.errors++;
         }
+      };
+
+      // Process auto-matched albums first, manual links last
+      let processedCount = 0;
+      for (const album of autoMatchedAlbums) {
+        await processAlbum(album, processedCount);
+        processedCount += 1;
+      }
+      for (const album of linkedAlbums) {
+        await processAlbum(album, processedCount);
+        processedCount += 1;
       }
 
       setResults(resultCounts);
@@ -484,9 +497,10 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
     .map((album, index) => ({ album, index }))
     .filter(({ album }) => album.status === 'NO_MATCH');
 
-  const isMissingResolutionTable = (err?: { message?: string; code?: string } | null) => {
+  const isMissingResolutionTable = (err?: { message?: string; code?: string; status?: number } | null) => {
     if (!err) return false;
     if (err.code === '42P01') return true;
+    if (err.status === 404) return true;
     return err.message?.includes('import_conflict_resolutions') ?? false;
   };
 
