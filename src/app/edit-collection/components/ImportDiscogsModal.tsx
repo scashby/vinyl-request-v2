@@ -139,6 +139,13 @@ interface ExistingAlbum {
   title_norm: string;
   artist_album_norm: string;
   discogs_release_id: string | null;
+  discogs_master_id?: string | null;
+  format?: string | null;
+  cat_no?: string | null;
+  media_condition?: string | null;
+  package_sleeve_condition?: string | null;
+  country?: string | null;
+  year?: string | null;
   image_url?: string | null;
   cover_image?: string | null;
   tracks?: unknown[] | null;
@@ -184,6 +191,30 @@ function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
+function normalizeComparable(value?: string | null): string {
+  return value?.trim().toLowerCase() ?? '';
+}
+
+function buildComparisonKey(data: {
+  format?: string | null;
+  cat_no?: string | null;
+  media_condition?: string | null;
+  package_sleeve_condition?: string | null;
+  country?: string | null;
+  year?: string | null;
+  discogs_master_id?: string | null;
+}): string {
+  return [
+    normalizeComparable(data.format),
+    normalizeComparable(data.cat_no),
+    normalizeComparable(data.media_condition),
+    normalizeComparable(data.package_sleeve_condition),
+    normalizeComparable(data.country),
+    normalizeComparable(data.year),
+    normalizeComparable(data.discogs_master_id),
+  ].join('|');
+}
+
 // Compare albums logic
 function compareAlbums(
   parsed: ParsedAlbum[],
@@ -191,7 +222,7 @@ function compareAlbums(
   sourceType: DiscogsSourceType
 ): ComparedAlbum[] {
   const releaseIdMap = new Map<string, ExistingAlbum>();
-  const artistAlbumMap = new Map<string, ExistingAlbum>();
+  const artistAlbumMap = new Map<string, ExistingAlbum[]>();
   const matchedDbIds = new Set<number>();
   
   existing.forEach(album => {
@@ -199,7 +230,9 @@ function compareAlbums(
       releaseIdMap.set(album.discogs_release_id, album);
     }
     const normalizedKey = normalizeArtistAlbum(album.artist, album.title);
-    artistAlbumMap.set(normalizedKey, album);
+    const entries = artistAlbumMap.get(normalizedKey) ?? [];
+    entries.push(album);
+    artistAlbumMap.set(normalizedKey, entries);
   });
 
   const compared: ComparedAlbum[] = [];
@@ -212,7 +245,20 @@ function compareAlbums(
     }
     
     if (!existingAlbum) {
-      existingAlbum = artistAlbumMap.get(parsedAlbum.artist_album_norm);
+      const candidates = artistAlbumMap.get(parsedAlbum.artist_album_norm);
+      if (candidates && candidates.length > 0) {
+        const parsedKey = buildComparisonKey(parsedAlbum);
+        const matchIndex = candidates.findIndex(
+          (candidate) => buildComparisonKey(candidate) === parsedKey
+        );
+        if (matchIndex >= 0) {
+          existingAlbum = candidates[matchIndex];
+          candidates.splice(matchIndex, 1);
+          if (candidates.length === 0) {
+            artistAlbumMap.delete(parsedAlbum.artist_album_norm);
+          }
+        }
+      }
     }
 
     if (!existingAlbum) {
@@ -246,6 +292,17 @@ function compareAlbums(
 
       if (existingAlbum.discogs_release_id) {
         releaseIdMap.delete(existingAlbum.discogs_release_id);
+      }
+
+      const normalizedKey = normalizeArtistAlbum(existingAlbum.artist, existingAlbum.title);
+      const matchedCandidates = artistAlbumMap.get(normalizedKey);
+      if (matchedCandidates) {
+        const remaining = matchedCandidates.filter((candidate) => candidate.id !== existingAlbum.id);
+        if (remaining.length > 0) {
+          artistAlbumMap.set(normalizedKey, remaining);
+        } else {
+          artistAlbumMap.delete(normalizedKey);
+        }
       }
     }
   }
@@ -668,14 +725,14 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           const { data: existingRaw, error: dbError } = await supabase
             .from('collection')
             .select(
-              'id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, image_url, tracks, genres, packaging'
+              'id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, discogs_master_id, format, cat_no, media_condition, package_sleeve_condition, country, year, image_url, tracks, genres, packaging'
             );
           if (dbError) throw dbError;
           existing = (existingRaw ?? []) as unknown as ExistingAlbum[];
         } else {
           const { data: existingRaw, error: dbError } = await supabase
             .from('wantlist')
-            .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, cover_image');
+            .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, discogs_master_id, format, cat_no, country, year, cover_image');
           if (dbError) throw dbError;
           existing = (existingRaw ?? []).map((album) => {
             const wantlistAlbum = album as ExistingAlbum;
