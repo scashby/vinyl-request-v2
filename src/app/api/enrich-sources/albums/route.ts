@@ -23,7 +23,7 @@ export async function GET(req: Request) {
 
     let query = supabase
       .from('collection')
-      .select('id,artist,title,image_url,musicbrainz_id,musicians,producers,spotify_id,apple_music_id,lastfm_id,allmusic_id,wikipedia_url,tempo_bpm,discogs_release_id,discogs_master_id,discogs_genres,back_image_url,tracklists')
+      .select('id,artist,title,image_url,musicbrainz_id,musicians,producers,spotify_id,apple_music_id,lastfm_id,allmusic_id,wikipedia_url,tempo_bpm,discogs_release_id,discogs_master_id,genres,styles,back_image_url,tracklists')
       .limit(limit);
 
     // Apply filters based on category
@@ -73,7 +73,7 @@ export async function GET(req: Request) {
         break;
       
       case 'missing-genres':
-        query = query.or('discogs_genres.is.null,discogs_genres.eq.[]');
+        query = query.or('genres.is.null,genres.eq.[],styles.is.null,styles.eq.[]');
         break;
     }
 
@@ -92,7 +92,7 @@ export async function GET(req: Request) {
     if (category === 'needs-enrichment') {
       filteredAlbums = filteredAlbums.filter(album => {
         const hasMusicBrainz = album.musicbrainz_id && album.musicians?.length > 0 && album.producers?.length > 0;
-        const hasDiscogs = album.discogs_release_id && album.discogs_master_id && album.discogs_genres?.length > 0;
+        const hasDiscogs = album.discogs_release_id && album.discogs_master_id && ((album.genres?.length ?? 0) > 0 || (album.styles?.length ?? 0) > 0);
         const hasImages = album.image_url && album.back_image_url;
         const hasStreaming = album.spotify_id && album.apple_music_id;
         const hasMetadata = album.lastfm_id && album.allmusic_id && album.wikipedia_url;
@@ -102,7 +102,7 @@ export async function GET(req: Request) {
     } else if (category === 'fully-enriched') {
       filteredAlbums = filteredAlbums.filter(album => {
         const hasMusicBrainz = album.musicbrainz_id && album.musicians?.length > 0 && album.producers?.length > 0;
-        const hasDiscogs = album.discogs_release_id && album.discogs_master_id && album.discogs_genres?.length > 0;
+        const hasDiscogs = album.discogs_release_id && album.discogs_master_id && ((album.genres?.length ?? 0) > 0 || (album.styles?.length ?? 0) > 0);
         const hasImages = album.image_url && album.back_image_url;
         const hasStreaming = album.spotify_id && album.apple_music_id;
         const hasMetadata = album.lastfm_id && album.allmusic_id && album.wikipedia_url;
