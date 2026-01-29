@@ -533,11 +533,10 @@ export default function EditEventForm() {
         info: eventData.info,
         info_url: eventData.info_url,
         has_queue: eventData.has_queue,
-        queue_types: eventData.has_queue
-          ? formatPostgresArray(normalizedQueueTypes)
+        queue_types: eventData.has_queue && normalizedQueueTypes.length > 0
+          ? normalizedQueueTypes
           : null,
-        allowed_formats: formatPostgresArray(normalizedFormats),
-        crate_id: eventData.crate_id || null, 
+        allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
         
         is_recurring: isTBA ? false : eventData.is_recurring,
         ...(!isTBA && eventData.is_recurring ? {
@@ -575,19 +574,22 @@ export default function EditEventForm() {
         if (error) throw error;
         
         const recurringEvents = generateRecurringEvents({ ...eventData, id: savedEvent.id });
-        const eventsToInsert = recurringEvents.slice(1).map(e => ({
-          ...e,
-          date: e.date,
-          allowed_formats: formatPostgresArray(normalizedFormats),
-          queue_types: eventData.has_queue
-            ? formatPostgresArray(normalizedQueueTypes)
-            : null,
-          crate_id: eventData.crate_id || null,
-          parent_event_id: savedEvent.id,
-          recurrence_pattern: null,
-          recurrence_interval: null,
-          recurrence_end_date: null,
-        }));
+        const eventsToInsert = recurringEvents.slice(1).map((event) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { crate_id: _crateId, ...eventWithoutCrate } = event;
+          return {
+            ...eventWithoutCrate,
+            date: event.date,
+            allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
+            queue_types: eventData.has_queue && normalizedQueueTypes.length > 0
+              ? normalizedQueueTypes
+              : null,
+            parent_event_id: savedEvent.id,
+            recurrence_pattern: null,
+            recurrence_interval: null,
+            recurrence_end_date: null,
+          };
+        });
         
         if (eventsToInsert.length > 0) {
           await supabase.from('events').insert(eventsToInsert);
