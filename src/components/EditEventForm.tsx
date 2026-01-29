@@ -176,6 +176,77 @@ function buildTag(prefix: string, value?: string) {
   return `${prefix}${value}`;
 }
 
+function buildEventDataFromDbEvent(dbEvent: DbEvent): EventData {
+  const normalizedTags = normalizeStringArray(dbEvent.allowed_tags);
+  return {
+    event_type: getTagValue(normalizedTags, EVENT_TYPE_TAG_PREFIX),
+    event_subtype: getTagValue(normalizedTags, EVENT_SUBTYPE_TAG_PREFIX),
+    title: dbEvent.title ?? '',
+    date: dbEvent.date ?? '',
+    time: dbEvent.time ?? '',
+    location: dbEvent.location ?? '',
+    image_url: dbEvent.image_url ?? '',
+    info: dbEvent.info ?? '',
+    info_url: dbEvent.info_url ?? '',
+    has_queue: !!dbEvent.has_queue,
+    queue_types: Array.isArray(dbEvent.queue_types)
+      ? dbEvent.queue_types
+      : dbEvent.queue_type ? [dbEvent.queue_type] : [],
+    allowed_formats: normalizeStringArray(dbEvent.allowed_formats),
+    crate_id: dbEvent.crate_id ?? null,
+    is_recurring: !!dbEvent.is_recurring,
+    recurrence_pattern: dbEvent.recurrence_pattern || 'weekly',
+    recurrence_interval: dbEvent.recurrence_interval || 1,
+    recurrence_end_date: dbEvent.recurrence_end_date || '',
+    parent_event_id: dbEvent.parent_event_id ?? undefined,
+    is_featured_grid: !!dbEvent.is_featured_grid,
+    is_featured_upnext: !!dbEvent.is_featured_upnext,
+    featured_priority: dbEvent.featured_priority ?? null,
+  };
+}
+
+const OVERRIDE_FIELDS: Array<{
+  key: string;
+  label: string;
+}> = [
+  { key: 'title', label: 'Title' },
+  { key: 'date', label: 'Date' },
+  { key: 'time', label: 'Time' },
+  { key: 'location', label: 'Location' },
+  { key: 'image_url', label: 'Image URL' },
+  { key: 'info', label: 'Info' },
+  { key: 'info_url', label: 'Info URL' },
+  { key: 'has_queue', label: 'Queue Enabled' },
+  { key: 'queue_types', label: 'Queue Types' },
+  { key: 'allowed_formats', label: 'Allowed Formats' },
+  { key: 'crate_id', label: 'Crate' },
+  { key: 'is_featured_grid', label: 'Featured Grid' },
+  { key: 'is_featured_upnext', label: 'Featured Up Next' },
+  { key: 'featured_priority', label: 'Featured Priority' },
+];
+
+function normalizeArrayValue(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean).sort();
+  }
+  if (typeof value === 'string') {
+    return value
+      .replace(/[{}]/g, '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .sort();
+  }
+  return [];
+}
+
+function formatDiffValue(value: unknown): string {
+  if (value === null || typeof value === 'undefined' || value === '') return '—';
+  if (Array.isArray(value)) return value.join(', ');
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  return String(value);
+}
+
 export default function EditEventForm() {
   const searchParams = useSearchParams();
   const id = searchParams.get('id');
@@ -185,6 +256,22 @@ export default function EditEventForm() {
   const [editMode, setEditMode] = useState<'all' | 'future' | 'single'>('all');
   const [isPartOfSeries, setIsPartOfSeries] = useState(false);
   const [isParentEvent, setIsParentEvent] = useState(false);
+  const [seriesEvents, setSeriesEvents] = useState<DbEvent[]>([]);
+  const [selectedSeriesEventId, setSelectedSeriesEventId] = useState<number | null>(null);
+  const [seriesParentId, setSeriesParentId] = useState<number | null>(null);
+  const [showOverrideModal, setShowOverrideModal] = useState(false);
+  const [overrideEntries, setOverrideEntries] = useState<Array<{
+    id: number;
+    title: string;
+    date: string;
+    diffs: Array<{ key: string; label: string; baseValue: unknown; currentValue: unknown }>;
+  }>>([]);
+  const [overrideSelections, setOverrideSelections] = useState<Record<number, Record<string, boolean>>>({});
+  const [pendingBulkUpdate, setPendingBulkUpdate] = useState<{
+    payload: Record<string, unknown>;
+    targetEvents: DbEvent[];
+  } | null>(null);
+  const [isRegeneratingChildren, setIsRegeneratingChildren] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [eventTypeConfig, setEventTypeConfig] = useState<EventTypeConfigState>(() =>
     normalizeEventTypeConfig(defaultEventTypeConfig)
@@ -310,6 +397,21 @@ export default function EditEventForm() {
     })();
   }, []);
 
+  const fetchSeriesEvents = async (parentId: number) => {
+    const { data: seriesData, error: seriesError } = await supabase
+      .from('events')
+      .select('*')
+      .or(`id.eq.${parentId},parent_event_id.eq.${parentId}`)
+      .order('date', { ascending: true });
+    if (seriesError) {
+      console.error('Error fetching series events:', seriesError);
+      return;
+    }
+    if (seriesData) {
+      setSeriesEvents(seriesData as DbEvent[]);
+    }
+  };
+
   // Fetch Event Data
   useEffect(() => {
     const fetchEvent = async () => {
@@ -348,6 +450,7 @@ export default function EditEventForm() {
           const dbEvent = data as DbEvent;
           const isTBA = !dbEvent.date || dbEvent.date === '' || dbEvent.date === '9999-12-31';
           const normalizedTags = normalizeStringArray(dbEvent.allowed_tags);
+          const parentId = dbEvent.parent_event_id || dbEvent.id;
           
           setEventData({
             ...eventData,
@@ -372,6 +475,12 @@ export default function EditEventForm() {
           
           setIsParentEvent(dbEvent.is_recurring === true);
           setIsPartOfSeries(!!dbEvent.parent_event_id);
+          setSeriesParentId(parentId);
+          setSelectedSeriesEventId(dbEvent.id);
+
+          if (dbEvent.is_recurring || dbEvent.parent_event_id) {
+            await fetchSeriesEvents(parentId);
+          }
         }
       }
     };
@@ -392,10 +501,187 @@ export default function EditEventForm() {
             ? (value === '' ? null : parseInt(value))
             : name === 'crate_id'
               ? (value === '' ? null : parseInt(value))
-              : value,
+              : name === 'image_url'
+                ? value.trim()
+                : value,
       ...(name === 'event_type' ? { event_subtype: '' } : {}),
       ...(name === 'date' && !value ? { is_recurring: false, recurrence_end_date: '' } : {})
     }));
+  };
+
+  const handleSeriesEventChange = async (eventIdValue: string) => {
+    const parsedId = eventIdValue ? Number.parseInt(eventIdValue, 10) : NaN;
+    if (Number.isNaN(parsedId)) return;
+    setSelectedSeriesEventId(parsedId);
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', parsedId)
+      .single();
+    if (error) {
+      console.error('Error fetching selected series event:', error);
+      return;
+    }
+    if (data) {
+      const dbEvent = data as DbEvent;
+      const normalizedTags = normalizeStringArray(dbEvent.allowed_tags);
+      const isTBA = !dbEvent.date || dbEvent.date === '' || dbEvent.date === '9999-12-31';
+      setEventData((prev) => ({
+        ...prev,
+        ...dbEvent,
+        event_type: getTagValue(normalizedTags, EVENT_TYPE_TAG_PREFIX),
+        event_subtype: getTagValue(normalizedTags, EVENT_SUBTYPE_TAG_PREFIX),
+        allowed_formats: normalizeStringArray(dbEvent.allowed_formats),
+        queue_types: Array.isArray(dbEvent.queue_types)
+          ? dbEvent.queue_types
+          : dbEvent.queue_type ? [dbEvent.queue_type] : [],
+        crate_id: dbEvent.crate_id || null,
+        is_recurring: dbEvent.is_recurring || false,
+        recurrence_pattern: dbEvent.recurrence_pattern || 'weekly',
+        recurrence_interval: dbEvent.recurrence_interval || 1,
+        recurrence_end_date: dbEvent.recurrence_end_date || '',
+        date: isTBA ? '9999-12-31' : dbEvent.date,
+        is_featured_grid: !!dbEvent.is_featured_grid,
+        is_featured_upnext: !!dbEvent.is_featured_upnext,
+        featured_priority: dbEvent.featured_priority ?? null,
+      }));
+    }
+  };
+
+  const handleOverrideToggle = (eventId: number, fieldKey: string) => {
+    setOverrideSelections((prev) => ({
+      ...prev,
+      [eventId]: {
+        ...prev[eventId],
+        [fieldKey]: !prev[eventId]?.[fieldKey],
+      },
+    }));
+  };
+
+  const handleApplyOverrides = async () => {
+    if (!pendingBulkUpdate) return;
+    const { payload, targetEvents } = pendingBulkUpdate;
+    const alwaysInclude = new Set([
+      'is_recurring',
+      'recurrence_pattern',
+      'recurrence_interval',
+      'recurrence_end_date',
+      'parent_event_id',
+    ]);
+
+    for (const event of targetEvents) {
+      const selections = overrideSelections[event.id];
+      let eventPayload: Record<string, unknown> = { ...payload };
+      if (selections) {
+        const selectedKeys = Object.keys(selections).filter((key) => selections[key]);
+        eventPayload = Object.keys(payload).reduce((acc, key) => {
+          if (selectedKeys.includes(key) || alwaysInclude.has(key)) {
+            acc[key] = payload[key];
+          }
+          return acc;
+        }, {} as Record<string, unknown>);
+      }
+      const { error } = await supabase.from('events').update(eventPayload).eq('id', event.id);
+      if (error) throw error;
+    }
+
+    setShowOverrideModal(false);
+    setPendingBulkUpdate(null);
+    router.push('/admin/manage-events');
+  };
+
+  const handleCloseOverrideModal = () => {
+    setShowOverrideModal(false);
+    setPendingBulkUpdate(null);
+  };
+
+  const buildTargetEvents = (mode: 'all' | 'future', baseDate: string) => {
+    if (mode === 'all') return seriesEvents;
+    return seriesEvents.filter((event) => event.date >= baseDate);
+  };
+
+  const handleRegenerateMissingChildren = async () => {
+    if (!seriesParentId) return;
+    setIsRegeneratingChildren(true);
+    try {
+      const { data: parentData, error: parentError } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', seriesParentId)
+        .single();
+      if (parentError || !parentData) {
+        throw parentError ?? new Error('Missing parent event data.');
+      }
+      const baseEvent = buildEventDataFromDbEvent(parentData as DbEvent);
+      if (!baseEvent.is_recurring || !baseEvent.recurrence_end_date) {
+        alert('Parent event is missing recurrence details. Update the series first.');
+        return;
+      }
+
+      const recurringEvents = generateRecurringEvents({ ...baseEvent, id: seriesParentId });
+      const expectedChildren = recurringEvents.slice(1);
+      const existingChildDates = new Set(
+        seriesEvents
+          .filter((event) => event.parent_event_id === seriesParentId)
+          .map((event) => event.date)
+      );
+      const missingChildren = expectedChildren.filter((event) => !existingChildDates.has(event.date));
+      if (missingChildren.length === 0) {
+        alert('No missing child events found.');
+        return;
+      }
+
+      const confirmed = window.confirm(
+        `Create ${missingChildren.length} missing child event${missingChildren.length === 1 ? '' : 's'}?`
+      );
+      if (!confirmed) return;
+
+      const normalizedFormats = baseEvent.allowed_formats
+        .map((format) => format.trim())
+        .filter(Boolean);
+      const normalizedQueueTypes = baseEvent.queue_types
+        .map((type) => type.trim())
+        .filter(Boolean);
+      const eventsToInsert = missingChildren.map((event) => {
+        const { event_type: _eventType, event_subtype: _eventSubtype, ...eventWithoutType } = event;
+        return {
+          ...eventWithoutType,
+          date: event.date,
+          allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
+          queue_types: baseEvent.has_queue && normalizedQueueTypes.length > 0
+            ? normalizedQueueTypes
+            : null,
+          crate_id: baseEvent.crate_id || null,
+          parent_event_id: seriesParentId,
+          recurrence_pattern: null,
+          recurrence_interval: null,
+          recurrence_end_date: null,
+        };
+      });
+
+      const { error: insertError } = await supabase.from('events').insert(eventsToInsert);
+      if (insertError) throw insertError;
+      await fetchSeriesEvents(seriesParentId);
+      alert(`Created ${missingChildren.length} missing child event${missingChildren.length === 1 ? '' : 's'}.`);
+    } catch (error) {
+      console.error('Error regenerating missing children:', error);
+      alert('Failed to regenerate missing children. Check console for details.');
+    } finally {
+      setIsRegeneratingChildren(false);
+    }
+  };
+
+  const getEventFieldValue = (event: DbEvent, key: string) => {
+    switch (key) {
+      case 'queue_types':
+        return normalizeArrayValue(event.queue_types ?? event.queue_type ?? []);
+      case 'allowed_formats':
+        return normalizeArrayValue(event.allowed_formats ?? []);
+      case 'crate_id':
+        return event.crate_id ?? null;
+      default:
+        return (event as unknown as Record<string, unknown>)[key];
+    }
   };
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -486,7 +772,7 @@ export default function EditEventForm() {
 
         setEventData((prev) => ({
           ...prev,
-          image_url: publicUrl,
+          image_url: publicUrl.trim(),
         }));
       } catch (error) {
         console.error('Error uploading event image:', error);
@@ -508,6 +794,13 @@ export default function EditEventForm() {
         buildTag(EVENT_TYPE_TAG_PREFIX, eventData.event_type),
         buildTag(EVENT_SUBTYPE_TAG_PREFIX, eventData.event_subtype),
       ].filter(Boolean) as string[];
+      const normalizedFormats = eventData.allowed_formats
+        .map((format) => format.trim())
+        .filter(Boolean);
+      const normalizedQueueTypes = eventData.queue_types
+        .map((type) => type.trim())
+        .filter(Boolean);
+      const normalizedImageUrl = eventData.image_url.trim();
       
       const payload: Record<string, unknown> = {
         allowed_tags: allowedTags.length > 0 ? allowedTags : null,
@@ -515,15 +808,15 @@ export default function EditEventForm() {
         date: isTBA ? '9999-12-31' : eventData.date,
         time: eventData.time,
         location: eventData.location,
-        image_url: eventData.image_url,
+        image_url: normalizedImageUrl || null,
         info: eventData.info,
         info_url: eventData.info_url,
         has_queue: eventData.has_queue,
-        queue_types: eventData.has_queue && eventData.queue_types.length > 0 
-          ? `{${eventData.queue_types.join(',')}}`
+        queue_types: eventData.has_queue && normalizedQueueTypes.length > 0
+          ? normalizedQueueTypes
           : null,
-        allowed_formats: `{${eventData.allowed_formats.map(f => f.trim()).join(',')}}`,
-        crate_id: eventData.crate_id || null, 
+        allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
+        crate_id: eventData.crate_id || null,
         
         is_recurring: isTBA ? false : eventData.is_recurring,
         ...(!isTBA && eventData.is_recurring ? {
@@ -544,37 +837,156 @@ export default function EditEventForm() {
       console.log('Submitting payload:', payload);
 
       // Handle Updates (Single, Future, Series)
+      const targetEventId = selectedSeriesEventId ?? (id ? Number.parseInt(id, 10) : null);
       if (id && (isParentEvent || isPartOfSeries)) {
         if (editMode === 'single') {
+           if (!targetEventId) throw new Error('Missing target event ID.');
            const singlePayload = { ...payload, is_recurring: false, recurrence_pattern: null, recurrence_interval: null, recurrence_end_date: null, parent_event_id: null };
-           await supabase.from('events').update(singlePayload).eq('id', id);
+           await supabase.from('events').update(singlePayload).eq('id', targetEventId);
         } else if (editMode === 'future') {
-           const parentId = eventData.parent_event_id || id;
-           await supabase.from('events').update(payload).or(`id.eq.${id},parent_event_id.eq.${parentId}`).gte('date', eventData.date);
+           if (!targetEventId) throw new Error('Missing target event ID.');
+           const parentId = (seriesParentId ?? eventData.parent_event_id) || targetEventId;
+           const targetEvents = buildTargetEvents('future', eventData.date);
+           if (!pendingBulkUpdate) {
+             const overrideEntries = targetEvents.map((event) => {
+               const diffs = OVERRIDE_FIELDS.map((field) => {
+                 const baseValue = (payload as Record<string, unknown>)[field.key];
+                 const currentValue = getEventFieldValue(event, field.key);
+                 if (field.key === 'queue_types' || field.key === 'allowed_formats') {
+                   const baseNormalized = normalizeArrayValue(baseValue);
+                   const currentNormalized = normalizeArrayValue(currentValue);
+                   if (JSON.stringify(baseNormalized) === JSON.stringify(currentNormalized)) {
+                     return null;
+                   }
+                   return {
+                     key: field.key,
+                     label: field.label,
+                     baseValue: baseNormalized,
+                     currentValue: currentNormalized,
+                   };
+                 }
+                 if (baseValue === currentValue) return null;
+                 return {
+                   key: field.key,
+                   label: field.label,
+                   baseValue,
+                   currentValue,
+                 };
+               }).filter(Boolean) as Array<{ key: string; label: string; baseValue: unknown; currentValue: unknown }>;
+               return diffs.length > 0
+                 ? { id: event.id, title: event.title, date: event.date, diffs }
+                 : null;
+             }).filter(Boolean) as Array<{ id: number; title: string; date: string; diffs: Array<{ key: string; label: string; baseValue: unknown; currentValue: unknown }> }>;
+
+             if (overrideEntries.length > 0) {
+               const selections: Record<number, Record<string, boolean>> = {};
+               overrideEntries.forEach((entry) => {
+                 selections[entry.id] = entry.diffs.reduce((acc, diff) => {
+                   acc[diff.key] = true;
+                   return acc;
+                 }, {} as Record<string, boolean>);
+               });
+               setOverrideEntries(overrideEntries);
+               setOverrideSelections(selections);
+               setPendingBulkUpdate({ payload, targetEvents });
+               setShowOverrideModal(true);
+               return;
+             }
+           }
+           await supabase
+             .from('events')
+             .update(payload)
+             .or(`id.eq.${targetEventId},parent_event_id.eq.${parentId}`)
+             .gte('date', eventData.date);
         } else {
-           const parentId = eventData.parent_event_id || id;
+           const parentId = (seriesParentId ?? eventData.parent_event_id) || targetEventId;
+           if (!parentId) throw new Error('Missing parent event ID.');
+           const targetEvents = buildTargetEvents('all', eventData.date);
+           if (!pendingBulkUpdate) {
+             const overrideEntries = targetEvents.map((event) => {
+               const diffs = OVERRIDE_FIELDS.map((field) => {
+                 const baseValue = (payload as Record<string, unknown>)[field.key];
+                 const currentValue = getEventFieldValue(event, field.key);
+                 if (field.key === 'queue_types' || field.key === 'allowed_formats') {
+                   const baseNormalized = normalizeArrayValue(baseValue);
+                   const currentNormalized = normalizeArrayValue(currentValue);
+                   if (JSON.stringify(baseNormalized) === JSON.stringify(currentNormalized)) {
+                     return null;
+                   }
+                   return {
+                     key: field.key,
+                     label: field.label,
+                     baseValue: baseNormalized,
+                     currentValue: currentNormalized,
+                   };
+                 }
+                 if (baseValue === currentValue) return null;
+                 return {
+                   key: field.key,
+                   label: field.label,
+                   baseValue,
+                   currentValue,
+                 };
+               }).filter(Boolean) as Array<{ key: string; label: string; baseValue: unknown; currentValue: unknown }>;
+               return diffs.length > 0
+                 ? { id: event.id, title: event.title, date: event.date, diffs }
+                 : null;
+             }).filter(Boolean) as Array<{ id: number; title: string; date: string; diffs: Array<{ key: string; label: string; baseValue: unknown; currentValue: unknown }> }>;
+
+             if (overrideEntries.length > 0) {
+               const selections: Record<number, Record<string, boolean>> = {};
+               overrideEntries.forEach((entry) => {
+                 selections[entry.id] = entry.diffs.reduce((acc, diff) => {
+                   acc[diff.key] = true;
+                   return acc;
+                 }, {} as Record<string, boolean>);
+               });
+               setOverrideEntries(overrideEntries);
+               setOverrideSelections(selections);
+               setPendingBulkUpdate({ payload, targetEvents });
+               setShowOverrideModal(true);
+               return;
+             }
+           }
            await supabase.from('events').update(payload).or(`id.eq.${parentId},parent_event_id.eq.${parentId}`);
         }
       } else if (!isTBA && eventData.is_recurring && !id) {
+        if (!eventData.recurrence_end_date) {
+          alert('Please choose a series end date before creating recurring events.');
+          return;
+        }
+        const recurrenceEnd = new Date(eventData.recurrence_end_date);
+        const recurrenceStart = new Date(eventData.date);
+        if (recurrenceEnd <= recurrenceStart) {
+          alert('Series end date must be after the start date to create future events.');
+          return;
+        }
         // Create Recurring
         const { data: savedEvent, error } = await supabase.from('events').insert([payload]).select().single();
         if (error) throw error;
         
         const recurringEvents = generateRecurringEvents({ ...eventData, id: savedEvent.id });
-        const eventsToInsert = recurringEvents.slice(1).map(e => ({
-          ...e,
-          date: e.date,
-          allowed_formats: `{${e.allowed_formats.map(f => f.trim()).join(',')}}`,
-          queue_types: eventData.has_queue && eventData.queue_types.length > 0 ? `{${eventData.queue_types.join(',')}}` : null,
-          crate_id: eventData.crate_id || null,
-          parent_event_id: savedEvent.id,
-          recurrence_pattern: null,
-          recurrence_interval: null,
-          recurrence_end_date: null,
-        }));
+        const eventsToInsert = recurringEvents.slice(1).map((event) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { event_type: _eventType, event_subtype: _eventSubtype, ...eventWithoutType } = event;
+          return {
+            ...eventWithoutType,
+            date: event.date,
+            allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
+            queue_types: eventData.has_queue && normalizedQueueTypes.length > 0
+              ? normalizedQueueTypes
+              : null,
+            crate_id: eventData.crate_id || null,
+            parent_event_id: savedEvent.id,
+            recurrence_pattern: null,
+            recurrence_interval: null,
+            recurrence_end_date: null,
+          };
+        });
         
         if (eventsToInsert.length > 0) {
-          await supabase.from('events').insert(eventsToInsert);
+          const { error: insertError } = await supabase.from('events').insert(eventsToInsert);
+          if (insertError) throw insertError;
         }
       } else {
         // Create/Update Single
@@ -616,6 +1028,23 @@ export default function EditEventForm() {
         <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
           <h3 className="font-bold text-yellow-800 mb-2">📅 Editing Recurring Event</h3>
           <div className="flex flex-col gap-2">
+            <label className="flex flex-col gap-2 text-sm text-yellow-900">
+              <span className="font-medium">Base event for edits</span>
+              <select
+                value={selectedSeriesEventId ? String(selectedSeriesEventId) : ''}
+                onChange={(e) => void handleSeriesEventChange(e.target.value)}
+                className="rounded-lg border border-yellow-200 bg-white px-3 py-2 text-sm shadow-sm"
+              >
+                {seriesEvents.map((seriesEvent) => (
+                  <option key={seriesEvent.id} value={seriesEvent.id}>
+                    {seriesEvent.date} — {seriesEvent.title}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-yellow-700">
+                Select which event to use as the starting point for “this event” and “this and future events.”
+              </span>
+            </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input 
                 type="radio" 
@@ -646,6 +1075,19 @@ export default function EditEventForm() {
               />
               <span>Edit all events in series</span>
             </label>
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => void handleRegenerateMissingChildren()}
+                disabled={isRegeneratingChildren}
+                className="inline-flex items-center justify-center rounded-lg border border-yellow-300 bg-white px-3 py-2 text-sm font-semibold text-yellow-900 shadow-sm transition hover:bg-yellow-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isRegeneratingChildren ? 'Regenerating...' : 'Regenerate missing children'}
+              </button>
+              <span className="text-xs text-yellow-700">
+                Create any missing events based on the series recurrence settings.
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -1059,6 +1501,81 @@ export default function EditEventForm() {
           {eventData.date && eventData.date !== '9999-12-31' && eventData.is_recurring && !id ? 'Create Recurring Events' : 'Save Event'}
         </button>
       </form>
+
+      {showOverrideModal && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 z-[50000]"
+            onClick={handleCloseOverrideModal}
+          />
+          <div className="fixed inset-0 z-[50001] flex items-center justify-center p-4">
+            <div className="w-full max-w-3xl rounded-2xl bg-white shadow-xl border border-gray-200 max-h-[80vh] overflow-hidden flex flex-col">
+              <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Review existing edits</h3>
+                  <p className="text-sm text-gray-500">
+                    Choose which fields to overwrite for events that already differ from the base event.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseOverrideModal}
+                  className="text-gray-400 hover:text-gray-600 text-xl"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="flex-1 overflow-auto px-6 py-4 space-y-6">
+                {overrideEntries.map((entry) => (
+                  <div key={entry.id} className="border border-gray-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-900">{entry.date}</div>
+                        <div className="text-xs text-gray-500">{entry.title}</div>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      {entry.diffs.map((diff) => (
+                        <label key={diff.key} className="flex items-start gap-3 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={!!overrideSelections[entry.id]?.[diff.key]}
+                            onChange={() => handleOverrideToggle(entry.id, diff.key)}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{diff.label}</div>
+                            <div className="text-xs text-gray-500">
+                              Current: {formatDiffValue(diff.currentValue)} · New:{' '}
+                              {formatDiffValue(diff.baseValue)}
+                            </div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4">
+                <button
+                  type="button"
+                  onClick={handleCloseOverrideModal}
+                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleApplyOverrides()}
+                  className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
+                >
+                  Apply selected changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
