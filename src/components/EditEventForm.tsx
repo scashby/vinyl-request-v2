@@ -176,6 +176,48 @@ function buildTag(prefix: string, value?: string) {
   return `${prefix}${value}`;
 }
 
+const OVERRIDE_FIELDS: Array<{
+  key: string;
+  label: string;
+}> = [
+  { key: 'title', label: 'Title' },
+  { key: 'date', label: 'Date' },
+  { key: 'time', label: 'Time' },
+  { key: 'location', label: 'Location' },
+  { key: 'image_url', label: 'Image URL' },
+  { key: 'info', label: 'Info' },
+  { key: 'info_url', label: 'Info URL' },
+  { key: 'has_queue', label: 'Queue Enabled' },
+  { key: 'queue_types', label: 'Queue Types' },
+  { key: 'allowed_formats', label: 'Allowed Formats' },
+  { key: 'crate_id', label: 'Crate' },
+  { key: 'is_featured_grid', label: 'Featured Grid' },
+  { key: 'is_featured_upnext', label: 'Featured Up Next' },
+  { key: 'featured_priority', label: 'Featured Priority' },
+];
+
+function normalizeArrayValue(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean).sort();
+  }
+  if (typeof value === 'string') {
+    return value
+      .replace(/[{}]/g, '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .sort();
+  }
+  return [];
+}
+
+function formatDiffValue(value: unknown): string {
+  if (value === null || typeof value === 'undefined' || value === '') return '—';
+  if (Array.isArray(value)) return value.join(', ');
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  return String(value);
+}
+
 export default function EditEventForm() {
   const searchParams = useSearchParams();
   const id = searchParams.get('id');
@@ -188,6 +230,18 @@ export default function EditEventForm() {
   const [seriesEvents, setSeriesEvents] = useState<DbEvent[]>([]);
   const [selectedSeriesEventId, setSelectedSeriesEventId] = useState<number | null>(null);
   const [seriesParentId, setSeriesParentId] = useState<number | null>(null);
+  const [showOverrideModal, setShowOverrideModal] = useState(false);
+  const [overrideEntries, setOverrideEntries] = useState<Array<{
+    id: number;
+    title: string;
+    date: string;
+    diffs: Array<{ key: string; label: string; baseValue: unknown; currentValue: unknown }>;
+  }>>([]);
+  const [overrideSelections, setOverrideSelections] = useState<Record<number, Record<string, boolean>>>({});
+  const [pendingBulkUpdate, setPendingBulkUpdate] = useState<{
+    payload: Record<string, unknown>;
+    targetEvents: DbEvent[];
+  } | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [eventTypeConfig, setEventTypeConfig] = useState<EventTypeConfigState>(() =>
     normalizeEventTypeConfig(defaultEventTypeConfig)
@@ -458,6 +512,71 @@ export default function EditEventForm() {
     }
   };
 
+  const handleOverrideToggle = (eventId: number, fieldKey: string) => {
+    setOverrideSelections((prev) => ({
+      ...prev,
+      [eventId]: {
+        ...prev[eventId],
+        [fieldKey]: !prev[eventId]?.[fieldKey],
+      },
+    }));
+  };
+
+  const handleApplyOverrides = async () => {
+    if (!pendingBulkUpdate) return;
+    const { payload, targetEvents } = pendingBulkUpdate;
+    const alwaysInclude = new Set([
+      'is_recurring',
+      'recurrence_pattern',
+      'recurrence_interval',
+      'recurrence_end_date',
+      'parent_event_id',
+    ]);
+
+    for (const event of targetEvents) {
+      const selections = overrideSelections[event.id];
+      let eventPayload: Record<string, unknown> = { ...payload };
+      if (selections) {
+        const selectedKeys = Object.keys(selections).filter((key) => selections[key]);
+        eventPayload = Object.keys(payload).reduce((acc, key) => {
+          if (selectedKeys.includes(key) || alwaysInclude.has(key)) {
+            acc[key] = payload[key];
+          }
+          return acc;
+        }, {} as Record<string, unknown>);
+      }
+      const { error } = await supabase.from('events').update(eventPayload).eq('id', event.id);
+      if (error) throw error;
+    }
+
+    setShowOverrideModal(false);
+    setPendingBulkUpdate(null);
+    router.push('/admin/manage-events');
+  };
+
+  const handleCloseOverrideModal = () => {
+    setShowOverrideModal(false);
+    setPendingBulkUpdate(null);
+  };
+
+  const buildTargetEvents = (mode: 'all' | 'future', baseDate: string) => {
+    if (mode === 'all') return seriesEvents;
+    return seriesEvents.filter((event) => event.date >= baseDate);
+  };
+
+  const getEventFieldValue = (event: DbEvent, key: string) => {
+    switch (key) {
+      case 'queue_types':
+        return normalizeArrayValue(event.queue_types ?? event.queue_type ?? []);
+      case 'allowed_formats':
+        return normalizeArrayValue(event.allowed_formats ?? []);
+      case 'crate_id':
+        return event.crate_id ?? null;
+      default:
+        return (event as Record<string, unknown>)[key];
+    }
+  };
+
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, checked } = e.target;
     setEventData((prev) => ({
@@ -620,6 +739,53 @@ export default function EditEventForm() {
         } else if (editMode === 'future') {
            if (!targetEventId) throw new Error('Missing target event ID.');
            const parentId = (seriesParentId ?? eventData.parent_event_id) || targetEventId;
+           const targetEvents = buildTargetEvents('future', eventData.date);
+           if (!pendingBulkUpdate) {
+             const overrideEntries = targetEvents.map((event) => {
+               const diffs = OVERRIDE_FIELDS.map((field) => {
+                 const baseValue = (payload as Record<string, unknown>)[field.key];
+                 const currentValue = getEventFieldValue(event, field.key);
+                 if (field.key === 'queue_types' || field.key === 'allowed_formats') {
+                   const baseNormalized = normalizeArrayValue(baseValue);
+                   const currentNormalized = normalizeArrayValue(currentValue);
+                   if (JSON.stringify(baseNormalized) === JSON.stringify(currentNormalized)) {
+                     return null;
+                   }
+                   return {
+                     key: field.key,
+                     label: field.label,
+                     baseValue: baseNormalized,
+                     currentValue: currentNormalized,
+                   };
+                 }
+                 if (baseValue === currentValue) return null;
+                 return {
+                   key: field.key,
+                   label: field.label,
+                   baseValue,
+                   currentValue,
+                 };
+               }).filter(Boolean) as Array<{ key: string; label: string; baseValue: unknown; currentValue: unknown }>;
+               return diffs.length > 0
+                 ? { id: event.id, title: event.title, date: event.date, diffs }
+                 : null;
+             }).filter(Boolean) as Array<{ id: number; title: string; date: string; diffs: Array<{ key: string; label: string; baseValue: unknown; currentValue: unknown }> }>;
+
+             if (overrideEntries.length > 0) {
+               const selections: Record<number, Record<string, boolean>> = {};
+               overrideEntries.forEach((entry) => {
+                 selections[entry.id] = entry.diffs.reduce((acc, diff) => {
+                   acc[diff.key] = true;
+                   return acc;
+                 }, {} as Record<string, boolean>);
+               });
+               setOverrideEntries(overrideEntries);
+               setOverrideSelections(selections);
+               setPendingBulkUpdate({ payload, targetEvents });
+               setShowOverrideModal(true);
+               return;
+             }
+           }
            await supabase
              .from('events')
              .update(payload)
@@ -628,6 +794,53 @@ export default function EditEventForm() {
         } else {
            const parentId = (seriesParentId ?? eventData.parent_event_id) || targetEventId;
            if (!parentId) throw new Error('Missing parent event ID.');
+           const targetEvents = buildTargetEvents('all', eventData.date);
+           if (!pendingBulkUpdate) {
+             const overrideEntries = targetEvents.map((event) => {
+               const diffs = OVERRIDE_FIELDS.map((field) => {
+                 const baseValue = (payload as Record<string, unknown>)[field.key];
+                 const currentValue = getEventFieldValue(event, field.key);
+                 if (field.key === 'queue_types' || field.key === 'allowed_formats') {
+                   const baseNormalized = normalizeArrayValue(baseValue);
+                   const currentNormalized = normalizeArrayValue(currentValue);
+                   if (JSON.stringify(baseNormalized) === JSON.stringify(currentNormalized)) {
+                     return null;
+                   }
+                   return {
+                     key: field.key,
+                     label: field.label,
+                     baseValue: baseNormalized,
+                     currentValue: currentNormalized,
+                   };
+                 }
+                 if (baseValue === currentValue) return null;
+                 return {
+                   key: field.key,
+                   label: field.label,
+                   baseValue,
+                   currentValue,
+                 };
+               }).filter(Boolean) as Array<{ key: string; label: string; baseValue: unknown; currentValue: unknown }>;
+               return diffs.length > 0
+                 ? { id: event.id, title: event.title, date: event.date, diffs }
+                 : null;
+             }).filter(Boolean) as Array<{ id: number; title: string; date: string; diffs: Array<{ key: string; label: string; baseValue: unknown; currentValue: unknown }> }>;
+
+             if (overrideEntries.length > 0) {
+               const selections: Record<number, Record<string, boolean>> = {};
+               overrideEntries.forEach((entry) => {
+                 selections[entry.id] = entry.diffs.reduce((acc, diff) => {
+                   acc[diff.key] = true;
+                   return acc;
+                 }, {} as Record<string, boolean>);
+               });
+               setOverrideEntries(overrideEntries);
+               setOverrideSelections(selections);
+               setPendingBulkUpdate({ payload, targetEvents });
+               setShowOverrideModal(true);
+               return;
+             }
+           }
            await supabase.from('events').update(payload).or(`id.eq.${parentId},parent_event_id.eq.${parentId}`);
         }
       } else if (!isTBA && eventData.is_recurring && !id) {
@@ -1157,6 +1370,81 @@ export default function EditEventForm() {
           {eventData.date && eventData.date !== '9999-12-31' && eventData.is_recurring && !id ? 'Create Recurring Events' : 'Save Event'}
         </button>
       </form>
+
+      {showOverrideModal && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 z-[50000]"
+            onClick={handleCloseOverrideModal}
+          />
+          <div className="fixed inset-0 z-[50001] flex items-center justify-center p-4">
+            <div className="w-full max-w-3xl rounded-2xl bg-white shadow-xl border border-gray-200 max-h-[80vh] overflow-hidden flex flex-col">
+              <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Review existing edits</h3>
+                  <p className="text-sm text-gray-500">
+                    Choose which fields to overwrite for events that already differ from the base event.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseOverrideModal}
+                  className="text-gray-400 hover:text-gray-600 text-xl"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="flex-1 overflow-auto px-6 py-4 space-y-6">
+                {overrideEntries.map((entry) => (
+                  <div key={entry.id} className="border border-gray-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-900">{entry.date}</div>
+                        <div className="text-xs text-gray-500">{entry.title}</div>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      {entry.diffs.map((diff) => (
+                        <label key={diff.key} className="flex items-start gap-3 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={!!overrideSelections[entry.id]?.[diff.key]}
+                            onChange={() => handleOverrideToggle(entry.id, diff.key)}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{diff.label}</div>
+                            <div className="text-xs text-gray-500">
+                              Current: {formatDiffValue(diff.currentValue)} · New:{' '}
+                              {formatDiffValue(diff.baseValue)}
+                            </div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4">
+                <button
+                  type="button"
+                  onClick={handleCloseOverrideModal}
+                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleApplyOverrides()}
+                  className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
+                >
+                  Apply selected changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
