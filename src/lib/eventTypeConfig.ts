@@ -1,5 +1,7 @@
 export type EventSubtypeDefaults = {
   enabled_fields?: string[];
+  prefill_fields?: string[];
+  date?: string;
   info?: string;
   info_url?: string;
   time?: string;
@@ -10,11 +12,14 @@ export type EventSubtypeDefaults = {
   is_recurring?: boolean;
   recurrence_pattern?: string;
   recurrence_interval?: number;
+  allowed_formats?: string[];
+  crate_id?: number | null;
 };
 
 export type EventSubtypeConfig = {
   id: string;
   label: string;
+  description?: string;
   defaults?: EventSubtypeDefaults;
 };
 
@@ -22,6 +27,7 @@ export type EventTypeConfig = {
   id: string;
   label: string;
   description?: string;
+  template_fields?: string[];
   defaults?: EventSubtypeDefaults;
   subtypes?: EventSubtypeConfig[];
 };
@@ -36,13 +42,25 @@ export const defaultEventTypeConfig: EventTypeConfigState = {
       id: 'brewery',
       label: 'Brewery Event',
       description: "Hosted at Devil's Purse Brewing Company.",
+      template_fields: [
+        'date',
+        'time',
+        'location',
+        'image_url',
+        'info',
+        'info_url',
+        'queue',
+        'recurrence',
+        'crate',
+        'formats'
+      ],
       subtypes: [
         { id: 'live-jukebox', label: 'Live Jukebox' },
         {
           id: 'vinyl-sundays',
           label: 'Vinyl Sundays',
           defaults: {
-            enabled_fields: ['time', 'location', 'queue', 'recurrence'],
+            prefill_fields: ['time', 'location', 'queue', 'recurrence'],
             time: '12:00 PM - 6:00 PM',
             location: "Devil's Purse Brewing Company",
             has_queue: true,

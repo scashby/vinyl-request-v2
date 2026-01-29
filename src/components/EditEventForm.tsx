@@ -20,6 +20,37 @@ const EVENT_TYPE_SETTINGS_KEY = 'event_type_config';
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
 const EVENT_SUBTYPE_TAG_PREFIX = 'event_subtype:';
 
+const TEMPLATE_FIELDS = ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'queue', 'recurrence', 'crate', 'formats'];
+
+const normalizeEventTypeConfig = (config: EventTypeConfigState): EventTypeConfigState => ({
+  types: config.types.map((type) => ({
+    ...type,
+    template_fields:
+      type.template_fields?.length
+        ? type.template_fields
+        : type.defaults?.enabled_fields?.length
+          ? type.defaults.enabled_fields
+          : TEMPLATE_FIELDS,
+    defaults: type.defaults
+      ? {
+          ...type.defaults,
+          prefill_fields:
+            type.defaults.prefill_fields ?? type.defaults.enabled_fields ?? [],
+        }
+      : type.defaults,
+    subtypes: (type.subtypes || []).map((subtype) => ({
+      ...subtype,
+      defaults: subtype.defaults
+        ? {
+            ...subtype.defaults,
+            prefill_fields:
+              subtype.defaults.prefill_fields ?? subtype.defaults.enabled_fields ?? [],
+          }
+        : subtype.defaults,
+    })),
+  })),
+});
+
 interface EventData {
   event_type: string;
   event_subtype: string;
@@ -130,7 +161,9 @@ export default function EditEventForm() {
   const [isPartOfSeries, setIsPartOfSeries] = useState(false);
   const [isParentEvent, setIsParentEvent] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [eventTypeConfig, setEventTypeConfig] = useState<EventTypeConfigState>(defaultEventTypeConfig);
+  const [eventTypeConfig, setEventTypeConfig] = useState<EventTypeConfigState>(() =>
+    normalizeEventTypeConfig(defaultEventTypeConfig)
+  );
   
   const [eventData, setEventData] = useState<EventData>({
     event_type: '',
@@ -155,19 +188,16 @@ export default function EditEventForm() {
     featured_priority: null,
   });
 
-  const templateFields = ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'queue', 'recurrence', 'crate', 'formats'];
+  const selectedType = eventTypeConfig.types.find((option) => option.id === eventData.event_type);
+  const selectedTypeDefaults = selectedType?.defaults;
+  const selectedSubtypeDefaults = selectedType?.subtypes?.find(
+    (item) => item.id === eventData.event_subtype
+  )?.defaults;
 
-  const selectedTypeDefaults = eventTypeConfig.types
-    .find((option) => option.id === eventData.event_type)
-    ?.defaults;
-
-  const selectedSubtypeDefaults = eventTypeConfig.types
-    .find((option) => option.id === eventData.event_type)
-    ?.subtypes?.find((item) => item.id === eventData.event_subtype)?.defaults;
-
-  const typeEnabledFields = selectedTypeDefaults?.enabled_fields ?? templateFields;
-  const subtypeEnabledFields = selectedSubtypeDefaults?.enabled_fields ?? [];
-  const enabledFields = Array.from(new Set([...typeEnabledFields, ...subtypeEnabledFields]));
+  const typeTemplateFields = selectedType?.template_fields ?? TEMPLATE_FIELDS;
+  const typePrefillFields = selectedTypeDefaults?.prefill_fields ?? [];
+  const subtypePrefillFields = selectedSubtypeDefaults?.prefill_fields ?? [];
+  const enabledFields = typeTemplateFields;
 
   const isFieldEnabled = (field: string) => enabledFields.includes(field);
   const showDate = isFieldEnabled('date');
@@ -210,7 +240,7 @@ export default function EditEventForm() {
         }
 
         if (data?.value) {
-          setEventTypeConfig(JSON.parse(data.value));
+          setEventTypeConfig(normalizeEventTypeConfig(JSON.parse(data.value)));
         }
       } catch (err) {
         console.error('Error loading event type config:', err);
@@ -333,14 +363,21 @@ export default function EditEventForm() {
 
   const applyDefaults = (defaults?: EventSubtypeDefaults, enabledList?: string[]) => {
     if (!defaults) return;
-    const enabledFields = enabledList ?? defaults.enabled_fields ?? templateFields;
+    const enabledFields = enabledList ?? defaults.prefill_fields ?? TEMPLATE_FIELDS;
     setEventData((prev) => ({
       ...prev,
+      ...(enabledFields.includes('date') && defaults.date ? { date: defaults.date } : {}),
       ...(enabledFields.includes('info') && defaults.info ? { info: defaults.info } : {}),
       ...(enabledFields.includes('info_url') && defaults.info_url ? { info_url: defaults.info_url } : {}),
       ...(enabledFields.includes('time') && defaults.time ? { time: defaults.time } : {}),
       ...(enabledFields.includes('location') && defaults.location ? { location: defaults.location } : {}),
       ...(enabledFields.includes('image_url') && defaults.image_url ? { image_url: defaults.image_url } : {}),
+      ...(enabledFields.includes('formats') && defaults.allowed_formats
+        ? { allowed_formats: defaults.allowed_formats }
+        : {}),
+      ...(enabledFields.includes('crate') && typeof defaults.crate_id !== 'undefined'
+        ? { crate_id: defaults.crate_id }
+        : {}),
       ...(enabledFields.includes('queue') && typeof defaults.has_queue === 'boolean'
         ? { has_queue: defaults.has_queue }
         : {}),
@@ -607,7 +644,7 @@ export default function EditEventForm() {
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => applyDefaults(selectedTypeDefaults, typeEnabledFields)}
+                    onClick={() => applyDefaults(selectedTypeDefaults, typePrefillFields)}
                     className="inline-flex items-center gap-2 rounded-full bg-purple-100 px-4 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-200 transition-colors"
                   >
                     Apply type defaults
@@ -615,7 +652,7 @@ export default function EditEventForm() {
                   {eventData.event_subtype && (
                     <button
                       type="button"
-                      onClick={() => applyDefaults(selectedSubtypeDefaults, subtypeEnabledFields)}
+                      onClick={() => applyDefaults(selectedSubtypeDefaults, subtypePrefillFields)}
                       className="inline-flex items-center gap-2 rounded-full bg-purple-100 px-4 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-200 transition-colors"
                     >
                       Apply subtype defaults
