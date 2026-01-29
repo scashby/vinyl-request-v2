@@ -878,7 +878,8 @@ export default function EditEventForm() {
         });
         
         if (eventsToInsert.length > 0) {
-          await supabase.from('events').insert(eventsToInsert);
+          const { error: insertError } = await supabase.from('events').insert(eventsToInsert);
+          if (insertError) throw insertError;
         }
       } else {
         // Create/Update Single
