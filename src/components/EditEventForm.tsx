@@ -176,6 +176,35 @@ function buildTag(prefix: string, value?: string) {
   return `${prefix}${value}`;
 }
 
+function buildEventDataFromDbEvent(dbEvent: DbEvent): EventData {
+  const normalizedTags = normalizeStringArray(dbEvent.allowed_tags);
+  return {
+    event_type: getTagValue(normalizedTags, EVENT_TYPE_TAG_PREFIX),
+    event_subtype: getTagValue(normalizedTags, EVENT_SUBTYPE_TAG_PREFIX),
+    title: dbEvent.title ?? '',
+    date: dbEvent.date ?? '',
+    time: dbEvent.time ?? '',
+    location: dbEvent.location ?? '',
+    image_url: dbEvent.image_url ?? '',
+    info: dbEvent.info ?? '',
+    info_url: dbEvent.info_url ?? '',
+    has_queue: !!dbEvent.has_queue,
+    queue_types: Array.isArray(dbEvent.queue_types)
+      ? dbEvent.queue_types
+      : dbEvent.queue_type ? [dbEvent.queue_type] : [],
+    allowed_formats: normalizeStringArray(dbEvent.allowed_formats),
+    crate_id: dbEvent.crate_id ?? null,
+    is_recurring: !!dbEvent.is_recurring,
+    recurrence_pattern: dbEvent.recurrence_pattern || 'weekly',
+    recurrence_interval: dbEvent.recurrence_interval || 1,
+    recurrence_end_date: dbEvent.recurrence_end_date || '',
+    parent_event_id: dbEvent.parent_event_id ?? undefined,
+    is_featured_grid: !!dbEvent.is_featured_grid,
+    is_featured_upnext: !!dbEvent.is_featured_upnext,
+    featured_priority: dbEvent.featured_priority ?? null,
+  };
+}
+
 const OVERRIDE_FIELDS: Array<{
   key: string;
   label: string;
@@ -242,6 +271,7 @@ export default function EditEventForm() {
     payload: Record<string, unknown>;
     targetEvents: DbEvent[];
   } | null>(null);
+  const [isRegeneratingChildren, setIsRegeneratingChildren] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [eventTypeConfig, setEventTypeConfig] = useState<EventTypeConfigState>(() =>
     normalizeEventTypeConfig(defaultEventTypeConfig)
@@ -367,6 +397,21 @@ export default function EditEventForm() {
     })();
   }, []);
 
+  const fetchSeriesEvents = async (parentId: number) => {
+    const { data: seriesData, error: seriesError } = await supabase
+      .from('events')
+      .select('*')
+      .or(`id.eq.${parentId},parent_event_id.eq.${parentId}`)
+      .order('date', { ascending: true });
+    if (seriesError) {
+      console.error('Error fetching series events:', seriesError);
+      return;
+    }
+    if (seriesData) {
+      setSeriesEvents(seriesData as DbEvent[]);
+    }
+  };
+
   // Fetch Event Data
   useEffect(() => {
     const fetchEvent = async () => {
@@ -434,16 +479,7 @@ export default function EditEventForm() {
           setSelectedSeriesEventId(dbEvent.id);
 
           if (dbEvent.is_recurring || dbEvent.parent_event_id) {
-            const { data: seriesData, error: seriesError } = await supabase
-              .from('events')
-              .select('*')
-              .or(`id.eq.${parentId},parent_event_id.eq.${parentId}`)
-              .order('date', { ascending: true });
-            if (seriesError) {
-              console.error('Error fetching series events:', seriesError);
-            } else if (seriesData) {
-              setSeriesEvents(seriesData as DbEvent[]);
-            }
+            await fetchSeriesEvents(parentId);
           }
         }
       }
@@ -562,6 +598,77 @@ export default function EditEventForm() {
   const buildTargetEvents = (mode: 'all' | 'future', baseDate: string) => {
     if (mode === 'all') return seriesEvents;
     return seriesEvents.filter((event) => event.date >= baseDate);
+  };
+
+  const handleRegenerateMissingChildren = async () => {
+    if (!seriesParentId) return;
+    setIsRegeneratingChildren(true);
+    try {
+      const { data: parentData, error: parentError } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', seriesParentId)
+        .single();
+      if (parentError || !parentData) {
+        throw parentError ?? new Error('Missing parent event data.');
+      }
+      const baseEvent = buildEventDataFromDbEvent(parentData as DbEvent);
+      if (!baseEvent.is_recurring || !baseEvent.recurrence_end_date) {
+        alert('Parent event is missing recurrence details. Update the series first.');
+        return;
+      }
+
+      const recurringEvents = generateRecurringEvents({ ...baseEvent, id: seriesParentId });
+      const expectedChildren = recurringEvents.slice(1);
+      const existingChildDates = new Set(
+        seriesEvents
+          .filter((event) => event.parent_event_id === seriesParentId)
+          .map((event) => event.date)
+      );
+      const missingChildren = expectedChildren.filter((event) => !existingChildDates.has(event.date));
+      if (missingChildren.length === 0) {
+        alert('No missing child events found.');
+        return;
+      }
+
+      const confirmed = window.confirm(
+        `Create ${missingChildren.length} missing child event${missingChildren.length === 1 ? '' : 's'}?`
+      );
+      if (!confirmed) return;
+
+      const normalizedFormats = baseEvent.allowed_formats
+        .map((format) => format.trim())
+        .filter(Boolean);
+      const normalizedQueueTypes = baseEvent.queue_types
+        .map((type) => type.trim())
+        .filter(Boolean);
+      const eventsToInsert = missingChildren.map((event) => {
+        const { event_type: _eventType, event_subtype: _eventSubtype, ...eventWithoutType } = event;
+        return {
+          ...eventWithoutType,
+          date: event.date,
+          allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
+          queue_types: baseEvent.has_queue && normalizedQueueTypes.length > 0
+            ? normalizedQueueTypes
+            : null,
+          crate_id: baseEvent.crate_id || null,
+          parent_event_id: seriesParentId,
+          recurrence_pattern: null,
+          recurrence_interval: null,
+          recurrence_end_date: null,
+        };
+      });
+
+      const { error: insertError } = await supabase.from('events').insert(eventsToInsert);
+      if (insertError) throw insertError;
+      await fetchSeriesEvents(seriesParentId);
+      alert(`Created ${missingChildren.length} missing child event${missingChildren.length === 1 ? '' : 's'}.`);
+    } catch (error) {
+      console.error('Error regenerating missing children:', error);
+      alert('Failed to regenerate missing children. Check console for details.');
+    } finally {
+      setIsRegeneratingChildren(false);
+    }
   };
 
   const getEventFieldValue = (event: DbEvent, key: string) => {
@@ -968,6 +1075,19 @@ export default function EditEventForm() {
               />
               <span>Edit all events in series</span>
             </label>
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => void handleRegenerateMissingChildren()}
+                disabled={isRegeneratingChildren}
+                className="inline-flex items-center justify-center rounded-lg border border-yellow-300 bg-white px-3 py-2 text-sm font-semibold text-yellow-900 shadow-sm transition hover:bg-yellow-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isRegeneratingChildren ? 'Regenerating...' : 'Regenerate missing children'}
+              </button>
+              <span className="text-xs text-yellow-700">
+                Create any missing events based on the series recurrence settings.
+              </span>
+            </div>
           </div>
         </div>
       )}
