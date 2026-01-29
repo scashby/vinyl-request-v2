@@ -24,9 +24,9 @@ export interface Database {
           info_url: string;
           has_queue: boolean;
           queue_type?: string | null;
-          queue_types?: string | null;
-          allowed_formats: string | null;
-          allowed_tags?: string | null;
+          queue_types?: string[] | null;
+          allowed_formats: string[] | null;
+          allowed_tags?: string[] | null;
           crate_id?: number | null;
           is_recurring: boolean;
           recurrence_pattern?: string | null;
@@ -50,9 +50,9 @@ export interface Database {
           info_url: string;
           has_queue?: boolean;
           queue_type?: string | null;
-          queue_types?: string | null;
-          allowed_formats?: string | null;
-          allowed_tags?: string | null;
+          queue_types?: string[] | null;
+          allowed_formats?: string[] | null;
+          allowed_tags?: string[] | null;
           crate_id?: number | null;
           is_recurring?: boolean;
           recurrence_pattern?: string | null;
@@ -76,9 +76,9 @@ export interface Database {
           info_url?: string;
           has_queue?: boolean;
           queue_type?: string | null;
-          queue_types?: string | null;
-          allowed_formats?: string | null;
-          allowed_tags?: string | null;
+          queue_types?: string[] | null;
+          allowed_formats?: string[] | null;
+          allowed_tags?: string[] | null;
           crate_id?: number | null;
           is_recurring?: boolean;
           recurrence_pattern?: string | null;
