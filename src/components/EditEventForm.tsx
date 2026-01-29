@@ -537,6 +537,7 @@ export default function EditEventForm() {
           ? normalizedQueueTypes
           : null,
         allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
+        crate_id: eventData.crate_id || null,
         
         is_recurring: isTBA ? false : eventData.is_recurring,
         ...(!isTBA && eventData.is_recurring ? {
@@ -575,15 +576,14 @@ export default function EditEventForm() {
         
         const recurringEvents = generateRecurringEvents({ ...eventData, id: savedEvent.id });
         const eventsToInsert = recurringEvents.slice(1).map((event) => {
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { crate_id: _crateId, ...eventWithoutCrate } = event;
           return {
-            ...eventWithoutCrate,
+            ...event,
             date: event.date,
             allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
             queue_types: eventData.has_queue && normalizedQueueTypes.length > 0
               ? normalizedQueueTypes
               : null,
+            crate_id: eventData.crate_id || null,
             parent_event_id: savedEvent.id,
             recurrence_pattern: null,
             recurrence_interval: null,
