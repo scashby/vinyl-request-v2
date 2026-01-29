@@ -185,6 +185,9 @@ export default function EditEventForm() {
   const [editMode, setEditMode] = useState<'all' | 'future' | 'single'>('all');
   const [isPartOfSeries, setIsPartOfSeries] = useState(false);
   const [isParentEvent, setIsParentEvent] = useState(false);
+  const [seriesEvents, setSeriesEvents] = useState<DbEvent[]>([]);
+  const [selectedSeriesEventId, setSelectedSeriesEventId] = useState<number | null>(null);
+  const [seriesParentId, setSeriesParentId] = useState<number | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [eventTypeConfig, setEventTypeConfig] = useState<EventTypeConfigState>(() =>
     normalizeEventTypeConfig(defaultEventTypeConfig)
@@ -348,6 +351,7 @@ export default function EditEventForm() {
           const dbEvent = data as DbEvent;
           const isTBA = !dbEvent.date || dbEvent.date === '' || dbEvent.date === '9999-12-31';
           const normalizedTags = normalizeStringArray(dbEvent.allowed_tags);
+          const parentId = dbEvent.parent_event_id || dbEvent.id;
           
           setEventData({
             ...eventData,
@@ -372,6 +376,21 @@ export default function EditEventForm() {
           
           setIsParentEvent(dbEvent.is_recurring === true);
           setIsPartOfSeries(!!dbEvent.parent_event_id);
+          setSeriesParentId(parentId);
+          setSelectedSeriesEventId(dbEvent.id);
+
+          if (dbEvent.is_recurring || dbEvent.parent_event_id) {
+            const { data: seriesData, error: seriesError } = await supabase
+              .from('events')
+              .select('*')
+              .or(`id.eq.${parentId},parent_event_id.eq.${parentId}`)
+              .order('date', { ascending: true });
+            if (seriesError) {
+              console.error('Error fetching series events:', seriesError);
+            } else if (seriesData) {
+              setSeriesEvents(seriesData as DbEvent[]);
+            }
+          }
         }
       }
     };
@@ -392,10 +411,51 @@ export default function EditEventForm() {
             ? (value === '' ? null : parseInt(value))
             : name === 'crate_id'
               ? (value === '' ? null : parseInt(value))
-              : value,
+              : name === 'image_url'
+                ? value.trim()
+                : value,
       ...(name === 'event_type' ? { event_subtype: '' } : {}),
       ...(name === 'date' && !value ? { is_recurring: false, recurrence_end_date: '' } : {})
     }));
+  };
+
+  const handleSeriesEventChange = async (eventIdValue: string) => {
+    const parsedId = eventIdValue ? Number.parseInt(eventIdValue, 10) : NaN;
+    if (Number.isNaN(parsedId)) return;
+    setSelectedSeriesEventId(parsedId);
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', parsedId)
+      .single();
+    if (error) {
+      console.error('Error fetching selected series event:', error);
+      return;
+    }
+    if (data) {
+      const dbEvent = data as DbEvent;
+      const normalizedTags = normalizeStringArray(dbEvent.allowed_tags);
+      const isTBA = !dbEvent.date || dbEvent.date === '' || dbEvent.date === '9999-12-31';
+      setEventData((prev) => ({
+        ...prev,
+        ...dbEvent,
+        event_type: getTagValue(normalizedTags, EVENT_TYPE_TAG_PREFIX),
+        event_subtype: getTagValue(normalizedTags, EVENT_SUBTYPE_TAG_PREFIX),
+        allowed_formats: normalizeStringArray(dbEvent.allowed_formats),
+        queue_types: Array.isArray(dbEvent.queue_types)
+          ? dbEvent.queue_types
+          : dbEvent.queue_type ? [dbEvent.queue_type] : [],
+        crate_id: dbEvent.crate_id || null,
+        is_recurring: dbEvent.is_recurring || false,
+        recurrence_pattern: dbEvent.recurrence_pattern || 'weekly',
+        recurrence_interval: dbEvent.recurrence_interval || 1,
+        recurrence_end_date: dbEvent.recurrence_end_date || '',
+        date: isTBA ? '9999-12-31' : dbEvent.date,
+        is_featured_grid: !!dbEvent.is_featured_grid,
+        is_featured_upnext: !!dbEvent.is_featured_upnext,
+        featured_priority: dbEvent.featured_priority ?? null,
+      }));
+    }
   };
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -486,7 +546,7 @@ export default function EditEventForm() {
 
         setEventData((prev) => ({
           ...prev,
-          image_url: publicUrl,
+          image_url: publicUrl.trim(),
         }));
       } catch (error) {
         console.error('Error uploading event image:', error);
@@ -508,6 +568,13 @@ export default function EditEventForm() {
         buildTag(EVENT_TYPE_TAG_PREFIX, eventData.event_type),
         buildTag(EVENT_SUBTYPE_TAG_PREFIX, eventData.event_subtype),
       ].filter(Boolean) as string[];
+      const normalizedFormats = eventData.allowed_formats
+        .map((format) => format.trim())
+        .filter(Boolean);
+      const normalizedQueueTypes = eventData.queue_types
+        .map((type) => type.trim())
+        .filter(Boolean);
+      const normalizedImageUrl = eventData.image_url.trim();
       
       const payload: Record<string, unknown> = {
         allowed_tags: allowedTags.length > 0 ? allowedTags : null,
@@ -515,15 +582,15 @@ export default function EditEventForm() {
         date: isTBA ? '9999-12-31' : eventData.date,
         time: eventData.time,
         location: eventData.location,
-        image_url: eventData.image_url,
+        image_url: normalizedImageUrl || null,
         info: eventData.info,
         info_url: eventData.info_url,
         has_queue: eventData.has_queue,
-        queue_types: eventData.has_queue && eventData.queue_types.length > 0 
-          ? `{${eventData.queue_types.join(',')}}`
+        queue_types: eventData.has_queue && normalizedQueueTypes.length > 0
+          ? normalizedQueueTypes
           : null,
-        allowed_formats: `{${eventData.allowed_formats.map(f => f.trim()).join(',')}}`,
-        crate_id: eventData.crate_id || null, 
+        allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
+        crate_id: eventData.crate_id || null,
         
         is_recurring: isTBA ? false : eventData.is_recurring,
         ...(!isTBA && eventData.is_recurring ? {
@@ -544,15 +611,23 @@ export default function EditEventForm() {
       console.log('Submitting payload:', payload);
 
       // Handle Updates (Single, Future, Series)
+      const targetEventId = selectedSeriesEventId ?? (id ? Number.parseInt(id, 10) : null);
       if (id && (isParentEvent || isPartOfSeries)) {
         if (editMode === 'single') {
+           if (!targetEventId) throw new Error('Missing target event ID.');
            const singlePayload = { ...payload, is_recurring: false, recurrence_pattern: null, recurrence_interval: null, recurrence_end_date: null, parent_event_id: null };
-           await supabase.from('events').update(singlePayload).eq('id', id);
+           await supabase.from('events').update(singlePayload).eq('id', targetEventId);
         } else if (editMode === 'future') {
-           const parentId = eventData.parent_event_id || id;
-           await supabase.from('events').update(payload).or(`id.eq.${id},parent_event_id.eq.${parentId}`).gte('date', eventData.date);
+           if (!targetEventId) throw new Error('Missing target event ID.');
+           const parentId = seriesParentId ?? eventData.parent_event_id || targetEventId;
+           await supabase
+             .from('events')
+             .update(payload)
+             .or(`id.eq.${targetEventId},parent_event_id.eq.${parentId}`)
+             .gte('date', eventData.date);
         } else {
-           const parentId = eventData.parent_event_id || id;
+           const parentId = seriesParentId ?? eventData.parent_event_id || targetEventId;
+           if (!parentId) throw new Error('Missing parent event ID.');
            await supabase.from('events').update(payload).or(`id.eq.${parentId},parent_event_id.eq.${parentId}`);
         }
       } else if (!isTBA && eventData.is_recurring && !id) {
@@ -561,17 +636,23 @@ export default function EditEventForm() {
         if (error) throw error;
         
         const recurringEvents = generateRecurringEvents({ ...eventData, id: savedEvent.id });
-        const eventsToInsert = recurringEvents.slice(1).map(e => ({
-          ...e,
-          date: e.date,
-          allowed_formats: `{${e.allowed_formats.map(f => f.trim()).join(',')}}`,
-          queue_types: eventData.has_queue && eventData.queue_types.length > 0 ? `{${eventData.queue_types.join(',')}}` : null,
-          crate_id: eventData.crate_id || null,
-          parent_event_id: savedEvent.id,
-          recurrence_pattern: null,
-          recurrence_interval: null,
-          recurrence_end_date: null,
-        }));
+        const eventsToInsert = recurringEvents.slice(1).map((event) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { event_type: _eventType, event_subtype: _eventSubtype, ...eventWithoutType } = event;
+          return {
+            ...eventWithoutType,
+            date: event.date,
+            allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
+            queue_types: eventData.has_queue && normalizedQueueTypes.length > 0
+              ? normalizedQueueTypes
+              : null,
+            crate_id: eventData.crate_id || null,
+            parent_event_id: savedEvent.id,
+            recurrence_pattern: null,
+            recurrence_interval: null,
+            recurrence_end_date: null,
+          };
+        });
         
         if (eventsToInsert.length > 0) {
           await supabase.from('events').insert(eventsToInsert);
@@ -616,6 +697,23 @@ export default function EditEventForm() {
         <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
           <h3 className="font-bold text-yellow-800 mb-2">📅 Editing Recurring Event</h3>
           <div className="flex flex-col gap-2">
+            <label className="flex flex-col gap-2 text-sm text-yellow-900">
+              <span className="font-medium">Base event for edits</span>
+              <select
+                value={selectedSeriesEventId ? String(selectedSeriesEventId) : ''}
+                onChange={(e) => void handleSeriesEventChange(e.target.value)}
+                className="rounded-lg border border-yellow-200 bg-white px-3 py-2 text-sm shadow-sm"
+              >
+                {seriesEvents.map((seriesEvent) => (
+                  <option key={seriesEvent.id} value={seriesEvent.id}>
+                    {seriesEvent.date} — {seriesEvent.title}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-yellow-700">
+                Select which event to use as the starting point for “this event” and “this and future events.”
+              </span>
+            </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input 
                 type="radio" 

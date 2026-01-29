@@ -27,6 +27,7 @@ export interface Database {
           queue_types?: string | null;
           allowed_formats: string | null;
           allowed_tags?: string | null;
+          crate_id?: number | null;
           is_recurring: boolean;
           recurrence_pattern?: string | null;
           recurrence_interval?: number | null;
@@ -52,6 +53,7 @@ export interface Database {
           queue_types?: string | null;
           allowed_formats?: string | null;
           allowed_tags?: string | null;
+          crate_id?: number | null;
           is_recurring?: boolean;
           recurrence_pattern?: string | null;
           recurrence_interval?: number | null;
@@ -77,6 +79,7 @@ export interface Database {
           queue_types?: string | null;
           allowed_formats?: string | null;
           allowed_tags?: string | null;
+          crate_id?: number | null;
           is_recurring?: boolean;
           recurrence_pattern?: string | null;
           recurrence_interval?: number | null;
