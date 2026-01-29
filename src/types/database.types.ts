@@ -364,6 +364,7 @@ export interface Database {
           queue_type: string | null
           allowed_tags: string[] | null
           queue_types: string[] | null
+          crate_id: number | null
           is_featured_grid: boolean
           is_featured_upnext: boolean
           featured_priority: number | null
