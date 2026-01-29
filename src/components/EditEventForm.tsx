@@ -176,6 +176,11 @@ function buildTag(prefix: string, value?: string) {
   return `${prefix}${value}`;
 }
 
+function formatPostgresArray(values: string[]): string | null {
+  if (values.length === 0) return null;
+  return `{${values.join(',')}}`;
+}
+
 export default function EditEventForm() {
   const searchParams = useSearchParams();
   const id = searchParams.get('id');
