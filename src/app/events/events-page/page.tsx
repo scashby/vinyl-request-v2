@@ -15,6 +15,7 @@ interface Event {
   image_url?: string;
   is_featured_grid?: boolean;
   featured_priority?: number | string | null;
+  allowed_tags?: string[] | string | null;
 }
 
 interface DJSet {
@@ -36,6 +37,28 @@ interface DateObj {
   day: string | number;
   wk: string;
 }
+
+const EVENT_TYPE_TAG_PREFIX = 'event_type:';
+
+const normalizeStringArray = (value: unknown): string[] => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    return value.replace(/[{}]/g, '').split(',').map((item) => item.trim()).filter(Boolean);
+  }
+  return [];
+};
+
+const getTagValue = (tags: string[], prefix: string): string => {
+  const match = tags.find((tag) => tag.startsWith(prefix));
+  return match ? match.replace(prefix, '') : '';
+};
+
+const getDisplayTitle = (event: Event): string => {
+  const tags = normalizeStringArray(event.allowed_tags);
+  const eventType = getTagValue(tags, EVENT_TYPE_TAG_PREFIX);
+  if (eventType === 'private-dj') return 'Private Event';
+  return event.title;
+};
 
 export default function Page() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -237,6 +260,7 @@ export default function Page() {
                         !ev.date ||
                         ev.date === "" ||
                         ev.date === "9999-12-31";
+                      const displayTitle = getDisplayTitle(ev);
 
                       return (
                         <Link
@@ -248,7 +272,7 @@ export default function Page() {
                             <div className="relative w-full aspect-video">
                               <Image
                                 src={img}
-                                alt={ev.title}
+                                alt={displayTitle}
                                 fill
                                 sizes="(max-width:900px) 100vw, 700px"
                                 className="object-cover"
@@ -264,7 +288,7 @@ export default function Page() {
                               <h3
                                 className="text-white text-3xl font-black leading-tight m-0"
                                 dangerouslySetInnerHTML={{
-                                  __html: formatEventText(ev.title),
+                                  __html: formatEventText(displayTitle),
                                 }}
                               />
                             </div>
@@ -288,6 +312,7 @@ export default function Page() {
                       const img = e.image_url || "/images/coverplaceholder.png";
                       const d = compactDate(e.date);
                       const tba = !e.date || e.date === "" || e.date === "9999-12-31";
+                      const displayTitle = getDisplayTitle(e);
 
                       return (
                         <Link
@@ -299,7 +324,7 @@ export default function Page() {
                             <div className="relative w-full pt-[100%]">
                               <Image
                                 src={img}
-                                alt={e.title}
+                                alt={displayTitle}
                                 fill
                                 sizes="280px"
                                 className="object-cover"
@@ -309,7 +334,7 @@ export default function Page() {
                             <div className="p-4">
                               <h4
                                 className="text-white text-lg font-extrabold leading-tight min-h-[2.5rem] mb-2"
-                                dangerouslySetInnerHTML={{ __html: formatEventText(e.title) }}
+                                dangerouslySetInnerHTML={{ __html: formatEventText(displayTitle) }}
                               />
                               <div className="text-[#00d9ff] font-extrabold text-sm">
                                 {tba ? "TBA" : `${d.mon} ${d.day}`}
@@ -336,6 +361,7 @@ export default function Page() {
                       // FIX: Updated placeholder path
                       const img =
                         e.image_url || "/images/coverplaceholder.png";
+                      const displayTitle = getDisplayTitle(e);
 
                       return (
                         <Link
@@ -349,7 +375,7 @@ export default function Page() {
                             <div className="relative w-full h-[150px] rounded-md overflow-hidden hidden md:block">
                               <Image
                                 src={img}
-                                alt={e.title}
+                                alt={displayTitle}
                                 fill
                                 sizes="150px"
                                 className="object-cover"
@@ -360,7 +386,7 @@ export default function Page() {
                             <div className="min-w-0 col-span-1 md:col-span-1">
                               <h3
                                 className="text-white text-xl font-extrabold leading-tight mb-1"
-                                dangerouslySetInnerHTML={{ __html: formatEventText(e.title) }}
+                                dangerouslySetInnerHTML={{ __html: formatEventText(displayTitle) }}
                               />
                               {e.location && (
                                 <div className="text-[#9aa3ad] text-sm mt-1">
@@ -395,6 +421,7 @@ export default function Page() {
                           !e.date ||
                           e.date === "" ||
                           e.date === "9999-12-31";
+                        const displayTitle = getDisplayTitle(e);
 
                         const palettes = [
                           {
@@ -465,7 +492,7 @@ export default function Page() {
                                     "0 1px 0 rgba(0,0,0,.25)",
                                 }}
                                 dangerouslySetInnerHTML={{
-                                  __html: formatEventText(e.title),
+                                  __html: formatEventText(displayTitle),
                                 }}
                               />
                               <div
