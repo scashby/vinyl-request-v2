@@ -66,7 +66,7 @@ export async function POST(req: Request) {
     // Get album info
     const { data: album, error: dbError } = await supabase
       .from('collection')
-      .select('id, artist, title, discogs_release_id, tracklists')
+      .select('id, artist, title, discogs_release_id, tracks')
       .eq('id', albumId)
       .single();
 
@@ -89,9 +89,9 @@ export async function POST(req: Request) {
     }
 
     // Check if already has tracks with artist info
-    if (album.tracklists) {
+    if (album.tracks) {
       try {
-        const existingTracks = JSON.parse(album.tracklists);
+        const existingTracks = JSON.parse(album.tracks);
         if (Array.isArray(existingTracks) && existingTracks.length > 0) {
           const hasArtistData = existingTracks.some(t => t.artist && t.artist !== album.artist);
           if (hasArtistData) {
@@ -149,7 +149,7 @@ export async function POST(req: Request) {
     const { error: updateError } = await supabase
       .from('collection')
       .update({
-        tracklists: JSON.stringify(enrichedTracks)
+        tracks: JSON.stringify(enrichedTracks)
       })
       .eq('id', albumId);
 

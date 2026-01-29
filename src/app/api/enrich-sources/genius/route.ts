@@ -123,7 +123,7 @@ export async function POST(req: Request) {
 
     const { data: album, error: dbError } = await supabase
       .from('collection')
-      .select('id, artist, title, tracklists')
+      .select('id, artist, title, tracks')
       .eq('id', albumId)
       .single();
 
@@ -138,11 +138,11 @@ export async function POST(req: Request) {
     console.log(`✓ Album found: "${album.artist}" - "${album.title}"`);
 
     let tracks: Track[] = [];
-    if (album.tracklists) {
+    if (album.tracks) {
       try {
-        tracks = typeof album.tracklists === 'string' 
-          ? JSON.parse(album.tracklists)
-          : album.tracklists;
+        tracks = typeof album.tracks === 'string' 
+          ? JSON.parse(album.tracks)
+          : album.tracks;
         console.log(`✓ Parsed ${tracks.length} tracks from tracklist`);
       } catch (err) {
         console.log('❌ ERROR: Invalid tracklist format', err);
@@ -244,7 +244,7 @@ export async function POST(req: Request) {
       console.log(`💾 Updating database...`);
       const { error: updateError } = await supabase
         .from('collection')
-        .update({ tracklists: JSON.stringify(enrichedTracks) })
+        .update({ tracks: JSON.stringify(enrichedTracks) })
         .eq('id', albumId);
 
       if (updateError) {
