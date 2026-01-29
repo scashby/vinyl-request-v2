@@ -844,6 +844,16 @@ export default function EditEventForm() {
            await supabase.from('events').update(payload).or(`id.eq.${parentId},parent_event_id.eq.${parentId}`);
         }
       } else if (!isTBA && eventData.is_recurring && !id) {
+        if (!eventData.recurrence_end_date) {
+          alert('Please choose a series end date before creating recurring events.');
+          return;
+        }
+        const recurrenceEnd = new Date(eventData.recurrence_end_date);
+        const recurrenceStart = new Date(eventData.date);
+        if (recurrenceEnd <= recurrenceStart) {
+          alert('Series end date must be after the start date to create future events.');
+          return;
+        }
         // Create Recurring
         const { data: savedEvent, error } = await supabase.from('events').insert([payload]).select().single();
         if (error) throw error;
@@ -868,7 +878,8 @@ export default function EditEventForm() {
         });
         
         if (eventsToInsert.length > 0) {
-          await supabase.from('events').insert(eventsToInsert);
+          const { error: insertError } = await supabase.from('events').insert(eventsToInsert);
+          if (insertError) throw insertError;
         }
       } else {
         // Create/Update Single
