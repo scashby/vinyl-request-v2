@@ -19,6 +19,7 @@ const EVENT_TYPE_SETTINGS_KEY = 'event_type_config';
 
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
 const EVENT_SUBTYPE_TAG_PREFIX = 'event_subtype:';
+const EVENT_CRATE_TAG_PREFIX = 'crate_id:';
 
 const TEMPLATE_FIELDS = ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'queue', 'recurrence', 'crate', 'formats'];
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
@@ -171,8 +172,20 @@ function getTagValue(tags: string[], prefix: string): string {
   return match ? match.replace(prefix, '') : '';
 }
 
+function getTagNumber(tags: string[], prefix: string): number | null {
+  const value = getTagValue(tags, prefix);
+  if (!value) return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 function buildTag(prefix: string, value?: string) {
   if (!value) return null;
+  return `${prefix}${value}`;
+}
+
+function buildNumberTag(prefix: string, value?: number | null) {
+  if (value === null || typeof value === 'undefined') return null;
   return `${prefix}${value}`;
 }
 
@@ -331,7 +344,7 @@ export default function EditEventForm() {
           event_subtype: getTagValue(normalizedTags, EVENT_SUBTYPE_TAG_PREFIX),
           allowed_formats: normalizeStringArray(copiedEvent?.allowed_formats),
           queue_types: Array.isArray(copiedEvent?.queue_types) ? copiedEvent!.queue_types : [],
-          crate_id: copiedEvent?.crate_id || null,
+          crate_id: getTagNumber(normalizedTags, EVENT_CRATE_TAG_PREFIX) ?? copiedEvent?.crate_id || null,
           title: copiedEvent?.title ? `${copiedEvent.title} (Copy)` : '',
           is_recurring: false
         }));
@@ -358,7 +371,7 @@ export default function EditEventForm() {
             queue_types: Array.isArray(dbEvent.queue_types)
               ? dbEvent.queue_types
               : dbEvent.queue_type ? [dbEvent.queue_type] : [],
-            crate_id: dbEvent.crate_id || null,
+            crate_id: getTagNumber(normalizedTags, EVENT_CRATE_TAG_PREFIX) ?? dbEvent.crate_id || null,
             
             is_recurring: dbEvent.is_recurring || false,
             recurrence_pattern: dbEvent.recurrence_pattern || 'weekly',
@@ -392,7 +405,9 @@ export default function EditEventForm() {
             ? (value === '' ? null : parseInt(value))
             : name === 'crate_id'
               ? (value === '' ? null : parseInt(value))
-              : value,
+              : name === 'image_url'
+                ? value.trim()
+                : value,
       ...(name === 'event_type' ? { event_subtype: '' } : {}),
       ...(name === 'date' && !value ? { is_recurring: false, recurrence_end_date: '' } : {})
     }));
@@ -486,7 +501,7 @@ export default function EditEventForm() {
 
         setEventData((prev) => ({
           ...prev,
-          image_url: publicUrl,
+          image_url: publicUrl.trim(),
         }));
       } catch (error) {
         console.error('Error uploading event image:', error);
@@ -507,7 +522,15 @@ export default function EditEventForm() {
       const allowedTags = [
         buildTag(EVENT_TYPE_TAG_PREFIX, eventData.event_type),
         buildTag(EVENT_SUBTYPE_TAG_PREFIX, eventData.event_subtype),
+        buildNumberTag(EVENT_CRATE_TAG_PREFIX, eventData.crate_id),
       ].filter(Boolean) as string[];
+      const normalizedFormats = eventData.allowed_formats
+        .map((format) => format.trim())
+        .filter(Boolean);
+      const normalizedQueueTypes = eventData.queue_types
+        .map((type) => type.trim())
+        .filter(Boolean);
+      const normalizedImageUrl = eventData.image_url.trim();
       
       const payload: Record<string, unknown> = {
         allowed_tags: allowedTags.length > 0 ? allowedTags : null,
@@ -515,15 +538,14 @@ export default function EditEventForm() {
         date: isTBA ? '9999-12-31' : eventData.date,
         time: eventData.time,
         location: eventData.location,
-        image_url: eventData.image_url,
+        image_url: normalizedImageUrl || null,
         info: eventData.info,
         info_url: eventData.info_url,
         has_queue: eventData.has_queue,
-        queue_types: eventData.has_queue && eventData.queue_types.length > 0 
-          ? `{${eventData.queue_types.join(',')}}`
+        queue_types: eventData.has_queue && normalizedQueueTypes.length > 0
+          ? normalizedQueueTypes
           : null,
-        allowed_formats: `{${eventData.allowed_formats.map(f => f.trim()).join(',')}}`,
-        crate_id: eventData.crate_id || null, 
+        allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
         
         is_recurring: isTBA ? false : eventData.is_recurring,
         ...(!isTBA && eventData.is_recurring ? {
@@ -561,17 +583,22 @@ export default function EditEventForm() {
         if (error) throw error;
         
         const recurringEvents = generateRecurringEvents({ ...eventData, id: savedEvent.id });
-        const eventsToInsert = recurringEvents.slice(1).map(e => ({
-          ...e,
-          date: e.date,
-          allowed_formats: `{${e.allowed_formats.map(f => f.trim()).join(',')}}`,
-          queue_types: eventData.has_queue && eventData.queue_types.length > 0 ? `{${eventData.queue_types.join(',')}}` : null,
-          crate_id: eventData.crate_id || null,
-          parent_event_id: savedEvent.id,
-          recurrence_pattern: null,
-          recurrence_interval: null,
-          recurrence_end_date: null,
-        }));
+        const eventsToInsert = recurringEvents.slice(1).map((event) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { crate_id: _crateId, ...eventWithoutCrate } = event;
+          return {
+            ...eventWithoutCrate,
+            date: event.date,
+            allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
+            queue_types: eventData.has_queue && normalizedQueueTypes.length > 0
+              ? normalizedQueueTypes
+              : null,
+            parent_event_id: savedEvent.id,
+            recurrence_pattern: null,
+            recurrence_interval: null,
+            recurrence_end_date: null,
+          };
+        });
         
         if (eventsToInsert.length > 0) {
           await supabase.from('events').insert(eventsToInsert);
