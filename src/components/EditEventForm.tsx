@@ -19,6 +19,7 @@ const EVENT_TYPE_SETTINGS_KEY = 'event_type_config';
 
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
 const EVENT_SUBTYPE_TAG_PREFIX = 'event_subtype:';
+const EVENT_CRATE_TAG_PREFIX = 'crate_id:';
 
 const TEMPLATE_FIELDS = ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'queue', 'recurrence', 'crate', 'formats'];
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
@@ -171,14 +172,21 @@ function getTagValue(tags: string[], prefix: string): string {
   return match ? match.replace(prefix, '') : '';
 }
 
+function getTagNumber(tags: string[], prefix: string): number | null {
+  const value = getTagValue(tags, prefix);
+  if (!value) return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 function buildTag(prefix: string, value?: string) {
   if (!value) return null;
   return `${prefix}${value}`;
 }
 
-function formatPostgresArray(values: string[]): string | null {
-  if (values.length === 0) return null;
-  return `{${values.join(',')}}`;
+function buildNumberTag(prefix: string, value?: number | null) {
+  if (value === null || typeof value === 'undefined') return null;
+  return `${prefix}${value}`;
 }
 
 export default function EditEventForm() {
@@ -336,7 +344,7 @@ export default function EditEventForm() {
           event_subtype: getTagValue(normalizedTags, EVENT_SUBTYPE_TAG_PREFIX),
           allowed_formats: normalizeStringArray(copiedEvent?.allowed_formats),
           queue_types: Array.isArray(copiedEvent?.queue_types) ? copiedEvent!.queue_types : [],
-          crate_id: copiedEvent?.crate_id || null,
+          crate_id: getTagNumber(normalizedTags, EVENT_CRATE_TAG_PREFIX) ?? copiedEvent?.crate_id || null,
           title: copiedEvent?.title ? `${copiedEvent.title} (Copy)` : '',
           is_recurring: false
         }));
@@ -363,7 +371,7 @@ export default function EditEventForm() {
             queue_types: Array.isArray(dbEvent.queue_types)
               ? dbEvent.queue_types
               : dbEvent.queue_type ? [dbEvent.queue_type] : [],
-            crate_id: dbEvent.crate_id || null,
+            crate_id: getTagNumber(normalizedTags, EVENT_CRATE_TAG_PREFIX) ?? dbEvent.crate_id || null,
             
             is_recurring: dbEvent.is_recurring || false,
             recurrence_pattern: dbEvent.recurrence_pattern || 'weekly',
@@ -514,6 +522,7 @@ export default function EditEventForm() {
       const allowedTags = [
         buildTag(EVENT_TYPE_TAG_PREFIX, eventData.event_type),
         buildTag(EVENT_SUBTYPE_TAG_PREFIX, eventData.event_subtype),
+        buildNumberTag(EVENT_CRATE_TAG_PREFIX, eventData.crate_id),
       ].filter(Boolean) as string[];
       const normalizedFormats = eventData.allowed_formats
         .map((format) => format.trim())

@@ -25,6 +25,7 @@ interface Event {
 
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
 const EVENT_SUBTYPE_TAG_PREFIX = 'event_subtype:';
+const EVENT_CRATE_TAG_PREFIX = 'crate_id:';
 
 const eventTypeLabels: Record<string, string> = {
   brewery: 'Brewery Event',
@@ -51,6 +52,13 @@ const normalizeStringArray = (value: unknown): string[] => {
 const getTagValue = (tags: string[], prefix: string): string => {
   const match = tags.find((tag) => tag.startsWith(prefix));
   return match ? match.replace(prefix, '') : '';
+};
+
+const getTagNumber = (tags: string[], prefix: string): number | null => {
+  const value = getTagValue(tags, prefix);
+  if (!value) return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? null : parsed;
 };
 
 export default function Page() {
@@ -195,6 +203,7 @@ export default function Page() {
           const tags = normalizeStringArray(event.allowed_tags);
           const eventType = getTagValue(tags, EVENT_TYPE_TAG_PREFIX);
           const eventSubtype = getTagValue(tags, EVENT_SUBTYPE_TAG_PREFIX);
+          const crateId = getTagNumber(tags, EVENT_CRATE_TAG_PREFIX) ?? event.crate_id ?? null;
 
           return (
             <Card key={event.id} className="flex flex-col gap-4">
@@ -219,9 +228,9 @@ export default function Page() {
                         {eventSubtypeLabels[eventSubtype] || eventSubtype}
                       </span>
                     )}
-                    {event.crate_id && crates[event.crate_id] && (
+                    {crateId && crates[crateId] && (
                       <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded-full">
-                        📦 {crates[event.crate_id]}
+                        📦 {crates[crateId]}
                       </span>
                     )}
                     {event.has_queue && (
