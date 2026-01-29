@@ -176,6 +176,11 @@ function buildTag(prefix: string, value?: string) {
   return `${prefix}${value}`;
 }
 
+function formatPostgresArray(values: string[]): string | null {
+  if (values.length === 0) return null;
+  return `{${values.join(',')}}`;
+}
+
 export default function EditEventForm() {
   const searchParams = useSearchParams();
   const id = searchParams.get('id');
@@ -392,7 +397,9 @@ export default function EditEventForm() {
             ? (value === '' ? null : parseInt(value))
             : name === 'crate_id'
               ? (value === '' ? null : parseInt(value))
-              : value,
+              : name === 'image_url'
+                ? value.trim()
+                : value,
       ...(name === 'event_type' ? { event_subtype: '' } : {}),
       ...(name === 'date' && !value ? { is_recurring: false, recurrence_end_date: '' } : {})
     }));
@@ -486,7 +493,7 @@ export default function EditEventForm() {
 
         setEventData((prev) => ({
           ...prev,
-          image_url: publicUrl,
+          image_url: publicUrl.trim(),
         }));
       } catch (error) {
         console.error('Error uploading event image:', error);
@@ -508,6 +515,13 @@ export default function EditEventForm() {
         buildTag(EVENT_TYPE_TAG_PREFIX, eventData.event_type),
         buildTag(EVENT_SUBTYPE_TAG_PREFIX, eventData.event_subtype),
       ].filter(Boolean) as string[];
+      const normalizedFormats = eventData.allowed_formats
+        .map((format) => format.trim())
+        .filter(Boolean);
+      const normalizedQueueTypes = eventData.queue_types
+        .map((type) => type.trim())
+        .filter(Boolean);
+      const normalizedImageUrl = eventData.image_url.trim();
       
       const payload: Record<string, unknown> = {
         allowed_tags: allowedTags.length > 0 ? allowedTags : null,
@@ -515,14 +529,14 @@ export default function EditEventForm() {
         date: isTBA ? '9999-12-31' : eventData.date,
         time: eventData.time,
         location: eventData.location,
-        image_url: eventData.image_url,
+        image_url: normalizedImageUrl || null,
         info: eventData.info,
         info_url: eventData.info_url,
         has_queue: eventData.has_queue,
-        queue_types: eventData.has_queue && eventData.queue_types.length > 0 
-          ? `{${eventData.queue_types.join(',')}}`
+        queue_types: eventData.has_queue
+          ? formatPostgresArray(normalizedQueueTypes)
           : null,
-        allowed_formats: `{${eventData.allowed_formats.map(f => f.trim()).join(',')}}`,
+        allowed_formats: formatPostgresArray(normalizedFormats),
         crate_id: eventData.crate_id || null, 
         
         is_recurring: isTBA ? false : eventData.is_recurring,
@@ -564,8 +578,10 @@ export default function EditEventForm() {
         const eventsToInsert = recurringEvents.slice(1).map(e => ({
           ...e,
           date: e.date,
-          allowed_formats: `{${e.allowed_formats.map(f => f.trim()).join(',')}}`,
-          queue_types: eventData.has_queue && eventData.queue_types.length > 0 ? `{${eventData.queue_types.join(',')}}` : null,
+          allowed_formats: formatPostgresArray(normalizedFormats),
+          queue_types: eventData.has_queue
+            ? formatPostgresArray(normalizedQueueTypes)
+            : null,
           crate_id: eventData.crate_id || null,
           parent_event_id: savedEvent.id,
           recurrence_pattern: null,
