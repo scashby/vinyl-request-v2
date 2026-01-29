@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "lib/supabaseClient";
 import { Container } from "components/ui/Container";
 import { Button } from "components/ui/Button";
@@ -133,6 +133,85 @@ const resetDefaultsForField = (
   if (field === "crate") nextDefaults.crate_id = null;
   if (field === "formats") nextDefaults.allowed_formats = [];
   return nextDefaults;
+};
+
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
+const GOOGLE_MAPS_LIBRARIES = "places";
+let googleMapsScriptPromise: Promise<void> | null = null;
+
+const loadGoogleMapsScript = () => {
+  if (!GOOGLE_MAPS_API_KEY) return Promise.resolve();
+  if (googleMapsScriptPromise) return googleMapsScriptPromise;
+  googleMapsScriptPromise = new Promise((resolve, reject) => {
+    if (typeof window === "undefined") {
+      resolve();
+      return;
+    }
+    if ((window as typeof window & { google?: unknown }).google) {
+      resolve();
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=${GOOGLE_MAPS_LIBRARIES}`;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Google Maps script"));
+    document.head.appendChild(script);
+  });
+  return googleMapsScriptPromise;
+};
+
+const LocationAutocompleteInput = ({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (nextValue: string) => void;
+}) => {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!GOOGLE_MAPS_API_KEY || !inputRef.current) return;
+    let autocomplete: {
+      getPlace: () => { formatted_address?: string };
+      addListener: (event: string, handler: () => void) => { remove: () => void };
+    } | null = null;
+    let listener: { remove: () => void } | null = null;
+
+    void loadGoogleMapsScript()
+      .then(() => {
+        if (!inputRef.current) return;
+        const googleMaps = (window as typeof window & { google?: any }).google;
+        if (!googleMaps?.maps?.places) return;
+        autocomplete = new googleMaps.maps.places.Autocomplete(inputRef.current, {
+          types: ["geocode"],
+        });
+        listener = autocomplete.addListener("place_changed", () => {
+          const place = autocomplete?.getPlace();
+          if (place?.formatted_address) {
+            onChange(place.formatted_address);
+          }
+        });
+      })
+      .catch((error) => {
+        console.warn("Google Maps autocomplete unavailable:", error);
+      });
+
+    return () => {
+      if (listener) listener.remove();
+      autocomplete = null;
+    };
+  }, [onChange]);
+
+  return (
+    <input
+      ref={inputRef}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+      placeholder="Venue or address"
+    />
+  );
 };
 
 export default function Page() {
@@ -582,11 +661,9 @@ export default function Page() {
         )}
         {fieldId === "location" && (
           <div className="space-y-2">
-            <input
+            <LocationAutocompleteInput
               value={defaults?.location || ""}
-              onChange={(e) => onUpdate({ location: e.target.value })}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-              placeholder="Venue or address"
+              onChange={(nextValue) => onUpdate({ location: nextValue })}
             />
             {defaults?.location && (
               <a
@@ -597,8 +674,13 @@ export default function Page() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-700"
               >
-                Search in Google Maps
+                Open in Google Maps
               </a>
+            )}
+            {!GOOGLE_MAPS_API_KEY && (
+              <p className="text-xs text-gray-400">
+                Add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to enable address autocomplete.
+              </p>
             )}
           </div>
         )}

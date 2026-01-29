@@ -3,7 +3,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from 'src/lib/supabaseClient';
@@ -21,6 +21,31 @@ const EVENT_TYPE_TAG_PREFIX = 'event_type:';
 const EVENT_SUBTYPE_TAG_PREFIX = 'event_subtype:';
 
 const TEMPLATE_FIELDS = ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'queue', 'recurrence', 'crate', 'formats'];
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
+const GOOGLE_MAPS_LIBRARIES = 'places';
+let googleMapsScriptPromise: Promise<void> | null = null;
+
+const loadGoogleMapsScript = () => {
+  if (!GOOGLE_MAPS_API_KEY) return Promise.resolve();
+  if (googleMapsScriptPromise) return googleMapsScriptPromise;
+  googleMapsScriptPromise = new Promise((resolve, reject) => {
+    if (typeof window === 'undefined') {
+      resolve();
+      return;
+    }
+    if ((window as typeof window & { google?: unknown }).google) {
+      resolve();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=${GOOGLE_MAPS_LIBRARIES}`;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Google Maps script'));
+    document.head.appendChild(script);
+  });
+  return googleMapsScriptPromise;
+};
 
 const normalizeEventTypeConfig = (config: EventTypeConfigState): EventTypeConfigState => ({
   types: config.types.map((type) => ({
@@ -205,6 +230,7 @@ export default function EditEventForm() {
   const showLocation = isFieldEnabled('location');
   const showInfo = isFieldEnabled('info');
   const showInfoUrl = isFieldEnabled('info_url');
+  const locationInputRef = useRef<HTMLInputElement | null>(null);
 
   // Fetch Available Crates
   useEffect(() => {
@@ -220,6 +246,42 @@ export default function EditEventForm() {
     };
     
     fetchCrates();
+  }, []);
+
+  useEffect(() => {
+    if (!GOOGLE_MAPS_API_KEY || !locationInputRef.current) return;
+    let autocomplete: {
+      getPlace: () => { formatted_address?: string };
+      addListener: (event: string, handler: () => void) => { remove: () => void };
+    } | null = null;
+    let listener: { remove: () => void } | null = null;
+
+    void loadGoogleMapsScript()
+      .then(() => {
+        if (!locationInputRef.current) return;
+        const googleMaps = (window as typeof window & { google?: any }).google;
+        if (!googleMaps?.maps?.places) return;
+        autocomplete = new googleMaps.maps.places.Autocomplete(locationInputRef.current, {
+          types: ['geocode'],
+        });
+        listener = autocomplete.addListener('place_changed', () => {
+          const place = autocomplete?.getPlace();
+          if (place?.formatted_address) {
+            setEventData((prev) => ({
+              ...prev,
+              location: place.formatted_address || '',
+            }));
+          }
+        });
+      })
+      .catch((error) => {
+        console.warn('Google Maps autocomplete unavailable:', error);
+      });
+
+    return () => {
+      if (listener) listener.remove();
+      autocomplete = null;
+    };
   }, []);
 
   useEffect(() => {
@@ -718,12 +780,18 @@ export default function EditEventForm() {
                   <div>
                     <label className="text-sm font-medium text-gray-700">Location</label>
                     <input
+                      ref={locationInputRef}
                       name="location"
                       value={eventData.location}
                       onChange={handleChange}
                       placeholder="Venue or address"
                       className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
                     />
+                    {!GOOGLE_MAPS_API_KEY && (
+                      <p className="text-xs text-gray-400 mt-2">
+                        Add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to enable address autocomplete.
+                      </p>
+                    )}
                     {eventData.location && (
                       <a
                         href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(eventData.location)}`}
