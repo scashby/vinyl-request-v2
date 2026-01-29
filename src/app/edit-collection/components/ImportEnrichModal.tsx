@@ -57,6 +57,7 @@ type EnrichmentStats = {
   needsEnrichment: number;
   fullyEnriched: number;
   missingArtwork: number;
+  missingFrontCover?: number;
   missingBackCover: number;
   missingSpine?: number;
   missingInnerSleeve?: number;
@@ -177,6 +178,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [folderFilter, setFolderFilter] = useState('');
   const [batchSize, setBatchSize] = useState('10');
   const [autoSnooze, setAutoSnooze] = useState(true); // Default to true (30-day skip)
+  const [missingDataOnly, setMissingDataOnly] = useState(false);
   
   const [fieldConfig, setFieldConfig] = useState<FieldConfigMap>({});
 
@@ -369,7 +371,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           // Assuming the API expects 'folder' to filter by location:
           location: folderFilter || undefined, 
           services: getServicesForSelection(),
-          autoSnooze: autoSnooze // PASSED TO SERVER
+          fields: Object.keys(fieldConfig),
+          autoSnooze: autoSnooze, // PASSED TO SERVER
+          missingDataOnly: missingDataOnly
         };
 
         const res = await fetch('/api/enrich-sources/fetch-candidates', {
@@ -479,9 +483,13 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         }
       });
       
-      if (foundKeys.size > 0) {
-         const summary = Array.from(foundKeys)
-            .filter(k => !['artist', 'title'].includes(k))
+      const allowedSummaryKeys = Array.from(foundKeys)
+        .filter(k => !['artist', 'title'].includes(k))
+        .filter(k => ALLOWED_COLUMNS.has(k))
+        .filter(k => !!fieldConfig[k]);
+
+      if (allowedSummaryKeys.length > 0) {
+         const summary = allowedSummaryKeys
             .map(k => k.replace(/_/g, ' '))
             .join(', ');
             
@@ -691,6 +699,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           else {
               if (key === 'tracks' && !isCurrentEmpty) return;
               if (autoFilledFields.includes(key)) return;
+              if (missingDataOnly && !isCurrentEmpty) return;
 
               if (!areValuesEqual(currentVal, proposedValue)) {
                   let priorityList = GLOBAL_PRIORITY;
@@ -1143,6 +1152,18 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                     <option value="25">25 (Standard)</option>
                   </select>
                 </div>
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                  <input
+                    type="checkbox"
+                    checked={missingDataOnly}
+                    onChange={(e) => setMissingDataOnly(e.target.checked)}
+                    disabled={enriching}
+                  />
+                  Missing data only
+                  <span className="text-[11px] font-medium text-gray-500">
+                    (skip conflicts unless multiple options)
+                  </span>
+                </label>
               </div>
 
               {/* 4. SESSION LOG */}
@@ -1286,12 +1307,61 @@ function DataCategoryCard({
 
   const formatLabel = (f: string) => f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 
+  const getCategoryMissing = () => {
+    if (!stats) return 0;
+    switch (category) {
+      case 'artwork':
+        return stats.missingArtwork;
+      case 'credits':
+        return stats.missingCredits;
+      case 'tracklists':
+        return stats.missingTracklists;
+      case 'sonic_domain':
+        return stats.missingAudioAnalysis;
+      case 'genres':
+        return stats.missingGenres;
+      case 'streaming_links':
+        return stats.missingStreamingLinks;
+      case 'release_metadata':
+        return stats.missingReleaseMetadata;
+      case 'lyrics':
+        return stats.missingLyrics || 0;
+      case 'reviews':
+        return stats.missingReviews || 0;
+      case 'chart_data':
+        return stats.missingChartData || 0;
+      case 'cultural_context':
+        return stats.missingContext || 0;
+      case 'similar_albums':
+        return stats.missingSimilar || 0;
+      default:
+        return 0;
+    }
+  };
+
   const getMissing = (field: string) => {
     if (!stats) return 0;
-    if (field === 'image_url') return stats.missingArtwork;
+    if (field === 'image_url') return stats.missingFrontCover || 0;
     if (field === 'back_image_url') return stats.missingBackCover;
+    if (field === 'inner_sleeve_images') return stats.missingInnerSleeve || 0;
     if (field.includes('musicians')) return stats.missingMusicians;
+    if (field.includes('producers')) return stats.missingProducers;
+    if (field.includes('engineers')) return stats.missingEngineers || 0;
+    if (field.includes('songwriters')) return stats.missingSongwriters || 0;
+    if (field === 'tracks' || field === 'tracklists') return stats.missingTracklists;
     if (field.includes('bpm')) return stats.missingTempo;
+    if (field.includes('musical_key')) return stats.missingMusicalKey || 0;
+    if (field.includes('danceability')) return stats.missingDanceability || 0;
+    if (field.includes('energy')) return stats.missingEnergy || 0;
+    if (field === 'genres') return stats.missingGenres;
+    if (field === 'styles') return stats.missingStyles || 0;
+    if (field === 'spotify_id') return stats.missingSpotify;
+    if (field === 'apple_music_id') return stats.missingAppleMusic || 0;
+    if (field === 'lastfm_id') return stats.missingLastFM || 0;
+    if (field === 'barcode') return stats.missingBarcode || 0;
+    if (field === 'labels') return stats.missingLabels || 0;
+    if (field === 'original_release_date') return stats.missingOriginalDate || 0;
+    if (field === 'cat_no') return stats.missingCatalogNumber || 0;
     return 0;
   };
 
@@ -1300,18 +1370,25 @@ function DataCategoryCard({
     <div className={`w-full text-left bg-white border-2 border-[#D8D8D8] rounded-md p-5 transition-all duration-200 ${disabled ? 'opacity-50 pointer-events-none' : 'hover:border-[#4FC3F7] hover:bg-[#F0F9FF]'}`}>
       {/* HEADER */}
       <div 
-        className="flex items-center gap-2 pb-2 border-b border-gray-200 mb-2"
+        className="flex items-center justify-between pb-2 border-b border-gray-200 mb-2"
       >
-         <input 
-            type="checkbox" 
-            checked={isAllSelected}
-            ref={el => { if(el) el.indeterminate = isIndeterminate; }}
-            onChange={onToggleCategory}
-            disabled={disabled}
-            className="cursor-pointer"
-         />
-         <span className="text-base">{DATA_CATEGORY_ICONS[category]}</span>
-         <span className="text-base font-semibold text-[#1a1a1a]">{DATA_CATEGORY_LABELS[category]}</span>
+         <div className="flex items-center gap-2">
+           <input 
+              type="checkbox" 
+              checked={isAllSelected}
+              ref={el => { if(el) el.indeterminate = isIndeterminate; }}
+              onChange={onToggleCategory}
+              disabled={disabled}
+              className="cursor-pointer"
+           />
+           <span className="text-base">{DATA_CATEGORY_ICONS[category]}</span>
+           <span className="text-base font-semibold text-[#1a1a1a]">{DATA_CATEGORY_LABELS[category]}</span>
+         </div>
+         {getCategoryMissing() > 0 && (
+           <span className="bg-red-100 text-red-700 text-[11px] px-2 py-0.5 rounded-full font-semibold">
+             {getCategoryMissing()}
+           </span>
+         )}
       </div>
 
       {/* FIELD ROWS (Dashboard Style) */}
