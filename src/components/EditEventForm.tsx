@@ -3,14 +3,82 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from 'src/lib/supabaseClient';
 import type { Crate } from 'src/types/crate';
+import {
+  defaultEventTypeConfig,
+  type EventSubtypeDefaults,
+  type EventTypeConfigState,
+} from 'src/lib/eventTypeConfig';
 
 const formatList = ['Vinyl', 'Cassettes', 'CD', '45s', '8-Track'];
+const EVENT_TYPE_SETTINGS_KEY = 'event_type_config';
+
+const EVENT_TYPE_TAG_PREFIX = 'event_type:';
+const EVENT_SUBTYPE_TAG_PREFIX = 'event_subtype:';
+
+const TEMPLATE_FIELDS = ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'queue', 'recurrence', 'crate', 'formats'];
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
+const GOOGLE_MAPS_LIBRARIES = 'places';
+let googleMapsScriptPromise: Promise<void> | null = null;
+
+const loadGoogleMapsScript = () => {
+  if (!GOOGLE_MAPS_API_KEY) return Promise.resolve();
+  if (googleMapsScriptPromise) return googleMapsScriptPromise;
+  googleMapsScriptPromise = new Promise((resolve, reject) => {
+    if (typeof window === 'undefined') {
+      resolve();
+      return;
+    }
+    if ((window as typeof window & { google?: unknown }).google) {
+      resolve();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=${GOOGLE_MAPS_LIBRARIES}`;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Google Maps script'));
+    document.head.appendChild(script);
+  });
+  return googleMapsScriptPromise;
+};
+
+const normalizeEventTypeConfig = (config: EventTypeConfigState): EventTypeConfigState => ({
+  types: config.types.map((type) => ({
+    ...type,
+    template_fields:
+      type.template_fields?.length
+        ? type.template_fields
+        : type.defaults?.enabled_fields?.length
+          ? type.defaults.enabled_fields
+          : TEMPLATE_FIELDS,
+    defaults: type.defaults
+      ? {
+          ...type.defaults,
+          prefill_fields:
+            type.defaults.prefill_fields ?? type.defaults.enabled_fields ?? [],
+        }
+      : type.defaults,
+    subtypes: (type.subtypes || []).map((subtype) => ({
+      ...subtype,
+      defaults: subtype.defaults
+        ? {
+            ...subtype.defaults,
+            prefill_fields:
+              subtype.defaults.prefill_fields ?? subtype.defaults.enabled_fields ?? [],
+          }
+        : subtype.defaults,
+    })),
+  })),
+});
 
 interface EventData {
+  event_type: string;
+  event_subtype: string;
   title: string;
   date: string;
   time: string;
@@ -40,6 +108,7 @@ interface EventData {
 interface DbEvent extends EventData {
   id: number;
   queue_type?: string; // Legacy field
+  allowed_tags?: string[] | string | null;
 }
 
 // Utility function to generate recurring events
@@ -97,6 +166,16 @@ function normalizeStringArray(value: unknown): string[] {
   return [];
 }
 
+function getTagValue(tags: string[], prefix: string): string {
+  const match = tags.find((tag) => tag.startsWith(prefix));
+  return match ? match.replace(prefix, '') : '';
+}
+
+function buildTag(prefix: string, value?: string) {
+  if (!value) return null;
+  return `${prefix}${value}`;
+}
+
 export default function EditEventForm() {
   const searchParams = useSearchParams();
   const id = searchParams.get('id');
@@ -106,8 +185,14 @@ export default function EditEventForm() {
   const [editMode, setEditMode] = useState<'all' | 'future' | 'single'>('all');
   const [isPartOfSeries, setIsPartOfSeries] = useState(false);
   const [isParentEvent, setIsParentEvent] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [eventTypeConfig, setEventTypeConfig] = useState<EventTypeConfigState>(() =>
+    normalizeEventTypeConfig(defaultEventTypeConfig)
+  );
   
   const [eventData, setEventData] = useState<EventData>({
+    event_type: '',
+    event_subtype: '',
     title: '',
     date: '',
     time: '',
@@ -128,6 +213,25 @@ export default function EditEventForm() {
     featured_priority: null,
   });
 
+  const selectedType = eventTypeConfig.types.find((option) => option.id === eventData.event_type);
+  const selectedTypeDefaults = selectedType?.defaults;
+  const selectedSubtypeDefaults = selectedType?.subtypes?.find(
+    (item) => item.id === eventData.event_subtype
+  )?.defaults;
+
+  const typeTemplateFields = selectedType?.template_fields ?? TEMPLATE_FIELDS;
+  const typePrefillFields = selectedTypeDefaults?.prefill_fields ?? [];
+  const subtypePrefillFields = selectedSubtypeDefaults?.prefill_fields ?? [];
+  const enabledFields = typeTemplateFields;
+
+  const isFieldEnabled = (field: string) => enabledFields.includes(field);
+  const showDate = isFieldEnabled('date');
+  const showTime = isFieldEnabled('time');
+  const showLocation = isFieldEnabled('location');
+  const showInfo = isFieldEnabled('info');
+  const showInfoUrl = isFieldEnabled('info_url');
+  const locationInputRef = useRef<HTMLInputElement | null>(null);
+
   // Fetch Available Crates
   useEffect(() => {
     const fetchCrates = async () => {
@@ -144,6 +248,65 @@ export default function EditEventForm() {
     fetchCrates();
   }, []);
 
+  useEffect(() => {
+    if (!GOOGLE_MAPS_API_KEY || !locationInputRef.current) return;
+    let autocomplete: { getPlace: () => { formatted_address?: string } } | null = null;
+    let listener: { remove: () => void } | null = null;
+
+    void loadGoogleMapsScript()
+      .then(() => {
+        if (!locationInputRef.current) return;
+        const googleMaps = (window as typeof window & { google?: any }).google;
+        if (!googleMaps?.maps?.places) return;
+        autocomplete = new googleMaps.maps.places.Autocomplete(locationInputRef.current, {
+          types: ['geocode'],
+        });
+        listener = autocomplete.addListener('place_changed', () => {
+          const place = autocomplete?.getPlace();
+          if (place?.formatted_address) {
+            setEventData((prev) => ({
+              ...prev,
+              location: place.formatted_address || '',
+            }));
+          }
+        });
+      })
+      .catch((error) => {
+        console.warn('Google Maps autocomplete unavailable:', error);
+      });
+
+    return () => {
+      if (listener) listener.remove();
+      autocomplete = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('admin_settings')
+          .select('value')
+          .eq('key', EVENT_TYPE_SETTINGS_KEY)
+          .single();
+
+        if (error) {
+          const errorStatus = 'status' in error ? error.status : null;
+          if (error.code !== 'PGRST116' && errorStatus !== 404) {
+            console.error('Error loading event type config:', error);
+          }
+          return;
+        }
+
+        if (data?.value) {
+          setEventTypeConfig(normalizeEventTypeConfig(JSON.parse(data.value)));
+        }
+      } catch (err) {
+        console.error('Error loading event type config:', err);
+      }
+    })();
+  }, []);
+
   // Fetch Event Data
   useEffect(() => {
     const fetchEvent = async () => {
@@ -157,9 +320,12 @@ export default function EditEventForm() {
       }
       
       if (copiedEvent) {
+        const normalizedTags = normalizeStringArray(copiedEvent?.allowed_tags);
         setEventData(prev => ({
           ...prev,
           ...copiedEvent,
+          event_type: getTagValue(normalizedTags, EVENT_TYPE_TAG_PREFIX),
+          event_subtype: getTagValue(normalizedTags, EVENT_SUBTYPE_TAG_PREFIX),
           allowed_formats: normalizeStringArray(copiedEvent?.allowed_formats),
           queue_types: Array.isArray(copiedEvent?.queue_types) ? copiedEvent!.queue_types : [],
           crate_id: copiedEvent?.crate_id || null,
@@ -178,10 +344,13 @@ export default function EditEventForm() {
         } else if (data) {
           const dbEvent = data as DbEvent;
           const isTBA = !dbEvent.date || dbEvent.date === '' || dbEvent.date === '9999-12-31';
+          const normalizedTags = normalizeStringArray(dbEvent.allowed_tags);
           
           setEventData({
             ...eventData,
             ...dbEvent,
+            event_type: getTagValue(normalizedTags, EVENT_TYPE_TAG_PREFIX),
+            event_subtype: getTagValue(normalizedTags, EVENT_SUBTYPE_TAG_PREFIX),
             allowed_formats: normalizeStringArray(dbEvent.allowed_formats),
             queue_types: Array.isArray(dbEvent.queue_types)
               ? dbEvent.queue_types
@@ -221,6 +390,7 @@ export default function EditEventForm() {
             : name === 'crate_id'
               ? (value === '' ? null : parseInt(value))
               : value,
+      ...(name === 'event_type' ? { event_subtype: '' } : {}),
       ...(name === 'date' && !value ? { is_recurring: false, recurrence_end_date: '' } : {})
     }));
   };
@@ -250,13 +420,94 @@ export default function EditEventForm() {
     });
   };
 
+  const applyDefaults = (defaults?: EventSubtypeDefaults, enabledList?: string[]) => {
+    if (!defaults) return;
+    const enabledFields = enabledList ?? defaults.prefill_fields ?? TEMPLATE_FIELDS;
+    setEventData((prev) => ({
+      ...prev,
+      ...(enabledFields.includes('date') && defaults.date ? { date: defaults.date } : {}),
+      ...(enabledFields.includes('info') && defaults.info ? { info: defaults.info } : {}),
+      ...(enabledFields.includes('info_url') && defaults.info_url ? { info_url: defaults.info_url } : {}),
+      ...(enabledFields.includes('time') && defaults.time ? { time: defaults.time } : {}),
+      ...(enabledFields.includes('location') && defaults.location ? { location: defaults.location } : {}),
+      ...(enabledFields.includes('image_url') && defaults.image_url ? { image_url: defaults.image_url } : {}),
+      ...(enabledFields.includes('formats') && defaults.allowed_formats
+        ? { allowed_formats: defaults.allowed_formats }
+        : {}),
+      ...(enabledFields.includes('crate') && typeof defaults.crate_id !== 'undefined'
+        ? { crate_id: defaults.crate_id }
+        : {}),
+      ...(enabledFields.includes('queue') && typeof defaults.has_queue === 'boolean'
+        ? { has_queue: defaults.has_queue }
+        : {}),
+      ...(enabledFields.includes('queue') && defaults.queue_types ? { queue_types: defaults.queue_types } : {}),
+      ...(enabledFields.includes('recurrence') && typeof defaults.is_recurring === 'boolean'
+        ? { is_recurring: defaults.is_recurring }
+        : {}),
+      ...(enabledFields.includes('recurrence') && defaults.recurrence_pattern
+        ? { recurrence_pattern: defaults.recurrence_pattern }
+        : {}),
+      ...(enabledFields.includes('recurrence') && defaults.recurrence_interval
+        ? { recurrence_interval: defaults.recurrence_interval }
+        : {}),
+    }));
+  };
+
+  const handleImageUpload = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      try {
+        setUploadingImage(true);
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+        const filePath = `event-images/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('event-images')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false,
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('event-images')
+          .getPublicUrl(filePath);
+
+        setEventData((prev) => ({
+          ...prev,
+          image_url: publicUrl,
+        }));
+      } catch (error) {
+        console.error('Error uploading event image:', error);
+        alert('Failed to upload image. Please try again.');
+      } finally {
+        setUploadingImage(false);
+      }
+    };
+
+    input.click();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
       const isTBA = !eventData.date || eventData.date === '' || eventData.date === '9999-12-31';
+      const allowedTags = [
+        buildTag(EVENT_TYPE_TAG_PREFIX, eventData.event_type),
+        buildTag(EVENT_SUBTYPE_TAG_PREFIX, eventData.event_subtype),
+      ].filter(Boolean) as string[];
       
       const payload: Record<string, unknown> = {
+        allowed_tags: allowedTags.length > 0 ? allowedTags : null,
         title: eventData.title,
         date: isTBA ? '9999-12-31' : eventData.date,
         time: eventData.time,
@@ -341,8 +592,21 @@ export default function EditEventForm() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto my-8 p-8 bg-white text-black border border-gray-200 rounded-lg shadow-sm">
-      <h2 className="text-2xl font-bold mb-6">{id ? 'Edit Event' : 'New Event'}</h2>
+    <div className="max-w-5xl mx-auto my-8 p-6 md:p-10 bg-white text-black border border-gray-200 rounded-2xl shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+        <div>
+          <h2 className="text-3xl font-bold">{id ? 'Edit Event' : 'Create Event'}</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Build events with richer details, featured placement, and queue settings.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-2 text-sm text-gray-500">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            Drafting
+          </span>
+        </div>
+      </div>
 
       {/* Series Editing Options */}
       {(isParentEvent || isPartOfSeries) && (
@@ -383,125 +647,330 @@ export default function EditEventForm() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <input
-            name="title"
-            value={eventData.title}
-            onChange={handleChange}
-            placeholder="Title"
-            required
-            className="w-full p-2 border border-gray-300 rounded"
-          />
-        </div>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <section className="p-5 border border-gray-200 rounded-2xl bg-gray-50/40">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Event type</h3>
+              <p className="text-sm text-gray-500">Choose the type of event to unlock presets and visibility rules.</p>
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Event category</label>
+              <select
+                name="event_type"
+                value={eventData.event_type}
+                onChange={handleChange}
+                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
+              >
+                <option value="">Select a category</option>
+                {eventTypeConfig.types.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {eventData.event_type && (
+                <p className="text-xs text-gray-500 mt-2">
+                  {eventTypeConfig.types.find((option) => option.id === eventData.event_type)?.description}
+                </p>
+              )}
+            </div>
+            {eventTypeConfig.types.find((option) => option.id === eventData.event_type)?.subtypes && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Event subtype</label>
+                <select
+                  name="event_subtype"
+                  value={eventData.event_subtype}
+                  onChange={handleChange}
+                  className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
+                >
+                  <option value="">Select a subtype</option>
+                  {(eventTypeConfig.types.find((option) => option.id === eventData.event_type)?.subtypes || []).map(
+                    (option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    )
+                  )}
+                </select>
+              </div>
+            )}
+            {eventData.event_type && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Defaults</label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => applyDefaults(selectedTypeDefaults, typePrefillFields)}
+                    className="inline-flex items-center gap-2 rounded-full bg-purple-100 px-4 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-200 transition-colors"
+                  >
+                    Apply type defaults
+                  </button>
+                  {eventData.event_subtype && (
+                    <button
+                      type="button"
+                      onClick={() => applyDefaults(selectedSubtypeDefaults, subtypePrefillFields)}
+                      className="inline-flex items-center gap-2 rounded-full bg-purple-100 px-4 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-200 transition-colors"
+                    >
+                      Apply subtype defaults
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            {eventData.event_type === 'private-dj' && (
+              <div className="rounded-lg border border-purple-200 bg-purple-50 p-3 text-xs text-purple-700">
+                Private DJ events will display as <strong>Private Event</strong> on the public events page.
+              </div>
+            )}
+          </div>
+        </section>
 
-        <div>
-          <input
-            name="date"
-            type="date"
-            value={eventData.date === '9999-12-31' ? '' : eventData.date}
-            onChange={handleChange}
-            className="w-full p-2 border border-gray-300 rounded mb-1"
-          />
-          <small className="text-gray-500">Leave empty for &ldquo;Date To Be Announced&rdquo;</small>
-        </div>
+        <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="space-y-6">
+            <div className="p-5 border border-gray-200 rounded-2xl bg-white shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Core details</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Event title</label>
+                  <input
+                    name="title"
+                    value={eventData.title}
+                    onChange={handleChange}
+                    placeholder="Title"
+                    required
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
+                  />
+                </div>
+                {(showDate || showTime) && (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {showDate && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-700">Date</label>
+                        <input
+                          name="date"
+                          type="date"
+                          value={eventData.date === '9999-12-31' ? '' : eventData.date}
+                          onChange={handleChange}
+                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
+                        />
+                        <p className="text-xs text-gray-500 mt-2">Leave empty for “Date To Be Announced.”</p>
+                      </div>
+                    )}
+                    {showTime && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-700">Time</label>
+                        <input
+                          name="time"
+                          value={eventData.time}
+                          onChange={handleChange}
+                          placeholder="3:00 PM - 6:00 PM"
+                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+                {showLocation && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Location</label>
+                    <input
+                      ref={locationInputRef}
+                      name="location"
+                      value={eventData.location}
+                      onChange={handleChange}
+                      placeholder="Venue or address"
+                      className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
+                    />
+                    {!GOOGLE_MAPS_API_KEY && (
+                      <p className="text-xs text-gray-400 mt-2">
+                        Add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to enable address autocomplete.
+                      </p>
+                    )}
+                    {eventData.location && (
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(eventData.location)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                      >
+                        Search in Google Maps
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
 
-        <input
-          name="time"
-          value={eventData.time}
-          onChange={handleChange}
-          placeholder="Time (e.g., 3:00 PM - 6:00 PM)"
-          className="w-full p-2 border border-gray-300 rounded"
-        />
-        <input
-          name="location"
-          value={eventData.location}
-          onChange={handleChange}
-          placeholder="Location"
-          className="w-full p-2 border border-gray-300 rounded"
-        />
-        <input
-          name="image_url"
-          value={eventData.image_url}
-          onChange={handleChange}
-          placeholder="Image URL"
-          className="w-full p-2 border border-gray-300 rounded"
-        />
-        
+            <div className="p-5 border border-gray-200 rounded-2xl bg-white shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Description &amp; links</h3>
+              <div className="space-y-4">
+                {showInfo && (
+                  <textarea
+                    name="info"
+                    value={eventData.info}
+                    onChange={handleChange}
+                    placeholder="Event description, lineup, cover, or quick notes."
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm min-h-[120px]"
+                  />
+                )}
+                {showInfoUrl && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Primary event link</label>
+                    <input
+                      name="info_url"
+                      value={eventData.info_url || ''}
+                      onChange={handleChange}
+                      placeholder="https://facebook.com/events/..."
+                      className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-2">
+                      Add a Facebook event link or external landing page here.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            {isFieldEnabled('image_url') && (
+              <div className="p-5 border border-gray-200 rounded-2xl bg-white shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Event media</h3>
+              <div className="flex flex-col gap-4">
+                <div className="relative w-full aspect-[4/3] rounded-xl border border-dashed border-gray-300 bg-gray-50 overflow-hidden">
+                  {eventData.image_url ? (
+                    <Image
+                      src={eventData.image_url}
+                      alt="Event"
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center text-sm text-gray-400">
+                      Upload a featured image
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={handleImageUpload}
+                    disabled={uploadingImage}
+                    className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                  >
+                    {uploadingImage ? 'Uploading…' : 'Upload image'}
+                  </button>
+                  <input
+                    name="image_url"
+                    value={eventData.image_url}
+                    onChange={handleChange}
+                    placeholder="Paste image URL"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
+                    disabled={!isFieldEnabled('image_url')}
+                  />
+                </div>
+              </div>
+              </div>
+            )}
+
+            <div className="p-5 border border-gray-200 rounded-2xl bg-white shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Featured placement</h3>
+              <div className="space-y-3 text-sm text-gray-600">
+                <label className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    name="is_featured_grid"
+                    checked={!!eventData.is_featured_grid}
+                    onChange={handleCheckboxChange}
+                    className="h-4 w-4"
+                  />
+                  Show in Featured Grid
+                </label>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500">Featured priority</label>
+                  <input
+                    type="number"
+                    name="featured_priority"
+                    value={eventData.featured_priority ?? ''}
+                    onChange={handleChange}
+                    placeholder="1"
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* CRATE SELECTION (Replacing Tags) */}
-        <div className="p-4 bg-gray-50 border border-gray-200 rounded-md">
-          <label className="block text-sm font-bold text-gray-700 mb-2">Limit Requests to Crate (Optional)</label>
-          <select 
-            name="crate_id" 
-            value={eventData.crate_id || ''} 
-            onChange={handleChange}
-            className="w-full p-2 border border-gray-300 rounded bg-white"
-          >
-            <option value="">-- Allow Entire Collection --</option>
-            {crates.map(crate => (
-              <option key={crate.id} value={crate.id}>
-                {crate.icon} {crate.name}
-              </option>
-            ))}
-          </select>
-          <small className="block mt-1 text-gray-500 text-xs">
-            If selected, attendees can only see/request songs from this Crate.
-          </small>
-        </div>
+        {isFieldEnabled('crate') && (
+          <section className="p-5 border border-gray-200 rounded-2xl bg-gray-50/40">
+            <label className="block text-sm font-bold text-gray-700 mb-2">Limit Requests to Crate (Optional)</label>
+            <select 
+              name="crate_id" 
+              value={eventData.crate_id || ''} 
+              onChange={handleChange}
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
+            >
+              <option value="">-- Allow Entire Collection --</option>
+              {crates.map(crate => (
+                <option key={crate.id} value={crate.id}>
+                  {crate.icon} {crate.name}
+                </option>
+              ))}
+            </select>
+            <small className="block mt-2 text-gray-500 text-xs">
+              If selected, attendees can only see/request songs from this Crate.
+            </small>
+          </section>
+        )}
 
         {/* ALLOWED FORMATS */}
-        <div className="p-4 border border-gray-200 rounded-md">
-          <label className="block text-sm font-bold text-gray-700 mb-2">Allowed Formats</label>
-          <div className="grid grid-cols-2 gap-2">
-            {formatList.map((format) => (
-              <label key={format} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={eventData.allowed_formats.includes(format)}
-                  onChange={(e) => handleFormatChange(format, e.target.checked)}
-                />
-                {format}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <textarea
-          name="info"
-          value={eventData.info}
-          onChange={handleChange}
-          placeholder="Event Info"
-          className="w-full p-2 border border-gray-300 rounded h-24"
-        />
-        <input
-          name="info_url"
-          value={eventData.info_url || ''}
-          onChange={handleChange}
-          placeholder="Event Info URL (optional)"
-          className="w-full p-2 border border-gray-300 rounded"
-        />
+        {isFieldEnabled('formats') && (
+          <section className="p-5 border border-gray-200 rounded-2xl bg-white shadow-sm">
+            <label className="block text-sm font-bold text-gray-700 mb-2">Allowed Formats</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {formatList.map((format) => (
+                <label key={format} className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={eventData.allowed_formats.includes(format)}
+                    onChange={(e) => handleFormatChange(format, e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  {format}
+                </label>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* RECURRING LOGIC */}
-        {eventData.date && eventData.date !== '9999-12-31' && !isPartOfSeries && (
-          <div className="p-4 bg-purple-50 border border-purple-200 rounded-md">
-            <label className="flex items-center gap-2 mb-2 font-bold">
+        {isFieldEnabled('recurrence') && eventData.date && eventData.date !== '9999-12-31' && !isPartOfSeries && (
+          <section className="p-5 bg-purple-50 border border-purple-200 rounded-2xl">
+            <label className="flex items-center gap-2 mb-4 font-bold text-purple-800">
               <input
                 type="checkbox"
                 name="is_recurring"
                 checked={eventData.is_recurring}
                 onChange={handleCheckboxChange}
+                className="h-4 w-4"
               />
               Recurring Event
             </label>
 
             {eventData.is_recurring && (
-              <div className="ml-6 space-y-3">
-                <div className="flex gap-2">
+              <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
+                <div className="flex flex-wrap gap-2 items-center">
                   <select
                     name="recurrence_pattern"
                     value={eventData.recurrence_pattern}
                     onChange={handleChange}
-                    className="p-1 border rounded"
+                    className="rounded-lg border border-purple-200 bg-white px-3 py-2 text-sm shadow-sm"
                   >
                     <option value="daily">Daily</option>
                     <option value="weekly">Weekly</option>
@@ -513,70 +982,76 @@ export default function EditEventForm() {
                     min="1"
                     value={eventData.recurrence_interval}
                     onChange={handleChange}
-                    className="p-1 border rounded w-16"
+                    className="rounded-lg border border-purple-200 bg-white px-3 py-2 text-sm shadow-sm w-20"
                   />
-                  <span className="self-center text-sm text-gray-600">Interval</span>
+                  <span className="text-sm text-purple-700">Interval</span>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-700">End Date:</label>
+                  <label className="block text-xs font-semibold text-purple-700 mb-1">Series end date</label>
                   <input
                     type="date"
                     name="recurrence_end_date"
                     value={eventData.recurrence_end_date}
                     onChange={handleChange}
-                    className="p-1 border rounded"
+                    className="rounded-lg border border-purple-200 bg-white px-3 py-2 text-sm shadow-sm"
                   />
                 </div>
               </div>
             )}
-          </div>
+          </section>
         )}
         
         {/* QUEUE LOGIC */}
-        <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-          <label className="flex items-center gap-2 mb-2 font-bold">
+        {isFieldEnabled('queue') && (
+          <section className="p-5 bg-blue-50 border border-blue-200 rounded-2xl">
+          <label className="flex items-center gap-2 mb-4 font-bold text-blue-800">
             <input
               type="checkbox"
               name="has_queue"
               checked={eventData.has_queue}
               onChange={handleCheckboxChange}
+              className="h-4 w-4"
             />
             Enable Request Queue
           </label>
 
           {eventData.has_queue && (
-            <div className="ml-6 flex flex-col gap-2">
-              <label className="flex items-center gap-2">
+            <div className="grid gap-3 md:grid-cols-3">
+              <label className="flex items-center gap-2 text-sm text-blue-900">
                 <input
                   type="checkbox"
                   checked={eventData.queue_types.includes('side')}
                   onChange={(e) => handleQueueTypeChange('side', e.target.checked)}
+                  className="h-4 w-4"
                 />
                 📀 By Side (A/B)
               </label>
-              <label className="flex items-center gap-2">
+              <label className="flex items-center gap-2 text-sm text-blue-900">
                 <input
                   type="checkbox"
                   checked={eventData.queue_types.includes('track')}
                   onChange={(e) => handleQueueTypeChange('track', e.target.checked)}
+                  className="h-4 w-4"
                 />
                 🎵 By Track
               </label>
-              <label className="flex items-center gap-2">
+              <label className="flex items-center gap-2 text-sm text-blue-900">
                 <input
                   type="checkbox"
                   checked={eventData.queue_types.includes('album')}
                   onChange={(e) => handleQueueTypeChange('album', e.target.checked)}
+                  className="h-4 w-4"
                 />
                 💿 By Album
               </label>
             </div>
           )}
-        </div>
+          </section>
+        )}
 
         <button
           type="submit"
-          className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded hover:bg-blue-700 transition-colors"
+          className="w-full rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white font-bold py-3 px-4 shadow-lg hover:from-blue-700 hover:to-indigo-800 transition-colors"
         >
           {eventData.date && eventData.date !== '9999-12-31' && eventData.is_recurring && !id ? 'Create Recurring Events' : 'Save Event'}
         </button>
