@@ -4,7 +4,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
+import NextImage from "next/image";
 import Link from "next/link";
 import { useSession } from "src/components/AuthProvider";
 import { supabase } from "src/lib/supabaseClient";
@@ -93,7 +93,7 @@ const sampleImageColor = (url: string): Promise<EventTheme | null> =>
       return;
     }
 
-    const img = new Image();
+    const img = new window.Image();
     img.crossOrigin = "anonymous";
     img.src = url;
 
@@ -392,7 +392,7 @@ export default function Page() {
                             }}
                           >
                             <div className="relative aspect-[4/3] w-full">
-                              <Image
+                              <NextImage
                                 src={event.image_url || "/images/coverplaceholder.png"}
                                 alt={displayTitle}
                                 fill
@@ -477,7 +477,7 @@ export default function Page() {
                             }}
                           >
                             <div className="relative aspect-[4/3] w-full">
-                              <Image
+                              <NextImage
                                 src={event.image_url || "/images/coverplaceholder.png"}
                                 alt={displayTitle}
                                 fill
