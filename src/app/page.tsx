@@ -347,19 +347,20 @@ export default function Page() {
           </nav>
         </div>
 
-        {/* Invisible Admin Link: 
-          Hidden in the bottom-left corner. 
-          No visual footprint, but cursor changes to pointer on hover.
-        */}
-        <Link 
-          href="/admin/" 
-          className="absolute bottom-0 left-0 w-8 h-8 opacity-0 cursor-default hover:cursor-pointer z-50"
-          aria-hidden="true"
-          title="Admin Access"
-        >
-          .
-        </Link>
       </header>
+
+      {/* Invisible Admin Link: 
+        Hidden in the bottom-left corner. 
+        No visual footprint, but cursor changes to pointer on hover.
+      */}
+      <Link 
+        href="/admin/" 
+        className="fixed bottom-16 left-0 w-8 h-8 opacity-0 cursor-default hover:cursor-pointer z-50"
+        aria-hidden="true"
+        title="Admin Access"
+      >
+        .
+      </Link>
 
       <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-black/70 backdrop-blur-md">
         <Container size="xl">
