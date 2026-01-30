@@ -180,28 +180,94 @@ function BrowseAlbumsContent() {
     return () => { isMounted = false; };
   }, []);
 
-  const formatVariants = (format: string) => {
-    const f = format.trim().toLowerCase();
-    if (f === "cd" || f === "cds") return ["cd", "cds"];
-    if (f === "cassette" || f === "cassettes") return ["cassette", "cassettes"];
-    if (f === "45" || f === "45s") return ["45", "45s"];
-    if (f === "8-track" || f === "8tracks" || f === "8-track tape" || f === "8 track") return ["8-track", "8tracks", "8-track tape", "8 track"];
-    if (f === "vinyl") return ["vinyl", "lp", "12\""];
-    return [f];
+  const splitFormatTokens = (format: string) => {
+    if (!format) return [];
+    return format
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const match = part.match(/^(\d+)x\s*(.+)$/i);
+        return (match ? match[2] : part).trim().toLowerCase();
+      });
+  };
+
+  const formatFilterAliases: Record<string, string> = {
+    vinyl: 'vinyl',
+    lp: 'vinyl',
+    lps: 'vinyl',
+    ep: 'vinyl',
+    eps: 'vinyl',
+    cassettes: 'cassette',
+    cassette: 'cassette',
+    cass: 'cassette',
+    cd: 'cd',
+    cds: 'cd',
+    'compact disc': 'cd',
+    '8-track': '8-track',
+    '8 track': '8-track',
+    '8tracks': '8-track',
+    '8-track tape': '8-track',
+    '45': '45s',
+    '45s': '45s',
+    '7"': '45s',
+    '7-inch': '45s',
+    '7 inch': '45s',
+    single: '45s',
+    singles: '45s',
+    all: 'all',
+    'all media': 'all',
+  };
+
+  const normalizeFormatFilter = (format: string) => {
+    const key = format.trim().toLowerCase();
+    return formatFilterAliases[key] ?? key;
+  };
+
+  const getFormatData = (format: string) => {
+    const tokens = splitFormatTokens(format);
+    const hasToken = (values: string[]) => values.some((value) => tokens.includes(value));
+
+    const vinylTokens = ['vinyl', 'lp', 'ep', '12"', '10"', 'maxi-single', 'mini-album'];
+    const cassetteTokens = ['cassette', 'cassettes', 'cass'];
+    const cdTokens = ['cd', 'cds', 'compact disc'];
+    const eightTrackTokens = ['8-track', '8 track', '8tracks', '8-track tape'];
+    const fortyFiveTokens = ['45', '45s', '7"', '7-inch', '7 inch'];
+
+    const hasVinyl = hasToken(vinylTokens);
+    const hasCassette = hasToken(cassetteTokens);
+    const hasCd = hasToken(cdTokens);
+    const has8Track = hasToken(eightTrackTokens);
+    const hasSingle = tokens.includes('single') || tokens.includes('singles');
+    const has45 = hasToken(fortyFiveTokens);
+
+    const categories = new Set<string>();
+    if (hasVinyl) categories.add('vinyl');
+    if (hasCassette) categories.add('cassette');
+    if (hasCd) categories.add('cd');
+    if (has8Track) categories.add('8-track');
+    if (has45 || (hasSingle && !hasCd && !hasCassette && !has8Track)) categories.add('45s');
+
+    return { tokens, categories };
   };
 
   const normalizedFormats = useMemo(() => (
-    allowedFormats ? allowedFormats.flatMap(formatVariants) : []
+    allowedFormats ? allowedFormats.map(normalizeFormatFilter) : null
   ), [allowedFormats]);
 
   const normalizedDropdown = allowedFormats?.length && allowedFormats.length > 0
     ? allowedFormats.map(f => f.trim())
     : ['Vinyl', 'Cassettes', 'CD', '45s', '8-Track'];
 
+  const dropdownOptions = normalizedDropdown.map((format) => ({
+    label: format,
+    value: normalizeFormatFilter(format),
+  }));
+
   const filteredAlbums = useMemo(() => {
     let fa = albums.filter(album => {
       // Use 'format' for media type filtering
-      const formatStr = (album.format || '').trim().toLowerCase();
+      const { tokens: formatTokens, categories: formatCategories } = getFormatData(album.format || '');
       
       const searchLower = searchTerm.toLowerCase();
 
@@ -221,12 +287,14 @@ function BrowseAlbumsContent() {
         searchInArray(album.custom_tags);
       
       const isAllowed =
-        !allowedFormats ||
-        normalizedFormats.includes(formatStr);
+        !normalizedFormats ||
+        normalizedFormats.includes('all') ||
+        normalizedFormats.some((format) => formatCategories.has(format) || formatTokens.includes(format));
         
       const matchesFilter =
         !mediaFilter ||
-        formatVariants(mediaFilter).includes(formatStr);
+        formatCategories.has(mediaFilter) ||
+        formatTokens.includes(mediaFilter);
         
       const matchesJustAdded =
         !showJustAdded || album.justAdded;
@@ -304,9 +372,9 @@ function BrowseAlbumsContent() {
                 className="w-full md:flex-1 p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="">All Media Types</option>
-                {normalizedDropdown.map((format) => (
-                  <option key={format} value={format.trim().toLowerCase()}>
-                    {format}
+                {dropdownOptions.map((format) => (
+                  <option key={format.label} value={format.value}>
+                    {format.label}
                   </option>
                 ))}
               </select>
