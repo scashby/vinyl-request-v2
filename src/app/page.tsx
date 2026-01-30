@@ -4,7 +4,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import NextImage from "next/image";
 import Link from "next/link";
 import { useSession } from "src/components/AuthProvider";
 import { supabase } from "src/lib/supabaseClient";
@@ -15,6 +14,7 @@ interface Event {
   id: number;
   title: string;
   date: string;
+  created_at?: string;
   location?: string;
   image_url?: string;
   is_featured_grid?: boolean;
@@ -221,10 +221,19 @@ export default function Page() {
     );
   }, [events]);
 
+  const justAddedEvents = useMemo(() => {
+    const sorted = [...events].sort((a, b) => {
+      const at = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bt = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return bt - at;
+    });
+    return sorted.slice(0, 6);
+  }, [events]);
+
   useEffect(() => {
     let isActive = true;
     const hydrateThemes = async () => {
-      const targets = [...upcomingEvents, ...featuredEvents];
+      const targets = [...upcomingEvents, ...justAddedEvents, ...featuredEvents];
       const entries = await Promise.all(
         targets.map(async (event) => {
           if (!event.image_url) return [event.id, null] as const;
@@ -252,7 +261,7 @@ export default function Page() {
     return () => {
       isActive = false;
     };
-  }, [upcomingEvents, featuredEvents]);
+  }, [upcomingEvents, justAddedEvents, featuredEvents]);
 
   const compactDate = (dateString?: string) => {
     if (!dateString || dateString === "9999-12-31") {
@@ -270,6 +279,22 @@ export default function Page() {
       }).toUpperCase(),
     };
   };
+
+  const tickerItems = useMemo(() => {
+    const ids = new Set<number>();
+    const items: Event[] = [];
+    const addItems = (list: Event[]) => {
+      list.forEach((event) => {
+        if (ids.has(event.id)) return;
+        ids.add(event.id);
+        items.push(event);
+      });
+    };
+    addItems(upcomingEvents.slice(0, 8));
+    addItems(justAddedEvents.slice(0, 6));
+    addItems(featuredEvents.slice(0, 6));
+    return items;
+  }, [upcomingEvents, justAddedEvents, featuredEvents]);
 
   return (
     <div className="min-h-screen font-sans bg-black flex flex-col justify-between">
@@ -322,216 +347,119 @@ export default function Page() {
           </nav>
         </div>
 
-        {/* Invisible Admin Link: 
-          Hidden in the bottom-left corner. 
-          No visual footprint, but cursor changes to pointer on hover.
-        */}
-        <Link 
-          href="/admin/" 
-          className="absolute bottom-0 left-0 w-8 h-8 opacity-0 cursor-default hover:cursor-pointer z-50"
-          aria-hidden="true"
-          title="Admin Access"
-        >
-          .
-        </Link>
       </header>
 
-      <section className="bg-black border-t border-white/10 py-12">
+      {/* Invisible Admin Link: 
+        Hidden in the bottom-left corner. 
+        No visual footprint, but cursor changes to pointer on hover.
+      */}
+      <Link 
+        href="/admin/" 
+        className="fixed bottom-16 left-0 w-8 h-8 opacity-0 cursor-default hover:cursor-pointer z-50"
+        aria-hidden="true"
+        title="Admin Access"
+      >
+        .
+      </Link>
+
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-black/70 backdrop-blur-md">
         <Container size="xl">
-          <div className="flex items-center justify-between gap-4 mb-6">
-            <div>
-              <div className="text-xs uppercase tracking-[0.4em] text-white/50 font-semibold mb-2">
-                Landing Lineup
-              </div>
-              <h2 className="text-3xl md:text-4xl font-black text-white tracking-tight">
-                Upcoming & Featured Events
-              </h2>
-            </div>
+          <div className="flex items-center gap-3 py-3 text-white">
             <Link
               href="/events/events-page"
-              className="text-sm uppercase font-semibold tracking-[0.2em] text-white/70 hover:text-white transition-colors"
+              className="text-xs uppercase tracking-[0.3em] font-semibold text-white/60 hover:text-white transition-colors"
             >
-              View All
+              Events
             </Link>
+            <div className="h-3 w-px bg-white/20" />
+            {loadingEvents ? (
+              <div className="text-sm text-white/60">Loading upcoming events…</div>
+            ) : (
+              <div className="relative flex-1 overflow-hidden">
+                <div className="ticker-track">
+                  {[...tickerItems, ...tickerItems].map((event, index) => {
+                    const date = compactDate(event.date);
+                    const tba =
+                      !event.date ||
+                      event.date === "" ||
+                      event.date === "9999-12-31";
+                    const theme = eventThemes[event.id] || DEFAULT_THEME;
+                    const displayTitle = getDisplayTitle(event);
+
+                    return (
+                      <Link
+                        key={`${event.id}-${index}`}
+                        href={`/events/event-detail/${event.id}`}
+                        className="ticker-item group"
+                      >
+                        <span className="ticker-text">
+                          <span
+                            className="inline-flex items-center justify-center w-2 h-2 rounded-full mr-2"
+                            style={{ background: theme.accent }}
+                          />
+                          <span
+                            className="text-white/70 text-sm font-semibold"
+                            style={{ color: theme.accent }}
+                          >
+                            {tba ? "TBA" : `${date.mon} ${date.day}`}
+                          </span>
+                          <span
+                            className="text-white font-semibold ml-3"
+                            dangerouslySetInnerHTML={{
+                              __html: formatEventText(displayTitle),
+                            }}
+                          />
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
-
-          {loadingEvents ? (
-            <div className="text-white/70 text-lg">Loading events…</div>
-          ) : (
-            <div className="space-y-10">
-              {upcomingEvents.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="h-2 w-2 rounded-full bg-[#00c4ff]" />
-                    <h3 className="text-lg font-bold text-white uppercase tracking-[0.25em]">
-                      Upcoming
-                    </h3>
-                  </div>
-                  <div className="flex gap-6 overflow-x-auto pb-4 pr-6 snap-x snap-mandatory">
-                    {upcomingEvents.map((event) => {
-                      const displayTitle = getDisplayTitle(event);
-                      const date = compactDate(event.date);
-                      const tba =
-                        !event.date ||
-                        event.date === "" ||
-                        event.date === "9999-12-31";
-                      const theme = eventThemes[event.id] || DEFAULT_THEME;
-
-                      return (
-                        <Link
-                          key={`upcoming-${event.id}`}
-                          href={`/events/event-detail/${event.id}`}
-                          className="group snap-start"
-                        >
-                          <article
-                            className="relative min-w-[260px] max-w-[260px] rounded-2xl overflow-hidden border shadow-[0_14px_36px_rgba(0,0,0,0.4)] transition-transform duration-200 group-hover:-translate-y-2"
-                            style={{
-                              borderColor: theme.border,
-                              background: theme.cardBg,
-                              boxShadow: `0 18px 36px ${theme.glow}`,
-                            }}
-                          >
-                            <div className="relative aspect-[4/3] w-full">
-                              <NextImage
-                                src={event.image_url || "/images/coverplaceholder.png"}
-                                alt={displayTitle}
-                                fill
-                                sizes="260px"
-                                className="object-cover"
-                                unoptimized
-                              />
-                              <div
-                                className="absolute inset-0"
-                                style={{
-                                  background:
-                                    "linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.6) 100%)",
-                                }}
-                              />
-                              <span
-                                className="absolute top-3 left-3 px-3 py-1 text-xs font-black uppercase tracking-[0.2em] rounded-full"
-                                style={{
-                                  background: theme.accent,
-                                  color: theme.badgeText,
-                                }}
-                              >
-                                Up Next
-                              </span>
-                            </div>
-                            <div className="p-5">
-                              <div
-                                className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.3em] mb-2"
-                                style={{ color: theme.accent }}
-                              >
-                                {tba ? "TBA" : `${date.wk} ${date.mon} ${date.day}`}
-                              </div>
-                              <h4
-                                className="text-white text-lg font-black leading-tight"
-                                dangerouslySetInnerHTML={{
-                                  __html: formatEventText(displayTitle),
-                                }}
-                              />
-                              {event.location && (
-                                <div className="text-white/60 text-sm mt-2">
-                                  {event.location}
-                                </div>
-                              )}
-                            </div>
-                          </article>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {featuredEvents.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="h-2 w-2 rounded-full bg-[#00c4ff]" />
-                    <h3 className="text-lg font-bold text-white uppercase tracking-[0.25em]">
-                      Featured
-                    </h3>
-                  </div>
-                  <div className="flex gap-6 overflow-x-auto pb-4 pr-6 snap-x snap-mandatory">
-                    {featuredEvents.map((event) => {
-                      const displayTitle = getDisplayTitle(event);
-                      const date = compactDate(event.date);
-                      const tba =
-                        !event.date ||
-                        event.date === "" ||
-                        event.date === "9999-12-31";
-                      const theme = eventThemes[event.id] || DEFAULT_THEME;
-
-                      return (
-                        <Link
-                          key={`featured-${event.id}`}
-                          href={`/events/event-detail/${event.id}`}
-                          className="group snap-start"
-                        >
-                          <article
-                            className="relative min-w-[260px] max-w-[260px] rounded-2xl overflow-hidden border shadow-[0_14px_36px_rgba(0,0,0,0.4)] transition-transform duration-200 group-hover:-translate-y-2"
-                            style={{
-                              borderColor: theme.border,
-                              background: theme.cardBg,
-                              boxShadow: `0 18px 36px ${theme.glow}`,
-                            }}
-                          >
-                            <div className="relative aspect-[4/3] w-full">
-                              <NextImage
-                                src={event.image_url || "/images/coverplaceholder.png"}
-                                alt={displayTitle}
-                                fill
-                                sizes="260px"
-                                className="object-cover"
-                                unoptimized
-                              />
-                              <div
-                                className="absolute inset-0"
-                                style={{
-                                  background:
-                                    "linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.6) 100%)",
-                                }}
-                              />
-                              <span
-                                className="absolute top-3 left-3 px-3 py-1 text-xs font-black uppercase tracking-[0.2em] rounded-full"
-                                style={{
-                                  background: theme.accent,
-                                  color: theme.badgeText,
-                                }}
-                              >
-                                Featured
-                              </span>
-                            </div>
-                            <div className="p-5">
-                              <div
-                                className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.3em] mb-2"
-                                style={{ color: theme.accent }}
-                              >
-                                {tba ? "TBA" : `${date.wk} ${date.mon} ${date.day}`}
-                              </div>
-                              <h4
-                                className="text-white text-lg font-black leading-tight"
-                                dangerouslySetInnerHTML={{
-                                  __html: formatEventText(displayTitle),
-                                }}
-                              />
-                              {event.location && (
-                                <div className="text-white/60 text-sm mt-2">
-                                  {event.location}
-                                </div>
-                              )}
-                            </div>
-                          </article>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </Container>
-      </section>
+        <style jsx>{`
+          .ticker-track {
+            display: flex;
+            align-items: center;
+            gap: 1.75rem;
+            width: max-content;
+            animation: ticker-scroll 40s linear infinite;
+          }
+          .ticker-track:hover {
+            animation-play-state: paused;
+          }
+          .ticker-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            white-space: nowrap;
+            padding-right: 1rem;
+            color: inherit;
+          }
+          .ticker-item:hover .ticker-text {
+            color: #fff;
+          }
+          .ticker-text {
+            display: inline-flex;
+            align-items: baseline;
+            transition: color 0.2s ease;
+          }
+          @keyframes ticker-scroll {
+            0% {
+              transform: translateX(0);
+            }
+            100% {
+              transform: translateX(-50%);
+            }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .ticker-track {
+              animation: none;
+            }
+          }
+        `}</style>
+      </div>
     </div>
   );
 }
