@@ -75,11 +75,11 @@ export default function Page() {
       
       setEvent(currentEvent);
 
-      // Fetch all events ordered by date (descending - most recent first)
+      // Fetch all events ordered by date (ascending - earliest first)
       const { data: allEvents, error: eventsError } = await supabase
         .from('events')
         .select('id, date')
-        .order('date', { ascending: false });
+        .order('date', { ascending: true });
 
       if (eventsError) {
         console.error('Error fetching all events:', eventsError);
