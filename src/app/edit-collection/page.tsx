@@ -16,6 +16,7 @@ import type { Crate } from '../../types/crate';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import CollectionInfoPanel from './components/CollectionInfoPanel';
 import { BoxIcon } from '../../components/BoxIcon';
+import { getDisplayFormat } from '../../utils/formatDisplay';
 
 type SortOption = 
   | 'artist-asc' | 'artist-desc' 
@@ -231,7 +232,7 @@ function CollectionBrowserPage() {
       }
 
       if (folderMode === 'format' && selectedFolderValue) {
-        if (album.format !== selectedFolderValue) return false;
+        if (getDisplayFormat(album.format || '') !== selectedFolderValue) return false;
       }
 
       if (searchQuery) {
@@ -279,8 +280,10 @@ function CollectionBrowserPage() {
           case 'decade-asc': return (a.decade || 0) - (b.decade || 0);
           case 'added-desc': return (b.date_added || '').localeCompare(a.date_added || '');
           case 'added-asc': return (a.date_added || '').localeCompare(b.date_added || '');
-          case 'format-asc': return (a.format || '').localeCompare(b.format || '');
-          case 'format-desc': return (b.format || '').localeCompare(a.format || '');
+          case 'format-asc':
+            return getDisplayFormat(a.format || '').localeCompare(getDisplayFormat(b.format || ''));
+          case 'format-desc':
+            return getDisplayFormat(b.format || '').localeCompare(getDisplayFormat(a.format || ''));
           case 'location-asc': return (a.location || '').localeCompare(b.location || '');
           case 'location-desc': return (b.location || '').localeCompare(a.location || '');
           case 'condition-asc': return (a.media_condition || '').localeCompare(b.media_condition || '');
@@ -313,7 +316,7 @@ function CollectionBrowserPage() {
 
   const folderCounts = useMemo(() => {
     return albums.reduce((acc, album) => {
-      const itemKey = album.format || 'Unknown';
+      const itemKey = getDisplayFormat(album.format || '');
       acc[itemKey] = (acc[itemKey] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
