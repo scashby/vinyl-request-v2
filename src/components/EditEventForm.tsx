@@ -338,10 +338,22 @@ export default function EditEventForm() {
   useEffect(() => {
     if (!GOOGLE_MAPS_API_KEY || !locationInputRef.current) return;
     let autocomplete: {
-      getPlace: () => { formatted_address?: string };
+      getPlace: () => { formatted_address?: string; name?: string };
       addListener: (event: string, handler: () => void) => { remove: () => void };
     } | null = null;
     let listener: { remove: () => void } | null = null;
+    const buildLocationLabel = (place: { formatted_address?: string; name?: string } | undefined) => {
+      const formatted = place?.formatted_address?.trim();
+      const name = place?.name?.trim();
+      if (name && formatted) {
+        const normalizedName = name.toLowerCase();
+        const normalizedFormatted = formatted.toLowerCase();
+        return normalizedFormatted.includes(normalizedName)
+          ? formatted
+          : `${name}, ${formatted}`;
+      }
+      return formatted || name || locationInputRef.current?.value || '';
+    };
 
     void loadGoogleMapsScript()
       .then(() => {
@@ -350,15 +362,16 @@ export default function EditEventForm() {
         if (!googleMaps?.maps?.places) return;
         autocomplete = new googleMaps.maps.places.Autocomplete(locationInputRef.current, {
           types: ['geocode'],
+          fields: ['formatted_address', 'name'],
         });
         listener = autocomplete.addListener('place_changed', () => {
           const place = autocomplete?.getPlace();
-          if (place?.formatted_address) {
-            setEventData((prev) => ({
-              ...prev,
-              location: place.formatted_address || '',
-            }));
-          }
+          const locationLabel = buildLocationLabel(place);
+          if (!locationLabel) return;
+          setEventData((prev) => ({
+            ...prev,
+            location: locationLabel,
+          }));
         });
       })
       .catch((error) => {
