@@ -333,13 +333,13 @@ export interface Database {
           master_release_id: string | null;
           master_release_date: string | null;
           custom_tags?: string | null;
+          genres?: string[] | null;
+          styles?: string[] | null;
           collection_id?: number | null;
           folder_id?: number | null;
           label?: string | null;
           catalog_no?: string | null;
           basic_information?: Json | null;
-          discogs_genres?: string | null;
-          discogs_styles?: string | null;
           decade?: number | null;
         };
         Insert: {
@@ -360,13 +360,13 @@ export interface Database {
           master_release_id?: string | null;
           master_release_date?: string | null;
           custom_tags?: string | null;
+          genres?: string[] | null;
+          styles?: string[] | null;
           collection_id?: number | null;
           folder_id?: number | null;
           label?: string | null;
           catalog_no?: string | null;
           basic_information?: Json | null;
-          discogs_genres?: string | null;
-          discogs_styles?: string | null;
           decade?: number | null;
         };
         Update: {
@@ -387,13 +387,13 @@ export interface Database {
           master_release_id?: string | null;
           master_release_date?: string | null;
           custom_tags?: string | null;
+          genres?: string[] | null;
+          styles?: string[] | null;
           collection_id?: number | null;
           folder_id?: number | null;
           label?: string | null;
           catalog_no?: string | null;
           basic_information?: Json | null;
-          discogs_genres?: string | null;
-          discogs_styles?: string | null;
           decade?: number | null;
         };
       };
