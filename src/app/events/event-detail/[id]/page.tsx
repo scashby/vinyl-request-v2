@@ -118,6 +118,14 @@ export default function Page() {
   } = event;
 
   const displayTitle = getDisplayTitle({ ...event, allowed_tags });
+  const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
+  const mapQuery = location ? encodeURIComponent(location) : '';
+  const mapSearchUrl = mapQuery
+    ? `https://www.google.com/maps/search/?api=1&query=${mapQuery}`
+    : '';
+  const directionsUrl = mapQuery
+    ? `https://www.google.com/maps/dir/?api=1&destination=${mapQuery}`
+    : '';
 
   const formatDate = (dateString: string) => {
     const [year, month, day] = dateString.split('-');
@@ -200,13 +208,25 @@ export default function Page() {
                 {location && (
                   <div className="mb-4">
                     <a
-                      href={`http://googleusercontent.com/maps.google.com/?q=${encodeURIComponent(location)}`}
+                      href={mapSearchUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-blue-600 hover:underline font-medium"
                     >
                       📍 {location}
                     </a>
+                    {directionsUrl && (
+                      <div className="mt-2">
+                        <a
+                          href={directionsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-purple-700 font-semibold hover:underline"
+                        >
+                          Get directions
+                        </a>
+                      </div>
+                    )}
                   </div>
                 )}
                 <div className="text-gray-600 font-medium border-t pt-4 mt-2">
@@ -231,6 +251,36 @@ export default function Page() {
                     className="text-blue-600 hover:underline font-semibold"
                   >
                     View the event page
+                  </a>
+                )}
+              </div>
+            )}
+            {location && (
+              <div className="space-y-3">
+                <h3 className="text-2xl font-bold text-gray-900">Map &amp; Directions</h3>
+                {googleMapsKey ? (
+                  <div className="aspect-video w-full overflow-hidden rounded-2xl border border-gray-200">
+                    <iframe
+                      title={`Map for ${displayTitle}`}
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                      className="h-full w-full"
+                      src={`https://www.google.com/maps/embed/v1/place?key=${googleMapsKey}&q=${mapQuery}`}
+                    />
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    Add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to show the embedded map.
+                  </p>
+                )}
+                {directionsUrl && (
+                  <a
+                    href={directionsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex text-sm font-semibold text-blue-600 hover:text-blue-700"
+                  >
+                    Open directions in Google Maps
                   </a>
                 )}
               </div>
