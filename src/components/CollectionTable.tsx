@@ -10,6 +10,7 @@ import {
   splitColumnsByLock,
   SortState 
 } from '../app/edit-collection/columnDefinitions';
+import { getDisplayFormat } from '../utils/formatDisplay';
 
 interface CollectionTableProps {
   albums: Album[];
@@ -114,7 +115,7 @@ const CollectionTable = memo(function CollectionTable({
       sort_title: (album: Album) => album.sort_title || '—',
       subtitle: (album: Album) => album.subtitle || '—',
       index_number: (album: Album) => album.index_number || '—',
-      format: (album: Album) => album.format || '—',
+      format: (album: Album) => getDisplayFormat(album.format || ''),
       discs: (album: Album) => album.discs || '—',
       tracks: (album: Album) => formatTrackCount(album),
       length: (album: Album) => formatLength(album.length_seconds),
