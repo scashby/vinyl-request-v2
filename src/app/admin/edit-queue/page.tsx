@@ -109,7 +109,7 @@ function EditQueueContent() {
         .eq('event_id', eventId)
         .order('id', { ascending: true });
 
-      const typedRequests = (data || []) as Array<{
+      const typedRequests = (data || []) as unknown as Array<{
         id: string;
         event_id: string;
         inventory_id: number | null;
