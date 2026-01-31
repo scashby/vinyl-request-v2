@@ -4,7 +4,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { UnknownElement } from 'lib/formatParser';
+
+interface UnknownElement {
+  element: string;
+  fullFormatString: string;
+  albumInfo?: {
+    artist: string;
+    title: string;
+    discogsReleaseId?: string | number | null;
+  } | null;
+}
 
 interface UnknownFormatElementModalProps {
   unknownElement: UnknownElement;
