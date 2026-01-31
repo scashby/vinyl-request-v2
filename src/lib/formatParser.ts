@@ -1,358 +1,141 @@
 // src/lib/formatParser.ts
-// Database-driven Discogs format string parser
-
-import { supabase } from './supabaseClient';
+// Updated for V3: Strictly separates Quantity, Media Type, and Descriptors
 
 export interface ParsedFormat {
-  // Database fields
-  format: string;                 // Cleaned format (e.g., "2xLP, Album")
-  discs: number;                  // Disc count (1, 2, 3, etc.)
-  rpm: string;                    // "33", "45", "78"
-  sound: string;                  // "Mono", "Stereo" (default), "Quadraphonic"
-  vinyl_weight: string | null;    // "180g", "140g", etc.
-  vinyl_color: string | null;     // "Blue", "Red", etc.
-  packaging: string | null;       // "Gatefold", "Digipak", etc.
+  qty: number;                    // 1, 2, 3...
+  media_type: string;             // "Vinyl", "CD", "Cassette"
+  format_details: string[];       // ["LP", "Album", "Stereo", "Gatefold"]
   
-  // Text to append to extra field
-  extraText: string;              // Sentences about edition, pressing plant, etc.
+  // Extracted physical attributes (still useful for filtering)
+  rpm: string | null;
+  weight: string | null;          // "180g"
+  color: string | null;           // "Blue"
   
-  // Unknown elements that need user input
-  unknownElements: UnknownElement[];
+  // Descriptions meant for the "Extra" text field (pressing info, etc)
+  extraText: string;
 }
 
-export interface UnknownElement {
-  element: string;
-  fullFormatString: string;
-  albumInfo?: {
-    artist: string;
-    title: string;
-    discogsReleaseId?: string;
-  };
+// 1. Base Formats (The "Media Type")
+const BASE_FORMATS = new Set([
+  'Vinyl', 'CD', 'CDr', 'Cassette', 'Cass', 'File', 'Box Set', 'All Media',
+  '8-Track Cartridge', 'Flexi-disc', 'Lathe Cut', 'Shellac', 'SACD',
+  'DVD', 'Blu-ray', 'Betamax', 'VHS'
+]);
+
+// 2. Format Descriptions (Goes into format_details array)
+const KNOWN_DESCRIPTIONS = new Set([
+  'Album', 'Compilation', 'Comp', 'EP', 'LP', 'Mini-Album', 'Maxi-Single', 'Single',
+  'Remastered', 'Reissue', 'Repress', 'Mono', 'Stereo', 'Quadraphonic', 'Mixed',
+  'Limited Edition', 'Promo', 'Test Pressing', 'Unofficial Release', 'Gatefold',
+  'Digipak', 'Club Edition', 'Jukebox'
+]);
+
+// Normalize helper (Discogs sometimes uses "Cass" for "Cassette")
+function normalizeMediaType(type: string): string {
+  if (type === 'Cass') return 'Cassette';
+  if (type === '7"' || type === '10"' || type === '12"') return 'Vinyl'; // Infer Vinyl from size if missing
+  return type;
 }
 
-export interface FormatAbbreviation {
-  id: number;
-  abbreviation: string;
-  full_name: string;
-  category: string;
-}
-
-// Cache for abbreviations to avoid repeated database calls
-let abbreviationsCache: FormatAbbreviation[] | null = null;
-let cacheTimestamp: number = 0;
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-/**
- * Load format abbreviations from database with caching
- */
-async function loadAbbreviations(): Promise<FormatAbbreviation[]> {
-  const now = Date.now();
-  
-  // Return cached data if still valid
-  if (abbreviationsCache && (now - cacheTimestamp) < CACHE_TTL) {
-    return abbreviationsCache;
-  }
-  
-  const { data, error } = await supabase
-    .from('format_abbreviations')
-    .select('*');
-  
-  if (error) {
-    console.error('Error loading format abbreviations:', error);
-    return [];
-  }
-  
-  abbreviationsCache = data as FormatAbbreviation[];
-  cacheTimestamp = now;
-  
-  return abbreviationsCache;
-}
-
-/**
- * Clear the abbreviations cache (call after adding new abbreviations)
- */
-export function clearAbbreviationsCache(): void {
-  abbreviationsCache = null;
-  cacheTimestamp = 0;
-}
-
-/**
- * Add a new format abbreviation to the database
- */
-export async function addFormatAbbreviation(
-  abbreviation: string,
-  fullName: string,
-  category: string,
-  createdBy?: string
-): Promise<boolean> {
-  const { error } = await supabase
-    .from('format_abbreviations')
-    .insert({
-      abbreviation,
-      full_name: fullName,
-      category,
-      created_by: createdBy,
-      use_count: 1,
-    });
-  
-  if (error) {
-    console.error('Error adding format abbreviation:', error);
-    return false;
-  }
-  
-  // Clear cache so new abbreviation is picked up
-  clearAbbreviationsCache();
-  return true;
-}
-
-/**
- * Known media types (always in format)
- */
-const MEDIA_TYPES = ['Cass', 'CD', '7"', '10"', '12"', 'LP', 'EP', 'Single', 'Maxi-Single', 'Mini-Album'];
-
-/**
- * Known album types (always in format)
- */
-const ALBUM_TYPES = ['Album', 'Comp', 'Compilation'];
-
-/**
- * Parses a Discogs format string into structured database fields
- * Uses database lookups for abbreviations
- * 
- * @param formatString - The raw format string from Discogs
- * @param albumInfo - Optional album info for unknown element modals
- * @returns ParsedFormat object with database fields, extra text, and unknown elements
- */
-export async function parseDiscogsFormat(
-  formatString: string,
-  albumInfo?: { artist: string; title: string; discogsReleaseId?: string }
-): Promise<ParsedFormat> {
-  if (!formatString || formatString.trim() === '') {
-    return {
-      format: '',
-      discs: 1,
-      rpm: '33',
-      sound: 'Stereo',
-      vinyl_weight: null,
-      vinyl_color: null,
-      packaging: null,
-      extraText: '',
-      unknownElements: [],
-    };
-  }
-
-  // Load abbreviations from database
-  const abbreviations = await loadAbbreviations();
-  
-  // Create lookup maps by category
-  const lookupByCategory = abbreviations.reduce((acc, abbr) => {
-    if (!acc[abbr.category]) {
-      acc[abbr.category] = new Map();
-    }
-    acc[abbr.category].set(abbr.abbreviation, abbr.full_name);
-    return acc;
-  }, {} as Record<string, Map<string, string>>);
-
-  // Split by comma and clean up
-  const parts = formatString.split(',').map(p => p.trim()).filter(p => p !== 'Vinyl' && p !== '');
-
-  // Initialize result
+export function parseDiscogsFormat(
+  formatString: string
+): ParsedFormat {
   const result: ParsedFormat = {
-    format: '',
-    discs: 1,
-    rpm: '33',
-    sound: 'Stereo',
-    vinyl_weight: null,
-    vinyl_color: null,
-    packaging: null,
-    extraText: '',
-    unknownElements: [],
+    qty: 1,
+    media_type: 'Vinyl', // Default fallback
+    format_details: [],
+    rpm: null,
+    weight: null,
+    color: null,
+    extraText: ''
   };
+
+  if (!formatString) return result;
+
+  // Step 1: Split string by comma and clean up
+  // Example: "2 x Vinyl, LP, Album, Limited Edition, 180g"
+  const rawParts = formatString.split(',').map(p => p.trim());
 
   const extraParts: string[] = [];
-  const formatParts: string[] = [];
-  const unknownElements: string[] = [];
 
-  for (const part of parts) {
-    let matched = false;
+  for (const part of rawParts) {
+    // A. Check for Quantity + Media Type (e.g., "2 x Vinyl")
+    // Regex matches "2xVinyl", "2 x Vinyl", "Vinyl"
+    const qtyMatch = part.match(/^(\d+)\s*x\s*(.+)$/i);
+    
+    if (qtyMatch) {
+      result.qty = parseInt(qtyMatch[1], 10);
+      result.media_type = normalizeMediaType(qtyMatch[2].trim());
+      continue;
+    }
 
-    // Disc count (e.g., "2xLP", "3xCD")
-    const discMatch = part.match(/^(\d+)x(LP|CD|Vinyl)/i);
-    if (discMatch) {
-      result.discs = parseInt(discMatch[1], 10);
-      const mediaType = discMatch[2].toUpperCase();
-      if (mediaType === 'LP') {
-        formatParts.push(`${result.discs}xLP`);
-      } else if (mediaType === 'CD') {
-        formatParts.push(`${result.discs}xCD`);
+    // B. Check for strict Media Type match if no qty prefix (e.g. "CD")
+    if (BASE_FORMATS.has(part)) {
+      result.media_type = normalizeMediaType(part);
+      continue;
+    }
+
+    // C. Check for Size implies Vinyl (e.g. 7", 12")
+    if (['7"', '10"', '12"'].includes(part)) {
+      if (result.media_type === 'Vinyl') { // Only add as detail if we know it's vinyl
+         result.format_details.push(part);
       }
-      matched = true;
-      continue;
-    }
-
-    // Media types for format
-    if (MEDIA_TYPES.includes(part)) {
-      formatParts.push(part);
-      matched = true;
-      continue;
-    }
-
-    // Album types for format
-    if (ALBUM_TYPES.includes(part)) {
-      const albumType = part === 'Comp' ? 'Compilation' : part;
-      formatParts.push(albumType);
-      matched = true;
-      continue;
-    }
-
-    // RPM (explicit)
-    if (part.includes('RPM') || ['33', '45', '78', '16⅔', '33⅓'].includes(part)) {
-      const rpmMatch = part.match(/(\d+)/);
-      if (rpmMatch) {
-        result.rpm = rpmMatch[1];
-        matched = true;
-        continue;
+      // Infer RPM defaults based on size
+      if (!result.rpm) {
+        if (part === '7"') result.rpm = '45';
+        else result.rpm = '33';
       }
-    }
-
-    // Sound - Mono/Stereo/Quad
-    if (part === 'Mono' || part.toLowerCase() === 'mono') {
-      result.sound = 'Mono';
-      matched = true;
-      continue;
-    }
-    if (part === 'Quad' || part === 'Quadraphonic') {
-      result.sound = 'Quadraphonic';
-      matched = true;
-      continue;
-    }
-    if (part === 'Stereo' || part.toLowerCase() === 'stereo') {
-      result.sound = 'Stereo';
-      matched = true;
       continue;
     }
 
-    // Weight (e.g., "180", "140g", "200 gram")
-    const weightMatch = part.match(/^(\d+)\s*(g|gram|grams)?$/i);
+    // D. Extract RPM explicitly
+    if (part.includes('RPM')) {
+      result.rpm = part.replace('RPM', '').trim();
+      continue;
+    }
+    if (['33', '45', '78'].includes(part)) {
+      result.rpm = part;
+      continue;
+    }
+
+    // E. Extract Weight
+    const weightMatch = part.match(/^(\d+)\s*(g|gram|grams)$/i);
     if (weightMatch) {
-      result.vinyl_weight = `${weightMatch[1]}g`;
-      matched = true;
+      result.weight = `${weightMatch[1]}g`;
+      result.format_details.push(result.weight); // Also add to details
       continue;
     }
 
-    // Try to match against database abbreviations
-    // Check each category in priority order
-    
-    // 1. Packaging
-    if (lookupByCategory.packaging?.has(part)) {
-      const packaging = lookupByCategory.packaging.get(part)!;
-      result.packaging = packaging;
-      if (part === 'Pic') {
-        extraParts.push('Picture disc');
-      }
-      matched = true;
+    // F. Extract Known Descriptions (LP, Album, etc.)
+    if (KNOWN_DESCRIPTIONS.has(part)) {
+      // Expand abbreviations
+      let desc = part;
+      if (part === 'Comp') desc = 'Compilation';
+      if (part === 'Pic') desc = 'Picture Disc';
+      
+      result.format_details.push(desc);
       continue;
     }
 
-    // 2. Pressing Plants
-    if (lookupByCategory.pressing_plant?.has(part)) {
-      extraParts.push(lookupByCategory.pressing_plant.get(part)!);
-      matched = true;
+    // G. Color Detection (Simple list)
+    const colors = ['Red', 'Blue', 'Green', 'Yellow', 'Orange', 'Purple', 'Pink', 
+                    'White', 'Clear', 'Gold', 'Silver', 'Splatter', 'Marble'];
+    if (colors.some(c => part.includes(c))) {
+      result.color = part;
+      extraParts.push(part); // Colors usually go to extra text or details
       continue;
     }
 
-    // 3. Colors - check if abbreviation OR if part contains color words
-    if (lookupByCategory.color?.has(part)) {
-      result.vinyl_color = lookupByCategory.color.get(part)!;
-      matched = true;
-      continue;
-    }
-    
-    // Check if part contains common color words (for multi-word colors like "Splatter Red Blue")
-    const colorWords = ['Red', 'Blue', 'Green', 'Yellow', 'Orange', 'Purple', 'Pink', 'Black', 'White', 
-                        'Clear', 'Gold', 'Silver', 'Marble', 'Splatter', 'Translucent', 'Opaque'];
-    if (colorWords.some(color => part.includes(color))) {
-      result.vinyl_color = part;
-      matched = true;
-      continue;
-    }
-
-    // 4. Editions
-    if (lookupByCategory.edition?.has(part)) {
-      extraParts.push(lookupByCategory.edition.get(part)!);
-      matched = true;
-      continue;
-    }
-
-    // 5. Cassette Features
-    if (lookupByCategory.cassette_feature?.has(part)) {
-      extraParts.push(lookupByCategory.cassette_feature.get(part)!);
-      matched = true;
-      continue;
-    }
-
-    // 6. CD Features
-    if (lookupByCategory.cd_feature?.has(part)) {
-      extraParts.push(lookupByCategory.cd_feature.get(part)!);
-      matched = true;
-      continue;
-    }
-
-    // 7. Vinyl Material
-    if (lookupByCategory.vinyl_material?.has(part)) {
-      extraParts.push(lookupByCategory.vinyl_material.get(part)!);
-      matched = true;
-      continue;
-    }
-
-    // If we get here, this element is unknown
-    if (!matched) {
-      unknownElements.push(part);
-    }
+    // H. Everything else goes to "Extra" (Unknown stuff)
+    extraParts.push(part);
   }
 
-  // Build format string
-  result.format = formatParts.join(', ');
-
-  // Infer RPM if not explicitly set
-  if (!parts.some(p => p.includes('RPM') || ['33', '45', '78'].includes(p))) {
-    if (parts.includes('7"')) {
-      result.rpm = '45';
-    } else if (parts.includes('10"') || parts.includes('LP') || parts.includes('12"')) {
-      result.rpm = '33';
-    }
+  // Final cleanup: If we have "LP" in details but media_type is unknown/default, ensure it's Vinyl
+  if (result.format_details.includes('LP') || result.format_details.includes('EP')) {
+    if (result.media_type === 'Unknown') result.media_type = 'Vinyl';
   }
 
-  // Build extra text
-  result.extraText = extraParts.length > 0 ? extraParts.join('. ') + '.' : '';
-
-  // Build unknown elements array
-  result.unknownElements = unknownElements.map(element => ({
-    element,
-    fullFormatString: formatString,
-    albumInfo,
-  }));
+  result.extraText = extraParts.join(', ');
 
   return result;
-}
-
-/**
- * Appends parsed format details to existing extra field
- * 
- * @param existingExtra - Current value of the extra field (may be null or empty)
- * @param newDetails - New details to append from parseDiscogsFormat
- * @returns Combined extra text
- */
-export function appendToExtra(existingExtra: string | null, newDetails: string): string {
-  if (!newDetails || newDetails.trim() === '') {
-    return existingExtra || '';
-  }
-
-  if (!existingExtra || existingExtra.trim() === '') {
-    return newDetails;
-  }
-
-  // Add separator if existing text doesn't end with punctuation
-  const separator = /[.!?]$/.test(existingExtra.trim()) ? ' ' : '. ';
-  return existingExtra.trim() + separator + newDetails;
 }

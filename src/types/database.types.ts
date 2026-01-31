@@ -1,432 +1,141 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+// src/lib/formatParser.ts
+// Updated for V3: Strictly separates Quantity, Media Type, and Descriptors
 
-export interface Database {
-  public: {
-    Tables: {
-      collection: {
-        Row: {
-          id: number
-          // Core Identification
-          artist: string
-          title: string
-          year: string | null
-          year_int: number | null
-          format: string
-          image_url: string | null
-          back_image_url: string | null
-          index_number: number | null
-          
-          // Normalized/Generated
-          album_norm: string | null
-          artist_norm: string | null
-          title_norm: string | null
-          artist_album_norm: string | null
-          
-          // Status & Location
-          collection_status: string | null
-          for_sale: boolean
-          location: string | null
-          storage_device: string | null
-          storage_device_slot: string | null
-          slot: string | null
-          date_added: string | null
-          modified_date: string | null
-          last_reviewed_at: string | null
-          
-          // Notes
-          personal_notes: string | null
-          release_notes: string | null
-          extra: string | null
-          
-          // Physical
-          media_condition: string
-          package_sleeve_condition: string | null
-          packaging: string | null
-          rpm: string | null
-          vinyl_weight: string | null
-          vinyl_color: string[] | null // Fixed: SQL is ARRAY
-          discs: number | null
-          sides: Json | null
-          is_box_set: boolean | null
-          box_set: string | null
-          
-          // Identifiers
-          barcode: string | null
-          cat_no: string | null
-          discogs_master_id: string | null
-          discogs_release_id: string | null
-          discogs_id: string | null
-          spotify_id: string | null
-          spotify_url: string | null
-          spotify_album_id: string | null
-          apple_music_id: string | null
-          apple_music_url: string | null
-          musicbrainz_id: string | null
-          musicbrainz_url: string | null
-          lastfm_id: string | null
-          lastfm_url: string | null
-          allmusic_id: string | null
-          allmusic_url: string | null
-          wikipedia_url: string | null
-          dbpedia_uri: string | null
+export interface ParsedFormat {
+  qty: number;                    // 1, 2, 3...
+  media_type: string;             // "Vinyl", "CD", "Cassette"
+  format_details: string[];       // ["LP", "Album", "Stereo", "Gatefold"]
+  
+  // Extracted physical attributes (still useful for filtering)
+  rpm: string | null;
+  weight: string | null;          // "180g"
+  color: string | null;           // "Blue"
+  
+  // Descriptions meant for the "Extra" text field (pressing info, etc)
+  extraText: string;
+}
 
-          // Audio & Metadata
-          tracks: Json | null
-          length_seconds: number | null
-          sound: string | null
-          spars_code: string | null
-          is_live: boolean | null
-          time_signature: string | null
-          tempo_bpm: number | null // Note: Derived or mapped
-          
-          // Arrays & Tags (SQL Arrays)
-          genres: string[] | null
-          styles: string[] | null
-          labels: string[] | null
-          custom_tags: string[] | null
-          secondary_artists: string[] | null
-          signed_by: string[] | null
-          finalized_fields: string[] | null
-          enrichment_sources: string[] | null
-          
-          // People (JSONB in SQL)
-          musicians: Json | null
-          songwriters: Json | null
-          producers: Json | null
-          engineers: Json | null
-          writers: Json | null
-          
-          // Classical / People Texts
-          chorus: string | null
-          composer: string | null
-          composition: string | null
-          conductor: string | null
-          orchestra: string | null
-          sort_artist: string | null
-          sort_title: string | null
-          sort_chorus: string | null
-          sort_composition: string | null
-          
-          // Values & Sales
-          owner: string | null
-          purchase_price: number | null
-          current_value: number | null
-          purchase_date: string | null
-          purchase_store: string | null
-          sale_price: number | null
-          sale_platform: string | null
-          sale_quantity: number | null
-          sale_notes: string | null
-          wholesale_cost: number | null
-          pricing_notes: string | null
-          
-          // Usage
-          play_count: number | null
-          last_played_date: string | null
-          last_cleaned_date: string | null
-          my_rating: number | null
-          
-          // Loans
-          due_date: string | null
-          loan_date: string | null
-          loaned_to: string | null
-          
-          // Tech / JSONB Blobs
-          disc_metadata: Json | null
-          matrix_numbers: Json | null
-          inner_sleeve_images: Json | null
-          enriched_metadata: Json | null
-          blocked_tracks: Json | null
-          
-          // Legacy/Other
-          sell_price: string | null // Text field in SQL
-          decade: number | null
-          master_release_id: string | null
-          master_release_date: string | null
-          country: string | null
-          studio: string | null
-          recording_location: string | null
-          cultural_significance: string | null
-          original_release_date: string | null
-          original_release_year: number | null
-          recording_date: string | null
-          recording_year: number | null
-          parent_id: string | null // UUID
-          child_album_ids: string[] | null
-          blocked: boolean | null
-          blocked_sides: string[] | null
-        }
-        Insert: {
-          artist: string
-          title: string
-          format: string
-          media_condition: string
-          // Allow all optional fields
-          [key: string]: unknown
-        }
-        Update: {
-          id?: number
-          // Allow updating any field
-          [key: string]: unknown
-        }
+// 1. Base Formats (The "Media Type")
+const BASE_FORMATS = new Set([
+  'Vinyl', 'CD', 'CDr', 'Cassette', 'Cass', 'File', 'Box Set', 'All Media',
+  '8-Track Cartridge', 'Flexi-disc', 'Lathe Cut', 'Shellac', 'SACD',
+  'DVD', 'Blu-ray', 'Betamax', 'VHS'
+]);
+
+// 2. Format Descriptions (Goes into format_details array)
+const KNOWN_DESCRIPTIONS = new Set([
+  'Album', 'Compilation', 'Comp', 'EP', 'LP', 'Mini-Album', 'Maxi-Single', 'Single',
+  'Remastered', 'Reissue', 'Repress', 'Mono', 'Stereo', 'Quadraphonic', 'Mixed',
+  'Limited Edition', 'Promo', 'Test Pressing', 'Unofficial Release', 'Gatefold',
+  'Digipak', 'Club Edition', 'Jukebox'
+]);
+
+// Normalize helper (Discogs sometimes uses "Cass" for "Cassette")
+function normalizeMediaType(type: string): string {
+  if (type === 'Cass') return 'Cassette';
+  if (type === '7"' || type === '10"' || type === '12"') return 'Vinyl'; // Infer Vinyl from size if missing
+  return type;
+}
+
+export function parseDiscogsFormat(
+  formatString: string
+): ParsedFormat {
+  const result: ParsedFormat = {
+    qty: 1,
+    media_type: 'Vinyl', // Default fallback
+    format_details: [],
+    rpm: null,
+    weight: null,
+    color: null,
+    extraText: ''
+  };
+
+  if (!formatString) return result;
+
+  // Step 1: Split string by comma and clean up
+  // Example: "2 x Vinyl, LP, Album, Limited Edition, 180g"
+  const rawParts = formatString.split(',').map(p => p.trim());
+
+  const extraParts: string[] = [];
+
+  for (const part of rawParts) {
+    // A. Check for Quantity + Media Type (e.g., "2 x Vinyl")
+    // Regex matches "2xVinyl", "2 x Vinyl", "Vinyl"
+    const qtyMatch = part.match(/^(\d+)\s*x\s*(.+)$/i);
+    
+    if (qtyMatch) {
+      result.qty = parseInt(qtyMatch[1], 10);
+      result.media_type = normalizeMediaType(qtyMatch[2].trim());
+      continue;
+    }
+
+    // B. Check for strict Media Type match if no qty prefix (e.g. "CD")
+    if (BASE_FORMATS.has(part)) {
+      result.media_type = normalizeMediaType(part);
+      continue;
+    }
+
+    // C. Check for Size implies Vinyl (e.g. 7", 12")
+    if (['7"', '10"', '12"'].includes(part)) {
+      if (result.media_type === 'Vinyl') { // Only add as detail if we know it's vinyl
+         result.format_details.push(part);
       }
-
-      wantlist: {
-        Row: {
-          id: number
-          artist: string
-          title: string
-          year: string | null
-          format: string | null
-          cover_image: string | null
-          notes: string | null
-          
-          // IDs
-          discogs_release_id: string | null
-          discogs_master_id: string | null
-          
-          // Normalized
-          artist_norm: string | null
-          title_norm: string | null
-          artist_album_norm: string | null
-          
-          date_added_to_wantlist: string
-        }
-        Insert: {
-          artist: string
-          title: string
-          // allow other optional fields
-          [key: string]: unknown
-        }
-        Update: {
-          [key: string]: unknown
-        }
+      // Infer RPM defaults based on size
+      if (!result.rpm) {
+        if (part === '7"') result.rpm = '45';
+        else result.rpm = '33';
       }
+      continue;
+    }
+
+    // D. Extract RPM explicitly
+    if (part.includes('RPM')) {
+      result.rpm = part.replace('RPM', '').trim();
+      continue;
+    }
+    if (['33', '45', '78'].includes(part)) {
+      result.rpm = part;
+      continue;
+    }
+
+    // E. Extract Weight
+    const weightMatch = part.match(/^(\d+)\s*(g|gram|grams)$/i);
+    if (weightMatch) {
+      result.weight = `${weightMatch[1]}g`;
+      result.format_details.push(result.weight); // Also add to details
+      continue;
+    }
+
+    // F. Extract Known Descriptions (LP, Album, etc.)
+    if (KNOWN_DESCRIPTIONS.has(part)) {
+      // Expand abbreviations
+      let desc = part;
+      if (part === 'Comp') desc = 'Compilation';
+      if (part === 'Pic') desc = 'Picture Disc';
       
-      artist_rules: {
-        Row: {
-          id: number
-          search_pattern: string
-          replacement: string | null
-          rule_type: 'alias' | 'sort_exception' | 'ignore'
-          created_at: string
-        }
-        Insert: {
-          search_pattern: string
-          replacement?: string | null
-          rule_type: 'alias' | 'sort_exception' | 'ignore'
-        }
-        Update: {
-          search_pattern?: string
-          replacement?: string | null
-          rule_type?: 'alias' | 'sort_exception' | 'ignore'
-        }
-      }
-
-      collection_dj_data: {
-        Row: {
-          collection_id: number
-          bpm: number | null
-          musical_key: string | null
-          energy: number | null
-          danceability: number | null
-          valence: number | null
-          created_at: string
-        }
-        Insert: {
-          collection_id: number
-          bpm?: number | null
-          musical_key?: string | null
-          energy?: number | null
-          danceability?: number | null
-          valence?: number | null
-        }
-        Update: {
-          bpm?: number | null
-          musical_key?: string | null
-          energy?: number | null
-          danceability?: number | null
-          valence?: number | null
-        }
-      }
-
-      master_tags: {
-        Row: {
-          id: number
-          name: string
-          category: 'genre' | 'style' | 'mood' | 'context' | 'custom'
-          created_at: string
-        }
-        Insert: {
-          name: string
-          category?: 'genre' | 'style' | 'mood' | 'context' | 'custom'
-        }
-        Update: {
-          name?: string
-          category?: 'genre' | 'style' | 'mood' | 'context' | 'custom'
-        }
-      }
-
-      collection_tags: {
-        Row: {
-          collection_id: number
-          tag_id: number
-        }
-        Insert: {
-          collection_id: number
-          tag_id: number
-        }
-        Update: {
-          collection_id?: number
-          tag_id?: number
-        }
-      }
-
-      crates: {
-        Row: {
-          id: number
-          name: string
-          icon: string | null
-          color: string | null
-          is_smart: boolean
-          smart_rules: Json | null
-          match_rules: string | null
-          live_update: boolean | null
-          sort_order: number | null
-          created_at: string
-          updated_at: string | null
-        }
-        Insert: {
-          name: string
-          icon?: string | null
-          color?: string | null
-          is_smart?: boolean
-          smart_rules?: Json | null
-          match_rules?: string | null
-          live_update?: boolean | null
-          sort_order?: number | null
-        }
-        Update: {
-          name?: string
-          icon?: string | null
-          color?: string | null
-          is_smart?: boolean
-          smart_rules?: Json | null
-          match_rules?: string | null
-          live_update?: boolean | null
-          sort_order?: number | null
-        }
-      }
-      
-      crate_albums: {
-        Row: {
-          id: number
-          crate_id: number
-          album_id: number
-          position: number | null
-          added_at: string
-        }
-        Insert: {
-          crate_id: number
-          album_id: number
-          position?: number | null
-          added_at?: string
-        }
-        Update: {
-          position?: number | null
-        }
-      }
-
-      events: {
-        Row: {
-          id: number
-          date: string
-          title: string
-          time: string
-          info: string | null
-          location: string | null
-          image_url: string | null
-          has_queue: boolean | null
-          allowed_formats: string[] | null
-          info_url: string | null
-          is_recurring: boolean | null
-          recurrence_pattern: string | null
-          recurrence_interval: number | null
-          recurrence_days: string | null
-          recurrence_end_date: string | null
-          parent_event_id: number | null
-          queue_type: string | null
-          allowed_tags: string[] | null
-          queue_types: string[] | null
-          crate_id: number | null
-          is_featured_grid: boolean
-          is_featured_upnext: boolean
-          featured_priority: number | null
-        }
-        Insert: {
-          date: string
-          title: string
-          time: string
-          [key: string]: unknown
-        }
-        Update: {
-          [key: string]: unknown
-        }
-      }
-
-      requests: {
-        Row: {
-          id: string // UUID
-          artist: string
-          title: string
-          side: string | null
-          name: string | null
-          status: string
-          votes: number
-          timestamp: string
-          folder: string
-          year: string | null
-          format: string | null
-          album_id: number | null
-          event_id: number | null
-          track_number: string | null
-          track_name: string | null
-          track_duration: string | null
-        }
-        Insert: {
-          id?: string
-          artist: string
-          title: string
-          status: string
-          [key: string]: unknown
-        }
-        Update: {
-          status?: string
-          votes?: number
-          [key: string]: unknown
-        }
-      }
-
-      // Other tables defined as unknown to prevent errors but should be fleshed out if used
-      dj_sets: { Row: { id: number; [key: string]: unknown }; Insert: { [key: string]: unknown }; Update: { [key: string]: unknown } }
-      format_abbreviations: { Row: { id: number; [key: string]: unknown }; Insert: { [key: string]: unknown }; Update: { [key: string]: unknown } }
-      staff_picks: { Row: { id: number; [key: string]: unknown }; Insert: { [key: string]: unknown }; Update: { [key: string]: unknown } }
-      tracks: { Row: { id: number; [key: string]: unknown }; Insert: { [key: string]: unknown }; Update: { [key: string]: unknown } }
+      result.format_details.push(desc);
+      continue;
     }
-    Views: {
-      [_ in never]: never
+
+    // G. Color Detection (Simple list)
+    const colors = ['Red', 'Blue', 'Green', 'Yellow', 'Orange', 'Purple', 'Pink', 
+                    'White', 'Clear', 'Gold', 'Silver', 'Splatter', 'Marble'];
+    if (colors.some(c => part.includes(c))) {
+      result.color = part;
+      extraParts.push(part); // Colors usually go to extra text or details
+      continue;
     }
-    Functions: {
-      [_ in never]: never
-    }
-    Enums: {
-      [_ in never]: never
-    }
+
+    // H. Everything else goes to "Extra" (Unknown stuff)
+    extraParts.push(part);
   }
+
+  // Final cleanup: If we have "LP" in details but media_type is unknown/default, ensure it's Vinyl
+  if (result.format_details.includes('LP') || result.format_details.includes('EP')) {
+    if (result.media_type === 'Unknown') result.media_type = 'Vinyl';
+  }
+
+  result.extraText = extraParts.join(', ');
+
+  return result;
 }
