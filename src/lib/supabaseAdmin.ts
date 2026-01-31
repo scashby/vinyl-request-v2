@@ -1,12 +1,19 @@
-// src/lib/supabaseAdmin.ts
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from 'types/supabase';
+import { Database } from '../types/database.types';
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!; // add in Vercel
+// NOTE: This client bypasses RLS policies! Use only server-side.
 
-export function supabaseAdmin() {
-  return createClient<Database>(url, serviceRoleKey, {
-    auth: { persistSession: false }
-  });
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+// Updated to use the modern "Secret" key name
+const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY!;
+
+if (!supabaseUrl || !supabaseSecretKey) {
+  throw new Error('Missing Supabase Admin environment variables');
 }
+
+export const supabaseAdmin = createClient<Database>(supabaseUrl, supabaseSecretKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+});

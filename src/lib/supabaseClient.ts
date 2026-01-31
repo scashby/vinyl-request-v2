@@ -1,13 +1,13 @@
-// src/lib/supabaseClient.ts
-
 import { createClient } from '@supabase/supabase-js';
-import { type Database } from '../types/supabase';
+import { Database } from '../types/database.types';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+// Updated to use the modern "Publishable" key name
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables');
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Missing Supabase environment variables');
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+// The <Database> generic is vital for your V3 table autocompletion
+export const supabase = createClient<Database>(supabaseUrl, supabaseKey);
