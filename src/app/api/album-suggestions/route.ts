@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     debugLog('Attempting to check for existing suggestion');
     
     // Check if suggestion already exists (to avoid duplicates)
-    const { data: existing, error: existingError } = await supabaseAdmin()
+    const { data: existing, error: existingError } = await supabaseAdmin
       .from('album_suggestions')
       .select('id, contribution_amount')
       .eq('artist', artist.trim())
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       debugLog('Found existing suggestion, updating:', existing.id);
       
       // Update existing record with proper field handling
-      const { data: updateData, error } = await supabaseAdmin()
+      const { data: updateData, error } = await supabaseAdmin
         .from('album_suggestions')
         .update({
           updated_at: new Date().toISOString(),
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
 
       debugLog('Insert data prepared:', insertData);
 
-      const { data: insertedData, error } = await supabaseAdmin()
+      const { data: insertedData, error } = await supabaseAdmin
         .from('album_suggestions')
         .insert(insertData)
         .select()
@@ -200,7 +200,7 @@ export async function GET(request: NextRequest) {
 
     debugLog('GET parameters:', { status, limit });
 
-    let query = supabaseAdmin()
+    let query = supabaseAdmin
       .from('album_suggestions')
       .select('*')
       .order('created_at', { ascending: false })
@@ -264,7 +264,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Use service role client to bypass RLS
-    const { data, error } = await supabaseAdmin()
+    const { data, error } = await supabaseAdmin
       .from('album_suggestions')
       .update(updateData)
       .eq('id', id)
@@ -318,7 +318,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Don't use .single() - just delete and check the count
-    const { error } = await supabaseAdmin()
+    const { error } = await supabaseAdmin
       .from('album_suggestions')
       .delete()
       .eq('id', id);

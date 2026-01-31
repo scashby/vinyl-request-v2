@@ -844,13 +844,13 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               // Parse format string for extra details (vinyl color etc)
               const formatData = await parseDiscogsFormat(album.format);
               const mappedFormatData = {
-                discs: formatData.discs,
+                discs: formatData.qty,
                 rpm: formatData.rpm,
-                sound: formatData.sound,
-                vinyl_weight: formatData.vinyl_weight,
-                packaging: formatData.packaging,
+                sound: null,
+                vinyl_weight: formatData.weight,
+                packaging: null,
                 extra: formatData.extraText,
-                vinyl_color: formatData.vinyl_color ? [formatData.vinyl_color] : null,
+                vinyl_color: formatData.color ? [formatData.color] : null,
               };
 
               Object.assign(albumData, mappedFormatData);

@@ -1,6 +1,6 @@
 // src/lib/importUtils.ts
 import { supabase } from './supabaseClient';
-import type { Database } from '../types/database.types';
+import type { Database } from '../types/supabase';
 
 // ============================================================================
 // 1. STRING NORMALIZATION (Synchronous)
@@ -155,9 +155,12 @@ export async function saveTags(collectionId: number, tags: string[], category: '
 export async function saveDJData(collectionId: number, bpm?: number, key?: string) {
   if (!bpm && !key) return;
 
-  // Uses strict typing from Database definitions to avoid 'any'
-  const updateData: Database['public']['Tables']['collection_dj_data']['Insert'] = { 
-    collection_id: collectionId 
+  const updateData: {
+    collection_id: number;
+    bpm?: number;
+    musical_key?: string;
+  } = {
+    collection_id: collectionId,
   };
   
   if (bpm) updateData.bpm = Math.round(bpm);
