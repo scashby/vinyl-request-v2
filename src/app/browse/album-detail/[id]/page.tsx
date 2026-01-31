@@ -106,7 +106,35 @@ function AlbumDetailContent() {
       if (error) {
         setError(error.message);
       } else {
-        const release = data.release;
+        const release = (data.release as unknown as {
+          id: number;
+          media_type: string | null;
+          format_details: string[] | null;
+          notes: string | null;
+          release_year: number | null;
+          release_date: string | null;
+          master: {
+            id: number;
+            title: string;
+            cover_image_url: string | null;
+            original_release_year: number | null;
+            artist: {
+              id: number;
+              name: string;
+            } | null;
+          } | null;
+          release_tracks: Array<{
+            id: number;
+            position: string;
+            side: string | null;
+            title_override: string | null;
+            recording: {
+              id: number;
+              title: string | null;
+              duration_seconds: number | null;
+            } | null;
+          }>;
+        } | null);
         const master = release?.master;
         const artistName = master?.artist?.name || 'Unknown Artist';
         const releaseYear = master?.original_release_year
