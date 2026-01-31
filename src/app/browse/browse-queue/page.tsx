@@ -107,13 +107,45 @@ function BrowseQueueContent() {
         .eq("event_id", eventId)
         .order("id", { ascending: true });
 
-      if (!requests?.length) {
+      const typedRequests = (requests || []) as unknown as Array<{
+        id: string;
+        event_id: number | null;
+        inventory_id: number | null;
+        recording_id: number | null;
+        artist_name: string | null;
+        track_title: string | null;
+        votes: number | null;
+        created_at: string;
+        inventory: {
+          id: number;
+          release: {
+            id: number;
+            media_type: string | null;
+            master: {
+              id: number;
+              title: string;
+              cover_image_url: string | null;
+              original_release_year: number | null;
+              artist: {
+                name: string;
+              } | null;
+            } | null;
+          } | null;
+        } | null;
+        recording: {
+          id: number;
+          title: string | null;
+          duration_seconds: number | null;
+        } | null;
+      }>;
+
+      if (!typedRequests.length) {
         setQueueItems([]);
         return;
       }
 
       const releaseIds = Array.from(new Set(
-        requests
+        typedRequests
           .map((req) => req.inventory?.release?.id)
           .filter(Boolean)
       )) as number[];
@@ -135,7 +167,7 @@ function BrowseQueueContent() {
       const queueTypes = event?.queue_types || (event?.queue_type ? [event.queue_type] : ['side']);
       const primaryQueueType = Array.isArray(queueTypes) ? queueTypes[0] : queueTypes;
 
-      const mapped: QueueItem[] = requests.map((req) => {
+      const mapped: QueueItem[] = typedRequests.map((req) => {
         const master = req.inventory?.release?.master;
         const artist = master?.artist?.name || req.artist_name || "Unknown Artist";
         const trackTitle = req.track_title || req.recording?.title || null;
