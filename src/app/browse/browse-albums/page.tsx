@@ -167,7 +167,33 @@ function BrowseAlbumsContent() {
         if (!inventoryRows || !isMounted) return;
 
         const parsed: BrowseAlbum[] = inventoryRows.map((row) => {
-          const release = row.release;
+          const release = (row.release as unknown as {
+            id: number;
+            media_type: string | null;
+            format_details: string[] | null;
+            notes: string | null;
+            release_year: number | null;
+            release_date: string | null;
+            master: {
+              id: number;
+              title: string;
+              cover_image_url: string | null;
+              original_release_year: number | null;
+              genres: string[] | null;
+              styles: string[] | null;
+              artist: {
+                id: number;
+                name: string;
+              } | null;
+              master_tag_links: Array<{
+                tag: {
+                  id: number;
+                  name: string;
+                  category: string;
+                } | null;
+              }> | null;
+            } | null;
+          } | null);
           const master = release?.master;
           const artistName = master?.artist?.name || 'Unknown Artist';
           const releaseYear = master?.original_release_year
