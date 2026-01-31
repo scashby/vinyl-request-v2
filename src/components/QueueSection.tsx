@@ -111,15 +111,17 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
         .eq("event_id", eventId)
         .order("id", { ascending: true });
 
-      if (error || !requests) {
+      const typedRequests = (requests || []) as unknown as RequestEntry[];
+
+      if (error || !typedRequests) {
         console.error("Error fetching requests:", error);
         setQueue([]);
         return;
       }
 
       const releaseIds = Array.from(new Set(
-        requests
-          .map((req: RequestEntry) => req.inventory?.release?.id)
+        typedRequests
+          .map((req) => req.inventory?.release?.id)
           .filter(Boolean)
       )) as number[];
 
@@ -136,7 +138,7 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
         });
       }
 
-      const mapped: QueueItem[] = requests.map((req: RequestEntry, i: number) => {
+      const mapped: QueueItem[] = typedRequests.map((req, i: number) => {
         const inventoryFallback: InventoryRecord = req.inventory || {
           id: req.inventory_id || 0,
           release: null,
