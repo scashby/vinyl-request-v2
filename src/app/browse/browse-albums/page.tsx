@@ -14,7 +14,9 @@ interface BrowseAlbum {
   title: string;
   artist: string;
   year: string | number;
-  format: string;           // Replaces 'folder' for media type
+  mediaType: string;
+  formatDetails: string[];
+  formatLabel: string;
   location?: string;
   dateAdded?: string;
   justAdded?: boolean;
@@ -27,7 +29,7 @@ interface BrowseAlbum {
   media_condition?: string;
   genres?: string[];        // Replaces separate genre arrays
   styles?: string[];
-  custom_tags?: string[];
+  tags?: string[];
   
   image: string;
 }
@@ -41,6 +43,7 @@ function BrowseAlbumsContent() {
   const [albums, setAlbums] = useState<BrowseAlbum[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [allowedFormats, setAllowedFormats] = useState<string[] | null>(null);
+  const [allowedTags, setAllowedTags] = useState<string[] | null>(null);
   const [eventTitle, setEventTitle] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [mediaFilter, setMediaFilter] = useState('');
@@ -80,24 +83,28 @@ function BrowseAlbumsContent() {
       if (eventId) {
         const { data, error } = await supabase
           .from('events')
-          .select('id, title, date, allowed_formats')
+          .select('id, title, date, allowed_formats, allowed_tags')
           .eq('id', eventId)
           .single();
         if (!error && data && isMounted) {
           setAllowedFormats(data.allowed_formats || []);
+          setAllowedTags(data.allowed_tags || []);
           setEventTitle(data.title || '');
           setEventDate(data.date || '');
         } else if (isMounted) {
           setAllowedFormats(null);
+          setAllowedTags(null);
           setEventTitle('');
           setEventDate('');
         }
       } else if (allowedFormatsParam && eventTitleParam) {
         setAllowedFormats(allowedFormatsParam.split(',').map(f => f.trim()));
+        setAllowedTags(null);
         setEventTitle(eventTitleParam);
         setEventDate('');
       } else {
         setAllowedFormats(null);
+        setAllowedTags(null);
         setEventTitle('');
         setEventDate('');
       }
@@ -113,59 +120,88 @@ function BrowseAlbumsContent() {
       setLoading(true);
 
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let allRows: any[] = [];
-        let from = 0;
-        const batchSize = 1000;
-        let keepGoing = true;
-        
-        while (keepGoing && isMounted) {
-            const { data: batch, error } = await supabase
-              .from('collection')
-              .select('*')
-              .eq('for_sale', false) // New Logic: Exclude items marked for sale
-              .range(from, from + batchSize - 1);
+        const { data: inventoryRows, error } = await supabase
+          .from('inventory')
+          .select(`
+            id,
+            status,
+            location,
+            media_condition,
+            personal_notes,
+            date_added,
+            release:release_id (
+              id,
+              media_type,
+              format_details,
+              notes,
+              release_year,
+              release_date,
+              master:master_id (
+                id,
+                title,
+                cover_image_url,
+                original_release_year,
+                genres,
+                styles,
+                artist:main_artist_id (
+                  id,
+                  name
+                ),
+                master_tag_links (
+                  tag:tag_id (
+                    id,
+                    name,
+                    category
+                  )
+                )
+              )
+            )
+          `)
+          .eq('status', 'active');
 
-            if (error) {
-                console.error('Error fetching albums:', error);
-                break;
-            }
-            if (!batch || batch.length === 0) break;
-            
-            allRows = allRows.concat(batch);
-            
-            if (batch.length < batchSize) {
-                keepGoing = false;
-            } else {
-                from += batchSize;
-            }
+        if (error) {
+          console.error('Error fetching albums:', error);
+          return;
         }
-        
-        if (!isMounted) return;
 
-        const parsed: BrowseAlbum[] = allRows.map(album => ({
-          id: album.id,
-          title: album.title,
-          artist: album.artist,
-          year: album.year ? String(album.year) : '',
-          format: album.format,
-          location: album.location,
-          dateAdded: album.date_added,
-          justAdded: isJustAdded(album.date_added),
-          
-          // Map new fields
-          personal_notes: album.personal_notes,
-          release_notes: album.release_notes,
-          media_condition: album.media_condition,
-          genres: album.genres,
-          styles: album.styles,
-          custom_tags: album.custom_tags,
-          
-          image:
-            (album.image_url && album.image_url.trim().toLowerCase() !== 'no')
-              ? album.image_url.trim()
-              : '/images/coverplaceholder.png'
-        }));
+        if (!inventoryRows || !isMounted) return;
+
+        const parsed: BrowseAlbum[] = inventoryRows.map((row) => {
+          const release = row.release;
+          const master = release?.master;
+          const artistName = master?.artist?.name || 'Unknown Artist';
+          const releaseYear = master?.original_release_year
+            ?? release?.release_year
+            ?? (release?.release_date ? new Date(release.release_date).getFullYear() : '');
+          const tags =
+            master?.master_tag_links?.map((link) => link.tag?.name).filter(Boolean) || [];
+          const mediaType = release?.media_type || 'Unknown';
+          const formatDetails = release?.format_details || [];
+          const formatLabel = [mediaType, ...formatDetails].filter(Boolean).join(', ') || mediaType;
+
+          return {
+            id: row.id,
+            title: master?.title || 'Untitled',
+            artist: artistName,
+            year: releaseYear ? String(releaseYear) : '',
+            mediaType,
+            formatDetails,
+            formatLabel,
+            location: row.location || undefined,
+            dateAdded: row.date_added || undefined,
+            justAdded: isJustAdded(row.date_added || undefined),
+            personal_notes: row.personal_notes || undefined,
+            release_notes: release?.notes || undefined,
+            media_condition: row.media_condition || undefined,
+            genres: master?.genres || undefined,
+            styles: master?.styles || undefined,
+            tags,
+            image:
+              master?.cover_image_url && master.cover_image_url.trim().toLowerCase() !== 'no'
+                ? master.cover_image_url.trim()
+                : '/images/coverplaceholder.png',
+          };
+        });
         
         setAlbums(parsed);
       } catch (err) {
@@ -179,18 +215,6 @@ function BrowseAlbumsContent() {
     
     return () => { isMounted = false; };
   }, []);
-
-  const splitFormatTokens = (format: string) => {
-    if (!format) return [];
-    return format
-      .split(',')
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .map((part) => {
-        const match = part.match(/^(\d+)x\s*(.+)$/i);
-        return (match ? match[2] : part).trim().toLowerCase();
-      });
-  };
 
   const formatFilterAliases: Record<string, string> = {
     vinyl: 'vinyl',
@@ -215,6 +239,9 @@ function BrowseAlbumsContent() {
     '7 inch': '45s',
     single: '45s',
     singles: '45s',
+    'vinyl only': 'vinyl',
+    'cd only': 'cd',
+    'cassette only': 'cassette',
     all: 'all',
     'all media': 'all',
   };
@@ -224,30 +251,11 @@ function BrowseAlbumsContent() {
     return formatFilterAliases[key] ?? key;
   };
 
-  const getFormatData = (format: string) => {
-    const tokens = splitFormatTokens(format);
-    const hasToken = (values: string[]) => values.some((value) => tokens.includes(value));
-
-    const vinylTokens = ['vinyl', 'lp', 'ep', '12"', '10"', 'maxi-single', 'mini-album'];
-    const cassetteTokens = ['cassette', 'cassettes', 'cass'];
-    const cdTokens = ['cd', 'cds', 'compact disc'];
-    const eightTrackTokens = ['8-track', '8 track', '8tracks', '8-track tape'];
-    const fortyFiveTokens = ['45', '45s', '7"', '7-inch', '7 inch'];
-
-    const hasVinyl = hasToken(vinylTokens);
-    const hasCassette = hasToken(cassetteTokens);
-    const hasCd = hasToken(cdTokens);
-    const has8Track = hasToken(eightTrackTokens);
-    const hasSingle = tokens.includes('single') || tokens.includes('singles');
-    const has45 = hasToken(fortyFiveTokens);
-
-    const categories = new Set<string>();
-    if (hasVinyl) categories.add('vinyl');
-    if (hasCassette) categories.add('cassette');
-    if (hasCd) categories.add('cd');
-    if (has8Track) categories.add('8-track');
-    if (has45 || (hasSingle && !hasCd && !hasCassette && !has8Track)) categories.add('45s');
-
+  const getFormatData = (mediaType: string, formatDetails: string[]) => {
+    const tokens = [mediaType, ...formatDetails]
+      .filter(Boolean)
+      .map((token) => token.trim().toLowerCase());
+    const categories = new Set(tokens.map(normalizeFormatFilter));
     return { tokens, categories };
   };
 
@@ -266,8 +274,10 @@ function BrowseAlbumsContent() {
 
   const filteredAlbums = useMemo(() => {
     let fa = albums.filter(album => {
-      // Use 'format' for media type filtering
-      const { tokens: formatTokens, categories: formatCategories } = getFormatData(album.format || '');
+      const { tokens: formatTokens, categories: formatCategories } = getFormatData(
+        album.mediaType || '',
+        album.formatDetails || []
+      );
       
       const searchLower = searchTerm.toLowerCase();
 
@@ -284,12 +294,19 @@ function BrowseAlbumsContent() {
         (album.release_notes || '').toLowerCase().includes(searchLower) ||
         searchInArray(album.genres) ||
         searchInArray(album.styles) ||
-        searchInArray(album.custom_tags);
+        searchInArray(album.tags);
       
       const isAllowed =
         !normalizedFormats ||
         normalizedFormats.includes('all') ||
         normalizedFormats.some((format) => formatCategories.has(format) || formatTokens.includes(format));
+
+      const normalizedAllowedTags = allowedTags?.map((tag) => tag.trim().toLowerCase());
+      const albumTags = album.tags?.map((tag) => tag.trim().toLowerCase()) || [];
+      const matchesTags =
+        !normalizedAllowedTags ||
+        normalizedAllowedTags.length === 0 ||
+        normalizedAllowedTags.some((tag) => albumTags.includes(tag));
         
       const matchesFilter =
         !mediaFilter ||
@@ -299,7 +316,7 @@ function BrowseAlbumsContent() {
       const matchesJustAdded =
         !showJustAdded || album.justAdded;
         
-      return matchesSearch && isAllowed && matchesFilter && matchesJustAdded;
+      return matchesSearch && isAllowed && matchesTags && matchesFilter && matchesJustAdded;
     });
     
     fa = [...fa].sort((a: BrowseAlbum, b: BrowseAlbum) => {
@@ -319,11 +336,22 @@ function BrowseAlbumsContent() {
     });
     
     return fa;
-  }, [albums, searchTerm, mediaFilter, allowedFormats, normalizedFormats, sortField, sortAsc, showJustAdded]);
+  }, [albums, searchTerm, mediaFilter, allowedFormats, allowedTags, normalizedFormats, sortField, sortAsc, showJustAdded]);
 
   const justAddedCount = albums.filter(album => album.justAdded).length;
   const hasSearchQuery = searchTerm.trim().length > 0;
   const hasNoResults = hasSearchQuery && filteredAlbums.length === 0;
+
+  useEffect(() => {
+    if (allowedFormats || allowedTags) {
+      console.info('[Browse Albums] Event gating active', {
+        allowedFormats,
+        allowedTags,
+        totalInventory: albums.length,
+        filteredCount: filteredAlbums.length,
+      });
+    }
+  }, [allowedFormats, allowedTags, albums.length, filteredAlbums.length]);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
@@ -452,7 +480,7 @@ function BrowseAlbumsContent() {
                   album={{
                     ...album,
                     eventId: eventId,
-                    mediaType: album.format, // Pass format correctly for badge
+                    mediaType: album.mediaType,
                     justAdded: album.justAdded
                   }}
                 />

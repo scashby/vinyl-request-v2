@@ -11,7 +11,7 @@ import AlbumSuggestionBox from "components/AlbumSuggestionBox";
 import { supabase } from "src/lib/supabaseClient";
 
 interface QueueItem {
-  id: number;
+  id: string;
   artist: string;
   title: string;
   side: string | null;
@@ -21,11 +21,21 @@ interface QueueItem {
   votes: number;
   created_at: string;
   queue_type: string;
-  collection: {
+  inventory: {
     id: number;
-    image_url: string;
-    year: string | number;
-    format: string;
+    release: {
+      id: number;
+      media_type: string | null;
+      master: {
+        id: number;
+        title: string;
+        cover_image_url: string | null;
+        original_release_year: number | null;
+        artist: {
+          name: string;
+        } | null;
+      } | null;
+    } | null;
   } | null;
 }
 
@@ -62,8 +72,38 @@ function BrowseQueueContent() {
       setEventData(event || null);
 
       const { data: requests } = await supabase
-        .from("requests")
-        .select("*")
+        .from("requests_v3")
+        .select(`
+          id,
+          event_id,
+          inventory_id,
+          recording_id,
+          artist_name,
+          track_title,
+          votes,
+          created_at,
+          inventory:inventory_id (
+            id,
+            release:release_id (
+              id,
+              media_type,
+              master:master_id (
+                id,
+                title,
+                cover_image_url,
+                original_release_year,
+                artist:main_artist_id (
+                  name
+                )
+              )
+            )
+          ),
+          recording:recording_id (
+            id,
+            title,
+            duration_seconds
+          )
+        `)
         .eq("event_id", eventId)
         .order("id", { ascending: true });
 
@@ -72,47 +112,56 @@ function BrowseQueueContent() {
         return;
       }
 
-      const albumIds = requests.map(r => r.album_id).filter(Boolean);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let albums: any[] = [];
+      const releaseIds = Array.from(new Set(
+        requests
+          .map((req) => req.inventory?.release?.id)
+          .filter(Boolean)
+      )) as number[];
 
-      if (albumIds.length) {
-        const res = await supabase
-          .from("collection")
-          .select("id, artist, title, image_url, year, format")
-          .in("id", albumIds);
-        albums = res.data || [];
+      const releaseTrackMap = new Map<string, string>();
+      if (releaseIds.length) {
+        const { data: releaseTracks } = await supabase
+          .from("release_tracks")
+          .select("release_id, recording_id, position")
+          .in("release_id", releaseIds);
+        (releaseTracks || []).forEach((track) => {
+          if (track.release_id && track.recording_id) {
+            releaseTrackMap.set(`${track.release_id}-${track.recording_id}`, track.position);
+          }
+        });
       }
 
       // Handle both old queue_type (singular) and new queue_types (array)
       const queueTypes = event?.queue_types || (event?.queue_type ? [event.queue_type] : ['side']);
       const primaryQueueType = Array.isArray(queueTypes) ? queueTypes[0] : queueTypes;
 
-      const mapped: QueueItem[] = requests.map(req => {
-        const album = albums.find(a => a.id === req.album_id) || {
-          id: req.album_id,
-          artist: req.artist || "",
-          title: req.title || "",
-          image_url: "",
-        };
+      const mapped: QueueItem[] = requests.map((req) => {
+        const master = req.inventory?.release?.master;
+        const artist = master?.artist?.name || req.artist_name || "Unknown Artist";
+        const trackTitle = req.track_title || req.recording?.title || null;
+        const trackDuration = req.recording?.duration_seconds
+          ? `${Math.floor(req.recording.duration_seconds / 60).toString().padStart(2, "0")}:${(req.recording.duration_seconds % 60).toString().padStart(2, "0")}`
+          : null;
+        const releaseId = req.inventory?.release?.id;
+        const trackNumber = req.recording_id && releaseId
+          ? releaseTrackMap.get(`${releaseId}-${req.recording_id}`) || null
+          : null;
+        const side = trackTitle?.toLowerCase().startsWith("side ")
+          ? trackTitle.slice(5).trim()
+          : null;
 
         return {
           id: req.id,
-          artist: req.artist || album.artist || "",
-          title: req.title || album.title || "",
-          side: req.side || null,
-          track_number: req.track_number || null,
-          track_name: req.track_name || null,
-          track_duration: req.track_duration || null,
+          artist,
+          title: master?.title || req.track_title || "Untitled",
+          side,
+          track_number: trackNumber,
+          track_name: trackTitle,
+          track_duration: trackDuration,
           votes: req.votes ?? 1,
           created_at: req.created_at,
           queue_type: primaryQueueType,
-          collection: {
-            id: album.id,
-            image_url: album.image_url,
-            year: album.year,
-            format: album.format,
-          },
+          inventory: req.inventory || null,
         };
       });
 
@@ -127,11 +176,11 @@ function BrowseQueueContent() {
 
   useEffect(() => { loadEventAndQueue(); }, [loadEventAndQueue]);
 
-  const voteForItem = async (itemId: number) => {
+  const voteForItem = async (itemId: string) => {
     try {
       const currentItem = queueItems.find(item => item.id === itemId);
       const newVotes = (currentItem?.votes ?? 1) + 1;
-      await supabase.from("requests").update({ votes: newVotes }).eq("id", itemId);
+      await supabase.from("requests_v3").update({ votes: newVotes }).eq("id", itemId);
       setQueueItems(prev =>
         prev
           .map(item => (item.id === itemId ? { ...item, votes: newVotes } : item))
@@ -269,7 +318,7 @@ function BrowseQueueContent() {
                       </td>
                       <td className="p-4 pl-0">
                         <Image
-                          src={item.collection?.image_url || "/images/placeholder.png"}
+                          src={item.inventory?.release?.master?.cover_image_url || "/images/placeholder.png"}
                           alt={item.title || ""}
                           className="rounded shadow-md object-cover bg-slate-800"
                           width={48}
@@ -280,9 +329,9 @@ function BrowseQueueContent() {
                       <td className="p-4">
                         <div className="flex items-center gap-2 mb-1">
                           {index < 3 && <span className="text-lg">{index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉"}</span>}
-                          {item.collection?.id ? (
+                          {item.inventory?.id ? (
                             <Link
-                              href={`/browse/album-detail/${item.collection.id}${eventId ? `?eventId=${eventId}` : ""}`}
+                              href={`/browse/album-detail/${item.inventory.id}${eventId ? `?eventId=${eventId}` : ""}`}
                               className="font-bold text-base text-emerald-400 hover:text-emerald-300 hover:underline line-clamp-1"
                               aria-label={`View ${queueType === 'track' ? 'track' : 'album'}: ${item.title} by ${item.artist}`}
                             >

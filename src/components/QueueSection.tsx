@@ -7,24 +7,35 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { supabase } from 'src/lib/supabaseClient';
 
-interface Album {
-  id: string | number;
-  artist: string;
-  title: string;
-  image_url?: string;
-  format?: string;
-  is_1001?: boolean | null;
+interface InventoryRecord {
+  id: number;
+  release: {
+    id: number;
+    master: {
+      title: string;
+      cover_image_url: string | null;
+      artist: {
+        name: string;
+      } | null;
+    } | null;
+  } | null;
 }
 
 interface RequestEntry {
-  id: string | number;
-  album_id: string | number;
-  side: string | null;
-  track_number: string | null;
-  track_name: string | null;
-  track_duration: string | null;
+  id: string;
+  inventory_id: number | null;
+  recording_id: number | null;
+  artist_name: string | null;
+  track_title: string | null;
   votes: number;
   event_id: string;
+  created_at: string;
+  inventory: InventoryRecord | null;
+  recording: {
+    id: number;
+    title: string | null;
+    duration_seconds: number | null;
+  } | null;
 }
 
 interface QueueItem {
@@ -35,7 +46,8 @@ interface QueueItem {
   track_name: string | null;
   track_duration: string | null;
   votes: number;
-  album: Album;
+  inventory: InventoryRecord;
+  artistName: string;
   queue_type: string;
 }
 
@@ -58,16 +70,44 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
       // Fetch event to get queue type
       const { data: eventData } = await supabase
         .from("events")
-        .select("queue_type")
+        .select("queue_type, queue_types")
         .eq("id", eventId)
         .single();
 
-      const currentQueueType = eventData?.queue_type || 'side';
-      setQueueType(currentQueueType);
+      const queueTypes = eventData?.queue_types || (eventData?.queue_type ? [eventData.queue_type] : ['side']);
+      const currentQueueType = Array.isArray(queueTypes) ? queueTypes[0] : queueTypes;
+      setQueueType(currentQueueType || 'side');
 
       const { data: requests, error } = await supabase
-        .from("requests")
-        .select("*")
+        .from("requests_v3")
+        .select(`
+          id,
+          event_id,
+          inventory_id,
+          recording_id,
+          artist_name,
+          track_title,
+          votes,
+          created_at,
+          inventory:inventory_id (
+            id,
+            release:release_id (
+              id,
+              master:master_id (
+                title,
+                cover_image_url,
+                artist:main_artist_id (
+                  name
+                )
+              )
+            )
+          ),
+          recording:recording_id (
+            id,
+            title,
+            duration_seconds
+          )
+        `)
         .eq("event_id", eventId)
         .order("id", { ascending: true });
 
@@ -77,42 +117,55 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
         return;
       }
 
-      const albumIds = requests.map((r: RequestEntry) => r.album_id).filter(Boolean);
-      if (!albumIds.length) {
-        setQueue([]);
-        return;
-      }
+      const releaseIds = Array.from(new Set(
+        requests
+          .map((req: RequestEntry) => req.inventory?.release?.id)
+          .filter(Boolean)
+      )) as number[];
 
-      const { data: albums, error: albumError } = await supabase
-        .from("collection")
-        .select("id, artist, title, image_url, format")
-        .in("id", albumIds);
-
-      if (albumError || !albums) {
-        console.error("Error fetching albums:", albumError);
-        setQueue([]);
-        return;
+      const releaseTrackMap = new Map<string, string>();
+      if (releaseIds.length) {
+        const { data: releaseTracks } = await supabase
+          .from("release_tracks")
+          .select("release_id, recording_id, position")
+          .in("release_id", releaseIds);
+        (releaseTracks || []).forEach((track) => {
+          if (track.release_id && track.recording_id) {
+            releaseTrackMap.set(`${track.release_id}-${track.recording_id}`, track.position);
+          }
+        });
       }
 
       const mapped: QueueItem[] = requests.map((req: RequestEntry, i: number) => {
-        const album =
-          (albums as Album[]).find((a: Album) => a.id === req.album_id) || {
-            id: req.album_id,
-            artist: "",
-            title: "",
-            image_url: "",
-            format: "",
-          };
+        const inventoryFallback: InventoryRecord = req.inventory || {
+          id: req.inventory_id || 0,
+          release: null,
+        };
+        const master = inventoryFallback.release?.master;
+        const artistName = master?.artist?.name || req.artist_name || '';
+        const trackTitle = req.track_title || req.recording?.title || null;
+        const trackDuration = req.recording?.duration_seconds
+          ? `${Math.floor(req.recording.duration_seconds / 60).toString().padStart(2, "0")}:${(req.recording.duration_seconds % 60).toString().padStart(2, "0")}`
+          : null;
+        const releaseId = inventoryFallback.release?.id;
+        const trackNumber = req.recording_id && releaseId
+          ? releaseTrackMap.get(`${releaseId}-${req.recording_id}`) || null
+          : null;
+        const side = trackTitle?.toLowerCase().startsWith("side ")
+          ? trackTitle.slice(5).trim()
+          : null;
+
         return {
           id: req.id,
           index: i + 1,
-          side: req.side || null,
-          track_number: req.track_number || null,
-          track_name: req.track_name || null,
-          track_duration: req.track_duration || null,
+          side,
+          track_number: trackNumber,
+          track_name: trackTitle,
+          track_duration: trackDuration,
           votes: req.votes || 1,
           queue_type: currentQueueType,
-          album,
+          inventory: inventoryFallback,
+          artistName,
         };
       });
 
@@ -132,7 +185,7 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
     const item = queue.find((q: QueueItem) => q.id === reqId);
     const newVotes = (item?.votes || 1) + 1;
     const { error } = await supabase
-      .from("requests")
+      .from("requests_v3")
       .update({ votes: newVotes })
       .eq("id", reqId);
     setVoting((v: { [key: string]: boolean }) => ({ ...v, [reqId]: false }));
@@ -157,9 +210,9 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
 
   const getDisplayTitle = (item: QueueItem) => {
     if (queueType === 'track') {
-      return item.track_name || item.album.title;
+      return item.track_name || item.inventory.release?.master?.title || '';
     }
-    return item.album.title;
+    return item.inventory.release?.master?.title || '';
   };
 
   return (
@@ -199,29 +252,38 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
                   voting[item.id] ||
                   (typeof window !== "undefined" &&
                     !!localStorage.getItem(getVoteKey(eventId, item.id)));
+                const canNavigate = item.inventory.id > 0;
                 return (
                   <tr key={item.id} className="hover:bg-white/5 transition-colors group">
                     <td className="p-4 text-center text-sm font-medium text-gray-600 group-hover:text-gray-400">{item.index}</td>
                     <td className="p-4 pl-0">
                       <Image
-                        src={item.album.image_url || "/images/placeholder.png"}
-                        alt={item.album.title || ""}
-                        className="rounded bg-slate-800 object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                        src={item.inventory.release?.master?.cover_image_url || "/images/placeholder.png"}
+                        alt={item.inventory.release?.master?.title || ""}
+                        className={`rounded bg-slate-800 object-cover ${canNavigate ? "cursor-pointer hover:opacity-80" : ""} transition-opacity`}
                         width={48}
                         height={48}
-                        onClick={() => goToAlbum(item.album.id)}
+                        onClick={() => {
+                          if (canNavigate) {
+                            goToAlbum(item.inventory.id);
+                          }
+                        }}
                         unoptimized
                       />
                     </td>
                     <td
-                      className="p-4 cursor-pointer"
-                      onClick={() => goToAlbum(item.album.id)}
+                      className={`p-4 ${canNavigate ? "cursor-pointer" : ""}`}
+                      onClick={() => {
+                        if (canNavigate) {
+                          goToAlbum(item.inventory.id);
+                        }
+                      }}
                     >
                       <div className="font-bold text-blue-400 hover:text-blue-300 hover:underline mb-0.5 line-clamp-1">
                         {getDisplayTitle(item)}
                       </div>
                       <div className="text-sm text-gray-400 font-medium uppercase tracking-wide line-clamp-1">
-                        {item.album.artist}
+                        {item.artistName}
                       </div>
                     </td>
                     {queueType === 'side' && (

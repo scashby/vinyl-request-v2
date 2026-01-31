@@ -5,24 +5,25 @@ import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from 'src/lib/supabaseClient';
+import { addOrVoteRequest } from 'src/lib/addOrVoteRequest';
 
-// Updated to match new DB Schema
 interface DbTrack {
   position: string | number;
   title: string;
   duration?: string;
   side?: string;
-  artist?: string;
-  type?: 'track' | 'header';
+  recordingId?: number | null;
 }
 
 interface Album {
   id: number;
+  releaseId?: number;
   title: string;
   artist: string;
   image_url: string;
   year?: string;
-  format?: string;
+  mediaType?: string;
+  formatDetails?: string[];
   
   // Phase 4 Fixes: New Columns
   location?: string;        // Was 'folder'
@@ -63,15 +64,83 @@ function AlbumDetailContent() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('collection')
-        .select('*')
+        .from('inventory')
+        .select(`
+          id,
+          location,
+          media_condition,
+          personal_notes,
+          release:release_id (
+            id,
+            media_type,
+            format_details,
+            notes,
+            release_year,
+            release_date,
+            master:master_id (
+              id,
+              title,
+              cover_image_url,
+              original_release_year,
+              artist:main_artist_id (
+                id,
+                name
+              )
+            ),
+            release_tracks (
+              id,
+              position,
+              side,
+              title_override,
+              recording:recording_id (
+                id,
+                title,
+                duration_seconds
+              )
+            )
+          )
+        `)
         .eq('id', id)
         .single();
 
       if (error) {
         setError(error.message);
       } else {
-        setAlbum(data as Album);
+        const release = data.release;
+        const master = release?.master;
+        const artistName = master?.artist?.name || 'Unknown Artist';
+        const releaseYear = master?.original_release_year
+          ?? release?.release_year
+          ?? (release?.release_date ? new Date(release.release_date).getFullYear() : '');
+        const tracks: DbTrack[] = (release?.release_tracks || []).map((track) => {
+          const durationSeconds = track.recording?.duration_seconds;
+          const duration = durationSeconds
+            ? `${Math.floor(durationSeconds / 60).toString().padStart(2, '0')}:${(durationSeconds % 60).toString().padStart(2, '0')}`
+            : undefined;
+          return {
+            position: track.position,
+            title: track.title_override || track.recording?.title || 'Untitled',
+            duration,
+            side: track.side || undefined,
+            recordingId: track.recording?.id ?? null,
+          };
+        });
+
+        setAlbum({
+          id: data.id,
+          releaseId: release?.id ?? undefined,
+          title: master?.title || 'Untitled',
+          artist: artistName,
+          image_url: master?.cover_image_url || '',
+          year: releaseYear ? String(releaseYear) : '',
+          mediaType: release?.media_type || undefined,
+          formatDetails: release?.format_details || [],
+          location: data.location || undefined,
+          personal_notes: data.personal_notes || undefined,
+          release_notes: release?.notes || undefined,
+          media_condition: data.media_condition || undefined,
+          tracks,
+        });
       }
     } catch {
       setError('Failed to load album');
@@ -105,25 +174,15 @@ function AlbumDetailContent() {
     if (!eventId || !album) return;
     setSubmittingRequest(true);
     try {
-      const { data: existing, error } = await supabase
-        .from('requests')
-        .select('id, votes')
-        .eq('event_id', eventId)
-        .eq('album_id', id)
-        .eq('side', side)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (existing) {
-        await supabase.from('requests').update({ votes: (existing.votes || 1) + 1 }).eq('id', existing.id);
-        setRequestStatus(`Upvoted Side ${side}`);
-      } else {
-        await supabase.from('requests').insert([{
-          album_id: id, artist: album.artist, title: album.title, side, event_id: eventId, votes: 1, status: 'open'
-        }]);
-        setRequestStatus(`Requested Side ${side}`);
-      }
+      const updated = await addOrVoteRequest({
+        eventId,
+        inventoryId: album.id,
+        recordingId: null,
+        artistName: album.artist,
+        trackTitle: `Side ${side}`,
+        status: 'pending',
+      });
+      setRequestStatus(`Requested Side ${side} (Votes: x${updated?.votes ?? 1})`);
     } catch (e) {
       console.error(e);
       setRequestStatus('Error adding to queue');
@@ -136,27 +195,15 @@ function AlbumDetailContent() {
     if (!eventId || !album) return;
     setSubmittingRequest(true);
     try {
-      const { data: existing, error } = await supabase
-        .from('requests')
-        .select('id, votes')
-        .eq('event_id', eventId)
-        .eq('album_id', id)
-        .eq('track_number', String(track.position))
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (existing) {
-        await supabase.from('requests').update({ votes: (existing.votes || 1) + 1 }).eq('id', existing.id);
-        setRequestStatus(`Upvoted: ${track.title}`);
-      } else {
-        await supabase.from('requests').insert([{
-          album_id: id, artist: track.artist || album.artist, title: track.title,
-          track_number: String(track.position), track_name: track.title,
-          track_duration: track.duration || '', event_id: eventId, votes: 1, status: 'open', side: null
-        }]);
-        setRequestStatus(`Requested: ${track.title}`);
-      }
+      const updated = await addOrVoteRequest({
+        eventId,
+        inventoryId: album.id,
+        recordingId: track.recordingId ?? null,
+        artistName: album.artist,
+        trackTitle: track.title,
+        status: 'pending',
+      });
+      setRequestStatus(`Requested: ${track.title} (Votes: x${updated?.votes ?? 1})`);
     } catch (e) {
       console.error(e);
       setRequestStatus('Error adding track');
@@ -169,27 +216,15 @@ function AlbumDetailContent() {
     if (!eventId || !album) return;
     setSubmittingRequest(true);
     try {
-      const { data: existing, error } = await supabase
-        .from('requests')
-        .select('id, votes')
-        .eq('event_id', eventId)
-        .eq('album_id', id)
-        .is('side', null)
-        .is('track_number', null)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (existing) {
-        await supabase.from('requests').update({ votes: (existing.votes || 1) + 1 }).eq('id', existing.id);
-        setRequestStatus(`Upvoted Album`);
-      } else {
-        await supabase.from('requests').insert([{
-          album_id: id, artist: album.artist, title: album.title, side: null, track_number: null,
-          track_name: null, event_id: eventId, votes: 1, status: 'open'
-        }]);
-        setRequestStatus(`Requested Album`);
-      }
+      const updated = await addOrVoteRequest({
+        eventId,
+        inventoryId: album.id,
+        recordingId: null,
+        artistName: album.artist,
+        trackTitle: null,
+        status: 'pending',
+      });
+      setRequestStatus(`Requested Album (Votes: x${updated?.votes ?? 1})`);
     } catch (e) {
       console.error(e);
       setRequestStatus('Error adding album');
@@ -231,6 +266,7 @@ function AlbumDetailContent() {
   if (!album) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Album not found</div>;
 
   const imageUrl = album.image_url && album.image_url.toLowerCase() !== 'no' ? album.image_url : '/images/coverplaceholder.png';
+  const formatLabel = [album.mediaType, ...(album.formatDetails || [])].filter(Boolean).join(', ');
   const queueTypes = eventData?.queue_types || (eventData?.queue_type ? [eventData.queue_type] : ['side']);
   const queueTypesArray = Array.isArray(queueTypes) ? queueTypes : [queueTypes];
 
@@ -304,7 +340,7 @@ function AlbumDetailContent() {
           
           <div className="flex flex-wrap gap-2 mb-6">
             {/* Fixed: Use 'location' instead of 'folder' */}
-            {[album.year, album.format, album.location].filter(Boolean).map((tag, i) => (
+            {[album.year, formatLabel, album.location].filter(Boolean).map((tag, i) => (
               <span key={i} className="px-3 py-1 bg-white/10 backdrop-blur-md rounded border border-white/10 text-xs font-bold uppercase tracking-wider text-gray-200">
                 {tag}
               </span>
@@ -387,7 +423,7 @@ function AlbumDetailContent() {
                       <span className="w-10 text-sm font-mono text-gray-500 text-center">{track.position}</span>
                       <div className="flex-1 px-4 min-w-0">
                         <div className="text-sm font-bold text-white truncate">{track.title}</div>
-                        <div className="text-xs text-gray-400 truncate">{track.artist || album.artist}</div>
+                        <div className="text-xs text-gray-400 truncate">{album.artist}</div>
                       </div>
                       <span className="text-xs font-mono text-gray-600 mr-4">{track.duration || '--:--'}</span>
                       {queueTypesArray.includes('track') && eventId && eventData?.has_queue && !blocked && (

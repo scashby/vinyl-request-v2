@@ -11,14 +11,15 @@ import { formatEventText } from 'src/utils/textFormatter';
 import { Button } from 'components/ui/Button';
 import { Card } from 'components/ui/Card';
 import { Container } from 'components/ui/Container';
-import type { DbEvent, DbRequest, Collection } from 'types/supabase';
+import type { DbEvent } from 'types/supabase';
 
 type Event = {
   id: string;
   title: string;
   date: string;
   has_queue: boolean;
-  queue_type: string;
+  queue_type?: string;
+  queue_types?: string[];
   [key: string]: unknown;
 };
 
@@ -33,7 +34,8 @@ type Request = {
   votes: number;
   event_id: string;
   created_at: string;
-  album_id?: string | number | null;
+  inventory_id?: number | null;
+  recording_id?: number | null;
   [key: string]: unknown;
 };
 
@@ -77,12 +79,62 @@ function EditQueueContent() {
       console.log('🔍 Admin Debug: Fetching requests for event_id:', eventId);
       
       const { data, error: requestsError } = await supabase
-        .from('requests')
-        .select('*')
+        .from('requests_v3')
+        .select(`
+          id,
+          event_id,
+          inventory_id,
+          recording_id,
+          artist_name,
+          track_title,
+          votes,
+          created_at,
+          inventory:inventory_id (
+            id,
+            release:release_id (
+              id,
+              master:master_id (
+                title,
+                artist:main_artist_id (
+                  name
+                )
+              )
+            )
+          ),
+          recording:recording_id (
+            title,
+            duration_seconds
+          )
+        `)
         .eq('event_id', eventId)
         .order('id', { ascending: true });
 
-      const typedRequests = (data || []) as DbRequest[];
+      const typedRequests = (data || []) as Array<{
+        id: string;
+        event_id: string;
+        inventory_id: number | null;
+        recording_id: number | null;
+        artist_name: string | null;
+        track_title: string | null;
+        votes: number | null;
+        created_at: string;
+        inventory: {
+          id: number;
+          release: {
+            id: number;
+            master: {
+              title: string;
+              artist: {
+                name: string;
+              } | null;
+            } | null;
+          } | null;
+        } | null;
+        recording: {
+          title: string | null;
+          duration_seconds: number | null;
+        } | null;
+      }>;
 
       console.log('🔍 Admin Debug: Requests query result:', { requests: typedRequests, requestsError, count: typedRequests?.length });
 
@@ -98,67 +150,53 @@ function EditQueueContent() {
         return;
       }
 
-      const albumIds = typedRequests.map(r => r.album_id).filter(Boolean);
-      console.log('🔍 Admin Debug: Album IDs found:', albumIds);
-      
-      if (albumIds.length === 0) {
-        console.log('🔍 Admin Debug: No album IDs, using direct request data');
-        const mapped = typedRequests.map(req => ({
-          id: req.id.toString(),
-          artist: req.artist || '',
-          title: req.title || '',
-          side: req.side || null,
-          track_number: req.track_number || null,
-          track_name: req.track_name || null,
-          track_duration: req.track_duration || null,
-          votes: req.votes || 1,
-          album_id: req.album_id,
-          created_at: req.created_at,
-          event_id: req.event_id.toString()
-        }));
-        console.log('🔍 Admin Debug: Mapped requests without albums:', mapped);
-        
-        const sorted = mapped.sort((a, b) => {
-          if (b.votes !== a.votes) {
-            return b.votes - a.votes;
+      const releaseIds = Array.from(new Set(
+        typedRequests
+          .map((req) => req.inventory?.release?.id)
+          .filter(Boolean)
+      )) as number[];
+
+      const releaseTrackMap = new Map<string, string>();
+      if (releaseIds.length) {
+        const { data: releaseTracks } = await supabase
+          .from('release_tracks')
+          .select('release_id, recording_id, position')
+          .in('release_id', releaseIds);
+        (releaseTracks || []).forEach((track) => {
+          if (track.release_id && track.recording_id) {
+            releaseTrackMap.set(`${track.release_id}-${track.recording_id}`, track.position);
           }
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
         });
-        
-        setRequests(sorted);
-        return;
-      }
-
-      console.log('🔍 Admin Debug: Fetching albums for IDs:', albumIds);
-      const { data: albumData, error: albumsError } = await supabase
-        .from('collection')
-        .select('id, artist, title, image_url, year, format')
-        .in('id', albumIds);
-
-      const albums = (albumData || []) as Collection[];
-
-      console.log('🔍 Admin Debug: Albums query result:', { albums, albumsError });
-
-      if (albumsError) {
-        console.error('Error loading albums:', albumsError);
-        setRequests([]);
-        return;
       }
 
       const mapped = typedRequests.map(req => {
-        const album = albums?.find(a => a.id === req.album_id);
+        const master = req.inventory?.release?.master;
+        const artist = master?.artist?.name || req.artist_name || '';
+        const trackTitle = req.track_title || req.recording?.title || null;
+        const trackDuration = req.recording?.duration_seconds
+          ? `${Math.floor(req.recording.duration_seconds / 60).toString().padStart(2, '0')}:${(req.recording.duration_seconds % 60).toString().padStart(2, '0')}`
+          : null;
+        const releaseId = req.inventory?.release?.id;
+        const trackNumber = req.recording_id && releaseId
+          ? releaseTrackMap.get(`${releaseId}-${req.recording_id}`) || null
+          : null;
+        const side = trackTitle?.toLowerCase().startsWith('side ')
+          ? trackTitle.slice(5).trim()
+          : null;
+
         return {
           id: req.id.toString(),
-          artist: req.artist || album?.artist || '',
-          title: req.title || album?.title || '',
-          side: req.side || null,
-          track_number: req.track_number || null,
-          track_name: req.track_name || null,
-          track_duration: req.track_duration || null,
+          artist,
+          title: master?.title || req.track_title || '',
+          side,
+          track_number: trackNumber,
+          track_name: trackTitle,
+          track_duration: trackDuration,
           votes: req.votes || 1,
-          album_id: req.album_id,
+          inventory_id: req.inventory_id,
+          recording_id: req.recording_id,
           created_at: req.created_at,
-          event_id: req.event_id.toString()
+          event_id: req.event_id.toString(),
         };
       });
 
@@ -183,7 +221,7 @@ function EditQueueContent() {
       console.log('🔍 Admin Debug: Removing request with ID:', id);
       
       const { error } = await supabase
-        .from('requests')
+        .from('requests_v3')
         .delete()
         .eq('id', id);
       
@@ -253,7 +291,8 @@ function EditQueueContent() {
     );
   }
 
-  const queueType = selectedEvent?.queue_type || 'side';
+  const queueTypes = selectedEvent?.queue_types || (selectedEvent?.queue_type ? [selectedEvent.queue_type] : ['side']);
+  const queueType = Array.isArray(queueTypes) ? queueTypes[0] : queueTypes;
 
   return (
     <div className="min-h-screen bg-white text-black">
@@ -290,7 +329,7 @@ function EditQueueContent() {
                       {formatDate(event.date)}
                     </p>
                     <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-                      {getQueueTypeLabel(event.queue_type || 'side')}
+                      {getQueueTypeLabel((event.queue_types?.[0] || event.queue_type || 'side'))}
                     </div>
                   </Card>
                 ))}
