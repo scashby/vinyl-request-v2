@@ -33,7 +33,23 @@ interface BrowseAlbum {
   image: string;
 }
 
-type CollectionRow = Database['public']['Tables']['collection']['Row'];
+type InventoryRow = Database['public']['Tables']['inventory']['Row'];
+type ReleaseRow = Database['public']['Tables']['releases']['Row'];
+type MasterRow = Database['public']['Tables']['masters']['Row'];
+type ArtistRow = Database['public']['Tables']['artists']['Row'];
+
+type MasterTagLinkRow = {
+  master_tags?: { name: string | null } | null;
+};
+
+type InventoryQueryRow = InventoryRow & {
+  release?: (ReleaseRow & {
+    master?: (MasterRow & {
+      artist?: ArtistRow | null;
+      master_tag_links?: MasterTagLinkRow[] | null;
+    }) | null;
+  }) | null;
+};
 
 function BrowseAlbumsContent() {
   const searchParams = useSearchParams();
@@ -44,6 +60,7 @@ function BrowseAlbumsContent() {
   const [albums, setAlbums] = useState<BrowseAlbum[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [allowedFormats, setAllowedFormats] = useState<string[] | null>(null);
+  const [allowedTags, setAllowedTags] = useState<string[] | null>(null);
   const [eventTitle, setEventTitle] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [mediaFilter, setMediaFilter] = useState('');
@@ -77,12 +94,20 @@ function BrowseAlbumsContent() {
     });
   };
 
-  const splitDelimitedString = (value?: string | null) => {
-    if (!value) return [];
-    return value
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter(Boolean);
+  const buildFormatLabel = (release?: ReleaseRow | null) => {
+    if (!release) return '';
+    const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
+    const base = parts.join(', ');
+    const qty = release.qty ?? 1;
+    if (!base) return '';
+    return qty > 1 ? `${qty}x${base}` : base;
+  };
+
+  const extractTagNames = (links?: MasterTagLinkRow[] | null) => {
+    if (!links) return [];
+    return links
+      .map((link) => link.master_tags?.name)
+      .filter((name): name is string => Boolean(name));
   };
 
   useEffect(() => {
@@ -91,24 +116,28 @@ function BrowseAlbumsContent() {
       if (eventId) {
         const { data, error } = await supabase
           .from('events')
-          .select('id, title, date, allowed_formats')
+          .select('id, title, date, allowed_formats, allowed_tags')
           .eq('id', eventId)
           .single();
         if (!error && data && isMounted) {
           setAllowedFormats(data.allowed_formats || []);
+          setAllowedTags(data.allowed_tags || []);
           setEventTitle(data.title || '');
           setEventDate(data.date || '');
         } else if (isMounted) {
           setAllowedFormats(null);
+          setAllowedTags(null);
           setEventTitle('');
           setEventDate('');
         }
       } else if (allowedFormatsParam && eventTitleParam) {
         setAllowedFormats(allowedFormatsParam.split(',').map(f => f.trim()));
+        setAllowedTags(null);
         setEventTitle(eventTitleParam);
         setEventDate('');
       } else {
         setAllowedFormats(null);
+        setAllowedTags(null);
         setEventTitle('');
         setEventDate('');
       }
@@ -124,16 +153,45 @@ function BrowseAlbumsContent() {
       setLoading(true);
 
       try {
-        let allRows: CollectionRow[] = [];
+        let allRows: InventoryQueryRow[] = [];
         let from = 0;
         const batchSize = 1000;
         let keepGoing = true;
         
         while (keepGoing && isMounted) {
             const { data: batch, error } = await supabase
-              .from('collection')
-              .select('*')
-              .eq('for_sale', false) // New Logic: Exclude items marked for sale
+              .from('inventory')
+              .select(`
+                id,
+                location,
+                media_condition,
+                date_added,
+                personal_notes,
+                status,
+                release:releases (
+                  id,
+                  media_type,
+                  format_details,
+                  qty,
+                  notes,
+                  master:masters (
+                    title,
+                    original_release_year,
+                    cover_image_url,
+                    genres,
+                    styles,
+                    artist:artists (
+                      name
+                    ),
+                    master_tag_links (
+                      master_tags (
+                        name
+                      )
+                    )
+                  )
+                )
+              `)
+              .neq('status', 'sold')
               .range(from, from + batchSize - 1);
 
             if (error) {
@@ -153,29 +211,35 @@ function BrowseAlbumsContent() {
         
         if (!isMounted) return;
 
-        const parsed: BrowseAlbum[] = allRows.map(album => ({
-          id: album.id,
-          title: album.title,
-          artist: album.artist,
-          year: album.year ? String(album.year) : '',
-          format: album.format ?? '',
-          location: album.folder ?? undefined,
-          dateAdded: album.date_added,
-          justAdded: isJustAdded(album.date_added),
-          
-          // Map new fields
-          personal_notes: album.notes ?? undefined,
-          release_notes: '',
-          media_condition: album.media_condition ?? undefined,
-          genres: splitDelimitedString(album.discogs_genres),
-          styles: splitDelimitedString(album.discogs_styles),
-          custom_tags: splitDelimitedString(album.custom_tags),
-          
-          image:
-            (album.image_url && album.image_url.trim().toLowerCase() !== 'no')
-              ? album.image_url.trim()
-              : '/images/coverplaceholder.png'
-        }));
+        const parsed: BrowseAlbum[] = allRows.map((album) => {
+          const release = album.release ?? null;
+          const master = release?.master ?? null;
+          const artist = master?.artist?.name ?? 'Unknown Artist';
+          const image = master?.cover_image_url?.trim();
+          const formatLabel = buildFormatLabel(release);
+          const tagNames = extractTagNames(master?.master_tag_links ?? null);
+
+          return {
+            id: album.id,
+            title: master?.title ?? 'Untitled',
+            artist,
+            year: master?.original_release_year ? String(master.original_release_year) : '',
+            format: formatLabel,
+            location: album.location ?? undefined,
+            dateAdded: album.date_added ?? undefined,
+            justAdded: isJustAdded(album.date_added ?? undefined),
+            personal_notes: album.personal_notes ?? undefined,
+            release_notes: release?.notes ?? undefined,
+            media_condition: album.media_condition ?? undefined,
+            genres: master?.genres ?? [],
+            styles: master?.styles ?? [],
+            custom_tags: tagNames,
+            image:
+              image && image.toLowerCase() !== 'no'
+                ? image
+                : '/images/coverplaceholder.png'
+          };
+        });
         
         setAlbums(parsed);
       } catch (err) {
@@ -265,6 +329,10 @@ function BrowseAlbumsContent() {
     allowedFormats ? allowedFormats.map(normalizeFormatFilter) : null
   ), [allowedFormats]);
 
+  const normalizedAllowedTags = useMemo(() => (
+    allowedTags ? allowedTags.map((tag) => tag.trim().toLowerCase()).filter(Boolean) : null
+  ), [allowedTags]);
+
   const normalizedDropdown = allowedFormats?.length && allowedFormats.length > 0
     ? allowedFormats.map(f => f.trim())
     : ['Vinyl', 'Cassettes', 'CD', '45s', '8-Track'];
@@ -305,11 +373,16 @@ function BrowseAlbumsContent() {
         !mediaFilter ||
         formatCategories.has(mediaFilter) ||
         formatTokens.includes(mediaFilter);
+
+      const matchesAllowedTags =
+        !normalizedAllowedTags ||
+        normalizedAllowedTags.length === 0 ||
+        normalizedAllowedTags.some((tag) => (album.custom_tags || []).some((value) => value.toLowerCase() === tag));
         
       const matchesJustAdded =
         !showJustAdded || album.justAdded;
         
-      return matchesSearch && isAllowed && matchesFilter && matchesJustAdded;
+      return matchesSearch && isAllowed && matchesFilter && matchesAllowedTags && matchesJustAdded;
     });
     
     fa = [...fa].sort((a: BrowseAlbum, b: BrowseAlbum) => {
@@ -329,7 +402,7 @@ function BrowseAlbumsContent() {
     });
     
     return fa;
-  }, [albums, searchTerm, mediaFilter, allowedFormats, normalizedFormats, sortField, sortAsc, showJustAdded]);
+  }, [albums, searchTerm, mediaFilter, allowedFormats, allowedTags, normalizedFormats, normalizedAllowedTags, sortField, sortAsc, showJustAdded]);
 
   const justAddedCount = albums.filter(album => album.justAdded).length;
   const hasSearchQuery = searchTerm.trim().length > 0;

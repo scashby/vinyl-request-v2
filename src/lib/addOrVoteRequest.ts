@@ -6,40 +6,37 @@ import { supabase } from "src/lib/supabaseClient";
 
 interface AddOrVoteParams {
   eventId: number | string;
-  albumId?: number | string | null;
+  inventoryId?: number | string | null;
   side: string; // 'A' | 'B' | ...
   artist: string;
   title: string;
   status?: string;
-  folder?: string;
-  year?: number | string | null;
-  format?: string | null;
 }
 
 export async function addOrVoteRequest({
   eventId,
-  albumId = null,
+  inventoryId = null,
   side,
   artist,
   title,
-  status = "open",
-  folder = "Unknown",
-  year = null,
-  format = null,
+  status = "pending",
 }: AddOrVoteParams) {
+  const trackTitle = `${title} (Side ${side})`;
   // 1) Look for an existing row in this event for this side
   let query = supabase
-    .from("requests")
+    .from("requests_v3")
     .select("id, votes")
     .eq("event_id", eventId)
-    .eq("side", side)
     .limit(1);
 
-  if (albumId !== null && albumId !== undefined) {
-    query = query.eq("album_id", albumId);
+  if (inventoryId !== null && inventoryId !== undefined) {
+    query = query.eq("inventory_id", inventoryId).eq("track_title", trackTitle);
   } else {
-    // manual requests: match by artist+title with null album_id
-    query = query.is("album_id", null).eq("artist", artist).eq("title", title);
+    // manual requests: match by artist+title with null inventory_id
+    query = query
+      .is("inventory_id", null)
+      .eq("artist_name", artist)
+      .eq("track_title", trackTitle);
   }
 
   const { data: rows, error: findErr } = await query;
@@ -49,7 +46,7 @@ export async function addOrVoteRequest({
   if (existing) {
     // 2) Increment votes
     const { data, error } = await supabase
-      .from("requests")
+      .from("requests_v3")
       .update({ votes: (existing.votes ?? 0) + 1 })
       .eq("id", existing.id)
       .select()
@@ -61,19 +58,16 @@ export async function addOrVoteRequest({
   // 3) Insert new with votes=1
   const payload = {
     event_id: eventId,
-    album_id: albumId,
-    side,
-    artist,
-    title,
+    inventory_id: inventoryId,
+    recording_id: null,
+    artist_name: artist,
+    track_title: trackTitle,
     status,
     votes: 1,
-    folder,
-    year,
-    format,
   };
 
   const { data, error } = await supabase
-    .from("requests")
+    .from("requests_v3")
     .insert([payload])
     .select()
     .single();
