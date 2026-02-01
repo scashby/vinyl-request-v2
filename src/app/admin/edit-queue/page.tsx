@@ -11,7 +11,7 @@ import { formatEventText } from 'src/utils/textFormatter';
 import { Button } from 'components/ui/Button';
 import { Card } from 'components/ui/Card';
 import { Container } from 'components/ui/Container';
-import type { DbEvent, DbRequest, Collection } from 'types/supabase';
+import type { DbEvent, DbRequestV3, Inventory, Release, Master, Artist } from 'types/supabase';
 
 type Event = {
   id: string;
@@ -33,8 +33,16 @@ type Request = {
   votes: number;
   event_id: string;
   created_at: string;
-  album_id?: string | number | null;
+  inventory_id?: number | null;
   [key: string]: unknown;
+};
+
+type InventoryQueryRow = Inventory & {
+  release?: (Release & {
+    master?: (Master & {
+      artist?: Artist | null;
+    }) | null;
+  }) | null;
 };
 
 function EditQueueContent() {
@@ -77,12 +85,29 @@ function EditQueueContent() {
       console.log('🔍 Admin Debug: Fetching requests for event_id:', eventId);
       
       const { data, error: requestsError } = await supabase
-        .from('requests')
-        .select('*')
+        .from('requests_v3')
+        .select(`
+          *,
+          inventory:inventory (
+            id,
+            release:releases (
+              master:masters (
+                title,
+                artist:artists (
+                  name
+                )
+              )
+            )
+          ),
+          recording:recordings (
+            title,
+            duration_seconds
+          )
+        `)
         .eq('event_id', eventId)
         .order('id', { ascending: true });
 
-      const typedRequests = (data || []) as DbRequest[];
+      const typedRequests = (data || []) as DbRequestV3[];
 
       console.log('🔍 Admin Debug: Requests query result:', { requests: typedRequests, requestsError, count: typedRequests?.length });
 
@@ -98,21 +123,23 @@ function EditQueueContent() {
         return;
       }
 
-      const albumIds = typedRequests.map(r => r.album_id).filter(Boolean);
-      console.log('🔍 Admin Debug: Album IDs found:', albumIds);
+      const inventoryIds = typedRequests.map(r => r.inventory_id).filter(Boolean);
+      console.log('🔍 Admin Debug: Inventory IDs found:', inventoryIds);
       
-      if (albumIds.length === 0) {
+      if (inventoryIds.length === 0) {
         console.log('🔍 Admin Debug: No album IDs, using direct request data');
         const mapped = typedRequests.map(req => ({
           id: req.id.toString(),
-          artist: req.artist || '',
-          title: req.title || '',
-          side: req.side || null,
-          track_number: req.track_number || null,
-          track_name: req.track_name || null,
-          track_duration: req.track_duration || null,
+          artist: req.artist_name || '',
+          title: req.track_title || '',
+          side: req.track_title && req.track_title.toLowerCase().startsWith('side ')
+            ? req.track_title.replace(/side\s+/i, '')
+            : null,
+          track_number: null,
+          track_name: req.track_title || null,
+          track_duration: null,
           votes: req.votes || 1,
-          album_id: req.album_id,
+          inventory_id: req.inventory_id,
           created_at: req.created_at,
           event_id: req.event_id.toString()
         }));
@@ -129,34 +156,24 @@ function EditQueueContent() {
         return;
       }
 
-      console.log('🔍 Admin Debug: Fetching albums for IDs:', albumIds);
-      const { data: albumData, error: albumsError } = await supabase
-        .from('collection')
-        .select('id, artist, title, image_url, year, format')
-        .in('id', albumIds);
-
-      const albums = (albumData || []) as Collection[];
-
-      console.log('🔍 Admin Debug: Albums query result:', { albums, albumsError });
-
-      if (albumsError) {
-        console.error('Error loading albums:', albumsError);
-        setRequests([]);
-        return;
-      }
-
       const mapped = typedRequests.map(req => {
-        const album = albums?.find(a => a.id === req.album_id);
+        const inventory = (req as DbRequestV3 & { inventory?: InventoryQueryRow | null }).inventory ?? null;
+        const master = inventory?.release?.master ?? null;
+        const artistName = master?.artist?.name ?? req.artist_name ?? '';
+        const title = master?.title ?? req.track_title ?? '';
+        const sideLabel = req.track_title && req.track_title.toLowerCase().startsWith('side ')
+          ? req.track_title.replace(/side\s+/i, '')
+          : null;
         return {
           id: req.id.toString(),
-          artist: req.artist || album?.artist || '',
-          title: req.title || album?.title || '',
-          side: req.side || null,
-          track_number: req.track_number || null,
-          track_name: req.track_name || null,
-          track_duration: req.track_duration || null,
+          artist: artistName,
+          title,
+          side: sideLabel,
+          track_number: null,
+          track_name: req.track_title || null,
+          track_duration: null,
           votes: req.votes || 1,
-          album_id: req.album_id,
+          inventory_id: req.inventory_id,
           created_at: req.created_at,
           event_id: req.event_id.toString()
         };
@@ -183,7 +200,7 @@ function EditQueueContent() {
       console.log('🔍 Admin Debug: Removing request with ID:', id);
       
       const { error } = await supabase
-        .from('requests')
+        .from('requests_v3')
         .delete()
         .eq('id', id);
       

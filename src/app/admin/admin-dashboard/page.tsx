@@ -21,7 +21,7 @@ interface DashboardEvent {
 }
 
 interface DbTestResults {
-  collection: 'pending' | 'success' | 'error';
+  inventory: 'pending' | 'success' | 'error';
   events: 'pending' | 'success' | 'error';
 }
 
@@ -37,7 +37,7 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
   const [dbTestResults, setDbTestResults] = useState<DbTestResults>({
-    collection: 'pending',
+    inventory: 'pending',
     events: 'pending'
   });
 
@@ -60,14 +60,14 @@ export default function AdminDashboardPage() {
         setAuthStatus('unauthenticated');
       }
 
-      const dbTests: DbTestResults = { collection: 'pending', events: 'pending' };
+      const dbTests: DbTestResults = { inventory: 'pending', events: 'pending' };
 
       try {
-        await supabase.from('collection').select('id', { count: 'exact', head: true }).limit(1);
-        dbTests.collection = 'success';
+        await supabase.from('inventory').select('id', { count: 'exact', head: true }).limit(1);
+        dbTests.inventory = 'success';
       } catch (error) {
-        dbTests.collection = 'error';
-        console.error('Collection DB test failed:', error);
+        dbTests.inventory = 'error';
+        console.error('Inventory DB test failed:', error);
       }
 
       try {
@@ -80,7 +80,7 @@ export default function AdminDashboardPage() {
 
       setDbTestResults(dbTests);
 
-      const { count: albumCount } = await supabase.from('collection').select('id', { count: 'exact', head: true });
+      const { count: albumCount } = await supabase.from('inventory').select('id', { count: 'exact', head: true });
       const { count: totalEventsCount } = await supabase.from('events').select('id', { count: 'exact', head: true });
 
       const today = new Date().toISOString().split('T')[0];
@@ -167,8 +167,8 @@ export default function AdminDashboardPage() {
           <div style={{ padding: 12, background: authStatus === 'authenticated' ? '#f0fdf4' : '#fef2f2', borderRadius: 6, border: `1px solid ${authStatus === 'authenticated' ? '#22c55e' : '#ef4444'}` }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: authStatus === 'authenticated' ? '#15803d' : '#dc2626' }}>{authStatus === 'authenticated' ? '✅ Authentication' : '❌ Auth Error'}</div>
           </div>
-          <div style={{ padding: 12, background: dbTestResults.collection === 'success' ? '#f0fdf4' : '#fef2f2', borderRadius: 6, border: `1px solid ${dbTestResults.collection === 'success' ? '#22c55e' : '#ef4444'}` }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: dbTestResults.collection === 'success' ? '#15803d' : '#dc2626' }}>{dbTestResults.collection === 'success' ? '✅ Collection DB' : '❌ Collection DB'}</div>
+          <div style={{ padding: 12, background: dbTestResults.inventory === 'success' ? '#f0fdf4' : '#fef2f2', borderRadius: 6, border: `1px solid ${dbTestResults.inventory === 'success' ? '#22c55e' : '#ef4444'}` }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: dbTestResults.inventory === 'success' ? '#15803d' : '#dc2626' }}>{dbTestResults.inventory === 'success' ? '✅ Inventory DB' : '❌ Inventory DB'}</div>
           </div>
           <div style={{ padding: 12, background: dbTestResults.events === 'success' ? '#f0fdf4' : '#fef2f2', borderRadius: 6, border: `1px solid ${dbTestResults.events === 'success' ? '#22c55e' : '#ef4444'}` }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: dbTestResults.events === 'success' ? '#15803d' : '#dc2626' }}>{dbTestResults.events === 'success' ? '✅ Events DB' : '❌ Events DB'}</div>
