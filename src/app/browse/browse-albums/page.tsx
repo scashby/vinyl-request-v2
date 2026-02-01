@@ -8,6 +8,7 @@ import AlbumSuggestionBox from 'components/AlbumSuggestionBox';
 import { supabase } from 'src/lib/supabaseClient';
 import { useSearchParams } from 'next/navigation';
 import { formatEventText } from 'src/utils/textFormatter';
+import type { Database } from 'src/types/supabase';
 
 interface BrowseAlbum {
   id: number;
@@ -31,6 +32,8 @@ interface BrowseAlbum {
   
   image: string;
 }
+
+type CollectionRow = Database['public']['Tables']['collection']['Row'];
 
 function BrowseAlbumsContent() {
   const searchParams = useSearchParams();
@@ -74,6 +77,14 @@ function BrowseAlbumsContent() {
     });
   };
 
+  const splitDelimitedString = (value?: string | null) => {
+    if (!value) return [];
+    return value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  };
+
   useEffect(() => {
     let isMounted = true;
     async function fetchEventDataIfNeeded() {
@@ -113,8 +124,7 @@ function BrowseAlbumsContent() {
       setLoading(true);
 
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let allRows: any[] = [];
+        let allRows: CollectionRow[] = [];
         let from = 0;
         const batchSize = 1000;
         let keepGoing = true;
@@ -148,18 +158,18 @@ function BrowseAlbumsContent() {
           title: album.title,
           artist: album.artist,
           year: album.year ? String(album.year) : '',
-          format: album.format,
-          location: album.location,
+          format: album.format ?? '',
+          location: album.folder ?? undefined,
           dateAdded: album.date_added,
           justAdded: isJustAdded(album.date_added),
           
           // Map new fields
-          personal_notes: album.personal_notes,
-          release_notes: album.release_notes,
-          media_condition: album.media_condition,
-          genres: album.genres,
-          styles: album.styles,
-          custom_tags: album.custom_tags,
+          personal_notes: album.notes ?? undefined,
+          release_notes: '',
+          media_condition: album.media_condition ?? undefined,
+          genres: splitDelimitedString(album.discogs_genres),
+          styles: splitDelimitedString(album.discogs_styles),
+          custom_tags: splitDelimitedString(album.custom_tags),
           
           image:
             (album.image_url && album.image_url.trim().toLowerCase() !== 'no')
