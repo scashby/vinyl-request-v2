@@ -236,16 +236,16 @@ export async function fetchStorageDevices(): Promise<PickerDataItem[]> {
 
 export async function fetchLabels(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('labels').not('labels', 'is', null);
+    const { data, error } = await supabase
+      .from('releases')
+      .select('label')
+      .not('label', 'is', null)
+      .not('label', 'eq', '');
     if (error) return [];
     
     const labelCounts = new Map<string, number>();
     data?.forEach(row => { 
-      if (Array.isArray(row.labels)) {
-        row.labels.forEach((label: string) => {
-          if (label) labelCounts.set(label, (labelCounts.get(label) || 0) + 1); 
-        });
-      }
+      if (row.label) labelCounts.set(row.label, (labelCounts.get(row.label) || 0) + 1);
     });
     return Array.from(labelCounts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
   } catch { return []; }
@@ -253,17 +253,28 @@ export async function fetchLabels(): Promise<PickerDataItem[]> {
 
 export async function fetchFormats(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('format').not('format', 'is', null).not('format', 'eq', '');
+    const { data, error } = await supabase
+      .from('releases')
+      .select('media_type, format_details')
+      .not('media_type', 'is', null)
+      .not('media_type', 'eq', '');
     if (error) return [];
     const formatCounts = new Map<string, number>();
-    data?.forEach(row => { if (row.format) formatCounts.set(row.format, (formatCounts.get(row.format) || 0) + 1); });
+    data?.forEach(row => {
+      const values = new Set<string>();
+      if (row.media_type) values.add(row.media_type);
+      if (Array.isArray(row.format_details)) {
+        row.format_details.forEach(detail => { if (detail) values.add(detail); });
+      }
+      values.forEach(value => formatCounts.set(value, (formatCounts.get(value) || 0) + 1));
+    });
     return Array.from(formatCounts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
   } catch { return []; }
 }
 
 export async function fetchGenres(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('genres').not('genres', 'is', null);
+    const { data, error } = await supabase.from('masters').select('genres').not('genres', 'is', null);
     if (error) return [];
     const genreCounts = new Map<string, number>();
     data?.forEach(row => {
@@ -276,7 +287,7 @@ export async function fetchGenres(): Promise<PickerDataItem[]> {
 
 export async function fetchLocations(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('location').not('location', 'is', null).not('location', 'eq', '');
+    const { data, error } = await supabase.from('inventory').select('location').not('location', 'is', null).not('location', 'eq', '');
     if (error) return [];
     const locationCounts = new Map<string, number>();
     data?.forEach(row => { if (row.location) locationCounts.set(row.location, (locationCounts.get(row.location) || 0) + 1); });
@@ -286,18 +297,18 @@ export async function fetchLocations(): Promise<PickerDataItem[]> {
 
 export async function fetchArtists(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('artist, sort_artist').not('artist', 'is', null).not('artist', 'eq', '');
+    const { data, error } = await supabase.from('artists').select('name').not('name', 'is', null).not('name', 'eq', '');
     if (error) return [];
     const artistMap = new Map<string, { count: number; sortName: string }>();
     data?.forEach(row => {
-      if (row.artist) {
-        const current = artistMap.get(row.artist);
-        const sortVal = row.sort_artist || row.artist;
+      if (row.name) {
+        const current = artistMap.get(row.name);
+        const sortVal = row.name;
         if (current) {
           current.count++;
-          if (current.sortName === row.artist && sortVal !== row.artist) current.sortName = sortVal;
+          if (current.sortName === row.name && sortVal !== row.name) current.sortName = sortVal;
         } else {
-          artistMap.set(row.artist, { count: 1, sortName: sortVal });
+          artistMap.set(row.name, { count: 1, sortName: sortVal });
         }
       }
     });
@@ -310,7 +321,7 @@ export async function fetchArtists(): Promise<PickerDataItem[]> {
 export async function fetchMediaConditions(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase
-      .from('collection')
+      .from('inventory')
       .select('media_condition')
       .not('media_condition', 'is', null)
       .not('media_condition', 'eq', '');
@@ -340,17 +351,17 @@ export async function fetchMediaConditions(): Promise<PickerDataItem[]> {
 export async function fetchPackageConditions(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase
-      .from('collection')
-      .select('package_sleeve_condition')
-      .not('package_sleeve_condition', 'is', null)
-      .not('package_sleeve_condition', 'eq', '');
+      .from('inventory')
+      .select('sleeve_condition')
+      .not('sleeve_condition', 'is', null)
+      .not('sleeve_condition', 'eq', '');
 
     if (error) return [];
 
     const counts = new Map<string, number>();
     data?.forEach(row => {
-      if (row.package_sleeve_condition) {
-        counts.set(row.package_sleeve_condition, (counts.get(row.package_sleeve_condition) || 0) + 1);
+      if (row.sleeve_condition) {
+        counts.set(row.sleeve_condition, (counts.get(row.sleeve_condition) || 0) + 1);
       }
     });
 
