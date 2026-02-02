@@ -61,60 +61,149 @@ function BrowseQueueContent() {
         .single();
       setEventData(event || null);
 
-      const { data: requests } = await supabase
-        .from("requests")
-        .select("*")
-        .eq("event_id", eventId)
-        .order("id", { ascending: true });
+      const queueItems = await (async () => {
+        try {
+          const { data: v3Requests, error: v3Error } = await supabase
+            .from("requests_v3")
+            .select("id, inventory_id, recording_id, votes, created_at")
+            .eq("event_id", eventId)
+            .order("id", { ascending: true });
 
-      if (!requests?.length) {
+          if (v3Error) throw v3Error;
+          if (!v3Requests?.length) return [];
+
+          const inventoryIds = v3Requests
+            .map((request) => request.inventory_id)
+            .filter(Boolean);
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let inventoryRows: any[] = [];
+
+          if (inventoryIds.length) {
+            const { data: inventoryData, error: inventoryError } = await supabase
+              .from("inventory")
+              .select(
+                "id, release:releases (id, title, release_year, format, image_url, master:masters (id, title, artist:artists (id, name)))"
+              )
+              .in("id", inventoryIds);
+
+            if (inventoryError) throw inventoryError;
+            inventoryRows = inventoryData || [];
+          }
+
+          const inventoryById = new Map(
+            inventoryRows.map((row) => [row.id, row])
+          );
+
+          return v3Requests.map((request) => {
+            const inventory = request.inventory_id
+              ? inventoryById.get(request.inventory_id)
+              : null;
+            const release = inventory?.release;
+            const master = release?.master;
+            const artist = master?.artist;
+            const title = release?.title || master?.title || "";
+            const artistName = artist?.name || "";
+            const imageUrl =
+              release?.image_url || master?.image_url || inventory?.image_url || "";
+
+            return {
+              id: request.id,
+              artist: artistName,
+              title,
+              side: null,
+              track_number: null,
+              track_name: null,
+              track_duration: null,
+              votes: request.votes ?? 1,
+              created_at: request.created_at,
+              queue_type: request.recording_id ? "track" : "album",
+              collection: inventory
+                ? {
+                    id: inventory.id,
+                    image_url: imageUrl,
+                    year: release?.release_year ?? "",
+                    format: release?.format ?? "",
+                  }
+                : null,
+            };
+          });
+        } catch (error) {
+          console.warn("Falling back to legacy requests queue:", error);
+          return null;
+        }
+      })();
+
+      if (queueItems === null) {
+        const { data: requests } = await supabase
+          .from("requests")
+          .select("*")
+          .eq("event_id", eventId)
+          .order("id", { ascending: true });
+
+        if (!requests?.length) {
+          setQueueItems([]);
+          return;
+        }
+
+        const albumIds = requests.map(r => r.album_id).filter(Boolean);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let albums: any[] = [];
+
+        if (albumIds.length) {
+          const res = await supabase
+            .from("collection")
+            .select("id, artist, title, image_url, year, format")
+            .in("id", albumIds);
+          albums = res.data || [];
+        }
+
+        // Handle both old queue_type (singular) and new queue_types (array)
+        const queueTypes = event?.queue_types || (event?.queue_type ? [event.queue_type] : ['side']);
+        const primaryQueueType = Array.isArray(queueTypes) ? queueTypes[0] : queueTypes;
+
+        const mapped: QueueItem[] = requests.map(req => {
+          const album = albums.find(a => a.id === req.album_id) || {
+            id: req.album_id,
+            artist: req.artist || "",
+            title: req.title || "",
+            image_url: "",
+          };
+
+          return {
+            id: req.id,
+            artist: req.artist || album.artist || "",
+            title: req.title || album.title || "",
+            side: req.side || null,
+            track_number: req.track_number || null,
+            track_name: req.track_name || null,
+            track_duration: req.track_duration || null,
+            votes: req.votes ?? 1,
+            created_at: req.created_at,
+            queue_type: primaryQueueType,
+            collection: {
+              id: album.id,
+              image_url: album.image_url,
+              year: album.year,
+              format: album.format,
+            },
+          };
+        });
+
+        return mapped;
+      }
+
+      if (!queueItems.length) {
         setQueueItems([]);
         return;
       }
 
-      const albumIds = requests.map(r => r.album_id).filter(Boolean);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let albums: any[] = [];
-
-      if (albumIds.length) {
-        const res = await supabase
-          .from("collection")
-          .select("id, artist, title, image_url, year, format")
-          .in("id", albumIds);
-        albums = res.data || [];
-      }
-
-      // Handle both old queue_type (singular) and new queue_types (array)
       const queueTypes = event?.queue_types || (event?.queue_type ? [event.queue_type] : ['side']);
       const primaryQueueType = Array.isArray(queueTypes) ? queueTypes[0] : queueTypes;
-
-      const mapped: QueueItem[] = requests.map(req => {
-        const album = albums.find(a => a.id === req.album_id) || {
-          id: req.album_id,
-          artist: req.artist || "",
-          title: req.title || "",
-          image_url: "",
-        };
-
-        return {
-          id: req.id,
-          artist: req.artist || album.artist || "",
-          title: req.title || album.title || "",
-          side: req.side || null,
-          track_number: req.track_number || null,
-          track_name: req.track_name || null,
-          track_duration: req.track_duration || null,
-          votes: req.votes ?? 1,
-          created_at: req.created_at,
-          queue_type: primaryQueueType,
-          collection: {
-            id: album.id,
-            image_url: album.image_url,
-            year: album.year,
-            format: album.format,
-          },
-        };
-      });
+      const mapped = queueItems.map((item) => ({
+        ...item,
+        queue_type: item.queue_type || primaryQueueType,
+      }));
 
       mapped.sort((a, b) => (b.votes !== a.votes ? b.votes - a.votes : new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
       setQueueItems(mapped);
