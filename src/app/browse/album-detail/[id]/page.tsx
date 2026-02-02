@@ -8,6 +8,8 @@ import { supabase } from 'src/lib/supabaseClient';
 
 // Updated to match new DB Schema
 interface DbTrack {
+  id?: number;
+  recording_id?: number;
   position: string | number;
   title: string;
   duration?: string;
@@ -18,6 +20,8 @@ interface DbTrack {
 
 interface Album {
   id: number;
+  inventory_id?: number;
+  recording_id?: number;
   title: string;
   artist: string;
   image_url: string;
@@ -62,6 +66,88 @@ function AlbumDetailContent() {
   const fetchAlbum = useCallback(async () => {
     try {
       setLoading(true);
+
+      const v3Album = await (async () => {
+        try {
+          const { data, error } = await supabase
+            .from('inventory')
+            .select(
+              `id,
+               personal_notes,
+               media_condition,
+               location,
+               release:releases (
+                 id,
+                 title,
+                 release_year,
+                 format,
+                 image_url,
+                 release_notes,
+                 master:masters (
+                   id,
+                   title,
+                   artist:artists (id, name)
+                 )
+               ),
+               release_tracks:release_tracks (
+                 id,
+                 position,
+                 recording_id,
+                 recording:recordings (
+                   id,
+                   title,
+                   duration,
+                   artist:artists (id, name)
+                 )
+               )`
+            )
+            .eq('id', id)
+            .single();
+
+          if (error) throw error;
+          if (!data) return null;
+
+          const release = data.release;
+          const master = release?.master;
+          const artist = master?.artist;
+          const imageUrl =
+            release?.image_url || master?.image_url || data.image_url || '';
+
+          const tracks = (data.release_tracks || []).map((track: DbTrack) => ({
+            id: track.id,
+            recording_id: track.recording_id ?? track.recording?.id,
+            position: track.position,
+            title: track.recording?.title || '',
+            duration: track.recording?.duration || '',
+            artist: track.recording?.artist?.name || '',
+            type: 'track',
+          }));
+
+          return {
+            id: data.id,
+            inventory_id: data.id,
+            title: release?.title || master?.title || '',
+            artist: artist?.name || '',
+            image_url: imageUrl,
+            year: release?.release_year ? String(release.release_year) : '',
+            format: release?.format || '',
+            location: data.location,
+            personal_notes: data.personal_notes,
+            release_notes: release?.release_notes ?? release?.notes,
+            media_condition: data.media_condition,
+            tracks,
+          } as Album;
+        } catch (error) {
+          console.warn('Falling back to legacy album detail:', error);
+          return null;
+        }
+      })();
+
+      if (v3Album) {
+        setAlbum(v3Album);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('collection')
         .select('*')
@@ -136,26 +222,52 @@ function AlbumDetailContent() {
     if (!eventId || !album) return;
     setSubmittingRequest(true);
     try {
-      const { data: existing, error } = await supabase
-        .from('requests')
-        .select('id, votes')
-        .eq('event_id', eventId)
-        .eq('album_id', id)
-        .eq('track_number', String(track.position))
-        .maybeSingle();
+      if (album.inventory_id && track.recording_id) {
+        const { data: existing, error } = await supabase
+          .from('requests_v3')
+          .select('id, votes')
+          .eq('event_id', eventId)
+          .eq('inventory_id', album.inventory_id)
+          .eq('recording_id', track.recording_id)
+          .maybeSingle();
 
-      if (error) throw error;
+        if (error) throw error;
 
-      if (existing) {
-        await supabase.from('requests').update({ votes: (existing.votes || 1) + 1 }).eq('id', existing.id);
-        setRequestStatus(`Upvoted: ${track.title}`);
+        if (existing) {
+          await supabase.from('requests_v3').update({ votes: (existing.votes || 1) + 1 }).eq('id', existing.id);
+          setRequestStatus(`Upvoted: ${track.title}`);
+        } else {
+          await supabase.from('requests_v3').insert([{
+            event_id: eventId,
+            inventory_id: album.inventory_id,
+            recording_id: track.recording_id,
+            votes: 1,
+            status: 'open',
+          }]);
+          setRequestStatus(`Requested: ${track.title}`);
+        }
       } else {
-        await supabase.from('requests').insert([{
-          album_id: id, artist: track.artist || album.artist, title: track.title,
-          track_number: String(track.position), track_name: track.title,
-          track_duration: track.duration || '', event_id: eventId, votes: 1, status: 'open', side: null
-        }]);
-        setRequestStatus(`Requested: ${track.title}`);
+        const { data: existing, error } = await supabase
+          .from('requests')
+          .select('id, votes')
+          .eq('event_id', eventId)
+          .eq('album_id', id)
+          .eq('track_number', String(track.position))
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (existing) {
+          await supabase.from('requests').update({ votes: (existing.votes || 1) + 1 }).eq('id', existing.id);
+          setRequestStatus(`Upvoted: ${track.title}`);
+        } else {
+          await supabase.from('requests').insert([{
+            album_id: id, artist: track.artist || album.artist, title: track.title,
+            track_number: String(track.position), track_name: track.title,
+            track_duration: track.duration || '', event_id: eventId, votes: 1, status: 'open', side: null
+          }]);
+          setRequestStatus(`Requested: ${track.title}`);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -169,26 +281,52 @@ function AlbumDetailContent() {
     if (!eventId || !album) return;
     setSubmittingRequest(true);
     try {
-      const { data: existing, error } = await supabase
-        .from('requests')
-        .select('id, votes')
-        .eq('event_id', eventId)
-        .eq('album_id', id)
-        .is('side', null)
-        .is('track_number', null)
-        .maybeSingle();
+      if (album.inventory_id) {
+        const { data: existing, error } = await supabase
+          .from('requests_v3')
+          .select('id, votes')
+          .eq('event_id', eventId)
+          .eq('inventory_id', album.inventory_id)
+          .is('recording_id', null)
+          .maybeSingle();
 
-      if (error) throw error;
+        if (error) throw error;
 
-      if (existing) {
-        await supabase.from('requests').update({ votes: (existing.votes || 1) + 1 }).eq('id', existing.id);
-        setRequestStatus(`Upvoted Album`);
+        if (existing) {
+          await supabase.from('requests_v3').update({ votes: (existing.votes || 1) + 1 }).eq('id', existing.id);
+          setRequestStatus(`Upvoted Album`);
+        } else {
+          await supabase.from('requests_v3').insert([{
+            event_id: eventId,
+            inventory_id: album.inventory_id,
+            recording_id: null,
+            votes: 1,
+            status: 'open',
+          }]);
+          setRequestStatus(`Requested Album`);
+        }
       } else {
-        await supabase.from('requests').insert([{
-          album_id: id, artist: album.artist, title: album.title, side: null, track_number: null,
-          track_name: null, event_id: eventId, votes: 1, status: 'open'
-        }]);
-        setRequestStatus(`Requested Album`);
+        const { data: existing, error } = await supabase
+          .from('requests')
+          .select('id, votes')
+          .eq('event_id', eventId)
+          .eq('album_id', id)
+          .is('side', null)
+          .is('track_number', null)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (existing) {
+          await supabase.from('requests').update({ votes: (existing.votes || 1) + 1 }).eq('id', existing.id);
+          setRequestStatus(`Upvoted Album`);
+        } else {
+          await supabase.from('requests').insert([{
+            album_id: id, artist: album.artist, title: album.title, side: null, track_number: null,
+            track_name: null, event_id: eventId, votes: 1, status: 'open'
+          }]);
+          setRequestStatus(`Requested Album`);
+        }
       }
     } catch (e) {
       console.error(e);
