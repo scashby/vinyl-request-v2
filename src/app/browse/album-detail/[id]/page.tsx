@@ -139,7 +139,7 @@ function AlbumDetailContent() {
       if (error) {
         setError(error.message);
       } else {
-        const row = data as InventoryQueryRow;
+        const row = data as unknown as InventoryQueryRow;
         const release = row.release ?? null;
         const master = release?.master ?? null;
         const artist = master?.artist?.name ?? 'Unknown Artist';
