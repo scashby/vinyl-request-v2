@@ -151,81 +151,34 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         setLoading(true);
         setError(null);
 
-        const v3Album = await (async () => {
-          try {
-            const { data, error: fetchError } = await supabase
-              .from('inventory')
-              .select(
-                `id,
-                 collection_id,
-                 personal_notes,
-                 media_condition,
-                 location,
-                 collection_status,
-                 for_sale,
-                 custom_tags,
-                 release:releases (
-                   id,
-                   title,
-                   release_year,
-                   format,
-                   image_url,
-                   release_notes,
-                   master:masters (
-                     id,
-                     title,
-                     genres,
-                     styles,
-                     artist:artists (id, name)
-                   )
-                 )`
-              )
-              .or(`collection_id.eq.${albumId},id.eq.${albumId}`)
-              .single();
-
-            if (fetchError) throw fetchError;
-            if (!data) return null;
-
-            const release = data.release;
-            const master = release?.master;
-            const artist = master?.artist;
-
-            return {
-              id: data.collection_id ?? data.id,
-              inventory_id: data.id,
-              master_id: master?.id ?? null,
-              release_id: release?.id ?? null,
-              artist: artist?.name || '',
-              title: release?.title || master?.title || '',
-              year: release?.release_year ? String(release.release_year) : null,
-              format: release?.format || '',
-              image_url: release?.image_url || null,
-              personal_notes: data.personal_notes ?? null,
-              release_notes: release?.release_notes ?? null,
-              media_condition: data.media_condition ?? '',
-              genres: master?.genres || [],
-              styles: master?.styles || [],
-              custom_tags: data.custom_tags || [],
-              location: data.location ?? null,
-              collection_status: data.collection_status ?? null,
-              for_sale: data.for_sale ?? false,
-            } as Album;
-          } catch (error) {
-            console.warn('Falling back to legacy collection fetch:', error);
-            return null;
-          }
-        })();
-
-        if (v3Album) {
-          setAlbum(v3Album);
-          setEditedAlbum(v3Album);
-          return;
-        }
-
         const { data, error: fetchError } = await supabase
-          .from('collection')
-          .select('*')
-          .eq('id', albumId)
+          .from('inventory')
+          .select(
+            `id,
+             collection_id,
+             personal_notes,
+             media_condition,
+             location,
+             collection_status,
+             for_sale,
+             custom_tags,
+             release:releases (
+               id,
+               title,
+               release_year,
+               format,
+               image_url,
+               release_notes,
+               master:masters (
+                 id,
+                 title,
+                 genres,
+                 styles,
+                 artist:artists (id, name)
+               )
+             )`
+          )
+          .or(`collection_id.eq.${albumId},id.eq.${albumId}`)
           .single();
 
         if (fetchError) {
@@ -234,12 +187,38 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           return;
         }
 
-        if (data) {
-          setAlbum(data as Album);
-          setEditedAlbum(data as Album);
-        } else {
+        if (!data) {
           setError('Album not found');
+          return;
         }
+
+        const release = data.release;
+        const master = release?.master;
+        const artist = master?.artist;
+
+        const v3Album = {
+          id: data.collection_id ?? data.id,
+          inventory_id: data.id,
+          master_id: master?.id ?? null,
+          release_id: release?.id ?? null,
+          artist: artist?.name || '',
+          title: release?.title || master?.title || '',
+          year: release?.release_year ? String(release.release_year) : null,
+          format: release?.format || '',
+          image_url: release?.image_url || null,
+          personal_notes: data.personal_notes ?? null,
+          release_notes: release?.release_notes ?? null,
+          media_condition: data.media_condition ?? '',
+          genres: master?.genres || [],
+          styles: master?.styles || [],
+          custom_tags: data.custom_tags || [],
+          location: data.location ?? null,
+          collection_status: data.collection_status ?? null,
+          for_sale: data.for_sale ?? false,
+        } as Album;
+
+        setAlbum(v3Album);
+        setEditedAlbum(v3Album);
       } catch (err) {
         console.error('Unexpected error:', err);
         setError('An unexpected error occurred');
@@ -302,8 +281,11 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
     try {
       console.log('💾 Starting save operation...');
 
-      if (editedAlbum.inventory_id) {
-        console.log('🧭 Saving via V3 tables...');
+      if (!editedAlbum.inventory_id) {
+        throw new Error('Missing inventory ID for V3 save.');
+      }
+
+      console.log('🧭 Saving via V3 tables...');
 
         const inventoryUpdate = {
           personal_notes: editedAlbum.personal_notes ?? null,
@@ -417,158 +399,8 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           }
         }
 
-        console.log('✅ V3 save complete!');
-        onRefresh();
-        return;
-      }
-      
-      // 1. Get tracks data from TracksTab (if available)
-      const tracksData = tracksTabRef.current?.getTracksData();
-      console.log('📊 Tracks data:', tracksData);
-      
-      // 2. Update collection table - main album fields
-      const albumUpdateData: Partial<Album> = {
-        ...editedAlbum,
-      };
-      
-      // Remove GENERATED columns (computed by database)
-      delete albumUpdateData.album_norm;
-      delete albumUpdateData.artist_norm;
-      delete albumUpdateData.title_norm;
-      delete albumUpdateData.artist_album_norm;
-      delete albumUpdateData.year_int;
-      
-      // Add tracks JSONB fields if we have tracks data
-      if (tracksData) {
-        // Store tracks in JSONB format
-        albumUpdateData.tracks = tracksData.tracks;
-        albumUpdateData.disc_metadata = tracksData.disc_metadata;
-        albumUpdateData.matrix_numbers = tracksData.matrix_numbers;
-        
-        // Update disc count
-        albumUpdateData.discs = tracksData.disc_metadata.length || 1;
-      }
-      
-      console.log('📝 Updating collection table...');
-      const { error: updateError } = await supabase
-        .from('collection')
-        .update(albumUpdateData)
-        .eq('id', albumId);
-      
-      if (updateError) {
-        console.error('❌ Failed to update collection:', updateError);
-        alert(`Failed to save album: ${updateError.message}`);
-        return;
-      }
-      
-      console.log('✅ Collection updated');
-      
-      // 3. Sync tracks to tracks table (if we have tracks data)
-      if (tracksData && tracksData.tracks.length > 0) {
-        console.log('🔄 Syncing tracks to tracks table...');
-        
-        // Get existing tracks for this album
-        const { data: existingTracks } = await supabase
-          .from('tracks')
-          .select('id, position, disc_number, side')
-          .eq('album_id', albumId);
-        
-        // Create composite key for tracking (disc_number-side-position or disc_number-position)
-        const existingKeys = new Set(
-          existingTracks?.map(t => `${t.disc_number || 1}-${t.side || ''}-${t.position}`) || []
-        );
-        const newKeys = new Set(
-          tracksData.tracks.map(t => `${t.disc_number || 1}-${t.side || ''}-${t.position}`)
-        );
-        
-        // Delete tracks no longer in the list
-        const keysToDelete = Array.from(existingKeys).filter(
-          key => !newKeys.has(key)
-        );
-        
-        if (keysToDelete.length > 0) {
-          console.log(`🗑️  Deleting ${keysToDelete.length} removed tracks...`);
-          for (const key of keysToDelete) {
-            const [disc, side, pos] = key.split('-');
-            let query = supabase
-              .from('tracks')
-              .delete()
-              .eq('album_id', albumId)
-              .eq('disc_number', parseInt(disc))
-              .eq('position', parseInt(pos));
-            
-            // Handle side: use .is() for null, .eq() for non-null
-            if (side) {
-              query = query.eq('side', side);
-            } else {
-              query = query.is('side', null);
-            }
-            
-            await query;
-          }
-        }
-        
-        // Insert or update tracks
-        let tracksAdded = 0;
-        let tracksUpdated = 0;
-        
-        for (const track of tracksData.tracks) {
-          const trackData = {
-            album_id: albumId,
-            position: track.position,
-            disc_number: track.disc_number || 1,
-            side: track.side || null,
-            title: track.title,
-            duration: track.duration,
-            artist: track.artist,
-            type: track.type === 'header' ? 'header' : 'track',
-          };
-          
-          const trackKey = `${track.disc_number || 1}-${track.side || ''}-${track.position}`;
-          
-          if (existingKeys.has(trackKey)) {
-            // Update existing track
-            let query = supabase
-              .from('tracks')
-              .update(trackData)
-              .eq('album_id', albumId)
-              .eq('disc_number', track.disc_number || 1)
-              .eq('position', track.position);
-            
-            // Handle side: use .is() for null, .eq() for non-null
-            if (track.side) {
-              query = query.eq('side', track.side);
-            } else {
-              query = query.is('side', null);
-            }
-            
-            await query;
-            tracksUpdated++;
-          } else {
-            // Insert new track
-            await supabase
-              .from('tracks')
-              .insert([trackData]);
-            tracksAdded++;
-          }
-        }
-        
-        console.log(`✅ Tracks synced: ${tracksAdded} added, ${tracksUpdated} updated, ${keysToDelete.length} deleted`);
-        
-        // Log sync operation
-        await supabase
-          .from('track_sync_log')
-          .insert([{
-            album_id: albumId,
-            tracks_added: tracksAdded,
-            tracks_updated: tracksUpdated,
-            tracks_deleted: keysToDelete.length,
-            status: 'success',
-          }]);
-      }
-      
-      console.log('✅ Save complete!');
-      onRefresh(); // Notify parent to refresh data
+      console.log('✅ V3 save complete!');
+      onRefresh();
     } catch (err) {
       console.error('❌ Save failed:', err);
       alert(`Failed to save: ${err instanceof Error ? err.message : 'Unknown error'}`);
