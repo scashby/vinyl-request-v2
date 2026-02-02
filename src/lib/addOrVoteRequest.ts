@@ -9,7 +9,7 @@ interface AddOrVoteParams {
   albumId?: number | string | null;
   inventoryId?: number | string | null;
   recordingId?: number | string | null;
-  side: string; // 'A' | 'B' | ...
+  side?: string; // 'A' | 'B' | ...
   artist: string;
   title: string;
   status?: string;
@@ -89,6 +89,10 @@ export async function addOrVoteRequest({
   }
 
   // 1) Look for an existing row in this event for this side
+  if (!side) {
+    throw new Error("Side is required for legacy requests.");
+  }
+
   let query = supabase
     .from("requests")
     .select("id, votes")
