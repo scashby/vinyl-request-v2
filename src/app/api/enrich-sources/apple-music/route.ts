@@ -65,8 +65,21 @@ export async function POST(req: Request) {
 
     // Get album info
     const { data: album, error: dbError } = await supabase
-      .from('collection')
-      .select('id, artist, title, apple_music_id')
+      .from('inventory')
+      .select(`
+        id,
+        release:releases (
+          id,
+          apple_music_id,
+          master:masters (
+            id,
+            title,
+            cover_image_url,
+            genres,
+            artist:artists (name)
+          )
+        )
+      `)
       .eq('id', albumId)
       .single();
 
@@ -78,38 +91,43 @@ export async function POST(req: Request) {
       }, { status: 404 });
     }
 
-    console.log(`✓ Album found: "${album.artist}" - "${album.title}"`);
+    const release = album.release;
+    const master = release?.master;
+    const artistName = master?.artist?.name ?? 'Unknown Artist';
+    const albumTitle = master?.title ?? 'Untitled';
+
+    console.log(`✓ Album found: "${artistName}" - "${albumTitle}"`);
 
     // Skip if already has Apple Music ID
-    if (album.apple_music_id) {
-      console.log(`⏭️ Album already has Apple Music ID: ${album.apple_music_id}`);
+    if (release?.apple_music_id) {
+      console.log(`⏭️ Album already has Apple Music ID: ${release.apple_music_id}`);
       return NextResponse.json({
         success: true,
         skipped: true,
         message: 'Album already has Apple Music ID',
         data: {
           albumId: album.id,
-          artist: album.artist,
-          title: album.title,
-          apple_music_id: album.apple_music_id
+          artist: artistName,
+          title: albumTitle,
+          apple_music_id: release?.apple_music_id
         }
       });
     }
 
     // Search Apple Music
     try {
-      const appleData = await searchAppleMusic(album.artist, album.title);
+      const appleData = await searchAppleMusic(artistName, albumTitle);
 
       if (!appleData) {
-        console.log(`❌ No Apple Music match found for "${album.artist}" - "${album.title}"`);
+        console.log(`❌ No Apple Music match found for "${artistName}" - "${albumTitle}"`);
         return NextResponse.json({
           success: false,
           error: 'No match found on Apple Music',
           data: {
             albumId: album.id,
-            artist: album.artist,
-            title: album.title,
-            searchQuery: `${album.artist} ${album.title}`
+            artist: artistName,
+            title: albumTitle,
+            searchQuery: `${artistName} ${albumTitle}`
           }
         });
       }
@@ -117,23 +135,62 @@ export async function POST(req: Request) {
       console.log(`💾 Updating database with Apple Music data...`);
 
       // Update database
-      const { error: updateError } = await supabase
-        .from('collection')
-        .update(appleData)
-        .eq('id', albumId);
+      if (release?.id) {
+        const { error: releaseError } = await supabase
+          .from('releases')
+          .update({
+            apple_music_id: appleData.apple_music_id,
+            apple_music_url: appleData.apple_music_url,
+            apple_music_label: appleData.apple_music_label,
+            apple_music_release_date: appleData.apple_music_release_date,
+            apple_music_track_count: appleData.apple_music_track_count
+          })
+          .eq('id', release.id);
 
-      if (updateError) {
-        console.log('❌ ERROR: Database update failed', updateError);
-        return NextResponse.json({
-          success: false,
-          error: `Database update failed: ${updateError.message}`,
-          data: {
-            albumId: album.id,
-            artist: album.artist,
-            title: album.title,
-            foundData: appleData
+        if (releaseError) {
+          console.log('❌ ERROR: Database update failed', releaseError);
+          return NextResponse.json({
+            success: false,
+            error: `Database update failed: ${releaseError.message}`,
+            data: {
+              albumId: album.id,
+              artist: artistName,
+              title: albumTitle,
+              foundData: appleData
+            }
+          }, { status: 500 });
+        }
+      }
+
+      if (master?.id) {
+        const masterUpdate: Record<string, unknown> = {};
+        if (appleData.apple_music_genres?.length) {
+          masterUpdate.genres = appleData.apple_music_genres;
+        }
+        if (!master.cover_image_url && appleData.apple_music_artwork_url) {
+          masterUpdate.cover_image_url = appleData.apple_music_artwork_url;
+        }
+
+        if (Object.keys(masterUpdate).length > 0) {
+          const { error: masterError } = await supabase
+            .from('masters')
+            .update(masterUpdate)
+            .eq('id', master.id);
+
+          if (masterError) {
+            console.log('❌ ERROR: Database update failed', masterError);
+            return NextResponse.json({
+              success: false,
+              error: `Database update failed: ${masterError.message}`,
+              data: {
+                albumId: album.id,
+                artist: artistName,
+                title: albumTitle,
+                foundData: appleData
+              }
+            }, { status: 500 });
           }
-        }, { status: 500 });
+        }
       }
 
       console.log(`✅ Successfully enriched with Apple Music data\n`);
@@ -142,8 +199,8 @@ export async function POST(req: Request) {
         success: true,
         data: {
           albumId: album.id,
-          artist: album.artist,
-          title: album.title,
+          artist: artistName,
+          title: albumTitle,
           apple_music_id: appleData.apple_music_id,
           apple_music_url: appleData.apple_music_url,
           genres: appleData.apple_music_genres,
@@ -160,8 +217,8 @@ export async function POST(req: Request) {
         error: error instanceof Error ? error.message : 'Apple Music search failed',
         data: {
           albumId: album.id,
-          artist: album.artist,
-          title: album.title
+          artist: artistName,
+          title: albumTitle
         }
       }, { status: 500 });
     }

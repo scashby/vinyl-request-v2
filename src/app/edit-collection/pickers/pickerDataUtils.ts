@@ -45,7 +45,7 @@ function getGradeRank(name: string): number {
 async function fetchSmartList(column: string): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase
-      .from('collection')
+      .from('collection_v2_archive')
       .select(column)
       .not(column, 'is', null);
 
@@ -97,7 +97,7 @@ async function fetchSmartList(column: string): Promise<PickerDataItem[]> {
 async function updateSmartList(column: string, oldName: string, newName: string, newSortName?: string): Promise<boolean> {
   try {
     const { data: rows, error: fetchError } = await supabase
-      .from('collection')
+      .from('collection_v2_archive')
       .select(`id, ${column}`)
       .not(column, 'is', null);
 
@@ -131,7 +131,7 @@ async function updateSmartList(column: string, oldName: string, newName: string,
     if (updates.length === 0) return true;
 
     const { error: updateError } = await supabase
-      .from('collection')
+      .from('collection_v2_archive')
       .upsert(updates);
 
     if (updateError) {
@@ -148,7 +148,7 @@ async function updateSmartList(column: string, oldName: string, newName: string,
 async function deleteSmartList(column: string, nameToDelete: string): Promise<boolean> {
   try {
     const { data: rows, error: fetchError } = await supabase
-      .from('collection')
+      .from('collection_v2_archive')
       .select(`id, ${column}`)
       .not(column, 'is', null);
 
@@ -170,7 +170,7 @@ async function deleteSmartList(column: string, nameToDelete: string): Promise<bo
     }, []);
 
     if (updates.length > 0) {
-      const { error } = await supabase.from('collection').upsert(updates);
+      const { error } = await supabase.from('collection_v2_archive').upsert(updates);
       if (error) return false;
     }
     return true;
@@ -182,7 +182,7 @@ async function deleteSmartList(column: string, nameToDelete: string): Promise<bo
 async function mergeSmartList(column: string, targetName: string, sourceNames: string[]): Promise<boolean> {
   try {
     const { data: rows, error: fetchError } = await supabase
-      .from('collection')
+      .from('collection_v2_archive')
       .select(`id, ${column}`)
       .not(column, 'is', null);
 
@@ -211,7 +211,7 @@ async function mergeSmartList(column: string, targetName: string, sourceNames: s
     }, []);
 
     if (updates.length > 0) {
-      const { error } = await supabase.from('collection').upsert(updates);
+      const { error } = await supabase.from('collection_v2_archive').upsert(updates);
       if (error) return false;
     }
     return true;
@@ -226,7 +226,7 @@ async function mergeSmartList(column: string, targetName: string, sourceNames: s
 
 export async function fetchStorageDevices(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('storage_device').not('storage_device', 'is', null).not('storage_device', 'eq', '');
+    const { data, error } = await supabase.from('collection_v2_archive').select('storage_device').not('storage_device', 'is', null).not('storage_device', 'eq', '');
     if (error) return [];
     const deviceCounts = new Map<string, number>();
     data?.forEach(row => { if (row.storage_device) deviceCounts.set(row.storage_device, (deviceCounts.get(row.storage_device) || 0) + 1); });
@@ -411,7 +411,7 @@ export async function updateLabel(): Promise<boolean> {
 }
 
 export async function updateFormat(id: string, newName: string): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ format: newName }).eq('format', id); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ format: newName }).eq('format', id); return !error; } catch { return false; }
 }
 
 export async function updateLocation(id: string, newName: string): Promise<boolean> {
@@ -426,17 +426,17 @@ export async function updateArtist(id: string, newName: string, newSortName?: st
   try {
     const updates: { artist: string; sort_artist?: string } = { artist: newName };
     if (newSortName !== undefined) updates.sort_artist = newSortName;
-    const { error } = await supabase.from('collection').update(updates).eq('artist', id);
+    const { error } = await supabase.from('collection_v2_archive').update(updates).eq('artist', id);
     return !error;
   } catch { return false; }
 }
 
 export async function deleteArtist(id: string): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').delete().eq('artist', id); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').delete().eq('artist', id); return !error; } catch { return false; }
 }
 
 export async function mergeArtists(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ artist: targetId }).in('artist', sourceIds); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ artist: targetId }).in('artist', sourceIds); return !error; } catch { return false; }
 }
 
 export async function deleteLabel(): Promise<boolean> {
@@ -450,7 +450,7 @@ export async function mergeLabels(): Promise<boolean> {
 }
 
 export async function mergeFormats(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ format: targetId }).in('format', sourceIds); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ format: targetId }).in('format', sourceIds); return !error; } catch { return false; }
 }
 
 export async function mergeLocations(targetId: string, sourceIds: string[]): Promise<boolean> {
@@ -476,15 +476,15 @@ export async function fetchPackaging(): Promise<PickerDataItem[]> {
 }
 
 export async function updatePackaging(id: string, newName: string): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ packaging: newName }).eq('packaging', id); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ packaging: newName }).eq('packaging', id); return !error; } catch { return false; }
 }
 
 export async function deletePackaging(id: string): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ packaging: null }).eq('packaging', id); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ packaging: null }).eq('packaging', id); return !error; } catch { return false; }
 }
 
 export async function mergePackaging(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ packaging: targetId }).in('packaging', sourceIds); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ packaging: targetId }).in('packaging', sourceIds); return !error; } catch { return false; }
 }
 
 // Studios
@@ -506,11 +506,11 @@ export async function fetchStudios(): Promise<PickerDataItem[]> {
 }
 
 export async function updateStudio(id: string, newName: string): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ studio: newName }).eq('studio', id); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ studio: newName }).eq('studio', id); return !error; } catch { return false; }
 }
 
 export async function mergeStudios(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ studio: targetId }).in('studio', sourceIds); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ studio: targetId }).in('studio', sourceIds); return !error; } catch { return false; }
 }
 
 // Countries
@@ -555,11 +555,11 @@ export async function fetchSounds(): Promise<PickerDataItem[]> {
 }
 
 export async function updateSound(id: string, newName: string): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ sound: newName }).eq('sound', id); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ sound: newName }).eq('sound', id); return !error; } catch { return false; }
 }
 
 export async function mergeSounds(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ sound: targetId }).in('sound', sourceIds); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ sound: targetId }).in('sound', sourceIds); return !error; } catch { return false; }
 }
 
 // Vinyl Colors
@@ -586,11 +586,11 @@ export async function fetchVinylColors(): Promise<PickerDataItem[]> {
 }
 
 export async function updateVinylColor(id: string, newName: string): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ vinyl_color: newName }).eq('vinyl_color', id); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ vinyl_color: newName }).eq('vinyl_color', id); return !error; } catch { return false; }
 }
 
 export async function mergeVinylColors(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ vinyl_color: targetId }).in('vinyl_color', sourceIds); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ vinyl_color: targetId }).in('vinyl_color', sourceIds); return !error; } catch { return false; }
 }
 
 // Vinyl Weights
@@ -631,18 +631,18 @@ export async function fetchSPARS(): Promise<PickerDataItem[]> {
 }
 
 export async function updateSPARS(id: string, newName: string): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ spars_code: newName }).eq('spars_code', id); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ spars_code: newName }).eq('spars_code', id); return !error; } catch { return false; }
 }
 
 export async function mergeSPARS(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ spars_code: targetId }).in('spars_code', sourceIds); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ spars_code: targetId }).in('spars_code', sourceIds); return !error; } catch { return false; }
 }
 
 // Box Sets
 
 export async function fetchBoxSets(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('box_set').not('box_set', 'is', null).not('box_set', 'eq', '');
+    const { data, error } = await supabase.from('collection_v2_archive').select('box_set').not('box_set', 'is', null).not('box_set', 'eq', '');
     if (error) return [];
     const boxSetCounts = new Map<string, number>();
     data?.forEach(row => { if (row.box_set) boxSetCounts.set(row.box_set, (boxSetCounts.get(row.box_set) || 0) + 1); });
@@ -654,7 +654,7 @@ export async function fetchBoxSets(): Promise<PickerDataItem[]> {
 
 export async function fetchPurchaseStores(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('purchase_store').not('purchase_store', 'is', null).not('purchase_store', 'eq', '');
+    const { data, error } = await supabase.from('collection_v2_archive').select('purchase_store').not('purchase_store', 'is', null).not('purchase_store', 'eq', '');
     if (error) return [];
     const counts = new Map<string, number>();
     data?.forEach(row => { if (row.purchase_store) counts.set(row.purchase_store, (counts.get(row.purchase_store) || 0) + 1); });
@@ -663,22 +663,22 @@ export async function fetchPurchaseStores(): Promise<PickerDataItem[]> {
 }
 
 export async function updatePurchaseStore(id: string, newName: string): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ purchase_store: newName }).eq('purchase_store', id); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ purchase_store: newName }).eq('purchase_store', id); return !error; } catch { return false; }
 }
 
 export async function deletePurchaseStore(id: string): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ purchase_store: null }).eq('purchase_store', id); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ purchase_store: null }).eq('purchase_store', id); return !error; } catch { return false; }
 }
 
 export async function mergePurchaseStores(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ purchase_store: targetId }).in('purchase_store', sourceIds); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ purchase_store: targetId }).in('purchase_store', sourceIds); return !error; } catch { return false; }
 }
 
 // Owners
 
 export async function fetchOwners(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('owner').not('owner', 'is', null).not('owner', 'eq', '');
+    const { data, error } = await supabase.from('collection_v2_archive').select('owner').not('owner', 'is', null).not('owner', 'eq', '');
     if (error) return [];
     const counts = new Map<string, number>();
     data?.forEach(row => { if (row.owner) counts.set(row.owner, (counts.get(row.owner) || 0) + 1); });
@@ -687,22 +687,22 @@ export async function fetchOwners(): Promise<PickerDataItem[]> {
 }
 
 export async function updateOwner(id: string, newName: string): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ owner: newName }).eq('owner', id); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ owner: newName }).eq('owner', id); return !error; } catch { return false; }
 }
 
 export async function deleteOwner(id: string): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ owner: null }).eq('owner', id); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ owner: null }).eq('owner', id); return !error; } catch { return false; }
 }
 
 export async function mergeOwners(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ owner: targetId }).in('owner', sourceIds); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ owner: targetId }).in('owner', sourceIds); return !error; } catch { return false; }
 }
 
 // Signees
 
 export async function fetchSignees(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('signed_by').not('signed_by', 'is', null);
+    const { data, error } = await supabase.from('collection_v2_archive').select('signed_by').not('signed_by', 'is', null);
     if (error) return [];
     const counts = new Map<string, number>();
     data?.forEach(row => { 
@@ -719,7 +719,7 @@ export async function fetchSignees(): Promise<PickerDataItem[]> {
 
 export async function fetchTags(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('custom_tags').not('custom_tags', 'is', null);
+    const { data, error } = await supabase.from('collection_v2_archive').select('custom_tags').not('custom_tags', 'is', null);
     if (error) return [];
     const counts = new Map<string, number>();
     data?.forEach(row => { 
@@ -736,7 +736,7 @@ export async function fetchTags(): Promise<PickerDataItem[]> {
 
 export async function fetchComposers(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('composer, sort_composer').not('composer', 'is', null).not('composer', 'eq', '');
+    const { data, error } = await supabase.from('collection_v2_archive').select('composer, sort_composer').not('composer', 'is', null).not('composer', 'eq', '');
     if (error) return [];
     const map = new Map<string, { count: number; sortName: string }>();
     data?.forEach(row => {
@@ -765,21 +765,21 @@ export async function updateComposer(id: string, newName: string, newSortName?: 
   try {
     const updates: { composer: string; sort_composer?: string } = { composer: newName };
     if (newSortName !== undefined) updates.sort_composer = newSortName;
-    const { error } = await supabase.from('collection').update(updates).eq('composer', id);
+    const { error } = await supabase.from('collection_v2_archive').update(updates).eq('composer', id);
     if (error) { console.error(error); return false; }
     return true; 
   } catch { return false; }
 }
 
 export async function mergeComposers(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ composer: targetId }).in('composer', sourceIds); if (error) { console.error(error); return false; } return true; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ composer: targetId }).in('composer', sourceIds); if (error) { console.error(error); return false; } return true; } catch { return false; }
 }
 
 // Conductors
 
 export async function fetchConductors(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('conductor, sort_conductor').not('conductor', 'is', null).not('conductor', 'eq', '');
+    const { data, error } = await supabase.from('collection_v2_archive').select('conductor, sort_conductor').not('conductor', 'is', null).not('conductor', 'eq', '');
     if (error) return [];
     const map = new Map<string, { count: number; sortName: string }>();
     data?.forEach(row => {
@@ -802,21 +802,21 @@ export async function updateConductor(id: string, newName: string, newSortName?:
   try { 
     const updates: { conductor: string; sort_conductor?: string } = { conductor: newName };
     if (newSortName !== undefined) updates.sort_conductor = newSortName;
-    const { error } = await supabase.from('collection').update(updates).eq('conductor', id); 
+    const { error } = await supabase.from('collection_v2_archive').update(updates).eq('conductor', id); 
     if (error) { console.error(error); return false; }
     return true; 
   } catch { return false; }
 }
 
 export async function mergeConductors(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ conductor: targetId }).in('conductor', sourceIds); if (error) { console.error(error); return false; } return true; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ conductor: targetId }).in('conductor', sourceIds); if (error) { console.error(error); return false; } return true; } catch { return false; }
 }
 
 // Choruses
 
 export async function fetchChoruses(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('chorus, sort_chorus').not('chorus', 'is', null).not('chorus', 'eq', '');
+    const { data, error } = await supabase.from('collection_v2_archive').select('chorus, sort_chorus').not('chorus', 'is', null).not('chorus', 'eq', '');
     if (error) return [];
     const map = new Map<string, { count: number; sortName: string }>();
     data?.forEach(row => {
@@ -839,21 +839,21 @@ export async function updateChorus(id: string, newName: string, newSortName?: st
   try { 
     const updates: { chorus: string; sort_chorus?: string } = { chorus: newName };
     if (newSortName !== undefined) updates.sort_chorus = newSortName;
-    const { error } = await supabase.from('collection').update(updates).eq('chorus', id); 
+    const { error } = await supabase.from('collection_v2_archive').update(updates).eq('chorus', id); 
     if (error) { console.error(error); return false; }
     return true; 
   } catch { return false; }
 }
 
 export async function mergeChorus(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ chorus: targetId }).in('chorus', sourceIds); if (error) { console.error(error); return false; } return true; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ chorus: targetId }).in('chorus', sourceIds); if (error) { console.error(error); return false; } return true; } catch { return false; }
 }
 
 // Compositions
 
 export async function fetchCompositions(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('composition, sort_composition').not('composition', 'is', null).not('composition', 'eq', '');
+    const { data, error } = await supabase.from('collection_v2_archive').select('composition, sort_composition').not('composition', 'is', null).not('composition', 'eq', '');
     if (error) return [];
     const map = new Map<string, { count: number; sortName: string }>();
     data?.forEach(row => {
@@ -876,21 +876,21 @@ export async function updateComposition(id: string, newName: string, newSortName
   try { 
     const updates: { composition: string; sort_composition?: string } = { composition: newName };
     if (newSortName !== undefined) updates.sort_composition = newSortName;
-    const { error } = await supabase.from('collection').update(updates).eq('composition', id); 
+    const { error } = await supabase.from('collection_v2_archive').update(updates).eq('composition', id); 
     if (error) { console.error(error); return false; }
     return true; 
   } catch { return false; }
 }
 
 export async function mergeCompositions(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ composition: targetId }).in('composition', sourceIds); if (error) { console.error(error); return false; } return true; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ composition: targetId }).in('composition', sourceIds); if (error) { console.error(error); return false; } return true; } catch { return false; }
 }
 
 // Orchestras
 
 export async function fetchOrchestras(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('orchestra, sort_orchestra').not('orchestra', 'is', null).not('orchestra', 'eq', '');
+    const { data, error } = await supabase.from('collection_v2_archive').select('orchestra, sort_orchestra').not('orchestra', 'is', null).not('orchestra', 'eq', '');
     if (error) return [];
     const map = new Map<string, { count: number; sortName: string }>();
     data?.forEach(row => {
@@ -913,14 +913,14 @@ export async function updateOrchestra(id: string, newName: string, newSortName?:
   try { 
     const updates: { orchestra: string; sort_orchestra?: string } = { orchestra: newName };
     if (newSortName !== undefined) updates.sort_orchestra = newSortName;
-    const { error } = await supabase.from('collection').update(updates).eq('orchestra', id); 
+    const { error } = await supabase.from('collection_v2_archive').update(updates).eq('orchestra', id); 
     if (error) { console.error(error); return false; }
     return true; 
   } catch { return false; }
 }
 
 export async function mergeOrchestras(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ orchestra: targetId }).in('orchestra', sourceIds); if (error) { console.error(error); return false; } return true; } catch { return false; }
+  try { const { error } = await supabase.from('collection_v2_archive').update({ orchestra: targetId }).in('orchestra', sourceIds); if (error) { console.error(error); return false; } return true; } catch { return false; }
 }
 
 // ============================================================================

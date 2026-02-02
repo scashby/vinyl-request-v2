@@ -35,7 +35,7 @@ export async function POST(req: Request) {
 
   // FIXED: Removed is_1001, updated columns to match schema
   let q = supabase
-    .from("collection")
+    .from("collection_v2_archive")
     .select("id,genres,location,artist,title") // FIXED: genres, location
     .gt("id", cursor)
     .order("id", { ascending: true })
@@ -86,7 +86,7 @@ export async function POST(req: Request) {
 
     // FIXED: Update location column
     const { error: upErr } = await supabase
-      .from("collection")
+      .from("collection_v2_archive")
       .update({ location: dest })
       .eq("id", r.id as number);
 

@@ -338,6 +338,7 @@ export interface Database {
         Row: {
           id: number;
           event_id: number | null;
+          inventory_id: number | null;
           title: string;
           description: string | null;
           file_url: string;
@@ -357,6 +358,7 @@ export interface Database {
         Insert: {
           id?: number;
           event_id?: number | null;
+          inventory_id?: number | null;
           title: string;
           description?: string | null;
           file_url: string;
@@ -376,6 +378,7 @@ export interface Database {
         Update: {
           id?: number;
           event_id?: number | null;
+          inventory_id?: number | null;
           title?: string;
           description?: string | null;
           file_url?: string;
@@ -614,18 +617,21 @@ export interface Database {
       most_wanted: {
         Row: {
           id: number;
+          inventory_id: number | null;
           title: string;
           url: string | null;
           rank: number | null;
         };
         Insert: {
           id?: number;
+          inventory_id?: number | null;
           title: string;
           url?: string | null;
           rank?: number | null;
         };
         Update: {
           id?: number;
+          inventory_id?: number | null;
           title?: string;
           url?: string | null;
           rank?: number | null;
@@ -1081,7 +1087,6 @@ export interface Database {
           image_url: string | null;
           notes: string | null;
           date_added: string | null;
-          inner_circle_preferred: boolean | null;
           blocked: boolean | null;
           created_at: string | null;
           updated_at: string | null;
@@ -1108,7 +1113,6 @@ export interface Database {
           image_url?: string | null;
           notes?: string | null;
           date_added?: string | null;
-          inner_circle_preferred?: boolean | null;
           blocked?: boolean | null;
           created_at?: string | null;
           updated_at?: string | null;
@@ -1135,7 +1139,86 @@ export interface Database {
           image_url?: string | null;
           notes?: string | null;
           date_added?: string | null;
-          inner_circle_preferred?: boolean | null;
+          blocked?: boolean | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+          master_release_id?: string | null;
+          master_release_date?: string | null;
+          custom_tags?: string | null;
+          collection_id?: number | null;
+          folder_id?: number | null;
+          label?: string | null;
+          catalog_no?: string | null;
+          basic_information?: Json | null;
+          discogs_genres?: string | null;
+          discogs_styles?: string | null;
+          decade?: number | null;
+        };
+      };
+      collection_v2_archive: {
+        Row: {
+          id: number;
+          artist: string;
+          title: string;
+          year: string | null;
+          format: string | null;
+          folder: string | null;
+          media_condition: string | null;
+          image_url: string | null;
+          notes: string | null;
+          date_added: string | null;
+          blocked: boolean | null;
+          created_at: string | null;
+          updated_at: string | null;
+          master_release_id: string | null;
+          master_release_date: string | null;
+          custom_tags?: string | null;
+          collection_id?: number | null;
+          folder_id?: number | null;
+          label?: string | null;
+          catalog_no?: string | null;
+          basic_information?: Json | null;
+          discogs_genres?: string | null;
+          discogs_styles?: string | null;
+          decade?: number | null;
+        };
+        Insert: {
+          id?: number;
+          artist: string;
+          title: string;
+          year?: string | null;
+          format?: string | null;
+          folder?: string | null;
+          media_condition?: string | null;
+          image_url?: string | null;
+          notes?: string | null;
+          date_added?: string | null;
+          blocked?: boolean | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+          master_release_id?: string | null;
+          master_release_date?: string | null;
+          custom_tags?: string | null;
+          collection_id?: number | null;
+          folder_id?: number | null;
+          label?: string | null;
+          catalog_no?: string | null;
+          basic_information?: Json | null;
+          discogs_genres?: string | null;
+          discogs_styles?: string | null;
+          decade?: number | null;
+        };
+        Update: {
+          id?: number;
+          artist?: string;
+          title?: string;
+          year?: string | null;
+          format?: string | null;
+          folder?: string | null;
+          media_condition?: string | null;
+          image_url?: string | null;
+          notes?: string | null;
+          date_added?: string | null;
           blocked?: boolean | null;
           created_at?: string | null;
           updated_at?: string | null;

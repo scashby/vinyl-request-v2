@@ -1,6 +1,6 @@
 // src/lib/importUtils.ts
 import { supabase } from './supabaseClient';
-import type { Database } from '../types/database.types';
+import type { Database } from '../types/supabase';
 
 // ============================================================================
 // 1. STRING NORMALIZATION (Synchronous)
