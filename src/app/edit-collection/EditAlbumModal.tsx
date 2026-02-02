@@ -160,6 +160,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
     if (status === 'wishlist') collectionStatus = 'wish_list';
     if (status === 'incoming') collectionStatus = 'on_order';
     if (status === 'sold') collectionStatus = 'sold';
+    if (status === 'for_sale') collectionStatus = 'for_sale';
 
     return {
       id: row.id,
@@ -174,7 +175,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
       back_image_url: null,
       index_number: null,
       collection_status: collectionStatus,
-      for_sale: false,
+      for_sale: status === 'for_sale',
       location: row.location ?? null,
       storage_device: null,
       storage_device_slot: null,

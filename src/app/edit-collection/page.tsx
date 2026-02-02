@@ -200,6 +200,7 @@ function CollectionBrowserPage() {
     if (status === 'wishlist') collectionStatus = 'wish_list';
     if (status === 'incoming') collectionStatus = 'on_order';
     if (status === 'sold') collectionStatus = 'sold';
+    if (status === 'for_sale') collectionStatus = 'for_sale';
 
     return {
       id: row.id,
@@ -214,7 +215,7 @@ function CollectionBrowserPage() {
       back_image_url: null,
       index_number: null,
       collection_status: collectionStatus,
-      for_sale: false,
+      for_sale: status === 'for_sale',
       location: row.location ?? null,
       storage_device: null,
       storage_device_slot: null,
@@ -641,12 +642,12 @@ function CollectionBrowserPage() {
   // Handler for marking an album as for sale
   const handleMarkForSale = useCallback(async (albumId: number) => {
     const { error } = await supabase
-      .from('collection')
-      .update({ for_sale: true })
+      .from('inventory')
+      .update({ status: 'for_sale' })
       .eq('id', albumId);
     
     if (!error) {
-      setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, for_sale: true } : a));
+      setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, for_sale: true, collection_status: 'for_sale' } : a));
     } else {
       console.error('Error marking album for sale:', error);
     }
