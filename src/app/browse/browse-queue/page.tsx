@@ -9,22 +9,23 @@ import Link from "next/link";
 import { formatEventText } from 'src/utils/textFormatter';
 import AlbumSuggestionBox from "components/AlbumSuggestionBox";
 import { supabase } from "src/lib/supabaseClient";
+import type { Database } from 'src/types/supabase';
 
 interface QueueItem {
-  id: number;
+  id: string;
   artist: string;
   title: string;
   side: string | null;
   track_number: string | null;
-  track_name: string | null;
+  track_title: string | null;
   track_duration: string | null;
   votes: number;
-  created_at: string;
+  created_at: string | null;
   queue_type: string;
-  collection: {
+  inventory: {
     id: number;
     image_url: string;
-    year: string | number;
+    year: number | null;
     format: string;
   } | null;
 }
@@ -38,6 +39,26 @@ interface EventData {
   queue_type?: string;
 }
 
+type InventoryRow = Database['public']['Tables']['inventory']['Row'];
+type ReleaseRow = Database['public']['Tables']['releases']['Row'];
+type MasterRow = Database['public']['Tables']['masters']['Row'];
+type ArtistRow = Database['public']['Tables']['artists']['Row'];
+type RecordingRow = Database['public']['Tables']['recordings']['Row'];
+type RequestRow = Database['public']['Tables']['requests_v3']['Row'];
+
+type InventoryQueryRow = InventoryRow & {
+  release?: (ReleaseRow & {
+    master?: (MasterRow & {
+      artist?: ArtistRow | null;
+    }) | null;
+  }) | null;
+};
+
+type RequestQueryRow = RequestRow & {
+  inventory?: InventoryQueryRow | null;
+  recording?: RecordingRow | null;
+};
+
 function BrowseQueueContent() {
   const searchParams = useSearchParams();
   const eventId = searchParams.get("eventId");
@@ -46,6 +67,22 @@ function BrowseQueueContent() {
   const [eventData, setEventData] = useState<EventData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showSuggestionBox, setShowSuggestionBox] = useState(false);
+
+  const buildFormatLabel = (release?: ReleaseRow | null) => {
+    if (!release) return '';
+    const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
+    const base = parts.join(', ');
+    const qty = release.qty ?? 1;
+    if (!base) return '';
+    return qty > 1 ? `${qty}x${base}` : base;
+  };
+
+  const formatDuration = (seconds?: number | null) => {
+    if (!seconds && seconds !== 0) return '';
+    const minutes = Math.floor(seconds / 60);
+    const remaining = Math.floor(seconds % 60);
+    return `${minutes}:${remaining.toString().padStart(2, '0')}`;
+  };
 
   const loadEventAndQueue = useCallback(async () => {
     if (!eventId) {
@@ -148,15 +185,20 @@ function BrowseQueueContent() {
 
   useEffect(() => { loadEventAndQueue(); }, [loadEventAndQueue]);
 
-  const voteForItem = async (itemId: number) => {
+  const voteForItem = async (itemId: string) => {
     try {
       const currentItem = queueItems.find(item => item.id === itemId);
       const newVotes = (currentItem?.votes ?? 1) + 1;
-      await supabase.from("requests").update({ votes: newVotes }).eq("id", itemId);
+      await supabase.from("requests_v3").update({ votes: newVotes }).eq("id", itemId);
       setQueueItems(prev =>
         prev
           .map(item => (item.id === itemId ? { ...item, votes: newVotes } : item))
-          .sort((a, b) => (b.votes !== a.votes ? b.votes - a.votes : new Date(a.created_at).getTime() - new Date(b.created_at).getTime()))
+          .sort((a, b) => {
+            if (b.votes !== a.votes) return b.votes - a.votes;
+            const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return dateA - dateB;
+          })
       );
     } catch (e) {
       console.error("Error voting:", e);
@@ -290,7 +332,7 @@ function BrowseQueueContent() {
                       </td>
                       <td className="p-4 pl-0">
                         <Image
-                          src={item.collection?.image_url || "/images/placeholder.png"}
+                          src={item.inventory?.image_url || "/images/placeholder.png"}
                           alt={item.title || ""}
                           className="rounded shadow-md object-cover bg-slate-800"
                           width={48}
@@ -301,16 +343,16 @@ function BrowseQueueContent() {
                       <td className="p-4">
                         <div className="flex items-center gap-2 mb-1">
                           {index < 3 && <span className="text-lg">{index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉"}</span>}
-                          {item.collection?.id ? (
+                          {item.inventory?.id ? (
                             <Link
-                              href={`/browse/album-detail/${item.collection.id}${eventId ? `?eventId=${eventId}` : ""}`}
+                              href={`/browse/album-detail/${item.inventory.id}${eventId ? `?eventId=${eventId}` : ""}`}
                               className="font-bold text-base text-emerald-400 hover:text-emerald-300 hover:underline line-clamp-1"
                               aria-label={`View ${queueType === 'track' ? 'track' : 'album'}: ${item.title} by ${item.artist}`}
                             >
-                              {queueType === 'track' ? (item.track_name || item.title) : item.title}
+                              {queueType === 'track' ? (item.track_title || item.title) : item.title}
                             </Link>
                           ) : (
-                            <span className="font-bold text-base text-white line-clamp-1">{queueType === 'track' ? (item.track_name || item.title) : item.title}</span>
+                            <span className="font-bold text-base text-white line-clamp-1">{queueType === 'track' ? (item.track_title || item.title) : item.title}</span>
                           )}
                         </div>
                         <div className="text-sm text-gray-400 font-medium uppercase tracking-wide line-clamp-1">{item.artist}</div>
@@ -318,7 +360,7 @@ function BrowseQueueContent() {
                       {queueType === 'side' && (
                         <td className="p-4 text-center">
                           <span className="inline-block px-2 py-1 rounded bg-blue-500/20 text-blue-300 text-sm font-bold">
-                            {item.side}
+                            {item.side || '--'}
                           </span>
                         </td>
                       )}

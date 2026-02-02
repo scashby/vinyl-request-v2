@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from 'src/lib/supabaseClient';
+import type { Database } from 'src/types/supabase';
 
 // Updated to match new DB Schema
 interface DbTrack {
@@ -25,7 +26,7 @@ interface Album {
   title: string;
   artist: string;
   image_url: string;
-  year?: string;
+  year?: string | number;
   format?: string;
   
   // Phase 4 Fixes: New Columns
@@ -39,6 +40,24 @@ interface Album {
   
   blocked_tracks?: { position: string; reason: string }[];
 }
+
+type InventoryRow = Database['public']['Tables']['inventory']['Row'];
+type ReleaseRow = Database['public']['Tables']['releases']['Row'];
+type MasterRow = Database['public']['Tables']['masters']['Row'];
+type ArtistRow = Database['public']['Tables']['artists']['Row'];
+type RecordingRow = Database['public']['Tables']['recordings']['Row'];
+type ReleaseTrackRow = Database['public']['Tables']['release_tracks']['Row'];
+
+type InventoryQueryRow = InventoryRow & {
+  release?: (ReleaseRow & {
+    master?: (MasterRow & {
+      artist?: ArtistRow | null;
+    }) | null;
+    release_tracks?: (ReleaseTrackRow & {
+      recording?: RecordingRow | null;
+    })[] | null;
+  }) | null;
+};
 
 interface EventData {
   id: number;
@@ -62,6 +81,22 @@ function AlbumDetailContent() {
   const [error, setError] = useState<string | null>(null);
   const [requestStatus, setRequestStatus] = useState('');
   const [submittingRequest, setSubmittingRequest] = useState(false);
+
+  const buildFormatLabel = (release?: ReleaseRow | null) => {
+    if (!release) return '';
+    const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
+    const base = parts.join(', ');
+    const qty = release.qty ?? 1;
+    if (!base) return '';
+    return qty > 1 ? `${qty}x${base}` : base;
+  };
+
+  const formatDuration = (seconds?: number | null) => {
+    if (!seconds && seconds !== 0) return '';
+    const minutes = Math.floor(seconds / 60);
+    const remaining = Math.floor(seconds % 60);
+    return `${minutes}:${remaining.toString().padStart(2, '0')}`;
+  };
 
   const fetchAlbum = useCallback(async () => {
     try {
@@ -172,6 +207,7 @@ function AlbumDetailContent() {
   const handleAddToQueue = async (side: string) => {
     if (!eventId || !album) return;
     setSubmittingRequest(true);
+    const trackTitle = `Side ${side}`;
     try {
       if (!album.inventory_id) {
         throw new Error('Missing inventory ID for V3 request.');

@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 
 export async function GET() {
-  const supabase = supabaseAdmin();
+  const supabase = supabaseAdmin;
   const { data, error } = await supabase
     .from('social_embeds')
     .select('id, platform, embed_html, visible')
@@ -25,7 +25,7 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
     const { id, platform, embed_html, visible } = body;
-    const supabase = supabaseAdmin();
+    const supabase = supabaseAdmin;
 
     const { error } = await supabase
       .from("social_embeds")

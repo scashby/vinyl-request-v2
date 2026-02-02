@@ -236,16 +236,16 @@ export async function fetchStorageDevices(): Promise<PickerDataItem[]> {
 
 export async function fetchLabels(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('labels').not('labels', 'is', null);
+    const { data, error } = await supabase
+      .from('releases')
+      .select('label')
+      .not('label', 'is', null)
+      .not('label', 'eq', '');
     if (error) return [];
     
     const labelCounts = new Map<string, number>();
     data?.forEach(row => { 
-      if (Array.isArray(row.labels)) {
-        row.labels.forEach((label: string) => {
-          if (label) labelCounts.set(label, (labelCounts.get(label) || 0) + 1); 
-        });
-      }
+      if (row.label) labelCounts.set(row.label, (labelCounts.get(row.label) || 0) + 1);
     });
     return Array.from(labelCounts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
   } catch { return []; }
@@ -267,7 +267,14 @@ export async function fetchFormats(): Promise<PickerDataItem[]> {
   } catch { return []; }
     if (error) return [];
     const formatCounts = new Map<string, number>();
-    data?.forEach(row => { if (row.format) formatCounts.set(row.format, (formatCounts.get(row.format) || 0) + 1); });
+    data?.forEach(row => {
+      const values = new Set<string>();
+      if (row.media_type) values.add(row.media_type);
+      if (Array.isArray(row.format_details)) {
+        row.format_details.forEach(detail => { if (detail) values.add(detail); });
+      }
+      values.forEach(value => formatCounts.set(value, (formatCounts.get(value) || 0) + 1));
+    });
     return Array.from(formatCounts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
   } catch { return []; }
 }
@@ -375,8 +382,8 @@ export async function fetchPackageConditions(): Promise<PickerDataItem[]> {
 
     const counts = new Map<string, number>();
     data?.forEach(row => {
-      if (row.package_sleeve_condition) {
-        counts.set(row.package_sleeve_condition, (counts.get(row.package_sleeve_condition) || 0) + 1);
+      if (row.sleeve_condition) {
+        counts.set(row.sleeve_condition, (counts.get(row.sleeve_condition) || 0) + 1);
       }
     });
 
@@ -408,7 +415,11 @@ export async function updateFormat(id: string, newName: string): Promise<boolean
 }
 
 export async function updateLocation(id: string, newName: string): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ location: newName }).eq('location', id); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('inventory').update({ location: newName }).eq('location', id); return !error; } catch { return false; }
+}
+
+export async function deleteLocation(id: string): Promise<boolean> {
+  try { const { error } = await supabase.from('inventory').update({ location: null }).eq('location', id); return !error; } catch { return false; }
 }
 
 export async function updateArtist(id: string, newName: string, newSortName?: string): Promise<boolean> {
@@ -443,7 +454,7 @@ export async function mergeFormats(targetId: string, sourceIds: string[]): Promi
 }
 
 export async function mergeLocations(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ location: targetId }).in('location', sourceIds); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('inventory').update({ location: targetId }).in('location', sourceIds); return !error; } catch { return false; }
 }
 
 // Packaging

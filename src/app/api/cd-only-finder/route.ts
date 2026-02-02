@@ -17,8 +17,6 @@ type Album = {
   format: string | null;
   image_url: string | null;
   discogs_release_id: string | null;
-  discogs_genres: string[] | null;
-  folder: string | null;
   notes: string | null;
 };
 
@@ -89,7 +87,7 @@ async function tagAlbumsAsCDOnly(albumIds: number[]): Promise<{ success: boolean
     for (const id of albumIds) {
       // Get current notes
       const { data: album } = await supabase
-        .from('collection')
+        .from('releases')
         .select('notes')
         .eq('id', id)
         .single();
@@ -112,7 +110,7 @@ async function tagAlbumsAsCDOnly(albumIds: number[]): Promise<{ success: boolean
 
       // Update album
       const { error } = await supabase
-        .from('collection')
+        .from('releases')
         .update({ notes: newNotes })
         .eq('id', id);
 
@@ -154,25 +152,70 @@ export async function POST(req: Request) {
 
     console.log('\n💿 === CD-ONLY FINDER SCAN ===');
 
-    // Get all CD releases from collection
-    const { data: albums, error } = await supabase
-      .from('collection')
-      .select('id, artist, title, year, format, image_url, discogs_release_id, discogs_genres, folder, notes')
-      .or('format.ilike.%CD%,format.ilike.%Compact Disc%')
-      .order('artist', { ascending: true });
+    // Get all CD releases from releases/masters
+    const { data: releaseRows, error } = await supabase
+      .from('releases')
+      .select('id, discogs_release_id, media_type, format_details, notes, release_year, masters ( title, original_release_year, cover_image_url, main_artist_id )')
+      .or('media_type.ilike.%CD%,media_type.ilike.%Compact Disc%')
+      .order('id', { ascending: true });
 
     if (error) {
       console.error('Database error:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    if (!albums || albums.length === 0) {
-      console.log('No CD releases found in collection');
+    if (!releaseRows || releaseRows.length === 0) {
+      console.log('No CD releases found in releases');
       return NextResponse.json({
         results: [],
         stats: { total: 0, scanned: 0, cdOnly: 0 }
       });
     }
+
+    const masterArtistIds = Array.from(new Set(
+      releaseRows
+        .map((row) => {
+          const master = Array.isArray(row.masters) ? row.masters[0] : row.masters;
+          return master?.main_artist_id ?? null;
+        })
+        .filter((id): id is number => typeof id === 'number')
+    ));
+
+    const artistMap = new Map<number, string>();
+    if (masterArtistIds.length > 0) {
+      const { data: artists, error: artistError } = await supabase
+        .from('artists')
+        .select('id, name')
+        .in('id', masterArtistIds);
+
+      if (artistError) {
+        console.error('Error loading artists:', artistError);
+      } else {
+        artists?.forEach((artist) => {
+          artistMap.set(artist.id, artist.name);
+        });
+      }
+    }
+
+    const albums: Album[] = releaseRows.map((row) => {
+      const master = Array.isArray(row.masters) ? row.masters[0] : row.masters;
+      const artist = master?.main_artist_id ? artistMap.get(master.main_artist_id) : undefined;
+      const year = row.release_year ?? master?.original_release_year ?? null;
+      const formatDetails = Array.isArray(row.format_details) ? row.format_details.join(', ') : null;
+      return {
+        id: row.id,
+        artist: artist ?? 'Unknown Artist',
+        title: master?.title ?? 'Unknown Title',
+        year: year ? String(year) : null,
+        format: row.media_type || formatDetails,
+        image_url: master?.cover_image_url ?? null,
+        discogs_release_id: row.discogs_release_id,
+        notes: row.notes ?? null
+      };
+    }).filter((album) => {
+      const formatValue = album.format?.toLowerCase() ?? '';
+      return formatValue.includes('cd') || formatValue.includes('compact disc');
+    });
 
     console.log(`Found ${albums.length} CD releases to check`);
 

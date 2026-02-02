@@ -156,6 +156,761 @@ export interface Database {
           description?: string;
         };
       };
+      about_content: {
+        Row: {
+          id: number;
+          main_description: string | null;
+          booking_description: string | null;
+          contact_name: string | null;
+          contact_company: string | null;
+          contact_email: string | null;
+          contact_phone: string | null;
+          calendly_url: string | null;
+          services: Json | null;
+          testimonials: Json | null;
+          booking_notes: string | null;
+          amazon_wishlist_url: string | null;
+          discogs_wantlist_url: string | null;
+          linktree_url: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Insert: {
+          id?: number;
+          main_description?: string | null;
+          booking_description?: string | null;
+          contact_name?: string | null;
+          contact_company?: string | null;
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          calendly_url?: string | null;
+          services?: Json | null;
+          testimonials?: Json | null;
+          booking_notes?: string | null;
+          amazon_wishlist_url?: string | null;
+          discogs_wantlist_url?: string | null;
+          linktree_url?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          main_description?: string | null;
+          booking_description?: string | null;
+          contact_name?: string | null;
+          contact_company?: string | null;
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          calendly_url?: string | null;
+          services?: Json | null;
+          testimonials?: Json | null;
+          booking_notes?: string | null;
+          amazon_wishlist_url?: string | null;
+          discogs_wantlist_url?: string | null;
+          linktree_url?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+      };
+      artist_rules: {
+        Row: {
+          id: number;
+          search_pattern: string;
+          replacement: string | null;
+          rule_type: string;
+          created_at?: string | null;
+        };
+        Insert: {
+          id?: number;
+          search_pattern: string;
+          replacement?: string | null;
+          rule_type: string;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          search_pattern?: string;
+          replacement?: string | null;
+          rule_type?: string;
+          created_at?: string | null;
+        };
+      };
+      artists: {
+        Row: {
+          id: number;
+          name: string;
+          slug: string | null;
+          profile_image_url: string | null;
+          discogs_id: string | null;
+          musicbrainz_id: string | null;
+          spotify_id: string | null;
+          created_at?: string | null;
+        };
+        Insert: {
+          id?: number;
+          name: string;
+          slug?: string | null;
+          profile_image_url?: string | null;
+          discogs_id?: string | null;
+          musicbrainz_id?: string | null;
+          spotify_id?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          name?: string;
+          slug?: string | null;
+          profile_image_url?: string | null;
+          discogs_id?: string | null;
+          musicbrainz_id?: string | null;
+          spotify_id?: string | null;
+          created_at?: string | null;
+        };
+      };
+      crate_items: {
+        Row: {
+          id: number;
+          crate_id: number | null;
+          inventory_id: number | null;
+          position: number | null;
+          notes: string | null;
+          added_at?: string | null;
+        };
+        Insert: {
+          id?: number;
+          crate_id?: number | null;
+          inventory_id?: number | null;
+          position?: number | null;
+          notes?: string | null;
+          added_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          crate_id?: number | null;
+          inventory_id?: number | null;
+          position?: number | null;
+          notes?: string | null;
+          added_at?: string | null;
+        };
+      };
+      crates: {
+        Row: {
+          id: number;
+          name: string;
+          icon: string | null;
+          color: string | null;
+          is_smart: boolean | null;
+          smart_rules: Json | null;
+          match_rules: string | null;
+          live_update: boolean | null;
+          sort_order: number | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Insert: {
+          id?: number;
+          name: string;
+          icon?: string | null;
+          color?: string | null;
+          is_smart?: boolean | null;
+          smart_rules?: Json | null;
+          match_rules?: string | null;
+          live_update?: boolean | null;
+          sort_order?: number | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          name?: string;
+          icon?: string | null;
+          color?: string | null;
+          is_smart?: boolean | null;
+          smart_rules?: Json | null;
+          match_rules?: string | null;
+          live_update?: boolean | null;
+          sort_order?: number | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+      };
+      dj_sets: {
+        Row: {
+          id: number;
+          event_id: number | null;
+          title: string;
+          description: string | null;
+          file_url: string;
+          file_size: number | null;
+          duration: number | null;
+          recorded_at: string | null;
+          is_live: boolean | null;
+          track_listing: string[] | null;
+          tags: string[] | null;
+          download_count: number | null;
+          google_drive_id: string | null;
+          download_url: string | null;
+          storage_provider: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Insert: {
+          id?: number;
+          event_id?: number | null;
+          title: string;
+          description?: string | null;
+          file_url: string;
+          file_size?: number | null;
+          duration?: number | null;
+          recorded_at?: string | null;
+          is_live?: boolean | null;
+          track_listing?: string[] | null;
+          tags?: string[] | null;
+          download_count?: number | null;
+          google_drive_id?: string | null;
+          download_url?: string | null;
+          storage_provider?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          event_id?: number | null;
+          title?: string;
+          description?: string | null;
+          file_url?: string;
+          file_size?: number | null;
+          duration?: number | null;
+          recorded_at?: string | null;
+          is_live?: boolean | null;
+          track_listing?: string[] | null;
+          tags?: string[] | null;
+          download_count?: number | null;
+          google_drive_id?: string | null;
+          download_url?: string | null;
+          storage_provider?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+      };
+      format_abbreviations: {
+        Row: {
+          id: number;
+          abbreviation: string;
+          full_name: string;
+          category: string;
+          created_by: string | null;
+          use_count: number | null;
+          created_at?: string | null;
+        };
+        Insert: {
+          id?: number;
+          abbreviation: string;
+          full_name: string;
+          category: string;
+          created_by?: string | null;
+          use_count?: number | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          abbreviation?: string;
+          full_name?: string;
+          category?: string;
+          created_by?: string | null;
+          use_count?: number | null;
+          created_at?: string | null;
+        };
+      };
+      import_conflict_resolutions: {
+        Row: {
+          id: number;
+          album_id: number | null;
+          field_name: string;
+          source: string;
+          resolution: string;
+          kept_value: Json | null;
+          rejected_value: Json | null;
+          resolved_at?: string | null;
+        };
+        Insert: {
+          id?: number;
+          album_id?: number | null;
+          field_name: string;
+          source: string;
+          resolution: string;
+          kept_value?: Json | null;
+          rejected_value?: Json | null;
+          resolved_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          album_id?: number | null;
+          field_name?: string;
+          source?: string;
+          resolution?: string;
+          kept_value?: Json | null;
+          rejected_value?: Json | null;
+          resolved_at?: string | null;
+        };
+      };
+      import_history: {
+        Row: {
+          id: number;
+          import_date?: string | null;
+          records_added: number | null;
+          records_updated: number | null;
+          records_removed: number | null;
+          status: string | null;
+          notes: string | null;
+        };
+        Insert: {
+          id?: number;
+          import_date?: string | null;
+          records_added?: number | null;
+          records_updated?: number | null;
+          records_removed?: number | null;
+          status?: string | null;
+          notes?: string | null;
+        };
+        Update: {
+          id?: number;
+          import_date?: string | null;
+          records_added?: number | null;
+          records_updated?: number | null;
+          records_removed?: number | null;
+          status?: string | null;
+          notes?: string | null;
+        };
+      };
+      inventory: {
+        Row: {
+          id: number;
+          release_id: number | null;
+          status: string | null;
+          location: string | null;
+          media_condition: string | null;
+          sleeve_condition: string | null;
+          date_added: string | null;
+          purchase_price: number | null;
+          current_value: number | null;
+          purchase_date: string | null;
+          owner: string | null;
+          personal_notes: string | null;
+          is_cleaned: boolean | null;
+          last_played_at: string | null;
+          play_count: number | null;
+          created_at?: string | null;
+        };
+        Insert: {
+          id?: number;
+          release_id?: number | null;
+          status?: string | null;
+          location?: string | null;
+          media_condition?: string | null;
+          sleeve_condition?: string | null;
+          date_added?: string | null;
+          purchase_price?: number | null;
+          current_value?: number | null;
+          purchase_date?: string | null;
+          owner?: string | null;
+          personal_notes?: string | null;
+          is_cleaned?: boolean | null;
+          last_played_at?: string | null;
+          play_count?: number | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          release_id?: number | null;
+          status?: string | null;
+          location?: string | null;
+          media_condition?: string | null;
+          sleeve_condition?: string | null;
+          date_added?: string | null;
+          purchase_price?: number | null;
+          current_value?: number | null;
+          purchase_date?: string | null;
+          owner?: string | null;
+          personal_notes?: string | null;
+          is_cleaned?: boolean | null;
+          last_played_at?: string | null;
+          play_count?: number | null;
+          created_at?: string | null;
+        };
+      };
+      master_tag_links: {
+        Row: {
+          master_id: number;
+          tag_id: number;
+        };
+        Insert: {
+          master_id: number;
+          tag_id: number;
+        };
+        Update: {
+          master_id?: number;
+          tag_id?: number;
+        };
+      };
+      master_tags: {
+        Row: {
+          id: number;
+          name: string;
+          category: string | null;
+          created_at?: string | null;
+        };
+        Insert: {
+          id?: number;
+          name: string;
+          category?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          name?: string;
+          category?: string | null;
+          created_at?: string | null;
+        };
+      };
+      masters: {
+        Row: {
+          id: number;
+          title: string;
+          main_artist_id: number | null;
+          original_release_year: number | null;
+          cover_image_url: string | null;
+          genres: string[] | null;
+          styles: string[] | null;
+          discogs_master_id: string | null;
+          musicbrainz_release_group_id: string | null;
+          created_at?: string | null;
+        };
+        Insert: {
+          id?: number;
+          title: string;
+          main_artist_id?: number | null;
+          original_release_year?: number | null;
+          cover_image_url?: string | null;
+          genres?: string[] | null;
+          styles?: string[] | null;
+          discogs_master_id?: string | null;
+          musicbrainz_release_group_id?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          title?: string;
+          main_artist_id?: number | null;
+          original_release_year?: number | null;
+          cover_image_url?: string | null;
+          genres?: string[] | null;
+          styles?: string[] | null;
+          discogs_master_id?: string | null;
+          musicbrainz_release_group_id?: string | null;
+          created_at?: string | null;
+        };
+      };
+      most_wanted: {
+        Row: {
+          id: number;
+          title: string;
+          url: string | null;
+          rank: number | null;
+        };
+        Insert: {
+          id?: number;
+          title: string;
+          url?: string | null;
+          rank?: number | null;
+        };
+        Update: {
+          id?: number;
+          title?: string;
+          url?: string | null;
+          rank?: number | null;
+        };
+      };
+      playlists: {
+        Row: {
+          id: number;
+          platform: string;
+          embed_url: string;
+          sort_order: number | null;
+          updated_at?: string | null;
+        };
+        Insert: {
+          id?: number;
+          platform: string;
+          embed_url: string;
+          sort_order?: number | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          platform?: string;
+          embed_url?: string;
+          sort_order?: number | null;
+          updated_at?: string | null;
+        };
+      };
+      recordings: {
+        Row: {
+          id: number;
+          work_id: number | null;
+          title: string | null;
+          duration_seconds: number | null;
+          isrc: string | null;
+          bpm: number | null;
+          musical_key: string | null;
+          energy: number | null;
+          danceability: number | null;
+          valence: number | null;
+          credits: Json | null;
+          created_at?: string | null;
+        };
+        Insert: {
+          id?: number;
+          work_id?: number | null;
+          title?: string | null;
+          duration_seconds?: number | null;
+          isrc?: string | null;
+          bpm?: number | null;
+          musical_key?: string | null;
+          energy?: number | null;
+          danceability?: number | null;
+          valence?: number | null;
+          credits?: Json | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          work_id?: number | null;
+          title?: string | null;
+          duration_seconds?: number | null;
+          isrc?: string | null;
+          bpm?: number | null;
+          musical_key?: string | null;
+          energy?: number | null;
+          danceability?: number | null;
+          valence?: number | null;
+          credits?: Json | null;
+          created_at?: string | null;
+        };
+      };
+      release_tracks: {
+        Row: {
+          id: number;
+          release_id: number | null;
+          recording_id: number | null;
+          position: string;
+          side: string | null;
+          title_override: string | null;
+        };
+        Insert: {
+          id?: number;
+          release_id?: number | null;
+          recording_id?: number | null;
+          position: string;
+          side?: string | null;
+          title_override?: string | null;
+        };
+        Update: {
+          id?: number;
+          release_id?: number | null;
+          recording_id?: number | null;
+          position?: string;
+          side?: string | null;
+          title_override?: string | null;
+        };
+      };
+      releases: {
+        Row: {
+          id: number;
+          master_id: number | null;
+          media_type: string;
+          label: string | null;
+          catalog_number: string | null;
+          barcode: string | null;
+          country: string | null;
+          release_date: string | null;
+          release_year: number | null;
+          discogs_release_id: string | null;
+          spotify_album_id: string | null;
+          notes: string | null;
+          track_count: number | null;
+          created_at?: string | null;
+          qty: number | null;
+          format_details: string[] | null;
+        };
+        Insert: {
+          id?: number;
+          master_id?: number | null;
+          media_type: string;
+          label?: string | null;
+          catalog_number?: string | null;
+          barcode?: string | null;
+          country?: string | null;
+          release_date?: string | null;
+          release_year?: number | null;
+          discogs_release_id?: string | null;
+          spotify_album_id?: string | null;
+          notes?: string | null;
+          track_count?: number | null;
+          created_at?: string | null;
+          qty?: number | null;
+          format_details?: string[] | null;
+        };
+        Update: {
+          id?: number;
+          master_id?: number | null;
+          media_type?: string;
+          label?: string | null;
+          catalog_number?: string | null;
+          barcode?: string | null;
+          country?: string | null;
+          release_date?: string | null;
+          release_year?: number | null;
+          discogs_release_id?: string | null;
+          spotify_album_id?: string | null;
+          notes?: string | null;
+          track_count?: number | null;
+          created_at?: string | null;
+          qty?: number | null;
+          format_details?: string[] | null;
+        };
+      };
+      requests_v3: {
+        Row: {
+          id: string;
+          event_id: number | null;
+          inventory_id: number | null;
+          recording_id: number | null;
+          artist_name: string | null;
+          track_title: string | null;
+          status: string | null;
+          votes: number | null;
+          created_at?: string | null;
+        };
+        Insert: {
+          id?: string;
+          event_id?: number | null;
+          inventory_id?: number | null;
+          recording_id?: number | null;
+          artist_name?: string | null;
+          track_title?: string | null;
+          status?: string | null;
+          votes?: number | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          event_id?: number | null;
+          inventory_id?: number | null;
+          recording_id?: number | null;
+          artist_name?: string | null;
+          track_title?: string | null;
+          status?: string | null;
+          votes?: number | null;
+          created_at?: string | null;
+        };
+      };
+      social_embeds: {
+        Row: {
+          id: string;
+          platform: string;
+          embed_html: string;
+          visible: boolean | null;
+          created_at?: string | null;
+        };
+        Insert: {
+          id?: string;
+          platform: string;
+          embed_html: string;
+          visible?: boolean | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          platform?: string;
+          embed_html?: string;
+          visible?: boolean | null;
+          created_at?: string | null;
+        };
+      };
+      wantlist: {
+        Row: {
+          id: number;
+          artist: string;
+          title: string;
+          year: string | null;
+          format: string | null;
+          cover_image: string | null;
+          discogs_release_id: string | null;
+          discogs_master_id: string | null;
+          notes: string | null;
+          date_added_to_wantlist?: string | null;
+          artist_norm: string | null;
+          title_norm: string | null;
+          artist_album_norm: string | null;
+        };
+        Insert: {
+          id?: number;
+          artist: string;
+          title: string;
+          year?: string | null;
+          format?: string | null;
+          cover_image?: string | null;
+          discogs_release_id?: string | null;
+          discogs_master_id?: string | null;
+          notes?: string | null;
+          date_added_to_wantlist?: string | null;
+          artist_norm?: string | null;
+          title_norm?: string | null;
+          artist_album_norm?: string | null;
+        };
+        Update: {
+          id?: number;
+          artist?: string;
+          title?: string;
+          year?: string | null;
+          format?: string | null;
+          cover_image?: string | null;
+          discogs_release_id?: string | null;
+          discogs_master_id?: string | null;
+          notes?: string | null;
+          date_added_to_wantlist?: string | null;
+          artist_norm?: string | null;
+          title_norm?: string | null;
+          artist_album_norm?: string | null;
+        };
+      };
+      works: {
+        Row: {
+          id: number;
+          title: string;
+          primary_artist_id: number | null;
+          original_release_year: number | null;
+          iswc: string | null;
+          created_at?: string | null;
+        };
+        Insert: {
+          id?: number;
+          title: string;
+          primary_artist_id?: number | null;
+          original_release_year?: number | null;
+          iswc?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          title?: string;
+          primary_artist_id?: number | null;
+          original_release_year?: number | null;
+          iswc?: string | null;
+          created_at?: string | null;
+        };
+      };
       collection_1001_matches: {
         Row: {
           album_1001_id: number;
@@ -653,6 +1408,10 @@ export type DbRequest = Database['public']['Tables']['requests']['Row'];
 export type NewRequest = Database['public']['Tables']['requests']['Insert'];
 export type UpdateRequest = Database['public']['Tables']['requests']['Update'];
 
+export type DbRequestV3 = Database['public']['Tables']['requests_v3']['Row'];
+export type NewRequestV3 = Database['public']['Tables']['requests_v3']['Insert'];
+export type UpdateRequestV3 = Database['public']['Tables']['requests_v3']['Update'];
+
 export type DbTagDefinition = Database['public']['Tables']['tag_definitions']['Row'];
 export type NewTagDefinition = Database['public']['Tables']['tag_definitions']['Insert'];
 export type UpdateTagDefinition = Database['public']['Tables']['tag_definitions']['Update'];
@@ -676,6 +1435,13 @@ export type UpdateAlbumContext = Database['public']['Tables']['album_context']['
 export type Collection = Database['public']['Tables']['collection']['Row'];
 export type NewCollection = Database['public']['Tables']['collection']['Insert'];
 export type UpdateCollection = Database['public']['Tables']['collection']['Update'];
+
+export type Artist = Database['public']['Tables']['artists']['Row'];
+export type Master = Database['public']['Tables']['masters']['Row'];
+export type Release = Database['public']['Tables']['releases']['Row'];
+export type Inventory = Database['public']['Tables']['inventory']['Row'];
+export type Recording = Database['public']['Tables']['recordings']['Row'];
+export type ReleaseTrack = Database['public']['Tables']['release_tracks']['Row'];
 
 export type StaffPick = Database['public']['Tables']['staff_picks']['Row'];
 export type NewStaffPick = Database['public']['Tables']['staff_picks']['Insert'];

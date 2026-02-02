@@ -13,9 +13,6 @@ interface AddOrVoteParams {
   artist: string;
   title: string;
   status?: string;
-  folder?: string;
-  year?: number | string | null;
-  format?: string | null;
 }
 
 export async function addOrVoteRequest({
@@ -26,10 +23,7 @@ export async function addOrVoteRequest({
   side,
   artist,
   title,
-  status = "open",
-  folder = "Unknown",
-  year = null,
-  format = null,
+  status = "pending",
 }: AddOrVoteParams) {
   if (!inventoryId && !recordingId) {
     throw new Error("inventoryId or recordingId is required for V3 requests.");
