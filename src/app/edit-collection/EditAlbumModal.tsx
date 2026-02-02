@@ -17,6 +17,8 @@ const ClassicalTab = dynamic(() => import('./tabs/ClassicalTab').then(mod => mod
 const CoverTab = dynamic(() => import('./tabs/CoverTab').then(mod => mod.CoverTab));
 const EnrichmentTab = dynamic(() => import('./tabs/EnrichmentTab').then(mod => mod.EnrichmentTab));
 import { PickerModal } from './pickers/PickerModal';
+import { EditModal } from './pickers/EditModal';
+import ManagePickListsModal from './ManagePickListsModal';
 import { fetchLocations, type PickerDataItem } from './pickers/pickerDataUtils';
 
 type TabId = 'main' | 'details' | 'enrichment' | 'classical' | 'people' | 'tracks' | 'personal' | 'cover' | 'links';
@@ -121,6 +123,8 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
 
   // Location picker state (shared across all tabs)
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [showManageLocations, setShowManageLocations] = useState(false);
+  const [showNewLocationModal, setShowNewLocationModal] = useState(false);
   const [locations, setLocations] = useState<PickerDataItem[]>([]);
 
   // Calculate current position and navigation availability
@@ -279,12 +283,13 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
     };
   };
 
+  const loadLocations = async () => {
+    const locationsData = await fetchLocations();
+    setLocations(locationsData);
+  };
+
   // Load locations on mount
   useEffect(() => {
-    const loadLocations = async () => {
-      const locationsData = await fetchLocations();
-      setLocations(locationsData);
-    };
     if (album) {
       loadLocations();
     }
@@ -673,14 +678,47 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               setShowLocationPicker(false);
             }}
             onManage={() => {
-              // TODO: Open manage locations modal
-              alert('Manage locations will be implemented');
+              setShowLocationPicker(false);
+              setShowManageLocations(true);
             }}
             onNew={() => {
-              // TODO: Open new location modal
-              alert('New location will be implemented');
+              setShowLocationPicker(false);
+              setShowNewLocationModal(true);
             }}
             searchPlaceholder="Search locations..."
+            itemLabel="Location"
+            showSortName={false}
+          />
+        )}
+
+        {showManageLocations && (
+          <ManagePickListsModal
+            isOpen={true}
+            onClose={() => {
+              setShowManageLocations(false);
+              loadLocations();
+            }}
+            initialList="location"
+            hideListSelector={true}
+          />
+        )}
+
+        {showNewLocationModal && (
+          <EditModal
+            isOpen={true}
+            onClose={() => setShowNewLocationModal(false)}
+            title="New Location"
+            itemName=""
+            onSave={(newName) => {
+              handleFieldChange('location', newName);
+              setLocations((prev) => {
+                if (prev.some((item) => item.name === newName)) {
+                  return prev;
+                }
+                return [...prev, { id: newName, name: newName, count: 0 }].sort((a, b) => a.name.localeCompare(b.name));
+              });
+              setShowNewLocationModal(false);
+            }}
             itemLabel="Location"
             showSortName={false}
           />

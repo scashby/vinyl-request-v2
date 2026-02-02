@@ -393,7 +393,11 @@ export async function updateFormat(id: string, newName: string): Promise<boolean
 }
 
 export async function updateLocation(id: string, newName: string): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ location: newName }).eq('location', id); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('inventory').update({ location: newName }).eq('location', id); return !error; } catch { return false; }
+}
+
+export async function deleteLocation(id: string): Promise<boolean> {
+  try { const { error } = await supabase.from('inventory').update({ location: null }).eq('location', id); return !error; } catch { return false; }
 }
 
 export async function updateArtist(id: string, newName: string, newSortName?: string): Promise<boolean> {
@@ -428,7 +432,7 @@ export async function mergeFormats(targetId: string, sourceIds: string[]): Promi
 }
 
 export async function mergeLocations(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('collection').update({ location: targetId }).in('location', sourceIds); return !error; } catch { return false; }
+  try { const { error } = await supabase.from('inventory').update({ location: targetId }).in('location', sourceIds); return !error; } catch { return false; }
 }
 
 // Packaging
