@@ -6,6 +6,7 @@
  */
 
 import { parseCLZXML } from './clzParser';
+import { parseDiscogsFormat } from './formatParser';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type UpdateMode = 'update_missing_only' | 'update_all';
@@ -93,6 +94,8 @@ async function getOrCreateRelease(
   masterId: number,
   data: {
     media_type?: string;
+    format_details?: string[] | null;
+    qty?: number | null;
     label?: string;
     cat_no?: string;
     barcode?: string;
@@ -119,6 +122,8 @@ async function getOrCreateRelease(
     .insert({
       master_id: masterId,
       media_type: mediaType,
+      format_details: data.format_details ?? null,
+      qty: data.qty ?? null,
       label: data.label ?? null,
       catalog_number: catalogNumber || null,
       barcode: data.barcode ?? null,
@@ -213,6 +218,7 @@ export async function importCLZData(
       try {
         const artistName = normalizeText(clzData.artist) || 'Unknown Artist';
         const title = normalizeText(clzData.title) || 'Untitled';
+        const parsedFormat = parseDiscogsFormat(clzData.format ?? '');
 
         const { row: artistRow } = await getOrCreateArtist(supabase, artistName);
         const { row: masterRow, created: masterCreated } = await getOrCreateMaster(
@@ -226,7 +232,9 @@ export async function importCLZData(
           supabase,
           masterRow.id,
           {
-            media_type: clzData.format,
+            media_type: parsedFormat.media_type,
+            format_details: parsedFormat.format_details,
+            qty: parsedFormat.qty,
             label: clzData.labels?.[0],
             cat_no: clzData.cat_no,
             barcode: clzData.barcode,
@@ -258,7 +266,9 @@ export async function importCLZData(
           await supabase.from('masters').update(masterUpdate).eq('id', masterRow.id);
 
           const releaseUpdate = {
-            media_type: clzData.format ?? 'Unknown',
+            media_type: parsedFormat.media_type ?? 'Unknown',
+            format_details: parsedFormat.format_details ?? null,
+            qty: parsedFormat.qty ?? null,
             label: clzData.labels?.[0] ?? null,
             catalog_number: clzData.cat_no ?? null,
             barcode: clzData.barcode ?? null,
