@@ -113,149 +113,81 @@ function BrowseAlbumsContent() {
       setLoading(true);
 
       try {
-        const v3Albums = await (async () => {
-          try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            let allRows: any[] = [];
-            let from = 0;
-            const batchSize = 1000;
-            let keepGoing = true;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let allRows: any[] = [];
+        let from = 0;
+        const batchSize = 1000;
+        let keepGoing = true;
 
-            while (keepGoing && isMounted) {
-              const { data: batch, error } = await supabase
-                .from('inventory')
-                .select(
-                  `id,
-                   personal_notes,
-                   media_condition,
-                   created_at,
-                   location,
-                   custom_tags,
-                   release:releases (
-                     id,
-                     title,
-                     release_year,
-                     format,
-                     image_url,
-                     release_notes,
-                     master:masters (
-                       id,
-                       title,
-                       genres,
-                       styles,
-                       artist:artists (id, name)
-                     )
-                   )`
-                )
-                .eq('for_sale', false)
-                .range(from, from + batchSize - 1);
+        while (keepGoing && isMounted) {
+          const { data: batch, error } = await supabase
+            .from('inventory')
+            .select(
+              `id,
+               personal_notes,
+               media_condition,
+               created_at,
+               location,
+               custom_tags,
+               release:releases (
+                 id,
+                 title,
+                 release_year,
+                 format,
+                 image_url,
+                 release_notes,
+                 master:masters (
+                   id,
+                   title,
+                   genres,
+                   styles,
+                   artist:artists (id, name)
+                 )
+               )`
+            )
+            .eq('for_sale', false)
+            .range(from, from + batchSize - 1);
 
-              if (error) throw error;
-              if (!batch || batch.length === 0) break;
+          if (error) throw error;
+          if (!batch || batch.length === 0) break;
 
-              allRows = allRows.concat(batch);
-              keepGoing = batch.length === batchSize;
-              from += batchSize;
-            }
-
-            if (!isMounted) return [];
-
-            return allRows.map((row) => {
-              const release = row.release;
-              const master = release?.master;
-              const artist = master?.artist;
-              const imageUrl =
-                release?.image_url || master?.image_url || '/images/coverplaceholder.png';
-
-              return {
-                id: row.id,
-                title: release?.title || master?.title || '',
-                artist: artist?.name || '',
-                year: release?.release_year ? String(release.release_year) : '',
-                format: release?.format || '',
-                location: row.location,
-                dateAdded: row.created_at,
-                justAdded: isJustAdded(row.created_at),
-                personal_notes: row.personal_notes,
-                release_notes: release?.release_notes ?? release?.notes,
-                media_condition: row.media_condition,
-                genres: master?.genres || [],
-                styles: master?.styles || [],
-                custom_tags: row.custom_tags,
-                image:
-                  imageUrl && imageUrl.trim().toLowerCase() !== 'no'
-                    ? imageUrl.trim()
-                    : '/images/coverplaceholder.png',
-              };
-            });
-          } catch (error) {
-            console.warn('Falling back to legacy collection browse:', error);
-            return null;
-          }
-        })();
+          allRows = allRows.concat(batch);
+          keepGoing = batch.length === batchSize;
+          from += batchSize;
+        }
 
         if (!isMounted) return;
 
-        if (v3Albums === null) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          let allRows: any[] = [];
-          let from = 0;
-          const batchSize = 1000;
-          let keepGoing = true;
-          
-          while (keepGoing && isMounted) {
-              const { data: batch, error } = await supabase
-                .from('collection')
-                .select('*')
-                .eq('for_sale', false) // New Logic: Exclude items marked for sale
-                .range(from, from + batchSize - 1);
+        const parsed = allRows.map((row) => {
+          const release = row.release;
+          const master = release?.master;
+          const artist = master?.artist;
+          const imageUrl =
+            release?.image_url || master?.image_url || '/images/coverplaceholder.png';
 
-              if (error) {
-                  console.error('Error fetching albums:', error);
-                  break;
-              }
-              if (!batch || batch.length === 0) break;
-              
-              allRows = allRows.concat(batch);
-              
-              if (batch.length < batchSize) {
-                  keepGoing = false;
-              } else {
-                  from += batchSize;
-              }
-          }
-          
-          if (!isMounted) return;
-
-          const parsed: BrowseAlbum[] = allRows.map(album => ({
-            id: album.id,
-            title: album.title,
-            artist: album.artist,
-            year: album.year ? String(album.year) : '',
-            format: album.format,
-            location: album.location,
-            dateAdded: album.date_added,
-            justAdded: isJustAdded(album.date_added),
-            
-            // Map new fields
-            personal_notes: album.personal_notes,
-            release_notes: album.release_notes,
-            media_condition: album.media_condition,
-            genres: album.genres,
-            styles: album.styles,
-            custom_tags: album.custom_tags,
-            
+          return {
+            id: row.id,
+            title: release?.title || master?.title || '',
+            artist: artist?.name || '',
+            year: release?.release_year ? String(release.release_year) : '',
+            format: release?.format || '',
+            location: row.location,
+            dateAdded: row.created_at,
+            justAdded: isJustAdded(row.created_at),
+            personal_notes: row.personal_notes,
+            release_notes: release?.release_notes ?? release?.notes,
+            media_condition: row.media_condition,
+            genres: master?.genres || [],
+            styles: master?.styles || [],
+            custom_tags: row.custom_tags,
             image:
-              (album.image_url && album.image_url.trim().toLowerCase() !== 'no')
-                ? album.image_url.trim()
-                : '/images/coverplaceholder.png'
-          }));
+              imageUrl && imageUrl.trim().toLowerCase() !== 'no'
+                ? imageUrl.trim()
+                : '/images/coverplaceholder.png',
+          };
+        });
 
-          setAlbums(parsed);
-          return;
-        }
-
-        setAlbums(v3Albums);
+        setAlbums(parsed);
       } catch (err) {
         console.error("Error loading albums:", err);
       } finally {
