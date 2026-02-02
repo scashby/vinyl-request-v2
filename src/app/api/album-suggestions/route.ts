@@ -200,7 +200,7 @@ export async function GET(request: NextRequest) {
 
     debugLog('GET parameters:', { status, limit });
 
-    let query = supabaseAdmin()
+    let query = supabaseAdmin
       .from('album_suggestions')
       .select('*')
       .order('created_at', { ascending: false })
@@ -264,7 +264,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Use service role client to bypass RLS
-    const { data, error } = await supabaseAdmin()
+    const { data, error } = await supabaseAdmin
       .from('album_suggestions')
       .update(updateData)
       .eq('id', id)
@@ -318,7 +318,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Don't use .single() - just delete and check the count
-    const { error } = await supabaseAdmin()
+    const { error } = await supabaseAdmin
       .from('album_suggestions')
       .delete()
       .eq('id', id);
