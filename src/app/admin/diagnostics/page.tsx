@@ -106,7 +106,8 @@ export default function DataDiagnosticsPage() {
       
       if (!batch || batch.length === 0) break;
       
-      allRows = allRows.concat(batch as InventoryRow[]);
+      const batchRows = batch as unknown as InventoryRow[];
+      allRows = allRows.concat(batchRows);
       setStatus(`Loaded ${allRows.length} rows...`);
       
       keepGoing = batch.length === batchSize;
