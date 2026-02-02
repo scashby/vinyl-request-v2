@@ -211,7 +211,7 @@ export async function POST(req: Request) {
     // Get albums with tracklists
     console.log(`📀 Querying albums...`);
     let query = supabase
-      .from('collection')
+      .from('collection_v2_archive')
       .select('id, artist, title, image_url, folder, tracklists')
       .not('tracklists', 'is', null);
 

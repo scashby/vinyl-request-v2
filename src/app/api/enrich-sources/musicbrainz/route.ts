@@ -105,7 +105,7 @@ export async function POST(req: Request) {
     }
 
     const { data: album, error: dbError } = await supabase
-      .from('collection')
+      .from('collection_v2_archive')
       .select('id, artist, title, musicbrainz_id, musicians, producers, engineers, songwriters, studio, labels')
       .eq('id', albumId)
       .single();
@@ -248,7 +248,7 @@ export async function POST(req: Request) {
     // Update database
     console.log(`💾 Updating database...`);
     const { error: updateError } = await supabase
-      .from('collection')
+      .from('collection_v2_archive')
       .update(updateData)
       .eq('id', albumId);
 

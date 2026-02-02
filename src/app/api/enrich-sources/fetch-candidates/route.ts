@@ -58,7 +58,7 @@ export async function POST(req: Request) {
 
     if (albumIds && albumIds.length > 0) {
       const { data, error } = await supabase
-        .from('collection')
+        .from('collection_v2_archive')
         .select('*')
         .in('id', albumIds);
         
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
       targetAlbums = data || [];
     } else {
       let query = supabase
-        .from('collection')
+        .from('collection_v2_archive')
         .select('*')
         .gt('id', cursor)
         .order('id', { ascending: true })

@@ -204,6 +204,7 @@ function CollectionBrowserPage() {
 
     return {
       id: row.id,
+      release,
       artist,
       secondary_artists: null,
       sort_artist: null,
@@ -338,28 +339,47 @@ function CollectionBrowserPage() {
         .from('inventory')
         .select(
           `id,
-           collection_id,
-           for_sale,
-           collection_status,
+           release_id,
+           status,
            personal_notes,
            media_condition,
+           sleeve_condition,
            location,
-           custom_tags,
            date_added,
            created_at,
+           purchase_price,
+           current_value,
+           purchase_date,
+           owner,
+           play_count,
+           last_played_at,
            release:releases (
              id,
-             title,
+             master_id,
+             media_type,
+             label,
+             catalog_number,
+             barcode,
+             country,
+             release_date,
              release_year,
-             format,
-             image_url,
-             release_notes,
+             discogs_release_id,
+             spotify_album_id,
+             notes,
+             qty,
+             format_details,
              master:masters (
                id,
                title,
+               original_release_year,
+               discogs_master_id,
+               cover_image_url,
                genres,
                styles,
-               artist:artists (id, name)
+               artist:artists (id, name),
+               master_tag_links:master_tag_links (
+                 master_tags (name)
+               )
              )
            )`
         )

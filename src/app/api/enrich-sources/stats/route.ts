@@ -25,7 +25,7 @@ export async function GET() {
   try {
     // 1. Fetch Albums
     const { data: albums, error } = await supabase
-      .from('collection')
+      .from('collection_v2_archive')
       .select('*');
 
     if (error) throw error;

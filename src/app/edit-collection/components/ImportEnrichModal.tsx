@@ -764,7 +764,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
 
     if (autoUpdates.length > 0) {
-      await Promise.all(autoUpdates.map(u => supabase.from('collection').update(u.fields).eq('id', u.id)));
+      await Promise.all(autoUpdates.map(u => supabase.from('collection_v2_archive').update(u.fields).eq('id', u.id)));
     }
     
     if (trackSavePromises.length > 0) {
@@ -781,7 +781,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     
     if (untouchedIds.length > 0) {
       const now = new Date().toISOString();
-      await supabase.from('collection')
+      await supabase.from('collection_v2_archive')
         .update({ last_reviewed_at: now }) // Mark as reviewed!
         .in('id', untouchedIds);
     }
@@ -831,7 +831,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   // --- NEW: SKIP HANDLER (SNOOZE) ---
   async function handleSkip(albumId: number) {
     const timestamp = new Date().toISOString();
-    await supabase.from('collection').update({ last_reviewed_at: timestamp }).eq('id', albumId);
+    await supabase.from('collection_v2_archive').update({ last_reviewed_at: timestamp }).eq('id', albumId);
     
     setConflicts(prev => {
         const nextQueue = prev.filter(c => c.album_id !== albumId);
@@ -917,14 +917,14 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             }
         });
 
-        const { error } = await supabase.from('collection').update(updates).eq('id', albumId);
+        const { error } = await supabase.from('collection_v2_archive').update(updates).eq('id', albumId);
         if (error) {
             console.error(`Failed to save album ${albumId}:`, error);
             addLog(String(albumId), 'skipped', `Save Error: ${error.message}`);
             return;
         }
     } else {
-        await supabase.from('collection').update({ last_reviewed_at: timestamp }).eq('id', albumId);
+        await supabase.from('collection_v2_archive').update({ last_reviewed_at: timestamp }).eq('id', albumId);
     }
 
     if (resolutionRecords.length > 0) {

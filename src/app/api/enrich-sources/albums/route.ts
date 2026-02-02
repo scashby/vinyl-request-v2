@@ -22,7 +22,7 @@ export async function GET(req: Request) {
     }
 
     let query = supabase
-      .from('collection')
+      .from('collection_v2_archive')
       .select('id,artist,title,image_url,musicbrainz_id,musicians,producers,spotify_id,apple_music_id,lastfm_id,allmusic_id,wikipedia_url,tempo_bpm,discogs_release_id,discogs_master_id,discogs_genres,back_image_url,tracklists')
       .limit(limit);
 

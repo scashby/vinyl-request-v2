@@ -122,7 +122,7 @@ export async function POST(req: Request) {
     }
 
     const { data: album, error: dbError } = await supabase
-      .from('collection')
+      .from('collection_v2_archive')
       .select('id, artist, title, tracklists')
       .eq('id', albumId)
       .single();
@@ -243,7 +243,7 @@ export async function POST(req: Request) {
     if (enrichedCount > 0) {
       console.log(`💾 Updating database...`);
       const { error: updateError } = await supabase
-        .from('collection')
+        .from('collection_v2_archive')
         .update({ tracklists: JSON.stringify(enrichedTracks) })
         .eq('id', albumId);
 

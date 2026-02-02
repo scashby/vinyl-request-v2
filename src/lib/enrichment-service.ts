@@ -101,7 +101,7 @@ async function getMusicBrainzRecording(recordingId: string): Promise<MusicBrainz
 export async function enrichMusicBrainz(albumId: number, artist: string, title: string): Promise<{ success: boolean; error?: string; skipped?: boolean }> {
   try {
     const { data: existing } = await supabase
-      .from('collection')
+      .from('collection_v2_archive')
       .select('musicians, producers, engineers, songwriters, musicbrainz_id')
       .eq('id', albumId)
       .single();
@@ -163,7 +163,7 @@ export async function enrichMusicBrainz(albumId: number, artist: string, title: 
     if (release.date) updateData.recording_date = release.date;
     if (release.country) updateData.country = release.country;
 
-    const { error } = await supabase.from('collection').update(updateData).eq('id', albumId);
+    const { error } = await supabase.from('collection_v2_archive').update(updateData).eq('id', albumId);
     if (error) return { success: false, error: error.message };
 
     return { success: true };
@@ -199,7 +199,7 @@ async function getDiscogsRelease(releaseId: string): Promise<Record<string, unkn
 export async function enrichDiscogsMetadata(albumId: number, artist: string, title: string): Promise<{ success: boolean; error?: string; skipped?: boolean }> {
   try {
     const { data: existing } = await supabase
-      .from('collection')
+      .from('collection_v2_archive')
       .select('discogs_release_id, image_url, genres, styles, tracks')
       .eq('id', albumId)
       .single();
@@ -255,7 +255,7 @@ export async function enrichDiscogsMetadata(albumId: number, artist: string, tit
     if (songwriters.size > 0) updateData.songwriters = Array.from(songwriters);
     if (producers.size > 0) updateData.producers = Array.from(producers);
 
-    const { error } = await supabase.from('collection').update(updateData).eq('id', albumId);
+    const { error } = await supabase.from('collection_v2_archive').update(updateData).eq('id', albumId);
     if (error) return { success: false, error: error.message };
 
     return { success: true };
@@ -266,7 +266,7 @@ export async function enrichDiscogsMetadata(albumId: number, artist: string, tit
 
 export async function enrichDiscogsTracklist(albumId: number): Promise<{ success: boolean; error?: string; skipped?: boolean }> {
   try {
-    const { data: album } = await supabase.from('collection').select('discogs_release_id, tracks, artist').eq('id', albumId).single();
+    const { data: album } = await supabase.from('collection_v2_archive').select('discogs_release_id, tracks, artist').eq('id', albumId).single();
     if (!album?.tracks || !isValidDiscogsId(album.discogs_release_id)) return { success: false, error: 'Missing data' };
 
     const release = await getDiscogsRelease(album.discogs_release_id);
@@ -280,7 +280,7 @@ export async function enrichDiscogsTracklist(albumId: number): Promise<{ success
       };
     });
 
-    const { error } = await supabase.from('collection').update({ tracks: updatedTracks }).eq('id', albumId);
+    const { error } = await supabase.from('collection_v2_archive').update({ tracks: updatedTracks }).eq('id', albumId);
     if (error) return { success: false, error: error.message };
     return { success: true };
   } catch (error) {
@@ -394,7 +394,7 @@ export async function enrichSpotify(albumId: number, artist: string, title: stri
         console.error('Failed to fetch Spotify audio features:', featError);
     }
 
-    const { error } = await supabase.from('collection').update(updateData).eq('id', albumId);
+    const { error } = await supabase.from('collection_v2_archive').update(updateData).eq('id', albumId);
     if (error) return { success: false, error: error.message };
 
     return { success: true };
@@ -438,7 +438,7 @@ export async function enrichAppleMusic(albumId: number, artist: string, title: s
         updateData.styles = attrs.genreNames;
     }
 
-    const { error } = await supabase.from('collection').update(updateData).eq('id', albumId);
+    const { error } = await supabase.from('collection_v2_archive').update(updateData).eq('id', albumId);
     if (error) return { success: false, error: error.message };
 
     return { success: true };
@@ -501,7 +501,7 @@ export async function enrichWikipedia(albumId: number, artist: string, title: st
             wikipedia_url: wikiUrl
         };
         
-        const { error } = await supabase.from('collection').update(updateData).eq('id', albumId);
+        const { error } = await supabase.from('collection_v2_archive').update(updateData).eq('id', albumId);
         if (error) return { success: false, error: error.message };
 
         return { success: true };
@@ -519,7 +519,7 @@ const CAA_BASE = 'https://coverartarchive.org';
 export async function enrichCoverArtArchive(albumId: number): Promise<{ success: boolean; error?: string; skipped?: boolean }> {
     try {
         // 1. Get MBID from DB
-        const { data: album } = await supabase.from('collection').select('musicbrainz_id').eq('id', albumId).single();
+        const { data: album } = await supabase.from('collection_v2_archive').select('musicbrainz_id').eq('id', albumId).single();
         if (!album?.musicbrainz_id) return { success: false, error: 'No MusicBrainz ID' };
 
         // 2. Fetch Images
@@ -544,7 +544,7 @@ export async function enrichCoverArtArchive(albumId: number): Promise<{ success:
         }
 
         if (Object.keys(updateData).length > 0) {
-            const { error } = await supabase.from('collection').update(updateData).eq('id', albumId);
+            const { error } = await supabase.from('collection_v2_archive').update(updateData).eq('id', albumId);
             if (error) return { success: false, error: error.message };
         }
 

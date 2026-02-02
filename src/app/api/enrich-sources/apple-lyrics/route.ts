@@ -178,7 +178,7 @@ export async function POST(req: Request) {
     }
 
     const { data: album, error: dbError } = await supabase
-      .from('collection')
+      .from('collection_v2_archive')
       .select('id, apple_music_id, tracklists')
       .eq('id', albumId)
       .single();
@@ -281,7 +281,7 @@ export async function POST(req: Request) {
     console.log(`\n📊 SUMMARY: ${lyricsFound} lyrics found, ${lyricsNotFound} not available`);
 
     const { error: updateError } = await supabase
-      .from('collection')
+      .from('collection_v2_archive')
       .update({
         tracklists: JSON.stringify(enrichedTracks)
       })

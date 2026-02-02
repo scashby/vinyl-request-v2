@@ -98,7 +98,7 @@ export default function ConflictResolutionModal({
       }
       
       const { error: updateError } = await supabase
-        .from('collection')
+        .from('collection_v2_archive')
         .update({ [conflict.field_name]: finalValue })
         .eq('id', conflict.album_id);
       

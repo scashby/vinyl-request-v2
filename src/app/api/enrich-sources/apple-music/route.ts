@@ -65,7 +65,7 @@ export async function POST(req: Request) {
 
     // Get album info
     const { data: album, error: dbError } = await supabase
-      .from('collection')
+      .from('collection_v2_archive')
       .select('id, artist, title, apple_music_id')
       .eq('id', albumId)
       .single();
@@ -118,7 +118,7 @@ export async function POST(req: Request) {
 
       // Update database
       const { error: updateError } = await supabase
-        .from('collection')
+        .from('collection_v2_archive')
         .update(appleData)
         .eq('id', albumId);
 

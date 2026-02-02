@@ -14,6 +14,8 @@ interface DbTrack {
   position: string | number;
   title: string;
   duration?: string;
+  duration_seconds?: number;
+  isrc?: string;
   side?: string;
   artist?: string;
   type?: 'track' | 'header';
@@ -111,26 +113,29 @@ function AlbumDetailContent() {
            location,
            release:releases (
              id,
-             title,
+             media_type,
              release_year,
-             format,
-             image_url,
-             release_notes,
+             notes,
+             qty,
+             format_details,
              master:masters (
                id,
                title,
+               cover_image_url,
                artist:artists (id, name)
-             )
-           ),
-           release_tracks:release_tracks (
-             id,
-             position,
-             recording_id,
-             recording:recordings (
+             ),
+             release_tracks:release_tracks (
                id,
-               title,
-               duration,
-               artist:artists (id, name)
+               position,
+               side,
+               recording_id,
+               title_override,
+               recording:recordings (
+                 id,
+                 title,
+                 duration_seconds,
+                 isrc
+               )
              )
            )`
         )
@@ -149,30 +154,31 @@ function AlbumDetailContent() {
       const release = data.release;
       const master = release?.master;
       const artist = master?.artist;
-      const imageUrl =
-        release?.image_url || master?.image_url || data.image_url || '';
+      const imageUrl = master?.cover_image_url || '';
 
-      const tracks = (data.release_tracks || []).map((track: DbTrack) => ({
+      const tracks = (release?.release_tracks || []).map((track: DbTrack) => ({
         id: track.id,
         recording_id: track.recording_id ?? track.recording?.id,
         position: track.position,
-        title: track.recording?.title || '',
-        duration: track.recording?.duration || '',
-        artist: track.recording?.artist?.name || '',
+        title: track.title_override || track.recording?.title || '',
+        duration_seconds: track.recording?.duration_seconds ?? null,
+        duration: formatDuration(track.recording?.duration_seconds ?? null),
+        isrc: track.recording?.isrc ?? undefined,
+        side: track.side,
         type: 'track',
       }));
 
       setAlbum({
         id: data.id,
         inventory_id: data.id,
-        title: release?.title || master?.title || '',
+        title: master?.title || '',
         artist: artist?.name || '',
         image_url: imageUrl,
         year: release?.release_year ? String(release.release_year) : '',
-        format: release?.format || '',
+        format: buildFormatLabel(release),
         location: data.location,
         personal_notes: data.personal_notes,
-        release_notes: release?.release_notes ?? release?.notes,
+        release_notes: release?.notes,
         media_condition: data.media_condition,
         tracks,
       } as Album);
@@ -326,18 +332,15 @@ function AlbumDetailContent() {
   const goToBrowse = () => router.push(`/browse/browse-albums?eventId=${eventId}`);
   const goToQueue = () => router.push(`/browse/browse-queue?eventId=${eventId}`);
 
-  // Fixed: Derive sides from 'tracks' JSON array
+  // Fixed: Derive sides from release_tracks.side
   const getAvailableSides = () => {
     const sides = new Set<string>();
     if (album?.tracks && Array.isArray(album.tracks)) {
-        album.tracks.forEach(t => {
-            if (t.side) {
-                sides.add(t.side);
-            } else if (typeof t.position === 'string' && t.position.match(/^[A-Z]/)) {
-                // Fallback: extract 'A' from 'A1' if side property is missing
-                sides.add(t.position.charAt(0));
-            }
-        });
+      album.tracks.forEach((track) => {
+        if (track.side) {
+          sides.add(track.side);
+        }
+      });
     }
     
     // Default fallback if no side data found

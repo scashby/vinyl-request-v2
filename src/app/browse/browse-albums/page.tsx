@@ -15,7 +15,8 @@ interface BrowseAlbum {
   title: string;
   artist: string;
   year: string | number;
-  format: string;           // Replaces 'folder' for media type
+  format: string;
+  media_type: string;
   location?: string;
   dateAdded?: string;
   justAdded?: boolean;
@@ -167,24 +168,27 @@ function BrowseAlbumsContent() {
                media_condition,
                created_at,
                location,
-               custom_tags,
                release:releases (
                  id,
-                 title,
+                 media_type,
                  release_year,
-                 format,
-                 image_url,
-                 release_notes,
+                 notes,
+                 qty,
+                 format_details,
                  master:masters (
                    id,
                    title,
+                   cover_image_url,
                    genres,
                    styles,
-                   artist:artists (id, name)
+                   artist:artists (id, name),
+                   master_tag_links:master_tag_links (
+                     master_tags (name)
+                   )
                  )
                )`
             )
-            .eq('for_sale', false)
+            .neq('status', 'for_sale')
             .range(from, from + batchSize - 1);
 
           if (error) throw error;
@@ -201,24 +205,25 @@ function BrowseAlbumsContent() {
           const release = row.release;
           const master = release?.master;
           const artist = master?.artist;
-          const imageUrl =
-            release?.image_url || master?.image_url || '/images/coverplaceholder.png';
+          const imageUrl = master?.cover_image_url || '/images/coverplaceholder.png';
+          const tags = extractTagNames(master?.master_tag_links ?? null);
 
           return {
             id: row.id,
-            title: release?.title || master?.title || '',
+            title: master?.title || '',
             artist: artist?.name || '',
             year: release?.release_year ? String(release.release_year) : '',
-            format: release?.format || '',
+            format: buildFormatLabel(release),
+            media_type: release?.media_type || '',
             location: row.location,
             dateAdded: row.created_at,
             justAdded: isJustAdded(row.created_at),
             personal_notes: row.personal_notes,
-            release_notes: release?.release_notes ?? release?.notes,
+            release_notes: release?.notes,
             media_condition: row.media_condition,
             genres: master?.genres || [],
             styles: master?.styles || [],
-            custom_tags: row.custom_tags,
+            custom_tags: tags,
             image:
               imageUrl && imageUrl.trim().toLowerCase() !== 'no'
                 ? imageUrl.trim()
@@ -239,79 +244,10 @@ function BrowseAlbumsContent() {
     return () => { isMounted = false; };
   }, []);
 
-  const splitFormatTokens = (format: string) => {
-    if (!format) return [];
-    return format
-      .split(',')
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .map((part) => {
-        const match = part.match(/^(\d+)x\s*(.+)$/i);
-        return (match ? match[2] : part).trim().toLowerCase();
-      });
-  };
-
-  const formatFilterAliases: Record<string, string> = {
-    vinyl: 'vinyl',
-    lp: 'vinyl',
-    lps: 'vinyl',
-    ep: 'vinyl',
-    eps: 'vinyl',
-    cassettes: 'cassette',
-    cassette: 'cassette',
-    cass: 'cassette',
-    cd: 'cd',
-    cds: 'cd',
-    'compact disc': 'cd',
-    '8-track': '8-track',
-    '8 track': '8-track',
-    '8tracks': '8-track',
-    '8-track tape': '8-track',
-    '45': '45s',
-    '45s': '45s',
-    '7"': '45s',
-    '7-inch': '45s',
-    '7 inch': '45s',
-    single: '45s',
-    singles: '45s',
-    all: 'all',
-    'all media': 'all',
-  };
-
-  const normalizeFormatFilter = (format: string) => {
-    const key = format.trim().toLowerCase();
-    return formatFilterAliases[key] ?? key;
-  };
-
-  const getFormatData = (format: string) => {
-    const tokens = splitFormatTokens(format);
-    const hasToken = (values: string[]) => values.some((value) => tokens.includes(value));
-
-    const vinylTokens = ['vinyl', 'lp', 'ep', '12"', '10"', 'maxi-single', 'mini-album'];
-    const cassetteTokens = ['cassette', 'cassettes', 'cass'];
-    const cdTokens = ['cd', 'cds', 'compact disc'];
-    const eightTrackTokens = ['8-track', '8 track', '8tracks', '8-track tape'];
-    const fortyFiveTokens = ['45', '45s', '7"', '7-inch', '7 inch'];
-
-    const hasVinyl = hasToken(vinylTokens);
-    const hasCassette = hasToken(cassetteTokens);
-    const hasCd = hasToken(cdTokens);
-    const has8Track = hasToken(eightTrackTokens);
-    const hasSingle = tokens.includes('single') || tokens.includes('singles');
-    const has45 = hasToken(fortyFiveTokens);
-
-    const categories = new Set<string>();
-    if (hasVinyl) categories.add('vinyl');
-    if (hasCassette) categories.add('cassette');
-    if (hasCd) categories.add('cd');
-    if (has8Track) categories.add('8-track');
-    if (has45 || (hasSingle && !hasCd && !hasCassette && !has8Track)) categories.add('45s');
-
-    return { tokens, categories };
-  };
+  const normalizeMediaType = (value: string) => value.trim().toLowerCase();
 
   const normalizedFormats = useMemo(() => (
-    allowedFormats ? allowedFormats.map(normalizeFormatFilter) : null
+    allowedFormats ? allowedFormats.map(normalizeMediaType) : null
   ), [allowedFormats]);
 
   const normalizedAllowedTags = useMemo(() => (
@@ -320,18 +256,15 @@ function BrowseAlbumsContent() {
 
   const normalizedDropdown = allowedFormats?.length && allowedFormats.length > 0
     ? allowedFormats.map(f => f.trim())
-    : ['Vinyl', 'Cassettes', 'CD', '45s', '8-Track'];
+    : ['Vinyl', 'Cassette', 'CD', '45s', '8-Track'];
 
   const dropdownOptions = normalizedDropdown.map((format) => ({
     label: format,
-    value: normalizeFormatFilter(format),
+    value: normalizeMediaType(format),
   }));
 
   const filteredAlbums = useMemo(() => {
     let fa = albums.filter(album => {
-      // Use 'format' for media type filtering
-      const { tokens: formatTokens, categories: formatCategories } = getFormatData(album.format || '');
-      
       const searchLower = searchTerm.toLowerCase();
 
       const searchInArray = (arr?: string[]) => {
@@ -349,15 +282,16 @@ function BrowseAlbumsContent() {
         searchInArray(album.styles) ||
         searchInArray(album.custom_tags);
       
+      const albumMediaType = normalizeMediaType(album.media_type || '');
+
       const isAllowed =
         !normalizedFormats ||
         normalizedFormats.includes('all') ||
-        normalizedFormats.some((format) => formatCategories.has(format) || formatTokens.includes(format));
+        normalizedFormats.includes(albumMediaType);
         
       const matchesFilter =
         !mediaFilter ||
-        formatCategories.has(mediaFilter) ||
-        formatTokens.includes(mediaFilter);
+        albumMediaType === mediaFilter;
 
       const matchesAllowedTags =
         !normalizedAllowedTags ||
@@ -371,6 +305,19 @@ function BrowseAlbumsContent() {
     });
     
     fa = [...fa].sort((a: BrowseAlbum, b: BrowseAlbum) => {
+      const getSortValue = (item: BrowseAlbum, field: string) => {
+        if (!field.includes('.')) {
+          return item[field as keyof BrowseAlbum];
+        }
+
+        return field.split('.').reduce<unknown>((acc, key) => {
+          if (acc && typeof acc === 'object' && key in acc) {
+            return (acc as Record<string, unknown>)[key];
+          }
+          return null;
+        }, item as unknown);
+      };
+
       let va, vb;
       
       if (sortField === 'date_added') {
@@ -378,8 +325,8 @@ function BrowseAlbumsContent() {
         vb = new Date(b.dateAdded || '1970-01-01');
         return sortAsc ? va.getTime() - vb.getTime() : vb.getTime() - va.getTime();
       } else {
-        va = (a[sortField as keyof BrowseAlbum] || '').toString().toLowerCase();
-        vb = (b[sortField as keyof BrowseAlbum] || '').toString().toLowerCase();
+        va = (getSortValue(a, sortField) || '').toString().toLowerCase();
+        vb = (getSortValue(b, sortField) || '').toString().toLowerCase();
         if (va > vb) return sortAsc ? 1 : -1;
         if (va < vb) return sortAsc ? -1 : 1;
         return 0;
@@ -520,7 +467,7 @@ function BrowseAlbumsContent() {
                   album={{
                     ...album,
                     eventId: eventId,
-                    mediaType: album.format, // Pass format correctly for badge
+                    mediaType: album.media_type,
                     justAdded: album.justAdded
                   }}
                 />
