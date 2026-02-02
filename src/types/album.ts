@@ -176,6 +176,7 @@ export type Album = Omit<CollectionRow, 'custom_tags' | 'notes'> & {
   // ============================================================================
   subtitle?: string | null;
   played_history?: string | null;
+  inventory_id?: number | null;
   
   blocked?: boolean | null;
   blocked_sides?: string[] | null;

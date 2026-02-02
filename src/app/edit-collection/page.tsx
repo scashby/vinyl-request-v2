@@ -156,30 +156,120 @@ function CollectionBrowserPage() {
   const loadAlbums = useCallback(async () => {
     setLoading(true);
     
+    const v3Albums = await (async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let allRows: any[] = [];
+        let from = 0;
+        const batchSize = 1000;
+        let keepGoing = true;
+
+        while (keepGoing) {
+          const { data: batch, error } = await supabase
+            .from('inventory')
+            .select(
+              `id,
+               collection_id,
+               for_sale,
+               collection_status,
+               personal_notes,
+               media_condition,
+               location,
+               custom_tags,
+               date_added,
+               created_at,
+               release:releases (
+                 id,
+                 title,
+                 release_year,
+                 format,
+                 image_url,
+                 release_notes,
+                 master:masters (
+                   id,
+                   title,
+                   genres,
+                   styles,
+                   artist:artists (id, name)
+                 )
+               )`
+            )
+            .order('id', { ascending: true })
+            .range(from, from + batchSize - 1);
+
+          if (error) throw error;
+          if (!batch || batch.length === 0) break;
+
+          allRows = allRows.concat(batch);
+          keepGoing = batch.length === batchSize;
+          from += batchSize;
+        }
+
+        return allRows.map((row) => {
+          const release = row.release;
+          const master = release?.master;
+          const artist = master?.artist;
+          const id = row.collection_id ?? row.id;
+          const imageUrl =
+            release?.image_url || master?.image_url || row.image_url || null;
+
+          return {
+            id,
+            inventory_id: row.id,
+            artist: artist?.name || '',
+            title: release?.title || master?.title || '',
+            year: release?.release_year ? String(release.release_year) : null,
+            format: release?.format || '',
+            image_url: imageUrl,
+            back_image_url: null,
+            personal_notes: row.personal_notes ?? null,
+            release_notes: release?.release_notes ?? release?.notes ?? null,
+            media_condition: row.media_condition ?? '',
+            genres: master?.genres || [],
+            styles: master?.styles || [],
+            custom_tags: row.custom_tags || [],
+            location: row.location ?? null,
+            for_sale: row.for_sale ?? false,
+            collection_status: row.collection_status ?? null,
+            date_added: row.date_added ?? row.created_at ?? null,
+          } as Album;
+        });
+      } catch (error) {
+        console.warn('Falling back to legacy collection admin load:', error);
+        return null;
+      }
+    })();
+
+    if (v3Albums) {
+      setAlbums(v3Albums);
+      setLoading(false);
+      return;
+    }
+
     let allRows: Album[] = [];
     let from = 0;
     const batchSize = 1000;
     let keepGoing = true;
-    
+
     while (keepGoing) {
       const { data: batch, error } = await supabase
         .from('collection')
         .select('*')
         .order('artist', { ascending: true })
         .range(from, from + batchSize - 1);
-      
+
       if (error) {
         console.error('Error loading albums:', error);
         break;
       }
-      
+
       if (!batch || batch.length === 0) break;
-      
+
       allRows = allRows.concat(batch as Album[]);
       keepGoing = batch.length === batchSize;
       from += batchSize;
     }
-    
+
     setAlbums(allRows);
     setLoading(false);
   }, []);
