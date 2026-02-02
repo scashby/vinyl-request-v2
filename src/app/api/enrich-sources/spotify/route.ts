@@ -121,8 +121,21 @@ export async function POST(req: Request) {
 
     // Get album info
     const { data: album, error: dbError } = await supabase
-      .from('collection')
-      .select('id, artist, title, spotify_id')
+      .from('inventory')
+      .select(`
+        id,
+        release:releases (
+          id,
+          spotify_album_id,
+          master:masters (
+            id,
+            title,
+            cover_image_url,
+            genres,
+            artist:artists (name)
+          )
+        )
+      `)
       .eq('id', albumId)
       .single();
 
@@ -134,38 +147,43 @@ export async function POST(req: Request) {
       }, { status: 404 });
     }
 
-    console.log(`✓ Album found: "${album.artist}" - "${album.title}"`);
+    const release = album.release;
+    const master = release?.master;
+    const artistName = master?.artist?.name ?? 'Unknown Artist';
+    const albumTitle = master?.title ?? 'Untitled';
+
+    console.log(`✓ Album found: "${artistName}" - "${albumTitle}"`);
 
     // Skip if already has Spotify ID
-    if (album.spotify_id) {
-      console.log(`⏭️ Album already has Spotify ID: ${album.spotify_id}`);
+    if (release?.spotify_album_id) {
+      console.log(`⏭️ Album already has Spotify ID: ${release.spotify_album_id}`);
       return NextResponse.json({
         success: true,
         skipped: true,
         message: 'Album already has Spotify ID',
         data: {
           albumId: album.id,
-          artist: album.artist,
-          title: album.title,
-          spotify_id: album.spotify_id
+          artist: artistName,
+          title: albumTitle,
+          spotify_id: release?.spotify_album_id
         }
       });
     }
 
     // Search Spotify
     try {
-      const spotifyData = await searchSpotify(album.artist, album.title);
+      const spotifyData = await searchSpotify(artistName, albumTitle);
 
       if (!spotifyData) {
-        console.log(`❌ No Spotify match found for "${album.artist}" - "${album.title}"`);
+        console.log(`❌ No Spotify match found for "${artistName}" - "${albumTitle}"`);
         return NextResponse.json({
           success: false,
           error: 'No match found on Spotify',
           data: {
             albumId: album.id,
-            artist: album.artist,
-            title: album.title,
-            searchQuery: `${album.artist} ${album.title}`
+            artist: artistName,
+            title: albumTitle,
+            searchQuery: `${artistName} ${albumTitle}`
           }
         });
       }
@@ -173,23 +191,58 @@ export async function POST(req: Request) {
       console.log(`💾 Updating database with Spotify data...`);
       
       // Update database
-      const { error: updateError } = await supabase
-        .from('collection')
-        .update(spotifyData)
-        .eq('id', albumId);
+      if (release?.id) {
+        const { error: releaseError } = await supabase
+          .from('releases')
+          .update({
+            spotify_album_id: spotifyData.spotify_id,
+          })
+          .eq('id', release.id);
 
-      if (updateError) {
-        console.log('❌ ERROR: Database update failed', updateError);
-        return NextResponse.json({
-          success: false,
-          error: `Database update failed: ${updateError.message}`,
-          data: {
-            albumId: album.id,
-            artist: album.artist,
-            title: album.title,
-            foundData: spotifyData
+        if (releaseError) {
+          console.log('❌ ERROR: Database update failed', releaseError);
+          return NextResponse.json({
+            success: false,
+            error: `Database update failed: ${releaseError.message}`,
+            data: {
+              albumId: album.id,
+              artist: artistName,
+              title: albumTitle,
+              foundData: spotifyData
+            }
+          }, { status: 500 });
+        }
+      }
+
+      if (master?.id) {
+        const masterUpdate: Record<string, unknown> = {};
+        if (spotifyData.spotify_genres?.length) {
+          masterUpdate.genres = spotifyData.spotify_genres;
+        }
+        if (!master.cover_image_url && spotifyData.spotify_image_url) {
+          masterUpdate.cover_image_url = spotifyData.spotify_image_url;
+        }
+
+        if (Object.keys(masterUpdate).length > 0) {
+          const { error: masterError } = await supabase
+            .from('masters')
+            .update(masterUpdate)
+            .eq('id', master.id);
+
+          if (masterError) {
+            console.log('❌ ERROR: Database update failed', masterError);
+            return NextResponse.json({
+              success: false,
+              error: `Database update failed: ${masterError.message}`,
+              data: {
+                albumId: album.id,
+                artist: artistName,
+                title: albumTitle,
+                foundData: spotifyData
+              }
+            }, { status: 500 });
           }
-        }, { status: 500 });
+        }
       }
 
       console.log(`✅ Successfully enriched with Spotify data\n`);
@@ -198,8 +251,8 @@ export async function POST(req: Request) {
         success: true,
         data: {
           albumId: album.id,
-          artist: album.artist,
-          title: album.title,
+          artist: artistName,
+          title: albumTitle,
           spotify_id: spotifyData.spotify_id,
           spotify_url: spotifyData.spotify_url,
           genres: spotifyData.spotify_genres,
@@ -217,8 +270,8 @@ export async function POST(req: Request) {
         error: error instanceof Error ? error.message : 'Spotify search failed',
         data: {
           albumId: album.id,
-          artist: album.artist,
-          title: album.title
+          artist: artistName,
+          title: albumTitle
         }
       }, { status: 500 });
     }

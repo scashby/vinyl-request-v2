@@ -1,9 +1,28 @@
 // src/types/album.ts
-import type { Database } from './supabase';
+import type { Database } from './database.types';
 
-type CollectionRow = Database['public']['Tables']['collection']['Row'];
+type InventoryRow = Database['public']['Tables']['inventory']['Row'];
+type ReleaseRow = Database['public']['Tables']['releases']['Row'];
+type MasterRow = Database['public']['Tables']['masters']['Row'];
+type ArtistRow = Database['public']['Tables']['artists']['Row'];
+type RecordingRow = Database['public']['Tables']['recordings']['Row'];
+type ReleaseTrackRow = Database['public']['Tables']['release_tracks']['Row'];
 
-export type Album = Omit<CollectionRow, 'custom_tags' | 'notes'> & {
+type MasterTagLinkRow = {
+  master_tags?: { name: string | null } | null;
+};
+
+export type Album = InventoryRow & {
+  release?: (ReleaseRow & {
+    master?: (MasterRow & {
+      artist?: ArtistRow | null;
+      master_tag_links?: MasterTagLinkRow[] | null;
+    }) | null;
+    release_tracks?: (ReleaseTrackRow & {
+      recording?: RecordingRow | null;
+    })[] | null;
+  }) | null;
+
   // ============================================================================
   // CORE IDENTIFICATION
   // ============================================================================

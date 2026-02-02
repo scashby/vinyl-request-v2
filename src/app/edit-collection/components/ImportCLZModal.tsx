@@ -293,7 +293,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
 
       // Load existing collection (select all fields needed for conflict detection)
       const { data: existing, error: dbError } = await supabase
-        .from('collection')
+        .from('collection_v2_archive')
         .select('*');
 
       if (dbError) {
@@ -416,7 +416,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
           // Update album with non-conflicting data
           if (Object.keys(updateData).length > 0) {
             const { error: updateError } = await supabase
-              .from('collection')
+              .from('collection_v2_archive')
               .update(updateData)
               .eq('id', album.existingId!);
 

@@ -29,7 +29,6 @@ type CollectionEntry = {
   sell_price: string | null;
   steves_top_200: boolean | null;
   this_weeks_top_10: boolean | null;
-  inner_circle_preferred: boolean | null;
   blocked: boolean | null;
   blocked_sides: string[] | null;
   blocked_tracks: Array<{ position: string; reason: string }> | null;
@@ -181,7 +180,7 @@ export default function EditEntryPage() {
   }, [id]);
 
   async function fetchEntry(rowId: string): Promise<CollectionEntry> {
-    const { data } = await supabase.from('collection').select('*').eq('id', rowId).single();
+    const { data } = await supabase.from('collection_v2_archive').select('*').eq('id', rowId).single();
     return data as CollectionEntry;
   }
 
@@ -634,7 +633,6 @@ export default function EditEntryPage() {
       sell_price: entry.sell_price || null,
       steves_top_200: !!entry.steves_top_200,
       this_weeks_top_10: !!entry.this_weeks_top_10,
-      inner_circle_preferred: !!entry.inner_circle_preferred,
       blocked_sides: blockedSides || [],
       blocked: !!entry.blocked,
       blocked_tracks: entry.blocked_tracks || [],
@@ -677,7 +675,7 @@ export default function EditEntryPage() {
       child_album_ids: entry.child_album_ids || null
     };
     
-    const { error } = await supabase.from('collection').update(update).eq('id', entry.id);
+    const { error } = await supabase.from('collection_v2_archive').update(update).eq('id', entry.id);
     
     if (error) {
       setStatus(`Error: ${error.message}`);
@@ -1050,15 +1048,6 @@ export default function EditEntryPage() {
                       style={{ marginRight: 10, width: 18, height: 18, cursor: 'pointer' }} 
                     />
                     <span style={{ fontWeight: '600', color: '#ea580c' }}>🔥 Top 10</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '14px' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={!!entry.inner_circle_preferred} 
-                      onChange={e => handleChange('inner_circle_preferred', e.target.checked)} 
-                      style={{ marginRight: 10, width: 18, height: 18, cursor: 'pointer' }} 
-                    />
-                    <span style={{ fontWeight: '600', color: '#7c3aed' }}>💎 Inner Circle</span>
                   </label>
                 </div>
               </div>

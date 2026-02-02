@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { supabase } from 'lib/supabaseClient';
+import { parseDiscogsFormat } from 'lib/formatParser';
 import type { Album } from 'types/album';
 import type { Database } from 'types/supabase';
 import { MainTab, type MainTabRef } from './tabs/MainTab';
@@ -83,6 +84,16 @@ const TABS: { id: TabId; label: string; IconComponent: () => React.ReactElement 
   { id: 'cover', label: 'Cover', IconComponent: TabIcons.camera },
   { id: 'links', label: 'Links', IconComponent: TabIcons.globe },
 ];
+
+const parseDurationToSeconds = (duration?: string | null) => {
+  if (!duration) return null;
+  const parts = duration.split(':').map((part) => Number(part));
+  if (parts.some((part) => Number.isNaN(part))) return null;
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+};
 
 interface EditAlbumModalProps {
   albumId: number;
@@ -333,30 +344,50 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           .from('inventory')
           .select(
             `id,
-             collection_id,
+             release_id,
+             status,
              personal_notes,
              media_condition,
+             sleeve_condition,
              location,
-             collection_status,
-             for_sale,
-             custom_tags,
+             date_added,
+             purchase_price,
+             current_value,
+             purchase_date,
+             owner,
+             play_count,
+             last_played_at,
              release:releases (
                id,
-               title,
+               master_id,
+               media_type,
+               label,
+               catalog_number,
+               barcode,
+               country,
+               release_date,
                release_year,
-               format,
-               image_url,
-               release_notes,
+               discogs_release_id,
+               spotify_album_id,
+               notes,
+               qty,
+               format_details,
                master:masters (
                  id,
                  title,
+                 original_release_year,
+                 discogs_master_id,
+                 cover_image_url,
                  genres,
                  styles,
-                 artist:artists (id, name)
+                 artist:artists (id, name),
+                 master_tag_links:master_tag_links (
+                   master_tags (name)
+                 )
                )
              )`
           )
-          .or(`collection_id.eq.${albumId},id.eq.${albumId}`)
+          .eq('id', albumId)
           .single();
 
         if (fetchError) {
@@ -373,26 +404,35 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         const release = data.release;
         const master = release?.master;
         const artist = master?.artist;
+        const tags = extractTagNames(master?.master_tag_links ?? null);
+        const status = data.status ?? 'active';
+
+        let collectionStatus: Album['collection_status'] = 'in_collection';
+        if (status === 'wishlist') collectionStatus = 'wish_list';
+        if (status === 'incoming') collectionStatus = 'on_order';
+        if (status === 'sold') collectionStatus = 'sold';
+        if (status === 'for_sale') collectionStatus = 'for_sale';
 
         const v3Album = {
-          id: data.collection_id ?? data.id,
+          id: data.id,
           inventory_id: data.id,
+          release,
           master_id: master?.id ?? null,
           release_id: release?.id ?? null,
           artist: artist?.name || '',
-          title: release?.title || master?.title || '',
-          year: release?.release_year ? String(release.release_year) : null,
-          format: release?.format || '',
-          image_url: release?.image_url || null,
+          title: master?.title || '',
+          year: master?.original_release_year ? String(master.original_release_year) : null,
+          format: buildFormatLabel(release),
+          image_url: master?.cover_image_url || null,
           personal_notes: data.personal_notes ?? null,
-          release_notes: release?.release_notes ?? null,
+          release_notes: release?.notes ?? null,
           media_condition: data.media_condition ?? '',
           genres: master?.genres || [],
           styles: master?.styles || [],
-          custom_tags: data.custom_tags || [],
+          custom_tags: tags,
           location: data.location ?? null,
-          collection_status: data.collection_status ?? null,
-          for_sale: data.for_sale ?? false,
+          collection_status: collectionStatus,
+          for_sale: status === 'for_sale',
         } as Album;
 
         setAlbum(v3Album);
@@ -465,13 +505,18 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
 
       console.log('🧭 Saving via V3 tables...');
 
+        let status: string | null = 'active';
+        if (editedAlbum.collection_status === 'wish_list') status = 'wishlist';
+        if (editedAlbum.collection_status === 'on_order') status = 'incoming';
+        if (editedAlbum.collection_status === 'sold') status = 'sold';
+        if (editedAlbum.collection_status === 'for_sale' || editedAlbum.for_sale) status = 'for_sale';
+
         const inventoryUpdate = {
           personal_notes: editedAlbum.personal_notes ?? null,
           media_condition: editedAlbum.media_condition ?? null,
+          sleeve_condition: editedAlbum.package_sleeve_condition ?? null,
           location: editedAlbum.location ?? null,
-          collection_status: editedAlbum.collection_status ?? null,
-          for_sale: editedAlbum.for_sale ?? false,
-          custom_tags: editedAlbum.custom_tags ?? [],
+          status,
         };
 
         const { error: inventoryError } = await supabase
@@ -506,7 +551,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
 
             const recordingPayload = {
               title: trackTitle,
-              duration: track.duration || null,
+              duration_seconds: parseDurationToSeconds(track.duration),
             };
 
             const { data: recording, error: recordingError } = await supabase
@@ -540,12 +585,17 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         }
 
         if (editedAlbum.release_id) {
-          const releaseUpdate = {
-            title: editedAlbum.title ?? null,
-            release_year: editedAlbum.year ? Number(editedAlbum.year) : null,
-            format: editedAlbum.format ?? null,
-            release_notes: editedAlbum.release_notes ?? null,
+          const releaseUpdate: Database['public']['Tables']['releases']['Update'] = {
+            label: editedAlbum.labels?.[0] ?? null,
+            catalog_number: editedAlbum.cat_no ?? null,
           };
+
+          if (editedAlbum.format) {
+            const parsedFormat = parseDiscogsFormat(editedAlbum.format);
+            releaseUpdate.media_type = parsedFormat.media_type;
+            releaseUpdate.format_details = parsedFormat.format_details;
+            releaseUpdate.qty = parsedFormat.qty;
+          }
 
           const { error: releaseError } = await supabase
             .from('releases')
@@ -560,7 +610,9 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         }
 
         if (editedAlbum.master_id) {
-          const masterUpdate = {
+          const masterUpdate: Database['public']['Tables']['masters']['Update'] = {
+            title: editedAlbum.title ?? null,
+            original_release_year: editedAlbum.year ? Number(editedAlbum.year) : null,
             genres: editedAlbum.genres ?? [],
             styles: editedAlbum.styles ?? [],
           };
@@ -574,6 +626,98 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             console.error('❌ Failed to update master:', masterError);
             alert(`Failed to save album: ${masterError.message}`);
             return;
+          }
+
+          const desiredTags = (editedAlbum.custom_tags ?? [])
+            .map((tag) => tag.trim())
+            .filter((tag) => tag.length > 0);
+
+          const desiredTagSet = new Set(desiredTags.map((tag) => tag.toLowerCase()));
+
+          const { data: existingLinks, error: existingLinksError } = await supabase
+            .from('master_tag_links')
+            .select('tag_id, master_tags (name)')
+            .eq('master_id', editedAlbum.master_id);
+
+          if (existingLinksError) {
+            console.error('❌ Failed to load existing tags:', existingLinksError);
+            alert(`Failed to save tags: ${existingLinksError.message}`);
+            return;
+          }
+
+          const existingByName = new Map(
+            (existingLinks ?? [])
+              .map((link) => {
+                const name = link.master_tags?.name;
+                return name ? [name.toLowerCase(), link.tag_id] : null;
+              })
+              .filter((entry): entry is [string, number] => Boolean(entry))
+          );
+
+          const tagsToRemove = (existingLinks ?? [])
+            .filter((link) => {
+              const name = link.master_tags?.name;
+              return name ? !desiredTagSet.has(name.toLowerCase()) : false;
+            })
+            .map((link) => link.tag_id);
+
+          for (const tagName of desiredTags) {
+            if (existingByName.has(tagName.toLowerCase())) continue;
+
+            const { data: existingTag, error: existingTagError } = await supabase
+              .from('master_tags')
+              .select('id')
+              .ilike('name', tagName)
+              .maybeSingle();
+
+            if (existingTagError) {
+              console.error('❌ Failed to lookup tag:', existingTagError);
+              alert(`Failed to save tag: ${existingTagError.message}`);
+              return;
+            }
+
+            let tagId = existingTag?.id;
+            if (!tagId) {
+              const { data: createdTag, error: createError } = await supabase
+                .from('master_tags')
+                .insert({ name: tagName, category: 'custom' })
+                .select('id')
+                .single();
+
+              if (createError) {
+                console.error('❌ Failed to create tag:', createError);
+                alert(`Failed to save tag: ${createError.message}`);
+                return;
+              }
+
+              tagId = createdTag?.id;
+            }
+
+            if (tagId) {
+              const { error: linkError } = await supabase
+                .from('master_tag_links')
+                .insert({ master_id: editedAlbum.master_id, tag_id: tagId });
+
+              if (linkError) {
+                console.error('❌ Failed to link tag:', linkError);
+                alert(`Failed to save tag: ${linkError.message}`);
+                return;
+              }
+            }
+          }
+
+          if (tagsToRemove.length > 0) {
+            const { error: deleteError } = await supabase
+              .from('master_tag_links')
+              .delete()
+              .eq('master_id', editedAlbum.master_id)
+              .in('tag_id', tagsToRemove);
+
+            if (deleteError) {
+              console.error('❌ Failed to remove tags:', deleteError);
+              alert(`Failed to remove tags: ${deleteError.message}`);
+              return;
+            }
           }
         }
 

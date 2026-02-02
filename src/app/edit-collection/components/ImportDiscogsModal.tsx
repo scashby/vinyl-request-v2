@@ -723,7 +723,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         let existing: ExistingAlbum[] = [];
         if (sourceType === 'collection') {
           const { data: existingRaw, error: dbError } = await supabase
-            .from('collection')
+            .from('collection_v2_archive')
             .select(
               'id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, discogs_master_id, format, cat_no, media_condition, package_sleeve_condition, country, year, image_url, tracks, genres, packaging'
             );
