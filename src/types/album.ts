@@ -3,19 +3,14 @@ import type { Database } from './supabase';
 
 type CollectionRow = Database['public']['Tables']['collection']['Row'];
 
-export type Album = CollectionRow & {
+export type Album = Omit<CollectionRow, 'custom_tags' | 'notes'> & {
   // ============================================================================
   // CORE IDENTIFICATION
   // ============================================================================
-  id: number;
-  artist: string;
   secondary_artists: string[] | null; 
   sort_artist: string | null;
-  title: string;
   sort_title: string | null;
-  year: string | null;
   year_int: number | null;
-  image_url: string | null;
   back_image_url: string | null;
   index_number: number | null;
   
@@ -51,8 +46,6 @@ export type Album = CollectionRow & {
   // ============================================================================
   // PHYSICAL METADATA
   // ============================================================================
-  format: string;
-  media_condition: string;
   package_sleeve_condition: string | null;
   barcode: string | null;
   cat_no: string | null;
@@ -183,6 +176,9 @@ export type Album = CollectionRow & {
   // ============================================================================
   subtitle?: string | null;
   played_history?: string | null;
+  inventory_id?: number | null;
+  master_id?: number | null;
+  release_id?: number | null;
   
   blocked?: boolean | null;
   blocked_sides?: string[] | null;

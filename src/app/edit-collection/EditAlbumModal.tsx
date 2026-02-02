@@ -328,73 +328,75 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
       try {
         setLoading(true);
         setError(null);
-        
+
         const { data, error: fetchError } = await supabase
           .from('inventory')
-          .select(`
-            id,
-            status,
-            location,
-            media_condition,
-            sleeve_condition,
-            date_added,
-            purchase_price,
-            current_value,
-            purchase_date,
-            owner,
-            personal_notes,
-            play_count,
-            release:releases (
-              id,
-              media_type,
-              format_details,
-              qty,
-              label,
-              catalog_number,
-              barcode,
-              country,
-              release_date,
-              discogs_release_id,
-              spotify_album_id,
-              notes,
-              master:masters (
-                id,
-                title,
-                original_release_year,
-                cover_image_url,
-                discogs_master_id,
-                genres,
-                styles,
-                artist:artists (
-                  name
-                ),
-                master_tag_links (
-                  master_tags (
-                    name
-                  )
-                )
-              )
-            )
-          `)
-          .eq('id', albumId)
+          .select(
+            `id,
+             collection_id,
+             personal_notes,
+             media_condition,
+             location,
+             collection_status,
+             for_sale,
+             custom_tags,
+             release:releases (
+               id,
+               title,
+               release_year,
+               format,
+               image_url,
+               release_notes,
+               master:masters (
+                 id,
+                 title,
+                 genres,
+                 styles,
+                 artist:artists (id, name)
+               )
+             )`
+          )
+          .or(`collection_id.eq.${albumId},id.eq.${albumId}`)
           .single();
-        
+
         if (fetchError) {
           console.error('Error fetching album:', fetchError);
           setError('Failed to load album data');
           return;
         }
-        
-        if (data) {
-          const row = data as unknown as InventoryQueryRow;
-          releaseIdRef.current = row.release?.id ?? null;
-          masterIdRef.current = row.release?.master?.id ?? null;
-          const mapped = mapInventoryToAlbum(row);
-          setAlbum(mapped);
-          setEditedAlbum(mapped);
-        } else {
+
+        if (!data) {
           setError('Album not found');
+          return;
         }
+
+        const release = data.release;
+        const master = release?.master;
+        const artist = master?.artist;
+
+        const v3Album = {
+          id: data.collection_id ?? data.id,
+          inventory_id: data.id,
+          master_id: master?.id ?? null,
+          release_id: release?.id ?? null,
+          artist: artist?.name || '',
+          title: release?.title || master?.title || '',
+          year: release?.release_year ? String(release.release_year) : null,
+          format: release?.format || '',
+          image_url: release?.image_url || null,
+          personal_notes: data.personal_notes ?? null,
+          release_notes: release?.release_notes ?? null,
+          media_condition: data.media_condition ?? '',
+          genres: master?.genres || [],
+          styles: master?.styles || [],
+          custom_tags: data.custom_tags || [],
+          location: data.location ?? null,
+          collection_status: data.collection_status ?? null,
+          for_sale: data.for_sale ?? false,
+        } as Album;
+
+        setAlbum(v3Album);
+        setEditedAlbum(v3Album);
       } catch (err) {
         console.error('Unexpected error:', err);
         setError('An unexpected error occurred');
@@ -456,115 +458,127 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
     
     try {
       console.log('💾 Starting save operation...');
-      
-      // 1. Get tracks data from TracksTab (if available)
-      const tracksData = tracksTabRef.current?.getTracksData();
-      console.log('📊 Tracks data:', tracksData);
-      
-      const inventoryUpdate = {
-        location: editedAlbum.location ?? null,
-        media_condition: editedAlbum.media_condition ?? null,
-        sleeve_condition: editedAlbum.package_sleeve_condition ?? null,
-        date_added: editedAlbum.date_added ?? null,
-        purchase_price: editedAlbum.purchase_price ?? null,
-        current_value: editedAlbum.current_value ?? null,
-        purchase_date: editedAlbum.purchase_date ?? null,
-        owner: editedAlbum.owner ?? null,
-        personal_notes: editedAlbum.personal_notes ?? null,
-        play_count: editedAlbum.play_count ?? null,
-      };
 
-      const releaseUpdate = {
-        label: editedAlbum.labels?.[0] ?? null,
-        catalog_number: editedAlbum.cat_no ?? null,
-        barcode: editedAlbum.barcode ?? null,
-        country: editedAlbum.country ?? null,
-        release_date: editedAlbum.master_release_date ?? null,
-        notes: editedAlbum.release_notes ?? null,
-        qty: editedAlbum.discs ?? null,
-      };
-
-      const masterUpdate = {
-        title: editedAlbum.title ?? null,
-        original_release_year: editedAlbum.original_release_year ?? (editedAlbum.year_int ?? null),
-        cover_image_url: editedAlbum.image_url ?? null,
-        genres: editedAlbum.genres ?? null,
-        styles: editedAlbum.styles ?? null,
-      };
-
-      const { error: inventoryError } = await supabase
-        .from('inventory')
-        .update(inventoryUpdate)
-        .eq('id', albumId);
-
-      if (inventoryError) {
-        console.error('❌ Failed to update inventory:', inventoryError);
-        alert(`Failed to save album: ${inventoryError.message}`);
-        return;
+      if (!editedAlbum.inventory_id) {
+        throw new Error('Missing inventory ID for V3 save.');
       }
 
-      if (releaseIdRef.current) {
-        const { error: releaseError } = await supabase
-          .from('releases')
-          .update(releaseUpdate)
-          .eq('id', releaseIdRef.current);
-        if (releaseError) {
-          console.error('❌ Failed to update release:', releaseError);
-          alert(`Failed to save release: ${releaseError.message}`);
-          return;
-        }
-      }
+      console.log('🧭 Saving via V3 tables...');
 
-      if (masterIdRef.current) {
-        const { error: masterError } = await supabase
-          .from('masters')
-          .update(masterUpdate)
-          .eq('id', masterIdRef.current);
-        if (masterError) {
-          console.error('❌ Failed to update master:', masterError);
-          alert(`Failed to save master: ${masterError.message}`);
-          return;
-        }
-      }
-      
-      if (tracksData && releaseIdRef.current) {
-        const releaseId = releaseIdRef.current;
-        const trackRows = tracksData.tracks
-          .filter((track) => track.type === 'track')
-          .map((track) => ({
-            release_id: releaseId,
-            recording_id: null,
-            position: track.position,
-            side: track.side ?? null,
-            title_override: track.title || null,
-          }));
+        const inventoryUpdate = {
+          personal_notes: editedAlbum.personal_notes ?? null,
+          media_condition: editedAlbum.media_condition ?? null,
+          location: editedAlbum.location ?? null,
+          collection_status: editedAlbum.collection_status ?? null,
+          for_sale: editedAlbum.for_sale ?? false,
+          custom_tags: editedAlbum.custom_tags ?? [],
+        };
 
-        const { error: deleteError } = await supabase
-          .from('release_tracks')
-          .delete()
-          .eq('release_id', releaseId);
+        const { error: inventoryError } = await supabase
+          .from('inventory')
+          .update(inventoryUpdate)
+          .eq('id', editedAlbum.inventory_id);
 
-        if (deleteError) {
-          console.error('❌ Failed to reset release tracks:', deleteError);
-          alert(`Failed to update tracks: ${deleteError.message}`);
+        if (inventoryError) {
+          console.error('❌ Failed to update inventory:', inventoryError);
+          alert(`Failed to save album: ${inventoryError.message}`);
           return;
         }
 
-        if (trackRows.length > 0) {
-          const { error: insertError } = await supabase
+        const tracksData = tracksTabRef.current?.getTracksData();
+        console.log('📊 Tracks data:', tracksData);
+
+        if (tracksData && editedAlbum.release_id) {
+          const { error: deleteError } = await supabase
             .from('release_tracks')
-            .insert(trackRows);
+            .delete()
+            .eq('release_id', editedAlbum.release_id);
 
-          if (insertError) {
-            console.error('❌ Failed to insert release tracks:', insertError);
-            alert(`Failed to update tracks: ${insertError.message}`);
+          if (deleteError) {
+            console.error('❌ Failed to clear release tracks:', deleteError);
+            alert(`Failed to save tracks: ${deleteError.message}`);
+            return;
+          }
+
+          for (const track of tracksData.tracks) {
+            const trackTitle = track.title?.trim() || '';
+            if (!trackTitle) continue;
+
+            const recordingPayload = {
+              title: trackTitle,
+              duration: track.duration || null,
+            };
+
+            const { data: recording, error: recordingError } = await supabase
+              .from('recordings')
+              .insert([recordingPayload])
+              .select('id')
+              .single();
+
+            if (recordingError || !recording) {
+              console.error('❌ Failed to create recording:', recordingError);
+              alert(`Failed to save track: ${recordingError?.message ?? 'Unknown error'}`);
+              return;
+            }
+
+            const { error: releaseTrackError } = await supabase
+              .from('release_tracks')
+              .insert([{
+                release_id: editedAlbum.release_id,
+                recording_id: recording.id,
+                position: track.position,
+                side: track.side ?? null,
+                disc_number: track.disc_number ?? 1,
+              }]);
+
+            if (releaseTrackError) {
+              console.error('❌ Failed to link recording:', releaseTrackError);
+              alert(`Failed to save track: ${releaseTrackError.message}`);
+              return;
+            }
+          }
+        }
+
+        if (editedAlbum.release_id) {
+          const releaseUpdate = {
+            title: editedAlbum.title ?? null,
+            release_year: editedAlbum.year ? Number(editedAlbum.year) : null,
+            format: editedAlbum.format ?? null,
+            release_notes: editedAlbum.release_notes ?? null,
+          };
+
+          const { error: releaseError } = await supabase
+            .from('releases')
+            .update(releaseUpdate)
+            .eq('id', editedAlbum.release_id);
+
+          if (releaseError) {
+            console.error('❌ Failed to update release:', releaseError);
+            alert(`Failed to save album: ${releaseError.message}`);
             return;
           }
         }
-      }
-      
-      console.log('✅ Save complete!');
-      onRefresh(); // Notify parent to refresh data
+
+        if (editedAlbum.master_id) {
+          const masterUpdate = {
+            genres: editedAlbum.genres ?? [],
+            styles: editedAlbum.styles ?? [],
+          };
+
+          const { error: masterError } = await supabase
+            .from('masters')
+            .update(masterUpdate)
+            .eq('id', editedAlbum.master_id);
+
+          if (masterError) {
+            console.error('❌ Failed to update master:', masterError);
+            alert(`Failed to save album: ${masterError.message}`);
+            return;
+          }
+        }
+
+      console.log('✅ V3 save complete!');
+      onRefresh();
     } catch (err) {
       console.error('❌ Save failed:', err);
       alert(`Failed to save: ${err instanceof Error ? err.message : 'Unknown error'}`);

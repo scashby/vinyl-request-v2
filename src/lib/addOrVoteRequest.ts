@@ -6,8 +6,10 @@ import { supabase } from "src/lib/supabaseClient";
 
 interface AddOrVoteParams {
   eventId: number | string;
+  albumId?: number | string | null;
   inventoryId?: number | string | null;
-  side: string; // 'A' | 'B' | ...
+  recordingId?: number | string | null;
+  side?: string; // 'A' | 'B' | ...
   artist: string;
   title: string;
   status?: string;
@@ -15,53 +17,55 @@ interface AddOrVoteParams {
 
 export async function addOrVoteRequest({
   eventId,
+  albumId = null,
   inventoryId = null,
+  recordingId = null,
   side,
   artist,
   title,
   status = "pending",
 }: AddOrVoteParams) {
-  const trackTitle = `${title} (Side ${side})`;
-  // 1) Look for an existing row in this event for this side
-  let query = supabase
+  if (!inventoryId && !recordingId) {
+    throw new Error("inventoryId or recordingId is required for V3 requests.");
+  }
+
+  let v3Query = supabase
     .from("requests_v3")
     .select("id, votes")
     .eq("event_id", eventId)
     .limit(1);
 
   if (inventoryId !== null && inventoryId !== undefined) {
-    query = query.eq("inventory_id", inventoryId).eq("track_title", trackTitle);
+    v3Query = v3Query.eq("inventory_id", inventoryId);
   } else {
-    // manual requests: match by artist+title with null inventory_id
-    query = query
-      .is("inventory_id", null)
-      .eq("artist_name", artist)
-      .eq("track_title", trackTitle);
+    v3Query = v3Query.is("inventory_id", null);
   }
 
-  const { data: rows, error: findErr } = await query;
-  if (findErr) throw findErr;
-  const existing = rows?.[0];
+  if (recordingId !== null && recordingId !== undefined) {
+    v3Query = v3Query.eq("recording_id", recordingId);
+  } else {
+    v3Query = v3Query.is("recording_id", null);
+  }
 
-  if (existing) {
-    // 2) Increment votes
+  const { data: v3Rows, error: v3FindErr } = await v3Query;
+  if (v3FindErr) throw v3FindErr;
+  const existingV3 = v3Rows?.[0];
+
+  if (existingV3) {
     const { data, error } = await supabase
       .from("requests_v3")
-      .update({ votes: (existing.votes ?? 0) + 1 })
-      .eq("id", existing.id)
+      .update({ votes: (existingV3.votes ?? 0) + 1 })
+      .eq("id", existingV3.id)
       .select()
       .single();
     if (error) throw error;
     return data;
   }
 
-  // 3) Insert new with votes=1
   const payload = {
     event_id: eventId,
     inventory_id: inventoryId,
-    recording_id: null,
-    artist_name: artist,
-    track_title: trackTitle,
+    recording_id: recordingId,
     status,
     votes: 1,
   };

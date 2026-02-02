@@ -157,91 +157,75 @@ function BrowseAlbumsContent() {
         let from = 0;
         const batchSize = 1000;
         let keepGoing = true;
-        
-        while (keepGoing && isMounted) {
-            const { data: batch, error } = await supabase
-              .from('inventory')
-              .select(`
-                id,
-                location,
-                media_condition,
-                date_added,
-                personal_notes,
-                status,
-                release:releases (
-                  id,
-                  media_type,
-                  format_details,
-                  qty,
-                  notes,
-                  master:masters (
-                    title,
-                    original_release_year,
-                    cover_image_url,
-                    genres,
-                    styles,
-                    artist:artists (
-                      name
-                    ),
-                    master_tag_links (
-                      master_tags (
-                        name
-                      )
-                    )
-                  )
-                )
-              `)
-              .neq('status', 'sold')
-              .range(from, from + batchSize - 1);
 
-            if (error) {
-                console.error('Error fetching albums:', error);
-                break;
-            }
-            if (!batch || batch.length === 0) break;
-            
-            const batchRows = batch as unknown as InventoryQueryRow[];
-            allRows = allRows.concat(batchRows);
-            
-            if (batch.length < batchSize) {
-                keepGoing = false;
-            } else {
-                from += batchSize;
-            }
+        while (keepGoing && isMounted) {
+          const { data: batch, error } = await supabase
+            .from('inventory')
+            .select(
+              `id,
+               personal_notes,
+               media_condition,
+               created_at,
+               location,
+               custom_tags,
+               release:releases (
+                 id,
+                 title,
+                 release_year,
+                 format,
+                 image_url,
+                 release_notes,
+                 master:masters (
+                   id,
+                   title,
+                   genres,
+                   styles,
+                   artist:artists (id, name)
+                 )
+               )`
+            )
+            .eq('for_sale', false)
+            .range(from, from + batchSize - 1);
+
+          if (error) throw error;
+          if (!batch || batch.length === 0) break;
+
+          allRows = allRows.concat(batch);
+          keepGoing = batch.length === batchSize;
+          from += batchSize;
         }
-        
+
         if (!isMounted) return;
 
-        const parsed: BrowseAlbum[] = allRows.map((album) => {
-          const release = album.release ?? null;
-          const master = release?.master ?? null;
-          const artist = master?.artist?.name ?? 'Unknown Artist';
-          const image = master?.cover_image_url?.trim();
-          const formatLabel = buildFormatLabel(release);
-          const tagNames = extractTagNames(master?.master_tag_links ?? null);
+        const parsed = allRows.map((row) => {
+          const release = row.release;
+          const master = release?.master;
+          const artist = master?.artist;
+          const imageUrl =
+            release?.image_url || master?.image_url || '/images/coverplaceholder.png';
 
           return {
-            id: album.id,
-            title: master?.title ?? 'Untitled',
-            artist,
-            year: master?.original_release_year ? String(master.original_release_year) : '',
-            format: formatLabel,
-            location: album.location ?? undefined,
-            dateAdded: album.date_added ?? undefined,
-            justAdded: isJustAdded(album.date_added ?? undefined),
-            personal_notes: album.personal_notes ?? undefined,
-            release_notes: release?.notes ?? undefined,
-            media_condition: album.media_condition ?? undefined,
-            genres: master?.genres ?? [],
-            styles: master?.styles ?? [],
-            custom_tags: tagNames,
+            id: row.id,
+            title: release?.title || master?.title || '',
+            artist: artist?.name || '',
+            year: release?.release_year ? String(release.release_year) : '',
+            format: release?.format || '',
+            location: row.location,
+            dateAdded: row.created_at,
+            justAdded: isJustAdded(row.created_at),
+            personal_notes: row.personal_notes,
+            release_notes: release?.release_notes ?? release?.notes,
+            media_condition: row.media_condition,
+            genres: master?.genres || [],
+            styles: master?.styles || [],
+            custom_tags: row.custom_tags,
             image:
-              image && image.toLowerCase() !== 'no'
-                ? image
-                : '/images/coverplaceholder.png'
+              imageUrl && imageUrl.trim().toLowerCase() !== 'no'
+                ? imageUrl.trim()
+                : '/images/coverplaceholder.png',
           };
         });
-        
+
         setAlbums(parsed);
       } catch (err) {
         console.error("Error loading albums:", err);

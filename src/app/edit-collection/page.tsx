@@ -327,75 +327,88 @@ function CollectionBrowserPage() {
   const loadAlbums = useCallback(async () => {
     setLoading(true);
     
-    let allRows: Album[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let allRows: any[] = [];
     let from = 0;
     const batchSize = 1000;
     let keepGoing = true;
-    
+
     while (keepGoing) {
       const { data: batch, error } = await supabase
         .from('inventory')
-        .select(`
-          id,
-          status,
-          location,
-          media_condition,
-          sleeve_condition,
-          date_added,
-          purchase_price,
-          current_value,
-          purchase_date,
-          owner,
-          personal_notes,
-          play_count,
-          release:releases (
-            id,
-            media_type,
-            format_details,
-            qty,
-            label,
-            catalog_number,
-            barcode,
-            country,
-            release_date,
-            discogs_release_id,
-            spotify_album_id,
-            notes,
-            master:masters (
-              title,
-              original_release_year,
-              cover_image_url,
-              discogs_master_id,
-              genres,
-              styles,
-              artist:artists (
-                name
-              ),
-              master_tag_links (
-                master_tags (
-                  name
-                )
-              )
-            )
-          )
-        `)
+        .select(
+          `id,
+           collection_id,
+           for_sale,
+           collection_status,
+           personal_notes,
+           media_condition,
+           location,
+           custom_tags,
+           date_added,
+           created_at,
+           release:releases (
+             id,
+             title,
+             release_year,
+             format,
+             image_url,
+             release_notes,
+             master:masters (
+               id,
+               title,
+               genres,
+               styles,
+               artist:artists (id, name)
+             )
+           )`
+        )
         .order('id', { ascending: true })
         .range(from, from + batchSize - 1);
-      
+
       if (error) {
         console.error('Error loading albums:', error);
         break;
       }
-      
+
       if (!batch || batch.length === 0) break;
-      
-      const mapped = (batch as unknown as InventoryQueryRow[]).map(mapInventoryToAlbum);
-      allRows = allRows.concat(mapped);
+
+      allRows = allRows.concat(batch);
       keepGoing = batch.length === batchSize;
       from += batchSize;
     }
-    
-    setAlbums(allRows);
+
+    const mapped = allRows.map((row) => {
+      const release = row.release;
+      const master = release?.master;
+      const artist = master?.artist;
+      const id = row.collection_id ?? row.id;
+      const imageUrl =
+        release?.image_url || master?.image_url || row.image_url || null;
+
+      return {
+        id,
+        inventory_id: row.id,
+        artist: artist?.name || '',
+        title: release?.title || master?.title || '',
+        year: release?.release_year ? String(release.release_year) : null,
+        format: release?.format || '',
+        image_url: imageUrl,
+        back_image_url: null,
+        personal_notes: row.personal_notes ?? null,
+        release_notes: release?.release_notes ?? release?.notes ?? null,
+        media_condition: row.media_condition ?? '',
+        genres: master?.genres || [],
+        styles: master?.styles || [],
+        custom_tags: row.custom_tags || [],
+        location: row.location ?? null,
+        for_sale: row.for_sale ?? false,
+        collection_status: row.collection_status ?? null,
+        date_added: row.date_added ?? row.created_at ?? null,
+      } as Album;
+    });
+
+    setAlbums(mapped);
     setLoading(false);
   }, []);
 

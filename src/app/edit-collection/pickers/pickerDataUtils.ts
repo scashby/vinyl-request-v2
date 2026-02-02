@@ -253,11 +253,18 @@ export async function fetchLabels(): Promise<PickerDataItem[]> {
 
 export async function fetchFormats(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase
+    const { data: v3Data, error: v3Error } = await supabase
       .from('releases')
-      .select('media_type, format_details')
-      .not('media_type', 'is', null)
-      .not('media_type', 'eq', '');
+      .select('format')
+      .not('format', 'is', null)
+      .not('format', 'eq', '');
+    if (v3Error) return [];
+    const formatCounts = new Map<string, number>();
+    v3Data?.forEach(row => { if (row.format) formatCounts.set(row.format, (formatCounts.get(row.format) || 0) + 1); });
+    return Array.from(formatCounts.entries())
+      .map(([name, count]) => ({ id: name, name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch { return []; }
     if (error) return [];
     const formatCounts = new Map<string, number>();
     data?.forEach(row => {
@@ -274,36 +281,51 @@ export async function fetchFormats(): Promise<PickerDataItem[]> {
 
 export async function fetchGenres(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('masters').select('genres').not('genres', 'is', null);
-    if (error) return [];
+    const { data: v3Data, error: v3Error } = await supabase
+      .from('masters')
+      .select('genres')
+      .not('genres', 'is', null);
+    if (v3Error) return [];
     const genreCounts = new Map<string, number>();
-    data?.forEach(row => {
+    v3Data?.forEach(row => {
       const allGenres = Array.isArray(row.genres) ? row.genres : [];
       allGenres.forEach(genre => { if (genre) genreCounts.set(genre, (genreCounts.get(genre) || 0) + 1); });
     });
-    return Array.from(genreCounts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(genreCounts.entries())
+      .map(([name, count]) => ({ id: name, name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   } catch { return []; }
 }
 
 export async function fetchLocations(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('inventory').select('location').not('location', 'is', null).not('location', 'eq', '');
-    if (error) return [];
+    const { data: v3Data, error: v3Error } = await supabase
+      .from('inventory')
+      .select('location')
+      .not('location', 'is', null)
+      .not('location', 'eq', '');
+    if (v3Error) return [];
     const locationCounts = new Map<string, number>();
-    data?.forEach(row => { if (row.location) locationCounts.set(row.location, (locationCounts.get(row.location) || 0) + 1); });
-    return Array.from(locationCounts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
+    v3Data?.forEach(row => { if (row.location) locationCounts.set(row.location, (locationCounts.get(row.location) || 0) + 1); });
+    return Array.from(locationCounts.entries())
+      .map(([name, count]) => ({ id: name, name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   } catch { return []; }
 }
 
 export async function fetchArtists(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('artists').select('name').not('name', 'is', null).not('name', 'eq', '');
-    if (error) return [];
+    const { data: v3Data, error: v3Error } = await supabase
+      .from('artists')
+      .select('name, sort_name')
+      .not('name', 'is', null)
+      .not('name', 'eq', '');
+    if (v3Error) return [];
     const artistMap = new Map<string, { count: number; sortName: string }>();
-    data?.forEach(row => {
+    v3Data?.forEach(row => {
       if (row.name) {
         const current = artistMap.get(row.name);
-        const sortVal = row.name;
+        const sortVal = row.sort_name || row.name;
         if (current) {
           current.count++;
           if (current.sortName === row.name && sortVal !== row.name) current.sortName = sortVal;
@@ -352,9 +374,9 @@ export async function fetchPackageConditions(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase
       .from('inventory')
-      .select('sleeve_condition')
-      .not('sleeve_condition', 'is', null)
-      .not('sleeve_condition', 'eq', '');
+      .select('package_sleeve_condition')
+      .not('package_sleeve_condition', 'is', null)
+      .not('package_sleeve_condition', 'eq', '');
 
     if (error) return [];
 
@@ -439,11 +461,17 @@ export async function mergeLocations(targetId: string, sourceIds: string[]): Pro
 
 export async function fetchPackaging(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('packaging').not('packaging', 'is', null).not('packaging', 'eq', '');
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('packaging')
+      .not('packaging', 'is', null)
+      .not('packaging', 'eq', '');
     if (error) return [];
     const packagingCounts = new Map<string, number>();
     data?.forEach(row => { if (row.packaging) packagingCounts.set(row.packaging, (packagingCounts.get(row.packaging) || 0) + 1); });
-    return Array.from(packagingCounts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(packagingCounts.entries())
+      .map(([name, count]) => ({ id: name, name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   } catch { return []; }
 }
 
@@ -463,11 +491,17 @@ export async function mergePackaging(targetId: string, sourceIds: string[]): Pro
 
 export async function fetchStudios(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('studio').not('studio', 'is', null).not('studio', 'eq', '');
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('studio')
+      .not('studio', 'is', null)
+      .not('studio', 'eq', '');
     if (error) return [];
     const counts = new Map<string, number>();
     data?.forEach(row => { if (row.studio) counts.set(row.studio, (counts.get(row.studio) || 0) + 1); });
-    return Array.from(counts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ id: name, name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   } catch { return []; }
 }
 
@@ -484,14 +518,21 @@ export async function mergeStudios(targetId: string, sourceIds: string[]): Promi
 export async function fetchCountries(): Promise<PickerDataItem[]> {
   const standardCountries = ['US', 'UK', 'Canada', 'Germany', 'France', 'Italy', 'Spain', 'Netherlands', 'Belgium', 'Sweden', 'Norway', 'Denmark', 'Finland', 'Austria', 'Switzerland', 'Japan', 'Australia', 'New Zealand', 'Brazil', 'Mexico', 'Argentina', 'Russia', 'Poland', 'Czech Republic', 'Hungary', 'Portugal', 'Greece', 'Ireland', 'Israel', 'South Korea', 'China', 'India', 'Europe', 'UK & Europe', 'USA & Canada'];
   try {
-    const { data, error } = await supabase.from('collection').select('country').not('country', 'is', null).not('country', 'eq', '');
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('country')
+      .not('country', 'is', null)
+      .not('country', 'eq', '');
     if (error) throw error;
     const countryCounts = new Map<string, number>();
     data?.forEach(row => { if (row.country) countryCounts.set(row.country, (countryCounts.get(row.country) || 0) + 1); });
     const allCountries = new Set([...standardCountries, ...countryCounts.keys()]);
-    return Array.from(allCountries).map(name => ({ id: name, name, count: countryCounts.get(name) || 0 })).sort((a, b) => (a.name === 'US' ? -1 : b.name === 'US' ? 1 : a.name.localeCompare(b.name)));
+    return Array.from(allCountries)
+      .map(name => ({ id: name, name, count: countryCounts.get(name) || 0 }))
+      .sort((a, b) => (a.name === 'US' ? -1 : b.name === 'US' ? 1 : a.name.localeCompare(b.name)));
   } catch {
-    return standardCountries.map(name => ({ id: name, name, count: 0 })).sort((a, b) => (a.name === 'US' ? -1 : b.name === 'US' ? 1 : a.name.localeCompare(b.name)));
+    return standardCountries.map(name => ({ id: name, name, count: 0 }))
+      .sort((a, b) => (a.name === 'US' ? -1 : b.name === 'US' ? 1 : a.name.localeCompare(b.name)));
   }
 }
 
@@ -499,11 +540,17 @@ export async function fetchCountries(): Promise<PickerDataItem[]> {
 
 export async function fetchSounds(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('sound').not('sound', 'is', null).not('sound', 'eq', '');
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('sound')
+      .not('sound', 'is', null)
+      .not('sound', 'eq', '');
     if (error) return [];
     const counts = new Map<string, number>();
     data?.forEach(row => { if (row.sound) counts.set(row.sound, (counts.get(row.sound) || 0) + 1); });
-    return Array.from(counts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ id: name, name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   } catch { return []; }
 }
 
@@ -520,16 +567,21 @@ export async function mergeSounds(targetId: string, sourceIds: string[]): Promis
 export async function fetchVinylColors(): Promise<PickerDataItem[]> {
   const standardColors = ['Black', 'Red', 'Blue', 'Yellow', 'Orange', 'Green', 'Purple', 'Pink', 'White', 'Transparent', 'Brown', 'Gold', 'Metallic', 'Marbled', 'Swirl', 'Glow-in-the-Dark', 'Picture', 'Color-in-Color', 'Starburst', 'Splatter', 'Liquid-Filled'];
   try {
-    const { data, error } = await supabase.from('collection').select('vinyl_color').not('vinyl_color', 'is', null);
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('vinyl_color')
+      .not('vinyl_color', 'is', null);
     if (error) throw error;
     const counts = new Map<string, number>();
     data?.forEach(row => { 
       if (row.vinyl_color) {
         const colors = Array.isArray(row.vinyl_color) ? row.vinyl_color : [row.vinyl_color];
-        colors.forEach((c: string) => { if(c) counts.set(c, (counts.get(c)||0)+1); }); 
+        colors.forEach((c: string) => { if (c) counts.set(c, (counts.get(c) || 0) + 1); }); 
       }
     });
-    return Array.from(new Set([...standardColors, ...counts.keys()])).map(name => ({ id: name, name, count: counts.get(name) || 0 })).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(new Set([...standardColors, ...counts.keys()]))
+      .map(name => ({ id: name, name, count: counts.get(name) || 0 }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   } catch { return standardColors.map(name => ({ id: name, name, count: 0 })); }
 }
 
@@ -546,11 +598,17 @@ export async function mergeVinylColors(targetId: string, sourceIds: string[]): P
 export async function fetchVinylWeights(): Promise<PickerDataItem[]> {
   const standardWeights = ['80 gram vinyl', '100 gram vinyl', '120 gram vinyl', '140 gram vinyl', '160 gram vinyl', '180 gram vinyl', '200 gram vinyl'];
   try {
-    const { data, error } = await supabase.from('collection').select('vinyl_weight').not('vinyl_weight', 'is', null).not('vinyl_weight', 'eq', '');
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('vinyl_weight')
+      .not('vinyl_weight', 'is', null)
+      .not('vinyl_weight', 'eq', '');
     if (error) throw error;
     const counts = new Map<string, number>();
     data?.forEach(row => { if (row.vinyl_weight) counts.set(row.vinyl_weight, (counts.get(row.vinyl_weight) || 0) + 1); });
-    return Array.from(new Set([...standardWeights, ...counts.keys()])).map(name => ({ id: name, name, count: counts.get(name) || 0 })).sort((a, b) => (parseInt(a.name) || 0) - (parseInt(b.name) || 0));
+    return Array.from(new Set([...standardWeights, ...counts.keys()]))
+      .map(name => ({ id: name, name, count: counts.get(name) || 0 }))
+      .sort((a, b) => (parseInt(a.name) || 0) - (parseInt(b.name) || 0));
   } catch { return standardWeights.map(name => ({ id: name, name, count: 0 })); }
 }
 
@@ -558,11 +616,17 @@ export async function fetchVinylWeights(): Promise<PickerDataItem[]> {
 
 export async function fetchSPARS(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('spars_code').not('spars_code', 'is', null).not('spars_code', 'eq', '');
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('spars_code')
+      .not('spars_code', 'is', null)
+      .not('spars_code', 'eq', '');
     if (error) return [];
     const counts = new Map<string, number>();
     data?.forEach(row => { if (row.spars_code) counts.set(row.spars_code, (counts.get(row.spars_code) || 0) + 1); });
-    return Array.from(counts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ id: name, name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   } catch { return []; }
 }
 

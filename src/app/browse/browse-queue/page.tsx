@@ -98,82 +98,83 @@ function BrowseQueueContent() {
         .single();
       setEventData(event || null);
 
-      const { data: requests } = await supabase
+      const { data: v3Requests, error: v3Error } = await supabase
         .from("requests_v3")
-        .select(`
-          *,
-          inventory:inventory (
-            id,
-            release:releases (
-              media_type,
-              format_details,
-              qty,
-              master:masters (
-                title,
-                original_release_year,
-                cover_image_url,
-                artist:artists (
-                  name
-                )
-              )
-            )
-          ),
-          recording:recordings (
-            title,
-            duration_seconds
-          )
-        `)
+        .select("id, inventory_id, recording_id, votes, created_at")
         .eq("event_id", eventId)
         .order("id", { ascending: true });
 
-      if (!requests?.length) {
+      if (v3Error) throw v3Error;
+      if (!v3Requests?.length) {
         setQueueItems([]);
         return;
       }
 
-      // Handle both old queue_type (singular) and new queue_types (array)
-      const queueTypes = event?.queue_types || (event?.queue_type ? [event.queue_type] : ['side']);
-      const primaryQueueType = Array.isArray(queueTypes) ? queueTypes[0] : queueTypes;
+      const inventoryIds = v3Requests
+        .map((request) => request.inventory_id)
+        .filter(Boolean);
 
-      const mapped: QueueItem[] = (requests as RequestQueryRow[]).map(req => {
-        const inventory = req.inventory ?? null;
-        const release = inventory?.release ?? null;
-        const master = release?.master ?? null;
-        const artistName = master?.artist?.name ?? req.artist_name ?? "";
-        const albumTitle = master?.title ?? req.track_title ?? "";
-        const format = buildFormatLabel(release);
-        const sideLabel = req.track_title && req.track_title.toLowerCase().startsWith('side ')
-          ? req.track_title.replace(/side\s+/i, '')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let inventoryRows: any[] = [];
+
+      if (inventoryIds.length) {
+        const { data: inventoryData, error: inventoryError } = await supabase
+          .from("inventory")
+          .select(
+            "id, release:releases (id, title, release_year, format, image_url, master:masters (id, title, artist:artists (id, name)))"
+          )
+          .in("id", inventoryIds);
+
+        if (inventoryError) throw inventoryError;
+        inventoryRows = inventoryData || [];
+      }
+
+      const inventoryById = new Map(
+        inventoryRows.map((row) => [row.id, row])
+      );
+
+      const queueItems = v3Requests.map((request) => {
+        const inventory = request.inventory_id
+          ? inventoryById.get(request.inventory_id)
           : null;
+        const release = inventory?.release;
+        const master = release?.master;
+        const artist = master?.artist;
+        const title = release?.title || master?.title || "";
+        const artistName = artist?.name || "";
+        const imageUrl =
+          release?.image_url || master?.image_url || inventory?.image_url || "";
 
         return {
-          id: req.id,
+          id: request.id,
           artist: artistName,
-          title: albumTitle,
-          side: sideLabel,
+          title,
+          side: null,
           track_number: null,
-          track_title: req.recording_id ? req.recording?.title ?? req.track_title ?? null : req.track_title ?? null,
-          track_duration: req.recording?.duration_seconds ? formatDuration(req.recording.duration_seconds) : null,
-          votes: req.votes ?? 1,
-          created_at: req.created_at ?? null,
-          queue_type: primaryQueueType,
-          inventory: inventory
+          track_name: null,
+          track_duration: null,
+          votes: request.votes ?? 1,
+          created_at: request.created_at,
+          queue_type: request.recording_id ? "track" : "album",
+          collection: inventory
             ? {
                 id: inventory.id,
-                image_url: master?.cover_image_url ?? "",
-                year: master?.original_release_year ?? null,
-                format
+                image_url: imageUrl,
+                year: release?.release_year ?? "",
+                format: release?.format ?? "",
               }
             : null,
         };
       });
 
-      mapped.sort((a, b) => {
-        if (b.votes !== a.votes) return b.votes - a.votes;
-        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-        return dateA - dateB;
-      });
+      const queueTypes = event?.queue_types || (event?.queue_type ? [event.queue_type] : ['side']);
+      const primaryQueueType = Array.isArray(queueTypes) ? queueTypes[0] : queueTypes;
+      const mapped = queueItems.map((item) => ({
+        ...item,
+        queue_type: item.queue_type || primaryQueueType,
+      }));
+
+      mapped.sort((a, b) => (b.votes !== a.votes ? b.votes - a.votes : new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
       setQueueItems(mapped);
     } catch (e) {
       console.error("Error loading event and queue:", e);

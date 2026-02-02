@@ -9,7 +9,8 @@ import type { Database } from 'src/types/supabase';
 
 // Updated to match new DB Schema
 interface DbTrack {
-  recording_id?: number | null;
+  id?: number;
+  recording_id?: number;
   position: string | number;
   title: string;
   duration?: string;
@@ -20,6 +21,8 @@ interface DbTrack {
 
 interface Album {
   id: number;
+  inventory_id?: number;
+  recording_id?: number;
   title: string;
   artist: string;
   image_url: string;
@@ -98,76 +101,81 @@ function AlbumDetailContent() {
   const fetchAlbum = useCallback(async () => {
     try {
       setLoading(true);
+
       const { data, error } = await supabase
         .from('inventory')
-        .select(`
-          id,
-          location,
-          media_condition,
-          personal_notes,
-          date_added,
-          release:releases (
-            id,
-            media_type,
-            format_details,
-            qty,
-            notes,
-            master:masters (
-              title,
-              original_release_year,
-              cover_image_url,
-              artist:artists (
-                name
-              )
-            ),
-            release_tracks (
-              id,
-              position,
-              side,
-              title_override,
-              recording:recordings (
-                id,
-                title,
-                duration_seconds
-              )
-            )
-          )
-        `)
+        .select(
+          `id,
+           personal_notes,
+           media_condition,
+           location,
+           release:releases (
+             id,
+             title,
+             release_year,
+             format,
+             image_url,
+             release_notes,
+             master:masters (
+               id,
+               title,
+               artist:artists (id, name)
+             )
+           ),
+           release_tracks:release_tracks (
+             id,
+             position,
+             recording_id,
+             recording:recordings (
+               id,
+               title,
+               duration,
+               artist:artists (id, name)
+             )
+           )`
+        )
         .eq('id', id)
         .single();
 
       if (error) {
         setError(error.message);
-      } else {
-        const row = data as unknown as InventoryQueryRow;
-        const release = row.release ?? null;
-        const master = release?.master ?? null;
-        const artist = master?.artist?.name ?? 'Unknown Artist';
-        const imageUrl = master?.cover_image_url ?? '/images/coverplaceholder.png';
-        const tracks: DbTrack[] = (release?.release_tracks ?? []).map((track) => ({
-          recording_id: track.recording?.id ?? null,
-          position: track.position,
-          side: track.side ?? undefined,
-          title: track.title_override || track.recording?.title || 'Untitled',
-          duration: formatDuration(track.recording?.duration_seconds ?? null),
-          artist,
-          type: 'track'
-        }));
-
-        setAlbum({
-          id: row.id,
-          title: master?.title ?? 'Untitled',
-          artist,
-          image_url: imageUrl,
-          year: master?.original_release_year ?? undefined,
-          format: buildFormatLabel(release),
-          location: row.location ?? undefined,
-          personal_notes: row.personal_notes ?? undefined,
-          release_notes: release?.notes ?? undefined,
-          media_condition: row.media_condition ?? undefined,
-          tracks
-        });
+        return;
       }
+      if (!data) {
+        setError('Album not found');
+        return;
+      }
+
+      const release = data.release;
+      const master = release?.master;
+      const artist = master?.artist;
+      const imageUrl =
+        release?.image_url || master?.image_url || data.image_url || '';
+
+      const tracks = (data.release_tracks || []).map((track: DbTrack) => ({
+        id: track.id,
+        recording_id: track.recording_id ?? track.recording?.id,
+        position: track.position,
+        title: track.recording?.title || '',
+        duration: track.recording?.duration || '',
+        artist: track.recording?.artist?.name || '',
+        type: 'track',
+      }));
+
+      setAlbum({
+        id: data.id,
+        inventory_id: data.id,
+        title: release?.title || master?.title || '',
+        artist: artist?.name || '',
+        image_url: imageUrl,
+        year: release?.release_year ? String(release.release_year) : '',
+        format: release?.format || '',
+        location: data.location,
+        personal_notes: data.personal_notes,
+        release_notes: release?.release_notes ?? release?.notes,
+        media_condition: data.media_condition,
+        tracks,
+      } as Album);
     } catch {
       setError('Failed to load album');
     } finally {
@@ -201,13 +209,16 @@ function AlbumDetailContent() {
     setSubmittingRequest(true);
     const trackTitle = `Side ${side}`;
     try {
+      if (!album.inventory_id) {
+        throw new Error('Missing inventory ID for V3 request.');
+      }
+
       const { data: existing, error } = await supabase
         .from('requests_v3')
         .select('id, votes')
         .eq('event_id', eventId)
-        .eq('inventory_id', album.id)
+        .eq('inventory_id', album.inventory_id)
         .is('recording_id', null)
-        .eq('track_title', trackTitle)
         .maybeSingle();
 
       if (error) throw error;
@@ -217,13 +228,11 @@ function AlbumDetailContent() {
         setRequestStatus(`Upvoted Side ${side}`);
       } else {
         await supabase.from('requests_v3').insert([{
-          inventory_id: album.id,
+          event_id: eventId,
+          inventory_id: album.inventory_id,
           recording_id: null,
-          artist_name: album.artist,
-          track_title: trackTitle,
-          event_id: Number(eventId),
           votes: 1,
-          status: 'pending'
+          status: 'open',
         }]);
         setRequestStatus(`Requested Side ${side}`);
       }
@@ -239,38 +248,32 @@ function AlbumDetailContent() {
     if (!eventId || !album) return;
     setSubmittingRequest(true);
     try {
-      const recordingId = track.recording_id ?? null;
-      let query = supabase
-        .from('requests_v3')
-        .select('id, votes')
-        .eq('event_id', eventId)
-        .eq('inventory_id', album.id)
-        .eq('track_title', track.title);
+      if (album.inventory_id && track.recording_id) {
+        const { data: existing, error } = await supabase
+          .from('requests_v3')
+          .select('id, votes')
+          .eq('event_id', eventId)
+          .eq('inventory_id', album.inventory_id)
+          .eq('recording_id', track.recording_id)
+          .maybeSingle();
 
-      if (recordingId === null) {
-        query = query.is('recording_id', null);
+        if (error) throw error;
+
+        if (existing) {
+          await supabase.from('requests_v3').update({ votes: (existing.votes || 1) + 1 }).eq('id', existing.id);
+          setRequestStatus(`Upvoted: ${track.title}`);
+        } else {
+          await supabase.from('requests_v3').insert([{
+            event_id: eventId,
+            inventory_id: album.inventory_id,
+            recording_id: track.recording_id,
+            votes: 1,
+            status: 'open',
+          }]);
+          setRequestStatus(`Requested: ${track.title}`);
+        }
       } else {
-        query = query.eq('recording_id', recordingId);
-      }
-
-      const { data: existing, error } = await query.maybeSingle();
-
-      if (error) throw error;
-
-      if (existing) {
-        await supabase.from('requests_v3').update({ votes: (existing.votes || 1) + 1 }).eq('id', existing.id);
-        setRequestStatus(`Upvoted: ${track.title}`);
-      } else {
-        await supabase.from('requests_v3').insert([{
-          inventory_id: album.id,
-          recording_id: recordingId,
-          artist_name: track.artist || album.artist,
-          track_title: track.title,
-          event_id: Number(eventId),
-          votes: 1,
-          status: 'pending'
-        }]);
-        setRequestStatus(`Requested: ${track.title}`);
+        throw new Error('Missing inventory or recording ID for V3 track request.');
       }
     } catch (e) {
       console.error(e);
@@ -284,13 +287,16 @@ function AlbumDetailContent() {
     if (!eventId || !album) return;
     setSubmittingRequest(true);
     try {
+      if (!album.inventory_id) {
+        throw new Error('Missing inventory ID for V3 request.');
+      }
+
       const { data: existing, error } = await supabase
         .from('requests_v3')
         .select('id, votes')
         .eq('event_id', eventId)
-        .eq('inventory_id', album.id)
+        .eq('inventory_id', album.inventory_id)
         .is('recording_id', null)
-        .is('track_title', null)
         .maybeSingle();
 
       if (error) throw error;
@@ -300,13 +306,11 @@ function AlbumDetailContent() {
         setRequestStatus(`Upvoted Album`);
       } else {
         await supabase.from('requests_v3').insert([{
-          inventory_id: album.id,
+          event_id: eventId,
+          inventory_id: album.inventory_id,
           recording_id: null,
-          artist_name: album.artist,
-          track_title: null,
-          event_id: Number(eventId),
           votes: 1,
-          status: 'pending'
+          status: 'open',
         }]);
         setRequestStatus(`Requested Album`);
       }
