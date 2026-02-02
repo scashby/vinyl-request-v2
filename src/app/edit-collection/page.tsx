@@ -389,7 +389,7 @@ function CollectionBrowserPage() {
       
       if (!batch || batch.length === 0) break;
       
-      const mapped = (batch as InventoryQueryRow[]).map(mapInventoryToAlbum);
+      const mapped = (batch as unknown as InventoryQueryRow[]).map(mapInventoryToAlbum);
       allRows = allRows.concat(mapped);
       keepGoing = batch.length === batchSize;
       from += batchSize;
