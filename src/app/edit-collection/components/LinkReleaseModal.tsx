@@ -1,7 +1,7 @@
 // src/app/edit-collection/components/LinkReleaseModal.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 
 interface LinkReleaseModalProps {
@@ -17,7 +17,14 @@ export function LinkReleaseModal({ isOpen, onClose, albumId, currentDiscogsId, o
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!isOpen || !albumId) return null;
+  useEffect(() => {
+    if (isOpen) {
+      setDiscogsId(currentDiscogsId || '');
+      setError(null);
+    }
+  }, [currentDiscogsId, isOpen]);
+
+  if (!isOpen || albumId == null) return null;
 
   const handleSave = async () => {
     setSaving(true);
@@ -25,17 +32,32 @@ export function LinkReleaseModal({ isOpen, onClose, albumId, currentDiscogsId, o
 
     // Basic validation: ensure it looks like an ID (numeric for releases, usually)
     const cleanId = discogsId.trim();
-    if (!cleanId) {
-        setError("Please enter a valid Discogs Release ID.");
-        setSaving(false);
-        return;
+    if (!cleanId || !/^\d+$/.test(cleanId)) {
+      setError('Please enter a valid Discogs Release ID.');
+      setSaving(false);
+      return;
     }
 
     try {
+      const { data: inventoryRow, error: inventoryError } = await supabase
+        .from('inventory')
+        .select('release_id')
+        .eq('id', albumId)
+        .single();
+
+      if (inventoryError) throw inventoryError;
+
+      const releaseId = inventoryRow?.release_id;
+      if (!releaseId) {
+        setError('No release linked to this inventory item.');
+        setSaving(false);
+        return;
+      }
+
       const { error: updateError } = await supabase
-        .from('collection')
+        .from('releases')
         .update({ discogs_release_id: cleanId })
-        .eq('id', albumId);
+        .eq('id', releaseId);
 
       if (updateError) throw updateError;
 

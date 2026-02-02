@@ -41,11 +41,11 @@ export default function RequestForm({ eventId }: RequestFormProps) {
     try {
       const updated = await addOrVoteRequest({
         eventId,
-        albumId: null, // manual request; match by artist+title+side
+        inventoryId: null, // manual request; match by artist+title+side
         side: formData.side.trim(),
         artist: formData.artist.trim(),
         title: formData.title.trim(),
-        status: "queued",
+        status: "pending",
       });
       setStatus(`Request recorded. Votes: x${updated?.votes ?? 1}`);
       setFormData({ artist: "", title: "", side: "", name: "", comment: "" });

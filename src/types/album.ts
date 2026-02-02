@@ -216,6 +216,13 @@ export type Album = {
   energy?: number | null;
   danceability?: number | null;
   valence?: number | null;
+  mood_acoustic?: number | null;
+  mood_electronic?: number | null;
+  mood_happy?: number | null;
+  mood_sad?: number | null;
+  mood_aggressive?: number | null;
+  mood_relaxed?: number | null;
+  mood_party?: number | null;
 
   // ============================================================================
   // HIERARCHY

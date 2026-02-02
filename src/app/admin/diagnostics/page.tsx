@@ -20,7 +20,7 @@ export default function DataDiagnosticsPage() {
     missingArtist: 0,
     missingTitle: 0,
     missingYear: 0,
-    missingMasterDate: 0,
+    missingReleaseDate: 0,
     missingGenres: 0,
     missingStyles: 0,
     missingDecade: 0,
@@ -40,29 +40,61 @@ export default function DataDiagnosticsPage() {
     setStatus('Loading all rows...');
     
     // Fetch ALL rows in batches
-    type CollectionRow = {
+    type InventoryRow = {
       id: number;
-      artist: string | null;
-      title: string | null;
-      year: string | null;
-      discogs_release_id: string | null;
-      master_release_date: string | null;
-      discogs_genres: string[] | null;
-      discogs_styles: string[] | null;
-      decade: number | null;
-      image_url: string | null;
-      tracklists: string | null;
+      location: string | null;
+      personal_notes: string | null;
+      release_id: number | null;
+      release: {
+        discogs_release_id: string | null;
+        release_date: string | null;
+        release_year: number | null;
+        master: {
+          title: string | null;
+          original_release_year: number | null;
+          cover_image_url: string | null;
+          genres: string[] | null;
+          styles: string[] | null;
+          artist: {
+            name: string | null;
+          } | null;
+        } | null;
+        release_tracks: { id: number }[] | null;
+      } | null;
     };
     
-    let allRows: CollectionRow[] = [];
+    let allRows: InventoryRow[] = [];
     let from = 0;
     const batchSize = 1000;
     let keepGoing = true;
     
     while (keepGoing) {
       const { data: batch, error } = await supabase
-        .from('collection')
-        .select('*')
+        .from('inventory')
+        .select(`
+          id,
+          location,
+          personal_notes,
+          release_id,
+          release:releases (
+            discogs_release_id,
+            release_date,
+            release_year,
+            master:masters (
+              title,
+              original_release_year,
+              cover_image_url,
+              genres,
+              styles,
+              artist:artists (
+                name
+              )
+            ),
+            release_tracks (
+              id
+            )
+          )
+        `)
         .range(from, from + batchSize - 1)
         .order('id');
 
@@ -74,7 +106,8 @@ export default function DataDiagnosticsPage() {
       
       if (!batch || batch.length === 0) break;
       
-      allRows = allRows.concat(batch as CollectionRow[]);
+      const batchRows = batch as unknown as InventoryRow[];
+      allRows = allRows.concat(batchRows);
       setStatus(`Loaded ${allRows.length} rows...`);
       
       keepGoing = batch.length === batchSize;
@@ -87,7 +120,7 @@ export default function DataDiagnosticsPage() {
       missingArtist: 0,
       missingTitle: 0,
       missingYear: 0,
-      missingMasterDate: 0,
+      missingReleaseDate: 0,
       missingGenres: 0,
       missingStyles: 0,
       missingDecade: 0,
@@ -99,51 +132,54 @@ export default function DataDiagnosticsPage() {
 
     allRows.forEach(row => {
       const rowIssues: string[] = [];
+      const release = row.release;
+      const master = release?.master;
+      const artist = master?.artist;
 
       // Check for completely empty rows
-      const hasNoData = !row.artist && !row.title && !row.year && !row.discogs_release_id;
+      const hasNoData = !row.release_id && !row.location && !row.personal_notes;
       if (hasNoData) {
         rowIssues.push('EMPTY ROW');
         newStats.emptyRows++;
       }
 
-      if (!row.artist || row.artist.trim() === '') {
+      if (!artist?.name || artist.name.trim() === '') {
         rowIssues.push('No artist');
         newStats.missingArtist++;
       }
-      if (!row.title || row.title.trim() === '') {
+      if (!master?.title || master.title.trim() === '') {
         rowIssues.push('No title');
         newStats.missingTitle++;
       }
-      if (!row.discogs_release_id) {
+      if (!release?.discogs_release_id) {
         rowIssues.push('No Discogs ID');
         newStats.missingDiscogsId++;
       }
-      if (!row.year) {
+      if (!master?.original_release_year && !release?.release_year) {
         rowIssues.push('No year');
         newStats.missingYear++;
       }
-      if (!row.master_release_date) {
-        rowIssues.push('No master date');
-        newStats.missingMasterDate++;
+      if (!release?.release_date) {
+        rowIssues.push('No release date');
+        newStats.missingReleaseDate++;
       }
-      if (!row.discogs_genres || row.discogs_genres.length === 0) {
+      if (!master?.genres || master.genres.length === 0) {
         rowIssues.push('No genres');
         newStats.missingGenres++;
       }
-      if (!row.discogs_styles || row.discogs_styles.length === 0) {
+      if (!master?.styles || master.styles.length === 0) {
         rowIssues.push('No styles');
         newStats.missingStyles++;
       }
-      if (!row.decade) {
+      if (!master?.original_release_year && !release?.release_year) {
         rowIssues.push('No decade');
         newStats.missingDecade++;
       }
-      if (!row.image_url) {
+      if (!master?.cover_image_url) {
         rowIssues.push('No image');
         newStats.missingImage++;
       }
-      if (!row.tracklists || row.tracklists === '[]' || row.tracklists === 'null') {
+      if (!release?.release_tracks || release.release_tracks.length === 0) {
         rowIssues.push('No tracklist');
         newStats.missingTracklist++;
       }
@@ -151,8 +187,8 @@ export default function DataDiagnosticsPage() {
       if (rowIssues.length > 0) {
         foundIssues.push({
           id: row.id,
-          artist: row.artist || '(no artist)',
-          title: row.title || '(no title)',
+          artist: artist?.name || '(no artist)',
+          title: master?.title || '(no title)',
           issues: rowIssues
         });
       }
@@ -179,7 +215,7 @@ export default function DataDiagnosticsPage() {
     }
 
     const { error } = await supabase
-      .from('collection')
+      .from('inventory')
       .delete()
       .in('id', emptyRowIds);
 
@@ -251,7 +287,7 @@ export default function DataDiagnosticsPage() {
         <StatBox label="No Discogs ID" value={stats.missingDiscogsId} color="#f59e0b" />
         <StatBox label="No Genres" value={stats.missingGenres} color="#f59e0b" />
         <StatBox label="No Styles" value={stats.missingStyles} color="#f59e0b" />
-        <StatBox label="No Master Date" value={stats.missingMasterDate} color="#f59e0b" />
+        <StatBox label="No Release Date" value={stats.missingReleaseDate} color="#f59e0b" />
         <StatBox label="No Decade" value={stats.missingDecade} color="#f59e0b" />
         <StatBox label="No Image" value={stats.missingImage} color="#8b5cf6" />
         <StatBox label="No Tracklist" value={stats.missingTracklist} color="#8b5cf6" />
