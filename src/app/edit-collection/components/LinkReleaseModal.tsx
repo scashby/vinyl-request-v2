@@ -32,10 +32,25 @@ export function LinkReleaseModal({ isOpen, onClose, albumId, currentDiscogsId, o
     }
 
     try {
+      const { data: inventoryRow, error: inventoryError } = await supabase
+        .from('inventory')
+        .select('release_id')
+        .eq('id', albumId)
+        .single();
+
+      if (inventoryError) throw inventoryError;
+
+      const releaseId = inventoryRow?.release_id;
+      if (!releaseId) {
+        setError('No release linked to this inventory item.');
+        setSaving(false);
+        return;
+      }
+
       const { error: updateError } = await supabase
-        .from('collection')
+        .from('releases')
         .update({ discogs_release_id: cleanId })
-        .eq('id', albumId);
+        .eq('id', releaseId);
 
       if (updateError) throw updateError;
 
