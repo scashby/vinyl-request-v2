@@ -521,8 +521,40 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         }
       }
       
-      if (tracksData && tracksData.tracks.length > 0) {
-        console.warn('Track syncing to V3 release_tracks is not implemented yet.');
+      if (tracksData && releaseIdRef.current) {
+        const releaseId = releaseIdRef.current;
+        const trackRows = tracksData.tracks
+          .filter((track) => track.type === 'track')
+          .map((track) => ({
+            release_id: releaseId,
+            recording_id: null,
+            position: track.position,
+            side: track.side ?? null,
+            title_override: track.title || null,
+          }));
+
+        const { error: deleteError } = await supabase
+          .from('release_tracks')
+          .delete()
+          .eq('release_id', releaseId);
+
+        if (deleteError) {
+          console.error('❌ Failed to reset release tracks:', deleteError);
+          alert(`Failed to update tracks: ${deleteError.message}`);
+          return;
+        }
+
+        if (trackRows.length > 0) {
+          const { error: insertError } = await supabase
+            .from('release_tracks')
+            .insert(trackRows);
+
+          if (insertError) {
+            console.error('❌ Failed to insert release tracks:', insertError);
+            alert(`Failed to update tracks: ${insertError.message}`);
+            return;
+          }
+        }
       }
       
       console.log('✅ Save complete!');
