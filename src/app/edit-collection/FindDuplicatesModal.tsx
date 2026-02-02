@@ -279,7 +279,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
         if (error) throw error;
         if (!batch || batch.length === 0) break;
 
-        const mapped = (batch as InventoryQueryRow[]).map(mapInventoryToAlbum);
+        const mapped = (batch as unknown as InventoryQueryRow[]).map(mapInventoryToAlbum);
         allAlbums = allAlbums.concat(mapped);
         from += batchSize;
         hasMore = batch.length === batchSize;
