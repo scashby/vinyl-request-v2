@@ -200,7 +200,8 @@ function BrowseAlbumsContent() {
             }
             if (!batch || batch.length === 0) break;
             
-            allRows = allRows.concat(batch);
+            const batchRows = batch as unknown as InventoryQueryRow[];
+            allRows = allRows.concat(batchRows);
             
             if (batch.length < batchSize) {
                 keepGoing = false;

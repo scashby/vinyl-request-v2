@@ -385,7 +385,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         }
         
         if (data) {
-          const row = data as InventoryQueryRow;
+          const row = data as unknown as InventoryQueryRow;
           releaseIdRef.current = row.release?.id ?? null;
           masterIdRef.current = row.release?.master?.id ?? null;
           const mapped = mapInventoryToAlbum(row);
