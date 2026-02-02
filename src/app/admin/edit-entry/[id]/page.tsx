@@ -180,7 +180,7 @@ export default function EditEntryPage() {
   }, [id]);
 
   async function fetchEntry(rowId: string): Promise<CollectionEntry> {
-    const { data } = await supabase.from('collection_v2_archive').select('*').eq('id', rowId).single();
+    const { data } = await supabase.from('v2_legacy_archive').select('*').eq('id', rowId).single();
     return data as CollectionEntry;
   }
 
@@ -675,7 +675,7 @@ export default function EditEntryPage() {
       child_album_ids: entry.child_album_ids || null
     };
     
-    const { error } = await supabase.from('collection_v2_archive').update(update).eq('id', entry.id);
+    const { error } = await supabase.from('v2_legacy_archive').update(update).eq('id', entry.id);
     
     if (error) {
       setStatus(`Error: ${error.message}`);

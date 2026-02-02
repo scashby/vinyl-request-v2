@@ -93,7 +93,7 @@ export default function FlexibleOrganizePage() {
     
     while (keepGoing) {
       const { data: batch, error } = await supabase
-        .from('collection_v2_archive')
+        .from('v2_legacy_archive')
         .select('id,artist,title,year,master_release_date,format,image_url,discogs_genres,discogs_styles,spotify_genres,apple_music_genres,decade,folder,custom_tags')
         .order('artist', { ascending: true })
         .range(from, from + batchSize - 1);

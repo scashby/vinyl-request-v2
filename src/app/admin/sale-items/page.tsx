@@ -51,7 +51,7 @@ export default function SaleItemsPage() {
     
     // Updated query: Removed 'folder', added 'location' and 'personal_notes'
     const { data, error } = await supabase
-      .from('collection_v2_archive')
+      .from('v2_legacy_archive')
       .select('id,artist,title,year,format,image_url,location,for_sale,sale_price,sale_platform,sale_quantity,sale_notes,wholesale_cost,discogs_release_id,personal_notes')
       .eq('for_sale', true)
       .order('artist', { ascending: true });
@@ -114,7 +114,7 @@ export default function SaleItemsPage() {
     setSaving(true);
     
     const { error } = await supabase
-      .from('collection_v2_archive')
+      .from('v2_legacy_archive')
       .update(editValues)
       .eq('id', id);
 
@@ -131,7 +131,7 @@ export default function SaleItemsPage() {
     if (!confirm('Remove this item from sale?')) return;
     
     const { error } = await supabase
-      .from('collection_v2_archive')
+      .from('v2_legacy_archive')
       .update({
         for_sale: false,
         sale_price: null,

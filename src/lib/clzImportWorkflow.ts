@@ -410,7 +410,7 @@ export async function previewCLZImport(
   
   // Fetch existing albums
   const { data: existingAlbums } = await supabase
-    .from('collection_v2_archive')
+    .from('v2_legacy_archive')
     .select('*');
   
   const newAlbums: Array<{ artist: string; title: string; format: string }> = [];
