@@ -150,19 +150,90 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
       try {
         setLoading(true);
         setError(null);
-        
+
+        const v3Album = await (async () => {
+          try {
+            const { data, error: fetchError } = await supabase
+              .from('inventory')
+              .select(
+                `id,
+                 collection_id,
+                 personal_notes,
+                 media_condition,
+                 location,
+                 collection_status,
+                 for_sale,
+                 custom_tags,
+                 release:releases (
+                   id,
+                   title,
+                   release_year,
+                   format,
+                   image_url,
+                   release_notes,
+                   master:masters (
+                     id,
+                     title,
+                     genres,
+                     styles,
+                     artist:artists (id, name)
+                   )
+                 )`
+              )
+              .or(`collection_id.eq.${albumId},id.eq.${albumId}`)
+              .single();
+
+            if (fetchError) throw fetchError;
+            if (!data) return null;
+
+            const release = data.release;
+            const master = release?.master;
+            const artist = master?.artist;
+
+            return {
+              id: data.collection_id ?? data.id,
+              inventory_id: data.id,
+              master_id: master?.id ?? null,
+              release_id: release?.id ?? null,
+              artist: artist?.name || '',
+              title: release?.title || master?.title || '',
+              year: release?.release_year ? String(release.release_year) : null,
+              format: release?.format || '',
+              image_url: release?.image_url || null,
+              personal_notes: data.personal_notes ?? null,
+              release_notes: release?.release_notes ?? null,
+              media_condition: data.media_condition ?? '',
+              genres: master?.genres || [],
+              styles: master?.styles || [],
+              custom_tags: data.custom_tags || [],
+              location: data.location ?? null,
+              collection_status: data.collection_status ?? null,
+              for_sale: data.for_sale ?? false,
+            } as Album;
+          } catch (error) {
+            console.warn('Falling back to legacy collection fetch:', error);
+            return null;
+          }
+        })();
+
+        if (v3Album) {
+          setAlbum(v3Album);
+          setEditedAlbum(v3Album);
+          return;
+        }
+
         const { data, error: fetchError } = await supabase
           .from('collection')
           .select('*')
           .eq('id', albumId)
           .single();
-        
+
         if (fetchError) {
           console.error('Error fetching album:', fetchError);
           setError('Failed to load album data');
           return;
         }
-        
+
         if (data) {
           setAlbum(data as Album);
           setEditedAlbum(data as Album);
@@ -230,6 +301,72 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
     
     try {
       console.log('💾 Starting save operation...');
+
+      if (editedAlbum.inventory_id) {
+        console.log('🧭 Saving via V3 tables...');
+
+        const inventoryUpdate = {
+          personal_notes: editedAlbum.personal_notes ?? null,
+          media_condition: editedAlbum.media_condition ?? null,
+          location: editedAlbum.location ?? null,
+          collection_status: editedAlbum.collection_status ?? null,
+          for_sale: editedAlbum.for_sale ?? false,
+          custom_tags: editedAlbum.custom_tags ?? [],
+        };
+
+        const { error: inventoryError } = await supabase
+          .from('inventory')
+          .update(inventoryUpdate)
+          .eq('id', editedAlbum.inventory_id);
+
+        if (inventoryError) {
+          console.error('❌ Failed to update inventory:', inventoryError);
+          alert(`Failed to save album: ${inventoryError.message}`);
+          return;
+        }
+
+        if (editedAlbum.release_id) {
+          const releaseUpdate = {
+            title: editedAlbum.title ?? null,
+            release_year: editedAlbum.year ? Number(editedAlbum.year) : null,
+            format: editedAlbum.format ?? null,
+            release_notes: editedAlbum.release_notes ?? null,
+          };
+
+          const { error: releaseError } = await supabase
+            .from('releases')
+            .update(releaseUpdate)
+            .eq('id', editedAlbum.release_id);
+
+          if (releaseError) {
+            console.error('❌ Failed to update release:', releaseError);
+            alert(`Failed to save album: ${releaseError.message}`);
+            return;
+          }
+        }
+
+        if (editedAlbum.master_id) {
+          const masterUpdate = {
+            genres: editedAlbum.genres ?? [],
+            styles: editedAlbum.styles ?? [],
+          };
+
+          const { error: masterError } = await supabase
+            .from('masters')
+            .update(masterUpdate)
+            .eq('id', editedAlbum.master_id);
+
+          if (masterError) {
+            console.error('❌ Failed to update master:', masterError);
+            alert(`Failed to save album: ${masterError.message}`);
+            return;
+          }
+        }
+
+        console.log('✅ V3 save complete!');
+        onRefresh();
+        return;
+      }
       
       // 1. Get tracks data from TracksTab (if available)
       const tracksData = tracksTabRef.current?.getTracksData();
