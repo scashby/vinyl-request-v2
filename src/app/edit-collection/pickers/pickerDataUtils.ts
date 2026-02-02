@@ -253,6 +253,22 @@ export async function fetchLabels(): Promise<PickerDataItem[]> {
 
 export async function fetchFormats(): Promise<PickerDataItem[]> {
   try {
+    try {
+      const { data: v3Data, error: v3Error } = await supabase
+        .from('releases')
+        .select('format')
+        .not('format', 'is', null)
+        .not('format', 'eq', '');
+      if (!v3Error && v3Data) {
+        const formatCounts = new Map<string, number>();
+        v3Data.forEach(row => { if (row.format) formatCounts.set(row.format, (formatCounts.get(row.format) || 0) + 1); });
+        return Array.from(formatCounts.entries())
+          .map(([name, count]) => ({ id: name, name, count }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+      }
+    } catch (error) {
+      console.warn('Falling back to legacy formats picker:', error);
+    }
     const { data, error } = await supabase.from('collection').select('format').not('format', 'is', null).not('format', 'eq', '');
     if (error) return [];
     const formatCounts = new Map<string, number>();
@@ -263,6 +279,24 @@ export async function fetchFormats(): Promise<PickerDataItem[]> {
 
 export async function fetchGenres(): Promise<PickerDataItem[]> {
   try {
+    try {
+      const { data: v3Data, error: v3Error } = await supabase
+        .from('masters')
+        .select('genres')
+        .not('genres', 'is', null);
+      if (!v3Error && v3Data) {
+        const genreCounts = new Map<string, number>();
+        v3Data.forEach(row => {
+          const allGenres = Array.isArray(row.genres) ? row.genres : [];
+          allGenres.forEach(genre => { if (genre) genreCounts.set(genre, (genreCounts.get(genre) || 0) + 1); });
+        });
+        return Array.from(genreCounts.entries())
+          .map(([name, count]) => ({ id: name, name, count }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+      }
+    } catch (error) {
+      console.warn('Falling back to legacy genres picker:', error);
+    }
     const { data, error } = await supabase.from('collection').select('genres').not('genres', 'is', null);
     if (error) return [];
     const genreCounts = new Map<string, number>();
@@ -276,6 +310,22 @@ export async function fetchGenres(): Promise<PickerDataItem[]> {
 
 export async function fetchLocations(): Promise<PickerDataItem[]> {
   try {
+    try {
+      const { data: v3Data, error: v3Error } = await supabase
+        .from('inventory')
+        .select('location')
+        .not('location', 'is', null)
+        .not('location', 'eq', '');
+      if (!v3Error && v3Data) {
+        const locationCounts = new Map<string, number>();
+        v3Data.forEach(row => { if (row.location) locationCounts.set(row.location, (locationCounts.get(row.location) || 0) + 1); });
+        return Array.from(locationCounts.entries())
+          .map(([name, count]) => ({ id: name, name, count }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+      }
+    } catch (error) {
+      console.warn('Falling back to legacy locations picker:', error);
+    }
     const { data, error } = await supabase.from('collection').select('location').not('location', 'is', null).not('location', 'eq', '');
     if (error) return [];
     const locationCounts = new Map<string, number>();
@@ -286,6 +336,33 @@ export async function fetchLocations(): Promise<PickerDataItem[]> {
 
 export async function fetchArtists(): Promise<PickerDataItem[]> {
   try {
+    try {
+      const { data: v3Data, error: v3Error } = await supabase
+        .from('artists')
+        .select('name, sort_name')
+        .not('name', 'is', null)
+        .not('name', 'eq', '');
+      if (!v3Error && v3Data) {
+        const artistMap = new Map<string, { count: number; sortName: string }>();
+        v3Data.forEach(row => {
+          if (row.name) {
+            const current = artistMap.get(row.name);
+            const sortVal = row.sort_name || row.name;
+            if (current) {
+              current.count++;
+              if (current.sortName === row.name && sortVal !== row.name) current.sortName = sortVal;
+            } else {
+              artistMap.set(row.name, { count: 1, sortName: sortVal });
+            }
+          }
+        });
+        return Array.from(artistMap.entries())
+          .map(([name, info]) => ({ id: name, name, count: info.count, sortName: info.sortName }))
+          .sort((a, b) => (a.sortName || a.name).localeCompare(b.sortName || b.name));
+      }
+    } catch (error) {
+      console.warn('Falling back to legacy artists picker:', error);
+    }
     const { data, error } = await supabase.from('collection').select('artist, sort_artist').not('artist', 'is', null).not('artist', 'eq', '');
     if (error) return [];
     const artistMap = new Map<string, { count: number; sortName: string }>();
@@ -309,6 +386,32 @@ export async function fetchArtists(): Promise<PickerDataItem[]> {
 
 export async function fetchMediaConditions(): Promise<PickerDataItem[]> {
   try {
+    try {
+      const { data: v3Data, error: v3Error } = await supabase
+        .from('inventory')
+        .select('media_condition')
+        .not('media_condition', 'is', null)
+        .not('media_condition', 'eq', '');
+
+      if (!v3Error && v3Data) {
+        const counts = new Map<string, number>();
+        v3Data.forEach(row => {
+          if (row.media_condition) {
+            counts.set(row.media_condition, (counts.get(row.media_condition) || 0) + 1);
+          }
+        });
+        return Array.from(counts.entries())
+          .map(([name, count]) => ({ id: name, name, count }))
+          .sort((a, b) => {
+            const rankA = getGradeRank(a.name);
+            const rankB = getGradeRank(b.name);
+            if (rankA === rankB) return a.name.localeCompare(b.name);
+            return rankA - rankB;
+          });
+      }
+    } catch (error) {
+      console.warn('Falling back to legacy media conditions picker:', error);
+    }
     const { data, error } = await supabase
       .from('collection')
       .select('media_condition')
