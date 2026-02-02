@@ -442,6 +442,32 @@ export async function fetchMediaConditions(): Promise<PickerDataItem[]> {
 
 export async function fetchPackageConditions(): Promise<PickerDataItem[]> {
   try {
+    try {
+      const { data: v3Data, error: v3Error } = await supabase
+        .from('inventory')
+        .select('package_sleeve_condition')
+        .not('package_sleeve_condition', 'is', null)
+        .not('package_sleeve_condition', 'eq', '');
+
+      if (!v3Error && v3Data) {
+        const counts = new Map<string, number>();
+        v3Data.forEach(row => {
+          if (row.package_sleeve_condition) {
+            counts.set(row.package_sleeve_condition, (counts.get(row.package_sleeve_condition) || 0) + 1);
+          }
+        });
+        return Array.from(counts.entries())
+          .map(([name, count]) => ({ id: name, name, count }))
+          .sort((a, b) => {
+            const rankA = getGradeRank(a.name);
+            const rankB = getGradeRank(b.name);
+            if (rankA === rankB) return a.name.localeCompare(b.name);
+            return rankA - rankB;
+          });
+      }
+    } catch (error) {
+      console.warn('Falling back to legacy package conditions picker:', error);
+    }
     const { data, error } = await supabase
       .from('collection')
       .select('package_sleeve_condition')
@@ -527,6 +553,22 @@ export async function mergeLocations(targetId: string, sourceIds: string[]): Pro
 
 export async function fetchPackaging(): Promise<PickerDataItem[]> {
   try {
+    try {
+      const { data: v3Data, error: v3Error } = await supabase
+        .from('inventory')
+        .select('packaging')
+        .not('packaging', 'is', null)
+        .not('packaging', 'eq', '');
+      if (!v3Error && v3Data) {
+        const packagingCounts = new Map<string, number>();
+        v3Data.forEach(row => { if (row.packaging) packagingCounts.set(row.packaging, (packagingCounts.get(row.packaging) || 0) + 1); });
+        return Array.from(packagingCounts.entries())
+          .map(([name, count]) => ({ id: name, name, count }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+      }
+    } catch (error) {
+      console.warn('Falling back to legacy packaging picker:', error);
+    }
     const { data, error } = await supabase.from('collection').select('packaging').not('packaging', 'is', null).not('packaging', 'eq', '');
     if (error) return [];
     const packagingCounts = new Map<string, number>();
@@ -551,6 +593,22 @@ export async function mergePackaging(targetId: string, sourceIds: string[]): Pro
 
 export async function fetchStudios(): Promise<PickerDataItem[]> {
   try {
+    try {
+      const { data: v3Data, error: v3Error } = await supabase
+        .from('inventory')
+        .select('studio')
+        .not('studio', 'is', null)
+        .not('studio', 'eq', '');
+      if (!v3Error && v3Data) {
+        const counts = new Map<string, number>();
+        v3Data.forEach(row => { if (row.studio) counts.set(row.studio, (counts.get(row.studio) || 0) + 1); });
+        return Array.from(counts.entries())
+          .map(([name, count]) => ({ id: name, name, count }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+      }
+    } catch (error) {
+      console.warn('Falling back to legacy studios picker:', error);
+    }
     const { data, error } = await supabase.from('collection').select('studio').not('studio', 'is', null).not('studio', 'eq', '');
     if (error) return [];
     const counts = new Map<string, number>();
@@ -572,6 +630,23 @@ export async function mergeStudios(targetId: string, sourceIds: string[]): Promi
 export async function fetchCountries(): Promise<PickerDataItem[]> {
   const standardCountries = ['US', 'UK', 'Canada', 'Germany', 'France', 'Italy', 'Spain', 'Netherlands', 'Belgium', 'Sweden', 'Norway', 'Denmark', 'Finland', 'Austria', 'Switzerland', 'Japan', 'Australia', 'New Zealand', 'Brazil', 'Mexico', 'Argentina', 'Russia', 'Poland', 'Czech Republic', 'Hungary', 'Portugal', 'Greece', 'Ireland', 'Israel', 'South Korea', 'China', 'India', 'Europe', 'UK & Europe', 'USA & Canada'];
   try {
+    try {
+      const { data: v3Data, error: v3Error } = await supabase
+        .from('inventory')
+        .select('country')
+        .not('country', 'is', null)
+        .not('country', 'eq', '');
+      if (!v3Error && v3Data) {
+        const countryCounts = new Map<string, number>();
+        v3Data.forEach(row => { if (row.country) countryCounts.set(row.country, (countryCounts.get(row.country) || 0) + 1); });
+        const allCountries = new Set([...standardCountries, ...countryCounts.keys()]);
+        return Array.from(allCountries)
+          .map(name => ({ id: name, name, count: countryCounts.get(name) || 0 }))
+          .sort((a, b) => (a.name === 'US' ? -1 : b.name === 'US' ? 1 : a.name.localeCompare(b.name)));
+      }
+    } catch (error) {
+      console.warn('Falling back to legacy countries picker:', error);
+    }
     const { data, error } = await supabase.from('collection').select('country').not('country', 'is', null).not('country', 'eq', '');
     if (error) throw error;
     const countryCounts = new Map<string, number>();
@@ -587,6 +662,22 @@ export async function fetchCountries(): Promise<PickerDataItem[]> {
 
 export async function fetchSounds(): Promise<PickerDataItem[]> {
   try {
+    try {
+      const { data: v3Data, error: v3Error } = await supabase
+        .from('inventory')
+        .select('sound')
+        .not('sound', 'is', null)
+        .not('sound', 'eq', '');
+      if (!v3Error && v3Data) {
+        const counts = new Map<string, number>();
+        v3Data.forEach(row => { if (row.sound) counts.set(row.sound, (counts.get(row.sound) || 0) + 1); });
+        return Array.from(counts.entries())
+          .map(([name, count]) => ({ id: name, name, count }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+      }
+    } catch (error) {
+      console.warn('Falling back to legacy sounds picker:', error);
+    }
     const { data, error } = await supabase.from('collection').select('sound').not('sound', 'is', null).not('sound', 'eq', '');
     if (error) return [];
     const counts = new Map<string, number>();
@@ -608,6 +699,26 @@ export async function mergeSounds(targetId: string, sourceIds: string[]): Promis
 export async function fetchVinylColors(): Promise<PickerDataItem[]> {
   const standardColors = ['Black', 'Red', 'Blue', 'Yellow', 'Orange', 'Green', 'Purple', 'Pink', 'White', 'Transparent', 'Brown', 'Gold', 'Metallic', 'Marbled', 'Swirl', 'Glow-in-the-Dark', 'Picture', 'Color-in-Color', 'Starburst', 'Splatter', 'Liquid-Filled'];
   try {
+    try {
+      const { data: v3Data, error: v3Error } = await supabase
+        .from('inventory')
+        .select('vinyl_color')
+        .not('vinyl_color', 'is', null);
+      if (!v3Error && v3Data) {
+        const counts = new Map<string, number>();
+        v3Data.forEach(row => {
+          if (row.vinyl_color) {
+            const colors = Array.isArray(row.vinyl_color) ? row.vinyl_color : [row.vinyl_color];
+            colors.forEach((c: string) => { if (c) counts.set(c, (counts.get(c) || 0) + 1); });
+          }
+        });
+        return Array.from(new Set([...standardColors, ...counts.keys()]))
+          .map(name => ({ id: name, name, count: counts.get(name) || 0 }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+      }
+    } catch (error) {
+      console.warn('Falling back to legacy vinyl colors picker:', error);
+    }
     const { data, error } = await supabase.from('collection').select('vinyl_color').not('vinyl_color', 'is', null);
     if (error) throw error;
     const counts = new Map<string, number>();
@@ -634,6 +745,22 @@ export async function mergeVinylColors(targetId: string, sourceIds: string[]): P
 export async function fetchVinylWeights(): Promise<PickerDataItem[]> {
   const standardWeights = ['80 gram vinyl', '100 gram vinyl', '120 gram vinyl', '140 gram vinyl', '160 gram vinyl', '180 gram vinyl', '200 gram vinyl'];
   try {
+    try {
+      const { data: v3Data, error: v3Error } = await supabase
+        .from('inventory')
+        .select('vinyl_weight')
+        .not('vinyl_weight', 'is', null)
+        .not('vinyl_weight', 'eq', '');
+      if (!v3Error && v3Data) {
+        const counts = new Map<string, number>();
+        v3Data.forEach(row => { if (row.vinyl_weight) counts.set(row.vinyl_weight, (counts.get(row.vinyl_weight) || 0) + 1); });
+        return Array.from(new Set([...standardWeights, ...counts.keys()]))
+          .map(name => ({ id: name, name, count: counts.get(name) || 0 }))
+          .sort((a, b) => (parseInt(a.name) || 0) - (parseInt(b.name) || 0));
+      }
+    } catch (error) {
+      console.warn('Falling back to legacy vinyl weights picker:', error);
+    }
     const { data, error } = await supabase.from('collection').select('vinyl_weight').not('vinyl_weight', 'is', null).not('vinyl_weight', 'eq', '');
     if (error) throw error;
     const counts = new Map<string, number>();
@@ -646,6 +773,22 @@ export async function fetchVinylWeights(): Promise<PickerDataItem[]> {
 
 export async function fetchSPARS(): Promise<PickerDataItem[]> {
   try {
+    try {
+      const { data: v3Data, error: v3Error } = await supabase
+        .from('inventory')
+        .select('spars_code')
+        .not('spars_code', 'is', null)
+        .not('spars_code', 'eq', '');
+      if (!v3Error && v3Data) {
+        const counts = new Map<string, number>();
+        v3Data.forEach(row => { if (row.spars_code) counts.set(row.spars_code, (counts.get(row.spars_code) || 0) + 1); });
+        return Array.from(counts.entries())
+          .map(([name, count]) => ({ id: name, name, count }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+      }
+    } catch (error) {
+      console.warn('Falling back to legacy SPARS picker:', error);
+    }
     const { data, error } = await supabase.from('collection').select('spars_code').not('spars_code', 'is', null).not('spars_code', 'eq', '');
     if (error) return [];
     const counts = new Map<string, number>();
