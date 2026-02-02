@@ -325,6 +325,60 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           return;
         }
 
+        const tracksData = tracksTabRef.current?.getTracksData();
+        console.log('📊 Tracks data:', tracksData);
+
+        if (tracksData && editedAlbum.release_id) {
+          const { error: deleteError } = await supabase
+            .from('release_tracks')
+            .delete()
+            .eq('release_id', editedAlbum.release_id);
+
+          if (deleteError) {
+            console.error('❌ Failed to clear release tracks:', deleteError);
+            alert(`Failed to save tracks: ${deleteError.message}`);
+            return;
+          }
+
+          for (const track of tracksData.tracks) {
+            const trackTitle = track.title?.trim() || '';
+            if (!trackTitle) continue;
+
+            const recordingPayload = {
+              title: trackTitle,
+              duration: track.duration || null,
+            };
+
+            const { data: recording, error: recordingError } = await supabase
+              .from('recordings')
+              .insert([recordingPayload])
+              .select('id')
+              .single();
+
+            if (recordingError || !recording) {
+              console.error('❌ Failed to create recording:', recordingError);
+              alert(`Failed to save track: ${recordingError?.message ?? 'Unknown error'}`);
+              return;
+            }
+
+            const { error: releaseTrackError } = await supabase
+              .from('release_tracks')
+              .insert([{
+                release_id: editedAlbum.release_id,
+                recording_id: recording.id,
+                position: track.position,
+                side: track.side ?? null,
+                disc_number: track.disc_number ?? 1,
+              }]);
+
+            if (releaseTrackError) {
+              console.error('❌ Failed to link recording:', releaseTrackError);
+              alert(`Failed to save track: ${releaseTrackError.message}`);
+              return;
+            }
+          }
+        }
+
         if (editedAlbum.release_id) {
           const releaseUpdate = {
             title: editedAlbum.title ?? null,
