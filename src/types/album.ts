@@ -1,5 +1,9 @@
 // src/types/album.ts
-export type Album = {
+import type { Database } from './supabase';
+
+type CollectionRow = Database['public']['Tables']['collection']['Row'];
+
+export type Album = CollectionRow & {
   // ============================================================================
   // CORE IDENTIFICATION
   // ============================================================================
