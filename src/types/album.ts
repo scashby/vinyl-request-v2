@@ -1,17 +1,16 @@
 // src/types/album.ts
-export type Album = {
+import type { Database } from './supabase';
+
+type CollectionRow = Database['public']['Tables']['collection']['Row'];
+
+export type Album = Omit<CollectionRow, 'custom_tags' | 'notes'> & {
   // ============================================================================
   // CORE IDENTIFICATION
   // ============================================================================
-  id: number;
-  artist: string;
   secondary_artists: string[] | null; 
   sort_artist: string | null;
-  title: string;
   sort_title: string | null;
-  year: string | null;
   year_int: number | null;
-  image_url: string | null;
   back_image_url: string | null;
   index_number: number | null;
   
@@ -47,8 +46,6 @@ export type Album = {
   // ============================================================================
   // PHYSICAL METADATA
   // ============================================================================
-  format: string;
-  media_condition: string;
   package_sleeve_condition: string | null;
   barcode: string | null;
   cat_no: string | null;
