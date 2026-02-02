@@ -1,7 +1,7 @@
 // src/app/edit-collection/components/LinkReleaseModal.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 
 interface LinkReleaseModalProps {
@@ -17,7 +17,14 @@ export function LinkReleaseModal({ isOpen, onClose, albumId, currentDiscogsId, o
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!isOpen || !albumId) return null;
+  useEffect(() => {
+    if (isOpen) {
+      setDiscogsId(currentDiscogsId || '');
+      setError(null);
+    }
+  }, [currentDiscogsId, isOpen]);
+
+  if (!isOpen || albumId == null) return null;
 
   const handleSave = async () => {
     setSaving(true);
@@ -25,10 +32,10 @@ export function LinkReleaseModal({ isOpen, onClose, albumId, currentDiscogsId, o
 
     // Basic validation: ensure it looks like an ID (numeric for releases, usually)
     const cleanId = discogsId.trim();
-    if (!cleanId) {
-        setError("Please enter a valid Discogs Release ID.");
-        setSaving(false);
-        return;
+    if (!cleanId || !/^\d+$/.test(cleanId)) {
+      setError('Please enter a valid Discogs Release ID.');
+      setSaving(false);
+      return;
     }
 
     try {
