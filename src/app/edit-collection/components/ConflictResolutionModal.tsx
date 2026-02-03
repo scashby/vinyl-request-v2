@@ -78,6 +78,66 @@ export default function ConflictResolutionModal({
     return 'merge';
   };
 
+  const coerceYear = (value: unknown): number | null => {
+    if (typeof value === 'number') return Number.isNaN(value) ? null : value;
+    if (typeof value === 'string') {
+      const parsed = parseInt(value, 10);
+      return Number.isNaN(parsed) ? null : parsed;
+    }
+    return null;
+  };
+
+  const resolveUpdateTarget = (fieldName: string, value: unknown) => {
+    switch (fieldName) {
+      case 'location':
+      case 'personal_notes':
+      case 'media_condition':
+        return { table: 'inventory', column: fieldName, value };
+      case 'package_sleeve_condition':
+        return { table: 'inventory', column: 'sleeve_condition', value };
+      case 'labels':
+        return { table: 'releases', column: 'label', value: Array.isArray(value) ? value[0] ?? null : value };
+      case 'cat_no':
+        return { table: 'releases', column: 'catalog_number', value };
+      case 'barcode':
+      case 'country':
+      case 'discogs_release_id':
+        return { table: 'releases', column: fieldName, value };
+      case 'spotify_id':
+        return { table: 'releases', column: 'spotify_album_id', value };
+      case 'apple_music_id':
+        return { table: 'releases', column: 'apple_music_id', value };
+      case 'release_notes':
+        return { table: 'releases', column: 'notes', value };
+      case 'year':
+        return { table: 'releases', column: 'release_year', value: coerceYear(value) };
+      case 'format':
+        return { table: 'releases', column: 'media_type', value };
+      case 'image_url':
+        return { table: 'masters', column: 'cover_image_url', value };
+      case 'genres':
+      case 'styles':
+      case 'discogs_master_id':
+        return { table: 'masters', column: fieldName, value };
+      default:
+        return null;
+    }
+  };
+
+  const resolveAlbumIds = async (conflict: FieldConflict) => {
+    if (conflict.release_id || conflict.master_id) {
+      return { release_id: conflict.release_id ?? null, master_id: conflict.master_id ?? null };
+    }
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('id, release_id, release:releases ( master_id )')
+      .eq('id', conflict.album_id)
+      .single();
+    if (error || !data) return { release_id: null, master_id: null };
+    const release = data.release as { master_id?: number | null } | null;
+    return { release_id: data.release_id ?? null, master_id: release?.master_id ?? null };
+  };
+
   const handleApplyConflict = async (conflict: FieldConflict): Promise<void> => {
     const conflictId = getConflictId(conflict);
     const resolution = resolutions.get(conflictId) || 'current';
@@ -97,11 +157,27 @@ export default function ConflictResolutionModal({
         finalValue = applyResolution(conflict.current_value, conflict.new_value, strategyResolution);
       }
       
+      const target = resolveUpdateTarget(conflict.field_name, finalValue);
+      if (!target) {
+        throw new Error(`Unsupported conflict field: ${conflict.field_name}`);
+      }
+
+      const { release_id, master_id } = await resolveAlbumIds(conflict);
+      const targetId = target.table === 'inventory'
+        ? conflict.album_id
+        : target.table === 'releases'
+          ? release_id
+          : master_id;
+
+      if (!targetId) {
+        throw new Error(`Missing target ID for ${target.table}`);
+      }
+
       const { error: updateError } = await supabase
-        .from('collection')
-        .update({ [conflict.field_name]: finalValue })
-        .eq('id', conflict.album_id);
-      
+        .from(target.table)
+        .update({ [target.column]: target.value } as Record<string, unknown>)
+        .eq('id', targetId);
+
       if (updateError) throw updateError;
       
       const rejectedValue = getRejectedValue(conflict.current_value, conflict.new_value, strategyResolution);
