@@ -51,15 +51,79 @@ export default function SaleItemsPage() {
     
     // Updated query: Removed 'folder', added 'location' and 'personal_notes'
     const { data, error } = await supabase
-      .from('v2_legacy_archive')
-      .select('id,artist,title,year,format,image_url,location,for_sale,sale_price,sale_platform,sale_quantity,sale_notes,wholesale_cost,discogs_release_id,personal_notes')
-      .eq('for_sale', true)
-      .order('artist', { ascending: true });
+      .from('inventory')
+      .select(`
+        id,
+        status,
+        location,
+        sale_price,
+        sale_platform,
+        sale_quantity,
+        sale_notes,
+        wholesale_cost,
+        personal_notes,
+        current_value,
+        purchase_price,
+        release:releases (
+          discogs_release_id,
+          release_year,
+          media_type,
+          format_details,
+          qty,
+          master:masters (
+            title,
+            original_release_year,
+            cover_image_url,
+            artist:artists ( name )
+          )
+        )
+      `)
+      .eq('status', 'for_sale')
+      .order('id', { ascending: true });
 
     if (!error && data) {
-      setItems(data as SaleItem[]);
-      
-      const locations = Array.from(new Set(data.map((item: SaleItem) => item.location).filter(Boolean)));
+      const mapped = data.map((row) => {
+        const release = row.release as {
+          discogs_release_id?: string | null;
+          release_year?: number | null;
+          media_type?: string | null;
+          format_details?: string[] | null;
+          qty?: number | null;
+          master?: {
+            title?: string | null;
+            original_release_year?: number | null;
+            cover_image_url?: string | null;
+            artist?: { name?: string | null } | null;
+          } | null;
+        } | null;
+        const master = release?.master;
+        const formatParts = [release?.media_type, ...(release?.format_details ?? [])].filter(Boolean);
+        const baseFormat = formatParts.join(', ');
+        const qty = release?.qty ?? 1;
+        const formatLabel = baseFormat ? (qty > 1 ? `${qty}x${baseFormat}` : baseFormat) : '';
+        const yearValue = release?.release_year ?? master?.original_release_year ?? null;
+
+        return {
+          id: row.id as number,
+          artist: master?.artist?.name ?? 'Unknown Artist',
+          title: master?.title ?? 'Untitled',
+          year: yearValue ? String(yearValue) : null,
+          format: formatLabel || 'Unknown',
+          image_url: master?.cover_image_url ?? null,
+          location: row.location ?? null,
+          for_sale: row.status === 'for_sale',
+          sale_price: (row.sale_price ?? row.current_value) ?? null,
+          sale_platform: row.sale_platform ?? null,
+          sale_quantity: row.sale_quantity ?? null,
+          sale_notes: row.sale_notes ?? null,
+          wholesale_cost: (row.wholesale_cost ?? row.purchase_price) ?? null,
+          discogs_release_id: release?.discogs_release_id ?? null,
+          personal_notes: row.personal_notes ?? null,
+        } satisfies SaleItem;
+      });
+
+      setItems(mapped);
+      const locations = Array.from(new Set(mapped.map((item) => item.location).filter(Boolean)));
       setAvailableLocations(locations.sort() as string[]);
     }
     
@@ -114,8 +178,8 @@ export default function SaleItemsPage() {
     setSaving(true);
     
     const { error } = await supabase
-      .from('v2_legacy_archive')
-      .update(editValues)
+      .from('inventory')
+      .update(editValues as Record<string, unknown>)
       .eq('id', id);
 
     if (!error) {
@@ -131,14 +195,14 @@ export default function SaleItemsPage() {
     if (!confirm('Remove this item from sale?')) return;
     
     const { error } = await supabase
-      .from('v2_legacy_archive')
+      .from('inventory')
       .update({
-        for_sale: false,
+        status: 'in_collection',
         sale_price: null,
         sale_platform: null,
         sale_quantity: null,
         sale_notes: null
-      })
+      } as Record<string, unknown>)
       .eq('id', id);
 
     if (!error) {

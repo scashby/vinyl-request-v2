@@ -14,7 +14,7 @@ type Track = {
 };
 
 type SearchResult = {
-  collection_id: number;
+  inventory_id: number;
   artist: string;
   album_title: string;
   track_title: string;
@@ -24,7 +24,7 @@ type SearchResult = {
 };
 
 type TagInsert = {
-  collection_id: number;
+  inventory_id: number;
   track_title: string;
   track_position: string | null;
   search_term: string;
@@ -32,10 +32,20 @@ type TagInsert = {
 };
 
 type TagQueryResult = {
-  collection_id: number;
+  inventory_id: number;
   track_title: string;
   track_position: string | null;
   genius_url: string | null;
+  inventory?: {
+    release?: {
+      master?: {
+        title?: string | null;
+        cover_image_url?: string | null;
+        artist?: {
+          name?: string | null;
+        } | null;
+      } | null;
+    } | null;
   inventory?: {
     release?: {
       master?: {
@@ -178,11 +188,11 @@ export async function POST(req: Request) {
       const { data: existingTags, error: tagError } = await supabase
         .from('lyric_search_tags')
         .select(`
-          collection_id,
+          inventory_id,
           track_title,
           track_position,
           genius_url,
-          inventory:collection_id (
+          inventory:inventory_id (
             id,
             release:releases (
               master:masters (
@@ -199,7 +209,7 @@ export async function POST(req: Request) {
         console.log(`✅ Found ${existingTags.length} cached results`);
         const tagResults = existingTags as unknown as TagQueryResult[];
         const results: SearchResult[] = tagResults.map((tag) => ({
-          collection_id: tag.collection_id,
+          inventory_id: tag.inventory_id,
           artist: tag.inventory?.release?.master?.artist?.name || 'Unknown Artist',
           album_title: tag.inventory?.release?.master?.title || 'Unknown Album',
           track_title: tag.track_title,
@@ -314,7 +324,7 @@ export async function POST(req: Request) {
             console.log(`  ✅ MATCH!`);
             tracksMatched++;
             results.push({
-              collection_id: album.id,
+              inventory_id: album.id,
               artist: artistName,
               album_title: albumTitle,
               track_title: track.title,
@@ -324,7 +334,7 @@ export async function POST(req: Request) {
             });
 
             tagsToInsert.push({
-              collection_id: album.id,
+              inventory_id: album.id,
               track_title: track.title,
               track_position: track.position || null,
               search_term: searchTerm,
@@ -396,11 +406,11 @@ export async function GET(req: Request) {
       const { data, error } = await supabase
         .from('lyric_search_tags')
         .select(`
-          collection_id,
+          inventory_id,
           track_title,
           track_position,
           genius_url,
-          inventory:collection_id (
+          inventory:inventory_id (
             release:releases (
               master:masters (
                 title,
@@ -418,7 +428,7 @@ export async function GET(req: Request) {
 
       const tagResults = data as unknown as TagQueryResult[] || [];
       const results: SearchResult[] = tagResults.map((tag) => ({
-        collection_id: tag.collection_id,
+        inventory_id: tag.inventory_id,
         artist: tag.inventory?.release?.master?.artist?.name || 'Unknown Artist',
         album_title: tag.inventory?.release?.master?.title || 'Unknown Album',
         track_title: tag.track_title,

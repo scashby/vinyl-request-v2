@@ -61,6 +61,7 @@ export async function POST(req: Request) {
       .select(`
         id,
         location,
+        last_reviewed_at,
         release:releases (
           id,
           discogs_release_id,
@@ -69,9 +70,13 @@ export async function POST(req: Request) {
           release_year,
           label,
           catalog_number,
+          media_type,
+          format_details,
+          qty,
           master:masters (
             id,
             title,
+            cover_image_url,
             discogs_master_id,
             genres,
             styles,
@@ -128,10 +133,18 @@ export async function POST(req: Request) {
     const mapInventoryToCandidate = (album: Record<string, unknown>) => {
       const release = (album as Record<string, any>).release;
       const master = release?.master;
+      const formatParts = [release?.media_type, ...(release?.format_details ?? [])].filter(Boolean);
+      const baseFormat = formatParts.join(', ');
+      const qty = release?.qty ?? 1;
+      const formatLabel = baseFormat ? (qty > 1 ? `${qty}x${baseFormat}` : baseFormat) : '';
       return {
         id: album.id,
+        release_id: release?.id ?? null,
+        master_id: master?.id ?? null,
         artist: master?.artist?.name ?? 'Unknown Artist',
         title: master?.title ?? 'Untitled',
+        format: formatLabel,
+        image_url: master?.cover_image_url ?? null,
         discogs_release_id: release?.discogs_release_id ?? null,
         discogs_master_id: master?.discogs_master_id ?? null,
         spotify_id: release?.spotify_album_id ?? null,
@@ -141,7 +154,8 @@ export async function POST(req: Request) {
         cat_no: release?.catalog_number ?? null,
         genres: master?.genres ?? null,
         styles: master?.styles ?? null,
-        location: album.location ?? null
+        location: album.location ?? null,
+        last_reviewed_at: album.last_reviewed_at ?? null
       };
     };
 

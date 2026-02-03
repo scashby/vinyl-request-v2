@@ -50,8 +50,19 @@ interface ParsedCLZAlbum {
 // Use Record type for existing albums since we need all fields for conflict detection
 type ExistingAlbum = Record<string, unknown> & {
   id: number;
+  release_id: number | null;
+  master_id: number | null;
   artist: string;
   title: string;
+  year: string | null;
+  labels: string[] | null;
+  cat_no: string | null;
+  barcode: string | null;
+  country: string | null;
+  location: string | null;
+  media_condition: string | null;
+  package_sleeve_condition: string | null;
+  personal_notes: string | null;
 };
 
 interface ComparedCLZAlbum extends ParsedCLZAlbum {
@@ -270,6 +281,71 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
 
   if (!isOpen) return null;
 
+  const coerceYear = (value: unknown): number | null => {
+    if (typeof value === 'number') return Number.isNaN(value) ? null : value;
+    if (typeof value === 'string') {
+      const parsed = parseInt(value, 10);
+      return Number.isNaN(parsed) ? null : parsed;
+    }
+    return null;
+  };
+
+  const splitV3Updates = (updates: Record<string, unknown>) => {
+    const inventoryUpdates: Record<string, unknown> = {};
+    const releaseUpdates: Record<string, unknown> = {};
+
+    Object.entries(updates).forEach(([key, value]) => {
+      switch (key) {
+        case 'location':
+        case 'personal_notes':
+        case 'media_condition':
+          inventoryUpdates[key] = value ?? null;
+          break;
+        case 'package_sleeve_condition':
+          inventoryUpdates.sleeve_condition = value ?? null;
+          break;
+        case 'labels':
+          releaseUpdates.label = Array.isArray(value) ? value[0] ?? null : value;
+          break;
+        case 'cat_no':
+          releaseUpdates.catalog_number = value ?? null;
+          break;
+        case 'barcode':
+        case 'country':
+          releaseUpdates[key] = value ?? null;
+          break;
+        case 'year':
+          releaseUpdates.release_year = coerceYear(value);
+          break;
+        default:
+          break;
+      }
+    });
+
+    return { inventoryUpdates, releaseUpdates };
+  };
+
+  const applyAlbumUpdates = async (album: ExistingAlbum, updates: Record<string, unknown>) => {
+    const { inventoryUpdates, releaseUpdates } = splitV3Updates(updates);
+    const operations: Promise<unknown>[] = [];
+
+    if (Object.keys(inventoryUpdates).length > 0) {
+      operations.push(
+        supabase.from('inventory').update(inventoryUpdates as Record<string, unknown>).eq('id', album.id)
+      );
+    }
+
+    if (album.release_id && Object.keys(releaseUpdates).length > 0) {
+      operations.push(
+        supabase.from('releases').update(releaseUpdates as Record<string, unknown>).eq('id', album.release_id)
+      );
+    }
+
+    if (operations.length > 0) {
+      await Promise.all(operations);
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
@@ -293,8 +369,28 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
 
       // Load existing collection (select all fields needed for conflict detection)
       const { data: existing, error: dbError } = await supabase
-        .from('v2_legacy_archive')
-        .select('*');
+        .from('inventory')
+        .select(`
+          id,
+          location,
+          media_condition,
+          sleeve_condition,
+          personal_notes,
+          release:releases (
+            id,
+            label,
+            catalog_number,
+            barcode,
+            country,
+            release_year,
+            master:masters (
+              id,
+              title,
+              original_release_year,
+              artist:artists ( name )
+            )
+          )
+        `);
 
       if (dbError) {
         setError(`Database error: ${dbError.message}`);
@@ -302,9 +398,43 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
       }
 
       // Compare
-      const compared = compareCLZAlbums(parsed, existing as ExistingAlbum[]);
+      const mappedExisting = (existing ?? []).map((row) => {
+        const release = row.release as {
+          id?: number | null;
+          label?: string | null;
+          catalog_number?: string | null;
+          barcode?: string | null;
+          country?: string | null;
+          release_year?: number | null;
+          master?: {
+            id?: number | null;
+            title?: string | null;
+            original_release_year?: number | null;
+            artist?: { name?: string | null } | null;
+          } | null;
+        } | null;
+        const master = release?.master;
+        return {
+          id: row.id as number,
+          release_id: release?.id ?? null,
+          master_id: master?.id ?? null,
+          artist: master?.artist?.name ?? 'Unknown Artist',
+          title: master?.title ?? 'Untitled',
+          year: (release?.release_year ?? master?.original_release_year)?.toString() ?? null,
+          labels: release?.label ? [release.label] : null,
+          cat_no: release?.catalog_number ?? null,
+          barcode: release?.barcode ?? null,
+          country: release?.country ?? null,
+          location: row.location ?? null,
+          media_condition: row.media_condition ?? null,
+          package_sleeve_condition: row.sleeve_condition ?? null,
+          personal_notes: row.personal_notes ?? null,
+        } satisfies ExistingAlbum;
+      });
+
+      const compared = compareCLZAlbums(parsed, mappedExisting);
       setComparedAlbums(compared);
-      setExistingAlbums(existing as ExistingAlbum[]);
+      setExistingAlbums(mappedExisting);
       setLinkQueries({});
       setStage('preview');
     } catch (err) {
@@ -378,13 +508,6 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
             artist: album.artist,
             title: album.title,
             year: album.year,
-            tracks: album.tracks,
-            disc_metadata: album.disc_metadata,
-            discs: album.disc_count,
-            musicians: album.musicians,
-            producers: album.producers,
-            engineers: album.engineers,
-            songwriters: album.songwriters,
             barcode: album.barcode,
             cat_no: album.cat_no,
             labels: album.labels,
@@ -415,12 +538,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
 
           // Update album with non-conflicting data
           if (Object.keys(updateData).length > 0) {
-            const { error: updateError } = await supabase
-              .from('v2_legacy_archive')
-              .update(updateData)
-              .eq('id', album.existingId!);
-
-            if (updateError) throw updateError;
+            await applyAlbumUpdates(existingAlbum, updateData);
           }
           
           // Count as updated if we applied changes or found conflicts

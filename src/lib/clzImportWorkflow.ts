@@ -7,6 +7,8 @@
 
 import { parseCLZXML } from './clzParser';
 import { parseDiscogsFormat } from './formatParser';
+import { parseCLZXML } from './clzParser';
+import { parseDiscogsFormat } from './formatParser';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type UpdateMode = 'update_missing_only' | 'update_all';
@@ -410,15 +412,47 @@ export async function previewCLZImport(
   
   // Fetch existing albums
   const { data: existingAlbums } = await supabase
-    .from('v2_legacy_archive')
-    .select('*');
-  
+    .from('inventory')
+    .select(`
+      id,
+      release:releases (
+        id,
+        media_type,
+        format_details,
+        qty,
+        master:masters (
+          title,
+          artist:artists ( name )
+        )
+      )
+    `);
+
   const newAlbums: Array<{ artist: string; title: string; format: string }> = [];
   const albumsToUpdate: Array<{ id: number; artist: string; title: string; updateCount: number }> = [];
   const conflicts: FieldConflict[] = [];
+
+  const buildFormatLabel = (release?: { media_type?: string | null; format_details?: string[] | null; qty?: number | null } | null) => {
+    if (!release) return '';
+    const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
+    const base = parts.join(', ');
+    const qty = release.qty ?? 1;
+    if (!base) return '';
+    return qty > 1 ? `${qty}x${base}` : base;
+  };
   
+  const normalizedExisting = (existingAlbums ?? []).map((row) => {
+    const release = row.release as { media_type?: string | null; format_details?: string[] | null; qty?: number | null; master?: { title?: string | null; artist?: { name?: string | null } | null } | null } | null;
+    const master = release?.master;
+    return {
+      id: row.id as number,
+      artist: master?.artist?.name ?? 'Unknown Artist',
+      title: master?.title ?? 'Untitled',
+      format: buildFormatLabel(release),
+    };
+  });
+
   for (const clzData of clzAlbums) {
-    const matchingAlbum: CollectionRow | undefined = findMatchingAlbum(clzData, existingAlbums || []);
+    const matchingAlbum: CollectionRow | undefined = findMatchingAlbum(clzData, normalizedExisting);
     
     if (!matchingAlbum) {
       newAlbums.push({
