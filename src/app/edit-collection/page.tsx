@@ -189,16 +189,20 @@ function CollectionBrowserPage() {
       .filter((name): name is string => Boolean(name));
   };
 
-  const getAlbumArtist = (album: V3Album) =>
-    album.release?.master?.artist?.name ?? 'Unknown Artist';
+  const getAlbumArtist = (album: Album) =>
+    album.artist ?? album.release?.master?.artist?.name ?? 'Unknown Artist';
 
-  const getAlbumTitle = (album: V3Album) =>
-    album.release?.master?.title ?? 'Untitled';
+  const getAlbumTitle = (album: Album) =>
+    album.title ?? album.release?.master?.title ?? 'Untitled';
 
-  const getAlbumYearValue = (album: V3Album) =>
-    album.release?.release_year ?? album.release?.master?.original_release_year ?? null;
+  const getAlbumYearValue = (album: Album) => {
+    if (album.year) return album.year;
+    if (album.release?.release_year) return album.release.release_year;
+    return album.release?.master?.original_release_year ?? null;
+  };
 
-  const getAlbumYearInt = (album: V3Album) => {
+  const getAlbumYearInt = (album: Album) => {
+    if (typeof album.year_int === 'number') return album.year_int;
     const yearValue = getAlbumYearValue(album);
     if (typeof yearValue === 'number') return yearValue;
     if (typeof yearValue === 'string') {
@@ -206,6 +210,156 @@ function CollectionBrowserPage() {
       return Number.isNaN(parsed) ? null : parsed;
     }
     return null;
+  };
+
+  const getAlbumFormat = (album: Album) =>
+    album.format ?? buildFormatLabel(album.release ?? null);
+
+  const getAlbumTags = (album: Album) =>
+    album.custom_tags ?? extractTagNames(album.release?.master?.master_tag_links ?? null);
+
+  const getAlbumGenres = (album: Album) =>
+    album.genres ?? album.release?.master?.genres ?? null;
+
+  const mapInventoryToAlbum = (row: InventoryQueryRow): Album => {
+    const release = row.release ?? null;
+    const master = release?.master ?? null;
+    const artist = master?.artist?.name ?? 'Unknown Artist';
+    const label = release?.label ?? null;
+    const tags = extractTagNames(master?.master_tag_links ?? null);
+    const status = row.status ?? 'active';
+
+    let collectionStatus: Album['collection_status'] = 'in_collection';
+    if (status === 'wishlist') collectionStatus = 'wish_list';
+    if (status === 'incoming') collectionStatus = 'on_order';
+    if (status === 'sold') collectionStatus = 'sold';
+    if (status === 'for_sale') collectionStatus = 'for_sale';
+
+    return {
+      inventory: row,
+      release,
+      id: row.id,
+      inventory_id: row.id,
+      release_id: release?.id ?? null,
+      master_id: master?.id ?? null,
+      artist,
+      secondary_artists: null,
+      sort_artist: null,
+      title: master?.title ?? 'Untitled',
+      sort_title: null,
+      year: master?.original_release_year ? String(master.original_release_year) : null,
+      year_int: master?.original_release_year ?? null,
+      image_url: master?.cover_image_url ?? null,
+      back_image_url: null,
+      index_number: null,
+      collection_status: collectionStatus,
+      for_sale: status === 'for_sale',
+      location: row.location ?? null,
+      storage_device: null,
+      storage_device_slot: null,
+      slot: null,
+      country: release?.country ?? null,
+      studio: null,
+      recording_location: null,
+      date_added: row.date_added ?? null,
+      modified_date: null,
+      last_reviewed_at: null,
+      decade: master?.original_release_year ? Math.floor(master.original_release_year / 10) * 10 : null,
+      personal_notes: row.personal_notes ?? null,
+      release_notes: release?.notes ?? null,
+      extra: null,
+      format: buildFormatLabel(release),
+      media_condition: row.media_condition ?? '',
+      package_sleeve_condition: row.sleeve_condition ?? null,
+      barcode: release?.barcode ?? null,
+      cat_no: release?.catalog_number ?? null,
+      packaging: null,
+      rpm: null,
+      vinyl_weight: null,
+      vinyl_color: null,
+      discs: release?.qty ?? null,
+      sides: null,
+      length_seconds: null,
+      sound: null,
+      spars_code: null,
+      is_live: null,
+      is_box_set: null,
+      box_set: null,
+      time_signature: null,
+      tracks: null,
+      discogs_id: null,
+      discogs_release_id: release?.discogs_release_id ?? null,
+      discogs_master_id: master?.discogs_master_id ?? null,
+      spotify_id: null,
+      spotify_url: null,
+      spotify_album_id: release?.spotify_album_id ?? null,
+      apple_music_id: null,
+      apple_music_url: null,
+      musicbrainz_id: null,
+      musicbrainz_url: null,
+      lastfm_id: null,
+      lastfm_url: null,
+      allmusic_id: null,
+      allmusic_url: null,
+      wikipedia_url: null,
+      dbpedia_uri: null,
+      original_release_date: null,
+      original_release_year: master?.original_release_year ?? null,
+      recording_date: null,
+      recording_year: null,
+      master_release_date: release?.release_date ?? null,
+      genres: master?.genres ?? null,
+      styles: master?.styles ?? null,
+      custom_tags: tags.length > 0 ? tags : null,
+      labels: label ? [label] : null,
+      enrichment_sources: null,
+      finalized_fields: null,
+      musicians: null,
+      producers: null,
+      engineers: null,
+      songwriters: null,
+      writers: null,
+      chorus: null,
+      composer: null,
+      composition: null,
+      conductor: null,
+      orchestra: null,
+      owner: row.owner ?? null,
+      due_date: null,
+      loan_date: null,
+      loaned_to: null,
+      last_cleaned_date: null,
+      last_played_date: null,
+      play_count: row.play_count ?? null,
+      my_rating: null,
+      signed_by: null,
+      purchase_price: row.purchase_price ?? null,
+      current_value: row.current_value ?? null,
+      purchase_date: row.purchase_date ?? null,
+      purchase_store: null,
+      sale_price: null,
+      sell_price: null,
+      sale_platform: null,
+      sale_quantity: null,
+      sale_notes: null,
+      wholesale_cost: null,
+      pricing_notes: null,
+      subtitle: null,
+      played_history: null,
+      blocked: null,
+      blocked_sides: null,
+      blocked_tracks: null,
+      disc_metadata: null,
+      matrix_numbers: null,
+      inner_sleeve_images: null,
+      enriched_metadata: null,
+      cultural_significance: null,
+      tempo_bpm: null,
+      musical_key: null,
+      energy: null,
+      danceability: null,
+      valence: null,
+    };
   };
 
   const getAlbumFormat = (album: V3Album) =>
@@ -245,37 +399,25 @@ function CollectionBrowserPage() {
            owner,
            play_count,
            last_played_at,
-             release:releases (
+           release:releases (
+             id,
+             master_id,
+             media_type,
+             label,
+             catalog_number,
+             barcode,
+             country,
+             release_date,
+             release_year,
+             discogs_release_id,
+             spotify_album_id,
+             notes,
+             qty,
+             format_details,
+             master:masters (
                id,
-               master_id,
-               media_type,
-               label,
-               catalog_number,
-               barcode,
-               country,
-               release_date,
-               release_year,
-               discogs_release_id,
-               spotify_album_id,
-               notes,
-               track_count,
-               qty,
-               format_details,
-               release_tracks:release_tracks (
-                 id,
-                 position,
-                 side,
-                 title_override,
-                 recording:recordings (
-                   id,
-                   title,
-                   duration_seconds
-                 )
-               ),
-               master:masters (
-                 id,
-                 title,
-                 original_release_year,
+               title,
+               original_release_year,
                discogs_master_id,
                cover_image_url,
                genres,
@@ -302,7 +444,9 @@ function CollectionBrowserPage() {
       from += batchSize;
     }
 
-    setAlbums(allRows as V3Album[]);
+    const mapped = allRows.map(mapInventoryToAlbum);
+
+    setAlbums(mapped);
     setLoading(false);
   }, []);
 
