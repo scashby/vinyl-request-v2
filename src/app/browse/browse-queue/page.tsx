@@ -155,7 +155,7 @@ function BrowseQueueContent() {
           votes: request.votes ?? 1,
           created_at: request.created_at,
           queue_type: request.recording_id ? "track" : "album",
-          collection: inventory
+          inventory: inventory
             ? {
                 id: inventory.id,
                 image_url: imageUrl,
