@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabaseClient';
 import CollectionTable from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
 import { ColumnId, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
-import { type Album, toSafeStringArray, toSafeSearchString } from '../../types/album';
+import { type V3Album, toSafeStringArray, toSafeSearchString } from '../../types/v3-types';
 import EditAlbumModal from './EditAlbumModal';
 import NewCrateModal from './crates/NewCrateModal';
 import NewSmartCrateModal from './crates/NewSmartCrateModal';
@@ -27,6 +27,7 @@ import {
   getAlbumYearInt,
   getAlbumYearValue
 } from './albumHelpers';
+import type { Database } from '../../types/supabase';
 
 type SortOption = 
   | 'artist-asc' | 'artist-desc' 
@@ -60,8 +61,17 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
   { value: 'tags-count-asc', label: 'Fewest Tags', category: 'Metadata' }
 ];
 
+type InventoryRow = Database['public']['Tables']['inventory']['Row'];
+type ReleaseRow = Database['public']['Tables']['releases']['Row'];
+type MasterRow = Database['public']['Tables']['masters']['Row'];
+type ArtistRow = Database['public']['Tables']['artists']['Row'];
+
+type MasterTagLinkRow = {
+  master_tags?: { name: string | null } | null;
+};
+
 function CollectionBrowserPage() {
-  const [albums, setAlbums] = useState<Album[]>([]);
+  const [albums, setAlbums] = useState<V3Album[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchTypeDropdown, setShowSearchTypeDropdown] = useState(false);
@@ -243,7 +253,7 @@ function CollectionBrowserPage() {
       from += batchSize;
     }
 
-    setAlbums(allRows as Album[]);
+    setAlbums(allRows as V3Album[]);
     setLoading(false);
   }, []);
 
@@ -370,6 +380,16 @@ function CollectionBrowserPage() {
           case 'condition-desc': return (b.media_condition || '').localeCompare(a.media_condition || '');
           case 'tags-count-desc': return toSafeStringArray(getAlbumTags(b)).length - toSafeStringArray(getAlbumTags(a)).length;
           case 'tags-count-asc': return toSafeStringArray(getAlbumTags(a)).length - toSafeStringArray(getAlbumTags(b)).length;
+          case 'sale-price-desc': return (b.sale_price || 0) - (a.sale_price || 0);
+          case 'sale-price-asc': return (a.sale_price || 0) - (b.sale_price || 0);
+          case 'sides-desc':
+            const bSides = typeof b.sides === 'number' ? b.sides : 0;
+            const aSides = typeof a.sides === 'number' ? a.sides : 0;
+            return bSides - aSides;
+          case 'sides-asc':
+            const aSidesAsc = typeof a.sides === 'number' ? a.sides : 0;
+            const bSidesAsc = typeof b.sides === 'number' ? b.sides : 0;
+            return aSidesAsc - bSidesAsc;
           default: return 0;
         }
       });
@@ -430,7 +450,7 @@ function CollectionBrowserPage() {
     }, {} as Record<string, typeof SORT_OPTIONS>);
   }, []);
 
-  const handleAlbumClick = useCallback((album: Album) => {
+  const handleAlbumClick = useCallback((album: V3Album) => {
     setSelectedAlbumId(album.id);
   }, []);
 
