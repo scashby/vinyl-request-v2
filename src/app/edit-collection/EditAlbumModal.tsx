@@ -423,6 +423,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           release,
           id: data.id,
           inventory_id: data.id,
+          release,
           master_id: master?.id ?? null,
           release_id: release?.id ?? null,
           artist: artist?.name || '',
