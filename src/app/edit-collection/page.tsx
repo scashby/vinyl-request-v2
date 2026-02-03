@@ -27,7 +27,6 @@ import {
   getAlbumYearInt,
   getAlbumYearValue
 } from './albumHelpers';
-import type { Database } from '../../types/supabase';
 
 type SortOption = 
   | 'artist-asc' | 'artist-desc' 
@@ -60,15 +59,6 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
   { value: 'tags-count-desc', label: 'Most Tags', category: 'Metadata' },
   { value: 'tags-count-asc', label: 'Fewest Tags', category: 'Metadata' }
 ];
-
-type InventoryRow = Database['public']['Tables']['inventory']['Row'];
-type ReleaseRow = Database['public']['Tables']['releases']['Row'];
-type MasterRow = Database['public']['Tables']['masters']['Row'];
-type ArtistRow = Database['public']['Tables']['artists']['Row'];
-
-type MasterTagLinkRow = {
-  master_tags?: { name: string | null } | null;
-};
 
 function CollectionBrowserPage() {
   const [albums, setAlbums] = useState<V3Album[]>([]);
@@ -380,16 +370,6 @@ function CollectionBrowserPage() {
           case 'condition-desc': return (b.media_condition || '').localeCompare(a.media_condition || '');
           case 'tags-count-desc': return toSafeStringArray(getAlbumTags(b)).length - toSafeStringArray(getAlbumTags(a)).length;
           case 'tags-count-asc': return toSafeStringArray(getAlbumTags(a)).length - toSafeStringArray(getAlbumTags(b)).length;
-          case 'sale-price-desc': return (b.sale_price || 0) - (a.sale_price || 0);
-          case 'sale-price-asc': return (a.sale_price || 0) - (b.sale_price || 0);
-          case 'sides-desc':
-            const bSides = typeof b.sides === 'number' ? b.sides : 0;
-            const aSides = typeof a.sides === 'number' ? a.sides : 0;
-            return bSides - aSides;
-          case 'sides-asc':
-            const aSidesAsc = typeof a.sides === 'number' ? a.sides : 0;
-            const bSidesAsc = typeof b.sides === 'number' ? b.sides : 0;
-            return aSidesAsc - bSidesAsc;
           default: return 0;
         }
       });
