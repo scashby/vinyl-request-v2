@@ -3,7 +3,7 @@
 
 import React, { memo, useCallback, useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { Album } from '../types/album';
+import type { V3Album } from '../types/v3-types';
 import { 
   ColumnId, 
   getVisibleColumns,
@@ -13,8 +13,8 @@ import {
 import { getDisplayFormat } from '../utils/formatDisplay';
 
 interface CollectionTableProps {
-  albums: Album[];
-  onAlbumClick: (album: Album) => void;
+  albums: V3Album[];
+  onAlbumClick: (album: V3Album) => void;
   selectedAlbums: Set<string>;
   onSelectionChange: (albumIds: Set<string>) => void;
   visibleColumns: ColumnId[];
@@ -54,17 +54,19 @@ const CollectionTable = memo(function CollectionTable({
 
   const formatters = useMemo(() => {
     const getAlbumArtist = (album: Album) =>
-      album.release?.master?.artist?.name || '—';
+      album.artist || album.release?.master?.artist?.name || '—';
 
     const getAlbumTitle = (album: Album) =>
-      album.release?.master?.title || '—';
+      album.title || album.release?.master?.title || '—';
 
     const getAlbumYear = (album: Album) =>
+      album.year ||
       album.release?.release_year ||
       album.release?.master?.original_release_year ||
       '—';
 
     const getAlbumFormat = (album: Album) => {
+      if (album.format) return album.format;
       const release = album.release;
       if (!release) return '';
       const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
@@ -75,44 +77,22 @@ const CollectionTable = memo(function CollectionTable({
     };
 
     const getAlbumGenres = (album: Album) =>
-      album.release?.master?.genres || null;
+      album.genres || album.release?.master?.genres || null;
 
     const getAlbumStyles = (album: Album) =>
-      album.release?.master?.styles || null;
+      album.styles || album.release?.master?.styles || null;
 
     const getAlbumLabels = (album: Album) => {
+      if (album.labels) return album.labels;
       const releaseLabel = album.release?.label;
       return releaseLabel ? [releaseLabel] : null;
     };
 
     const getAlbumBarcode = (album: Album) =>
-      album.release?.barcode || '—';
+      album.barcode || album.release?.barcode || '—';
 
     const getAlbumCatalogNumber = (album: Album) =>
-      album.release?.catalog_number || '—';
-
-    const getAlbumLocation = (album: Album) =>
-      album.location || '—';
-
-    const getAlbumStatus = (album: Album) =>
-      album.status || '—';
-
-    const getAlbumTags = (album: Album) =>
-      (album.release?.master?.master_tag_links ?? [])
-        .map((link) => link.master_tags?.name)
-        .filter((name): name is string => Boolean(name));
-
-    const getTrackCount = (album: Album): number => {
-      const tracks = album.release?.release_tracks ?? [];
-      return tracks.length;
-    };
-
-    const getTotalDuration = (album: Album): number | null => {
-      const tracks = album.release?.release_tracks ?? [];
-      if (tracks.length === 0) return null;
-      const total = tracks.reduce((sum, track) => sum + (track.recording?.duration_seconds ?? 0), 0);
-      return total > 0 ? total : null;
-    };
+      album.cat_no || album.release?.catalog_number || '—';
 
     const formatLength = (seconds: number | null | undefined): string => {
       if (!seconds) return '—';
@@ -144,8 +124,8 @@ const CollectionTable = memo(function CollectionTable({
     return {
       checkbox: () => null,
       owned: () => <span className="text-green-500 text-sm">✓</span>,
-      for_sale_indicator: (album: Album) => album.status === 'for_sale' ? <span className="text-amber-500 text-sm">$</span> : null,
-      menu: (album: Album) => (
+      for_sale_indicator: (album: V3Album) => album.status === 'for_sale' ? <span className="text-amber-500 text-sm">$</span> : null,
+      menu: (album: V3Album) => (
         <span 
           className="text-blue-500 text-sm cursor-pointer"
           onClick={(e) => {
@@ -167,17 +147,17 @@ const CollectionTable = memo(function CollectionTable({
       year: (album: Album) => getAlbumYear(album),
       barcode: (album: Album) => getAlbumBarcode(album),
       cat_no: (album: Album) => getAlbumCatalogNumber(album),
-      sort_title: () => '—',
-      subtitle: () => '—',
-      index_number: () => '—',
+      sort_title: (album: Album) => album.sort_title || '—',
+      subtitle: (album: Album) => album.subtitle || '—',
+      index_number: (album: Album) => album.index_number || '—',
       format: (album: Album) => getDisplayFormat(getAlbumFormat(album)),
-      discs: (album: Album) => album.release?.qty ?? '—',
-      tracks: (album: Album) => (getTrackCount(album) > 0 ? getTrackCount(album) : '—'),
-      length: (album: Album) => formatLength(getTotalDuration(album)),
-      box_set: () => '—',
-      country: (album: Album) => album.release?.country || '—',
-      extra: () => '—',
-      is_live: () => '—',
+      discs: (album: Album) => album.discs || '—',
+      tracks: (album: Album) => formatTrackCount(album),
+      length: (album: Album) => formatLength(album.length_seconds),
+      box_set: (album: Album) => album.is_box_set ? 'Yes' : 'No',
+      country: (album: Album) => album.country || '—',
+      extra: (album: Album) => album.extra || '—',
+      is_live: (album: Album) => album.is_live ? 'Yes' : 'No',
       media_condition: (album: Album) => album.media_condition || '—',
       package_sleeve_condition: (album: Album) => album.sleeve_condition || '—',
       packaging: () => '—',
@@ -192,20 +172,20 @@ const CollectionTable = memo(function CollectionTable({
       genres: (album: Album) => formatArray(getAlbumGenres(album)),
       styles: (album: Album) => formatArray(getAlbumStyles(album)),
       label: (album: Album) => formatArray(getAlbumLabels(album)),
-      original_release_date: () => '—',
-      original_release_year: (album: Album) => album.release?.master?.original_release_year || '—',
-      recording_date: () => '—',
-      recording_year: () => '—',
-      master_release_date: (album: Album) => album.release?.release_date || '—',
-      chorus: () => '—',
-      composer: () => '—',
-      composition: () => '—',
-      conductor: () => '—',
-      orchestra: () => '—',
-      engineers: () => '—',
-      musicians: () => '—',
-      producers: () => '—',
-      songwriters: () => '—',
+      original_release_date: (album: Album) => formatDate(album.original_release_date),
+      original_release_year: (album: Album) => album.original_release_year || '—',
+      recording_date: (album: Album) => formatDate(album.recording_date),
+      recording_year: (album: Album) => album.recording_year || '—',
+      master_release_date: (album: Album) => album.master_release_date || '—',
+      chorus: (album: Album) => album.chorus || '—',
+      composer: (album: Album) => album.composer || '—',
+      composition: (album: Album) => album.composition || '—',
+      conductor: (album: Album) => album.conductor || '—',
+      orchestra: (album: Album) => album.orchestra || '—',
+      engineers: (album: Album) => formatArray(album.engineers),
+      musicians: (album: Album) => formatArray(album.musicians),
+      producers: (album: Album) => formatArray(album.producers),
+      songwriters: (album: Album) => formatArray(album.songwriters),
       added_date: (album: Album) => formatDate(album.date_added),
       collection_status: (album: Album) => getAlbumStatus(album),
       location: (album: Album) => getAlbumLocation(album),
@@ -257,7 +237,7 @@ const CollectionTable = memo(function CollectionTable({
     return sortState.direction === 'asc' ? ' ▲' : ' ▼';
   }, [sortState]);
 
-  const handleRowClick = useCallback((album: Album) => {
+  const handleRowClick = useCallback((album: V3Album) => {
     onAlbumClick(album);
   }, [onAlbumClick]);
 
@@ -322,7 +302,7 @@ const CollectionTable = memo(function CollectionTable({
     );
   }, [allSelected, someSelected, sortState, handleSelectAll, handleHeaderClick, getSortIndicator, locked]);
 
-  const renderCellContent = useCallback((col: ReturnType<typeof getVisibleColumns>[0], album: Album, albumId: string, isSelected: boolean) => {
+  const renderCellContent = useCallback((col: ReturnType<typeof getVisibleColumns>[0], album: V3Album, albumId: string, isSelected: boolean) => {
     if (col.id === 'checkbox') {
       return (
         <input

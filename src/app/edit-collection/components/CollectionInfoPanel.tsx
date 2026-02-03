@@ -3,10 +3,10 @@
 
 import { memo } from 'react';
 import Image from 'next/image';
-import { type Album, toSafeStringArray } from '../../../types/album';
+import { type V3Album, toSafeStringArray } from '../../../types/v3-types';
 
 interface CollectionInfoPanelProps {
-  album: Album | null;
+  album: V3Album | null;
   onClose?: () => void;
   onEditTags?: () => void;
   onMarkForSale?: () => void;
@@ -17,7 +17,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
     return <div className="py-20 text-center text-gray-400 text-sm italic">Select an album to view details</div>;
   }
 
-  type ReleaseTrack = NonNullable<NonNullable<Album['release']>['release_tracks']>[number];
+  type ReleaseTrack = NonNullable<NonNullable<V3Album['release']>['release_tracks']>[number];
 
   const releaseTracks = album.release?.release_tracks ?? [];
 
