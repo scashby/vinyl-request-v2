@@ -75,6 +75,55 @@ type InventoryQueryRow = InventoryRow & {
   }) | null;
 };
 
+const buildFormatLabel = (release?: ReleaseRow | null) => {
+  if (!release) return '';
+  const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
+  const base = parts.join(', ');
+  const qty = release.qty ?? 1;
+  if (!base) return '';
+  return qty > 1 ? `${qty}x${base}` : base;
+};
+
+const extractTagNames = (links?: MasterTagLinkRow[] | null) => {
+  if (!links) return [];
+  return links
+    .map((link) => link.master_tags?.name)
+    .filter((name): name is string => Boolean(name));
+};
+
+const getAlbumArtist = (album: V3Album) =>
+  album.release?.master?.artist?.name ?? 'Unknown Artist';
+
+const getAlbumTitle = (album: V3Album) =>
+  album.release?.master?.title ?? 'Untitled';
+
+const getAlbumYearValue = (album: V3Album) =>
+  album.release?.release_year ?? album.release?.master?.original_release_year ?? null;
+
+const getAlbumYearInt = (album: V3Album) => {
+  const yearValue = getAlbumYearValue(album);
+  if (typeof yearValue === 'number') return yearValue;
+  if (typeof yearValue === 'string') {
+    const parsed = parseInt(yearValue, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+};
+
+const getAlbumDecade = (album: V3Album) => {
+  const yearValue = getAlbumYearInt(album);
+  return yearValue ? Math.floor(yearValue / 10) * 10 : null;
+};
+
+const getAlbumFormat = (album: V3Album) =>
+  buildFormatLabel(album.release ?? null);
+
+const getAlbumTags = (album: V3Album) =>
+  extractTagNames(album.release?.master?.master_tag_links ?? null);
+
+const getAlbumGenres = (album: V3Album) =>
+  album.release?.master?.genres ?? null;
+
 function CollectionBrowserPage() {
   const [albums, setAlbums] = useState<V3Album[]>([]);
   const [loading, setLoading] = useState(true);
