@@ -236,7 +236,7 @@ export type Album = {
   cultural_significance?: string | null;
 
   // ============================================================================
-  // DJ DATA (Mapped from collection_dj_data)
+  // DJ DATA (Derived from track-level recordings)
   // ============================================================================
   tempo_bpm?: number | null;
   musical_key?: string | null;
