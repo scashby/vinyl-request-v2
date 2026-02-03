@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabaseClient';
 import CollectionTable from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
 import { ColumnId, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
-import { Album, toSafeStringArray, toSafeSearchString } from '../../types/album';
+import { type V3Album, toSafeStringArray, toSafeSearchString } from '../../types/v3-types';
 import EditAlbumModal from './EditAlbumModal';
 import NewCrateModal from './crates/NewCrateModal';
 import NewSmartCrateModal from './crates/NewSmartCrateModal';
@@ -76,7 +76,7 @@ type InventoryQueryRow = InventoryRow & {
 };
 
 function CollectionBrowserPage() {
-  const [albums, setAlbums] = useState<Album[]>([]);
+  const [albums, setAlbums] = useState<V3Album[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchTypeDropdown, setShowSearchTypeDropdown] = useState(false);
@@ -362,6 +362,15 @@ function CollectionBrowserPage() {
     };
   };
 
+  const getAlbumFormat = (album: V3Album) =>
+    buildFormatLabel(album.release ?? null);
+
+  const getAlbumTags = (album: V3Album) =>
+    extractTagNames(album.release?.master?.master_tag_links ?? null);
+
+  const getAlbumGenres = (album: V3Album) =>
+    album.release?.master?.genres ?? null;
+
   const loadAlbums = useCallback(async () => {
     setLoading(true);
     
@@ -482,7 +491,7 @@ function CollectionBrowserPage() {
 
   const filteredAndSortedAlbums = useMemo(() => {
     let filtered = albums.filter(album => {
-      if (collectionFilter === 'For Sale' && !album.for_sale) return false;
+      if (collectionFilter === 'For Sale' && album.status !== 'for_sale') return false;
       
       if (selectedLetter !== 'All') {
         const firstChar = getAlbumArtist(album).charAt(0).toUpperCase();
@@ -635,7 +644,7 @@ function CollectionBrowserPage() {
     }, {} as Record<string, typeof SORT_OPTIONS>);
   }, []);
 
-  const handleAlbumClick = useCallback((album: Album) => {
+  const handleAlbumClick = useCallback((album: V3Album) => {
     setSelectedAlbumId(album.id);
   }, []);
 
@@ -707,7 +716,7 @@ function CollectionBrowserPage() {
       .eq('id', albumId);
     
     if (!error) {
-      setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, for_sale: true, collection_status: 'for_sale' } : a));
+      setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, status: 'for_sale' } : a));
     } else {
       console.error('Error marking album for sale:', error);
     }

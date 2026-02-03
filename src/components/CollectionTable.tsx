@@ -3,7 +3,7 @@
 
 import React, { memo, useCallback, useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Album } from '../types/album';
+import type { V3Album } from '../types/v3-types';
 import { 
   ColumnId, 
   getVisibleColumns,
@@ -13,8 +13,8 @@ import {
 import { getDisplayFormat } from '../utils/formatDisplay';
 
 interface CollectionTableProps {
-  albums: Album[];
-  onAlbumClick: (album: Album) => void;
+  albums: V3Album[];
+  onAlbumClick: (album: V3Album) => void;
   selectedAlbums: Set<string>;
   onSelectionChange: (albumIds: Set<string>) => void;
   visibleColumns: ColumnId[];
@@ -121,17 +121,11 @@ const CollectionTable = memo(function CollectionTable({
       return arr.join(', ');
     };
 
-    const formatTrackCount = (album: Album): string | number => {
-      if (!album.tracks || album.tracks.length === 0) return '—';
-      const countedTracks = album.tracks.filter((track) => track.type === 'track').length;
-      return countedTracks > 0 ? countedTracks : album.tracks.length;
-    };
-
     return {
       checkbox: () => null,
       owned: () => <span className="text-green-500 text-sm">✓</span>,
-      for_sale_indicator: (album: Album) => album.for_sale ? <span className="text-amber-500 text-sm">$</span> : null,
-      menu: (album: Album) => (
+      for_sale_indicator: (album: V3Album) => album.status === 'for_sale' ? <span className="text-amber-500 text-sm">$</span> : null,
+      menu: (album: V3Album) => (
         <span 
           className="text-blue-500 text-sm cursor-pointer"
           onClick={(e) => {
@@ -243,7 +237,7 @@ const CollectionTable = memo(function CollectionTable({
     return sortState.direction === 'asc' ? ' ▲' : ' ▼';
   }, [sortState]);
 
-  const handleRowClick = useCallback((album: Album) => {
+  const handleRowClick = useCallback((album: V3Album) => {
     onAlbumClick(album);
   }, [onAlbumClick]);
 
@@ -308,7 +302,7 @@ const CollectionTable = memo(function CollectionTable({
     );
   }, [allSelected, someSelected, sortState, handleSelectAll, handleHeaderClick, getSortIndicator, locked]);
 
-  const renderCellContent = useCallback((col: ReturnType<typeof getVisibleColumns>[0], album: Album, albumId: string, isSelected: boolean) => {
+  const renderCellContent = useCallback((col: ReturnType<typeof getVisibleColumns>[0], album: V3Album, albumId: string, isSelected: boolean) => {
     if (col.id === 'checkbox') {
       return (
         <input
