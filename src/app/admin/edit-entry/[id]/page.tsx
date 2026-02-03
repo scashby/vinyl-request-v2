@@ -25,7 +25,7 @@ type CollectionEntry = {
   artist: string | null;
   title: string | null;
   year: string | null;
-  folder: string | null;
+  location: string | null;
   format: string | null;
   image_url: string | null;
   media_condition: string | null;
@@ -263,7 +263,7 @@ export default function EditEntryPage() {
       artist: artist?.name ?? 'Unknown Artist',
       title: master?.title ?? 'Untitled',
       year: yearValue ? String(yearValue) : null,
-      folder: data?.location ?? null,
+      location: data?.location ?? null,
       format: buildFormatLabel(release),
       image_url: master?.cover_image_url ?? null,
       media_condition: data?.media_condition ?? null,
@@ -751,7 +751,7 @@ export default function EditEntryPage() {
     setStatus('Saving...');
     
     const inventoryUpdate: Record<string, unknown> = {
-      location: entry.folder || null,
+      location: entry.location || null,
       media_condition: entry.media_condition || null,
       status: forSale ? 'for_sale' : 'in_collection',
       sale_price: forSale && salePrice ? parseFloat(salePrice) : null,
@@ -994,8 +994,8 @@ export default function EditEntryPage() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Folder</label>
-                  <input style={inputStyle} value={entry.folder || ''} onChange={e => handleChange('folder', e.target.value)} placeholder="Collection folder" />
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Location</label>
+                  <input style={inputStyle} value={entry.location || ''} onChange={e => handleChange('location', e.target.value)} placeholder="Location" />
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Format</label>
