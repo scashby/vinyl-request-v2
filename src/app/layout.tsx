@@ -14,8 +14,8 @@ const playfair = Playfair_Display({
 });
 
 export const metadata = {
-  title: 'Vinyl Request',
-  description: 'Request vinyl tracks for the next set',
+  title: 'Dead Wax Dialogues',
+  description: 'Vinyl record collection manager and DJ booking page',
 };
 
 export default function RootLayout({
