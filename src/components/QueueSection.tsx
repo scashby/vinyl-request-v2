@@ -14,7 +14,6 @@ interface Album {
   title: string;
   image_url?: string;
   format?: string;
-  is_1001?: boolean | null;
 }
 
 interface RequestEntry {

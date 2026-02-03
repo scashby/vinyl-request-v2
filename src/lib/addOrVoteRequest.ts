@@ -25,8 +25,62 @@ export async function addOrVoteRequest({
   title,
   status = "pending",
 }: AddOrVoteParams) {
-  if (!inventoryId && !recordingId) {
-    throw new Error("inventoryId or recordingId is required for V3 requests.");
+  let resolvedInventoryId = inventoryId;
+
+  if (!resolvedInventoryId) {
+    const { data: existingArtist, error: artistError } = await supabase
+      .from("artists")
+      .select("id")
+      .ilike("name", artist)
+      .maybeSingle();
+
+    if (artistError) throw artistError;
+
+    let artistId = existingArtist?.id;
+    if (!artistId) {
+      const { data: createdArtist, error: createArtistError } = await supabase
+        .from("artists")
+        .insert({ name: artist || "Unknown Artist" })
+        .select("id")
+        .single();
+
+      if (createArtistError) throw createArtistError;
+      artistId = createdArtist.id;
+    }
+
+    const { data: createdMaster, error: masterError } = await supabase
+      .from("masters")
+      .insert({
+        title: title || "Placeholder Master",
+        main_artist_id: artistId,
+      })
+      .select("id")
+      .single();
+
+    if (masterError || !createdMaster) throw masterError;
+
+    const { data: createdRelease, error: releaseError } = await supabase
+      .from("releases")
+      .insert({
+        master_id: createdMaster.id,
+        media_type: "Unknown",
+      })
+      .select("id")
+      .single();
+
+    if (releaseError || !createdRelease) throw releaseError;
+
+    const { data: createdInventory, error: inventoryError } = await supabase
+      .from("inventory")
+      .insert({
+        release_id: createdRelease.id,
+        status: "placeholder",
+      })
+      .select("id")
+      .single();
+
+    if (inventoryError || !createdInventory) throw inventoryError;
+    resolvedInventoryId = createdInventory.id;
   }
 
   let v3Query = supabase
@@ -35,8 +89,8 @@ export async function addOrVoteRequest({
     .eq("event_id", eventId)
     .limit(1);
 
-  if (inventoryId !== null && inventoryId !== undefined) {
-    v3Query = v3Query.eq("inventory_id", inventoryId);
+  if (resolvedInventoryId !== null && resolvedInventoryId !== undefined) {
+    v3Query = v3Query.eq("inventory_id", resolvedInventoryId);
   } else {
     v3Query = v3Query.is("inventory_id", null);
   }
@@ -62,10 +116,44 @@ export async function addOrVoteRequest({
     return data;
   }
 
+  const { data: inventoryDetails, error: inventoryDetailsError } = await supabase
+    .from("inventory")
+    .select(
+      `id,
+       release:releases (
+         master:masters (
+           title,
+           artist:artists (name)
+         )
+       )`
+    )
+    .eq("id", resolvedInventoryId)
+    .single();
+
+  if (inventoryDetailsError) throw inventoryDetailsError;
+
+  const { data: recordingDetails, error: recordingDetailsError } = recordingId
+    ? await supabase
+        .from("recordings")
+        .select("title")
+        .eq("id", recordingId)
+        .single()
+    : { data: null, error: null };
+
+  if (recordingDetailsError) throw recordingDetailsError;
+
+  const artistName =
+    inventoryDetails?.release?.master?.artist?.name || artist || "Unknown Artist";
+  const masterTitle =
+    inventoryDetails?.release?.master?.title || title || "Untitled";
+  const trackTitle = recordingDetails?.title || masterTitle;
+
   const payload = {
     event_id: eventId,
-    inventory_id: inventoryId,
+    inventory_id: resolvedInventoryId,
     recording_id: recordingId,
+    artist_name: artistName,
+    track_title: trackTitle,
     status,
     votes: 1,
   };

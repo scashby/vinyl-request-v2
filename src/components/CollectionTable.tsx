@@ -53,6 +53,47 @@ const CollectionTable = memo(function CollectionTable({
   });
 
   const formatters = useMemo(() => {
+    const getAlbumArtist = (album: Album) =>
+      album.artist || album.release?.master?.artist?.name || '—';
+
+    const getAlbumTitle = (album: Album) =>
+      album.title || album.release?.master?.title || '—';
+
+    const getAlbumYear = (album: Album) =>
+      album.year ||
+      album.release?.release_year ||
+      album.release?.master?.original_release_year ||
+      '—';
+
+    const getAlbumFormat = (album: Album) => {
+      if (album.format) return album.format;
+      const release = album.release;
+      if (!release) return '';
+      const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
+      const base = parts.join(', ');
+      const qty = release.qty ?? 1;
+      if (!base) return '';
+      return qty > 1 ? `${qty}x${base}` : base;
+    };
+
+    const getAlbumGenres = (album: Album) =>
+      album.genres || album.release?.master?.genres || null;
+
+    const getAlbumStyles = (album: Album) =>
+      album.styles || album.release?.master?.styles || null;
+
+    const getAlbumLabels = (album: Album) => {
+      if (album.labels) return album.labels;
+      const releaseLabel = album.release?.label;
+      return releaseLabel ? [releaseLabel] : null;
+    };
+
+    const getAlbumBarcode = (album: Album) =>
+      album.barcode || album.release?.barcode || '—';
+
+    const getAlbumCatalogNumber = (album: Album) =>
+      album.cat_no || album.release?.catalog_number || '—';
+
     const formatLength = (seconds: number | null | undefined): string => {
       if (!seconds) return '—';
       const mins = Math.floor(seconds / 60);
@@ -101,21 +142,21 @@ const CollectionTable = memo(function CollectionTable({
           ✏
         </span>
       ),
-      artist: (album: Album) => album.artist || '—',
+      artist: (album: Album) => getAlbumArtist(album),
       title: (album: Album) => (
         <span 
           className="text-blue-700 no-underline cursor-pointer hover:underline"
         >
-          {album.title || '—'}
+          {getAlbumTitle(album)}
         </span>
       ),
-      year: (album: Album) => album.year || '—',
-      barcode: (album: Album) => album.barcode || '—',
-      cat_no: (album: Album) => album.cat_no || '—',
+      year: (album: Album) => getAlbumYear(album),
+      barcode: (album: Album) => getAlbumBarcode(album),
+      cat_no: (album: Album) => getAlbumCatalogNumber(album),
       sort_title: (album: Album) => album.sort_title || '—',
       subtitle: (album: Album) => album.subtitle || '—',
       index_number: (album: Album) => album.index_number || '—',
-      format: (album: Album) => getDisplayFormat(album.format || ''),
+      format: (album: Album) => getDisplayFormat(getAlbumFormat(album)),
       discs: (album: Album) => album.discs || '—',
       tracks: (album: Album) => formatTrackCount(album),
       length: (album: Album) => formatLength(album.length_seconds),
@@ -134,9 +175,9 @@ const CollectionTable = memo(function CollectionTable({
       vinyl_color: (album: Album) => formatArray(album.vinyl_color),
       vinyl_weight: (album: Album) => album.vinyl_weight || '—',
       
-      genres: (album: Album) => formatArray(album.genres),
-      styles: (album: Album) => formatArray(album.styles),
-      label: (album: Album) => formatArray(album.labels),
+      genres: (album: Album) => formatArray(getAlbumGenres(album)),
+      styles: (album: Album) => formatArray(getAlbumStyles(album)),
+      label: (album: Album) => formatArray(getAlbumLabels(album)),
       original_release_date: (album: Album) => formatDate(album.original_release_date),
       original_release_year: (album: Album) => album.original_release_year || '—',
       recording_date: (album: Album) => formatDate(album.recording_date),

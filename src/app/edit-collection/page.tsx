@@ -85,6 +85,7 @@ function CollectionBrowserPage() {
   const [selectedFolderValue, setSelectedFolderValue] = useState<string | null>(null);
   const [selectedCrateId, setSelectedCrateId] = useState<number | null>(null);
   const [crates, setCrates] = useState<Crate[]>([]);
+  const [crateItemCounts, setCrateItemCounts] = useState<Record<number, number>>({});
   
   const [collectionFilter, setCollectionFilter] = useState<string>('All');
   const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
@@ -203,7 +204,12 @@ function CollectionBrowserPage() {
     if (status === 'for_sale') collectionStatus = 'for_sale';
 
     return {
+      inventory: row,
+      release,
       id: row.id,
+      inventory_id: row.id,
+      release_id: release?.id ?? null,
+      master_id: master?.id ?? null,
       artist,
       secondary_artists: null,
       sort_artist: null,
@@ -338,28 +344,47 @@ function CollectionBrowserPage() {
         .from('inventory')
         .select(
           `id,
-           collection_id,
-           for_sale,
-           collection_status,
+           release_id,
+           status,
            personal_notes,
            media_condition,
+           sleeve_condition,
            location,
-           custom_tags,
            date_added,
            created_at,
+           purchase_price,
+           current_value,
+           purchase_date,
+           owner,
+           play_count,
+           last_played_at,
            release:releases (
              id,
-             title,
+             master_id,
+             media_type,
+             label,
+             catalog_number,
+             barcode,
+             country,
+             release_date,
              release_year,
-             format,
-             image_url,
-             release_notes,
+             discogs_release_id,
+             spotify_album_id,
+             notes,
+             qty,
+             format_details,
              master:masters (
                id,
                title,
+               original_release_year,
+               discogs_master_id,
+               cover_image_url,
                genres,
                styles,
-               artist:artists (id, name)
+               artist:artists (id, name),
+               master_tag_links:master_tag_links (
+                 master_tags (name)
+               )
              )
            )`
         )
@@ -378,35 +403,7 @@ function CollectionBrowserPage() {
       from += batchSize;
     }
 
-    const mapped = allRows.map((row) => {
-      const release = row.release;
-      const master = release?.master;
-      const artist = master?.artist;
-      const id = row.collection_id ?? row.id;
-      const imageUrl =
-        release?.image_url || master?.image_url || row.image_url || null;
-
-      return {
-        id,
-        inventory_id: row.id,
-        artist: artist?.name || '',
-        title: release?.title || master?.title || '',
-        year: release?.release_year ? String(release.release_year) : null,
-        format: release?.format || '',
-        image_url: imageUrl,
-        back_image_url: null,
-        personal_notes: row.personal_notes ?? null,
-        release_notes: release?.release_notes ?? release?.notes ?? null,
-        media_condition: row.media_condition ?? '',
-        genres: master?.genres || [],
-        styles: master?.styles || [],
-        custom_tags: row.custom_tags || [],
-        location: row.location ?? null,
-        for_sale: row.for_sale ?? false,
-        collection_status: row.collection_status ?? null,
-        date_added: row.date_added ?? row.created_at ?? null,
-      } as Album;
-    });
+    const mapped = allRows.map(mapInventoryToAlbum);
 
     setAlbums(mapped);
     setLoading(false);
@@ -426,6 +423,24 @@ function CollectionBrowserPage() {
     if (data) {
       setCrates(data as Crate[]);
     }
+
+    const { data: crateItems, error: crateItemsError } = await supabase
+      .from('crate_items')
+      .select('crate_id');
+
+    if (crateItemsError) {
+      console.error('Error loading crate items:', crateItemsError);
+      return;
+    }
+
+    const counts = (crateItems ?? []).reduce((acc, item) => {
+      if (item.crate_id) {
+        acc[item.crate_id] = (acc[item.crate_id] || 0) + 1;
+      }
+      return acc;
+    }, {} as Record<number, number>);
+
+    setCrateItemCounts(counts);
   }, []);
 
   useEffect(() => {
@@ -460,7 +475,7 @@ function CollectionBrowserPage() {
       }
 
       if (folderMode === 'format' && selectedFolderValue) {
-        if (getDisplayFormat(album.format || '') !== selectedFolderValue) return false;
+        if ((album.release?.media_type || 'Unknown') !== selectedFolderValue) return false;
       }
 
       if (searchQuery) {
@@ -544,7 +559,7 @@ function CollectionBrowserPage() {
 
   const folderCounts = useMemo(() => {
     return albums.reduce((acc, album) => {
-      const itemKey = getDisplayFormat(album.format || '');
+      const itemKey = album.release?.media_type || 'Unknown';
       acc[itemKey] = (acc[itemKey] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -556,11 +571,11 @@ function CollectionBrowserPage() {
       if (crate.is_smart) {
         count = albums.filter(album => albumMatchesSmartCrate(album, crate)).length;
       } else {
-        count = 0;
+        count = crateItemCounts[crate.id] || 0;
       }
       return { ...crate, album_count: count };
     });
-  }, [crates, albums]);
+  }, [crates, albums, crateItemCounts]);
 
   const sortedFolderItems = useMemo(() => {
     return Object.entries(folderCounts)
@@ -622,13 +637,13 @@ function CollectionBrowserPage() {
         for (const albumId of albumIds) {
           records.push({
             crate_id: crateId,
-            album_id: albumId,
+            inventory_id: albumId,
           });
         }
       }
 
       const { error } = await supabase
-        .from('crate_albums')
+        .from('crate_items')
         .insert(records);
 
       if (error) {
