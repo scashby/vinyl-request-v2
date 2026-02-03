@@ -22,7 +22,7 @@ type Row = {
 };
 
 type LyricSearchResult = {
-  collection_id: number;
+  inventory_id: number;
   artist: string;
   album_title: string;
   track_title: string;
@@ -646,8 +646,8 @@ export default function FlexibleOrganizePage() {
             }}>
               {lyricResults.map((result, idx) => (
                 <Link
-                  key={`${result.collection_id}-${result.track_title}-${idx}`}
-                  href={`/admin/edit-entry/${result.collection_id}`}
+                  key={`${result.inventory_id}-${result.track_title}-${idx}`}
+                  href={`/admin/edit-entry/${result.inventory_id}`}
                   style={{
                     display: 'flex',
                     gap: 12,

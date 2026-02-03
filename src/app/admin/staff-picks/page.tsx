@@ -12,19 +12,19 @@ interface StaffSubmission {
   staff_title: string;
   staff_photo_url?: string;
   staff_bio?: string;
-  collection_id: number;
+  inventory_id: number;
   pick_order: number;
   reason: string;
   favorite_track?: string;
   listening_context?: string;
   is_active: boolean;
   created_at: string;
-  // Joined from collection
+  // Joined from inventory -> release -> master
   artist?: string;
   title?: string;
-  year?: string;
+  year?: string | null;
   image_url?: string;
-  folder?: string;
+  location?: string | null;
 }
 
 interface StaffSummary {
@@ -68,12 +68,18 @@ export default function AdminStaffPicksPage() {
         .from('staff_picks')
         .select(`
           *,
-          collection:collection_id (
-            artist,
-            title,
-            year,
-            image_url,
-            folder
+          inventory:inventory_id (
+            id,
+            location,
+            release:releases (
+              release_year,
+              master:masters (
+                title,
+                original_release_year,
+                cover_image_url,
+                artist:artists ( name )
+              )
+            )
           )
         `)
         .order('staff_name')
@@ -84,11 +90,15 @@ export default function AdminStaffPicksPage() {
       // Flatten the data structure
       const picks = data?.map(pick => ({
         ...pick,
-        artist: pick.collection?.artist,
-        title: pick.collection?.title,
-        year: pick.collection?.year,
-        image_url: pick.collection?.image_url,
-        folder: pick.collection?.folder
+        artist: pick.inventory?.release?.master?.artist?.name,
+        title: pick.inventory?.release?.master?.title,
+        year: pick.inventory?.release?.release_year
+          ? String(pick.inventory.release.release_year)
+          : pick.inventory?.release?.master?.original_release_year
+            ? String(pick.inventory.release.master.original_release_year)
+            : null,
+        image_url: pick.inventory?.release?.master?.cover_image_url,
+        location: pick.inventory?.location ?? null
       })) || [];
 
       setSubmissions(picks);
@@ -780,7 +790,7 @@ export default function AdminStaffPicksPage() {
                               {pick.artist} - {pick.title}
                             </div>
                             <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
-                              {pick.year} • {pick.folder}
+                              {pick.year} • {pick.location}
                               {pick.favorite_track && ` • Favorite: ${pick.favorite_track}`}
                             </div>
                             <div style={{

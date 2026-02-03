@@ -1162,7 +1162,7 @@ export interface Database {
           staff_title: string | null;
           staff_photo_url: string | null;
           staff_bio: string | null;
-          collection_id: number;
+          inventory_id: number;
           pick_order: number;
           reason: string;
           favorite_track: string | null;
@@ -1177,7 +1177,7 @@ export interface Database {
           staff_title?: string | null;
           staff_photo_url?: string | null;
           staff_bio?: string | null;
-          collection_id: number;
+          inventory_id: number;
           pick_order: number;
           reason: string;
           favorite_track?: string | null;
@@ -1192,7 +1192,7 @@ export interface Database {
           staff_title?: string | null;
           staff_photo_url?: string | null;
           staff_bio?: string | null;
-          collection_id?: number;
+          inventory_id?: number;
           pick_order?: number;
           reason?: string;
           favorite_track?: string | null;
