@@ -1,45 +1,54 @@
-import csv
-import xml.etree.ElementTree as ET
-import json
-import re
 import os
+import xml.etree.ElementTree as ET
 
 # --- CONFIGURATION ---
 XML_FILE = 'music_2025-12-18_14-38-58-export.xml'
-CLZ_CSV = 'model_data (3).csv'
-SUPABASE_CSV = 'collection_rows (3).csv'
-OUTPUT_PREFIX = 'migration_part'
-BATCH_SIZE = 100
+OUTPUT_PREFIX = 'inventory_import'
+BATCH_SIZE = 50
 
-def format_duration_clz(seconds_int):
-    """Converts integer seconds to MM:SS string for frontend compatibility."""
-    if not seconds_int or seconds_int <= 0:
-        return "0:00"
-    minutes = seconds_int // 60
-    seconds = seconds_int % 60
-    return f"{minutes}:{seconds:02d}"
 
-def clean_position(pos_str):
-    if not pos_str: return 0
-    nums = re.findall(r'\d+', str(pos_str))
-    return int(nums[0]) if nums else 0
+def clean_text(value):
+    if value is None:
+        return ''
+    return str(value).replace("'", "''").strip()
 
-def normalize_clz_text(text):
-    if not text or text == 'N/A' or str(text).lower() == 'none':
-        return ""
-    text = str(text).lower()
-    text = re.sub(r'\s\(\d+\)', '', text)
-    text = re.sub(r'[^a-z0-9\s]', '', text)
-    return " ".join(text.split())
 
-def check_files():
-    files = [XML_FILE, CLZ_CSV, SUPABASE_CSV]
-    missing = [f for f in files if not os.path.exists(f)]
-    if missing:
-        print("ERROR: Missing files in the current folder:")
-        for m in missing: print(f" - {m}")
-        return False
-    return True
+def normalize_int(value):
+    if value is None:
+        return None
+    value = str(value).strip()
+    if not value:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+def parse_tracks(music):
+    tracks = []
+    discs = music.findall('.//discs/disc')
+
+    if not discs:
+        discs = [music]
+
+    for disc_index, disc in enumerate(discs, start=1):
+        track_nodes = disc.findall('.//track') if disc is not music else music.findall('.//tracks/track')
+        for track in track_nodes:
+            raw_pos = track.findtext('position', '').strip()
+            seconds_val = normalize_int(track.findtext('length', '0')) or 0
+            title = track.findtext('title', '') or ''
+            if not title:
+                continue
+            tracks.append({
+                'title': title,
+                'position': raw_pos or str(len(tracks) + 1),
+                'side': raw_pos[0] if raw_pos and raw_pos[0].isalpha() else None,
+                'duration_seconds': seconds_val,
+                'disc_number': disc_index,
+            })
+    return tracks
+
 
 def parse_clz_xml(xml_path):
     print(f"Parsing XML: {xml_path}...")
@@ -48,11 +57,12 @@ def parse_clz_xml(xml_path):
         root = tree.getroot()
     except Exception as e:
         print(f"Error reading XML: {e}")
-        return {}
-    
+        return []
+
     clz_data = []
     music_list = root.find('.//musiclist')
-    if music_list is None: return {}
+    if music_list is None:
+        return []
 
     for music in music_list.findall('music'):
         artist_nodes = music.findall('.//artists/artist/displayname')
@@ -60,136 +70,156 @@ def parse_clz_xml(xml_path):
         primary_artist = artists[0] if artists else "Unknown Artist"
         title = music.findtext('title', 'Unknown Title')
         year = music.findtext('releaseyear', '')
-        
-        # New: Get Notes
         notes = music.findtext('notes', '')
-        # New: Get Location (Storage Device + Slot)
         storage = music.findtext('storagedevice', '')
         slot = music.findtext('slot', '')
         location = f"{storage} {slot}".strip()
 
-        tracks_json = []
-        disc_metadata = []
-        discs = music.findall('.//discs/disc')
-        
-        if not discs:
-            actual_disc_count = 1
-            disc_metadata.append({"index": 1, "name": "Disc 1"})
-            for track in music.findall('.//tracks/track'):
-                seconds_val = int(track.findtext('length', '0'))
-                t_hash = track.findtext('hash', '0')
-                tracks_json.append({
-                    "id": f"clz-{t_hash}",
-                    "title": track.findtext('title', ''),
-                    "position": clean_position(track.findtext('position', '0')),
-                    "side": track.findtext('position', '')[0] if track.findtext('position', '').isalpha() else None,
-                    "duration": format_duration_clz(seconds_val),
-                    "disc_number": 1, 
-                    "type": "track",
-                    "artist": None
-                })
-        else:
-            actual_disc_count = len(discs)
-            for i, disc in enumerate(discs):
-                d_idx = i + 1
-                d_name = disc.findtext('displayname', f"Disc {d_idx}")
-                disc_metadata.append({"index": d_idx, "name": d_name})
-                
-                for track in disc.findall('.//track'):
-                    seconds_val = int(track.findtext('length', '0'))
-                    t_hash = track.findtext('hash', '0')
-                    raw_pos = track.findtext('position', '')
-                    tracks_json.append({
-                        "id": f"clz-{t_hash}",
-                        "title": track.findtext('title', ''),
-                        "position": clean_position(raw_pos),
-                        "side": raw_pos[0] if raw_pos and raw_pos[0].isalpha() else None,
-                        "duration": format_duration_clz(seconds_val),
-                        "disc_number": d_idx,
-                        "type": "track",
-                        "artist": None
-                    })
+        tracks = parse_tracks(music)
+        disc_count = max({t['disc_number'] for t in tracks} or {1})
 
         clz_data.append({
-            "artist": primary_artist,
-            "title": title,
-            "year": year,
-            "norm_artist": normalize_clz_text(primary_artist),
-            "norm_title": normalize_clz_text(title),
-            "tracks": tracks_json,
-            "disc_metadata": disc_metadata,
-            "disc_count": actual_disc_count,
-            "credits": {
-                "musicians": [m.findtext('displayname') for m in music.findall('.//musicians/musician') if m.findtext('displayname')],
-                "producers": [p.findtext('displayname') for p in music.findall('.//producers/producer') if p.findtext('displayname')],
-                "engineers": [e.findtext('displayname') for e in music.findall('.//engineers/engineer') if e.findtext('displayname')],
-                "songwriters": [s.findtext('displayname') for s in music.findall('.//songwriters/songwriter') if s.findtext('displayname')]
-            },
-            "barcode": music.findtext('barcode', ''),
-            "cat_no": music.findtext('labelnumber', ''),
-            "personal_notes": notes,
-            "location": location
+            'artist': primary_artist,
+            'title': title,
+            'year': year,
+            'tracks': tracks,
+            'disc_count': disc_count,
+            'barcode': music.findtext('barcode', ''),
+            'cat_no': music.findtext('labelnumber', ''),
+            'personal_notes': notes,
+            'location': location,
         })
     return clz_data
 
-def generate_sql():
-    if not check_files(): return
-    clz_items = parse_clz_xml(XML_FILE)
-    updates = []
-    
-    print(f"Reading Supabase State: {SUPABASE_CSV}...")
-    with open(SUPABASE_CSV, mode='r', encoding='utf-8-sig') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            s_id, s_norm_artist, s_norm_title, s_year = row['id'], row['artist_norm'], row['title_norm'], row['year']
-            match_found = next((i for i in clz_items if i['norm_artist'] == s_norm_artist and i['norm_title'] == s_norm_title and i['year'] == s_year), None)
-            if not match_found:
-                match_found = next((i for i in clz_items if i['norm_artist'] == s_norm_artist and i['norm_title'] == s_norm_title), None)
-            if not match_found:
-                match_found = next((i for i in clz_items if i['norm_title'] == s_norm_title and (i['norm_artist'] in s_norm_artist or s_norm_artist in i['norm_artist'])), None)
-            
-            if match_found: updates.append((s_id, match_found))
 
-    if not updates:
-        print("No matches found.")
+def build_album_sql(item):
+    artist = clean_text(item['artist'])
+    title = clean_text(item['title'])
+    year = normalize_int(item['year'])
+    barcode = clean_text(item['barcode']) or None
+    catalog_number = clean_text(item['cat_no']) or None
+    location = clean_text(item['location']) or None
+    personal_notes = clean_text(item['personal_notes']) or None
+    disc_count = item.get('disc_count') or 1
+
+    return f"""
+WITH artist_row AS (
+  INSERT INTO public.artists (name)
+  VALUES ('{artist}')
+  ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+  RETURNING id
+),
+artist_id AS (
+  SELECT id FROM artist_row
+  UNION ALL
+  SELECT id FROM public.artists WHERE name = '{artist}' LIMIT 1
+),
+master_row AS (
+  INSERT INTO public.masters (title, main_artist_id, original_release_year)
+  VALUES ('{title}', (SELECT id FROM artist_id), {year if year else 'NULL'})
+  ON CONFLICT (title, main_artist_id) DO UPDATE SET title = EXCLUDED.title
+  RETURNING id
+),
+master_id AS (
+  SELECT id FROM master_row
+  UNION ALL
+  SELECT id FROM public.masters WHERE title = '{title}' AND main_artist_id = (SELECT id FROM artist_id) LIMIT 1
+),
+release_row AS (
+  INSERT INTO public.releases (master_id, media_type, qty, catalog_number, barcode, release_year)
+  VALUES (
+    (SELECT id FROM master_id),
+    'Unknown',
+    {disc_count},
+    {f"'{catalog_number}'" if catalog_number else 'NULL'},
+    {f"'{barcode}'" if barcode else 'NULL'},
+    {year if year else 'NULL'}
+  )
+  ON CONFLICT (master_id, catalog_number) DO UPDATE SET
+    qty = EXCLUDED.qty
+  RETURNING id
+),
+release_id AS (
+  SELECT id FROM release_row
+  UNION ALL
+  SELECT id FROM public.releases WHERE master_id = (SELECT id FROM master_id) AND catalog_number IS NOT DISTINCT FROM {f"'{catalog_number}'" if catalog_number else 'NULL'} LIMIT 1
+)
+INSERT INTO public.inventory (release_id, status, location, personal_notes)
+VALUES (
+  (SELECT id FROM release_id),
+  'in_collection',
+  {f"'{location}'" if location else 'NULL'},
+  {f"'{personal_notes}'" if personal_notes else 'NULL'}
+);
+""".strip()
+
+
+def build_track_sql(item, track):
+    artist = clean_text(item['artist'])
+    title = clean_text(item['title'])
+    catalog_number = clean_text(item['cat_no']) or None
+    track_title = clean_text(track['title'])
+    position = clean_text(track['position'])
+    side = clean_text(track['side']) if track.get('side') else None
+    duration_seconds = track.get('duration_seconds')
+
+    return f"""
+WITH release_id AS (
+  SELECT r.id
+  FROM public.releases r
+  JOIN public.masters m ON m.id = r.master_id
+  JOIN public.artists a ON a.id = m.main_artist_id
+  WHERE a.name = '{artist}'
+    AND m.title = '{title}'
+    AND r.catalog_number IS NOT DISTINCT FROM {f"'{catalog_number}'" if catalog_number else 'NULL'}
+  LIMIT 1
+),
+recording_row AS (
+  INSERT INTO public.recordings (title, duration_seconds)
+  VALUES (
+    '{track_title}',
+    {duration_seconds if duration_seconds is not None else 'NULL'}
+  )
+  RETURNING id
+)
+INSERT INTO public.release_tracks (release_id, recording_id, position, side)
+VALUES (
+  (SELECT id FROM release_id),
+  (SELECT id FROM recording_row),
+  '{position}',
+  {f"'{side}'" if side else 'NULL'}
+);
+""".strip()
+
+
+def generate_sql():
+    if not os.path.exists(XML_FILE):
+        print(f"ERROR: {XML_FILE} not found.")
         return
 
-    print(f"Matched {len(updates)} records. Splitting into batches of {BATCH_SIZE}...")
-    for i in range(0, len(updates), BATCH_SIZE):
+    clz_items = parse_clz_xml(XML_FILE)
+    if not clz_items:
+        print("No rows to import.")
+        return
+
+    print(f"Generating SQL for {len(clz_items)} records...")
+
+    for i in range(0, len(clz_items), BATCH_SIZE):
         batch_num = (i // BATCH_SIZE) + 1
         filename = f"{OUTPUT_PREFIX}_{batch_num}.sql"
+
         with open(filename, 'w', encoding='utf-8') as f:
             f.write("BEGIN;\n\n")
-            for s_id, data in updates[i:i + BATCH_SIZE]:
-                def esc(v):
-                    if not isinstance(v, str): return v
-                    return v.replace("'", "''")
-                
-                def to_arr(l):
-                    if not l: return "'{}'"
-                    items = ['"' + x.replace('"', '""') + '"' for x in l]
-                    joined = ",".join(items)
-                    return f"'{{{joined}}}'"
+            for item in clz_items[i:i + BATCH_SIZE]:
+                f.write(build_album_sql(item))
+                f.write("\n\n")
+                for track in item['tracks']:
+                    f.write(build_track_sql(item, track))
+                    f.write("\n\n")
+            f.write("COMMIT;")
 
-                tracks_json_str = json.dumps(data['tracks']).replace("'", "''")
-                # Removed disc_metadata column update if it's not in new schema, but sticking to collection updates
-                # Note: 'disc_metadata' might be part of JSONB 'tracks' or separate. Assuming separate or ignored if unused.
-                
-                sql = f"""UPDATE public.collection SET 
-    tracks = '{tracks_json_str}'::jsonb, 
-    discs = {data['disc_count']}, 
-    musicians = {to_arr(data['credits']['musicians'])}, 
-    producers = {to_arr(data['credits']['producers'])}, 
-    engineers = {to_arr(data['credits']['engineers'])}, 
-    songwriters = {to_arr(data['credits']['songwriters'])}, 
-    barcode = '{esc(data['barcode'])}', 
-    cat_no = '{esc(data['cat_no'])}',
-    personal_notes = '{esc(data['personal_notes'])}',
-    location = '{esc(data['location'])}'
-WHERE id = {s_id};"""
-                f.write(sql + "\n")
-            f.write("\nCOMMIT;")
         print(f"Created {filename}")
+
 
 if __name__ == "__main__":
     generate_sql()

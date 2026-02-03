@@ -15,7 +15,23 @@ export async function GET(request: NextRequest) {
       .from('dj_sets')
       .select(`
         *,
-        events(title, date, location)
+        events(title, date, location),
+        inventory:inventory_id (
+          id,
+          release:releases (
+            id,
+            release_year,
+            media_type,
+            format_details,
+            qty,
+            master:masters (
+              id,
+              title,
+              cover_image_url,
+              artist:artists (id, name)
+            )
+          )
+        )
       `)
       .order('recorded_at', { ascending: false })
       .limit(limit);
@@ -60,6 +76,7 @@ export async function POST(request: NextRequest) {
       title,
       description,
       event_id,
+      inventory_id,
       file_url,
       file_size,
       duration,
@@ -83,6 +100,7 @@ export async function POST(request: NextRequest) {
         title,
         description,
         event_id: event_id || null,
+        inventory_id: inventory_id || null,
         file_url,
         file_size: file_size || null,
         duration: duration || null,
