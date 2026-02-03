@@ -5,14 +5,8 @@
  * * Complete implementation with database operations for importing CLZ XML data
  */
 
-import { parseCLZXML, clzToCollectionRow } from './clzParser';
-import { 
-  detectConflicts, 
-  getSafeUpdates, 
-  findMatchingAlbum, 
-  type FieldConflict,
-  type CollectionRow
-} from './conflictDetection';
+import { parseCLZXML } from './clzParser';
+import { parseDiscogsFormat } from './formatParser';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type UpdateMode = 'update_missing_only' | 'update_all';
@@ -27,6 +21,167 @@ export interface ImportResult {
   skippedAlbums: number;
   errors: Array<{ album: string; error: string }>;
   message: string;
+}
+
+export type FieldConflict = {
+  album_id: number;
+  field_name: string;
+  current_value: unknown;
+  new_value: unknown;
+  source: string;
+};
+
+type ArtistRow = { id: number };
+type MasterRow = { id: number };
+type ReleaseRow = { id: number };
+type InventoryRow = { id: number };
+
+const normalizeText = (value?: string | null) => (value ?? '').trim();
+
+async function getOrCreateArtist(
+  supabase: SupabaseClient,
+  name: string
+): Promise<{ row: ArtistRow; created: boolean }> {
+  const { data: existing } = await supabase
+    .from('artists')
+    .select('id')
+    .ilike('name', name)
+    .maybeSingle();
+
+  if (existing) return { row: existing, created: false };
+
+  const { data: created, error } = await supabase
+    .from('artists')
+    .insert({ name })
+    .select('id')
+    .single();
+
+  if (error || !created) throw error;
+  return { row: created, created: true };
+}
+
+async function getOrCreateMaster(
+  supabase: SupabaseClient,
+  artistId: number,
+  title: string,
+  year?: string
+): Promise<{ row: MasterRow; created: boolean }> {
+  const { data: existing } = await supabase
+    .from('masters')
+    .select('id')
+    .eq('title', title)
+    .eq('main_artist_id', artistId)
+    .maybeSingle();
+
+  if (existing) return { row: existing, created: false };
+
+  const { data: created, error } = await supabase
+    .from('masters')
+    .insert({
+      title,
+      main_artist_id: artistId,
+      original_release_year: year ? Number(year) : null,
+    })
+    .select('id')
+    .single();
+
+  if (error || !created) throw error;
+  return { row: created, created: true };
+}
+
+async function getOrCreateRelease(
+  supabase: SupabaseClient,
+  masterId: number,
+  data: {
+    media_type?: string;
+    format_details?: string[] | null;
+    qty?: number | null;
+    label?: string;
+    cat_no?: string;
+    barcode?: string;
+    country?: string;
+    year?: string;
+  }
+): Promise<{ row: ReleaseRow; created: boolean }> {
+  const catalogNumber = normalizeText(data.cat_no);
+  const mediaType = normalizeText(data.media_type) || 'Unknown';
+
+  const query = supabase
+    .from('releases')
+    .select('id')
+    .eq('master_id', masterId);
+
+  const { data: existing } = catalogNumber
+    ? await query.eq('catalog_number', catalogNumber).maybeSingle()
+    : await query.eq('media_type', mediaType).maybeSingle();
+
+  if (existing) return { row: existing, created: false };
+
+  const { data: created, error } = await supabase
+    .from('releases')
+    .insert({
+      master_id: masterId,
+      media_type: mediaType,
+      format_details: data.format_details ?? null,
+      qty: data.qty ?? null,
+      label: data.label ?? null,
+      catalog_number: catalogNumber || null,
+      barcode: data.barcode ?? null,
+      country: data.country ?? null,
+      release_year: data.year ? Number(data.year) : null,
+    })
+    .select('id')
+    .single();
+
+  if (error || !created) throw error;
+  return { row: created, created: true };
+}
+
+async function getOrCreateInventory(
+  supabase: SupabaseClient,
+  releaseId: number,
+  data: {
+    location?: string;
+    media_condition?: string;
+    sleeve_condition?: string;
+    personal_notes?: string;
+    collection_status?: string;
+  }
+): Promise<{ row: InventoryRow; created: boolean }> {
+  const { data: existing } = await supabase
+    .from('inventory')
+    .select('id')
+    .eq('release_id', releaseId)
+    .maybeSingle();
+
+  if (existing) return { row: existing, created: false };
+
+  const status =
+    data.collection_status === 'wishlist'
+      ? 'wishlist'
+      : data.collection_status === 'incoming'
+        ? 'incoming'
+        : data.collection_status === 'sold'
+          ? 'sold'
+          : data.collection_status === 'for_sale'
+            ? 'for_sale'
+            : 'in_collection';
+
+  const { data: created, error } = await supabase
+    .from('inventory')
+    .insert({
+      release_id: releaseId,
+      status,
+      location: data.location ?? null,
+      media_condition: data.media_condition ?? null,
+      sleeve_condition: data.sleeve_condition ?? null,
+      personal_notes: data.personal_notes ?? null,
+    })
+    .select('id')
+    .single();
+
+  if (error || !created) throw error;
+  return { row: created, created: true };
 }
 
 /**
@@ -51,149 +206,118 @@ export async function importCLZData(
   };
   
   try {
-    // Parse CLZ XML
     const clzAlbums = await parseCLZXML(xmlContent);
     result.totalProcessed = clzAlbums.length;
-    
+
     if (clzAlbums.length === 0) {
       result.message = 'No albums found in CLZ XML';
       return result;
     }
-    
-    // Fetch all existing albums for matching
-    const { data: existingAlbums, error: fetchError } = await supabase
-      .from('collection')
-      .select('*');
-    
-    if (fetchError) {
-      throw new Error(`Failed to fetch existing albums: ${fetchError.message}`);
-    }
-    
-    const albumsToInsert: Array<Record<string, unknown>> = [];
-    const albumsToUpdate: Array<{ id: number; updates: Record<string, unknown> }> = [];
-    const conflicts: FieldConflict[] = [];
-    
-    // Process each album
+
     for (const clzData of clzAlbums) {
       try {
-        // Find matching album
-        const matchingAlbum: CollectionRow | undefined = findMatchingAlbum(clzData, existingAlbums || []);
-        
-        if (!matchingAlbum) {
-          // New album - prepare for insert
-          const newAlbum = clzToCollectionRow(clzData, defaultFolder);
-          albumsToInsert.push(newAlbum);
-          continue;
-        }
-        
-        // Existing album - handle based on update mode
-        if (updateMode === 'update_missing_only') {
-          // Only update NULL/empty fields
-          const safeUpdates = getSafeUpdates(matchingAlbum, clzData, 'clz');
-          
-          if (Object.keys(safeUpdates).length > 0) {
-            albumsToUpdate.push({
-              id: matchingAlbum.id,
-              updates: safeUpdates
-            });
-          } else {
-            result.skippedAlbums++;
+        const artistName = normalizeText(clzData.artist) || 'Unknown Artist';
+        const title = normalizeText(clzData.title) || 'Untitled';
+        const parsedFormat = parseDiscogsFormat(clzData.format ?? '');
+
+        const { row: artistRow } = await getOrCreateArtist(supabase, artistName);
+        const { row: masterRow, created: masterCreated } = await getOrCreateMaster(
+          supabase,
+          artistRow.id,
+          title,
+          clzData.year
+        );
+
+        const { row: releaseRow, created: releaseCreated } = await getOrCreateRelease(
+          supabase,
+          masterRow.id,
+          {
+            media_type: parsedFormat.media_type,
+            format_details: parsedFormat.format_details,
+            qty: parsedFormat.qty,
+            label: clzData.labels?.[0],
+            cat_no: clzData.cat_no,
+            barcode: clzData.barcode,
+            country: clzData.country,
+            year: clzData.year,
           }
+        );
+
+        const { row: inventoryRow, created: inventoryCreated } = await getOrCreateInventory(
+          supabase,
+          releaseRow.id,
+          {
+            location: clzData.location || defaultFolder,
+            media_condition: clzData.media_condition,
+            sleeve_condition: clzData.package_sleeve_condition,
+            personal_notes: clzData.personal_notes,
+            collection_status: clzData.collection_status,
+          }
+        );
+
+        if (masterCreated || releaseCreated || inventoryCreated) {
+          result.newAlbums++;
+        } else if (updateMode === 'update_all') {
+          const masterUpdate = {
+            title,
+            original_release_year: clzData.year ? Number(clzData.year) : null,
+            genres: clzData.clz_genres ?? null,
+          };
+          await supabase.from('masters').update(masterUpdate).eq('id', masterRow.id);
+
+          const releaseUpdate = {
+            media_type: parsedFormat.media_type ?? 'Unknown',
+            format_details: parsedFormat.format_details ?? null,
+            qty: parsedFormat.qty ?? null,
+            label: clzData.labels?.[0] ?? null,
+            catalog_number: clzData.cat_no ?? null,
+            barcode: clzData.barcode ?? null,
+            country: clzData.country ?? null,
+            release_year: clzData.year ? Number(clzData.year) : null,
+          };
+          await supabase.from('releases').update(releaseUpdate).eq('id', releaseRow.id);
+
+          const inventoryUpdate = {
+            location: clzData.location || defaultFolder,
+            media_condition: clzData.media_condition ?? null,
+            sleeve_condition: clzData.package_sleeve_condition ?? null,
+            personal_notes: clzData.personal_notes ?? null,
+          };
+          await supabase.from('inventory').update(inventoryUpdate).eq('id', inventoryRow.id);
+
+          result.updatedAlbums++;
         } else {
-          // update_all mode - detect conflicts
-          const { conflicts: albumConflicts, safeUpdates } = detectConflicts(
-            matchingAlbum,
-            clzData,
-            'clz',
-            []
-          );
-          
-          if (albumConflicts.length > 0) {
-            // Has conflicts - add to list for user resolution
-            conflicts.push(...albumConflicts);
-            result.conflictsDetected++;
-          } else if (Object.keys(safeUpdates).length > 0) {
-            // No conflicts but has updates - safe to update
-            albumsToUpdate.push({
-              id: matchingAlbum.id,
-              updates: safeUpdates
-            });
-          } else {
-            result.skippedAlbums++;
-          }
+          result.skippedAlbums++;
         }
       } catch (error) {
         result.errors.push({
           album: `${clzData.artist} - ${clzData.title}`,
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : 'Unknown error',
         });
       }
     }
-    
-    // If conflicts detected in update_all mode, return them for user resolution
-    if (conflicts.length > 0 && updateMode === 'update_all') {
-      result.conflicts = conflicts;
-      result.message = `Found ${result.conflictsDetected} albums with conflicts requiring resolution`;
-      return result;
-    }
-    
-    // Execute database operations
-    
-    // Insert new albums
-    if (albumsToInsert.length > 0) {
-      const { error: insertError } = await supabase
-        .from('collection')
-        .insert(albumsToInsert);
-      
-      if (insertError) {
-        throw new Error(`Failed to insert albums: ${insertError.message}`);
-      }
-      
-      result.newAlbums = albumsToInsert.length;
-    }
-    
-    // Update existing albums
-    if (albumsToUpdate.length > 0) {
-      for (const update of albumsToUpdate) {
-        const { error: updateError } = await supabase
-          .from('collection')
-          .update(update.updates)
-          .eq('id', update.id);
-        
-        if (updateError) {
-          result.errors.push({
-            album: `Album ID ${update.id}`,
-            error: updateError.message
-          });
-        } else {
-          result.updatedAlbums++;
-        }
-      }
-    }
-    
-    // Record import history
+
     const { error: historyError } = await supabase
       .from('import_history')
       .insert({
         records_added: result.newAlbums,
         records_updated: result.updatedAlbums,
         status: 'completed',
-        notes: `CLZ import: ${updateMode} mode. ${result.errors.length} errors.`
+        notes: `CLZ import: ${updateMode} mode. ${result.errors.length} errors.`,
       });
-    
+
     if (historyError) {
       console.error('Failed to record import history:', historyError);
     }
-    
+
     result.success = true;
     result.message = `Successfully imported ${result.newAlbums} new albums and updated ${result.updatedAlbums} existing albums`;
-    
+
     if (result.errors.length > 0) {
       result.message += `. ${result.errors.length} errors occurred.`;
     }
-    
+
     return result;
-    
   } catch (error) {
     result.success = false;
     result.message = `CLZ import failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -220,10 +344,17 @@ export async function applyConflictResolutions(
   
   for (const resolution of resolutions) {
     try {
-      // Update collection table with resolved value
+      const field = resolution.field_name;
+      const targetTable =
+        ['location', 'personal_notes', 'media_condition', 'sleeve_condition', 'status'].includes(field)
+          ? 'inventory'
+          : ['media_type', 'label', 'catalog_number', 'barcode', 'country', 'release_year'].includes(field)
+            ? 'releases'
+            : 'masters';
+
       const { error: updateError } = await supabase
-        .from('collection')
-        .update({ [resolution.field_name]: resolution.resolved_value })
+        .from(targetTable)
+        .update({ [field]: resolution.resolved_value })
         .eq('id', resolution.album_id);
       
       if (updateError) {
@@ -279,15 +410,47 @@ export async function previewCLZImport(
   
   // Fetch existing albums
   const { data: existingAlbums } = await supabase
-    .from('collection')
-    .select('*');
-  
+    .from('inventory')
+    .select(`
+      id,
+      release:releases (
+        id,
+        media_type,
+        format_details,
+        qty,
+        master:masters (
+          title,
+          artist:artists ( name )
+        )
+      )
+    `);
+
   const newAlbums: Array<{ artist: string; title: string; format: string }> = [];
   const albumsToUpdate: Array<{ id: number; artist: string; title: string; updateCount: number }> = [];
   const conflicts: FieldConflict[] = [];
+
+  const buildFormatLabel = (release?: { media_type?: string | null; format_details?: string[] | null; qty?: number | null } | null) => {
+    if (!release) return '';
+    const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
+    const base = parts.join(', ');
+    const qty = release.qty ?? 1;
+    if (!base) return '';
+    return qty > 1 ? `${qty}x${base}` : base;
+  };
   
+  const normalizedExisting = (existingAlbums ?? []).map((row) => {
+    const release = row.release as { media_type?: string | null; format_details?: string[] | null; qty?: number | null; master?: { title?: string | null; artist?: { name?: string | null } | null } | null } | null;
+    const master = release?.master;
+    return {
+      id: row.id as number,
+      artist: master?.artist?.name ?? 'Unknown Artist',
+      title: master?.title ?? 'Untitled',
+      format: buildFormatLabel(release),
+    };
+  });
+
   for (const clzData of clzAlbums) {
-    const matchingAlbum: CollectionRow | undefined = findMatchingAlbum(clzData, existingAlbums || []);
+    const matchingAlbum: CollectionRow | undefined = findMatchingAlbum(clzData, normalizedExisting);
     
     if (!matchingAlbum) {
       newAlbums.push({

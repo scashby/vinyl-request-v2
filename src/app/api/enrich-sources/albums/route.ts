@@ -21,63 +21,32 @@ export async function GET(req: Request) {
       }, { status: 400 });
     }
 
-    let query = supabase
-      .from('collection')
-      .select('id,artist,title,image_url,musicbrainz_id,musicians,producers,spotify_id,apple_music_id,lastfm_id,allmusic_id,wikipedia_url,tempo_bpm,discogs_release_id,discogs_master_id,discogs_genres,back_image_url,tracklists')
+    const { data: albums, error } = await supabase
+      .from('inventory')
+      .select(`
+        id,
+        release:releases (
+          id,
+          spotify_album_id,
+          apple_music_id,
+          discogs_release_id,
+          master:masters (
+            id,
+            title,
+            cover_image_url,
+            genres,
+            styles,
+            musicbrainz_release_group_id,
+            artist:artists (name)
+          ),
+          release_tracks:release_tracks (
+            recording:recordings (
+              credits
+            )
+          )
+        )
+      `)
       .limit(limit);
-
-    // Apply filters based on category
-    switch (category) {
-      case 'needs-enrichment':
-        // Albums missing any enrichment data
-        break; // Return all, filter in code below
-      
-      case 'fully-enriched':
-        // Albums with all enrichment data
-        break; // Filter in code below
-      
-      case 'missing-musicians':
-        query = query.or('musicians.is.null,musicians.eq.[]');
-        break;
-      
-      case 'missing-producers':
-        query = query.or('producers.is.null,producers.eq.[]');
-        break;
-      
-      case 'missing-spotify':
-        query = query.is('spotify_id', null);
-        break;
-      
-      case 'missing-apple':
-        query = query.is('apple_music_id', null);
-        break;
-      
-      case 'missing-lastfm':
-        query = query.is('lastfm_id', null);
-        break;
-      
-      case 'missing-allmusic':
-        query = query.is('allmusic_id', null);
-        break;
-      
-      case 'missing-wikipedia':
-        query = query.is('wikipedia_url', null);
-        break;
-      
-      case 'missing-tempo':
-        query = query.is('tempo_bpm', null);
-        break;
-      
-      case 'missing-back-image':
-        query = query.is('back_image_url', null);
-        break;
-      
-      case 'missing-genres':
-        query = query.or('discogs_genres.is.null,discogs_genres.eq.[]');
-        break;
-    }
-
-    const { data: albums, error } = await query;
 
     if (error) {
       return NextResponse.json({
@@ -86,29 +55,63 @@ export async function GET(req: Request) {
       }, { status: 500 });
     }
 
-    let filteredAlbums = albums || [];
+    const enrichedAlbums = (albums || []).map((album) => {
+      const release = album.release;
+      const master = release?.master;
+      const credits = (release?.release_tracks ?? [])
+        .map((track) => track.recording?.credits)
+        .filter((value) => typeof value === 'object' && value && !Array.isArray(value));
+      const musicians = credits.flatMap((credit) => (credit as Record<string, unknown>).musicians as string[] || []);
+      const producers = credits.flatMap((credit) => (credit as Record<string, unknown>).producers as string[] || []);
+
+      return {
+        id: album.id,
+        artist: master?.artist?.name ?? 'Unknown Artist',
+        title: master?.title ?? 'Untitled',
+        image_url: master?.cover_image_url ?? null,
+        musicbrainz_id: master?.musicbrainz_release_group_id ?? null,
+        musicians,
+        producers,
+        spotify_id: release?.spotify_album_id ?? null,
+        apple_music_id: release?.apple_music_id ?? null,
+        discogs_release_id: release?.discogs_release_id ?? null,
+        discogs_master_id: master?.id ?? null,
+        discogs_genres: master?.genres ?? null,
+        back_image_url: null
+      };
+    });
+
+    let filteredAlbums = enrichedAlbums;
 
     // Post-filter for complex categories
     if (category === 'needs-enrichment') {
       filteredAlbums = filteredAlbums.filter(album => {
         const hasMusicBrainz = album.musicbrainz_id && album.musicians?.length > 0 && album.producers?.length > 0;
         const hasDiscogs = album.discogs_release_id && album.discogs_master_id && album.discogs_genres?.length > 0;
-        const hasImages = album.image_url && album.back_image_url;
+        const hasImages = album.image_url;
         const hasStreaming = album.spotify_id && album.apple_music_id;
-        const hasMetadata = album.lastfm_id && album.allmusic_id && album.wikipedia_url;
-        const hasAudio = album.tempo_bpm;
-        return !(hasMusicBrainz && hasDiscogs && hasImages && hasStreaming && hasMetadata && hasAudio);
+        return !(hasMusicBrainz && hasDiscogs && hasImages && hasStreaming);
       });
     } else if (category === 'fully-enriched') {
       filteredAlbums = filteredAlbums.filter(album => {
         const hasMusicBrainz = album.musicbrainz_id && album.musicians?.length > 0 && album.producers?.length > 0;
         const hasDiscogs = album.discogs_release_id && album.discogs_master_id && album.discogs_genres?.length > 0;
-        const hasImages = album.image_url && album.back_image_url;
+        const hasImages = album.image_url;
         const hasStreaming = album.spotify_id && album.apple_music_id;
-        const hasMetadata = album.lastfm_id && album.allmusic_id && album.wikipedia_url;
-        const hasAudio = album.tempo_bpm;
-        return hasMusicBrainz && hasDiscogs && hasImages && hasStreaming && hasMetadata && hasAudio;
+        return hasMusicBrainz && hasDiscogs && hasImages && hasStreaming;
       });
+    } else if (category === 'missing-musicians') {
+      filteredAlbums = filteredAlbums.filter(album => !album.musicians || album.musicians.length === 0);
+    } else if (category === 'missing-producers') {
+      filteredAlbums = filteredAlbums.filter(album => !album.producers || album.producers.length === 0);
+    } else if (category === 'missing-spotify') {
+      filteredAlbums = filteredAlbums.filter(album => !album.spotify_id);
+    } else if (category === 'missing-apple') {
+      filteredAlbums = filteredAlbums.filter(album => !album.apple_music_id);
+    } else if (category === 'missing-back-image') {
+      filteredAlbums = filteredAlbums.filter(album => !album.image_url);
+    } else if (category === 'missing-genres') {
+      filteredAlbums = filteredAlbums.filter(album => !album.discogs_genres || album.discogs_genres.length === 0);
     }
 
     return NextResponse.json({

@@ -12,17 +12,17 @@ interface StaffPick {
   staff_title: string;
   staff_photo_url?: string;
   staff_bio?: string;
-  collection_id: number;
+  inventory_id: number;
   pick_order: number;
   reason: string;
   favorite_track?: string;
   listening_context?: string;
-  // Joined from collection
+  // Joined from inventory -> release -> master
   artist?: string;
   title?: string;
-  year?: string;
+  year?: string | null;
   image_url?: string;
-  folder?: string;
+  location?: string | null;
 }
 
 export default function StaffPicksPage() {
@@ -40,12 +40,18 @@ export default function StaffPicksPage() {
         .from('staff_picks')
         .select(`
           *,
-          collection:collection_id (
-            artist,
-            title,
-            year,
-            image_url,
-            folder
+          inventory:inventory_id (
+            id,
+            location,
+            release:releases (
+              release_year,
+              master:masters (
+                title,
+                original_release_year,
+                cover_image_url,
+                artist:artists ( name )
+              )
+            )
           )
         `)
         .eq('is_active', true)
@@ -57,11 +63,15 @@ export default function StaffPicksPage() {
       // Flatten the data structure
       const picks = data?.map(pick => ({
         ...pick,
-        artist: pick.collection?.artist,
-        title: pick.collection?.title,
-        year: pick.collection?.year,
-        image_url: pick.collection?.image_url,
-        folder: pick.collection?.folder
+        artist: pick.inventory?.release?.master?.artist?.name,
+        title: pick.inventory?.release?.master?.title,
+        year: pick.inventory?.release?.release_year
+          ? String(pick.inventory.release.release_year)
+          : pick.inventory?.release?.master?.original_release_year
+            ? String(pick.inventory.release.master.original_release_year)
+            : null,
+        image_url: pick.inventory?.release?.master?.cover_image_url,
+        location: pick.inventory?.location ?? null
       })) || [];
 
       setStaffPicks(picks);
@@ -199,7 +209,7 @@ export default function StaffPicksPage() {
 
                         {/* Album Cover */}
                         <Link
-                          href={`/browse/album-detail/${pick.collection_id}`}
+                          href={`/browse/album-detail/${pick.inventory_id}`}
                           className="shrink-0 group-hover:scale-105 transition-transform duration-200 ease-out mx-auto md:mx-0"
                         >
                           {pick.image_url ? (
@@ -221,7 +231,7 @@ export default function StaffPicksPage() {
                         {/* Album Info & Story */}
                         <div className="flex-1 min-w-0">
                           <Link
-                            href={`/browse/album-detail/${pick.collection_id}`}
+                            href={`/browse/album-detail/${pick.inventory_id}`}
                             className="no-underline text-inherit block"
                           >
                             <div className="text-xl font-bold mb-1.5 transition-colors duration-200 hover:text-amber-400 text-center md:text-left">
@@ -231,7 +241,7 @@ export default function StaffPicksPage() {
                           
                           <div className="text-sm opacity-80 mb-3 flex gap-4 flex-wrap justify-center md:justify-start">
                             <span>🗓️ {pick.year}</span>
-                            <span>💿 {pick.folder}</span>
+                            <span>💿 {pick.location}</span>
                             {pick.favorite_track && (
                               <span>⭐ Favorite: &ldquo;{pick.favorite_track}&rdquo;</span>
                             )}
