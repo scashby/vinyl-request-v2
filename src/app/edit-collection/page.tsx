@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabaseClient';
 import CollectionTable from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
 import { ColumnId, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
-import { Album, toSafeStringArray, toSafeSearchString } from '../../types/album';
+import { type Album, toSafeStringArray, toSafeSearchString } from '../../types/album';
 import EditAlbumModal from './EditAlbumModal';
 import NewCrateModal from './crates/NewCrateModal';
 import NewSmartCrateModal from './crates/NewSmartCrateModal';
@@ -17,7 +17,16 @@ import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import CollectionInfoPanel from './components/CollectionInfoPanel';
 import { BoxIcon } from '../../components/BoxIcon';
 import { getDisplayFormat } from '../../utils/formatDisplay';
-import type { Database } from '../../types/supabase';
+import {
+  getAlbumArtist,
+  getAlbumDecade,
+  getAlbumFormat,
+  getAlbumGenres,
+  getAlbumTags,
+  getAlbumTitle,
+  getAlbumYearInt,
+  getAlbumYearValue
+} from './albumHelpers';
 
 type SortOption = 
   | 'artist-asc' | 'artist-desc' 
@@ -26,10 +35,8 @@ type SortOption =
   | 'added-desc' | 'added-asc' 
   | 'format-asc' | 'format-desc' 
   | 'tags-count-desc' | 'tags-count-asc' 
-  | 'sale-price-desc' | 'sale-price-asc' 
   | 'condition-asc' | 'condition-desc'
   | 'location-asc' | 'location-desc'
-  | 'sides-desc' | 'sides-asc'
   | 'decade-desc' | 'decade-asc';
 
 const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
@@ -49,31 +56,9 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
   { value: 'location-desc', label: 'Location (Z→A)', category: 'Physical' },
   { value: 'condition-asc', label: 'Condition (A→Z)', category: 'Physical' },
   { value: 'condition-desc', label: 'Condition (Z→A)', category: 'Physical' },
-  { value: 'sides-desc', label: 'Most Sides First)', category: 'Physical' },
-  { value: 'sides-asc', label: 'Fewest Sides First', category: 'Physical' },
   { value: 'tags-count-desc', label: 'Most Tags', category: 'Metadata' },
-  { value: 'tags-count-asc', label: 'Fewest Tags', category: 'Metadata' },
-  { value: 'sale-price-desc', label: 'Highest Price', category: 'Sales' },
-  { value: 'sale-price-asc', label: 'Lowest Price', category: 'Sales' }
+  { value: 'tags-count-asc', label: 'Fewest Tags', category: 'Metadata' }
 ];
-
-type InventoryRow = Database['public']['Tables']['inventory']['Row'];
-type ReleaseRow = Database['public']['Tables']['releases']['Row'];
-type MasterRow = Database['public']['Tables']['masters']['Row'];
-type ArtistRow = Database['public']['Tables']['artists']['Row'];
-
-type MasterTagLinkRow = {
-  master_tags?: { name: string | null } | null;
-};
-
-type InventoryQueryRow = InventoryRow & {
-  release?: (ReleaseRow & {
-    master?: (MasterRow & {
-      artist?: ArtistRow | null;
-      master_tag_links?: MasterTagLinkRow[] | null;
-    }) | null;
-  }) | null;
-};
 
 function CollectionBrowserPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -85,6 +70,7 @@ function CollectionBrowserPage() {
   const [selectedFolderValue, setSelectedFolderValue] = useState<string | null>(null);
   const [selectedCrateId, setSelectedCrateId] = useState<number | null>(null);
   const [crates, setCrates] = useState<Crate[]>([]);
+  const [crateItemCounts, setCrateItemCounts] = useState<Record<number, number>>({});
   
   const [collectionFilter, setCollectionFilter] = useState<string>('All');
   const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
@@ -172,158 +158,6 @@ function CollectionBrowserPage() {
     });
   }, []);
 
-  const buildFormatLabel = (release?: ReleaseRow | null) => {
-    if (!release) return '';
-    const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
-    const base = parts.join(', ');
-    const qty = release.qty ?? 1;
-    if (!base) return '';
-    return qty > 1 ? `${qty}x${base}` : base;
-  };
-
-  const extractTagNames = (links?: MasterTagLinkRow[] | null) => {
-    if (!links) return [];
-    return links
-      .map((link) => link.master_tags?.name)
-      .filter((name): name is string => Boolean(name));
-  };
-
-  const mapInventoryToAlbum = (row: InventoryQueryRow): Album => {
-    const release = row.release ?? null;
-    const master = release?.master ?? null;
-    const artist = master?.artist?.name ?? 'Unknown Artist';
-    const label = release?.label ?? null;
-    const tags = extractTagNames(master?.master_tag_links ?? null);
-    const status = row.status ?? 'active';
-
-    let collectionStatus: Album['collection_status'] = 'in_collection';
-    if (status === 'wishlist') collectionStatus = 'wish_list';
-    if (status === 'incoming') collectionStatus = 'on_order';
-    if (status === 'sold') collectionStatus = 'sold';
-    if (status === 'for_sale') collectionStatus = 'for_sale';
-
-    return {
-      id: row.id,
-      artist,
-      secondary_artists: null,
-      sort_artist: null,
-      title: master?.title ?? 'Untitled',
-      sort_title: null,
-      year: master?.original_release_year ? String(master.original_release_year) : null,
-      year_int: master?.original_release_year ?? null,
-      image_url: master?.cover_image_url ?? null,
-      back_image_url: null,
-      index_number: null,
-      collection_status: collectionStatus,
-      for_sale: status === 'for_sale',
-      location: row.location ?? null,
-      storage_device: null,
-      storage_device_slot: null,
-      slot: null,
-      country: release?.country ?? null,
-      studio: null,
-      recording_location: null,
-      date_added: row.date_added ?? null,
-      modified_date: null,
-      last_reviewed_at: null,
-      decade: master?.original_release_year ? Math.floor(master.original_release_year / 10) * 10 : null,
-      personal_notes: row.personal_notes ?? null,
-      release_notes: release?.notes ?? null,
-      extra: null,
-      format: buildFormatLabel(release),
-      media_condition: row.media_condition ?? '',
-      package_sleeve_condition: row.sleeve_condition ?? null,
-      barcode: release?.barcode ?? null,
-      cat_no: release?.catalog_number ?? null,
-      packaging: null,
-      rpm: null,
-      vinyl_weight: null,
-      vinyl_color: null,
-      discs: release?.qty ?? null,
-      sides: null,
-      length_seconds: null,
-      sound: null,
-      spars_code: null,
-      is_live: null,
-      is_box_set: null,
-      box_set: null,
-      time_signature: null,
-      tracks: null,
-      discogs_id: null,
-      discogs_release_id: release?.discogs_release_id ?? null,
-      discogs_master_id: master?.discogs_master_id ?? null,
-      spotify_id: null,
-      spotify_url: null,
-      spotify_album_id: release?.spotify_album_id ?? null,
-      apple_music_id: null,
-      apple_music_url: null,
-      musicbrainz_id: null,
-      musicbrainz_url: null,
-      lastfm_id: null,
-      lastfm_url: null,
-      allmusic_id: null,
-      allmusic_url: null,
-      wikipedia_url: null,
-      dbpedia_uri: null,
-      original_release_date: null,
-      original_release_year: master?.original_release_year ?? null,
-      recording_date: null,
-      recording_year: null,
-      master_release_date: release?.release_date ?? null,
-      genres: master?.genres ?? null,
-      styles: master?.styles ?? null,
-      custom_tags: tags.length > 0 ? tags : null,
-      labels: label ? [label] : null,
-      enrichment_sources: null,
-      finalized_fields: null,
-      musicians: null,
-      producers: null,
-      engineers: null,
-      songwriters: null,
-      writers: null,
-      chorus: null,
-      composer: null,
-      composition: null,
-      conductor: null,
-      orchestra: null,
-      owner: row.owner ?? null,
-      due_date: null,
-      loan_date: null,
-      loaned_to: null,
-      last_cleaned_date: null,
-      last_played_date: null,
-      play_count: row.play_count ?? null,
-      my_rating: null,
-      signed_by: null,
-      purchase_price: row.purchase_price ?? null,
-      current_value: row.current_value ?? null,
-      purchase_date: row.purchase_date ?? null,
-      purchase_store: null,
-      sale_price: null,
-      sell_price: null,
-      sale_platform: null,
-      sale_quantity: null,
-      sale_notes: null,
-      wholesale_cost: null,
-      pricing_notes: null,
-      subtitle: null,
-      played_history: null,
-      blocked: null,
-      blocked_sides: null,
-      blocked_tracks: null,
-      disc_metadata: null,
-      matrix_numbers: null,
-      inner_sleeve_images: null,
-      enriched_metadata: null,
-      cultural_significance: null,
-      tempo_bpm: null,
-      musical_key: null,
-      energy: null,
-      danceability: null,
-      valence: null,
-    };
-  };
-
   const loadAlbums = useCallback(async () => {
     setLoading(true);
     
@@ -338,28 +172,59 @@ function CollectionBrowserPage() {
         .from('inventory')
         .select(
           `id,
-           collection_id,
-           for_sale,
-           collection_status,
+           release_id,
+           status,
            personal_notes,
            media_condition,
+           sleeve_condition,
            location,
-           custom_tags,
            date_added,
            created_at,
-           release:releases (
-             id,
-             title,
-             release_year,
-             format,
-             image_url,
-             release_notes,
-             master:masters (
+           purchase_price,
+           current_value,
+           purchase_date,
+           owner,
+           play_count,
+           last_played_at,
+             release:releases (
                id,
-               title,
+               master_id,
+               media_type,
+               label,
+               catalog_number,
+               barcode,
+               country,
+               release_date,
+               release_year,
+               discogs_release_id,
+               spotify_album_id,
+               notes,
+               track_count,
+               qty,
+               format_details,
+               release_tracks:release_tracks (
+                 id,
+                 position,
+                 side,
+                 title_override,
+                 recording:recordings (
+                   id,
+                   title,
+                   duration_seconds
+                 )
+               ),
+               master:masters (
+                 id,
+                 title,
+                 original_release_year,
+               discogs_master_id,
+               cover_image_url,
                genres,
                styles,
-               artist:artists (id, name)
+               artist:artists (id, name),
+               master_tag_links:master_tag_links (
+                 master_tags (name)
+               )
              )
            )`
         )
@@ -378,37 +243,7 @@ function CollectionBrowserPage() {
       from += batchSize;
     }
 
-    const mapped = allRows.map((row) => {
-      const release = row.release;
-      const master = release?.master;
-      const artist = master?.artist;
-      const id = row.collection_id ?? row.id;
-      const imageUrl =
-        release?.image_url || master?.image_url || row.image_url || null;
-
-      return {
-        id,
-        inventory_id: row.id,
-        artist: artist?.name || '',
-        title: release?.title || master?.title || '',
-        year: release?.release_year ? String(release.release_year) : null,
-        format: release?.format || '',
-        image_url: imageUrl,
-        back_image_url: null,
-        personal_notes: row.personal_notes ?? null,
-        release_notes: release?.release_notes ?? release?.notes ?? null,
-        media_condition: row.media_condition ?? '',
-        genres: master?.genres || [],
-        styles: master?.styles || [],
-        custom_tags: row.custom_tags || [],
-        location: row.location ?? null,
-        for_sale: row.for_sale ?? false,
-        collection_status: row.collection_status ?? null,
-        date_added: row.date_added ?? row.created_at ?? null,
-      } as Album;
-    });
-
-    setAlbums(mapped);
+    setAlbums(allRows as Album[]);
     setLoading(false);
   }, []);
 
@@ -426,6 +261,24 @@ function CollectionBrowserPage() {
     if (data) {
       setCrates(data as Crate[]);
     }
+
+    const { data: crateItems, error: crateItemsError } = await supabase
+      .from('crate_items')
+      .select('crate_id');
+
+    if (crateItemsError) {
+      console.error('Error loading crate items:', crateItemsError);
+      return;
+    }
+
+    const counts = (crateItems ?? []).reduce((acc, item) => {
+      if (item.crate_id) {
+        acc[item.crate_id] = (acc[item.crate_id] || 0) + 1;
+      }
+      return acc;
+    }, {} as Record<number, number>);
+
+    setCrateItemCounts(counts);
   }, []);
 
   useEffect(() => {
@@ -435,10 +288,10 @@ function CollectionBrowserPage() {
 
   const filteredAndSortedAlbums = useMemo(() => {
     let filtered = albums.filter(album => {
-      if (collectionFilter === 'For Sale' && !album.for_sale) return false;
+      if (collectionFilter === 'For Sale' && album.status !== 'for_sale') return false;
       
       if (selectedLetter !== 'All') {
-        const firstChar = (album.artist || '').charAt(0).toUpperCase();
+        const firstChar = getAlbumArtist(album).charAt(0).toUpperCase();
         if (selectedLetter === '0-9') {
           if (!/[0-9]/.test(firstChar)) return false;
         } else {
@@ -460,21 +313,20 @@ function CollectionBrowserPage() {
       }
 
       if (folderMode === 'format' && selectedFolderValue) {
-        if (getDisplayFormat(album.format || '') !== selectedFolderValue) return false;
+        if ((album.release?.media_type || 'Unknown') !== selectedFolderValue) return false;
       }
 
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const searchable = [
-          album.artist,
-          album.title,
-          album.format,
-          album.year,
-          toSafeSearchString(album.custom_tags),
+          getAlbumArtist(album),
+          getAlbumTitle(album),
+          getAlbumFormat(album),
+          getAlbumYearValue(album),
+          toSafeSearchString(getAlbumTags(album)),
           // FIXED: Search canonical genres instead of discogs_genres
-          toSafeSearchString(album.genres),
-          toSafeSearchString(album.spotify_label),
-          toSafeSearchString(album.apple_music_label)
+          toSafeSearchString(getAlbumGenres(album)),
+          toSafeSearchString(album.release?.label)
         ].join(' ').toLowerCase();
         
         if (!searchable.includes(q)) return false;
@@ -489,45 +341,35 @@ function CollectionBrowserPage() {
       
       filtered = [...filtered].sort((a, b) => {
         if (column === 'artist') {
-          return multiplier * (a.artist || '').localeCompare(b.artist || '');
+          return multiplier * getAlbumArtist(a).localeCompare(getAlbumArtist(b));
         } else if (column === 'title') {
-          return multiplier * (a.title || '').localeCompare(b.title || '');
+          return multiplier * getAlbumTitle(a).localeCompare(getAlbumTitle(b));
         }
         return 0;
       });
     } else {
       filtered = [...filtered].sort((a, b) => {
         switch (sortBy) {
-          case 'artist-asc': return (a.artist || '').localeCompare(b.artist || '');
-          case 'artist-desc': return (b.artist || '').localeCompare(a.artist || '');
-          case 'title-asc': return (a.title || '').localeCompare(b.title || '');
-          case 'title-desc': return (b.title || '').localeCompare(a.title || '');
-          case 'year-desc': return (b.year_int || 0) - (a.year_int || 0);
-          case 'year-asc': return (a.year_int || 0) - (b.year_int || 0);
-          case 'decade-desc': return (b.decade || 0) - (a.decade || 0);
-          case 'decade-asc': return (a.decade || 0) - (b.decade || 0);
+          case 'artist-asc': return getAlbumArtist(a).localeCompare(getAlbumArtist(b));
+          case 'artist-desc': return getAlbumArtist(b).localeCompare(getAlbumArtist(a));
+          case 'title-asc': return getAlbumTitle(a).localeCompare(getAlbumTitle(b));
+          case 'title-desc': return getAlbumTitle(b).localeCompare(getAlbumTitle(a));
+          case 'year-desc': return (getAlbumYearInt(b) || 0) - (getAlbumYearInt(a) || 0);
+          case 'year-asc': return (getAlbumYearInt(a) || 0) - (getAlbumYearInt(b) || 0);
+          case 'decade-desc': return (getAlbumDecade(b) || 0) - (getAlbumDecade(a) || 0);
+          case 'decade-asc': return (getAlbumDecade(a) || 0) - (getAlbumDecade(b) || 0);
           case 'added-desc': return (b.date_added || '').localeCompare(a.date_added || '');
           case 'added-asc': return (a.date_added || '').localeCompare(b.date_added || '');
           case 'format-asc':
-            return getDisplayFormat(a.format || '').localeCompare(getDisplayFormat(b.format || ''));
+            return getDisplayFormat(getAlbumFormat(a)).localeCompare(getDisplayFormat(getAlbumFormat(b)));
           case 'format-desc':
-            return getDisplayFormat(b.format || '').localeCompare(getDisplayFormat(a.format || ''));
+            return getDisplayFormat(getAlbumFormat(b)).localeCompare(getDisplayFormat(getAlbumFormat(a)));
           case 'location-asc': return (a.location || '').localeCompare(b.location || '');
           case 'location-desc': return (b.location || '').localeCompare(a.location || '');
           case 'condition-asc': return (a.media_condition || '').localeCompare(b.media_condition || '');
           case 'condition-desc': return (b.media_condition || '').localeCompare(a.media_condition || '');
-          case 'tags-count-desc': return toSafeStringArray(b.custom_tags).length - toSafeStringArray(a.custom_tags).length;
-          case 'tags-count-asc': return toSafeStringArray(a.custom_tags).length - toSafeStringArray(b.custom_tags).length;
-          case 'sale-price-desc': return (b.sale_price || 0) - (a.sale_price || 0);
-          case 'sale-price-asc': return (a.sale_price || 0) - (b.sale_price || 0);
-          case 'sides-desc':
-            const bSides = typeof b.sides === 'number' ? b.sides : 0;
-            const aSides = typeof a.sides === 'number' ? a.sides : 0;
-            return bSides - aSides;
-          case 'sides-asc':
-            const aSidesAsc = typeof a.sides === 'number' ? a.sides : 0;
-            const bSidesAsc = typeof b.sides === 'number' ? b.sides : 0;
-            return aSidesAsc - bSidesAsc;
+          case 'tags-count-desc': return toSafeStringArray(getAlbumTags(b)).length - toSafeStringArray(getAlbumTags(a)).length;
+          case 'tags-count-asc': return toSafeStringArray(getAlbumTags(a)).length - toSafeStringArray(getAlbumTags(b)).length;
           default: return 0;
         }
       });
@@ -544,7 +386,7 @@ function CollectionBrowserPage() {
 
   const folderCounts = useMemo(() => {
     return albums.reduce((acc, album) => {
-      const itemKey = getDisplayFormat(album.format || '');
+      const itemKey = album.release?.media_type || 'Unknown';
       acc[itemKey] = (acc[itemKey] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -556,11 +398,11 @@ function CollectionBrowserPage() {
       if (crate.is_smart) {
         count = albums.filter(album => albumMatchesSmartCrate(album, crate)).length;
       } else {
-        count = 0;
+        count = crateItemCounts[crate.id] || 0;
       }
       return { ...crate, album_count: count };
     });
-  }, [crates, albums]);
+  }, [crates, albums, crateItemCounts]);
 
   const sortedFolderItems = useMemo(() => {
     return Object.entries(folderCounts)
@@ -622,13 +464,13 @@ function CollectionBrowserPage() {
         for (const albumId of albumIds) {
           records.push({
             crate_id: crateId,
-            album_id: albumId,
+            inventory_id: albumId,
           });
         }
       }
 
       const { error } = await supabase
-        .from('crate_albums')
+        .from('crate_items')
         .insert(records);
 
       if (error) {
@@ -660,7 +502,7 @@ function CollectionBrowserPage() {
       .eq('id', albumId);
     
     if (!error) {
-      setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, for_sale: true, collection_status: 'for_sale' } : a));
+      setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, status: 'for_sale' } : a));
     } else {
       console.error('Error marking album for sale:', error);
     }

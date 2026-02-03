@@ -338,6 +338,7 @@ export interface Database {
         Row: {
           id: number;
           event_id: number | null;
+          inventory_id: number | null;
           title: string;
           description: string | null;
           file_url: string;
@@ -357,6 +358,7 @@ export interface Database {
         Insert: {
           id?: number;
           event_id?: number | null;
+          inventory_id?: number | null;
           title: string;
           description?: string | null;
           file_url: string;
@@ -376,6 +378,7 @@ export interface Database {
         Update: {
           id?: number;
           event_id?: number | null;
+          inventory_id?: number | null;
           title?: string;
           description?: string | null;
           file_url?: string;
@@ -614,18 +617,21 @@ export interface Database {
       most_wanted: {
         Row: {
           id: number;
+          inventory_id: number | null;
           title: string;
           url: string | null;
           rank: number | null;
         };
         Insert: {
           id?: number;
+          inventory_id?: number | null;
           title: string;
           url?: string | null;
           rank?: number | null;
         };
         Update: {
           id?: number;
+          inventory_id?: number | null;
           title?: string;
           url?: string | null;
           rank?: number | null;
@@ -1081,7 +1087,6 @@ export interface Database {
           image_url: string | null;
           notes: string | null;
           date_added: string | null;
-          inner_circle_preferred: boolean | null;
           blocked: boolean | null;
           created_at: string | null;
           updated_at: string | null;
@@ -1108,7 +1113,6 @@ export interface Database {
           image_url?: string | null;
           notes?: string | null;
           date_added?: string | null;
-          inner_circle_preferred?: boolean | null;
           blocked?: boolean | null;
           created_at?: string | null;
           updated_at?: string | null;
@@ -1135,7 +1139,6 @@ export interface Database {
           image_url?: string | null;
           notes?: string | null;
           date_added?: string | null;
-          inner_circle_preferred?: boolean | null;
           blocked?: boolean | null;
           created_at?: string | null;
           updated_at?: string | null;
@@ -1159,7 +1162,7 @@ export interface Database {
           staff_title: string | null;
           staff_photo_url: string | null;
           staff_bio: string | null;
-          collection_id: number;
+          inventory_id: number;
           pick_order: number;
           reason: string;
           favorite_track: string | null;
@@ -1174,7 +1177,7 @@ export interface Database {
           staff_title?: string | null;
           staff_photo_url?: string | null;
           staff_bio?: string | null;
-          collection_id: number;
+          inventory_id: number;
           pick_order: number;
           reason: string;
           favorite_track?: string | null;
@@ -1189,7 +1192,7 @@ export interface Database {
           staff_title?: string | null;
           staff_photo_url?: string | null;
           staff_bio?: string | null;
-          collection_id?: number;
+          inventory_id?: number;
           pick_order?: number;
           reason?: string;
           favorite_track?: string | null;
