@@ -1,6 +1,6 @@
 // src/app/api/enrich-sources/fetch-candidates/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 import { 
   fetchSpotifyData, 
   fetchMusicBrainzData, 
@@ -25,11 +25,6 @@ import {
   type EnrichmentResult
 } from "lib/enrichment-utils";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 // Helper to chunk arrays for concurrency control
 const chunkArray = <T>(array: T[], size: number): T[][] => {
   const chunked: T[][] = [];
@@ -40,6 +35,7 @@ const chunkArray = <T>(array: T[], size: number): T[][] => {
 };
 
 export async function POST(req: Request) {
+  const supabase = supabaseServer(getAuthHeader(req));
   try {
     const body = await req.json();
     const { 

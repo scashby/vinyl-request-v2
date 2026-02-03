@@ -1,12 +1,7 @@
 // src/app/api/enrich-sources/apple-lyrics/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 const APPLE_MUSIC_TOKEN = process.env.APPLE_MUSIC_TOKEN;
-
-const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 
 type Track = {
   position?: string;
@@ -160,6 +155,7 @@ function matchTrackByTitle(
 }
 
 export async function POST(req: Request) {
+  const supabase = supabaseServer(getAuthHeader(req));
   try {
     const body = await req.json();
     const { albumId } = body;

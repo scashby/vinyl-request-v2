@@ -1,10 +1,6 @@
 // src/app/api/search-lyrics/route.ts - Fixed with better Genius scraping
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
@@ -165,6 +161,7 @@ function containsTerm(text: string, term: string): boolean {
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function POST(req: Request) {
+  const supabase = supabaseServer(getAuthHeader(req));
   try {
     const body = (await req.json()) as Body;
     
@@ -392,6 +389,7 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
+  const supabase = supabaseServer(getAuthHeader(req));
   try {
     const { searchParams } = new URL(req.url);
     const term = searchParams.get('term');

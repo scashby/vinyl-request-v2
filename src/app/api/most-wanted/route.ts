@@ -1,11 +1,11 @@
 // src/app/api/most-wanted/route.ts
-import { supabaseAdmin } from 'src/lib/supabaseAdmin';
 import { NextRequest, NextResponse } from 'next/server';
+import { getAuthHeader, supabaseServer } from 'src/lib/supabaseServer';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
-  const supabase = supabaseAdmin;
+export async function GET(request: Request) {
+  const supabase = supabaseServer(getAuthHeader(request));
   const { data, error } = await supabase
     .from('most_wanted')
     .select(`
@@ -45,7 +45,7 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
     const { id, inventory_id, title, url, rank } = body;
-    const supabase = supabaseAdmin;
+    const supabase = supabaseServer(getAuthHeader(request));
 
     const { error } = await supabase
       .from("most_wanted")

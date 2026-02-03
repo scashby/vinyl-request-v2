@@ -57,8 +57,7 @@ The DWD Collection Management System has successfully completed all 8 Edit Album
 
 ### Supabase Database:
 - ✅ `NEXT_PUBLIC_SUPABASE_URL` - Database connection URL
-- ✅ `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Public client authentication key
-- ✅ `SUPABASE_SERVICE_ROLE_KEY` - Server-side admin operations key
+- ✅ `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` - Public client authentication key
 
 ### Cover Search Implementation Status:
 - **Discogs**: ✅ Fully configured (uses NEXT_PUBLIC_DISCOGS_TOKEN)

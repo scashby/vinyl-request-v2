@@ -1,12 +1,7 @@
 // src/app/api/enrich-sources/discogs-tracklist/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 const DISCOGS_TOKEN = process.env.DISCOGS_TOKEN ?? process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
-
-const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
@@ -60,6 +55,7 @@ async function fetchDiscogsRelease(releaseId: string): Promise<DiscogsResponse> 
 }
 
 export async function POST(req: Request) {
+  const supabase = supabaseServer(getAuthHeader(req));
   try {
     const body = await req.json();
     const { albumId } = body;

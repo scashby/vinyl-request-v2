@@ -1,17 +1,12 @@
 // src/app/api/enrich-sources/albums/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-);
+import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
 
 export async function GET(req: Request) {
+  const supabase = supabaseServer(getAuthHeader(req));
   try {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get('category');

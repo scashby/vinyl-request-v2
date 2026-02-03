@@ -2,7 +2,7 @@
 // Replace: src/app/api/album-suggestions/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from 'src/lib/supabaseAdmin'; // Use service role client
+import { getAuthHeader, supabaseServer } from 'src/lib/supabaseServer';
 
 // Enable detailed logging
 const DEBUG = true;
@@ -14,6 +14,7 @@ function debugLog(message: string, data?: unknown) {
 }
 
 export async function POST(request: NextRequest) {
+  const supabase = supabaseServer(getAuthHeader(request));
   debugLog('POST request received');
   
   try {
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     debugLog('Attempting to check for existing suggestion');
     
     // Check if suggestion already exists (to avoid duplicates)
-    const { data: existing, error: existingError } = await supabaseAdmin
+    const { data: existing, error: existingError } = await supabase
       .from('album_suggestions')
       .select('id, contribution_amount')
       .eq('artist', artist.trim())
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
       debugLog('Found existing suggestion, updating:', existing.id);
       
       // Update existing record with proper field handling
-      const { data: updateData, error } = await supabaseAdmin
+      const { data: updateData, error } = await supabase
         .from('album_suggestions')
         .update({
           updated_at: new Date().toISOString(),
@@ -139,7 +140,7 @@ export async function POST(request: NextRequest) {
 
       debugLog('Insert data prepared:', insertData);
 
-      const { data: insertedData, error } = await supabaseAdmin
+      const { data: insertedData, error } = await supabase
         .from('album_suggestions')
         .insert(insertData)
         .select()
@@ -191,6 +192,7 @@ export async function POST(request: NextRequest) {
 
 // GET - Retrieve album suggestions (for admin panel)
 export async function GET(request: NextRequest) {
+  const supabase = supabaseServer(getAuthHeader(request));
   debugLog('GET request received');
   
   try {
@@ -200,7 +202,7 @@ export async function GET(request: NextRequest) {
 
     debugLog('GET parameters:', { status, limit });
 
-    let query = supabaseAdmin
+    let query = supabase
       .from('album_suggestions')
       .select('*')
       .order('created_at', { ascending: false })
@@ -238,6 +240,7 @@ export async function GET(request: NextRequest) {
 
 // PUT - Update suggestion status (for admin)  
 export async function PUT(request: NextRequest) {
+  const supabase = supabaseServer(getAuthHeader(request));
   debugLog('PUT request received');
   
   try {
@@ -263,8 +266,8 @@ export async function PUT(request: NextRequest) {
       updateData.admin_notes = admin_notes;
     }
 
-    // Use service role client to bypass RLS
-    const { data, error } = await supabaseAdmin
+    // Update with request-scoped client (RLS will apply)
+    const { data, error } = await supabase
       .from('album_suggestions')
       .update(updateData)
       .eq('id', id)
@@ -274,7 +277,7 @@ export async function PUT(request: NextRequest) {
       debugLog('PUT error:', error);
       return NextResponse.json({
         success: false,
-        error: `Database error: ${error.message}. This is likely an RLS permissions issue. Check that your API is using service role key.`
+        error: `Database error: ${error.message}. This is likely an RLS permissions issue.`
       }, { status: 500 });
     }
 
@@ -304,6 +307,7 @@ export async function PUT(request: NextRequest) {
 
 // DELETE - Remove suggestion (for admin)
 export async function DELETE(request: NextRequest) {
+  const supabase = supabaseServer(getAuthHeader(request));
   debugLog('DELETE request received');
   
   try {
@@ -318,7 +322,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Don't use .single() - just delete and check the count
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('album_suggestions')
       .delete()
       .eq('id', id);

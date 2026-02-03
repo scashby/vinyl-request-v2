@@ -1,10 +1,6 @@
 // src/app/api/organize/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 
 type Body = {
   cursor?: number | null;
@@ -24,6 +20,7 @@ function sanitize(text: string) {
 }
 
 export async function POST(req: Request) {
+  const supabase = supabaseServer(getAuthHeader(req));
   const body = (await req.json().catch(() => null)) as Body | null;
   if (!body) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
 

@@ -1,12 +1,10 @@
 // src/app/api/cd-only-finder/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "types/supabase";
+import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 const DISCOGS_TOKEN = process.env.DISCOGS_TOKEN ?? process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
 
-const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 type Album = {
@@ -80,7 +78,10 @@ async function checkVinylAvailability(artist: string, title: string): Promise<bo
   }
 }
 
-async function tagAlbumsAsCDOnly(albumIds: number[]): Promise<{ success: boolean; updated: number }> {
+async function tagAlbumsAsCDOnly(
+  supabase: SupabaseClient<Database>,
+  albumIds: number[]
+): Promise<{ success: boolean; updated: number }> {
   try {
     let updated = 0;
     
@@ -127,6 +128,7 @@ async function tagAlbumsAsCDOnly(albumIds: number[]): Promise<{ success: boolean
 }
 
 export async function POST(req: Request) {
+  const supabase = supabaseServer(getAuthHeader(req));
   try {
     const body = await req.json();
     const action = body.action;
@@ -138,7 +140,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Invalid album IDs' }, { status: 400 });
       }
 
-      const result = await tagAlbumsAsCDOnly(albumIds);
+      const result = await tagAlbumsAsCDOnly(supabase, albumIds);
       return NextResponse.json({
         success: result.success,
         updated: result.updated

@@ -1,11 +1,11 @@
 // src/app/api/social-embeds/route.ts
-import { supabaseAdmin } from 'src/lib/supabaseAdmin';
 import { NextRequest, NextResponse } from 'next/server';
+import { getAuthHeader, supabaseServer } from 'src/lib/supabaseServer';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
-  const supabase = supabaseAdmin;
+export async function GET(request: Request) {
+  const supabase = supabaseServer(getAuthHeader(request));
   const { data, error } = await supabase
     .from('social_embeds')
     .select('id, platform, embed_html, visible')
@@ -25,7 +25,7 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
     const { id, platform, embed_html, visible } = body;
-    const supabase = supabaseAdmin;
+    const supabase = supabaseServer(getAuthHeader(request));
 
     const { error } = await supabase
       .from("social_embeds")

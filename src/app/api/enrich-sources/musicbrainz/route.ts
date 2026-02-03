@@ -1,10 +1,6 @@
 // src/app/api/enrich-sources/musicbrainz/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 
 const MB_BASE = 'https://musicbrainz.org/ws/2';
 const MB_USER_AGENT = 'DeadwaxDialogues/1.0 (https://deadwaxdialogues.com)';
@@ -93,6 +89,7 @@ async function getMusicBrainzRecording(recordingId: string): Promise<MusicBrainz
 }
 
 export async function POST(req: Request) {
+  const supabase = supabaseServer(getAuthHeader(req));
   try {
     const body = await req.json();
     const { albumId } = body;
