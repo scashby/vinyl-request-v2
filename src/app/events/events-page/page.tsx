@@ -67,20 +67,12 @@ export default function Page() {
 
   useEffect(() => {
     const load = async () => {
-      // Timeout failsafe: prevents infinite loading if Supabase hangs
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout')), 5000)
-      );
-
       try {
         // Load events
-        const fetchEvents = supabase
+        const { data: ev, error: evError } = await supabase
           .from("events")
           .select("*")
           .order("date", { ascending: true });
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: ev, error: evError } = await Promise.race([fetchEvents, timeoutPromise]) as any;
 
         if (evError) {
           console.error("Error loading events", evError);
@@ -112,14 +104,11 @@ export default function Page() {
         setEvents(sorted);
 
         // Load DJ sets
-        const fetchSets = supabase
+        const { data: sets, error: setsError } = await supabase
           .from("dj_sets")
           .select(`*, events ( id, title, date, location )`)
           .order("recorded_at", { ascending: false })
           .limit(6);
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: sets, error: setsError } = await Promise.race([fetchSets, timeoutPromise]) as any;
 
         if (setsError) {
           console.error("Error loading dj_sets", setsError);

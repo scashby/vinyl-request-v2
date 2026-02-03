@@ -82,17 +82,45 @@ function albumMatchesRule(album: Album, rule: SmartRule): boolean {
  * Get the value of a field from an album
  */
 function getAlbumFieldValue(album: Album, field: string): unknown {
-  // Direct field access
-  if (field in album) {
-    return album[field as keyof Album];
-  }
+  const release = album.release;
+  const master = release?.master;
+  const artist = master?.artist;
 
-  // Derived fields
-  if (field === 'decade') {
-    return album.decade;
+  switch (field) {
+    case 'artist':
+      return artist?.name ?? null;
+    case 'title':
+      return master?.title ?? null;
+    case 'year':
+      return release?.release_year ?? master?.original_release_year ?? null;
+    case 'format': {
+      if (!release) return null;
+      const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
+      const base = parts.join(', ');
+      const qty = release.qty ?? 1;
+      return base ? (qty > 1 ? `${qty}x${base}` : base) : null;
+    }
+    case 'location':
+      return album.location ?? null;
+    case 'collection_status':
+      return album.status ?? null;
+    case 'genres':
+      return master?.genres ?? null;
+    case 'styles':
+      return master?.styles ?? null;
+    case 'labels':
+      return release?.label ? [release.label] : null;
+    case 'media_condition':
+      return album.media_condition ?? null;
+    case 'owner':
+      return album.owner ?? null;
+    case 'decade': {
+      const year = release?.release_year ?? master?.original_release_year;
+      return year ? Math.floor(year / 10) * 10 : null;
+    }
+    default:
+      return null;
   }
-
-  return null;
 }
 
 /**
