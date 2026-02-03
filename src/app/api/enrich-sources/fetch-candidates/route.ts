@@ -56,18 +56,42 @@ export async function POST(req: Request) {
     let targetAlbums: Record<string, unknown>[] = [];
     let nextCursor = null;
 
+    const baseQuery = supabase
+      .from('inventory')
+      .select(`
+        id,
+        location,
+        last_reviewed_at,
+        release:releases (
+          id,
+          discogs_release_id,
+          spotify_album_id,
+          apple_music_id,
+          release_year,
+          label,
+          catalog_number,
+          media_type,
+          format_details,
+          qty,
+          master:masters (
+            id,
+            title,
+            cover_image_url,
+            discogs_master_id,
+            genres,
+            styles,
+            original_release_year,
+            artist:artists (name)
+          )
+        )
+      `);
+
     if (albumIds && albumIds.length > 0) {
-      const { data, error } = await supabase
-        .from('collection')
-        .select('*')
-        .in('id', albumIds);
-        
+      const { data, error } = await baseQuery.in('id', albumIds);
       if (error) throw error;
       targetAlbums = data || [];
     } else {
-      let query = supabase
-        .from('collection')
-        .select('*')
+      let query = baseQuery
         .gt('id', cursor)
         .order('id', { ascending: true })
         .limit(limit);
@@ -106,6 +130,35 @@ export async function POST(req: Request) {
 
     const results: { album: Record<string, unknown>, candidates: Record<string, CandidateData> }[] = [];
 
+    const mapInventoryToCandidate = (album: Record<string, unknown>) => {
+      const release = (album as Record<string, any>).release;
+      const master = release?.master;
+      const formatParts = [release?.media_type, ...(release?.format_details ?? [])].filter(Boolean);
+      const baseFormat = formatParts.join(', ');
+      const qty = release?.qty ?? 1;
+      const formatLabel = baseFormat ? (qty > 1 ? `${qty}x${baseFormat}` : baseFormat) : '';
+      return {
+        id: album.id,
+        release_id: release?.id ?? null,
+        master_id: master?.id ?? null,
+        artist: master?.artist?.name ?? 'Unknown Artist',
+        title: master?.title ?? 'Untitled',
+        format: formatLabel,
+        image_url: master?.cover_image_url ?? null,
+        discogs_release_id: release?.discogs_release_id ?? null,
+        discogs_master_id: master?.discogs_master_id ?? null,
+        spotify_id: release?.spotify_album_id ?? null,
+        apple_music_id: release?.apple_music_id ?? null,
+        year: release?.release_year ?? master?.original_release_year ?? null,
+        label: release?.label ?? null,
+        cat_no: release?.catalog_number ?? null,
+        genres: master?.genres ?? null,
+        styles: master?.styles ?? null,
+        location: album.location ?? null,
+        last_reviewed_at: album.last_reviewed_at ?? null
+      };
+    };
+
     // --- UPDATED CONCURRENCY LOGIC ---
     // Process albums in chunks of 5 to speed up response time while respecting rate limits
     const CHUNK_SIZE = 5;
@@ -138,7 +191,7 @@ export async function POST(req: Request) {
           const promises: Promise<EnrichmentResult | null>[] = [];
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const typedAlbum = album as any;
+          const typedAlbum = mapInventoryToCandidate(album) as any;
 
           if (!hasMissingSelectedField(typedAlbum)) {
             return null;
@@ -174,7 +227,7 @@ export async function POST(req: Request) {
           });
 
           if (Object.keys(candidates).length > 0) {
-            return { album, candidates };
+            return { album: typedAlbum, candidates };
           }
           return null;
        });

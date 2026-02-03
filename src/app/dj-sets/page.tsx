@@ -36,22 +36,14 @@ export default function DJSetsPage() {
   }, []);
 
   const loadDJSets = async () => {
-    // Timeout failsafe
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Timeout')), 5000)
-    );
-
     try {
-      const fetchPromise = supabase
+      const { data, error } = await supabase
         .from('dj_sets')
         .select(`
           *,
           events(title, date, location)
         `)
         .order('recorded_at', { ascending: false });
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
 
       if (error) throw error;
       setDjSets((data as unknown as DJSet[]) || []);

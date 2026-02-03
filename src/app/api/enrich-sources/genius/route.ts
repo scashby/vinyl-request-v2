@@ -11,11 +11,13 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSessi
 type Track = {
   position?: string;
   title?: string;
-  duration?: string;
-  type_?: string;
-  lyrics_url?: string;
-  lyrics?: string;
-  lyrics_source?: 'apple_music' | 'genius';
+  recording_id?: number | null;
+  credits?: Record<string, unknown> | null;
+};
+
+const normalizeCredits = (credits: unknown) => {
+  if (!credits || typeof credits !== 'object' || Array.isArray(credits)) return {};
+  return credits as Record<string, unknown>;
 };
 
 function normalizeForMatch(str: string): string {
@@ -122,8 +124,27 @@ export async function POST(req: Request) {
     }
 
     const { data: album, error: dbError } = await supabase
-      .from('collection')
-      .select('id, artist, title, tracklists')
+      .from('inventory')
+      .select(`
+        id,
+        release:releases (
+          id,
+          master:masters (
+            title,
+            artist:artists (name)
+          ),
+          release_tracks:release_tracks (
+            position,
+            recording_id,
+            title_override,
+            recording:recordings (
+              id,
+              title,
+              credits
+            )
+          )
+        )
+      `)
       .eq('id', albumId)
       .single();
 
@@ -135,28 +156,19 @@ export async function POST(req: Request) {
       }, { status: 404 });
     }
 
-    console.log(`✓ Album found: "${album.artist}" - "${album.title}"`);
+    const release = album.release;
+    const master = release?.master;
+    const artistName = master?.artist?.name ?? 'Unknown Artist';
+    const albumTitle = master?.title ?? 'Untitled';
 
-    let tracks: Track[] = [];
-    if (album.tracklists) {
-      try {
-        tracks = typeof album.tracklists === 'string' 
-          ? JSON.parse(album.tracklists)
-          : album.tracklists;
-        console.log(`✓ Parsed ${tracks.length} tracks from tracklist`);
-      } catch (err) {
-        console.log('❌ ERROR: Invalid tracklist format', err);
-        return NextResponse.json({
-          success: false,
-          error: 'Invalid tracklist format',
-          data: {
-            albumId: album.id,
-            artist: album.artist,
-            title: album.title
-          }
-        });
-      }
-    }
+    console.log(`✓ Album found: "${artistName}" - "${albumTitle}"`);
+
+    const tracks: Track[] = (release?.release_tracks ?? []).map((track) => ({
+      position: track.position,
+      title: track.title_override || track.recording?.title || '',
+      recording_id: track.recording_id ?? track.recording?.id ?? null,
+      credits: normalizeCredits(track.recording?.credits ?? null)
+    }));
 
     if (!Array.isArray(tracks) || tracks.length === 0) {
       console.log('❌ ERROR: No tracklist found');
@@ -165,8 +177,8 @@ export async function POST(req: Request) {
         error: 'No tracklist found',
         data: {
           albumId: album.id,
-          artist: album.artist,
-          title: album.title
+          artist: artistName,
+          title: albumTitle
         }
       });
     }
@@ -190,7 +202,7 @@ export async function POST(req: Request) {
         continue;
       }
 
-      if (track.lyrics_url) {
+      if (track.credits?.lyrics_url) {
         console.log(`    ⏭️ Skipping: Already has lyrics URL`);
         enrichedTracks.push(track);
         skippedCount++;
@@ -198,13 +210,17 @@ export async function POST(req: Request) {
       }
 
       try {
-        const lyricsUrl = await searchLyrics(album.artist, track.title);
+        const lyricsUrl = await searchLyrics(artistName, track.title);
 
         if (lyricsUrl) {
           console.log(`    ✅ Found validated lyrics URL`);
           enrichedTracks.push({
             ...track,
-            lyrics_url: lyricsUrl
+            credits: {
+              ...track.credits,
+              lyrics_url: lyricsUrl,
+              lyrics_source: 'genius'
+            }
           });
           enrichedCount++;
           enrichedTracksList.push({
@@ -242,23 +258,26 @@ export async function POST(req: Request) {
 
     if (enrichedCount > 0) {
       console.log(`💾 Updating database...`);
-      const { error: updateError } = await supabase
-        .from('collection')
-        .update({ tracklists: JSON.stringify(enrichedTracks) })
-        .eq('id', albumId);
+      for (const track of enrichedTracks) {
+        if (!track.recording_id || !track.credits?.lyrics_url) continue;
+        const { error: updateError } = await supabase
+          .from('recordings')
+          .update({ credits: track.credits })
+          .eq('id', track.recording_id);
 
-      if (updateError) {
-        console.log('❌ ERROR: Database update failed', updateError);
-        return NextResponse.json({
-          success: false,
-          error: `Database update failed: ${updateError.message}`,
-          data: {
-            albumId: album.id,
-            artist: album.artist,
-            title: album.title,
-            enrichedCount
-          }
-        }, { status: 500 });
+        if (updateError) {
+          console.log('❌ ERROR: Database update failed', updateError);
+          return NextResponse.json({
+            success: false,
+            error: `Database update failed: ${updateError.message}`,
+            data: {
+              albumId: album.id,
+              artist: artistName,
+              title: albumTitle,
+              enrichedCount
+            }
+          }, { status: 500 });
+        }
       }
       console.log(`✅ Database updated successfully`);
     }
@@ -269,8 +288,8 @@ export async function POST(req: Request) {
       success: enrichedCount > 0 || skippedCount === tracks.length,
       data: {
         albumId: album.id,
-        artist: album.artist,
-        title: album.title,
+        artist: artistName,
+        title: albumTitle,
         totalTracks: tracks.length,
         enrichedCount,
         skippedCount,
