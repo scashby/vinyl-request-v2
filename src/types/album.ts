@@ -29,8 +29,6 @@ export type Album = {
   // ============================================================================
   // CORE IDENTIFICATION
   // ============================================================================
-  // NOTE: Legacy flat fields remain for adapter compatibility. Prefer nested
-  // inventory/release/master data when available to avoid mixed sources.
   artist?: string | null;
   title?: string | null;
   year?: string | number | null;
