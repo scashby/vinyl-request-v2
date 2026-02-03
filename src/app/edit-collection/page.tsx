@@ -36,10 +36,8 @@ type SortOption =
   | 'added-desc' | 'added-asc' 
   | 'format-asc' | 'format-desc' 
   | 'tags-count-desc' | 'tags-count-asc' 
-  | 'sale-price-desc' | 'sale-price-asc' 
   | 'condition-asc' | 'condition-desc'
   | 'location-asc' | 'location-desc'
-  | 'sides-desc' | 'sides-asc'
   | 'decade-desc' | 'decade-asc';
 
 const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
@@ -59,12 +57,8 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
   { value: 'location-desc', label: 'Location (Z→A)', category: 'Physical' },
   { value: 'condition-asc', label: 'Condition (A→Z)', category: 'Physical' },
   { value: 'condition-desc', label: 'Condition (Z→A)', category: 'Physical' },
-  { value: 'sides-desc', label: 'Most Sides First)', category: 'Physical' },
-  { value: 'sides-asc', label: 'Fewest Sides First', category: 'Physical' },
   { value: 'tags-count-desc', label: 'Most Tags', category: 'Metadata' },
-  { value: 'tags-count-asc', label: 'Fewest Tags', category: 'Metadata' },
-  { value: 'sale-price-desc', label: 'Highest Price', category: 'Sales' },
-  { value: 'sale-price-asc', label: 'Lowest Price', category: 'Sales' }
+  { value: 'tags-count-asc', label: 'Fewest Tags', category: 'Metadata' }
 ];
 
 type InventoryRow = Database['public']['Tables']['inventory']['Row'];
@@ -74,15 +68,6 @@ type ArtistRow = Database['public']['Tables']['artists']['Row'];
 
 type MasterTagLinkRow = {
   master_tags?: { name: string | null } | null;
-};
-
-type InventoryQueryRow = InventoryRow & {
-  release?: (ReleaseRow & {
-    master?: (MasterRow & {
-      artist?: ArtistRow | null;
-      master_tag_links?: MasterTagLinkRow[] | null;
-    }) | null;
-  }) | null;
 };
 
 function CollectionBrowserPage() {

@@ -257,16 +257,18 @@ export type Album = {
   parent_id?: string | null;
   child_album_ids?: string[] | null;
 
-  // ============================================================================
-  // NORMALIZED
-  // ============================================================================
-  album_norm?: string | null;
-  artist_norm?: string | null;
-  title_norm?: string | null;
-  artist_album_norm?: string | null;
+export type Album = InventoryRow & {
+  release?: (ReleaseRow & {
+    master?: (MasterRow & {
+      artist?: ArtistRow | null;
+      master_tag_links?: MasterTagLinkRow[] | null;
+    }) | null;
+    release_tracks?: (ReleaseTrackRow & {
+      recording?: RecordingRow | null;
+    })[] | null;
+  }) | null;
 };
 
-// HELPER FUNCTIONS
 export function toSafeStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item) => typeof item === 'string' && item.length > 0);
