@@ -7,8 +7,6 @@
 
 import { parseCLZXML } from './clzParser';
 import { parseDiscogsFormat } from './formatParser';
-import { parseCLZXML } from './clzParser';
-import { parseDiscogsFormat } from './formatParser';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type UpdateMode = 'update_missing_only' | 'update_all';
