@@ -139,6 +139,8 @@ export interface FieldConflict {
   country: string | null;
   year: string | null;
   labels: string[];
+  release_id?: number | null;
+  master_id?: number | null;
 }
 
 export interface PreviousResolution {
@@ -307,6 +309,8 @@ export function detectConflicts(existingAlbum: Record<string, unknown>, imported
         country: existingAlbum.country as string | null,
         year: existingAlbum.year as string | null,
         labels: (existingAlbum.labels as string[]) || [],
+        release_id: existingAlbum.release_id as number | null,
+        master_id: existingAlbum.master_id as number | null,
       });
     }
   }

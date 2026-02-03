@@ -105,8 +105,32 @@ export async function POST(req: Request) {
     }
 
     const { data: album, error: dbError } = await supabase
-      .from('collection')
-      .select('id, artist, title, musicbrainz_id, musicians, producers, engineers, songwriters, studio, labels')
+      .from('inventory')
+      .select(`
+        id,
+        release:releases (
+          id,
+          label,
+          catalog_number,
+          country,
+          release_date,
+          master:masters (
+            id,
+            title,
+            musicbrainz_release_group_id,
+            artist:artists (name)
+          ),
+          release_tracks:release_tracks (
+            recording_id,
+            title_override,
+            recording:recordings (
+              id,
+              title,
+              credits
+            )
+          )
+        )
+      `)
       .eq('id', albumId)
       .single();
 
@@ -118,40 +142,27 @@ export async function POST(req: Request) {
       }, { status: 404 });
     }
 
-    console.log(`✓ Album found: "${album.artist}" - "${album.title}"`);
+    const releaseRow = album.release;
+    const master = releaseRow?.master;
+    const artistName = master?.artist?.name ?? 'Unknown Artist';
+    const albumTitle = master?.title ?? 'Untitled';
+
+    console.log(`✓ Album found: "${artistName}" - "${albumTitle}"`);
 
     // Check if already enriched
-    const hasMusicians = album.musicians && Array.isArray(album.musicians) && album.musicians.length > 0;
-    const hasProducers = album.producers && Array.isArray(album.producers) && album.producers.length > 0;
-    
-    if (hasMusicians && hasProducers) {
-      console.log(`⏭️ Album already has MusicBrainz credits`);
-      return NextResponse.json({
-        success: true,
-        skipped: true,
-        message: 'Album already has MusicBrainz credits',
-        data: {
-          albumId: album.id,
-          artist: album.artist,
-          title: album.title,
-          musicbrainz_id: album.musicbrainz_id
-        }
-      });
-    }
-
     // Search or use existing MBID
-    let mbid = album.musicbrainz_id;
+    let mbid = master?.musicbrainz_release_group_id ?? null;
     if (!mbid) {
-      mbid = await searchMusicBrainz(album.artist, album.title);
+      mbid = await searchMusicBrainz(artistName, albumTitle);
       if (!mbid) {
-        console.log(`❌ No MusicBrainz match found for "${album.artist}" - "${album.title}"`);
+        console.log(`❌ No MusicBrainz match found for "${artistName}" - "${albumTitle}"`);
         return NextResponse.json({
           success: false,
           error: 'No match found on MusicBrainz',
           data: {
             albumId: album.id,
-            artist: album.artist,
-            title: album.title
+            artist: artistName,
+            title: albumTitle
           }
         });
       }
@@ -215,55 +226,110 @@ export async function POST(req: Request) {
 
     // Build update object
     const updateData: Record<string, unknown> = {
-      musicbrainz_id: mbid,
-      musicbrainz_url: `https://musicbrainz.org/release/${mbid}`,
+      musicbrainz_release_group_id: mbid,
     };
 
-    if (musiciansSet.size > 0) updateData.musicians = Array.from(musiciansSet);
-    if (producersSet.size > 0) updateData.producers = Array.from(producersSet);
-    if (engineersSet.size > 0) updateData.engineers = Array.from(engineersSet);
-    if (songwritersSet.size > 0) updateData.songwriters = Array.from(songwritersSet);
-
-    // Extract label and catalog number
     const labelInfo = release['label-info']?.[0];
-    if (labelInfo?.label?.name && (!album.labels || album.labels.length === 0)) {
-      updateData.labels = [labelInfo.label.name];
+    const releaseUpdate: Record<string, unknown> = {};
+    if (labelInfo?.label?.name) {
+      releaseUpdate.label = labelInfo.label.name;
       console.log(`✓ Found label: ${labelInfo.label.name}`);
     }
     if (labelInfo?.['catalog-number']) {
-      updateData.cat_no = labelInfo['catalog-number'];
+      releaseUpdate.catalog_number = labelInfo['catalog-number'];
       console.log(`✓ Found catalog number: ${labelInfo['catalog-number']}`);
     }
-
-    // Recording date and country
     if (release.date) {
-      updateData.recording_date = release.date;
-      console.log(`✓ Found recording date: ${release.date}`);
+      releaseUpdate.release_date = release.date;
+      console.log(`✓ Found release date: ${release.date}`);
     }
     if (release.country) {
-      updateData.country = release.country;
+      releaseUpdate.country = release.country;
       console.log(`✓ Found country: ${release.country}`);
     }
 
-    // Update database
     console.log(`💾 Updating database...`);
-    const { error: updateError } = await supabase
-      .from('collection')
-      .update(updateData)
-      .eq('id', albumId);
+    if (master?.id) {
+      const { error: masterError } = await supabase
+        .from('masters')
+        .update(updateData)
+        .eq('id', master.id);
 
-    if (updateError) {
-      console.log('❌ ERROR: Database update failed', updateError);
-      return NextResponse.json({
-        success: false,
-        error: `Database update failed: ${updateError.message}`,
-        data: {
-          albumId: album.id,
-          artist: album.artist,
-          title: album.title,
-          foundData: updateData
+      if (masterError) {
+        console.log('❌ ERROR: Database update failed', masterError);
+        return NextResponse.json({
+          success: false,
+          error: `Database update failed: ${masterError.message}`,
+          data: {
+            albumId: album.id,
+            artist: artistName,
+            title: albumTitle,
+            foundData: updateData
+          }
+        }, { status: 500 });
+      }
+    }
+
+    if (releaseRow?.id && Object.keys(releaseUpdate).length > 0) {
+      const { error: releaseError } = await supabase
+        .from('releases')
+        .update(releaseUpdate)
+        .eq('id', releaseRow.id);
+
+      if (releaseError) {
+        console.log('❌ ERROR: Database update failed', releaseError);
+        return NextResponse.json({
+          success: false,
+          error: `Database update failed: ${releaseError.message}`,
+          data: {
+            albumId: album.id,
+            artist: artistName,
+            title: albumTitle,
+            foundData: releaseUpdate
+          }
+        }, { status: 500 });
+      }
+    }
+
+    const trackMap = new Map(
+      (releaseRow?.release_tracks ?? [])
+        .map((track) => {
+          const title = (track.title_override || track.recording?.title || '').toLowerCase().trim();
+          return title ? [title, track.recording] : null;
+        })
+        .filter((entry): entry is [string, { id?: number; credits?: unknown }] => Boolean(entry))
+    );
+
+    for (const recording of trackMap.values()) {
+      const credits = typeof recording.credits === 'object' && recording.credits && !Array.isArray(recording.credits)
+        ? { ...(recording.credits as Record<string, unknown>) }
+        : {};
+
+      credits.musicians = Array.from(musiciansSet);
+      credits.producers = Array.from(producersSet);
+      credits.engineers = Array.from(engineersSet);
+      credits.songwriters = Array.from(songwritersSet);
+
+      if (recording.id) {
+        const { error: recordingError } = await supabase
+          .from('recordings')
+          .update({ credits })
+          .eq('id', recording.id);
+
+        if (recordingError) {
+          console.log('❌ ERROR: Database update failed', recordingError);
+          return NextResponse.json({
+            success: false,
+            error: `Database update failed: ${recordingError.message}`,
+            data: {
+              albumId: album.id,
+              artist: artistName,
+              title: albumTitle,
+              foundData: credits
+            }
+          }, { status: 500 });
         }
-      }, { status: 500 });
+      }
     }
 
     console.log(`✅ Successfully enriched with MusicBrainz data\n`);
@@ -272,18 +338,18 @@ export async function POST(req: Request) {
       success: true,
       data: {
         albumId: album.id,
-        artist: album.artist,
-        title: album.title,
+        artist: artistName,
+        title: albumTitle,
         musicbrainz_id: mbid,
-        musicbrainz_url: updateData.musicbrainz_url,
-        musicians: (updateData.musicians as unknown[] | undefined)?.length || 0,
-        producers: (updateData.producers as unknown[] | undefined)?.length || 0,
-        engineers: (updateData.engineers as unknown[] | undefined)?.length || 0,
-        songwriters: (updateData.songwriters as unknown[] | undefined)?.length || 0,
-        label: (updateData.labels as string[] | undefined)?.[0],
-        catalog_number: updateData.cat_no,
-        recording_date: updateData.recording_date,
-        country: updateData.country
+        musicbrainz_url: `https://musicbrainz.org/release/${mbid}`,
+        musicians: musiciansSet.size,
+        producers: producersSet.size,
+        engineers: engineersSet.size,
+        songwriters: songwritersSet.size,
+        label: releaseUpdate.label,
+        catalog_number: releaseUpdate.catalog_number,
+        release_date: releaseUpdate.release_date,
+        country: releaseUpdate.country
       }
     });
 
