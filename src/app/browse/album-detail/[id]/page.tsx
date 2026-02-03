@@ -16,6 +16,7 @@ interface DbTrack {
   duration?: string;
   duration_seconds?: number;
   isrc?: string;
+  bpm?: number;
   side?: string;
   artist?: string;
   type?: 'track' | 'header';
@@ -134,7 +135,8 @@ function AlbumDetailContent() {
                  id,
                  title,
                  duration_seconds,
-                 isrc
+                 isrc,
+                 bpm
                )
              )
            )`
@@ -164,6 +166,7 @@ function AlbumDetailContent() {
         duration_seconds: track.recording?.duration_seconds ?? null,
         duration: formatDuration(track.recording?.duration_seconds ?? null),
         isrc: track.recording?.isrc ?? undefined,
+        bpm: track.recording?.bpm ?? undefined,
         side: track.side,
         type: 'track',
       }));

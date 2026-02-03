@@ -1155,7 +1155,7 @@ export interface Database {
           decade?: number | null;
         };
       };
-      collection_v2_archive: {
+      v2_legacy_archive: {
         Row: {
           id: number;
           artist: string;

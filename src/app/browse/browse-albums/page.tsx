@@ -17,6 +17,11 @@ interface BrowseAlbum {
   year: string | number;
   format: string;
   media_type: string;
+  release?: (ReleaseRow & {
+    master?: (MasterRow & {
+      artist?: ArtistRow | null;
+    }) | null;
+  }) | null;
   location?: string;
   dateAdded?: string;
   justAdded?: boolean;
@@ -73,6 +78,13 @@ function BrowseAlbumsContent() {
   
   const [showSuggestionBox, setShowSuggestionBox] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const sortFieldLabels = [
+    { value: 'release.master.artist.name', label: 'Artist' },
+    { value: 'date_added', label: 'Date Added' },
+    { value: 'release.master.title', label: 'Title' },
+    { value: 'release.release_year', label: 'Year' },
+  ];
 
   // Helper function to check if album was added in last 2 weeks
   const isJustAdded = (dateAdded?: string) => {
@@ -215,6 +227,7 @@ function BrowseAlbumsContent() {
             year: release?.release_year ? String(release.release_year) : '',
             format: buildFormatLabel(release),
             media_type: release?.media_type || '',
+            release: release ?? null,
             location: row.location,
             dateAdded: row.created_at,
             justAdded: isJustAdded(row.created_at),
@@ -399,10 +412,11 @@ function BrowseAlbumsContent() {
                 onChange={e => setSortField(e.target.value)}
                 className="w-full md:w-40 p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none"
               >
-                <option value="artist">Artist</option>
-                <option value="date_added">Date Added</option>
-                <option value="title">Title</option>
-                <option value="year">Year</option>
+                {sortFieldLabels.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
 
               <button

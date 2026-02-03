@@ -12,7 +12,8 @@ type MasterTagLinkRow = {
   master_tags?: { name: string | null } | null;
 };
 
-export type Album = InventoryRow & {
+export type Album = {
+  inventory: InventoryRow;
   release?: (ReleaseRow & {
     master?: (MasterRow & {
       artist?: ArtistRow | null;
@@ -22,75 +23,82 @@ export type Album = InventoryRow & {
       recording?: RecordingRow | null;
     })[] | null;
   }) | null;
+} & {
+  id: number;
 
   // ============================================================================
   // CORE IDENTIFICATION
   // ============================================================================
-  secondary_artists: string[] | null; 
-  sort_artist: string | null;
-  sort_title: string | null;
-  year_int: number | null;
-  back_image_url: string | null;
-  index_number: number | null;
+  artist?: string | null;
+  title?: string | null;
+  year?: string | number | null;
+  image_url?: string | null;
+  format?: string | null;
+  secondary_artists?: string[] | null; 
+  sort_artist?: string | null;
+  sort_title?: string | null;
+  year_int?: number | null;
+  back_image_url?: string | null;
+  index_number?: number | null;
   
   // ============================================================================
   // STATUS & LOCATION
   // ============================================================================
-  collection_status: 'in_collection' | 'for_sale' | 'wish_list' | 'on_order' | 'sold' | 'not_in_collection' | null;
-  for_sale: boolean;
+  collection_status?: 'in_collection' | 'for_sale' | 'wish_list' | 'on_order' | 'sold' | 'not_in_collection' | null;
+  for_sale?: boolean;
   
   // Location
-  location: string | null;
-  storage_device: string | null;
-  storage_device_slot: string | null;
-  slot: string | null;
-  country: string | null;
-  studio: string | null;
-  recording_location: string | null;
+  location?: string | null;
+  storage_device?: string | null;
+  storage_device_slot?: string | null;
+  slot?: string | null;
+  country?: string | null;
+  studio?: string | null;
+  recording_location?: string | null;
 
   // Dates
-  date_added: string | null;
-  modified_date: string | null;
-  last_reviewed_at: string | null;
-  decade: number | null;
+  date_added?: string | null;
+  modified_date?: string | null;
+  last_reviewed_at?: string | null;
+  decade?: number | null;
 
   // ============================================================================
   // NOTES
   // ============================================================================
-  personal_notes: string | null;
+  personal_notes?: string | null;
   notes?: string | null; // UI Alias for personal_notes
-  release_notes: string | null;
-  extra: string | null;
+  release_notes?: string | null;
+  extra?: string | null;
 
   // ============================================================================
   // PHYSICAL METADATA
   // ============================================================================
-  package_sleeve_condition: string | null;
-  barcode: string | null;
-  cat_no: string | null;
-  packaging: string | null;
+  package_sleeve_condition?: string | null;
+  barcode?: string | null;
+  cat_no?: string | null;
+  packaging?: string | null;
   
   // Vinyl Specifics
-  rpm: string | null;
-  vinyl_weight: string | null;
-  vinyl_color: string[] | null; 
+  rpm?: string | null;
+  vinyl_weight?: string | null;
+  vinyl_color?: string[] | null; 
   
-  discs: number | null;
-  sides: number | null;
+  discs?: number | null;
+  sides?: number | null;
   
   // Audio / Content
-  length_seconds: number | null;
-  sound: string | null;
-  spars_code: string | null;
-  is_live: boolean | null;
-  is_box_set: boolean | null;
-  box_set: string | null;
-  time_signature: string | null;
+  length_seconds?: number | null;
+  sound?: string | null;
+  spars_code?: string | null;
+  is_live?: boolean | null;
+  is_box_set?: boolean | null;
+  box_set?: string | null;
+  time_signature?: string | null;
 
   // ============================================================================
   // TRACKS (JSONB)
   // ============================================================================
-  tracks: Array<{
+  tracks?: Array<{
     position: string;
     title: string;
     artist?: string | null;
@@ -103,92 +111,92 @@ export type Album = InventoryRow & {
   // ============================================================================
   // EXTERNAL LINKS & IDs
   // ============================================================================
-  discogs_id: string | null;
-  discogs_release_id: string | null;
-  discogs_master_id: string | null;
+  discogs_id?: string | null;
+  discogs_release_id?: string | null;
+  discogs_master_id?: string | null;
   
-  spotify_id: string | null;
-  spotify_url: string | null;
-  spotify_album_id: string | null;
+  spotify_id?: string | null;
+  spotify_url?: string | null;
+  spotify_album_id?: string | null;
   
-  apple_music_id: string | null;
-  apple_music_url: string | null;
+  apple_music_id?: string | null;
+  apple_music_url?: string | null;
   
-  musicbrainz_id: string | null;
-  musicbrainz_url: string | null;
+  musicbrainz_id?: string | null;
+  musicbrainz_url?: string | null;
   
-  lastfm_id: string | null;
-  lastfm_url: string | null;
-  allmusic_id: string | null;
-  allmusic_url: string | null;
-  wikipedia_url: string | null;
-  dbpedia_uri: string | null;
+  lastfm_id?: string | null;
+  lastfm_url?: string | null;
+  allmusic_id?: string | null;
+  allmusic_url?: string | null;
+  wikipedia_url?: string | null;
+  dbpedia_uri?: string | null;
   
   // ============================================================================
   // DATES
   // ============================================================================
-  original_release_date: string | null;
-  original_release_year: number | null;
-  recording_date: string | null;
-  recording_year: number | null;
-  master_release_date: string | null;
+  original_release_date?: string | null;
+  original_release_year?: number | null;
+  recording_date?: string | null;
+  recording_year?: number | null;
+  master_release_date?: string | null;
 
   // ============================================================================
   // TAGS & LABELS
   // ============================================================================
-  genres: string[] | null; 
-  styles: string[] | null; 
-  custom_tags: string[] | null; 
-  labels: string[] | null;
-  enrichment_sources: string[] | null;
-  finalized_fields: string[] | null;
+  genres?: string[] | null; 
+  styles?: string[] | null; 
+  custom_tags?: string[] | null; 
+  labels?: string[] | null;
+  enrichment_sources?: string[] | null;
+  finalized_fields?: string[] | null;
 
   // ============================================================================
   // PEOPLE
   // ============================================================================
-  musicians: string[] | null;
-  producers: string[] | null;
-  engineers: string[] | null;
-  songwriters: string[] | null;
-  writers: string[] | null;
+  musicians?: string[] | null;
+  producers?: string[] | null;
+  engineers?: string[] | null;
+  songwriters?: string[] | null;
+  writers?: string[] | null;
   
-  chorus: string | null;
-  composer: string | null;
-  composition: string | null;
-  conductor: string | null;
-  orchestra: string | null;
+  chorus?: string | null;
+  composer?: string | null;
+  composition?: string | null;
+  conductor?: string | null;
+  orchestra?: string | null;
 
   // ============================================================================
   // PERSONAL / TRACKING / LOANS
   // ============================================================================
-  owner: string | null;
-  due_date: string | null;
-  loan_date: string | null;
-  loaned_to: string | null;
+  owner?: string | null;
+  due_date?: string | null;
+  loan_date?: string | null;
+  loaned_to?: string | null;
   
-  last_cleaned_date: string | null;
-  last_played_date: string | null;
-  play_count: number | null;
-  my_rating: number | null;
-  signed_by: string[] | null;
+  last_cleaned_date?: string | null;
+  last_played_date?: string | null;
+  play_count?: number | null;
+  my_rating?: number | null;
+  signed_by?: string[] | null;
   
   // ============================================================================
   // VALUE & SALES
   // ============================================================================
-  purchase_price: number | null;
-  current_value: number | null;
-  purchase_date: string | null;
-  purchase_store: string | null;
+  purchase_price?: number | null;
+  current_value?: number | null;
+  purchase_date?: string | null;
+  purchase_store?: string | null;
   
   for_sale_indicator?: boolean; 
   
-  sale_price: number | null;
-  sell_price: string | null; // Legacy text field
-  sale_platform: string | null;
-  sale_quantity: number | null;
-  sale_notes: string | null;
-  wholesale_cost: number | null;
-  pricing_notes: string | null;
+  sale_price?: number | null;
+  sell_price?: string | null; // Legacy text field
+  sale_platform?: string | null;
+  sale_quantity?: number | null;
+  sale_notes?: string | null;
+  wholesale_cost?: number | null;
+  pricing_notes?: string | null;
 
   // ============================================================================
   // UI HELPERS / OPTIONAL

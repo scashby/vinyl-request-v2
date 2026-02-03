@@ -174,7 +174,12 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
     if (status === 'for_sale') collectionStatus = 'for_sale';
 
     return {
+      inventory: row,
+      release,
       id: row.id,
+      inventory_id: row.id,
+      release_id: release?.id ?? null,
+      master_id: master?.id ?? null,
       artist,
       secondary_artists: null,
       sort_artist: null,
@@ -414,6 +419,8 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         if (status === 'for_sale') collectionStatus = 'for_sale';
 
         const v3Album = {
+          inventory: data,
+          release,
           id: data.id,
           inventory_id: data.id,
           release,
@@ -588,13 +595,24 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           const releaseUpdate: Database['public']['Tables']['releases']['Update'] = {
             label: editedAlbum.labels?.[0] ?? null,
             catalog_number: editedAlbum.cat_no ?? null,
+            release_year: editedAlbum.year ? Number(editedAlbum.year) : null,
           };
 
-          if (editedAlbum.format) {
-            const parsedFormat = parseDiscogsFormat(editedAlbum.format);
-            releaseUpdate.media_type = parsedFormat.media_type;
-            releaseUpdate.format_details = parsedFormat.format_details;
-            releaseUpdate.qty = parsedFormat.qty;
+          const parsedFormat = editedAlbum.format
+            ? parseDiscogsFormat(editedAlbum.format)
+            : null;
+          const resolvedMediaType = parsedFormat?.media_type ?? editedAlbum.release?.media_type ?? null;
+          const resolvedFormatDetails = parsedFormat?.format_details ?? editedAlbum.release?.format_details ?? null;
+          const resolvedQty = parsedFormat?.qty ?? editedAlbum.discs ?? editedAlbum.release?.qty ?? null;
+
+          if (resolvedMediaType) {
+            releaseUpdate.media_type = resolvedMediaType;
+          }
+          if (resolvedFormatDetails) {
+            releaseUpdate.format_details = resolvedFormatDetails;
+          }
+          if (resolvedQty !== null && resolvedQty !== undefined) {
+            releaseUpdate.qty = resolvedQty;
           }
 
           const { error: releaseError } = await supabase

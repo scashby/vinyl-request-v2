@@ -1,5 +1,6 @@
 import csv
 import os
+import subprocess
 
 # --- CONFIGURATION ---
 # This file generates INSERT statements that follow the "Get or Create" chain:
@@ -8,11 +9,41 @@ import os
 CLZ_CSV = 'clz_export.csv'
 OUTPUT_PREFIX = 'inventory_import'
 BATCH_SIZE = 100
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 def clean_text(val):
     if val is None:
         return ''
     return str(val).replace("'", "''").strip()
+
+def format_sql_array(values):
+    if not values:
+        return 'NULL'
+    escaped = [clean_text(value) for value in values if value]
+    if not escaped:
+        return 'NULL'
+    return "ARRAY['{}']".format("','".join(escaped))
+
+def parse_format(format_text):
+    if not format_text:
+        return {'media_type': 'Unknown', 'format_details': [], 'qty': 1}
+    try:
+        script = (
+            "const { parseDiscogsFormat } = require('./src/lib/formatParser');"
+            "const result = parseDiscogsFormat(process.argv[1] || '');"
+            "console.log(JSON.stringify(result));"
+        )
+        output = subprocess.check_output(
+            ['node', '-e', script, format_text],
+            cwd=REPO_ROOT,
+            text=True
+        )
+        data = json.loads(output.strip())
+        if isinstance(data, dict):
+            return data
+    except Exception as error:
+        print(f"Format parsing failed for '{format_text}': {error}")
+    return {'media_type': format_text or 'Unknown', 'format_details': [], 'qty': 1}
 
 def check_files():
     if not os.path.exists(CLZ_CSV):
@@ -38,7 +69,12 @@ def build_sql(item):
     artist = clean_text(item['artist'])
     title = clean_text(item['title'])
     year = clean_text(item['year'])
-    media_type = clean_text(item['media_type']) or 'Unknown'
+    raw_format = clean_text(item['media_type']) or 'Unknown'
+    parsed_format = parse_format(raw_format)
+    media_type = clean_text(parsed_format.get('media_type') or raw_format or 'Unknown')
+    format_details = format_sql_array(parsed_format.get('format_details') or [])
+    qty = parsed_format.get('qty')
+    qty_value = qty if isinstance(qty, int) else 'NULL'
     label = clean_text(item['label']) or None
     catalog_number = clean_text(item['catalog_number']) or None
     location = clean_text(item['location']) or None
@@ -70,15 +106,20 @@ master_id AS (
   SELECT id FROM public.masters WHERE title = '{title}' AND main_artist_id = (SELECT id FROM artist_id) LIMIT 1
 ),
 release_row AS (
-  INSERT INTO public.releases (master_id, media_type, label, catalog_number, release_year)
+  INSERT INTO public.releases (master_id, media_type, format_details, qty, label, catalog_number, release_year)
   VALUES (
     (SELECT id FROM master_id),
     '{media_type}',
+    {format_details},
+    {qty_value},
     {f"'{label}'" if label else 'NULL'},
     {f"'{catalog_number}'" if catalog_number else 'NULL'},
     {year if year else 'NULL'}
   )
-  ON CONFLICT (master_id, catalog_number) DO UPDATE SET media_type = EXCLUDED.media_type
+  ON CONFLICT (master_id, catalog_number) DO UPDATE SET
+    media_type = EXCLUDED.media_type,
+    format_details = EXCLUDED.format_details,
+    qty = EXCLUDED.qty
   RETURNING id
 ),
 release_id AS (
