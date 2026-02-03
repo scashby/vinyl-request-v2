@@ -15,14 +15,14 @@ import ImportCLZModal from './components/ImportCLZModal';
 import ImportCSVModal from './components/ImportCSVModal';
 import ImportEnrichModal from './components/ImportEnrichModal';
 import FindDuplicatesModal from './FindDuplicatesModal';
-import type { Album } from '../../types/album';
+import type { V3Album } from '../../types/v3-types';
 import type { Crate } from '../../types/crate';
 
 interface HeaderProps {
-  albums?: Album[];
+  albums?: V3Album[];
   loadAlbums?: () => Promise<void>;
   loadCrates?: () => Promise<void>;
-  filteredAndSortedAlbums?: Album[];
+  filteredAndSortedAlbums?: V3Album[];
   selectedAlbumIds?: Set<number>;
 }
 
