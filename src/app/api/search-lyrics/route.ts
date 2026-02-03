@@ -46,16 +46,6 @@ type TagQueryResult = {
         } | null;
       } | null;
     } | null;
-  inventory?: {
-    release?: {
-      master?: {
-        title?: string | null;
-        cover_image_url?: string | null;
-        artist?: {
-          name?: string | null;
-        } | null;
-      } | null;
-    } | null;
   } | null;
 };
 
