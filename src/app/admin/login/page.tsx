@@ -44,7 +44,7 @@ export default function Page() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: 'https://deadwaxdialogues.com/admin'
+        redirectTo: `${window.location.origin}/admin`
       }
     });
     if (error) alert('Google login error: ' + error.message);

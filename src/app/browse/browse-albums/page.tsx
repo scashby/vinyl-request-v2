@@ -137,8 +137,10 @@ function BrowseAlbumsContent() {
           .eq('id', eventId)
           .single();
         if (!error && data && isMounted) {
-          setAllowedFormats(data.allowed_formats || []);
-          setAllowedTags(data.allowed_tags || []);
+          const formats = (data.allowed_formats || []).filter(Boolean);
+          const tags = (data.allowed_tags || []).filter(Boolean);
+          setAllowedFormats(formats.length > 0 ? formats : null);
+          setAllowedTags(tags.length > 0 ? tags : null);
           setEventTitle(data.title || '');
           setEventDate(data.date || '');
         } else if (isMounted) {
@@ -148,7 +150,11 @@ function BrowseAlbumsContent() {
           setEventDate('');
         }
       } else if (allowedFormatsParam && eventTitleParam) {
-        setAllowedFormats(allowedFormatsParam.split(',').map(f => f.trim()));
+        const parsedFormats = allowedFormatsParam
+          .split(',')
+          .map((f) => f.trim())
+          .filter(Boolean);
+        setAllowedFormats(parsedFormats.length > 0 ? parsedFormats : null);
         setAllowedTags(null);
         setEventTitle(eventTitleParam);
         setEventDate('');

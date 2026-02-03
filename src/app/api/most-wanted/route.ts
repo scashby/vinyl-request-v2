@@ -8,27 +8,7 @@ export async function GET(request: Request) {
   const supabase = supabaseServer(getAuthHeader(request));
   const { data, error } = await supabase
     .from('most_wanted')
-    .select(`
-      id,
-      rank,
-      inventory_id,
-      inventory:inventory_id (
-        id,
-        release:releases (
-          id,
-          release_year,
-          media_type,
-          format_details,
-          qty,
-          master:masters (
-            id,
-            title,
-            cover_image_url,
-            artist:artists (id, name)
-          )
-        )
-      )
-    `)
+    .select('id, rank, title, url')
     .order('rank', { ascending: true });
 
   if (error) {
