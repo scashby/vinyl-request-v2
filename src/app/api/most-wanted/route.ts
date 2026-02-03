@@ -8,7 +8,27 @@ export async function GET() {
   const supabase = supabaseAdmin;
   const { data, error } = await supabase
     .from('most_wanted')
-    .select('id, title, url, rank')
+    .select(`
+      id,
+      rank,
+      inventory_id,
+      inventory:inventory_id (
+        id,
+        release:releases (
+          id,
+          release_year,
+          media_type,
+          format_details,
+          qty,
+          master:masters (
+            id,
+            title,
+            cover_image_url,
+            artist:artists (id, name)
+          )
+        )
+      )
+    `)
     .order('rank', { ascending: true });
 
   if (error) {
@@ -24,12 +44,12 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, title, url, rank } = body;
+    const { id, inventory_id, title, url, rank } = body;
     const supabase = supabaseAdmin;
 
     const { error } = await supabase
       .from("most_wanted")
-      .update({ title, url, rank })
+      .update({ title, url, rank, inventory_id })
       .eq("id", id);
 
     if (error) {
