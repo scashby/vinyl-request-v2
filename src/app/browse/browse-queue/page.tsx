@@ -121,7 +121,7 @@ function BrowseQueueContent() {
         const { data: inventoryData, error: inventoryError } = await supabase
           .from("inventory")
           .select(
-            "id, release:releases (id, title, release_year, format, image_url, master:masters (id, title, artist:artists (id, name)))"
+            "id, release:releases (id, media_type, format_details, qty, release_year, master:masters (id, title, cover_image_url, artist:artists (id, name)))"
           )
           .in("id", inventoryIds);
 
@@ -142,8 +142,7 @@ function BrowseQueueContent() {
         const artist = master?.artist;
         const title = release?.title || master?.title || "";
         const artistName = artist?.name || "";
-        const imageUrl =
-          release?.image_url || master?.image_url || inventory?.image_url || "";
+        const imageUrl = master?.cover_image_url || inventory?.image_url || "";
 
         return {
           id: request.id,
@@ -161,7 +160,7 @@ function BrowseQueueContent() {
                 id: inventory.id,
                 image_url: imageUrl,
                 year: release?.release_year ?? "",
-                format: release?.format ?? "",
+                format: buildFormatLabel(release),
               }
             : null,
         };

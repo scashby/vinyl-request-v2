@@ -19,6 +19,9 @@ type Track = {
 
 type CollectionEntry = {
   id: string;
+  release_id?: number | null;
+  master_id?: number | null;
+  artist_id?: number | null;
   artist: string | null;
   title: string | null;
   year: string | null;
@@ -29,7 +32,6 @@ type CollectionEntry = {
   sell_price: string | null;
   steves_top_200: boolean | null;
   this_weeks_top_10: boolean | null;
-  inner_circle_preferred: boolean | null;
   blocked: boolean | null;
   blocked_sides: string[] | null;
   blocked_tracks: Array<{ position: string; reason: string }> | null;
@@ -94,6 +96,15 @@ function calculateDecade(year: string | null): number | null {
   const yearNum = parseInt(year, 10);
   if (isNaN(yearNum)) return null;
   return Math.floor(yearNum / 10) * 10;
+}
+
+function buildFormatLabel(release?: { media_type?: string | null; format_details?: string[] | null; qty?: number | null } | null): string {
+  if (!release) return '';
+  const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
+  const base = parts.join(', ');
+  const qty = release.qty ?? 1;
+  if (!base) return '';
+  return qty > 1 ? `${qty}x${base}` : base;
 }
 
 async function fetchDiscogsRelease(releaseId: string): Promise<DiscogsData> {
@@ -181,8 +192,124 @@ export default function EditEntryPage() {
   }, [id]);
 
   async function fetchEntry(rowId: string): Promise<CollectionEntry> {
-    const { data } = await supabase.from('collection').select('*').eq('id', rowId).single();
-    return data as CollectionEntry;
+    const { data } = await supabase
+      .from('inventory')
+      .select(`
+        id,
+        location,
+        media_condition,
+        status,
+        sale_price,
+        sale_platform,
+        sale_quantity,
+        sale_notes,
+        wholesale_cost,
+        personal_notes,
+        release:releases (
+          id,
+          discogs_release_id,
+          spotify_album_id,
+          apple_music_id,
+          release_year,
+          release_date,
+          media_type,
+          format_details,
+          qty,
+          master:masters (
+            id,
+            title,
+            original_release_year,
+            cover_image_url,
+            genres,
+            styles,
+            discogs_master_id,
+            artist:artists ( id, name )
+          )
+        )
+      `)
+      .eq('id', rowId)
+      .single();
+
+    const release = data?.release as {
+      id?: number | null;
+      discogs_release_id?: string | null;
+      spotify_album_id?: string | null;
+      apple_music_id?: string | null;
+      release_year?: number | null;
+      release_date?: string | null;
+      media_type?: string | null;
+      format_details?: string[] | null;
+      qty?: number | null;
+      master?: {
+        id?: number | null;
+        title?: string | null;
+        original_release_year?: number | null;
+        cover_image_url?: string | null;
+        genres?: string[] | null;
+        styles?: string[] | null;
+        discogs_master_id?: string | null;
+        artist?: { id?: number | null; name?: string | null } | null;
+      } | null;
+    } | null;
+    const master = release?.master;
+    const artist = master?.artist;
+    const yearValue = release?.release_year ?? master?.original_release_year ?? null;
+
+    return {
+      id: String(data?.id ?? rowId),
+      release_id: release?.id ?? null,
+      master_id: master?.id ?? null,
+      artist_id: artist?.id ?? null,
+      artist: artist?.name ?? 'Unknown Artist',
+      title: master?.title ?? 'Untitled',
+      year: yearValue ? String(yearValue) : null,
+      folder: data?.location ?? null,
+      format: buildFormatLabel(release),
+      image_url: master?.cover_image_url ?? null,
+      media_condition: data?.media_condition ?? null,
+      sell_price: null,
+      steves_top_200: null,
+      this_weeks_top_10: null,
+      blocked: null,
+      blocked_sides: null,
+      blocked_tracks: null,
+      tracklists: null,
+      discogs_release_id: release?.discogs_release_id ?? null,
+      discogs_genres: master?.genres ?? null,
+      discogs_styles: master?.styles ?? null,
+      decade: calculateDecade(yearValue ? String(yearValue) : null),
+      master_release_id: master?.discogs_master_id ?? null,
+      master_release_date: release?.release_date ?? null,
+      spotify_id: release?.spotify_album_id ?? null,
+      spotify_url: null,
+      spotify_popularity: null,
+      spotify_genres: null,
+      spotify_label: null,
+      spotify_release_date: null,
+      spotify_total_tracks: null,
+      spotify_image_url: null,
+      apple_music_id: release?.apple_music_id ?? null,
+      apple_music_url: null,
+      apple_music_genre: null,
+      apple_music_genres: null,
+      apple_music_label: null,
+      apple_music_release_date: null,
+      apple_music_track_count: null,
+      apple_music_artwork_url: null,
+      for_sale: data?.status === 'for_sale',
+      sale_price: (data?.sale_price as number | null) ?? null,
+      sale_platform: (data?.sale_platform as string | null) ?? null,
+      sale_quantity: (data?.sale_quantity as number | null) ?? null,
+      sale_notes: (data?.sale_notes as string | null) ?? null,
+      discogs_master_id: master?.discogs_master_id ?? null,
+      discogs_notes: null,
+      pricing_notes: null,
+      wholesale_cost: (data?.wholesale_cost as number | null) ?? null,
+      sides: null,
+      is_box_set: false,
+      parent_id: null,
+      child_album_ids: null,
+    } as CollectionEntry;
   }
 
   const missingSpotify = !entry?.spotify_id;
@@ -623,70 +750,70 @@ export default function EditEntryPage() {
     setSaving(true);
     setStatus('Saving...');
     
-    const update = {
-      artist: entry.artist || '',
-      title: entry.title || '',
-      year: entry.year || '',
-      folder: entry.folder || '',
-      format: entry.format || '',
-      image_url: entry.image_url || '',
-      media_condition: entry.media_condition || '',
-      sell_price: entry.sell_price || null,
-      steves_top_200: !!entry.steves_top_200,
-      this_weeks_top_10: !!entry.this_weeks_top_10,
-      inner_circle_preferred: !!entry.inner_circle_preferred,
-      blocked_sides: blockedSides || [],
-      blocked: !!entry.blocked,
-      blocked_tracks: entry.blocked_tracks || [],
-      tracklists: JSON.stringify(tracks),
-      discogs_release_id: entry.discogs_release_id || '',
-      discogs_genres: entry.discogs_genres || null,
-      discogs_styles: entry.discogs_styles || null,
-      decade: entry.decade || null,
-      master_release_id: entry.master_release_id || null,
-      master_release_date: entry.master_release_date || null,
-      spotify_id: entry.spotify_id || null,
-      spotify_url: entry.spotify_url || null,
-      spotify_popularity: entry.spotify_popularity || null,
-      spotify_genres: entry.spotify_genres || null,
-      spotify_label: entry.spotify_label || null,
-      spotify_release_date: entry.spotify_release_date || null,
-      spotify_total_tracks: entry.spotify_total_tracks || null,
-      spotify_image_url: entry.spotify_image_url || null,
-      apple_music_id: entry.apple_music_id || null,
-      apple_music_url: entry.apple_music_url || null,
-      apple_music_genre: entry.apple_music_genre || null,
-      apple_music_genres: entry.apple_music_genres || null,
-      apple_music_label: entry.apple_music_label || null,
-      apple_music_release_date: entry.apple_music_release_date || null,
-      apple_music_track_count: entry.apple_music_track_count || null,
-      apple_music_artwork_url: entry.apple_music_artwork_url || null,
-      for_sale: forSale,
+    const inventoryUpdate: Record<string, unknown> = {
+      location: entry.folder || null,
+      media_condition: entry.media_condition || null,
+      status: forSale ? 'for_sale' : 'in_collection',
       sale_price: forSale && salePrice ? parseFloat(salePrice) : null,
       sale_platform: forSale && salePlatform ? salePlatform : null,
       sale_quantity: forSale && saleQuantity ? parseInt(saleQuantity) : null,
       sale_notes: forSale && saleNotes ? saleNotes : null,
-      // Database fields
-      discogs_master_id: entry.discogs_master_id || null,
-      discogs_notes: entry.discogs_notes || null,
-      pricing_notes: entry.pricing_notes || null,
       wholesale_cost: entry.wholesale_cost || null,
-      sides: entry.sides || null,
-      is_box_set: !!entry.is_box_set,
-      parent_id: entry.parent_id || null,
-      child_album_ids: entry.child_album_ids || null
     };
-    
-    const { error } = await supabase.from('collection').update(update).eq('id', entry.id);
-    
-    if (error) {
-      setStatus(`Error: ${error.message}`);
+
+    const releaseUpdate: Record<string, unknown> = {
+      discogs_release_id: entry.discogs_release_id || null,
+      spotify_album_id: entry.spotify_id || null,
+      apple_music_id: entry.apple_music_id || null,
+      release_year: entry.year ? parseInt(entry.year, 10) : null,
+      release_date: entry.master_release_date || null,
+    };
+
+    const masterUpdate: Record<string, unknown> = {
+      title: entry.title || 'Untitled',
+      cover_image_url: entry.image_url || null,
+      genres: entry.discogs_genres || null,
+      styles: entry.discogs_styles || null,
+      discogs_master_id: entry.discogs_master_id || null,
+      original_release_year: entry.year ? parseInt(entry.year, 10) : null,
+    };
+
+    try {
+      if (entry.artist_id && entry.artist) {
+        await supabase
+          .from('artists')
+          .update({ name: entry.artist } as Record<string, unknown>)
+          .eq('id', entry.artist_id);
+      }
+
+      await supabase
+        .from('inventory')
+        .update(inventoryUpdate)
+        .eq('id', entry.id);
+
+      if (entry.release_id) {
+        await supabase
+          .from('releases')
+          .update(releaseUpdate)
+          .eq('id', entry.release_id);
+      }
+
+      if (entry.master_id) {
+        await supabase
+          .from('masters')
+          .update(masterUpdate)
+          .eq('id', entry.master_id);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setStatus(`Error: ${message}`);
       setSaving(false);
-    } else {
-      setStatus('✅ Saved!');
-      setSaving(false);
-      setTimeout(() => router.push('/admin/edit-collection'), 1000);
+      return;
     }
+    
+    setStatus('✅ Saved!');
+    setSaving(false);
+    setTimeout(() => router.push('/admin/edit-collection'), 1000);
   }
 
   const sides = Array.from(new Set(tracks.map(t => getSideFromPosition(t.position)).filter(s => s !== 'Unknown')));
@@ -1050,15 +1177,6 @@ export default function EditEntryPage() {
                       style={{ marginRight: 10, width: 18, height: 18, cursor: 'pointer' }} 
                     />
                     <span style={{ fontWeight: '600', color: '#ea580c' }}>🔥 Top 10</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '14px' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={!!entry.inner_circle_preferred} 
-                      onChange={e => handleChange('inner_circle_preferred', e.target.checked)} 
-                      style={{ marginRight: 10, width: 18, height: 18, cursor: 'pointer' }} 
-                    />
-                    <span style={{ fontWeight: '600', color: '#7c3aed' }}>💎 Inner Circle</span>
                   </label>
                 </div>
               </div>

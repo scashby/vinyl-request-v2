@@ -1,6 +1,5 @@
 // src/lib/importUtils.ts
 import { supabase } from './supabaseClient';
-import type { Database } from '../types/database.types';
 
 // ============================================================================
 // 1. STRING NORMALIZATION (Synchronous)
@@ -102,9 +101,9 @@ export async function resolveArtistAlias(artistName: string): Promise<string> {
 }
 
 /**
- * Ensure tags exist in 'master_tags' and link them to the album in 'collection_tags'.
+ * Ensure tags exist in 'master_tags' and link them to the master in 'master_tag_links'.
  */
-export async function saveTags(collectionId: number, tags: string[], category: 'genre' | 'style' | 'custom' = 'custom') {
+export async function saveTags(masterId: number, tags: string[], category: 'genre' | 'style' | 'custom' = 'custom') {
   if (!tags || tags.length === 0) return;
 
   const validTags = tags.map(t => t.trim()).filter(t => t.length > 0);
@@ -137,38 +136,15 @@ export async function saveTags(collectionId: number, tags: string[], category: '
     if (tagId) tagIds.push(tagId);
   }
 
-  // 2. Link to collection
+  // 2. Link to master
   if (tagIds.length > 0) {
     const links = tagIds.map(tagId => ({
-      collection_id: collectionId,
+      master_id: masterId,
       tag_id: tagId
     }));
 
     // Upsert to avoid duplicates
-    await supabase.from('collection_tags').upsert(links, { onConflict: 'collection_id,tag_id' });
-  }
-}
-
-/**
- * Save BPM and Key data to the 'collection_dj_data' sidecar table.
- */
-export async function saveDJData(collectionId: number, bpm?: number, key?: string) {
-  if (!bpm && !key) return;
-
-  // Uses strict typing from Database definitions to avoid 'any'
-  const updateData: Database['public']['Tables']['collection_dj_data']['Insert'] = { 
-    collection_id: collectionId 
-  };
-  
-  if (bpm) updateData.bpm = Math.round(bpm);
-  if (key) updateData.musical_key = key;
-
-  const { error } = await supabase
-    .from('collection_dj_data')
-    .upsert(updateData, { onConflict: 'collection_id' });
-
-  if (error) {
-    console.error('Error saving DJ data:', error);
+    await supabase.from('master_tag_links').upsert(links, { onConflict: 'master_id,tag_id' });
   }
 }
 
