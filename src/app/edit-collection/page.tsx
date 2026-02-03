@@ -17,6 +17,16 @@ import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import CollectionInfoPanel from './components/CollectionInfoPanel';
 import { BoxIcon } from '../../components/BoxIcon';
 import { getDisplayFormat } from '../../utils/formatDisplay';
+import {
+  getAlbumArtist,
+  getAlbumDecade,
+  getAlbumFormat,
+  getAlbumGenres,
+  getAlbumTags,
+  getAlbumTitle,
+  getAlbumYearInt,
+  getAlbumYearValue
+} from './albumHelpers';
 import type { Database } from '../../types/supabase';
 
 type SortOption = 
