@@ -53,18 +53,20 @@ const CollectionTable = memo(function CollectionTable({
   });
 
   const formatters = useMemo(() => {
-    const getAlbumArtist = (album: V3Album) =>
-      album.release?.master?.artist?.name || '—';
+    const getAlbumArtist = (album: Album) =>
+      album.artist || album.release?.master?.artist?.name || '—';
 
-    const getAlbumTitle = (album: V3Album) =>
-      album.release?.master?.title || '—';
+    const getAlbumTitle = (album: Album) =>
+      album.title || album.release?.master?.title || '—';
 
-    const getAlbumYear = (album: V3Album) =>
+    const getAlbumYear = (album: Album) =>
+      album.year ||
       album.release?.release_year ||
       album.release?.master?.original_release_year ||
       '—';
 
-    const getAlbumFormat = (album: V3Album) => {
+    const getAlbumFormat = (album: Album) => {
+      if (album.format) return album.format;
       const release = album.release;
       if (!release) return '';
       const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
@@ -74,45 +76,23 @@ const CollectionTable = memo(function CollectionTable({
       return qty > 1 ? `${qty}x${base}` : base;
     };
 
-    const getAlbumGenres = (album: V3Album) =>
-      album.release?.master?.genres || null;
+    const getAlbumGenres = (album: Album) =>
+      album.genres || album.release?.master?.genres || null;
 
-    const getAlbumStyles = (album: V3Album) =>
-      album.release?.master?.styles || null;
+    const getAlbumStyles = (album: Album) =>
+      album.styles || album.release?.master?.styles || null;
 
-    const getAlbumLabels = (album: V3Album) => {
+    const getAlbumLabels = (album: Album) => {
+      if (album.labels) return album.labels;
       const releaseLabel = album.release?.label;
       return releaseLabel ? [releaseLabel] : null;
     };
 
-    const getAlbumBarcode = (album: V3Album) =>
-      album.release?.barcode || '—';
+    const getAlbumBarcode = (album: Album) =>
+      album.barcode || album.release?.barcode || '—';
 
-    const getAlbumCatalogNumber = (album: V3Album) =>
-      album.release?.catalog_number || '—';
-
-    const getAlbumLocation = (album: V3Album) =>
-      album.location || '—';
-
-    const getAlbumStatus = (album: V3Album) =>
-      album.status || '—';
-
-    const getAlbumTags = (album: V3Album) =>
-      (album.release?.master?.master_tag_links ?? [])
-        .map((link) => link.master_tags?.name)
-        .filter((name): name is string => Boolean(name));
-
-    const getTrackCount = (album: V3Album): number => {
-      const tracks = album.release?.release_tracks ?? [];
-      return tracks.length;
-    };
-
-    const getTotalDuration = (album: V3Album): number | null => {
-      const tracks = album.release?.release_tracks ?? [];
-      if (tracks.length === 0) return null;
-      const total = tracks.reduce((sum, track) => sum + (track.recording?.duration_seconds ?? 0), 0);
-      return total > 0 ? total : null;
-    };
+    const getAlbumCatalogNumber = (album: Album) =>
+      album.cat_no || album.release?.catalog_number || '—';
 
     const formatLength = (seconds: number | null | undefined): string => {
       if (!seconds) return '—';
@@ -156,82 +136,82 @@ const CollectionTable = memo(function CollectionTable({
           ✏
         </span>
       ),
-      artist: (album: V3Album) => getAlbumArtist(album),
-      title: (album: V3Album) => (
+      artist: (album: Album) => getAlbumArtist(album),
+      title: (album: Album) => (
         <span 
           className="text-blue-700 no-underline cursor-pointer hover:underline"
         >
           {getAlbumTitle(album)}
         </span>
       ),
-      year: (album: V3Album) => getAlbumYear(album),
-      barcode: (album: V3Album) => getAlbumBarcode(album),
-      cat_no: (album: V3Album) => getAlbumCatalogNumber(album),
-      sort_title: () => '—',
-      subtitle: () => '—',
-      index_number: () => '—',
-      format: (album: V3Album) => getDisplayFormat(getAlbumFormat(album)),
-      discs: (album: V3Album) => album.release?.qty ?? '—',
-      tracks: (album: V3Album) => (getTrackCount(album) > 0 ? getTrackCount(album) : '—'),
-      length: (album: V3Album) => formatLength(getTotalDuration(album)),
-      box_set: () => '—',
-      country: (album: V3Album) => album.release?.country || '—',
-      extra: () => '—',
-      is_live: () => '—',
-      media_condition: (album: V3Album) => album.media_condition || '—',
-      package_sleeve_condition: (album: V3Album) => album.sleeve_condition || '—',
-      packaging: () => '—',
-      rpm: () => '—',
-      sound: () => '—',
-      spars_code: () => '—',
-      storage_device_slot: () => '—',
-      studio: () => '—',
-      vinyl_color: () => '—',
-      vinyl_weight: () => '—',
+      year: (album: Album) => getAlbumYear(album),
+      barcode: (album: Album) => getAlbumBarcode(album),
+      cat_no: (album: Album) => getAlbumCatalogNumber(album),
+      sort_title: (album: Album) => album.sort_title || '—',
+      subtitle: (album: Album) => album.subtitle || '—',
+      index_number: (album: Album) => album.index_number || '—',
+      format: (album: Album) => getDisplayFormat(getAlbumFormat(album)),
+      discs: (album: Album) => album.discs || '—',
+      tracks: (album: Album) => formatTrackCount(album),
+      length: (album: Album) => formatLength(album.length_seconds),
+      box_set: (album: Album) => album.is_box_set ? 'Yes' : 'No',
+      country: (album: Album) => album.country || '—',
+      extra: (album: Album) => album.extra || '—',
+      is_live: (album: Album) => album.is_live ? 'Yes' : 'No',
+      media_condition: (album: Album) => album.media_condition || '—',
+      package_sleeve_condition: (album: Album) => album.package_sleeve_condition || '—',
+      packaging: (album: Album) => album.packaging || '—',
+      rpm: (album: Album) => album.rpm || '—',
+      sound: (album: Album) => album.sound || '—',
+      spars_code: (album: Album) => album.spars_code || '—',
+      storage_device_slot: (album: Album) => album.storage_device_slot || '—',
+      studio: (album: Album) => album.studio || '—',
+      vinyl_color: (album: Album) => formatArray(album.vinyl_color),
+      vinyl_weight: (album: Album) => album.vinyl_weight || '—',
       
-      genres: (album: V3Album) => formatArray(getAlbumGenres(album)),
-      styles: (album: V3Album) => formatArray(getAlbumStyles(album)),
-      label: (album: V3Album) => formatArray(getAlbumLabels(album)),
-      original_release_date: () => '—',
-      original_release_year: (album: V3Album) => album.release?.master?.original_release_year || '—',
-      recording_date: () => '—',
-      recording_year: () => '—',
-      master_release_date: (album: V3Album) => album.release?.release_date || '—',
-      chorus: () => '—',
-      composer: () => '—',
-      composition: () => '—',
-      conductor: () => '—',
-      orchestra: () => '—',
-      engineers: () => '—',
-      musicians: () => '—',
-      producers: () => '—',
-      songwriters: () => '—',
-      added_date: (album: V3Album) => formatDate(album.date_added),
-      collection_status: (album: V3Album) => getAlbumStatus(album),
-      location: (album: V3Album) => getAlbumLocation(album),
-      my_rating: () => '—',
-      notes: (album: V3Album) => album.personal_notes || '—',
-      owner: (album: V3Album) => album.owner || '—',
-      play_count: (album: V3Album) => album.play_count || 0,
-      last_played_date: (album: V3Album) => formatDate(album.last_played_at),
-      last_cleaned_date: () => '—',
-      signed_by: () => '—',
-      custom_tags: (album: V3Album) => formatArray(getAlbumTags(album)),
-      modified_date: () => '—',
-      due_date: () => '—',
-      loan_date: () => '—',
-      loaned_to: () => '—',
-      for_sale: (album: V3Album) => album.status === 'for_sale' ? 'Yes' : 'No',
-      purchase_date: (album: V3Album) => formatDate(album.purchase_date),
-      purchase_store: () => '—',
-      purchase_price: (album: V3Album) => formatCurrency(album.purchase_price),
-      current_value: (album: V3Album) => formatCurrency(album.current_value),
-      sale_price: () => '—',
-      sale_platform: () => '—',
-      sale_quantity: () => '—',
-      wholesale_cost: () => '—',
-      pricing_notes: () => '—',
-    } as Record<string, (album: V3Album) => React.ReactNode>;
+      genres: (album: Album) => formatArray(getAlbumGenres(album)),
+      styles: (album: Album) => formatArray(getAlbumStyles(album)),
+      label: (album: Album) => formatArray(getAlbumLabels(album)),
+      original_release_date: (album: Album) => formatDate(album.original_release_date),
+      original_release_year: (album: Album) => album.original_release_year || '—',
+      recording_date: (album: Album) => formatDate(album.recording_date),
+      recording_year: (album: Album) => album.recording_year || '—',
+      master_release_date: (album: Album) => album.master_release_date || '—',
+      chorus: (album: Album) => album.chorus || '—',
+      composer: (album: Album) => album.composer || '—',
+      composition: (album: Album) => album.composition || '—',
+      conductor: (album: Album) => album.conductor || '—',
+      orchestra: (album: Album) => album.orchestra || '—',
+      engineers: (album: Album) => formatArray(album.engineers),
+      musicians: (album: Album) => formatArray(album.musicians),
+      producers: (album: Album) => formatArray(album.producers),
+      songwriters: (album: Album) => formatArray(album.songwriters),
+      added_date: (album: Album) => formatDate(album.date_added),
+      collection_status: (album: Album) => album.collection_status || '—',
+      location: (album: Album) => album.location || '—',
+      my_rating: (album: Album) => album.my_rating ? '⭐'.repeat(album.my_rating) : '—',
+      notes: (album: Album) => album.notes || '—',
+      owner: (album: Album) => album.owner || '—',
+      play_count: (album: Album) => album.play_count || 0,
+      last_played_date: (album: Album) => formatDate(album.last_played_date),
+      last_cleaned_date: (album: Album) => formatDate(album.last_cleaned_date),
+      signed_by: (album: Album) => formatArray(album.signed_by),
+      custom_tags: (album: Album) => formatArray(album.custom_tags),
+      modified_date: (album: Album) => formatDate(album.modified_date),
+      due_date: (album: Album) => formatDate(album.due_date),
+      loan_date: (album: Album) => formatDate(album.loan_date),
+      loaned_to: (album: Album) => album.loaned_to || '—',
+      for_sale: (album: Album) => album.for_sale ? 'Yes' : 'No',
+      purchase_date: (album: Album) => formatDate(album.purchase_date),
+      purchase_store: (album: Album) => album.purchase_store || '—',
+      purchase_price: (album: Album) => formatCurrency(album.purchase_price),
+      current_value: (album: Album) => formatCurrency(album.current_value),
+      sale_price: (album: Album) => formatCurrency(album.sale_price),
+      sale_platform: (album: Album) => album.sale_platform || '—',
+      sale_quantity: (album: Album) => album.sale_quantity || '—',
+      wholesale_cost: (album: Album) => formatCurrency(album.wholesale_cost),
+      pricing_notes: (album: Album) => album.pricing_notes || '—',
+    } as Record<string, (album: Album) => React.ReactNode>;
   }, [onEditAlbum]);
 
   const handleSelectAll = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
