@@ -7,73 +7,170 @@ import { supabase } from "src/lib/supabaseClient";
 interface AddOrVoteParams {
   eventId: number | string;
   albumId?: number | string | null;
-  side: string; // 'A' | 'B' | ...
+  inventoryId?: number | string | null;
+  recordingId?: number | string | null;
+  side?: string; // 'A' | 'B' | ...
   artist: string;
   title: string;
   status?: string;
-  folder?: string;
-  year?: number | string | null;
-  format?: string | null;
 }
 
 export async function addOrVoteRequest({
   eventId,
-  albumId = null,
+  inventoryId = null,
+  recordingId = null,
   side,
   artist,
   title,
-  status = "open",
-  folder = "Unknown",
-  year = null,
-  format = null,
+  status = "pending",
 }: AddOrVoteParams) {
-  // 1) Look for an existing row in this event for this side
-  let query = supabase
-    .from("requests")
-    .select("id, votes")
-    .eq("event_id", eventId)
-    .eq("side", side)
-    .limit(1);
+  const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+    Array.isArray(value) ? value[0] ?? null : value ?? null;
+  const normalizeSide = (value?: string) => {
+    const trimmed = value?.trim();
+    if (!trimmed) return null;
+    return trimmed.toLowerCase().startsWith("side ")
+      ? trimmed
+      : `Side ${trimmed}`;
+  };
+  let resolvedInventoryId = inventoryId;
 
-  if (albumId !== null && albumId !== undefined) {
-    query = query.eq("album_id", albumId);
-  } else {
-    // manual requests: match by artist+title with null album_id
-    query = query.is("album_id", null).eq("artist", artist).eq("title", title);
+  if (!resolvedInventoryId) {
+    const { data: existingArtist, error: artistError } = await supabase
+      .from("artists")
+      .select("id")
+      .ilike("name", artist)
+      .maybeSingle();
+
+    if (artistError) throw artistError;
+
+    let artistId = existingArtist?.id;
+    if (!artistId) {
+      const { data: createdArtist, error: createArtistError } = await supabase
+        .from("artists")
+        .insert({ name: artist || "Unknown Artist" })
+        .select("id")
+        .single();
+
+      if (createArtistError) throw createArtistError;
+      artistId = createdArtist.id;
+    }
+
+    const { data: createdMaster, error: masterError } = await supabase
+      .from("masters")
+      .insert({
+        title: title || "Placeholder Master",
+        main_artist_id: artistId,
+      })
+      .select("id")
+      .single();
+
+    if (masterError || !createdMaster) throw masterError;
+
+    const { data: createdRelease, error: releaseError } = await supabase
+      .from("releases")
+      .insert({
+        master_id: createdMaster.id,
+        media_type: "Unknown",
+      })
+      .select("id")
+      .single();
+
+    if (releaseError || !createdRelease) throw releaseError;
+
+    const { data: createdInventory, error: inventoryError } = await supabase
+      .from("inventory")
+      .insert({
+        release_id: createdRelease.id,
+        status: "placeholder",
+      })
+      .select("id")
+      .single();
+
+    if (inventoryError || !createdInventory) throw inventoryError;
+    resolvedInventoryId = createdInventory.id;
   }
 
-  const { data: rows, error: findErr } = await query;
-  if (findErr) throw findErr;
-  const existing = rows?.[0];
+  let requestQuery = supabase
+    .from("requests_v3")
+    .select("id, votes")
+    .eq("event_id", eventId)
+    .limit(1);
 
-  if (existing) {
-    // 2) Increment votes
+  if (resolvedInventoryId !== null && resolvedInventoryId !== undefined) {
+    requestQuery = requestQuery.eq("inventory_id", resolvedInventoryId);
+  } else {
+    requestQuery = requestQuery.is("inventory_id", null);
+  }
+
+  if (recordingId !== null && recordingId !== undefined) {
+    requestQuery = requestQuery.eq("recording_id", recordingId);
+  } else {
+    requestQuery = requestQuery.is("recording_id", null);
+  }
+
+  const { data: requestRows, error: requestFindErr } = await requestQuery;
+  if (requestFindErr) throw requestFindErr;
+  const existingRequest = requestRows?.[0];
+
+  if (existingRequest) {
     const { data, error } = await supabase
-      .from("requests")
-      .update({ votes: (existing.votes ?? 0) + 1 })
-      .eq("id", existing.id)
+      .from("requests_v3")
+      .update({ votes: (existingRequest.votes ?? 0) + 1 })
+      .eq("id", existingRequest.id)
       .select()
       .single();
     if (error) throw error;
     return data;
   }
 
-  // 3) Insert new with votes=1
+  const { data: inventoryDetails, error: inventoryDetailsError } = await supabase
+    .from("inventory")
+    .select(
+      `id,
+       release:releases (
+         master:masters (
+           title,
+           artist:artists (name)
+         )
+       )`
+    )
+    .eq("id", resolvedInventoryId)
+    .single();
+
+  if (inventoryDetailsError) throw inventoryDetailsError;
+
+  const { data: recordingDetails, error: recordingDetailsError } = recordingId
+    ? await supabase
+        .from("recordings")
+        .select("title")
+        .eq("id", recordingId)
+        .single()
+    : { data: null, error: null };
+
+  if (recordingDetailsError) throw recordingDetailsError;
+
+  const release = toSingle(inventoryDetails?.release);
+  const master = toSingle(release?.master);
+  const artistName =
+    toSingle(master?.artist)?.name || artist || "Unknown Artist";
+  const masterTitle =
+    master?.title || title || "Untitled";
+  const sideLabel = normalizeSide(side);
+  const trackTitle = recordingDetails?.title || sideLabel || masterTitle;
+
   const payload = {
     event_id: eventId,
-    album_id: albumId,
-    side,
-    artist,
-    title,
+    inventory_id: resolvedInventoryId,
+    recording_id: recordingId,
+    artist_name: artistName,
+    track_title: trackTitle,
     status,
     votes: 1,
-    folder,
-    year,
-    format,
   };
 
   const { data, error } = await supabase
-    .from("requests")
+    .from("requests_v3")
     .insert([payload])
     .select()
     .single();

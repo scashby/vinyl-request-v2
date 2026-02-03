@@ -3,7 +3,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
-import { Album } from '../../types/album';
+import type { Album } from '../../types/album';
+import { getAlbumArtist, getAlbumFormat, getAlbumGenres, getAlbumTitle, getAlbumYearValue } from './albumHelpers';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 interface StatisticsData {
@@ -51,23 +52,19 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
     try {
       // Calculate statistics from albums data
       const totalAlbums = albums.length;
-      const totalArtists = new Set(albums.map(a => a.artist)).size;
-      const totalDiscs = albums.reduce((sum, a) => sum + (a.discs || 1), 0);
-      const totalTracks = albums.reduce((sum, a) => 
-        sum + (a.tracks?.filter((t) => t.type === 'track').length || 0), 0
+      const totalArtists = new Set(albums.map((album) => getAlbumArtist(album))).size;
+      const totalDiscs = albums.reduce((sum, album) => sum + (album.release?.qty || 1), 0);
+      const totalTracks = albums.reduce((sum, album) => 
+        sum + (album.release?.release_tracks?.length || 0), 0
       );
 
       // Calculate total runtime
       let totalSeconds = 0;
       albums.forEach(album => {
-        album.tracks?.forEach((track) => {
-          if (track.duration) {
-            const parts = track.duration.split(':');
-            if (parts.length === 2) {
-              totalSeconds += parseInt(parts[0]) * 60 + parseInt(parts[1]);
-            } else if (parts.length === 3) {
-              totalSeconds += parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
-            }
+        album.release?.release_tracks?.forEach((track) => {
+          const duration = track.recording?.duration_seconds ?? null;
+          if (typeof duration === 'number') {
+            totalSeconds += duration;
           }
         });
       });
@@ -81,7 +78,7 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
       // Format data - TOP 9 FORMATS + OTHER
       const formatCounts: Record<string, number> = {};
       albums.forEach(album => {
-        const format = album.format || 'Unknown';
+        const format = getAlbumFormat(album) || 'Unknown';
         formatCounts[format] = (formatCounts[format] || 0) + 1;
       });
 
@@ -114,7 +111,7 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
       const genreCounts: Record<string, number> = {};
       albums.forEach(album => {
         // FIXED: Only use canonical 'genres' field (removed spotify_genres)
-        const genreList = album.genres || [];
+        const genreList = getAlbumGenres(album) || [];
         const genres = (Array.isArray(genreList) ? genreList : []).map((g: string) => g.trim()).filter(Boolean);
         if (genres.length === 0) genres.push('Unknown');
         genres.forEach(genre => {
@@ -129,7 +126,7 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
       // Year data
       const yearCounts: Record<string, number> = {};
       albums.forEach(album => {
-        const year = album.year?.toString() || 'Unknown';
+        const year = getAlbumYearValue(album)?.toString() || 'Unknown';
         yearCounts[year] = (yearCounts[year] || 0) + 1;
       });
 
@@ -141,7 +138,7 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
       // Artist data
       const artistCounts: Record<string, number> = {};
       albums.forEach(album => {
-        const artist = album.artist || 'Unknown';
+        const artist = getAlbumArtist(album) || 'Unknown';
         artistCounts[artist] = (artistCounts[artist] || 0) + 1;
       });
 
@@ -293,27 +290,27 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
                   <h2 className="m-0 mb-4 text-lg font-semibold text-gray-900">Most recent additions</h2>
                   <div className="flex flex-col gap-3">
                     {stats.recentAdditions.slice(0, 5).map((album) => {
-                      const imageUrl = album.image_url && album.image_url.trim().toLowerCase() !== 'no'
-                        ? album.image_url.trim()
+                      const imageUrl = album.release?.master?.cover_image_url && album.release?.master?.cover_image_url.trim().toLowerCase() !== 'no'
+                        ? album.release?.master?.cover_image_url.trim()
                         : '/images/placeholder.png';
                       return (
                         <div key={album.id} className="flex gap-3 items-center p-2 rounded border border-gray-200">
                           <Image
                             src={imageUrl}
-                            alt={album.title}
+                            alt={getAlbumTitle(album)}
                             width={60}
                             height={60}
                             unoptimized
                           />
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-semibold text-blue-600 mb-0.5 truncate">
-                            {album.title}
+                            {getAlbumTitle(album)}
                           </div>
-                          <div className="text-[13px] text-gray-500 mb-0.5">{album.artist}</div>
-                          <div className="text-xs text-gray-400">{album.format} - {album.year || 'Unknown'}</div>
+                          <div className="text-[13px] text-gray-500 mb-0.5">{getAlbumArtist(album)}</div>
+                          <div className="text-xs text-gray-400">{getAlbumFormat(album)} - {getAlbumYearValue(album) || 'Unknown'}</div>
                         </div>
                         <div className="text-right text-xs text-gray-500 shrink-0">
-                          {album.tracks?.filter((t) => t.type === 'track').length || 0} tracks<br />
+                          {album.release?.release_tracks?.length || 0} tracks<br />
                           {album.date_added ? new Date(album.date_added).toLocaleDateString() : ''}
                         </div>
                       </div>
@@ -420,8 +417,8 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
                     <div className="flex flex-col gap-2">
                       {stats.mostPlayed.slice(0, 5).map((item, idx) => (
                         <div key={idx} className="text-[13px] text-gray-900 p-2 rounded bg-gray-50">
-                          <div className="font-semibold">{item.album.artist}</div>
-                          <div className="text-gray-600">{item.album.title}</div>
+                          <div className="font-semibold">{getAlbumArtist(item.album)}</div>
+                          <div className="text-gray-600">{getAlbumTitle(item.album)}</div>
                           <div className="text-gray-400 text-xs">{item.playCount} plays</div>
                         </div>
                       ))}
@@ -440,8 +437,8 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
                     <div className="flex flex-col gap-2">
                       {stats.recentlyPlayed.slice(0, 5).map((item, idx) => (
                         <div key={idx} className="text-[13px] text-gray-900 p-2 rounded bg-gray-50">
-                          <div className="font-semibold">{item.album.artist}</div>
-                          <div className="text-gray-600">{item.album.title}</div>
+                          <div className="font-semibold">{getAlbumArtist(item.album)}</div>
+                          <div className="text-gray-600">{getAlbumTitle(item.album)}</div>
                           <div className="text-gray-400 text-xs">{new Date(item.lastPlayed).toLocaleDateString()}</div>
                         </div>
                       ))}

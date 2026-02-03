@@ -2,7 +2,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Album } from '../../types/album';
+import type { Album } from '../../types/album';
+import { getAlbumArtist, getAlbumFormat, getAlbumGenres, getAlbumTitle, getAlbumYearValue } from './albumHelpers';
 import { ManageSortFavoritesModal, SortFavorite } from './ManageSortFavoritesModal';
 import { ManageColumnFavoritesModal, ColumnFavorite } from './ManageColumnFavoritesModal';
 
@@ -13,6 +14,55 @@ interface PrintToPDFModalProps {
   currentListAlbums: Album[];
   checkedAlbumIds: Set<number>;
 }
+
+const formatDuration = (totalSeconds: number) => {
+  if (!totalSeconds) return '—';
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+};
+
+const getAlbumLength = (album: Album) => {
+  const totalSeconds = album.release?.release_tracks?.reduce((sum, track) => {
+    const duration = track.recording?.duration_seconds ?? 0;
+    return sum + (typeof duration === 'number' ? duration : 0);
+  }, 0);
+  return formatDuration(totalSeconds ?? 0);
+};
+
+const getAlbumColumnValue = (album: Album, column: string) => {
+  switch (column) {
+    case 'Artist':
+      return getAlbumArtist(album);
+    case 'Title':
+      return getAlbumTitle(album);
+    case 'Release Date':
+      return getAlbumYearValue(album) ?? '—';
+    case 'Format':
+      return getAlbumFormat(album) || '—';
+    case 'Discs':
+      return album.release?.qty ?? '—';
+    case 'Tracks':
+      return album.release?.release_tracks?.length ?? 0;
+    case 'Length':
+      return getAlbumLength(album);
+    case 'Genre': {
+      const genres = getAlbumGenres(album) ?? [];
+      return Array.isArray(genres) ? genres.join(', ') : '—';
+    }
+    case 'Label':
+      return album.release?.label ?? '—';
+    case 'Added Date':
+      return album.date_added ?? '—';
+    default: {
+      const key = column.toLowerCase().replace(/ /g, '_');
+      const fallback = (album as Record<string, unknown>)[key];
+      return fallback ?? '—';
+    }
+  }
+};
 
 export function PrintToPDFModal({
   isOpen,
@@ -93,9 +143,8 @@ export function PrintToPDFModal({
       if (!selectedSortFavorite) return 0;
       
       for (const sortField of selectedSortFavorite.fields) {
-        const fieldKey = sortField.field.toLowerCase().replace(/ /g, '_') as keyof Album;
-        const aVal = a[fieldKey] || '';
-        const bVal = b[fieldKey] || '';
+        const aVal = getAlbumColumnValue(a, sortField.field);
+        const bVal = getAlbumColumnValue(b, sortField.field);
         
         const comparison = String(aVal).localeCompare(String(bVal));
         if (comparison !== 0) {
@@ -165,13 +214,7 @@ export function PrintToPDFModal({
         // Prepare table data
         const columns = selectedColumnFavorite?.columns || [];
         const tableData = sortedAlbums.map(album => {
-          return columns.map(col => {
-            const key = col.toLowerCase().replace(/ /g, '_') as keyof Album;
-            if (col === 'Tracks') {
-              return String(album.tracks?.filter(t => t.type === 'track').length || '—');
-            }
-            return String(album[key] || '—');
-          });
+          return columns.map(col => String(getAlbumColumnValue(album, col)));
         });
 
         // Split data into pages if max albums per page is set

@@ -21,9 +21,9 @@ export default function GenreStyleSelector({ value, onChange, type, placeholder 
   const loadOptions = useCallback(async () => {
     setLoading(true);
     try {
-      const field = type === 'genre' ? 'discogs_genres' : 'discogs_styles';
+      const field = type === 'genre' ? 'genres' : 'styles';
       const { data, error } = await supabase
-        .from('collection')
+        .from('masters')
         .select(field)
         .not(field, 'is', null);
 

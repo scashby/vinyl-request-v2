@@ -157,11 +157,10 @@ export default function Page() {
           .select("*")
           .order("date", { ascending: true });
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: ev, error } = (await Promise.race([
           fetchEvents,
           timeoutPromise,
-        ])) as any;
+        ])) as { data: Event[] | null; error: { message?: string } | null };
 
         if (error) {
           console.error("Error loading events", error);

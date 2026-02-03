@@ -25,35 +25,38 @@ export async function GET() {
   try {
     // 1. Fetch Albums
     const { data: albums, error } = await supabase
-      .from('collection')
-      .select('*');
+      .from('inventory')
+      .select(`
+        id,
+        release:releases (
+          id,
+          barcode,
+          label,
+          catalog_number,
+          release_date,
+          release_year,
+          spotify_album_id,
+          apple_music_id,
+          master:masters (
+            id,
+            cover_image_url,
+            genres,
+            styles,
+            original_release_year
+          ),
+          release_tracks:release_tracks (
+            recording:recordings (
+              duration_seconds
+            )
+          )
+        )
+      `);
 
     if (error) throw error;
     if (!albums) return NextResponse.json({ success: true, stats: null });
 
-    // 2. Fetch Track Data (Source of Truth)
-    // UPGRADE: Fetch duration to check for missing times
-    const { data: trackRows, error: trackError } = await supabase
-      .from('tracks')
-      .select('*');
-    
-    if (trackError) console.error("Track Fetch Error:", trackError);
-
-    // Analyze Track Data
     const albumsWithTracks = new Set<string>();
     const albumsWithMissingDurations = new Set<string>();
-
-    trackRows?.forEach(t => {
-      const aId = String(t.album_id);
-      albumsWithTracks.add(aId);
-      // If duration is missing/empty, flag this album
-      const durationValue = t.duration === null || t.duration === undefined
-        ? ''
-        : String(t.duration).trim();
-      if (durationValue === '') {
-        albumsWithMissingDurations.add(aId);
-      }
-    });
 
     // Initialize Counters
     let fullyEnriched = 0;
@@ -62,26 +65,26 @@ export async function GET() {
     // Artwork
     let missingArtwork = 0;
     let missingFrontCover = 0;
-    let missingBackCover = 0;
-    let missingInnerSleeve = 0;
+    const missingBackCover = 0;
+    const missingInnerSleeve = 0;
     
     // Credits
-    let missingCredits = 0;
-    let missingMusicians = 0;
-    let missingProducers = 0;
-    let missingEngineers = 0;
-    let missingSongwriters = 0;
+    const missingCredits = 0;
+    const missingMusicians = 0;
+    const missingProducers = 0;
+    const missingEngineers = 0;
+    const missingSongwriters = 0;
     
     // Tracklists
     let missingTracklists = 0;
     let missingDurations = 0; // NEW STAT
     
     // Audio
-    let missingAudioAnalysis = 0;
-    let missingTempo = 0;
-    let missingMusicalKey = 0;
-    let missingDanceability = 0;
-    let missingEnergy = 0;
+    const missingAudioAnalysis = 0;
+    const missingTempo = 0;
+    const missingMusicalKey = 0;
+    const missingDanceability = 0;
+    const missingEnergy = 0;
     
     // Genres
     let missingGenres = 0;
@@ -91,7 +94,7 @@ export async function GET() {
     let missingStreamingLinks = 0;
     let missingSpotify = 0;
     let missingAppleMusic = 0;
-    let missingLastFM = 0;
+    const missingLastFM = 0;
     
     // Metadata
     let missingReleaseMetadata = 0;
@@ -102,132 +105,66 @@ export async function GET() {
 
     const folders = new Set<string>();
 
-    const parseTracklists = (tracklists: unknown) => {
-      if (!tracklists) return null;
-      if (Array.isArray(tracklists)) return tracklists;
-      if (typeof tracklists === 'string') {
-        try {
-          const parsed = JSON.parse(tracklists);
-          return Array.isArray(parsed) ? parsed : null;
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    };
+    const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+      Array.isArray(value) ? value[0] ?? null : value ?? null;
 
     albums.forEach(album => {
-      if (album.folder) folders.add(album.folder);
       const albumIdStr = String(album.id);
-      const tracklists = parseTracklists(album.tracklists);
-      const hasTracklists = Array.isArray(tracklists) && tracklists.length > 0;
-      const tracklistsMissingDurations = hasTracklists
-        ? tracklists.some(track => {
-          const durationValue = track?.duration === null || track?.duration === undefined
-            ? ''
-            : String(track.duration).trim();
-          return durationValue === '';
-        })
-        : false;
+      const release = toSingle(album.release);
+      const master = toSingle(release?.master);
+      const releaseTracks = release?.release_tracks ?? [];
 
-      // 1. ARTWORK
-      const hasFront = !!album.image_url;
-      const hasBack = !!album.back_image_url;
-      const hasInner = Array.isArray(album.inner_sleeve_images) && album.inner_sleeve_images.length > 0;
-
-      if (!hasFront || !hasBack) {
-        missingArtwork++; 
-        if (!hasFront) missingFrontCover++;
-        if (!hasBack) missingBackCover++;
-      }
-      if (!hasInner) missingInnerSleeve++;
-
-      // 2. CREDITS
-      const hasMusicians = Array.isArray(album.musicians) && album.musicians.length > 0;
-      const hasProducers = Array.isArray(album.producers) && album.producers.length > 0;
-      const hasEngineers = Array.isArray(album.engineers) && album.engineers.length > 0;
-      const hasSongwriters = Array.isArray(album.songwriters) && album.songwriters.length > 0;
-
-      if (!hasMusicians || !hasProducers) {
-        missingCredits++;
-      }
-      if (!hasMusicians) missingMusicians++;
-      if (!hasProducers) missingProducers++;
-      if (!hasEngineers) missingEngineers++;
-      if (!hasSongwriters) missingSongwriters++;
-
-      // 3. TRACKLISTS & DURATIONS
-      const hasTracks = albumsWithTracks.has(albumIdStr) || hasTracklists;
-      // It has missing durations if it has tracks AND is in the missing set,
-      // or if tracklists exist but have missing durations.
-      const hasMissingDurations = (albumsWithTracks.has(albumIdStr) && albumsWithMissingDurations.has(albumIdStr))
-        || (!albumsWithTracks.has(albumIdStr) && tracklistsMissingDurations);
-
-      if (!hasTracks) {
-        missingTracklists++;
-      }
-      if (hasMissingDurations) {
-        missingDurations++;
+      if (releaseTracks.length > 0) {
+        albumsWithTracks.add(albumIdStr);
       }
 
-      // 4. AUDIO ANALYSIS
-      const hasTempo = album.tempo_bpm !== null && album.tempo_bpm !== 0;
-      const hasKey = !!album.musical_key;
-      const hasDance = album.danceability !== null;
-      const hasEnergy = album.energy !== null;
-
-      if (!hasTempo || !hasKey) {
-        missingAudioAnalysis++;
+      const missingDuration = releaseTracks.some((track) => {
+        const recording = toSingle(track.recording);
+        return !recording?.duration_seconds && recording?.duration_seconds !== 0;
+      });
+      if (missingDuration) {
+        albumsWithMissingDurations.add(albumIdStr);
       }
-      if (!hasTempo) missingTempo++;
-      if (!hasKey) missingMusicalKey++;
-      if (!hasDance) missingDanceability++;
-      if (!hasEnergy) missingEnergy++;
 
-      // 5. GENRES
-      const hasGenres = Array.isArray(album.genres) && album.genres.length > 0;
-      const hasStyles = Array.isArray(album.styles) && album.styles.length > 0;
-      if (!hasGenres || !hasStyles) {
-        missingGenres++; 
+      const hasFront = !!master?.cover_image_url;
+      if (!hasFront) {
+        missingArtwork++;
+        missingFrontCover++;
       }
-      // Note: We don't increment a global "missingGenres" for styles alone, 
-      // but we track the specific sub-stat
+
+      const hasTracks = albumsWithTracks.has(albumIdStr);
+      const hasMissingDurations = albumsWithMissingDurations.has(albumIdStr);
+      if (!hasTracks) missingTracklists++;
+      if (hasMissingDurations) missingDurations++;
+
+      const hasGenres = Array.isArray(master?.genres) && master?.genres.length > 0;
+      const hasStyles = Array.isArray(master?.styles) && master?.styles.length > 0;
+      if (!hasGenres || !hasStyles) missingGenres++;
       if (!hasStyles) missingStyles++;
 
-      // 6. STREAMING
-      const hasSpotify = !!album.spotify_id;
-      const hasApple = !!album.apple_music_id;
-      const hasLastfm = !!album.lastfm_url;
-      
-      if (!hasSpotify && !hasApple && !hasLastfm) {
-        missingStreamingLinks++;
-      }
+      const hasSpotify = !!release?.spotify_album_id;
+      const hasApple = !!release?.apple_music_id;
+      if (!hasSpotify || !hasApple) missingStreamingLinks++;
       if (!hasSpotify) missingSpotify++;
       if (!hasApple) missingAppleMusic++;
-      if (!hasLastfm) missingLastFM++;
 
-      // 7. RELEASE METADATA
-      const hasBarcode = !!album.barcode;
-      const hasLabel = Array.isArray(album.labels) && album.labels.length > 0;
-      const hasOriginalDate = !!album.original_release_date;
-      const hasCatNo = !!album.cat_no;
-      
-      if (!hasBarcode || !hasLabel || !hasOriginalDate) {
+      const hasOriginalDate = !!master?.original_release_year || !!release?.release_year;
+      const hasBarcode = !!release?.barcode;
+      const hasLabel = !!release?.label;
+      const hasCatalogNumber = !!release?.catalog_number;
+      if (!hasOriginalDate || !hasBarcode || !hasLabel || !hasCatalogNumber) {
         missingReleaseMetadata++;
       }
+      if (!hasOriginalDate) missingOriginalDate++;
       if (!hasBarcode) missingBarcode++;
       if (!hasLabel) missingLabels++;
-      if (!hasOriginalDate) missingOriginalDate++;
-      if (!hasCatNo) missingCatalogNumber++;
+      if (!hasCatalogNumber) missingCatalogNumber++;
 
-      // 8. TOTAL SCORE
-      const isComplete = 
-        (hasFront && hasBack) &&
-        (hasMusicians && hasProducers) &&
+      const isComplete =
+        hasFront &&
         hasTracks &&
-        (hasTempo && hasKey) &&
         hasGenres &&
-        (hasSpotify || hasApple || hasLastfm) && 
+        (hasSpotify || hasApple) &&
         (hasBarcode && hasLabel && hasOriginalDate);
 
       if (isComplete) fullyEnriched++;

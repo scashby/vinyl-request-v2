@@ -6,6 +6,14 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { supabase } from 'src/lib/supabaseClient';
+import type { Database } from 'src/types/supabase';
+
+type InventoryRow = Database['public']['Tables']['inventory']['Row'];
+type ReleaseRow = Database['public']['Tables']['releases']['Row'];
+type MasterRow = Database['public']['Tables']['masters']['Row'];
+type ArtistRow = Database['public']['Tables']['artists']['Row'];
+type RecordingRow = Database['public']['Tables']['recordings']['Row'];
+type RequestRow = Database['public']['Tables']['requests_v3']['Row'];
 
 interface Album {
   id: string | number;
@@ -13,18 +21,6 @@ interface Album {
   title: string;
   image_url?: string;
   format?: string;
-  is_1001?: boolean | null;
-}
-
-interface RequestEntry {
-  id: string | number;
-  album_id: string | number;
-  side: string | null;
-  track_number: string | null;
-  track_name: string | null;
-  track_duration: string | null;
-  votes: number;
-  event_id: string;
 }
 
 interface QueueItem {
@@ -47,11 +43,43 @@ function getVoteKey(eventId: string, reqId: string | number) {
   return `queue-vote-${eventId}-${reqId}`;
 }
 
+const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
+
+const buildFormatLabel = (release?: ReleaseRow | null) => {
+  if (!release) return '';
+  const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
+  const base = parts.join(', ');
+  const qty = release.qty ?? 1;
+  if (!base) return '';
+  return qty > 1 ? `${qty}x${base}` : base;
+};
+
+const formatDuration = (seconds?: number | null) => {
+  if (!seconds && seconds !== 0) return '';
+  const minutes = Math.floor(seconds / 60);
+  const remaining = Math.floor(seconds % 60);
+  return `${minutes}:${remaining.toString().padStart(2, '0')}`;
+};
+
 export default function QueueSection({ eventId }: QueueSectionProps) {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [queueType, setQueueType] = useState<string>('side');
   const [voting, setVoting] = useState<{ [key: string]: boolean }>({});
   const router = useRouter();
+
+  type InventoryQueryRow = InventoryRow & {
+    release?: (ReleaseRow & {
+      master?: (MasterRow & {
+        artist?: ArtistRow | null;
+      }) | null;
+    }) | null;
+  };
+
+  type RequestQueryRow = RequestRow & {
+    inventory?: InventoryQueryRow | null;
+    recording?: RecordingRow | null;
+  };
 
   useEffect(() => {
     const fetchQueue = async () => {
@@ -66,8 +94,29 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
       setQueueType(currentQueueType);
 
       const { data: requests, error } = await supabase
-        .from("requests")
-        .select("*")
+        .from("requests_v3")
+        .select(`
+          *,
+          inventory:inventory (
+            id,
+            release:releases (
+              media_type,
+              format_details,
+              qty,
+              master:masters (
+                title,
+                cover_image_url,
+                artist:artists (
+                  name
+                )
+              )
+            )
+          ),
+          recording:recordings (
+            title,
+            duration_seconds
+          )
+        `)
         .eq("event_id", eventId)
         .order("id", { ascending: true });
 
@@ -77,39 +126,28 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
         return;
       }
 
-      const albumIds = requests.map((r: RequestEntry) => r.album_id).filter(Boolean);
-      if (!albumIds.length) {
-        setQueue([]);
-        return;
-      }
+      const mapped: QueueItem[] = (requests as RequestQueryRow[]).map((req, i) => {
+        const inventory = req.inventory ?? null;
+        const release = toSingle(inventory?.release) ?? null;
+        const master = toSingle(release?.master) ?? null;
+        const album: Album = {
+          id: inventory?.id ?? req.inventory_id ?? '',
+          artist: toSingle(master?.artist)?.name ?? req.artist_name ?? '',
+          title: master?.title ?? '',
+          image_url: master?.cover_image_url ?? '',
+          format: buildFormatLabel(release)
+        };
+        const sideLabel = req.track_title && req.track_title.toLowerCase().startsWith('side ')
+          ? req.track_title.replace(/side\s+/i, '')
+          : null;
 
-      const { data: albums, error: albumError } = await supabase
-        .from("collection")
-        .select("id, artist, title, image_url, format")
-        .in("id", albumIds);
-
-      if (albumError || !albums) {
-        console.error("Error fetching albums:", albumError);
-        setQueue([]);
-        return;
-      }
-
-      const mapped: QueueItem[] = requests.map((req: RequestEntry, i: number) => {
-        const album =
-          (albums as Album[]).find((a: Album) => a.id === req.album_id) || {
-            id: req.album_id,
-            artist: "",
-            title: "",
-            image_url: "",
-            format: "",
-          };
         return {
           id: req.id,
           index: i + 1,
-          side: req.side || null,
-          track_number: req.track_number || null,
-          track_name: req.track_name || null,
-          track_duration: req.track_duration || null,
+          side: sideLabel,
+          track_number: null,
+          track_name: req.recording?.title ?? req.track_title ?? null,
+          track_duration: req.recording?.duration_seconds ? formatDuration(req.recording.duration_seconds) : null,
           votes: req.votes || 1,
           queue_type: currentQueueType,
           album,
@@ -132,7 +170,7 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
     const item = queue.find((q: QueueItem) => q.id === reqId);
     const newVotes = (item?.votes || 1) + 1;
     const { error } = await supabase
-      .from("requests")
+      .from("requests_v3")
       .update({ votes: newVotes })
       .eq("id", reqId);
     setVoting((v: { [key: string]: boolean }) => ({ ...v, [reqId]: false }));

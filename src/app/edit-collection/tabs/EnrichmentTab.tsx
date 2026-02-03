@@ -102,7 +102,20 @@ export function EnrichmentTab({ album, onChange }: EnrichmentTabProps) {
         </div>
 
         {/* RIGHT: Moods */}
-        {/* TODO: Mood fields are not currently part of Album schema; re-enable once available. */}
+        <div className="space-y-4">
+          <h3 className="text-sm font-bold text-gray-700 border-b border-gray-200 pb-2">
+            Mood Profile
+          </h3>
+          <div className="pt-2">
+            {renderSlider('Acoustic', 'mood_acoustic', 'accent-slate-500')}
+            {renderSlider('Electronic', 'mood_electronic', 'accent-indigo-500')}
+            {renderSlider('Happy', 'mood_happy', 'accent-yellow-500')}
+            {renderSlider('Sad', 'mood_sad', 'accent-blue-500')}
+            {renderSlider('Aggressive', 'mood_aggressive', 'accent-red-500')}
+            {renderSlider('Relaxed', 'mood_relaxed', 'accent-green-500')}
+            {renderSlider('Party', 'mood_party', 'accent-pink-500')}
+          </div>
+        </div>
       </div>
 
     </div>

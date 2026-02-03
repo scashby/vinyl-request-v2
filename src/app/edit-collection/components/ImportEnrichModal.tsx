@@ -95,9 +95,11 @@ type EnrichmentStats = {
 
 type Album = {
   id: number;
+  release_id?: number | null;
+  master_id?: number | null;
   artist: string;
   title: string;
-  image_url: string | null;
+  image_url?: string | null;
   finalized_fields?: string[];
   last_reviewed_at?: string;
   enriched_metadata?: Record<string, unknown>; // New JSONB column
@@ -105,12 +107,7 @@ type Album = {
 };
 
 interface CandidateResult {
-  album: Record<string, unknown> & { 
-    id: number; 
-    artist: string; 
-    title: string; 
-    finalized_fields?: string[]; 
-  };
+  album: Album;
   candidates: Record<string, unknown>;
 }
 
@@ -134,6 +131,8 @@ export type ExtendedFieldConflict = FieldConflict & {
   source: string;
   candidates?: Record<string, unknown>; // map of source -> value
   existing_finalized?: string[];
+  release_id?: number | null;
+  master_id?: number | null;
 };
 
 // Helper to normalize values for comparison
@@ -166,6 +165,84 @@ const isValidDate = (dateStr: unknown): boolean => {
   if (typeof dateStr !== 'string') return false;
   // Strict check for YYYY-MM-DD.
   return /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
+};
+
+type UpdateBatch = {
+  inventoryUpdates: Record<string, unknown>;
+  releaseUpdates: Record<string, unknown>;
+  masterUpdates: Record<string, unknown>;
+};
+
+const coerceYear = (value: unknown): number | null => {
+  if (typeof value === 'number') return Number.isNaN(value) ? null : value;
+  if (typeof value === 'string') {
+    const parsed = parseInt(value, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+};
+
+const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
+  const inventoryUpdates: Record<string, unknown> = {};
+  const releaseUpdates: Record<string, unknown> = {};
+  const masterUpdates: Record<string, unknown> = {};
+
+  Object.entries(updates).forEach(([key, value]) => {
+    switch (key) {
+      case 'location':
+      case 'personal_notes':
+      case 'media_condition':
+      case 'sleeve_condition':
+      case 'package_sleeve_condition':
+      case 'last_reviewed_at':
+      case 'enriched_metadata':
+      case 'finalized_fields':
+      case 'enrichment_sources':
+      case 'my_rating':
+        inventoryUpdates[key === 'package_sleeve_condition' ? 'sleeve_condition' : key] = value;
+        break;
+      case 'labels':
+        releaseUpdates.label = Array.isArray(value) ? value[0] ?? null : value;
+        break;
+      case 'cat_no':
+        releaseUpdates.catalog_number = value ?? null;
+        break;
+      case 'barcode':
+      case 'country':
+      case 'discogs_release_id':
+        releaseUpdates[key] = value ?? null;
+        break;
+      case 'spotify_id':
+        releaseUpdates.spotify_album_id = value ?? null;
+        break;
+      case 'apple_music_id':
+        releaseUpdates.apple_music_id = value ?? null;
+        break;
+      case 'release_notes':
+        releaseUpdates.notes = value ?? null;
+        break;
+      case 'year':
+        releaseUpdates.release_year = coerceYear(value);
+        break;
+      case 'original_release_date':
+        if (isValidDate(value)) {
+          releaseUpdates.release_date = value;
+        }
+        break;
+      case 'image_url':
+        masterUpdates.cover_image_url = value ?? null;
+        break;
+      case 'genres':
+      case 'styles':
+      case 'discogs_master_id':
+        masterUpdates[key] = value ?? null;
+        break;
+      default:
+        break;
+    }
+  });
+
+  return { inventoryUpdates, releaseUpdates, masterUpdates };
 };
 
 // --- 3. MAIN COMPONENT ---
@@ -442,6 +519,48 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
   }
 
+  const applyAlbumUpdates = async (album: Album, updates: Record<string, unknown>) => {
+    const { inventoryUpdates, releaseUpdates, masterUpdates } = splitV3Updates(updates);
+    const operations: Promise<unknown>[] = [];
+
+    if (Object.keys(inventoryUpdates).length > 0) {
+      operations.push(
+        (async () => {
+          await supabase
+            .from('inventory')
+            .update(inventoryUpdates as Record<string, unknown>)
+            .eq('id', album.id);
+        })()
+      );
+    }
+
+    if (album.release_id && Object.keys(releaseUpdates).length > 0) {
+      operations.push(
+        (async () => {
+          await supabase
+            .from('releases')
+            .update(releaseUpdates as Record<string, unknown>)
+            .eq('id', album.release_id);
+        })()
+      );
+    }
+
+    if (album.master_id && Object.keys(masterUpdates).length > 0) {
+      operations.push(
+        (async () => {
+          await supabase
+            .from('masters')
+            .update(masterUpdates as Record<string, unknown>)
+            .eq('id', album.master_id);
+        })()
+      );
+    }
+
+    if (operations.length > 0) {
+      await Promise.all(operations);
+    }
+  };
+
   async function processBatchAndSave(results: CandidateResult[]) {
     const albumIds = results.map(r => r.album.id);
     const { data: resolutions, error: resError } = await supabase
@@ -452,7 +571,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       
     if (resError) console.error('Error fetching history:', resError);
 
-    const autoUpdates: { id: number; fields: Record<string, unknown> }[] = [];
+    const autoUpdates: { album: Album; fields: Record<string, unknown> }[] = [];
     const newConflicts: ExtendedFieldConflict[] = [];
     const processedIds: number[] = [];
     const historyUpdates: { album_id: number; field_name: string; source: string; resolution: string; kept_value: unknown; resolved_at: string }[] = [];
@@ -717,6 +836,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                       source: primarySource, 
                       candidates: sourceValues,
                       existing_finalized: album.finalized_fields || [],
+                      release_id: album.release_id ?? null,
+                      master_id: album.master_id ?? null,
                       artist: album.artist,
                       title: album.title,
                       format: (album.format as string) || 'Unknown',
@@ -739,7 +860,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       }
 
       if (Object.keys(updatesForAlbum).length > 0) {
-        autoUpdates.push({ id: album.id, fields: updatesForAlbum });
+        autoUpdates.push({ album, fields: updatesForAlbum });
         
         autoFilledFields.forEach(field => {
           const val = updatesForAlbum[field];
@@ -764,7 +885,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
 
     if (autoUpdates.length > 0) {
-      await Promise.all(autoUpdates.map(u => supabase.from('collection').update(u.fields).eq('id', u.id)));
+      await Promise.all(autoUpdates.map(u => applyAlbumUpdates(u.album, u.fields)));
     }
     
     if (trackSavePromises.length > 0) {
@@ -773,7 +894,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     // FINAL SAFETY: Update any touched IDs that weren't caught in autoUpdates
     // This ensures albums with "No Data Found" still get their timestamps updated so they don't loop.
-    const changedIds = new Set(autoUpdates.map(u => u.id));
+    const changedIds = new Set(autoUpdates.map(u => u.album.id));
     // Also include albums that have pending conflicts (we don't want to auto-timestamp them yet)
     newConflicts.forEach(c => changedIds.add(c.album_id));
     
@@ -781,7 +902,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     
     if (untouchedIds.length > 0) {
       const now = new Date().toISOString();
-      await supabase.from('collection')
+      await supabase.from('inventory')
         .update({ last_reviewed_at: now }) // Mark as reviewed!
         .in('id', untouchedIds);
     }
@@ -831,7 +952,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   // --- NEW: SKIP HANDLER (SNOOZE) ---
   async function handleSkip(albumId: number) {
     const timestamp = new Date().toISOString();
-    await supabase.from('collection').update({ last_reviewed_at: timestamp }).eq('id', albumId);
+    await supabase.from('inventory').update({ last_reviewed_at: timestamp }).eq('id', albumId);
     
     setConflicts(prev => {
         const nextQueue = prev.filter(c => c.album_id !== albumId);
@@ -908,6 +1029,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     });
 
     // 3. Database Updates
+    const conflictSeed = conflicts.find(c => c.album_id === albumId);
+    const albumStub: Album = {
+        id: albumId,
+        release_id: conflictSeed?.release_id ?? null,
+        master_id: conflictSeed?.master_id ?? null,
+        artist: conflictSeed?.artist ?? 'Unknown Artist',
+        title: conflictSeed?.title ?? 'Untitled',
+        image_url: null,
+    };
+
     if (Object.keys(updates).length > 0) {
         updates.last_reviewed_at = timestamp;
 
@@ -917,14 +1048,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             }
         });
 
-        const { error } = await supabase.from('collection').update(updates).eq('id', albumId);
-        if (error) {
+        try {
+            await applyAlbumUpdates(albumStub, updates);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
             console.error(`Failed to save album ${albumId}:`, error);
-            addLog(String(albumId), 'skipped', `Save Error: ${error.message}`);
+            addLog(String(albumId), 'skipped', `Save Error: ${message}`);
             return;
         }
     } else {
-        await supabase.from('collection').update({ last_reviewed_at: timestamp }).eq('id', albumId);
+        await supabase.from('inventory').update({ last_reviewed_at: timestamp }).eq('id', albumId);
     }
 
     if (resolutionRecords.length > 0) {

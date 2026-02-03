@@ -1,9 +1,10 @@
 // src/app/edit-collection/components/CollectionInfoPanel.tsx
 'use client';
 
-import { memo, useState } from 'react';
+import { memo } from 'react';
 import Image from 'next/image';
-import { Album, toSafeStringArray } from '../../../types/album';
+import type { Album } from '../../../types/album';
+import { toSafeStringArray } from '../../../types/album';
 
 interface CollectionInfoPanelProps {
   album: Album | null;
@@ -13,59 +14,25 @@ interface CollectionInfoPanelProps {
 }
 
 const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, onEditTags, onMarkForSale }: CollectionInfoPanelProps) {
-  const [imageIndex, setImageIndex] = useState(0);
-
   if (!album) {
     return <div className="py-20 text-center text-gray-400 text-sm italic">Select an album to view details</div>;
   }
 
-  const getDiscRuntime = (discNumber: number): string => {
-    if (!album.tracks) return '';
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const discTracks = (album.tracks as any[]).filter((t: any) => t.disc_number === discNumber && t.type !== 'header');
-    let totalSeconds = 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    discTracks.forEach((track: any) => {
-      if (track.duration) {
-        const parts = track.duration.split(':');
-        if (parts.length === 2) {
-          totalSeconds += parseInt(parts[0]) * 60 + parseInt(parts[1]);
-        }
-      }
-    });
+  type ReleaseTrack = NonNullable<NonNullable<Album['release']>['release_tracks']>[number];
+
+  const releaseTracks = album.release?.release_tracks ?? [];
+
+  const formatDuration = (totalSeconds: number | null): string => {
+    if (!totalSeconds || totalSeconds <= 0) return '—';
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   const getTotalRuntime = (): string => {
-    if (!album.tracks || (album.tracks as unknown[]).length === 0) {
-      if (album.length_seconds) {
-        const minutes = Math.floor(album.length_seconds / 60);
-        const seconds = album.length_seconds % 60;
-        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-      }
-      return '—';
-    }
-    
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const allTracks = (album.tracks as any[]).filter((t: any) => t.type === 'track');
-    let totalSeconds = 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    allTracks.forEach((track: any) => {
-      if (track.duration) {
-        const parts = track.duration.split(':');
-        if (parts.length === 2) {
-          totalSeconds += parseInt(parts[0]) * 60 + parseInt(parts[1]);
-        }
-      }
-    });
-    
-    if (totalSeconds === 0) return '—';
-    
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    if (releaseTracks.length === 0) return '—';
+    const totalSeconds = releaseTracks.reduce((sum, track) => sum + (track.recording?.duration_seconds ?? 0), 0);
+    return formatDuration(totalSeconds);
   };
 
   const formatDate = (dateStr: string | null): string => {
@@ -89,20 +56,55 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
     }
   };
 
-  const getEbayUrl = (): string => {
-    const query = `${album.artist} ${album.title}`.replace(/\s+/g, '+');
-    return `https://www.ebay.com/sch/i.html?_nkw=${query}&LH_Sold=1&LH_Complete=1`;
+  const buildFormatLabel = (): string => {
+    if (!album.release) return '—';
+    const parts = [album.release.media_type, ...(album.release.format_details ?? [])].filter(Boolean);
+    const base = parts.join(', ');
+    const qty = album.release.qty ?? 1;
+    if (!base) return '—';
+    return qty > 1 ? `${qty}x${base}` : base;
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const totalTracks = (album.tracks as any[])?.filter((t: any) => t.type === 'track').length || album.spotify_total_tracks || album.apple_music_track_count || 0;
+  const artistName = album.artist ?? album.release?.master?.artist?.name ?? 'Unknown Artist';
+  const albumTitle = album.title ?? album.release?.master?.title ?? 'Untitled';
+  const coverImage = album.image_url ?? album.release?.master?.cover_image_url ?? null;
+  const releaseYear = album.release?.release_year ?? album.release?.master?.original_release_year ?? null;
+  const totalTracks = album.release?.track_count ?? releaseTracks.length;
   const totalRuntime = getTotalRuntime();
+  const notes = album.personal_notes ?? album.release?.notes ?? null;
 
   // Combine canonical genres and styles for display
   const displayGenres = Array.from(new Set([
-    ...toSafeStringArray(album.genres || []),
-    ...toSafeStringArray(album.styles || [])
+    ...toSafeStringArray(album.release?.master?.genres ?? []),
+    ...toSafeStringArray(album.release?.master?.styles ?? [])
   ]));
+
+  const tagNames = Array.from(new Set(
+    (album.release?.master?.master_tag_links ?? [])
+      .map((link) => link.master_tags?.name ?? '')
+      .filter(Boolean)
+  ));
+
+  const getEbayUrl = (): string => {
+    const query = `${artistName} ${albumTitle}`.replace(/\s+/g, '+');
+    return `https://www.ebay.com/sch/i.html?_nkw=${query}&LH_Sold=1&LH_Complete=1`;
+  };
+
+  const tracksHaveSide = releaseTracks.some((track) => Boolean(track.side));
+  const groupedTracks = releaseTracks.reduce<Map<string, ReleaseTrack[]>>((map, track) => {
+    const sideKey = track.side ?? 'Tracks';
+    const existing = map.get(sideKey) ?? [];
+    existing.push(track);
+    map.set(sideKey, existing);
+    return map;
+  }, new Map());
+
+  const sortedTrackGroups = Array.from(groupedTracks.entries()).map(([side, tracks]) => {
+    const sortedTracks = [...tracks].sort((a, b) =>
+      a.position.localeCompare(b.position, undefined, { numeric: true, sensitivity: 'base' })
+    );
+    return { side, tracks: sortedTracks };
+  });
 
   return (
     <div className="p-4 flex-1 overflow-y-auto bg-gradient-to-br from-[#f5f7fa] to-[#c3cfe2]">
@@ -113,17 +115,17 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
         </div>
       )}
 
-      <div className="text-sm text-gray-800 mb-1 font-normal">{album.artist}</div>
+      <div className="text-sm text-gray-800 mb-1 font-normal">{artistName}</div>
       <div className="flex items-center gap-2 mb-4">
-        <h4 className="text-[#2196F3] m-0 text-lg font-semibold">{album.title}</h4>
+        <h4 className="text-[#2196F3] m-0 text-lg font-semibold">{albumTitle}</h4>
         <div className="bg-[#2196F3] text-white rounded px-1.5 py-0.5 text-xs flex items-center justify-center font-bold" title="Album owned">✓</div>
       </div>
 
       <div className="relative mb-4 group">
-        {(imageIndex === 0 ? album.image_url : album.back_image_url) ? (
-          <Image 
-            src={(imageIndex === 0 ? album.image_url : album.back_image_url) || ''} 
-            alt={`${album.artist} - ${album.title} ${imageIndex === 0 ? 'front' : 'back'}`}
+        {coverImage ? (
+          <Image
+            src={coverImage}
+            alt={`${artistName} - ${albumTitle} cover`}
             width={400}
             height={400}
             className="w-full h-auto aspect-square object-cover border border-gray-300 rounded shadow-sm"
@@ -132,18 +134,11 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
         ) : (
           <div className="w-full aspect-square bg-white flex items-center justify-center text-gray-300 text-5xl border border-gray-200 rounded">🎵</div>
         )}
-        
-        {album.back_image_url && (
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
-            <div className={`w-2 h-2 rounded-full cursor-pointer ${imageIndex === 0 ? 'bg-[#333]' : 'bg-[#999]'}`} onClick={() => setImageIndex(0)} />
-            <div className={`w-2 h-2 rounded-full cursor-pointer ${imageIndex === 1 ? 'bg-[#333]' : 'bg-[#999]'}`} onClick={() => setImageIndex(1)} />
-          </div>
-        )}
       </div>
 
       <div className="text-sm font-normal text-[#333] mb-2">
-        {(album.labels && album.labels.length > 0 ? album.labels.join(', ') : (album.spotify_label || album.apple_music_label)) || 'Unknown Label'} 
-        {album.year && ` (${album.year})`}
+        {album.release?.label ?? 'Unknown Label'} 
+        {releaseYear && ` (${releaseYear})`}
       </div>
 
       {displayGenres.length > 0 && (
@@ -152,11 +147,11 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
         </div>
       )}
 
-      <div className="text-xs text-[#333] mb-2 font-mono font-normal">||||| {album.barcode || '—'}</div>
-      <div className="text-[13px] text-[#333] mb-2 font-normal">{album.country || '—'}</div>
+      <div className="text-xs text-[#333] mb-2 font-mono font-normal">||||| {album.release?.barcode || '—'}</div>
+      <div className="text-[13px] text-[#333] mb-2 font-normal">{album.release?.country || '—'}</div>
       <div className="text-[13px] text-[#333] mb-3 font-normal">
-        {album.format || '—'}
-        {' | '}{album.discs ? `${album.discs} Disc${album.discs > 1 ? 's' : ''}` : '—'}
+        {buildFormatLabel()}
+        {' | '}{album.release?.qty ? `${album.release.qty} Disc${album.release.qty > 1 ? 's' : ''}` : '—'}
         {' | '}{totalTracks > 0 ? `${totalTracks} Tracks` : '—'}
         {' | '}{totalRuntime}
       </div>
@@ -166,7 +161,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
       </div>
 
       <div className="text-[13px] text-[#666] mb-3 font-normal">
-        <span className="font-semibold">CAT NO</span> {album.cat_no || '—'}
+        <span className="font-semibold">CAT NO</span> {album.release?.catalog_number || '—'}
       </div>
 
       <a href={getEbayUrl()} target="_blank" rel="noopener noreferrer" className="text-[13px] text-[#2196F3] mb-4 block no-underline font-normal hover:underline">
@@ -174,55 +169,27 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
       </a>
 
       {(() => {
-        if (!album.tracks || (album.tracks as unknown[]).length === 0) return null;
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const discMap = new Map<number, any[]>();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (album.tracks as any[]).forEach((track: any) => {
-          if (!discMap.has(track.disc_number)) {
-            discMap.set(track.disc_number, []);
-          }
-          discMap.get(track.disc_number)!.push(track);
-        });
-
-        discMap.forEach(tracks => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          tracks.sort((a: any, b: any) => parseInt(a.position) - parseInt(b.position));
-        });
-
-        const sortedDiscs = Array.from(discMap.entries()).sort(([a], [b]) => a - b);
+        if (releaseTracks.length === 0) return null;
 
         return (
           <div className="mb-4">
-            {sortedDiscs.map(([discNumber, tracks]) => {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const discMeta = (album.disc_metadata as any[])?.find((d: any) => d.disc_number === discNumber);
-              const discTitle = discMeta?.title || `Disc #${discNumber}`;
-              const runtime = getDiscRuntime(discNumber);
-
+            {sortedTrackGroups.map(({ side, tracks }) => {
               return (
-                <div key={discNumber} className="mb-4">
-                  <div className="text-xs font-bold text-white mb-1.5 p-2 px-3 bg-[#2196F3] rounded flex justify-between items-center shadow-sm uppercase tracking-wider">
-                    <span>{discTitle}</span>
-                    {runtime && <span className="font-mono">{runtime}</span>}
-                  </div>
+                <div key={side} className="mb-4">
+                  {tracksHaveSide && (
+                    <div className="text-xs font-bold text-white mb-1.5 p-2 px-3 bg-[#2196F3] rounded flex justify-between items-center shadow-sm uppercase tracking-wider">
+                      <span>{side}</span>
+                    </div>
+                  )}
                   <div className="flex flex-col gap-px">
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    {tracks.map((track: any, idx: number) => {
-                      if (track.type === 'header') {
-                        return (
-                          <div key={idx} className={`text-[11px] font-semibold text-gray-500 px-2 py-1.5 bg-gray-100 ${idx > 0 ? 'mt-1' : ''}`}>
-                            {track.title}
-                          </div>
-                        );
-                      }
-
+                    {tracks.map((track, idx) => {
+                      const title = track.title_override ?? track.recording?.title ?? 'Untitled';
+                      const duration = formatDuration(track.recording?.duration_seconds ?? null);
                       return (
-                        <div key={idx} className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                        <div key={track.id ?? `${track.position}-${idx}`} className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                           <div className="min-w-[28px] text-gray-500 text-[13px]">{track.position}</div>
-                          <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{track.title}</div>
-                          {track.duration && <div className="text-gray-500 text-[13px] min-w-[40px] text-right">{track.duration}</div>}
+                          <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{title}</div>
+                          {duration !== '—' && <div className="text-gray-500 text-[13px] min-w-[40px] text-right">{duration}</div>}
                         </div>
                       );
                     })}
@@ -239,15 +206,15 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
         <div className="bg-white p-3 rounded">
           <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
             <span className="font-semibold min-w-[180px]">Release Date</span>
-            <span>{album.year || '—'}</span>
+            <span>{album.release?.release_date ? formatDate(album.release.release_date) : '—'}</span>
           </div>
           <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
             <span className="font-semibold min-w-[180px]">Original Release Date</span>
-            <span>{album.original_release_date ? formatDate(album.original_release_date) : '—'}</span>
+            <span>{album.release?.master?.original_release_year ?? '—'}</span>
           </div>
           <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
             <span className="font-semibold min-w-[180px]">Package/Sleeve Condition</span>
-            <span>{album.package_sleeve_condition || '—'}</span>
+            <span>{album.sleeve_condition || '—'}</span>
           </div>
           <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
             <span className="font-semibold min-w-[180px]">Media Condition</span>
@@ -264,16 +231,12 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
             <span>1</span>
           </div>
           <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
-            <span className="font-semibold min-w-[140px]">Index</span>
-            <span>{album.index_number || '—'}</span>
-          </div>
-          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
             <span className="font-semibold min-w-[140px]">Purchase Date</span>
             <span>{album.purchase_date ? formatDate(album.purchase_date) : '—'}</span>
           </div>
           <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
             <span className="font-semibold min-w-[140px]">Purchase Store</span>
-            <span>{album.purchase_store || '—'}</span>
+            <span>—</span>
           </div>
           <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
             <span className="font-semibold min-w-[140px]">Purchase Price</span>
@@ -288,55 +251,30 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
             <span>{album.owner || '—'}</span>
           </div>
           <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
-            <span className="font-semibold min-w-[140px]">My Rating</span>
-            <div className="flex-1">
-              {album.my_rating ? (
-                <div className="flex gap-0.5 items-center">
-                  {Array.from({ length: album.my_rating }).map((_, i) => (
-                    <span key={i} className="text-yellow-400 text-sm">★</span>
-                  ))}
-                  {Array.from({ length: 10 - album.my_rating }).map((_, i) => (
-                    <span key={i} className="text-gray-300 text-sm">★</span>
-                  ))}
-                </div>
-              ) : (
-                <span className="text-gray-400">—</span>
-              )}
-            </div>
+            <span className="font-semibold min-w-[140px]">Play Count</span>
+            <span>{album.play_count ?? '—'}</span>
           </div>
           <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
-            <span className="font-semibold min-w-[140px]">Last Cleaned</span>
-            <span>{album.last_cleaned_date ? formatDate(album.last_cleaned_date) : '—'}</span>
-          </div>
-          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
-            <span className="font-semibold min-w-[140px]">Signed By</span>
-            <span>
-              {album.signed_by && Array.isArray(album.signed_by) && album.signed_by.length > 0 
-                ? album.signed_by.join(', ') 
-                : '—'}
-            </span>
+            <span className="font-semibold min-w-[140px]">Last Played</span>
+            <span>{album.last_played_at ? formatDateTime(album.last_played_at) : '—'}</span>
           </div>
           <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
             <span className="font-semibold min-w-[140px]">Added Date</span>
             <span>{album.date_added ? formatDateTime(album.date_added) : '—'}</span>
-          </div>
-          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
-            <span className="font-semibold min-w-[140px]">Modified Date</span>
-            <span>{album.modified_date ? formatDateTime(album.modified_date) : '—'}</span>
           </div>
         </div>
       </div>
 
       <div className="mb-4">
         <div className="text-base font-bold text-[#2196F3] mb-3">Notes</div>
-        <div className="text-[13px] text-gray-800 leading-relaxed bg-white p-3 rounded font-normal min-h-[40px]">{album.notes || '—'}</div>
+        <div className="text-[13px] text-gray-800 leading-relaxed bg-white p-3 rounded font-normal min-h-[40px]">{notes || '—'}</div>
       </div>
 
       <div>
         <div className="text-base font-bold text-[#2196F3] mb-3">Tags</div>
-        {album.custom_tags && album.custom_tags.length > 0 ? (
+        {tagNames.length > 0 ? (
           <div className="flex flex-wrap gap-2">
-            {toSafeStringArray(album.custom_tags).map((tag) => (
+            {toSafeStringArray(tagNames).map((tag) => (
               <span key={tag} className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-full text-[13px] font-normal">{tag}</span>
             ))}
           </div>
@@ -353,7 +291,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
         >
           ✏️ Edit Album
         </button>
-        {!album.for_sale && (
+        {album.status !== 'for_sale' && (
           <button 
             onClick={onMarkForSale} 
             className="flex-1 p-2.5 bg-emerald-500 text-white border-none rounded-md text-[13px] font-semibold cursor-pointer hover:bg-emerald-600"

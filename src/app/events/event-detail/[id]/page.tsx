@@ -106,7 +106,6 @@ export default function Page() {
   if (!event) return <div>Loading...</div>;
 
   const {
-    title,
     date,
     time,
     location,

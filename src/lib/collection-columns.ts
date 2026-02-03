@@ -179,7 +179,6 @@ export type Album = {
   is_1001?: boolean | null;
   steves_top_200?: boolean | null;
   this_weeks_top_10?: boolean | null;
-  inner_circle_preferred?: boolean | null;
   blocked?: boolean | null;
   blocked_sides?: string[] | null;
   blocked_tracks?: unknown | null;

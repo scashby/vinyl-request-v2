@@ -6,7 +6,8 @@ import { supabase } from '../../lib/supabaseClient';
 import CollectionTable from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
 import { ColumnId, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
-import { Album, toSafeStringArray, toSafeSearchString } from '../../types/album';
+import type { Album } from '../../types/album';
+import { toSafeStringArray, toSafeSearchString } from '../../types/album';
 import EditAlbumModal from './EditAlbumModal';
 import NewCrateModal from './crates/NewCrateModal';
 import NewSmartCrateModal from './crates/NewSmartCrateModal';
@@ -17,6 +18,16 @@ import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import CollectionInfoPanel from './components/CollectionInfoPanel';
 import { BoxIcon } from '../../components/BoxIcon';
 import { getDisplayFormat } from '../../utils/formatDisplay';
+import {
+  getAlbumArtist,
+  getAlbumDecade,
+  getAlbumFormat,
+  getAlbumGenres,
+  getAlbumTags,
+  getAlbumTitle,
+  getAlbumYearInt,
+  getAlbumYearValue
+} from './albumHelpers';
 
 type SortOption = 
   | 'artist-asc' | 'artist-desc' 
@@ -25,10 +36,8 @@ type SortOption =
   | 'added-desc' | 'added-asc' 
   | 'format-asc' | 'format-desc' 
   | 'tags-count-desc' | 'tags-count-asc' 
-  | 'sale-price-desc' | 'sale-price-asc' 
   | 'condition-asc' | 'condition-desc'
   | 'location-asc' | 'location-desc'
-  | 'sides-desc' | 'sides-asc'
   | 'decade-desc' | 'decade-asc';
 
 const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
@@ -48,12 +57,8 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
   { value: 'location-desc', label: 'Location (Z→A)', category: 'Physical' },
   { value: 'condition-asc', label: 'Condition (A→Z)', category: 'Physical' },
   { value: 'condition-desc', label: 'Condition (Z→A)', category: 'Physical' },
-  { value: 'sides-desc', label: 'Most Sides First)', category: 'Physical' },
-  { value: 'sides-asc', label: 'Fewest Sides First', category: 'Physical' },
   { value: 'tags-count-desc', label: 'Most Tags', category: 'Metadata' },
-  { value: 'tags-count-asc', label: 'Fewest Tags', category: 'Metadata' },
-  { value: 'sale-price-desc', label: 'Highest Price', category: 'Sales' },
-  { value: 'sale-price-asc', label: 'Lowest Price', category: 'Sales' }
+  { value: 'tags-count-asc', label: 'Fewest Tags', category: 'Metadata' }
 ];
 
 function CollectionBrowserPage() {
@@ -66,6 +71,7 @@ function CollectionBrowserPage() {
   const [selectedFolderValue, setSelectedFolderValue] = useState<string | null>(null);
   const [selectedCrateId, setSelectedCrateId] = useState<number | null>(null);
   const [crates, setCrates] = useState<Crate[]>([]);
+  const [crateItemCounts, setCrateItemCounts] = useState<Record<number, number>>({});
   
   const [collectionFilter, setCollectionFilter] = useState<string>('All');
   const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
@@ -156,31 +162,89 @@ function CollectionBrowserPage() {
   const loadAlbums = useCallback(async () => {
     setLoading(true);
     
-    let allRows: Album[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let allRows: any[] = [];
     let from = 0;
     const batchSize = 1000;
     let keepGoing = true;
-    
+
     while (keepGoing) {
       const { data: batch, error } = await supabase
-        .from('collection')
-        .select('*')
-        .order('artist', { ascending: true })
+        .from('inventory')
+        .select(
+          `id,
+           release_id,
+           status,
+           personal_notes,
+           media_condition,
+           sleeve_condition,
+           location,
+           date_added,
+           created_at,
+           purchase_price,
+           current_value,
+           purchase_date,
+           owner,
+           play_count,
+           last_played_at,
+             release:releases (
+               id,
+               master_id,
+               media_type,
+               label,
+               catalog_number,
+               barcode,
+               country,
+               release_date,
+               release_year,
+               discogs_release_id,
+               spotify_album_id,
+               notes,
+               track_count,
+               qty,
+               format_details,
+               release_tracks:release_tracks (
+                 id,
+                 position,
+                 side,
+                 title_override,
+                 recording:recordings (
+                   id,
+                   title,
+                   duration_seconds
+                 )
+               ),
+               master:masters (
+                 id,
+                 title,
+                 original_release_year,
+               discogs_master_id,
+               cover_image_url,
+               genres,
+               styles,
+               artist:artists (id, name),
+               master_tag_links:master_tag_links (
+                 master_tags (name)
+               )
+             )
+           )`
+        )
+        .order('id', { ascending: true })
         .range(from, from + batchSize - 1);
-      
+
       if (error) {
         console.error('Error loading albums:', error);
         break;
       }
-      
+
       if (!batch || batch.length === 0) break;
-      
-      allRows = allRows.concat(batch as Album[]);
+
+      allRows = allRows.concat(batch);
       keepGoing = batch.length === batchSize;
       from += batchSize;
     }
-    
-    setAlbums(allRows);
+
+    setAlbums(allRows as Album[]);
     setLoading(false);
   }, []);
 
@@ -198,6 +262,24 @@ function CollectionBrowserPage() {
     if (data) {
       setCrates(data as Crate[]);
     }
+
+    const { data: crateItems, error: crateItemsError } = await supabase
+      .from('crate_items')
+      .select('crate_id');
+
+    if (crateItemsError) {
+      console.error('Error loading crate items:', crateItemsError);
+      return;
+    }
+
+    const counts = (crateItems ?? []).reduce((acc, item) => {
+      if (item.crate_id) {
+        acc[item.crate_id] = (acc[item.crate_id] || 0) + 1;
+      }
+      return acc;
+    }, {} as Record<number, number>);
+
+    setCrateItemCounts(counts);
   }, []);
 
   useEffect(() => {
@@ -207,10 +289,10 @@ function CollectionBrowserPage() {
 
   const filteredAndSortedAlbums = useMemo(() => {
     let filtered = albums.filter(album => {
-      if (collectionFilter === 'For Sale' && !album.for_sale) return false;
+      if (collectionFilter === 'For Sale' && album.status !== 'for_sale') return false;
       
       if (selectedLetter !== 'All') {
-        const firstChar = (album.artist || '').charAt(0).toUpperCase();
+        const firstChar = getAlbumArtist(album).charAt(0).toUpperCase();
         if (selectedLetter === '0-9') {
           if (!/[0-9]/.test(firstChar)) return false;
         } else {
@@ -232,21 +314,20 @@ function CollectionBrowserPage() {
       }
 
       if (folderMode === 'format' && selectedFolderValue) {
-        if (getDisplayFormat(album.format || '') !== selectedFolderValue) return false;
+        if ((album.release?.media_type || 'Unknown') !== selectedFolderValue) return false;
       }
 
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const searchable = [
-          album.artist,
-          album.title,
-          album.format,
-          album.year,
-          toSafeSearchString(album.custom_tags),
+          getAlbumArtist(album),
+          getAlbumTitle(album),
+          getAlbumFormat(album),
+          getAlbumYearValue(album),
+          toSafeSearchString(getAlbumTags(album)),
           // FIXED: Search canonical genres instead of discogs_genres
-          toSafeSearchString(album.genres),
-          toSafeSearchString(album.spotify_label),
-          toSafeSearchString(album.apple_music_label)
+          toSafeSearchString(getAlbumGenres(album)),
+          toSafeSearchString(album.release?.label)
         ].join(' ').toLowerCase();
         
         if (!searchable.includes(q)) return false;
@@ -261,45 +342,35 @@ function CollectionBrowserPage() {
       
       filtered = [...filtered].sort((a, b) => {
         if (column === 'artist') {
-          return multiplier * (a.artist || '').localeCompare(b.artist || '');
+          return multiplier * getAlbumArtist(a).localeCompare(getAlbumArtist(b));
         } else if (column === 'title') {
-          return multiplier * (a.title || '').localeCompare(b.title || '');
+          return multiplier * getAlbumTitle(a).localeCompare(getAlbumTitle(b));
         }
         return 0;
       });
     } else {
       filtered = [...filtered].sort((a, b) => {
         switch (sortBy) {
-          case 'artist-asc': return (a.artist || '').localeCompare(b.artist || '');
-          case 'artist-desc': return (b.artist || '').localeCompare(a.artist || '');
-          case 'title-asc': return (a.title || '').localeCompare(b.title || '');
-          case 'title-desc': return (b.title || '').localeCompare(a.title || '');
-          case 'year-desc': return (b.year_int || 0) - (a.year_int || 0);
-          case 'year-asc': return (a.year_int || 0) - (b.year_int || 0);
-          case 'decade-desc': return (b.decade || 0) - (a.decade || 0);
-          case 'decade-asc': return (a.decade || 0) - (b.decade || 0);
+          case 'artist-asc': return getAlbumArtist(a).localeCompare(getAlbumArtist(b));
+          case 'artist-desc': return getAlbumArtist(b).localeCompare(getAlbumArtist(a));
+          case 'title-asc': return getAlbumTitle(a).localeCompare(getAlbumTitle(b));
+          case 'title-desc': return getAlbumTitle(b).localeCompare(getAlbumTitle(a));
+          case 'year-desc': return (getAlbumYearInt(b) || 0) - (getAlbumYearInt(a) || 0);
+          case 'year-asc': return (getAlbumYearInt(a) || 0) - (getAlbumYearInt(b) || 0);
+          case 'decade-desc': return (getAlbumDecade(b) || 0) - (getAlbumDecade(a) || 0);
+          case 'decade-asc': return (getAlbumDecade(a) || 0) - (getAlbumDecade(b) || 0);
           case 'added-desc': return (b.date_added || '').localeCompare(a.date_added || '');
           case 'added-asc': return (a.date_added || '').localeCompare(b.date_added || '');
           case 'format-asc':
-            return getDisplayFormat(a.format || '').localeCompare(getDisplayFormat(b.format || ''));
+            return getDisplayFormat(getAlbumFormat(a)).localeCompare(getDisplayFormat(getAlbumFormat(b)));
           case 'format-desc':
-            return getDisplayFormat(b.format || '').localeCompare(getDisplayFormat(a.format || ''));
+            return getDisplayFormat(getAlbumFormat(b)).localeCompare(getDisplayFormat(getAlbumFormat(a)));
           case 'location-asc': return (a.location || '').localeCompare(b.location || '');
           case 'location-desc': return (b.location || '').localeCompare(a.location || '');
           case 'condition-asc': return (a.media_condition || '').localeCompare(b.media_condition || '');
           case 'condition-desc': return (b.media_condition || '').localeCompare(a.media_condition || '');
-          case 'tags-count-desc': return toSafeStringArray(b.custom_tags).length - toSafeStringArray(a.custom_tags).length;
-          case 'tags-count-asc': return toSafeStringArray(a.custom_tags).length - toSafeStringArray(b.custom_tags).length;
-          case 'sale-price-desc': return (b.sale_price || 0) - (a.sale_price || 0);
-          case 'sale-price-asc': return (a.sale_price || 0) - (b.sale_price || 0);
-          case 'sides-desc':
-            const bSides = typeof b.sides === 'number' ? b.sides : 0;
-            const aSides = typeof a.sides === 'number' ? a.sides : 0;
-            return bSides - aSides;
-          case 'sides-asc':
-            const aSidesAsc = typeof a.sides === 'number' ? a.sides : 0;
-            const bSidesAsc = typeof b.sides === 'number' ? b.sides : 0;
-            return aSidesAsc - bSidesAsc;
+          case 'tags-count-desc': return toSafeStringArray(getAlbumTags(b)).length - toSafeStringArray(getAlbumTags(a)).length;
+          case 'tags-count-asc': return toSafeStringArray(getAlbumTags(a)).length - toSafeStringArray(getAlbumTags(b)).length;
           default: return 0;
         }
       });
@@ -316,7 +387,7 @@ function CollectionBrowserPage() {
 
   const folderCounts = useMemo(() => {
     return albums.reduce((acc, album) => {
-      const itemKey = getDisplayFormat(album.format || '');
+      const itemKey = album.release?.media_type || 'Unknown';
       acc[itemKey] = (acc[itemKey] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -328,11 +399,11 @@ function CollectionBrowserPage() {
       if (crate.is_smart) {
         count = albums.filter(album => albumMatchesSmartCrate(album, crate)).length;
       } else {
-        count = 0;
+        count = crateItemCounts[crate.id] || 0;
       }
       return { ...crate, album_count: count };
     });
-  }, [crates, albums]);
+  }, [crates, albums, crateItemCounts]);
 
   const sortedFolderItems = useMemo(() => {
     return Object.entries(folderCounts)
@@ -394,13 +465,13 @@ function CollectionBrowserPage() {
         for (const albumId of albumIds) {
           records.push({
             crate_id: crateId,
-            album_id: albumId,
+            inventory_id: albumId,
           });
         }
       }
 
       const { error } = await supabase
-        .from('crate_albums')
+        .from('crate_items')
         .insert(records);
 
       if (error) {
@@ -427,12 +498,12 @@ function CollectionBrowserPage() {
   // Handler for marking an album as for sale
   const handleMarkForSale = useCallback(async (albumId: number) => {
     const { error } = await supabase
-      .from('collection')
-      .update({ for_sale: true })
+      .from('inventory')
+      .update({ status: 'for_sale' })
       .eq('id', albumId);
     
     if (!error) {
-      setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, for_sale: true } : a));
+      setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, status: 'for_sale' } : a));
     } else {
       console.error('Error marking album for sale:', error);
     }

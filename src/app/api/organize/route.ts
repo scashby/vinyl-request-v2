@@ -33,31 +33,41 @@ export async function POST(req: Request) {
   const unknown = body.unknownLabel ?? "(unknown)";
   const dry = !!body.dryRun;
 
-  // FIXED: Removed is_1001, updated columns to match schema
-  let q = supabase
-    .from("collection")
-    .select("id,genres,location,artist,title") // FIXED: genres, location
+  const { data, error } = await supabase
+    .from("inventory")
+    .select(`
+      id,
+      location,
+      release:releases (
+        master:masters (
+          title,
+          genres,
+          artist:artists ( name )
+        )
+      )
+    `)
     .gt("id", cursor)
     .order("id", { ascending: true })
     .limit(limit);
-
-  // Apply user-friendly filters
-  const s = body.scope ?? {};
-  // FIXED: Filter by location
-  if (s.locationExact && s.locationExact !== 'all') {
-    q = q.eq("location", s.locationExact);
-  }
-  if (s.artistSearch) {
-    q = q.ilike("artist", `%${s.artistSearch}%`);
-  }
-  if (s.titleSearch) {
-    q = q.ilike("title", `%${s.titleSearch}%`);
-  }
-
-  const { data, error } = await q;
   if (error) return NextResponse.json({ error }, { status: 500 });
 
-  const rows = data ?? [];
+  const s = body.scope ?? {};
+  const rows = (data ?? []).map((row) => {
+    const release = row.release as { master?: { title?: string | null; genres?: string[] | null; artist?: { name?: string | null } | null } | null } | null;
+    const master = release?.master;
+    return {
+      id: row.id as number,
+      location: row.location as string | null,
+      genres: master?.genres ?? [],
+      artist: master?.artist?.name ?? '',
+      title: master?.title ?? '',
+    };
+  }).filter((row) => {
+    if (s.locationExact && s.locationExact !== 'all' && row.location !== s.locationExact) return false;
+    if (s.artistSearch && !row.artist.toLowerCase().includes(s.artistSearch.toLowerCase())) return false;
+    if (s.titleSearch && !row.title.toLowerCase().includes(s.titleSearch.toLowerCase())) return false;
+    return true;
+  });
   if (!rows.length) {
     return NextResponse.json({ moved_known: 0, moved_unknown: 0, scanned: 0, nextCursor: null });
   }
@@ -86,7 +96,7 @@ export async function POST(req: Request) {
 
     // FIXED: Update location column
     const { error: upErr } = await supabase
-      .from("collection")
+      .from("inventory")
       .update({ location: dest })
       .eq("id", r.id as number);
 

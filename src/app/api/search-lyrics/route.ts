@@ -6,6 +6,9 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 
+const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
+
 type Track = {
   position?: string;
   title?: string;
@@ -14,7 +17,7 @@ type Track = {
 };
 
 type SearchResult = {
-  collection_id: number;
+  inventory_id: number;
   artist: string;
   album_title: string;
   track_title: string;
@@ -24,7 +27,7 @@ type SearchResult = {
 };
 
 type TagInsert = {
-  collection_id: number;
+  inventory_id: number;
   track_title: string;
   track_position: string | null;
   search_term: string;
@@ -32,14 +35,20 @@ type TagInsert = {
 };
 
 type TagQueryResult = {
-  collection_id: number;
+  inventory_id: number;
   track_title: string;
   track_position: string | null;
   genius_url: string | null;
-  collection?: {
-    artist: string;
-    title: string;
-    image_url: string | null;
+  inventory?: {
+    release?: {
+      master?: {
+        title?: string | null;
+        cover_image_url?: string | null;
+        artist?: {
+          name?: string | null;
+        } | null;
+      } | null;
+    } | null;
   } | null;
 };
 
@@ -172,14 +181,19 @@ export async function POST(req: Request) {
       const { data: existingTags, error: tagError } = await supabase
         .from('lyric_search_tags')
         .select(`
-          collection_id,
+          inventory_id,
           track_title,
           track_position,
           genius_url,
-          collection:collection_id (
-            artist,
-            title,
-            image_url
+          inventory:inventory_id (
+            id,
+            release:releases (
+              master:masters (
+                title,
+                cover_image_url,
+                artist:artists (name)
+              )
+            )
           )
         `)
         .eq('search_term', searchTerm);
@@ -188,13 +202,13 @@ export async function POST(req: Request) {
         console.log(`✅ Found ${existingTags.length} cached results`);
         const tagResults = existingTags as unknown as TagQueryResult[];
         const results: SearchResult[] = tagResults.map((tag) => ({
-          collection_id: tag.collection_id,
-          artist: tag.collection?.artist || 'Unknown Artist',
-          album_title: tag.collection?.title || 'Unknown Album',
+          inventory_id: tag.inventory_id,
+          artist: tag.inventory?.release?.master?.artist?.name || 'Unknown Artist',
+          album_title: tag.inventory?.release?.master?.title || 'Unknown Album',
           track_title: tag.track_title,
           track_position: tag.track_position,
           genius_url: tag.genius_url,
-          image_url: tag.collection?.image_url || null
+          image_url: tag.inventory?.release?.master?.cover_image_url || null
         }));
 
         return NextResponse.json({
@@ -211,12 +225,28 @@ export async function POST(req: Request) {
     // Get albums with tracklists
     console.log(`📀 Querying albums...`);
     let query = supabase
-      .from('collection')
-      .select('id, artist, title, image_url, folder, tracklists')
-      .not('tracklists', 'is', null);
+      .from('inventory')
+      .select(`
+        id,
+        location,
+        release:releases (
+          master:masters (
+            title,
+            cover_image_url,
+            artist:artists (name)
+          ),
+          release_tracks:release_tracks (
+            position,
+            recording:recordings (
+              title,
+              credits
+            )
+          )
+        )
+      `);
 
     if (body.folder) {
-      query = query.eq('folder', body.folder);
+      query = query.eq('location', body.folder);
     }
 
     const { data: albums, error: albumError } = await query;
@@ -248,16 +278,24 @@ export async function POST(req: Request) {
     let tracksMatched = 0;
 
     for (const album of albums) {
-      console.log(`\n📀 Album ${album.id}: ${album.artist} - ${album.title}`);
-      try {
-        const tracklists: Track[] = typeof album.tracklists === 'string'
-          ? JSON.parse(album.tracklists) as Track[]
-          : album.tracklists as Track[];
+      const release = toSingle(album.release);
+      const master = toSingle(release?.master);
+      const artistName = toSingle(master?.artist)?.name ?? 'Unknown Artist';
+      const albumTitle = master?.title ?? 'Unknown Album';
 
-        if (!Array.isArray(tracklists)) {
-          console.log(`⚠️ Invalid tracklists`);
-          continue;
-        }
+      console.log(`\n📀 Album ${album.id}: ${artistName} - ${albumTitle}`);
+      try {
+        const tracklists: Track[] = (release?.release_tracks ?? []).map((track) => {
+          const recording = toSingle(track.recording);
+          const credits = (recording?.credits && typeof recording.credits === 'object' && !Array.isArray(recording.credits))
+            ? (recording.credits as Record<string, unknown>)
+            : {};
+          return {
+            position: track.position || null,
+            title: recording?.title || '',
+            lyrics_url: (credits as Record<string, unknown>).lyrics_url as string | undefined
+          };
+        });
 
         for (const track of tracklists) {
           if (!track.lyrics_url || !track.title) {
@@ -280,17 +318,17 @@ export async function POST(req: Request) {
             console.log(`  ✅ MATCH!`);
             tracksMatched++;
             results.push({
-              collection_id: album.id,
-              artist: album.artist,
-              album_title: album.title,
+              inventory_id: album.id,
+              artist: artistName,
+              album_title: albumTitle,
               track_title: track.title,
               track_position: track.position || null,
               genius_url: track.lyrics_url,
-              image_url: album.image_url
+              image_url: master?.cover_image_url || null
             });
 
             tagsToInsert.push({
-              collection_id: album.id,
+              inventory_id: album.id,
               track_title: track.title,
               track_position: track.position || null,
               search_term: searchTerm,
@@ -362,14 +400,18 @@ export async function GET(req: Request) {
       const { data, error } = await supabase
         .from('lyric_search_tags')
         .select(`
-          collection_id,
+          inventory_id,
           track_title,
           track_position,
           genius_url,
-          collection:collection_id (
-            artist,
-            title,
-            image_url
+          inventory:inventory_id (
+            release:releases (
+              master:masters (
+                title,
+                cover_image_url,
+                artist:artists (name)
+              )
+            )
           )
         `)
         .eq('search_term', term.toLowerCase());
@@ -380,13 +422,13 @@ export async function GET(req: Request) {
 
       const tagResults = data as unknown as TagQueryResult[] || [];
       const results: SearchResult[] = tagResults.map((tag) => ({
-        collection_id: tag.collection_id,
-        artist: tag.collection?.artist || 'Unknown Artist',
-        album_title: tag.collection?.title || 'Unknown Album',
+        inventory_id: tag.inventory_id,
+        artist: tag.inventory?.release?.master?.artist?.name || 'Unknown Artist',
+        album_title: tag.inventory?.release?.master?.title || 'Unknown Album',
         track_title: tag.track_title,
         track_position: tag.track_position,
         genius_url: tag.genius_url,
-        image_url: tag.collection?.image_url || null
+        image_url: tag.inventory?.release?.master?.cover_image_url || null
       }));
 
       return NextResponse.json({

@@ -2,6 +2,9 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { ManageModal } from './ManageModal';
+import { EditModal } from './EditModal';
+import { MergeModal } from './MergeModal';
 
 interface UniversalPickerItem {
   id: string;
@@ -38,6 +41,9 @@ export function UniversalPicker({
   onSelect,
   multiSelect,
   canManage,
+  onUpdate,
+  onDelete,
+  onMerge,
   newItemLabel = 'Item',
   manageItemsLabel = 'Manage Items',
   showSortName = false,
@@ -48,6 +54,11 @@ export function UniversalPicker({
   const [searchQuery, setSearchQuery] = useState('');
   const [localSelectedItems, setLocalSelectedItems] = useState<string[]>(selectedItems);
   const [showNewModal, setShowNewModal] = useState(false);
+  const [showManageModal, setShowManageModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<UniversalPickerItem | null>(null);
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [mergeCandidates, setMergeCandidates] = useState<UniversalPickerItem[]>([]);
   
   // New item form state
   const [newItemName, setNewItemName] = useState('');
@@ -123,6 +134,84 @@ export function UniversalPicker({
     setNewItemSortName('');
     setNewItemDefaultInstrument('');
     setShowNewModal(true);
+  };
+
+  const handleOpenManageModal = () => {
+    setShowManageModal(true);
+  };
+
+  const handleEditItem = (itemId: string) => {
+    const item = items.find((entry) => entry.id === itemId);
+    if (!item) return;
+    setEditingItem(item);
+    setShowManageModal(false);
+    setShowEditModal(true);
+  };
+
+  const handleSaveEditItem = async (newName: string, newSortName?: string) => {
+    if (!editingItem) return;
+    const updateFn = onUpdate;
+    let success = true;
+    if (updateFn) {
+      success = await updateFn(editingItem.id, newName, newSortName, editingItem.defaultInstrument);
+    }
+    if (!success) return;
+
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === editingItem.id
+          ? {
+              ...item,
+              id: newName,
+              name: newName,
+              sortName: showSortName ? (newSortName || getSortName(newName)) : item.sortName,
+            }
+          : item
+      )
+    );
+
+    setLocalSelectedItems((prev) =>
+      prev.map((name) => (name === editingItem.name ? newName : name))
+    );
+
+    setShowEditModal(false);
+    setEditingItem(null);
+  };
+
+  const handleDeleteItem = async (itemId: string) => {
+    if (!onDelete) return;
+    const success = await onDelete(itemId);
+    if (!success) return;
+    setItems((prev) => prev.filter((item) => item.id !== itemId));
+    setLocalSelectedItems((prev) => prev.filter((name) => name !== itemId));
+  };
+
+  const handleStartMerge = (itemIds: string[]) => {
+    const candidates = items.filter((item) => itemIds.includes(item.id));
+    if (candidates.length < 2) return;
+    setMergeCandidates(candidates);
+    setShowManageModal(false);
+    setShowMergeModal(true);
+  };
+
+  const handleMergeItems = async (primaryId: string, mergeIntoIds: string[]) => {
+    if (!onMerge) return;
+    const success = await onMerge(mergeIntoIds, primaryId);
+    if (!success) return;
+    const totalCount = mergeCandidates.reduce((sum, item) => sum + (item.count ?? 0), 0);
+    setItems((prev) =>
+      prev
+        .filter((item) => !mergeIntoIds.includes(item.id))
+        .map((item) =>
+          item.id === primaryId ? { ...item, count: totalCount } : item
+        )
+    );
+    setLocalSelectedItems((prev) => {
+      const next = prev.map((name) => (mergeIntoIds.includes(name) ? primaryId : name));
+      return Array.from(new Set(next));
+    });
+    setShowMergeModal(false);
+    setMergeCandidates([]);
   };
 
   const handleSaveNewItem = () => {
@@ -257,7 +346,7 @@ export function UniversalPicker({
             </button>
             {canManage && (
               <button
-                onClick={() => {/* TODO: Implement manage modal */}}
+                onClick={handleOpenManageModal}
                 style={{
                   padding: '6px 12px',
                   background: '#6b7280',
@@ -576,6 +665,50 @@ export function UniversalPicker({
             </div>
           </div>
         </div>
+      )}
+
+      {showManageModal && (
+        <ManageModal
+          isOpen={true}
+          onClose={() => setShowManageModal(false)}
+          title={manageItemsLabel}
+          items={items}
+          onEdit={handleEditItem}
+          onDelete={handleDeleteItem}
+          onMerge={handleStartMerge}
+          itemLabel={newItemLabel}
+          allowMerge={Boolean(onMerge)}
+        />
+      )}
+
+      {showEditModal && editingItem && (
+        <EditModal
+          isOpen={true}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingItem(null);
+          }}
+          title={`Edit ${newItemLabel}`}
+          itemName={editingItem.name}
+          itemSortName={editingItem.sortName}
+          onSave={handleSaveEditItem}
+          itemLabel={newItemLabel}
+          showSortName={showSortName}
+        />
+      )}
+
+      {showMergeModal && (
+        <MergeModal
+          isOpen={true}
+          onClose={() => {
+            setShowMergeModal(false);
+            setMergeCandidates([]);
+          }}
+          title={`Merge ${newItemLabel}s`}
+          items={mergeCandidates}
+          onMerge={handleMergeItems}
+          itemLabel={newItemLabel}
+        />
       )}
     </>
   );

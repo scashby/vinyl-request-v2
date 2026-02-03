@@ -90,7 +90,8 @@ const createEmptyType = (): EventTypeConfig => ({
 const normalizeDefaults = (defaults?: EventSubtypeConfig["defaults"]) => {
   if (!defaults) return undefined;
   const prefill_fields = defaults.prefill_fields ?? defaults.enabled_fields ?? [];
-  const { enabled_fields, ...rest } = defaults;
+  const { enabled_fields: _enabled_fields, ...rest } = defaults;
+  void _enabled_fields;
   return {
     ...rest,
     prefill_fields,
@@ -181,7 +182,24 @@ const LocationAutocompleteInput = ({
     void loadGoogleMapsScript()
       .then(() => {
         if (!inputRef.current) return;
-        const googleMaps = (window as typeof window & { google?: any }).google;
+        const googleMaps = (window as typeof window & {
+          google?: {
+            maps?: {
+              places?: {
+                Autocomplete: new (
+                  input: HTMLInputElement,
+                  options: { types: string[] }
+                ) => {
+                  getPlace: () => { formatted_address?: string };
+                  addListener: (
+                    event: string,
+                    handler: () => void
+                  ) => { remove: () => void };
+                };
+              };
+            };
+          };
+        }).google;
         if (!googleMaps?.maps?.places) return;
         autocomplete = new googleMaps.maps.places.Autocomplete(inputRef.current, {
           types: ["geocode"],

@@ -11,11 +11,13 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSessi
 type Track = {
   position?: string;
   title?: string;
-  duration?: string;
-  type_?: string;
-  lyrics_url?: string;
-  lyrics?: string;
-  lyrics_source?: 'apple_music' | 'genius';
+  recording_id?: number | null;
+  credits?: Record<string, unknown> | null;
+};
+
+const normalizeCredits = (credits: unknown) => {
+  if (!credits || typeof credits !== 'object' || Array.isArray(credits)) return {};
+  return credits as Record<string, unknown>;
 };
 
 type AppleTrack = {
@@ -35,6 +37,9 @@ type AppleLyricsResponse = {
     };
   }];
 };
+
+const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
 
 function parseTTML(ttml: string): string {
   // Apple Music lyrics are in TTML (Timed Text Markup Language) format
@@ -178,8 +183,24 @@ export async function POST(req: Request) {
     }
 
     const { data: album, error: dbError } = await supabase
-      .from('collection')
-      .select('id, apple_music_id, tracklists')
+      .from('inventory')
+      .select(`
+        id,
+        release:releases (
+          id,
+          apple_music_id,
+          release_tracks:release_tracks (
+            position,
+            recording_id,
+            title_override,
+            recording:recordings (
+              id,
+              title,
+              credits
+            )
+          )
+        )
+      `)
       .eq('id', albumId)
       .single();
 
@@ -191,9 +212,10 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log(`✓ Album found: ID=${album.id}, Apple Music ID=${album.apple_music_id}`);
+    const release = toSingle(album.release);
+    console.log(`✓ Album found: ID=${album.id}, Apple Music ID=${release?.apple_music_id}`);
 
-    if (!album.apple_music_id) {
+    if (!release?.apple_music_id) {
       console.log('❌ ERROR: Album has no Apple Music ID');
       return NextResponse.json(
         { success: false, error: 'Album has no Apple Music ID' },
@@ -201,19 +223,15 @@ export async function POST(req: Request) {
       );
     }
 
-    let existingTracks: Track[] = [];
-    if (album.tracklists) {
-      try {
-        const parsed = typeof album.tracklists === 'string'
-          ? JSON.parse(album.tracklists)
-          : album.tracklists;
-        existingTracks = Array.isArray(parsed) ? parsed : [];
-        console.log(`✓ Parsed ${existingTracks.length} existing tracks`);
-      } catch (err) {
-        console.log('❌ ERROR: Failed to parse tracklists', err);
-        existingTracks = [];
-      }
-    }
+    const existingTracks: Track[] = (release?.release_tracks ?? []).map((track) => {
+      const recording = toSingle(track.recording);
+      return {
+        position: track.position,
+        title: track.title_override || recording?.title || '',
+        recording_id: track.recording_id ?? recording?.id ?? null,
+        credits: normalizeCredits(recording?.credits ?? null)
+      };
+    });
 
     if (existingTracks.length === 0) {
       console.log('❌ ERROR: No tracklist found to enrich');
@@ -223,9 +241,9 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log(`🔍 Fetching Apple Music tracks for album ${album.apple_music_id}...`);
+    console.log(`🔍 Fetching Apple Music tracks for album ${release.apple_music_id}...`);
 
-    const appleTracks = await fetchAppleAlbumTracks(album.apple_music_id);
+    const appleTracks = await fetchAppleAlbumTracks(release.apple_music_id);
     
     if (appleTracks.length === 0) {
       console.log('❌ ERROR: No tracks found on Apple Music');
@@ -244,7 +262,7 @@ export async function POST(req: Request) {
 
     const enrichedTracks = await Promise.all(
       existingTracks.map(async (track, index) => {
-        if (track.lyrics && track.lyrics_source === 'apple_music') {
+        if (track.credits?.lyrics && track.credits?.lyrics_source === 'apple_music') {
           console.log(`⏭️  Track ${index + 1}/${existingTracks.length}: "${track.title}" - Already has Apple Music lyrics`);
           return track;
         }
@@ -267,8 +285,11 @@ export async function POST(req: Request) {
           lyricsFound++;
           return {
             ...track,
-            lyrics,
-            lyrics_source: 'apple_music' as const
+            credits: {
+              ...track.credits,
+              lyrics,
+              lyrics_source: 'apple_music'
+            }
           };
         } else {
           console.log(`❌ Track ${index + 1}/${existingTracks.length}: No lyrics available from Apple`);
@@ -280,19 +301,20 @@ export async function POST(req: Request) {
 
     console.log(`\n📊 SUMMARY: ${lyricsFound} lyrics found, ${lyricsNotFound} not available`);
 
-    const { error: updateError } = await supabase
-      .from('collection')
-      .update({
-        tracklists: JSON.stringify(enrichedTracks)
-      })
-      .eq('id', albumId);
+    for (const track of enrichedTracks) {
+      if (!track.recording_id || !track.credits?.lyrics) continue;
+      const { error: updateError } = await supabase
+        .from('recordings')
+        .update({ credits: track.credits })
+        .eq('id', track.recording_id);
 
-    if (updateError) {
-      console.log('❌ ERROR: Database update failed', updateError);
-      return NextResponse.json(
-        { success: false, error: `Database update failed: ${updateError.message}` },
-        { status: 500 }
-      );
+      if (updateError) {
+        console.log('❌ ERROR: Database update failed', updateError);
+        return NextResponse.json(
+          { success: false, error: `Database update failed: ${updateError.message}` },
+          { status: 500 }
+        );
+      }
     }
 
     console.log(`✅ Database updated successfully\n`);

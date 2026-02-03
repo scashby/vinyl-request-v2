@@ -16,15 +16,13 @@ type Row = {
   image_url: string | null;
   discogs_genres: string | string[] | null;
   discogs_styles: string | string[] | null;
-  spotify_genres: string | string[] | null;
-  apple_music_genres: string | string[] | null;
   decade: number | null;
-  folder: string;
+  location: string | null;
   custom_tags: string[] | null;
 };
 
 type LyricSearchResult = {
-  collection_id: number;
+  inventory_id: number;
   artist: string;
   album_title: string;
   track_title: string;
@@ -44,6 +42,22 @@ function parseGenres(value: string | string[] | null): string[] {
   if (!value) return [];
   if (Array.isArray(value)) return value;
   return [];
+}
+
+function buildFormatLabel(release?: { media_type?: string | null; format_details?: string[] | null; qty?: number | null } | null): string {
+  if (!release) return '';
+  const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
+  const base = parts.join(', ');
+  const qty = release.qty ?? 1;
+  if (!base) return '';
+  return qty > 1 ? `${qty}x${base}` : base;
+}
+
+function calculateDecade(year: string | null): number | null {
+  if (!year) return null;
+  const parsed = parseInt(year, 10);
+  if (Number.isNaN(parsed)) return null;
+  return Math.floor(parsed / 10) * 10;
 }
 
 export default function FlexibleOrganizePage() {
@@ -93,9 +107,32 @@ export default function FlexibleOrganizePage() {
     
     while (keepGoing) {
       const { data: batch, error } = await supabase
-        .from('collection')
-        .select('id,artist,title,year,master_release_date,format,image_url,discogs_genres,discogs_styles,spotify_genres,apple_music_genres,decade,folder,custom_tags')
-        .order('artist', { ascending: true })
+        .from('inventory')
+        .select(`
+          id,
+          location,
+          release:releases (
+            id,
+            release_year,
+            release_date,
+            media_type,
+            format_details,
+            qty,
+            master:masters (
+              id,
+              title,
+              original_release_year,
+              cover_image_url,
+              genres,
+              styles,
+              artist:artists ( name ),
+              master_tag_links (
+                master_tags ( name )
+              )
+            )
+          )
+        `)
+        .order('id', { ascending: true })
         .range(from, from + batchSize - 1);
       
       if (error) {
@@ -105,14 +142,54 @@ export default function FlexibleOrganizePage() {
       
       if (!batch || batch.length === 0) break;
       
-      allRows = allRows.concat(batch as Row[]);
+      const mappedBatch = (batch ?? []).map((row) => {
+        const release = row.release as {
+          release_year?: number | null;
+          release_date?: string | null;
+          media_type?: string | null;
+          format_details?: string[] | null;
+          qty?: number | null;
+          master?: {
+            title?: string | null;
+            original_release_year?: number | null;
+            cover_image_url?: string | null;
+            genres?: string[] | null;
+            styles?: string[] | null;
+            artist?: { name?: string | null } | null;
+            master_tag_links?: { master_tags?: { name?: string | null } | null }[] | null;
+          } | null;
+        } | null;
+        const master = release?.master;
+        const yearValue = release?.release_year ?? master?.original_release_year ?? null;
+        const year = yearValue ? String(yearValue) : null;
+        const tags = (master?.master_tag_links ?? [])
+          .map((link) => link.master_tags?.name)
+          .filter((name): name is string => Boolean(name));
+
+        return {
+          id: row.id as number,
+          artist: master?.artist?.name ?? 'Unknown Artist',
+          title: master?.title ?? 'Untitled',
+          year,
+          master_release_date: release?.release_date ?? null,
+          format: buildFormatLabel(release),
+          image_url: master?.cover_image_url ?? null,
+          discogs_genres: master?.genres ?? null,
+          discogs_styles: master?.styles ?? null,
+          decade: calculateDecade(year),
+          location: row.location ?? null,
+          custom_tags: tags.length > 0 ? tags : null,
+        } satisfies Row;
+      });
+
+      allRows = allRows.concat(mappedBatch);
       keepGoing = batch.length === batchSize;
       from += batchSize;
     }
     
     setRows(allRows);
     
-    const folders = Array.from(new Set(allRows.map(r => r.folder).filter(Boolean)));
+    const folders = Array.from(new Set(allRows.map(r => r.location).filter(Boolean)));
     setAvailableFolders(folders.sort());
     
     const genresStyles = new Set<string>();
@@ -120,8 +197,6 @@ export default function FlexibleOrganizePage() {
     allRows.forEach(r => {
       parseGenres(r.discogs_genres).forEach(g => genresStyles.add(g));
       parseGenres(r.discogs_styles).forEach(s => genresStyles.add(s));
-      parseGenres(r.spotify_genres).forEach(g => genresStyles.add(g));
-      parseGenres(r.apple_music_genres).forEach(g => genresStyles.add(g));
     });
     
     setAvailableGenresStyles(Array.from(genresStyles).sort());
@@ -186,14 +261,12 @@ export default function FlexibleOrganizePage() {
 
   const filteredAlbums = useMemo(() => {
     return rows.filter(row => {
-      if (selectedFolders.length > 0 && !selectedFolders.includes(row.folder)) return false;
+      if (selectedFolders.length > 0 && !selectedFolders.includes(row.location || '')) return false;
       
       if (selectedGenresStyles.length > 0) {
         const albumGenresStyles = [
           ...parseGenres(row.discogs_genres),
-          ...parseGenres(row.discogs_styles),
-          ...parseGenres(row.spotify_genres),
-          ...parseGenres(row.apple_music_genres)
+          ...parseGenres(row.discogs_styles)
         ];
         if (!albumGenresStyles.some(gs => selectedGenresStyles.includes(gs))) return false;
       }
@@ -571,8 +644,8 @@ export default function FlexibleOrganizePage() {
             }}>
               {lyricResults.map((result, idx) => (
                 <Link
-                  key={`${result.collection_id}-${result.track_title}-${idx}`}
-                  href={`/admin/edit-entry/${result.collection_id}`}
+                  key={`${result.inventory_id}-${result.track_title}-${idx}`}
+                  href={`/admin/edit-entry/${result.inventory_id}`}
                   style={{
                     display: 'flex',
                     gap: 12,
@@ -1148,7 +1221,7 @@ export default function FlexibleOrganizePage() {
                   ) : (
                     album.year && <span>{album.year}</span>
                   )}
-                  {album.folder && <span>• {album.folder}</span>}
+                  {album.location && <span>• {album.location}</span>}
                 </div>
                 
                 {/* Show tags on album cards */}

@@ -9,22 +9,23 @@ import Link from "next/link";
 import { formatEventText } from 'src/utils/textFormatter';
 import AlbumSuggestionBox from "components/AlbumSuggestionBox";
 import { supabase } from "src/lib/supabaseClient";
+import type { Database } from 'src/types/supabase';
 
 interface QueueItem {
-  id: number;
+  id: string;
   artist: string;
   title: string;
   side: string | null;
   track_number: string | null;
-  track_name: string | null;
+  track_title: string | null;
   track_duration: string | null;
   votes: number;
-  created_at: string;
+  created_at: string | null;
   queue_type: string;
-  collection: {
+  inventory: {
     id: number;
     image_url: string;
-    year: string | number;
+    year: number | null;
     format: string;
   } | null;
 }
@@ -38,6 +39,8 @@ interface EventData {
   queue_type?: string;
 }
 
+type ReleaseRow = Database['public']['Tables']['releases']['Row'];
+
 function BrowseQueueContent() {
   const searchParams = useSearchParams();
   const eventId = searchParams.get("eventId");
@@ -46,6 +49,16 @@ function BrowseQueueContent() {
   const [eventData, setEventData] = useState<EventData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showSuggestionBox, setShowSuggestionBox] = useState(false);
+
+  const buildFormatLabel = (release?: ReleaseRow | null) => {
+    if (!release) return '';
+    const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
+    const base = parts.join(', ');
+    const qty = release.qty ?? 1;
+    if (!base) return '';
+    return qty > 1 ? `${qty}x${base}` : base;
+  };
+
 
   const loadEventAndQueue = useCallback(async () => {
     if (!eventId) {
@@ -61,60 +74,80 @@ function BrowseQueueContent() {
         .single();
       setEventData(event || null);
 
-      const { data: requests } = await supabase
-        .from("requests")
-        .select("*")
+      const { data: requestRows, error: requestError } = await supabase
+        .from("requests_v3")
+        .select("id, inventory_id, recording_id, votes, created_at")
         .eq("event_id", eventId)
         .order("id", { ascending: true });
 
-      if (!requests?.length) {
+      if (requestError) throw requestError;
+      if (!requestRows?.length) {
         setQueueItems([]);
         return;
       }
 
-      const albumIds = requests.map(r => r.album_id).filter(Boolean);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let albums: any[] = [];
+      const inventoryIds = requestRows
+        .map((request) => request.inventory_id)
+        .filter(Boolean);
 
-      if (albumIds.length) {
-        const res = await supabase
-          .from("collection")
-          .select("id, artist, title, image_url, year, format")
-          .in("id", albumIds);
-        albums = res.data || [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let inventoryRows: any[] = [];
+
+      if (inventoryIds.length) {
+        const { data: inventoryData, error: inventoryError } = await supabase
+          .from("inventory")
+          .select(
+            "id, release:releases (id, media_type, format_details, qty, release_year, master:masters (id, title, cover_image_url, artist:artists (id, name)))"
+          )
+          .in("id", inventoryIds);
+
+        if (inventoryError) throw inventoryError;
+        inventoryRows = inventoryData || [];
       }
 
-      // Handle both old queue_type (singular) and new queue_types (array)
-      const queueTypes = event?.queue_types || (event?.queue_type ? [event.queue_type] : ['side']);
-      const primaryQueueType = Array.isArray(queueTypes) ? queueTypes[0] : queueTypes;
+      const inventoryById = new Map(
+        inventoryRows.map((row) => [row.id, row])
+      );
 
-      const mapped: QueueItem[] = requests.map(req => {
-        const album = albums.find(a => a.id === req.album_id) || {
-          id: req.album_id,
-          artist: req.artist || "",
-          title: req.title || "",
-          image_url: "",
-        };
+      const queueItems = requestRows.map((request) => {
+        const inventory = request.inventory_id
+          ? inventoryById.get(request.inventory_id)
+          : null;
+        const release = inventory?.release;
+        const master = release?.master;
+        const artist = master?.artist;
+        const title = release?.title || master?.title || "";
+        const artistName = artist?.name || "";
+        const imageUrl = master?.cover_image_url || inventory?.image_url || "";
 
         return {
-          id: req.id,
-          artist: req.artist || album.artist || "",
-          title: req.title || album.title || "",
-          side: req.side || null,
-          track_number: req.track_number || null,
-          track_name: req.track_name || null,
-          track_duration: req.track_duration || null,
-          votes: req.votes ?? 1,
-          created_at: req.created_at,
-          queue_type: primaryQueueType,
-          collection: {
-            id: album.id,
-            image_url: album.image_url,
-            year: album.year,
-            format: album.format,
-          },
+          id: request.id,
+          artist: artistName,
+          title,
+          side: null,
+          track_number: null,
+          track_title: null,
+          track_duration: null,
+          votes: request.votes ?? 1,
+          created_at: request.created_at,
+          queue_type: request.recording_id ? "track" : "album",
+          inventory: inventory
+            ? {
+                id: inventory.id,
+                image_url: imageUrl,
+                year: release?.release_year ?? null,
+                format: buildFormatLabel(release),
+              }
+            : null,
         };
       });
+
+      const queueTypes = event?.queue_types || (event?.queue_type ? [event.queue_type] : ['side']);
+      const primaryQueueType = Array.isArray(queueTypes) ? queueTypes[0] : queueTypes;
+      const mapped = queueItems.map((item) => ({
+        ...item,
+        queue_type: item.queue_type || primaryQueueType,
+      }));
 
       mapped.sort((a, b) => (b.votes !== a.votes ? b.votes - a.votes : new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
       setQueueItems(mapped);
@@ -127,15 +160,20 @@ function BrowseQueueContent() {
 
   useEffect(() => { loadEventAndQueue(); }, [loadEventAndQueue]);
 
-  const voteForItem = async (itemId: number) => {
+  const voteForItem = async (itemId: string) => {
     try {
       const currentItem = queueItems.find(item => item.id === itemId);
       const newVotes = (currentItem?.votes ?? 1) + 1;
-      await supabase.from("requests").update({ votes: newVotes }).eq("id", itemId);
+      await supabase.from("requests_v3").update({ votes: newVotes }).eq("id", itemId);
       setQueueItems(prev =>
         prev
           .map(item => (item.id === itemId ? { ...item, votes: newVotes } : item))
-          .sort((a, b) => (b.votes !== a.votes ? b.votes - a.votes : new Date(a.created_at).getTime() - new Date(b.created_at).getTime()))
+          .sort((a, b) => {
+            if (b.votes !== a.votes) return b.votes - a.votes;
+            const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return dateA - dateB;
+          })
       );
     } catch (e) {
       console.error("Error voting:", e);
@@ -269,7 +307,7 @@ function BrowseQueueContent() {
                       </td>
                       <td className="p-4 pl-0">
                         <Image
-                          src={item.collection?.image_url || "/images/placeholder.png"}
+                          src={item.inventory?.image_url || "/images/placeholder.png"}
                           alt={item.title || ""}
                           className="rounded shadow-md object-cover bg-slate-800"
                           width={48}
@@ -280,16 +318,16 @@ function BrowseQueueContent() {
                       <td className="p-4">
                         <div className="flex items-center gap-2 mb-1">
                           {index < 3 && <span className="text-lg">{index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉"}</span>}
-                          {item.collection?.id ? (
+                          {item.inventory?.id ? (
                             <Link
-                              href={`/browse/album-detail/${item.collection.id}${eventId ? `?eventId=${eventId}` : ""}`}
+                              href={`/browse/album-detail/${item.inventory.id}${eventId ? `?eventId=${eventId}` : ""}`}
                               className="font-bold text-base text-emerald-400 hover:text-emerald-300 hover:underline line-clamp-1"
                               aria-label={`View ${queueType === 'track' ? 'track' : 'album'}: ${item.title} by ${item.artist}`}
                             >
-                              {queueType === 'track' ? (item.track_name || item.title) : item.title}
+                              {queueType === 'track' ? (item.track_title || item.title) : item.title}
                             </Link>
                           ) : (
-                            <span className="font-bold text-base text-white line-clamp-1">{queueType === 'track' ? (item.track_name || item.title) : item.title}</span>
+                            <span className="font-bold text-base text-white line-clamp-1">{queueType === 'track' ? (item.track_title || item.title) : item.title}</span>
                           )}
                         </div>
                         <div className="text-sm text-gray-400 font-medium uppercase tracking-wide line-clamp-1">{item.artist}</div>
@@ -297,7 +335,7 @@ function BrowseQueueContent() {
                       {queueType === 'side' && (
                         <td className="p-4 text-center">
                           <span className="inline-block px-2 py-1 rounded bg-blue-500/20 text-blue-300 text-sm font-bold">
-                            {item.side}
+                            {item.side || '--'}
                           </span>
                         </td>
                       )}

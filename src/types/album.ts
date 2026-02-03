@@ -1,80 +1,107 @@
 // src/types/album.ts
+import type { Database } from './database.types';
+
+type InventoryRow = Database['public']['Tables']['inventory']['Row'];
+type ReleaseRow = Database['public']['Tables']['releases']['Row'];
+type MasterRow = Database['public']['Tables']['masters']['Row'];
+type ArtistRow = Database['public']['Tables']['artists']['Row'];
+type RecordingRow = Database['public']['Tables']['recordings']['Row'];
+type ReleaseTrackRow = Database['public']['Tables']['release_tracks']['Row'];
+
+type MasterTagLinkRow = {
+  master_tags?: { name: string | null } | null;
+};
+
 export type Album = {
+  inventory?: InventoryRow | null;
+  release?: (ReleaseRow & {
+    master?: (MasterRow & {
+      artist?: ArtistRow | null;
+      master_tag_links?: MasterTagLinkRow[] | null;
+    }) | null;
+    release_tracks?: (ReleaseTrackRow & {
+      recording?: RecordingRow | null;
+    })[] | null;
+  }) | null;
+} & {
+  id: number;
+
   // ============================================================================
   // CORE IDENTIFICATION
   // ============================================================================
-  id: number;
-  artist: string;
-  secondary_artists: string[] | null; 
-  sort_artist: string | null;
-  title: string;
-  sort_title: string | null;
-  year: string | null;
-  year_int: number | null;
-  image_url: string | null;
-  back_image_url: string | null;
-  index_number: number | null;
+  artist?: string | null;
+  title?: string | null;
+  year?: string | number | null;
+  image_url?: string | null;
+  format?: string | null;
+  secondary_artists?: string[] | null; 
+  sort_artist?: string | null;
+  sort_title?: string | null;
+  year_int?: number | null;
+  back_image_url?: string | null;
+  index_number?: number | null;
   
   // ============================================================================
   // STATUS & LOCATION
   // ============================================================================
-  collection_status: 'in_collection' | 'for_sale' | 'wish_list' | 'on_order' | 'sold' | 'not_in_collection' | null;
-  for_sale: boolean;
+  collection_status?: 'in_collection' | 'for_sale' | 'wish_list' | 'on_order' | 'sold' | 'not_in_collection' | null;
+  for_sale?: boolean;
+  status?: string | null;
   
   // Location
-  location: string | null;
-  storage_device: string | null;
-  storage_device_slot: string | null;
-  slot: string | null;
-  country: string | null;
-  studio: string | null;
-  recording_location: string | null;
+  location?: string | null;
+  storage_device?: string | null;
+  storage_device_slot?: string | null;
+  slot?: string | null;
+  country?: string | null;
+  studio?: string | null;
+  recording_location?: string | null;
 
   // Dates
-  date_added: string | null;
-  modified_date: string | null;
-  last_reviewed_at: string | null;
-  decade: number | null;
+  date_added?: string | null;
+  modified_date?: string | null;
+  last_reviewed_at?: string | null;
+  decade?: number | null;
 
   // ============================================================================
   // NOTES
   // ============================================================================
-  personal_notes: string | null;
+  personal_notes?: string | null;
   notes?: string | null; // UI Alias for personal_notes
-  release_notes: string | null;
-  extra: string | null;
+  release_notes?: string | null;
+  extra?: string | null;
 
   // ============================================================================
   // PHYSICAL METADATA
   // ============================================================================
-  format: string;
-  media_condition: string;
-  package_sleeve_condition: string | null;
-  barcode: string | null;
-  cat_no: string | null;
-  packaging: string | null;
+  media_condition?: string | null;
+  package_sleeve_condition?: string | null;
+  sleeve_condition?: string | null;
+  barcode?: string | null;
+  cat_no?: string | null;
+  packaging?: string | null;
   
   // Vinyl Specifics
-  rpm: string | null;
-  vinyl_weight: string | null;
-  vinyl_color: string[] | null; 
+  rpm?: string | null;
+  vinyl_weight?: string | null;
+  vinyl_color?: string[] | null; 
   
-  discs: number | null;
-  sides: number | null;
+  discs?: number | null;
+  sides?: number | null;
   
   // Audio / Content
-  length_seconds: number | null;
-  sound: string | null;
-  spars_code: string | null;
-  is_live: boolean | null;
-  is_box_set: boolean | null;
-  box_set: string | null;
-  time_signature: string | null;
+  length_seconds?: number | null;
+  sound?: string | null;
+  spars_code?: string | null;
+  is_live?: boolean | null;
+  is_box_set?: boolean | null;
+  box_set?: string | null;
+  time_signature?: string | null;
 
   // ============================================================================
   // TRACKS (JSONB)
   // ============================================================================
-  tracks: Array<{
+  tracks?: Array<{
     position: string;
     title: string;
     artist?: string | null;
@@ -87,98 +114,102 @@ export type Album = {
   // ============================================================================
   // EXTERNAL LINKS & IDs
   // ============================================================================
-  discogs_id: string | null;
-  discogs_release_id: string | null;
-  discogs_master_id: string | null;
+  discogs_id?: string | null;
+  discogs_release_id?: string | null;
+  discogs_master_id?: string | null;
   
-  spotify_id: string | null;
-  spotify_url: string | null;
-  spotify_album_id: string | null;
+  spotify_id?: string | null;
+  spotify_url?: string | null;
+  spotify_album_id?: string | null;
   
-  apple_music_id: string | null;
-  apple_music_url: string | null;
+  apple_music_id?: string | null;
+  apple_music_url?: string | null;
   
-  musicbrainz_id: string | null;
-  musicbrainz_url: string | null;
+  musicbrainz_id?: string | null;
+  musicbrainz_url?: string | null;
   
-  lastfm_id: string | null;
-  lastfm_url: string | null;
-  allmusic_id: string | null;
-  allmusic_url: string | null;
-  wikipedia_url: string | null;
-  dbpedia_uri: string | null;
+  lastfm_id?: string | null;
+  lastfm_url?: string | null;
+  allmusic_id?: string | null;
+  allmusic_url?: string | null;
+  wikipedia_url?: string | null;
+  dbpedia_uri?: string | null;
   
   // ============================================================================
   // DATES
   // ============================================================================
-  original_release_date: string | null;
-  original_release_year: number | null;
-  recording_date: string | null;
-  recording_year: number | null;
-  master_release_date: string | null;
+  original_release_date?: string | null;
+  original_release_year?: number | null;
+  recording_date?: string | null;
+  recording_year?: number | null;
+  master_release_date?: string | null;
 
   // ============================================================================
   // TAGS & LABELS
   // ============================================================================
-  genres: string[] | null; 
-  styles: string[] | null; 
-  custom_tags: string[] | null; 
-  labels: string[] | null;
-  enrichment_sources: string[] | null;
-  finalized_fields: string[] | null;
+  genres?: string[] | null; 
+  styles?: string[] | null; 
+  custom_tags?: string[] | null; 
+  labels?: string[] | null;
+  enrichment_sources?: string[] | null;
+  finalized_fields?: string[] | null;
 
   // ============================================================================
   // PEOPLE
   // ============================================================================
-  musicians: string[] | null;
-  producers: string[] | null;
-  engineers: string[] | null;
-  songwriters: string[] | null;
-  writers: string[] | null;
+  musicians?: string[] | null;
+  producers?: string[] | null;
+  engineers?: string[] | null;
+  songwriters?: string[] | null;
+  writers?: string[] | null;
   
-  chorus: string | null;
-  composer: string | null;
-  composition: string | null;
-  conductor: string | null;
-  orchestra: string | null;
+  chorus?: string | null;
+  composer?: string | null;
+  composition?: string | null;
+  conductor?: string | null;
+  orchestra?: string | null;
 
   // ============================================================================
   // PERSONAL / TRACKING / LOANS
   // ============================================================================
-  owner: string | null;
-  due_date: string | null;
-  loan_date: string | null;
-  loaned_to: string | null;
+  owner?: string | null;
+  due_date?: string | null;
+  loan_date?: string | null;
+  loaned_to?: string | null;
   
-  last_cleaned_date: string | null;
-  last_played_date: string | null;
-  play_count: number | null;
-  my_rating: number | null;
-  signed_by: string[] | null;
+  last_cleaned_date?: string | null;
+  last_played_date?: string | null;
+  last_played_at?: string | null;
+  play_count?: number | null;
+  my_rating?: number | null;
+  signed_by?: string[] | null;
   
   // ============================================================================
   // VALUE & SALES
   // ============================================================================
-  purchase_price: number | null;
-  current_value: number | null;
-  purchase_date: string | null;
-  purchase_store: string | null;
+  purchase_price?: number | null;
+  current_value?: number | null;
+  purchase_date?: string | null;
+  purchase_store?: string | null;
   
   for_sale_indicator?: boolean; 
   
-  sale_price: number | null;
-  sell_price: string | null; // Legacy text field
-  sale_platform: string | null;
-  sale_quantity: number | null;
-  sale_notes: string | null;
-  wholesale_cost: number | null;
-  pricing_notes: string | null;
+  sale_price?: number | null;
+  sell_price?: string | null; // Legacy text field
+  sale_platform?: string | null;
+  sale_quantity?: number | null;
+  sale_notes?: string | null;
+  wholesale_cost?: number | null;
+  pricing_notes?: string | null;
 
   // ============================================================================
   // UI HELPERS / OPTIONAL
   // ============================================================================
   subtitle?: string | null;
   played_history?: string | null;
+  inventory_id?: number | null;
+  master_id?: number | null;
+  release_id?: number | null;
   
   blocked?: boolean | null;
   blocked_sides?: string[] | null;
@@ -209,30 +240,28 @@ export type Album = {
   cultural_significance?: string | null;
 
   // ============================================================================
-  // DJ DATA (Mapped from collection_dj_data)
+  // DJ DATA (Derived from track-level recordings)
   // ============================================================================
   tempo_bpm?: number | null;
   musical_key?: string | null;
   energy?: number | null;
   danceability?: number | null;
   valence?: number | null;
+  mood_acoustic?: number | null;
+  mood_electronic?: number | null;
+  mood_happy?: number | null;
+  mood_sad?: number | null;
+  mood_aggressive?: number | null;
+  mood_relaxed?: number | null;
+  mood_party?: number | null;
 
   // ============================================================================
   // HIERARCHY
   // ============================================================================
   parent_id?: string | null;
   child_album_ids?: string[] | null;
-
-  // ============================================================================
-  // NORMALIZED
-  // ============================================================================
-  album_norm?: string | null;
-  artist_norm?: string | null;
-  title_norm?: string | null;
-  artist_album_norm?: string | null;
 };
 
-// HELPER FUNCTIONS
 export function toSafeStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item) => typeof item === 'string' && item.length > 0);

@@ -8,6 +8,9 @@ const DISCOGS_TOKEN = process.env.DISCOGS_TOKEN ?? process.env.NEXT_PUBLIC_DISCO
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 
+const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
+
 type DiscogsTrack = {
   position?: string;
   type_?: string;
@@ -21,6 +24,22 @@ type DiscogsResponse = {
   tracklist?: DiscogsTrack[];
   genres?: string[];
   styles?: string[];
+};
+
+const parseDurationToSeconds = (duration?: string) => {
+  if (!duration) return null;
+  const parts = duration.split(':').map((part) => Number(part));
+  if (parts.some((part) => Number.isNaN(part))) return null;
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+};
+
+const getSideFromPosition = (position?: string) => {
+  if (!position) return null;
+  const match = position.trim().match(/^([A-Za-z]+)/);
+  return match ? match[1].toUpperCase() : null;
 };
 
 async function fetchDiscogsRelease(releaseId: string): Promise<DiscogsResponse> {
@@ -65,8 +84,18 @@ export async function POST(req: Request) {
 
     // Get album info
     const { data: album, error: dbError } = await supabase
-      .from('collection')
-      .select('id, artist, title, discogs_release_id, tracklists')
+      .from('inventory')
+      .select(`
+        id,
+        release:releases (
+          id,
+          discogs_release_id,
+          master:masters (
+            title,
+            artist:artists (name)
+          )
+        )
+      `)
       .eq('id', albumId)
       .single();
 
@@ -78,9 +107,14 @@ export async function POST(req: Request) {
       }, { status: 404 });
     }
 
-    console.log(`✓ Album found: "${album.artist}" - "${album.title}"`);
+    const release = toSingle(album.release);
+    const master = toSingle(release?.master);
+    const artistName = toSingle(master?.artist)?.name ?? 'Unknown Artist';
+    const albumTitle = master?.title ?? 'Untitled';
 
-    if (!album.discogs_release_id) {
+    console.log(`✓ Album found: "${artistName}" - "${albumTitle}"`);
+
+    if (!release?.discogs_release_id) {
       console.log('❌ ERROR: No Discogs Release ID');
       return NextResponse.json({
         success: false,
@@ -88,30 +122,9 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Check if already has tracks with artist info
-    if (album.tracklists) {
-      try {
-        const existingTracks = JSON.parse(album.tracklists);
-        if (Array.isArray(existingTracks) && existingTracks.length > 0) {
-          const hasArtistData = existingTracks.some(t => t.artist && t.artist !== album.artist);
-          if (hasArtistData) {
-            console.log('⏭️ Album already has per-track artist data');
-            return NextResponse.json({
-              success: true,
-              skipped: true,
-              message: 'Album already has per-track artist data'
-            });
-          }
-        }
-      } catch {
-        // Continue if parse fails
-      }
-    }
-
-    // Fetch from Discogs
-    console.log(`🔍 Fetching tracklist from Discogs release ${album.discogs_release_id}...`);
+    console.log(`🔍 Fetching tracklist from Discogs release ${release.discogs_release_id}...`);
     
-    const discogsData = await fetchDiscogsRelease(album.discogs_release_id);
+    const discogsData = await fetchDiscogsRelease(release.discogs_release_id);
     
     if (!discogsData.tracklist || discogsData.tracklist.length === 0) {
       console.log('❌ No tracklist found on Discogs');
@@ -144,21 +157,62 @@ export async function POST(req: Request) {
     const tracksWithArtists = enrichedTracks.filter(t => t.artist).length;
     console.log(`✓ ${tracksWithArtists}/${enrichedTracks.length} tracks have artist info`);
 
-    // Update database
-    console.log(`💾 Updating database...`);
-    const { error: updateError } = await supabase
-      .from('collection')
-      .update({
-        tracklists: JSON.stringify(enrichedTracks)
-      })
-      .eq('id', albumId);
-
-    if (updateError) {
-      console.log('❌ ERROR: Database update failed', updateError);
+    if (!release?.id) {
       return NextResponse.json({
         success: false,
-        error: `Database update failed: ${updateError.message}`
+        error: 'Missing release ID for track update.'
+      }, { status: 400 });
+    }
+
+    console.log(`💾 Updating release tracks...`);
+    const { error: deleteError } = await supabase
+      .from('release_tracks')
+      .delete()
+      .eq('release_id', release.id);
+
+    if (deleteError) {
+      console.log('❌ ERROR: Failed to clear existing tracks', deleteError);
+      return NextResponse.json({
+        success: false,
+        error: `Database update failed: ${deleteError.message}`
       }, { status: 500 });
+    }
+
+    for (const track of enrichedTracks) {
+      const { data: recording, error: recordingError } = await supabase
+        .from('recordings')
+        .insert({
+          title: track.title || null,
+          duration_seconds: parseDurationToSeconds(track.duration),
+        })
+        .select('id')
+        .single();
+
+      if (recordingError || !recording) {
+        console.log('❌ ERROR: Failed to create recording', recordingError);
+        return NextResponse.json({
+          success: false,
+          error: `Database update failed: ${recordingError?.message ?? 'Recording insert failed'}`
+        }, { status: 500 });
+      }
+
+      const { error: linkError } = await supabase
+        .from('release_tracks')
+        .insert({
+          release_id: release.id,
+          recording_id: recording.id,
+          position: track.position || '',
+          side: getSideFromPosition(track.position),
+          title_override: track.title || null,
+        });
+
+      if (linkError) {
+        console.log('❌ ERROR: Failed to link recording', linkError);
+        return NextResponse.json({
+          success: false,
+          error: `Database update failed: ${linkError.message}`
+        }, { status: 500 });
+      }
     }
 
     console.log(`✅ Successfully enriched tracklist\n`);
@@ -167,8 +221,8 @@ export async function POST(req: Request) {
       success: true,
       data: {
         albumId: album.id,
-        artist: album.artist,
-        title: album.title,
+        artist: artistName,
+        title: albumTitle,
         totalTracks: enrichedTracks.length,
         tracksWithArtists
       }
