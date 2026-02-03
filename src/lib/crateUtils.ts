@@ -1,11 +1,11 @@
 // src/lib/crateUtils.ts
-import type { V3Album } from '../types/v3-types';
+import type { Album } from '../types/album';
 import type { SmartRule, Crate } from '../types/crate';
 
 /**
  * Evaluate if an album matches a smart crate's rules
  */
-export function albumMatchesSmartCrate(album: V3Album, crate: Crate): boolean {
+export function albumMatchesSmartCrate(album: Album, crate: Crate): boolean {
   if (!crate.is_smart || !crate.smart_rules) return false;
 
   const { rules } = crate.smart_rules;
@@ -23,7 +23,7 @@ export function albumMatchesSmartCrate(album: V3Album, crate: Crate): boolean {
 /**
  * Check if an album matches a single rule
  */
-function albumMatchesRule(album: V3Album, rule: SmartRule): boolean {
+function albumMatchesRule(album: Album, rule: SmartRule): boolean {
   const { field, operator, value } = rule;
   const albumValue = getAlbumFieldValue(album, field);
 
@@ -81,7 +81,7 @@ function albumMatchesRule(album: V3Album, rule: SmartRule): boolean {
 /**
  * Get the value of a field from an album
  */
-function getAlbumFieldValue(album: V3Album, field: string): unknown {
+function getAlbumFieldValue(album: Album, field: string): unknown {
   const release = album.release;
   const master = release?.master;
   const artist = master?.artist;

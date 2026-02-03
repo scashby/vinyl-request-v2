@@ -275,13 +275,13 @@ export async function fetchFormats(): Promise<PickerDataItem[]> {
 
 export async function fetchGenres(): Promise<PickerDataItem[]> {
   try {
-    const { data: v3Data, error: v3Error } = await supabase
+    const { data, error } = await supabase
       .from('masters')
       .select('genres')
       .not('genres', 'is', null);
-    if (v3Error) return [];
+    if (error) return [];
     const genreCounts = new Map<string, number>();
-    v3Data?.forEach(row => {
+    data?.forEach(row => {
       const allGenres = Array.isArray(row.genres) ? row.genres : [];
       allGenres.forEach(genre => { if (genre) genreCounts.set(genre, (genreCounts.get(genre) || 0) + 1); });
     });
@@ -293,14 +293,14 @@ export async function fetchGenres(): Promise<PickerDataItem[]> {
 
 export async function fetchLocations(): Promise<PickerDataItem[]> {
   try {
-    const { data: v3Data, error: v3Error } = await supabase
+    const { data, error } = await supabase
       .from('inventory')
       .select('location')
       .not('location', 'is', null)
       .not('location', 'eq', '');
-    if (v3Error) return [];
+    if (error) return [];
     const locationCounts = new Map<string, number>();
-    v3Data?.forEach(row => { if (row.location) locationCounts.set(row.location, (locationCounts.get(row.location) || 0) + 1); });
+    data?.forEach(row => { if (row.location) locationCounts.set(row.location, (locationCounts.get(row.location) || 0) + 1); });
     return Array.from(locationCounts.entries())
       .map(([name, count]) => ({ id: name, name, count }))
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -309,14 +309,14 @@ export async function fetchLocations(): Promise<PickerDataItem[]> {
 
 export async function fetchArtists(): Promise<PickerDataItem[]> {
   try {
-    const { data: v3Data, error: v3Error } = await supabase
+    const { data, error } = await supabase
       .from('artists')
       .select('name, sort_name')
       .not('name', 'is', null)
       .not('name', 'eq', '');
-    if (v3Error) return [];
+    if (error) return [];
     const artistMap = new Map<string, { count: number; sortName: string }>();
-    v3Data?.forEach(row => {
+    data?.forEach(row => {
       if (row.name) {
         const current = artistMap.get(row.name);
         const sortVal = row.sort_name || row.name;
@@ -404,11 +404,6 @@ export async function updateLabel(): Promise<boolean> {
   return false; 
 }
 
-export async function updateFormat(id: string, newName: string): Promise<boolean> {
-  console.warn("Global format rename is not supported in the V3 schema.");
-  return false;
-}
-
 export async function updateLocation(id: string, newName: string): Promise<boolean> {
   try { const { error } = await supabase.from('inventory').update({ location: newName }).eq('location', id); return !error; } catch { return false; }
 }
@@ -427,13 +422,56 @@ export async function updateArtist(id: string, newName: string, newSortName?: st
 }
 
 export async function deleteArtist(id: string): Promise<boolean> {
-  console.warn("Deleting artists is not supported in the V3 schema.");
-  return false;
+  try {
+    const { data: artist, error: fetchError } = await supabase
+      .from('artists')
+      .select('id')
+      .eq('name', id)
+      .maybeSingle();
+    if (fetchError || !artist) return false;
+
+    const { count, error: countError } = await supabase
+      .from('masters')
+      .select('id', { count: 'exact', head: true })
+      .eq('main_artist_id', artist.id);
+    if (countError) return false;
+    if ((count ?? 0) > 0) return false;
+
+    const { error: deleteError } = await supabase
+      .from('artists')
+      .delete()
+      .eq('id', artist.id);
+    return !deleteError;
+  } catch { return false; }
 }
 
 export async function mergeArtists(targetId: string, sourceIds: string[]): Promise<boolean> {
-  console.warn("Merging artists is not supported in the V3 schema.");
-  return false;
+  try {
+    const { data: targetArtist, error: targetError } = await supabase
+      .from('artists')
+      .select('id')
+      .eq('name', targetId)
+      .maybeSingle();
+    if (targetError || !targetArtist) return false;
+
+    if (!sourceIds.length) return true;
+    const { data: sourceArtists, error: sourceError } = await supabase
+      .from('artists')
+      .select('id, name')
+      .in('name', sourceIds);
+    if (sourceError) return false;
+    const sourceArtistIds = (sourceArtists ?? []).map(row => row.id).filter((idVal) => idVal !== targetArtist.id);
+    if (!sourceArtistIds.length) return true;
+
+    const { error: updateError } = await supabase
+      .from('masters')
+      .update({ main_artist_id: targetArtist.id })
+      .in('main_artist_id', sourceArtistIds);
+    if (updateError) return false;
+
+    await supabase.from('artists').delete().in('id', sourceArtistIds);
+    return true;
+  } catch { return false; }
 }
 
 export async function deleteLabel(): Promise<boolean> {
@@ -446,9 +484,69 @@ export async function mergeLabels(): Promise<boolean> {
   return false; 
 }
 
+const replaceFormatValues = (values: string[] | null | undefined, targetId: string, sourceIds: string[]) => {
+  if (!Array.isArray(values) || values.length === 0) return values ?? null;
+  const sources = new Set(sourceIds);
+  const replaced = values.map(value => (sources.has(value) ? targetId : value));
+  const deduped: string[] = [];
+  replaced.forEach(value => {
+    if (!deduped.includes(value)) deduped.push(value);
+  });
+  return deduped;
+};
+
+export async function updateFormat(id: string, newName: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('releases')
+      .select('id, media_type, format_details')
+      .or(`media_type.eq.${id},format_details.cs.{${id}}`);
+    if (error) return false;
+    const rows = data ?? [];
+    if (!rows.length) return true;
+
+    const updates = rows.map(row => {
+      const mediaType = row.media_type === id ? newName : row.media_type;
+      const formatDetails = replaceFormatValues(row.format_details ?? null, newName, [id]);
+      const payload: { media_type?: string | null; format_details?: string[] | null } = {};
+      if (mediaType !== row.media_type) payload.media_type = mediaType;
+      if (formatDetails !== row.format_details) payload.format_details = formatDetails ?? null;
+      if (!Object.keys(payload).length) return Promise.resolve(null);
+      return supabase.from('releases').update(payload).eq('id', row.id);
+    });
+
+    const results = await Promise.all(updates);
+    return results.every(res => !res || !('error' in res) || !res.error);
+  } catch { return false; }
+}
+
 export async function mergeFormats(targetId: string, sourceIds: string[]): Promise<boolean> {
-  console.warn("Global format merge is not supported in the V3 schema.");
-  return false;
+  try {
+    if (!sourceIds.length) return true;
+    const { data, error } = await supabase
+      .from('releases')
+      .select('id, media_type, format_details')
+      .or([
+        `media_type.in.(${sourceIds.map((val) => `"${val}"`).join(',')})`,
+        `format_details.cs.{${sourceIds.join(',')}}`
+      ].join(','));
+    if (error) return false;
+    const rows = data ?? [];
+    if (!rows.length) return true;
+
+    const updates = rows.map(row => {
+      const mediaType = sourceIds.includes(row.media_type ?? '') ? targetId : row.media_type;
+      const formatDetails = replaceFormatValues(row.format_details ?? null, targetId, sourceIds);
+      const payload: { media_type?: string | null; format_details?: string[] | null } = {};
+      if (mediaType !== row.media_type) payload.media_type = mediaType;
+      if (formatDetails !== row.format_details) payload.format_details = formatDetails ?? null;
+      if (!Object.keys(payload).length) return Promise.resolve(null);
+      return supabase.from('releases').update(payload).eq('id', row.id);
+    });
+
+    const results = await Promise.all(updates);
+    return results.every(res => !res || !('error' in res) || !res.error);
+  } catch { return false; }
 }
 
 export async function mergeLocations(targetId: string, sourceIds: string[]): Promise<boolean> {

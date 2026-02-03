@@ -6,7 +6,8 @@ import { supabase } from '../../lib/supabaseClient';
 import CollectionTable from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
 import { ColumnId, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
-import { type V3Album, toSafeStringArray, toSafeSearchString } from '../../types/v3-types';
+import type { Album } from '../../types/album';
+import { toSafeStringArray, toSafeSearchString } from '../../types/album';
 import EditAlbumModal from './EditAlbumModal';
 import NewCrateModal from './crates/NewCrateModal';
 import NewSmartCrateModal from './crates/NewSmartCrateModal';
@@ -61,7 +62,7 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
 ];
 
 function CollectionBrowserPage() {
-  const [albums, setAlbums] = useState<V3Album[]>([]);
+  const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchTypeDropdown, setShowSearchTypeDropdown] = useState(false);
@@ -243,7 +244,7 @@ function CollectionBrowserPage() {
       from += batchSize;
     }
 
-    setAlbums(allRows as V3Album[]);
+    setAlbums(allRows as Album[]);
     setLoading(false);
   }, []);
 
@@ -430,7 +431,7 @@ function CollectionBrowserPage() {
     }, {} as Record<string, typeof SORT_OPTIONS>);
   }, []);
 
-  const handleAlbumClick = useCallback((album: V3Album) => {
+  const handleAlbumClick = useCallback((album: Album) => {
     setSelectedAlbumId(album.id);
   }, []);
 

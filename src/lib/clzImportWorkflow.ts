@@ -8,6 +8,13 @@
 import { parseCLZXML } from './clzParser';
 import { parseDiscogsFormat } from './formatParser';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  type CollectionRow,
+  type FieldConflict,
+  detectConflicts,
+  findMatchingAlbum,
+  getSafeUpdates,
+} from './conflictDetection';
 
 export type UpdateMode = 'update_missing_only' | 'update_all';
 
@@ -22,14 +29,6 @@ export interface ImportResult {
   errors: Array<{ album: string; error: string }>;
   message: string;
 }
-
-export type FieldConflict = {
-  album_id: number;
-  field_name: string;
-  current_value: unknown;
-  new_value: unknown;
-  source: string;
-};
 
 type ArtistRow = { id: number };
 type MasterRow = { id: number };
@@ -413,6 +412,8 @@ export async function previewCLZImport(
     .from('inventory')
     .select(`
       id,
+      location,
+      media_condition,
       release:releases (
         id,
         media_type,
@@ -446,6 +447,9 @@ export async function previewCLZImport(
       artist: master?.artist?.name ?? 'Unknown Artist',
       title: master?.title ?? 'Untitled',
       format: buildFormatLabel(release),
+      location: (row as { location?: string | null }).location ?? '',
+      media_condition: (row as { media_condition?: string | null }).media_condition ?? '',
+      discs: release?.qty ?? 1,
     };
   });
 

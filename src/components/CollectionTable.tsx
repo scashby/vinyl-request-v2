@@ -3,7 +3,7 @@
 
 import React, { memo, useCallback, useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { V3Album } from '../types/v3-types';
+import type { Album } from '@/types/album';
 import { 
   ColumnId, 
   getVisibleColumns,
@@ -13,8 +13,8 @@ import {
 import { getDisplayFormat } from '../utils/formatDisplay';
 
 interface CollectionTableProps {
-  albums: V3Album[];
-  onAlbumClick: (album: V3Album) => void;
+  albums: Album[];
+  onAlbumClick: (album: Album) => void;
   selectedAlbums: Set<string>;
   onSelectionChange: (albumIds: Set<string>) => void;
   visibleColumns: ColumnId[];
@@ -94,6 +94,39 @@ const CollectionTable = memo(function CollectionTable({
     const getAlbumCatalogNumber = (album: Album) =>
       album.cat_no || album.release?.catalog_number || '—';
 
+    const getAlbumTags = (album: Album) => {
+      const links = album.release?.master?.master_tag_links ?? [];
+      return links
+        .map((link) => link.master_tags?.name)
+        .filter((name): name is string => Boolean(name));
+    };
+
+    const getAlbumStatus = (album: Album) => {
+      const status = album.status ?? null;
+      if (!status) return '—';
+      switch (status) {
+        case 'wishlist':
+          return 'Wish List';
+        case 'incoming':
+          return 'On Order';
+        case 'sold':
+          return 'Sold';
+        case 'for_sale':
+          return 'For Sale';
+        case 'active':
+          return 'In Collection';
+        default:
+          return status;
+      }
+    };
+
+    const getAlbumLocation = (album: Album) => album.location || '—';
+
+    const formatTrackCount = (album: Album) => {
+      const trackCount = album.release?.release_tracks?.length ?? 0;
+      return trackCount > 0 ? trackCount : '—';
+    };
+
     const formatLength = (seconds: number | null | undefined): string => {
       if (!seconds) return '—';
       const mins = Math.floor(seconds / 60);
@@ -124,8 +157,8 @@ const CollectionTable = memo(function CollectionTable({
     return {
       checkbox: () => null,
       owned: () => <span className="text-green-500 text-sm">✓</span>,
-      for_sale_indicator: (album: V3Album) => album.status === 'for_sale' ? <span className="text-amber-500 text-sm">$</span> : null,
-      menu: (album: V3Album) => (
+      for_sale_indicator: (album: Album) => album.status === 'for_sale' ? <span className="text-amber-500 text-sm">$</span> : null,
+      menu: (album: Album) => (
         <span 
           className="text-blue-500 text-sm cursor-pointer"
           onClick={(e) => {
@@ -159,7 +192,7 @@ const CollectionTable = memo(function CollectionTable({
       extra: (album: Album) => album.extra || '—',
       is_live: (album: Album) => album.is_live ? 'Yes' : 'No',
       media_condition: (album: Album) => album.media_condition || '—',
-      package_sleeve_condition: (album: Album) => album.sleeve_condition || '—',
+      package_sleeve_condition: (album: Album) => album.sleeve_condition || album.package_sleeve_condition || '—',
       packaging: () => '—',
       rpm: () => '—',
       sound: () => '—',
@@ -237,7 +270,7 @@ const CollectionTable = memo(function CollectionTable({
     return sortState.direction === 'asc' ? ' ▲' : ' ▼';
   }, [sortState]);
 
-  const handleRowClick = useCallback((album: V3Album) => {
+  const handleRowClick = useCallback((album: Album) => {
     onAlbumClick(album);
   }, [onAlbumClick]);
 
@@ -302,7 +335,7 @@ const CollectionTable = memo(function CollectionTable({
     );
   }, [allSelected, someSelected, sortState, handleSelectAll, handleHeaderClick, getSortIndicator, locked]);
 
-  const renderCellContent = useCallback((col: ReturnType<typeof getVisibleColumns>[0], album: V3Album, albumId: string, isSelected: boolean) => {
+  const renderCellContent = useCallback((col: ReturnType<typeof getVisibleColumns>[0], album: Album, albumId: string, isSelected: boolean) => {
     if (col.id === 'checkbox') {
       return (
         <input

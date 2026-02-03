@@ -1144,18 +1144,24 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               const masterRow = album.existingMasterId
                 ? { id: album.existingMasterId }
                 : await getOrCreateMaster(artistRow.id, album.title, album.year);
+              const getString = (value: unknown): string | null =>
+                typeof value === 'string' && value.trim().length > 0 ? value : null;
+              const getNumber = (value: unknown): number | null =>
+                typeof value === 'number' && !Number.isNaN(value) ? value : null;
+              const getStringArray = (value: unknown): string[] =>
+                Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
               const releaseRow = album.existingReleaseId
                 ? { id: album.existingReleaseId }
                 : await getOrCreateRelease(masterRow.id, {
-                    media_type: releaseUpdates.media_type ?? 'Vinyl',
-                    format_details: releaseUpdates.format_details ?? null,
-                    qty: releaseUpdates.qty ?? 1,
-                    label: releaseUpdates.label ?? null,
-                    catalog_number: releaseUpdates.catalog_number ?? null,
-                    barcode: releaseUpdates.barcode ?? null,
-                    country: releaseUpdates.country ?? null,
-                    release_year: releaseUpdates.release_year ?? null,
-                    discogs_release_id: releaseUpdates.discogs_release_id ?? null,
+                    media_type: getString(releaseUpdates.media_type) ?? 'Vinyl',
+                    format_details: getStringArray(releaseUpdates.format_details),
+                    qty: getNumber(releaseUpdates.qty) ?? 1,
+                    label: getString(releaseUpdates.label),
+                    catalog_number: getString(releaseUpdates.catalog_number),
+                    barcode: getString(releaseUpdates.barcode),
+                    country: getString(releaseUpdates.country),
+                    release_year: getNumber(releaseUpdates.release_year),
+                    discogs_release_id: getString(releaseUpdates.discogs_release_id) ?? album.discogs_release_id,
                   });
               const inventoryRow = album.existingId
                 ? { id: album.existingId }

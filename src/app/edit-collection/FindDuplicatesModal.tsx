@@ -454,7 +454,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
       case 'Artist': return album.artist || '—';
       case 'Title': return album.title || '—';
       case 'Release Date':
-      case 'Release Year': return album.year || '—';
+      case 'Release Year': return album.year ? String(album.year) : '—';
       case 'Format': return album.format || '—';
       case 'Discs': return String(album.discs || 1);
       case 'Tracks': return String(album.spotify_total_tracks || album.apple_music_track_count || '—');

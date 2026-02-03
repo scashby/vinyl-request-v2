@@ -99,7 +99,7 @@ type Album = {
   master_id?: number | null;
   artist: string;
   title: string;
-  image_url: string | null;
+  image_url?: string | null;
   finalized_fields?: string[];
   last_reviewed_at?: string;
   enriched_metadata?: Record<string, unknown>; // New JSONB column
@@ -107,12 +107,7 @@ type Album = {
 };
 
 interface CandidateResult {
-  album: Record<string, unknown> & { 
-    id: number; 
-    artist: string; 
-    title: string; 
-    finalized_fields?: string[]; 
-  };
+  album: Album;
   candidates: Record<string, unknown>;
 }
 
@@ -530,19 +525,34 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     if (Object.keys(inventoryUpdates).length > 0) {
       operations.push(
-        supabase.from('inventory').update(inventoryUpdates as Record<string, unknown>).eq('id', album.id)
+        (async () => {
+          await supabase
+            .from('inventory')
+            .update(inventoryUpdates as Record<string, unknown>)
+            .eq('id', album.id);
+        })()
       );
     }
 
     if (album.release_id && Object.keys(releaseUpdates).length > 0) {
       operations.push(
-        supabase.from('releases').update(releaseUpdates as Record<string, unknown>).eq('id', album.release_id)
+        (async () => {
+          await supabase
+            .from('releases')
+            .update(releaseUpdates as Record<string, unknown>)
+            .eq('id', album.release_id);
+        })()
       );
     }
 
     if (album.master_id && Object.keys(masterUpdates).length > 0) {
       operations.push(
-        supabase.from('masters').update(masterUpdates as Record<string, unknown>).eq('id', album.master_id)
+        (async () => {
+          await supabase
+            .from('masters')
+            .update(masterUpdates as Record<string, unknown>)
+            .eq('id', album.master_id);
+        })()
       );
     }
 

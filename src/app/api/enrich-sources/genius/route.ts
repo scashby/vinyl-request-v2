@@ -8,6 +8,9 @@ const GENIUS_TOKEN = process.env.GENIUS_API_TOKEN;
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 
+const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
+
 type Track = {
   position?: string;
   title?: string;
@@ -156,19 +159,22 @@ export async function POST(req: Request) {
       }, { status: 404 });
     }
 
-    const release = album.release;
-    const master = release?.master;
-    const artistName = master?.artist?.name ?? 'Unknown Artist';
+    const release = toSingle(album.release);
+    const master = toSingle(release?.master);
+    const artistName = toSingle(master?.artist)?.name ?? 'Unknown Artist';
     const albumTitle = master?.title ?? 'Untitled';
 
     console.log(`✓ Album found: "${artistName}" - "${albumTitle}"`);
 
-    const tracks: Track[] = (release?.release_tracks ?? []).map((track) => ({
-      position: track.position,
-      title: track.title_override || track.recording?.title || '',
-      recording_id: track.recording_id ?? track.recording?.id ?? null,
-      credits: normalizeCredits(track.recording?.credits ?? null)
-    }));
+    const tracks: Track[] = (release?.release_tracks ?? []).map((track) => {
+      const recording = toSingle(track.recording);
+      return {
+        position: track.position,
+        title: track.title_override || recording?.title || '',
+        recording_id: track.recording_id ?? recording?.id ?? null,
+        credits: normalizeCredits(recording?.credits ?? null)
+      };
+    });
 
     if (!Array.isArray(tracks) || tracks.length === 0) {
       console.log('❌ ERROR: No tracklist found');

@@ -65,26 +65,26 @@ export async function GET() {
     // Artwork
     let missingArtwork = 0;
     let missingFrontCover = 0;
-    let missingBackCover = 0;
-    let missingInnerSleeve = 0;
+    const missingBackCover = 0;
+    const missingInnerSleeve = 0;
     
     // Credits
-    let missingCredits = 0;
-    let missingMusicians = 0;
-    let missingProducers = 0;
-    let missingEngineers = 0;
-    let missingSongwriters = 0;
+    const missingCredits = 0;
+    const missingMusicians = 0;
+    const missingProducers = 0;
+    const missingEngineers = 0;
+    const missingSongwriters = 0;
     
     // Tracklists
     let missingTracklists = 0;
     let missingDurations = 0; // NEW STAT
     
     // Audio
-    let missingAudioAnalysis = 0;
-    let missingTempo = 0;
-    let missingMusicalKey = 0;
-    let missingDanceability = 0;
-    let missingEnergy = 0;
+    const missingAudioAnalysis = 0;
+    const missingTempo = 0;
+    const missingMusicalKey = 0;
+    const missingDanceability = 0;
+    const missingEnergy = 0;
     
     // Genres
     let missingGenres = 0;
@@ -94,7 +94,7 @@ export async function GET() {
     let missingStreamingLinks = 0;
     let missingSpotify = 0;
     let missingAppleMusic = 0;
-    let missingLastFM = 0;
+    const missingLastFM = 0;
     
     // Metadata
     let missingReleaseMetadata = 0;
@@ -105,17 +105,23 @@ export async function GET() {
 
     const folders = new Set<string>();
 
+    const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+      Array.isArray(value) ? value[0] ?? null : value ?? null;
+
     albums.forEach(album => {
       const albumIdStr = String(album.id);
-      const release = album.release;
-      const master = release?.master;
+      const release = toSingle(album.release);
+      const master = toSingle(release?.master);
       const releaseTracks = release?.release_tracks ?? [];
 
       if (releaseTracks.length > 0) {
         albumsWithTracks.add(albumIdStr);
       }
 
-      const missingDuration = releaseTracks.some((track) => !track.recording?.duration_seconds && track.recording?.duration_seconds !== 0);
+      const missingDuration = releaseTracks.some((track) => {
+        const recording = toSingle(track.recording);
+        return !recording?.duration_seconds && recording?.duration_seconds !== 0;
+      });
       if (missingDuration) {
         albumsWithMissingDurations.add(albumIdStr);
       }

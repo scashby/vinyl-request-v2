@@ -17,7 +17,6 @@ interface AddOrVoteParams {
 
 export async function addOrVoteRequest({
   eventId,
-  albumId = null,
   inventoryId = null,
   recordingId = null,
   side,
@@ -25,6 +24,15 @@ export async function addOrVoteRequest({
   title,
   status = "pending",
 }: AddOrVoteParams) {
+  const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+    Array.isArray(value) ? value[0] ?? null : value ?? null;
+  const normalizeSide = (value?: string) => {
+    const trimmed = value?.trim();
+    if (!trimmed) return null;
+    return trimmed.toLowerCase().startsWith("side ")
+      ? trimmed
+      : `Side ${trimmed}`;
+  };
   let resolvedInventoryId = inventoryId;
 
   if (!resolvedInventoryId) {
@@ -83,33 +91,33 @@ export async function addOrVoteRequest({
     resolvedInventoryId = createdInventory.id;
   }
 
-  let v3Query = supabase
+  let requestQuery = supabase
     .from("requests_v3")
     .select("id, votes")
     .eq("event_id", eventId)
     .limit(1);
 
   if (resolvedInventoryId !== null && resolvedInventoryId !== undefined) {
-    v3Query = v3Query.eq("inventory_id", resolvedInventoryId);
+    requestQuery = requestQuery.eq("inventory_id", resolvedInventoryId);
   } else {
-    v3Query = v3Query.is("inventory_id", null);
+    requestQuery = requestQuery.is("inventory_id", null);
   }
 
   if (recordingId !== null && recordingId !== undefined) {
-    v3Query = v3Query.eq("recording_id", recordingId);
+    requestQuery = requestQuery.eq("recording_id", recordingId);
   } else {
-    v3Query = v3Query.is("recording_id", null);
+    requestQuery = requestQuery.is("recording_id", null);
   }
 
-  const { data: v3Rows, error: v3FindErr } = await v3Query;
-  if (v3FindErr) throw v3FindErr;
-  const existingV3 = v3Rows?.[0];
+  const { data: requestRows, error: requestFindErr } = await requestQuery;
+  if (requestFindErr) throw requestFindErr;
+  const existingRequest = requestRows?.[0];
 
-  if (existingV3) {
+  if (existingRequest) {
     const { data, error } = await supabase
       .from("requests_v3")
-      .update({ votes: (existingV3.votes ?? 0) + 1 })
-      .eq("id", existingV3.id)
+      .update({ votes: (existingRequest.votes ?? 0) + 1 })
+      .eq("id", existingRequest.id)
       .select()
       .single();
     if (error) throw error;
@@ -142,11 +150,14 @@ export async function addOrVoteRequest({
 
   if (recordingDetailsError) throw recordingDetailsError;
 
+  const release = toSingle(inventoryDetails?.release);
+  const master = toSingle(release?.master);
   const artistName =
-    inventoryDetails?.release?.master?.artist?.name || artist || "Unknown Artist";
+    toSingle(master?.artist)?.name || artist || "Unknown Artist";
   const masterTitle =
-    inventoryDetails?.release?.master?.title || title || "Untitled";
-  const trackTitle = recordingDetails?.title || masterTitle;
+    master?.title || title || "Untitled";
+  const sideLabel = normalizeSide(side);
+  const trackTitle = recordingDetails?.title || sideLabel || masterTitle;
 
   const payload = {
     event_id: eventId,

@@ -6,6 +6,9 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 
+const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
+
 type Track = {
   position?: string;
   title?: string;
@@ -275,20 +278,21 @@ export async function POST(req: Request) {
     let tracksMatched = 0;
 
     for (const album of albums) {
-      const release = album.release;
-      const master = release?.master;
-      const artistName = master?.artist?.name ?? 'Unknown Artist';
+      const release = toSingle(album.release);
+      const master = toSingle(release?.master);
+      const artistName = toSingle(master?.artist)?.name ?? 'Unknown Artist';
       const albumTitle = master?.title ?? 'Unknown Album';
 
       console.log(`\n📀 Album ${album.id}: ${artistName} - ${albumTitle}`);
       try {
         const tracklists: Track[] = (release?.release_tracks ?? []).map((track) => {
-          const credits = (track.recording?.credits && typeof track.recording.credits === 'object' && !Array.isArray(track.recording.credits))
-            ? (track.recording.credits as Record<string, unknown>)
+          const recording = toSingle(track.recording);
+          const credits = (recording?.credits && typeof recording.credits === 'object' && !Array.isArray(recording.credits))
+            ? (recording.credits as Record<string, unknown>)
             : {};
           return {
             position: track.position || null,
-            title: track.recording?.title || '',
+            title: recording?.title || '',
             lyrics_url: (credits as Record<string, unknown>).lyrics_url as string | undefined
           };
         });

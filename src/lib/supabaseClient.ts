@@ -9,5 +9,5 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-// The <Database> generic is vital for your V3 table autocompletion
+// The <Database> generic is vital for table autocompletion
 export const supabase = createClient<Database>(supabaseUrl, supabaseKey);

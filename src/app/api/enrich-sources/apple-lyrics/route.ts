@@ -38,6 +38,9 @@ type AppleLyricsResponse = {
   }];
 };
 
+const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
+
 function parseTTML(ttml: string): string {
   // Apple Music lyrics are in TTML (Timed Text Markup Language) format
   // Extract just the text content, removing timestamps and XML tags
@@ -209,7 +212,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const release = album.release;
+    const release = toSingle(album.release);
     console.log(`✓ Album found: ID=${album.id}, Apple Music ID=${release?.apple_music_id}`);
 
     if (!release?.apple_music_id) {
@@ -220,12 +223,15 @@ export async function POST(req: Request) {
       );
     }
 
-    const existingTracks: Track[] = (release?.release_tracks ?? []).map((track) => ({
-      position: track.position,
-      title: track.title_override || track.recording?.title || '',
-      recording_id: track.recording_id ?? track.recording?.id ?? null,
-      credits: normalizeCredits(track.recording?.credits ?? null)
-    }));
+    const existingTracks: Track[] = (release?.release_tracks ?? []).map((track) => {
+      const recording = toSingle(track.recording);
+      return {
+        position: track.position,
+        title: track.title_override || recording?.title || '',
+        recording_id: track.recording_id ?? recording?.id ?? null,
+        credits: normalizeCredits(recording?.credits ?? null)
+      };
+    });
 
     if (existingTracks.length === 0) {
       console.log('❌ ERROR: No tracklist found to enrich');

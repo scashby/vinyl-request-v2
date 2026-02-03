@@ -8,22 +8,19 @@ import { useRouter } from "next/navigation";
 import { supabase } from 'src/lib/supabaseClient';
 import type { Database } from 'src/types/supabase';
 
+type InventoryRow = Database['public']['Tables']['inventory']['Row'];
+type ReleaseRow = Database['public']['Tables']['releases']['Row'];
+type MasterRow = Database['public']['Tables']['masters']['Row'];
+type ArtistRow = Database['public']['Tables']['artists']['Row'];
+type RecordingRow = Database['public']['Tables']['recordings']['Row'];
+type RequestRow = Database['public']['Tables']['requests_v3']['Row'];
+
 interface Album {
   id: string | number;
   artist: string;
   title: string;
   image_url?: string;
   format?: string;
-}
-
-interface RequestEntry {
-  id: string | number;
-  inventory_id: number | null;
-  recording_id: number | null;
-  track_title: string | null;
-  votes: number;
-  event_id: number | null;
-  created_at?: string | null;
 }
 
 interface QueueItem {
@@ -46,34 +43,30 @@ function getVoteKey(eventId: string, reqId: string | number) {
   return `queue-vote-${eventId}-${reqId}`;
 }
 
+const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
+
+const buildFormatLabel = (release?: ReleaseRow | null) => {
+  if (!release) return '';
+  const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
+  const base = parts.join(', ');
+  const qty = release.qty ?? 1;
+  if (!base) return '';
+  return qty > 1 ? `${qty}x${base}` : base;
+};
+
+const formatDuration = (seconds?: number | null) => {
+  if (!seconds && seconds !== 0) return '';
+  const minutes = Math.floor(seconds / 60);
+  const remaining = Math.floor(seconds % 60);
+  return `${minutes}:${remaining.toString().padStart(2, '0')}`;
+};
+
 export default function QueueSection({ eventId }: QueueSectionProps) {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [queueType, setQueueType] = useState<string>('side');
   const [voting, setVoting] = useState<{ [key: string]: boolean }>({});
   const router = useRouter();
-
-  const buildFormatLabel = (release?: ReleaseRow | null) => {
-    if (!release) return '';
-    const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
-    const base = parts.join(', ');
-    const qty = release.qty ?? 1;
-    if (!base) return '';
-    return qty > 1 ? `${qty}x${base}` : base;
-  };
-
-  const formatDuration = (seconds?: number | null) => {
-    if (!seconds && seconds !== 0) return '';
-    const minutes = Math.floor(seconds / 60);
-    const remaining = Math.floor(seconds % 60);
-    return `${minutes}:${remaining.toString().padStart(2, '0')}`;
-  };
-
-  type InventoryRow = Database['public']['Tables']['inventory']['Row'];
-  type ReleaseRow = Database['public']['Tables']['releases']['Row'];
-  type MasterRow = Database['public']['Tables']['masters']['Row'];
-  type ArtistRow = Database['public']['Tables']['artists']['Row'];
-  type RecordingRow = Database['public']['Tables']['recordings']['Row'];
-  type RequestRow = Database['public']['Tables']['requests_v3']['Row'];
 
   type InventoryQueryRow = InventoryRow & {
     release?: (ReleaseRow & {
@@ -135,11 +128,11 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
 
       const mapped: QueueItem[] = (requests as RequestQueryRow[]).map((req, i) => {
         const inventory = req.inventory ?? null;
-        const release = inventory?.release ?? null;
-        const master = release?.master ?? null;
+        const release = toSingle(inventory?.release) ?? null;
+        const master = toSingle(release?.master) ?? null;
         const album: Album = {
           id: inventory?.id ?? req.inventory_id ?? '',
-          artist: master?.artist?.name ?? req.artist_name ?? '',
+          artist: toSingle(master?.artist)?.name ?? req.artist_name ?? '',
           title: master?.title ?? '',
           image_url: master?.cover_image_url ?? '',
           format: buildFormatLabel(release)

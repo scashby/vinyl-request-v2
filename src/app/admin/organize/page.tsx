@@ -266,9 +266,7 @@ export default function FlexibleOrganizePage() {
       if (selectedGenresStyles.length > 0) {
         const albumGenresStyles = [
           ...parseGenres(row.discogs_genres),
-          ...parseGenres(row.discogs_styles),
-          ...parseGenres(row.spotify_genres),
-          ...parseGenres(row.apple_music_genres)
+          ...parseGenres(row.discogs_styles)
         ];
         if (!albumGenresStyles.some(gs => selectedGenresStyles.includes(gs))) return false;
       }

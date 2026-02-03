@@ -44,23 +44,18 @@ interface Album {
   blocked_tracks?: { position: string; reason: string }[];
 }
 
-type InventoryRow = Database['public']['Tables']['inventory']['Row'];
 type ReleaseRow = Database['public']['Tables']['releases']['Row'];
-type MasterRow = Database['public']['Tables']['masters']['Row'];
-type ArtistRow = Database['public']['Tables']['artists']['Row'];
 type RecordingRow = Database['public']['Tables']['recordings']['Row'];
 type ReleaseTrackRow = Database['public']['Tables']['release_tracks']['Row'];
 
-type InventoryQueryRow = InventoryRow & {
-  release?: (ReleaseRow & {
-    master?: (MasterRow & {
-      artist?: ArtistRow | null;
-    }) | null;
-    release_tracks?: (ReleaseTrackRow & {
-      recording?: RecordingRow | null;
-    })[] | null;
-  }) | null;
+type ReleaseTrackQueryRow = ReleaseTrackRow & {
+  title_override?: string | null;
+  recording?: RecordingRow | null;
 };
+
+const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
+
 
 interface EventData {
   id: number;
@@ -85,7 +80,7 @@ function AlbumDetailContent() {
   const [requestStatus, setRequestStatus] = useState('');
   const [submittingRequest, setSubmittingRequest] = useState(false);
 
-  const buildFormatLabel = (release?: ReleaseRow | null) => {
+  const buildFormatLabel = (release?: Partial<ReleaseRow> | null) => {
     if (!release) return '';
     const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
     const base = parts.join(', ');
@@ -153,12 +148,12 @@ function AlbumDetailContent() {
         return;
       }
 
-      const release = data.release;
-      const master = release?.master;
-      const artist = master?.artist;
+      const release = toSingle(data.release);
+      const master = toSingle(release?.master);
+      const artist = toSingle(master?.artist);
       const imageUrl = master?.cover_image_url || '';
 
-      const tracks = (release?.release_tracks || []).map((track: DbTrack) => ({
+      const tracks = (release?.release_tracks || []).map((track: ReleaseTrackQueryRow) => ({
         id: track.id,
         recording_id: track.recording_id ?? track.recording?.id,
         position: track.position,
@@ -216,10 +211,9 @@ function AlbumDetailContent() {
   const handleAddToQueue = async (side: string) => {
     if (!eventId || !album) return;
     setSubmittingRequest(true);
-    const trackTitle = `Side ${side}`;
     try {
       if (!album.inventory_id) {
-        throw new Error('Missing inventory ID for V3 request.');
+        throw new Error('Missing inventory ID for request.');
       }
 
       const { data: existing, error } = await supabase
@@ -282,7 +276,7 @@ function AlbumDetailContent() {
           setRequestStatus(`Requested: ${track.title}`);
         }
       } else {
-        throw new Error('Missing inventory or recording ID for V3 track request.');
+        throw new Error('Missing inventory or recording ID for track request.');
       }
     } catch (e) {
       console.error(e);
@@ -297,7 +291,7 @@ function AlbumDetailContent() {
     setSubmittingRequest(true);
     try {
       if (!album.inventory_id) {
-        throw new Error('Missing inventory ID for V3 request.');
+        throw new Error('Missing inventory ID for request.');
       }
 
       const { data: existing, error } = await supabase

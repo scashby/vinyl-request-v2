@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { type V3Album } from '../../types/v3-types';
+import type { Album } from '../../types/album';
 import { getAlbumArtist, getAlbumFormat, getAlbumGenres, getAlbumTitle, getAlbumYearValue } from './albumHelpers';
 import { ManageSortFavoritesModal, SortFavorite } from './ManageSortFavoritesModal';
 import { ManageColumnFavoritesModal, ColumnFavorite } from './ManageColumnFavoritesModal';
@@ -10,8 +10,8 @@ import { ManageColumnFavoritesModal, ColumnFavorite } from './ManageColumnFavori
 interface PrintToPDFModalProps {
   isOpen: boolean;
   onClose: () => void;
-  allAlbums: V3Album[];
-  currentListAlbums: V3Album[];
+  allAlbums: Album[];
+  currentListAlbums: Album[];
   checkedAlbumIds: Set<number>;
 }
 
@@ -24,7 +24,7 @@ const formatDuration = (totalSeconds: number) => {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 };
 
-const getAlbumLength = (album: V3Album) => {
+const getAlbumLength = (album: Album) => {
   const totalSeconds = album.release?.release_tracks?.reduce((sum, track) => {
     const duration = track.recording?.duration_seconds ?? 0;
     return sum + (typeof duration === 'number' ? duration : 0);
@@ -32,7 +32,7 @@ const getAlbumLength = (album: V3Album) => {
   return formatDuration(totalSeconds ?? 0);
 };
 
-const getAlbumColumnValue = (album: V3Album, column: string) => {
+const getAlbumColumnValue = (album: Album, column: string) => {
   switch (column) {
     case 'Artist':
       return getAlbumArtist(album);
@@ -129,7 +129,7 @@ export function PrintToPDFModal({
 
   const generatePDF = () => {
     // Determine which albums to include
-    let albumsToInclude: V3Album[];
+    let albumsToInclude: Album[];
     if (whichAlbums === 'all') {
       albumsToInclude = allAlbums;
     } else if (whichAlbums === 'current') {

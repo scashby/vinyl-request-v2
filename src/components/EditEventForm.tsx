@@ -118,8 +118,8 @@ function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<E
   const isTBA = !baseEvent.date || baseEvent.date === '' || baseEvent.date === '9999-12-31';
   
   if (!baseEvent.is_recurring || !baseEvent.recurrence_end_date || isTBA) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { id: _id, ...eventWithoutId } = baseEvent;
+    const eventWithoutId = { ...baseEvent };
+    delete eventWithoutId.id;
     return [eventWithoutId];
   }
 
@@ -131,8 +131,8 @@ function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<E
   const currentDate = new Date(startDate);
 
   while (currentDate <= endDate) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { id: _id, ...baseEventWithoutId } = baseEvent;
+    const baseEventWithoutId = { ...baseEvent };
+    delete baseEventWithoutId.id;
     const eventForDate: Omit<EventData, 'id'> = {
       ...baseEventWithoutId,
       date: currentDate.toISOString().split('T')[0],
@@ -358,7 +358,21 @@ export default function EditEventForm() {
     void loadGoogleMapsScript()
       .then(() => {
         if (!locationInputRef.current) return;
-        const googleMaps = (window as typeof window & { google?: any }).google;
+        const googleMaps = (window as typeof window & {
+          google?: {
+            maps?: {
+              places?: {
+                Autocomplete: new (
+                  input: HTMLInputElement,
+                  options: { types: string[]; fields: string[] }
+                ) => {
+                  getPlace: () => { formatted_address?: string; name?: string };
+                  addListener: (event: string, handler: () => void) => { remove: () => void };
+                };
+              };
+            };
+          };
+        }).google;
         if (!googleMaps?.maps?.places) return;
         autocomplete = new googleMaps.maps.places.Autocomplete(locationInputRef.current, {
           types: ['geocode'],
@@ -656,7 +670,9 @@ export default function EditEventForm() {
         .map((type) => type.trim())
         .filter(Boolean);
       const eventsToInsert = missingChildren.map((event) => {
-        const { event_type: _eventType, event_subtype: _eventSubtype, ...eventWithoutType } = event;
+        const eventWithoutType: Partial<DbEvent> = { ...event };
+        delete eventWithoutType.event_type;
+        delete eventWithoutType.event_subtype;
         return {
           ...eventWithoutType,
           date: event.date,
@@ -980,8 +996,9 @@ export default function EditEventForm() {
         
         const recurringEvents = generateRecurringEvents({ ...eventData, id: savedEvent.id });
         const eventsToInsert = recurringEvents.slice(1).map((event) => {
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { event_type: _eventType, event_subtype: _eventSubtype, ...eventWithoutType } = event;
+          const eventWithoutType = { ...event };
+          delete eventWithoutType.event_type;
+          delete eventWithoutType.event_subtype;
           return {
             ...eventWithoutType,
             date: event.date,

@@ -103,23 +103,15 @@ interface EditAlbumModalProps {
   allAlbumIds: number[];
 }
 
-type InventoryRow = Database['public']['Tables']['inventory']['Row'];
 type ReleaseRow = Database['public']['Tables']['releases']['Row'];
-type MasterRow = Database['public']['Tables']['masters']['Row'];
-type ArtistRow = Database['public']['Tables']['artists']['Row'];
 
 type MasterTagLinkRow = {
   master_tags?: { name: string | null } | null;
 };
 
-type InventoryQueryRow = InventoryRow & {
-  release?: (ReleaseRow & {
-    master?: (MasterRow & {
-      artist?: ArtistRow | null;
-      master_tag_links?: MasterTagLinkRow[] | null;
-    }) | null;
-  }) | null;
-};
+const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
+
 
 export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate, allAlbumIds }: EditAlbumModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>('main');
@@ -129,8 +121,6 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
   const [error, setError] = useState<string | null>(null);
   const mainTabRef = useRef<MainTabRef>(null);
   const tracksTabRef = useRef<TracksTabRef>(null);
-  const releaseIdRef = useRef<number | null>(null);
-  const masterIdRef = useRef<number | null>(null);
 
   // Location picker state (shared across all tabs)
   const [showLocationPicker, setShowLocationPicker] = useState(false);
@@ -159,146 +149,6 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
       .filter((name): name is string => Boolean(name));
   };
 
-  const mapInventoryToAlbum = (row: InventoryQueryRow): Album => {
-    const release = row.release ?? null;
-    const master = release?.master ?? null;
-    const artist = master?.artist?.name ?? 'Unknown Artist';
-    const label = release?.label ?? null;
-    const tags = extractTagNames(master?.master_tag_links ?? null);
-    const status = row.status ?? 'active';
-
-    let collectionStatus: Album['collection_status'] = 'in_collection';
-    if (status === 'wishlist') collectionStatus = 'wish_list';
-    if (status === 'incoming') collectionStatus = 'on_order';
-    if (status === 'sold') collectionStatus = 'sold';
-    if (status === 'for_sale') collectionStatus = 'for_sale';
-
-    return {
-      inventory: row,
-      release,
-      id: row.id,
-      inventory_id: row.id,
-      release_id: release?.id ?? null,
-      master_id: master?.id ?? null,
-      artist,
-      secondary_artists: null,
-      sort_artist: null,
-      title: master?.title ?? 'Untitled',
-      sort_title: null,
-      year: master?.original_release_year ? String(master.original_release_year) : null,
-      year_int: master?.original_release_year ?? null,
-      image_url: master?.cover_image_url ?? null,
-      back_image_url: null,
-      index_number: null,
-      collection_status: collectionStatus,
-      for_sale: status === 'for_sale',
-      location: row.location ?? null,
-      storage_device: null,
-      storage_device_slot: null,
-      slot: null,
-      country: release?.country ?? null,
-      studio: null,
-      recording_location: null,
-      date_added: row.date_added ?? null,
-      modified_date: null,
-      last_reviewed_at: null,
-      decade: master?.original_release_year ? Math.floor(master.original_release_year / 10) * 10 : null,
-      personal_notes: row.personal_notes ?? null,
-      release_notes: release?.notes ?? null,
-      extra: null,
-      format: buildFormatLabel(release),
-      media_condition: row.media_condition ?? '',
-      package_sleeve_condition: row.sleeve_condition ?? null,
-      barcode: release?.barcode ?? null,
-      cat_no: release?.catalog_number ?? null,
-      packaging: null,
-      rpm: null,
-      vinyl_weight: null,
-      vinyl_color: null,
-      discs: release?.qty ?? null,
-      sides: null,
-      length_seconds: null,
-      sound: null,
-      spars_code: null,
-      is_live: null,
-      is_box_set: null,
-      box_set: null,
-      time_signature: null,
-      tracks: null,
-      discogs_id: null,
-      discogs_release_id: release?.discogs_release_id ?? null,
-      discogs_master_id: master?.discogs_master_id ?? null,
-      spotify_id: null,
-      spotify_url: null,
-      spotify_album_id: release?.spotify_album_id ?? null,
-      apple_music_id: null,
-      apple_music_url: null,
-      musicbrainz_id: null,
-      musicbrainz_url: null,
-      lastfm_id: null,
-      lastfm_url: null,
-      allmusic_id: null,
-      allmusic_url: null,
-      wikipedia_url: null,
-      dbpedia_uri: null,
-      original_release_date: null,
-      original_release_year: master?.original_release_year ?? null,
-      recording_date: null,
-      recording_year: null,
-      master_release_date: release?.release_date ?? null,
-      genres: master?.genres ?? null,
-      styles: master?.styles ?? null,
-      custom_tags: tags.length > 0 ? tags : null,
-      labels: label ? [label] : null,
-      enrichment_sources: null,
-      finalized_fields: null,
-      musicians: null,
-      producers: null,
-      engineers: null,
-      songwriters: null,
-      writers: null,
-      chorus: null,
-      composer: null,
-      composition: null,
-      conductor: null,
-      orchestra: null,
-      owner: row.owner ?? null,
-      due_date: null,
-      loan_date: null,
-      loaned_to: null,
-      last_cleaned_date: null,
-      last_played_date: null,
-      play_count: row.play_count ?? null,
-      my_rating: null,
-      signed_by: null,
-      purchase_price: row.purchase_price ?? null,
-      current_value: row.current_value ?? null,
-      purchase_date: row.purchase_date ?? null,
-      purchase_store: null,
-      sale_price: null,
-      sell_price: null,
-      sale_platform: null,
-      sale_quantity: null,
-      sale_notes: null,
-      wholesale_cost: null,
-      pricing_notes: null,
-      subtitle: null,
-      played_history: null,
-      blocked: null,
-      blocked_sides: null,
-      blocked_tracks: null,
-      disc_metadata: null,
-      matrix_numbers: null,
-      inner_sleeve_images: null,
-      enriched_metadata: null,
-      cultural_significance: null,
-      tempo_bpm: null,
-      musical_key: null,
-      energy: null,
-      danceability: null,
-      valence: null,
-    };
-  };
 
   const loadLocations = async () => {
     const locationsData = await fetchLocations();
@@ -374,6 +224,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                release_year,
                discogs_release_id,
                spotify_album_id,
+               track_count,
                notes,
                qty,
                format_details,
@@ -406,9 +257,9 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           return;
         }
 
-        const release = data.release;
-        const master = release?.master;
-        const artist = master?.artist;
+        const release = toSingle(data.release);
+        const master = toSingle(release?.master);
+        const artist = toSingle(master?.artist);
         const tags = extractTagNames(master?.master_tag_links ?? null);
         const status = data.status ?? 'active';
 
@@ -418,12 +269,17 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         if (status === 'sold') collectionStatus = 'sold';
         if (status === 'for_sale') collectionStatus = 'for_sale';
 
-        const v3Album = {
-          inventory: data,
-          release,
+        const normalizedRelease = release
+          ? ({
+              ...release,
+              master,
+            } as Album['release'])
+          : null;
+
+        const albumData: Album = {
+          release: normalizedRelease,
           id: data.id,
           inventory_id: data.id,
-          release,
           master_id: master?.id ?? null,
           release_id: release?.id ?? null,
           artist: artist?.name || '',
@@ -440,10 +296,10 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           location: data.location ?? null,
           collection_status: collectionStatus,
           for_sale: status === 'for_sale',
-        } as Album;
+        };
 
-        setAlbum(v3Album);
-        setEditedAlbum(v3Album);
+        setAlbum(albumData);
+        setEditedAlbum(albumData);
       } catch (err) {
         console.error('Unexpected error:', err);
         setError('An unexpected error occurred');
@@ -507,10 +363,10 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
       console.log('💾 Starting save operation...');
 
       if (!editedAlbum.inventory_id) {
-        throw new Error('Missing inventory ID for V3 save.');
+        throw new Error('Missing inventory ID for save.');
       }
 
-      console.log('🧭 Saving via V3 tables...');
+      console.log('🧭 Saving via inventory tables...');
 
         let status: string | null = 'active';
         if (editedAlbum.collection_status === 'wish_list') status = 'wishlist';
@@ -666,7 +522,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           const existingByName = new Map(
             (existingLinks ?? [])
               .map((link) => {
-                const name = link.master_tags?.name;
+                const name = toSingle(link.master_tags)?.name;
                 return name ? [name.toLowerCase(), link.tag_id] : null;
               })
               .filter((entry): entry is [string, number] => Boolean(entry))
@@ -674,7 +530,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
 
           const tagsToRemove = (existingLinks ?? [])
             .filter((link) => {
-              const name = link.master_tags?.name;
+              const name = toSingle(link.master_tags)?.name;
               return name ? !desiredTagSet.has(name.toLowerCase()) : false;
             })
             .map((link) => link.tag_id);
@@ -739,7 +595,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           }
         }
 
-      console.log('✅ V3 save complete!');
+      console.log('✅ Save complete!');
       onRefresh();
     } catch (err) {
       console.error('❌ Save failed:', err);

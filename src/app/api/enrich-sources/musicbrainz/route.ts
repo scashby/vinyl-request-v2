@@ -9,6 +9,9 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSessi
 const MB_BASE = 'https://musicbrainz.org/ws/2';
 const MB_USER_AGENT = 'DeadwaxDialogues/1.0 (https://deadwaxdialogues.com)';
 
+const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
+
 type MusicBrainzRelease = {
   id: string;
   title: string;
@@ -142,9 +145,9 @@ export async function POST(req: Request) {
       }, { status: 404 });
     }
 
-    const releaseRow = album.release;
-    const master = releaseRow?.master;
-    const artistName = master?.artist?.name ?? 'Unknown Artist';
+    const releaseRow = toSingle(album.release);
+    const master = toSingle(releaseRow?.master);
+    const artistName = toSingle(master?.artist)?.name ?? 'Unknown Artist';
     const albumTitle = master?.title ?? 'Untitled';
 
     console.log(`✓ Album found: "${artistName}" - "${albumTitle}"`);
@@ -294,8 +297,9 @@ export async function POST(req: Request) {
     const trackMap = new Map(
       (releaseRow?.release_tracks ?? [])
         .map((track) => {
-          const title = (track.title_override || track.recording?.title || '').toLowerCase().trim();
-          return title ? [title, track.recording] : null;
+          const recording = toSingle(track.recording);
+          const title = (track.title_override || recording?.title || '').toLowerCase().trim();
+          return title && recording ? [title, recording] : null;
         })
         .filter((entry): entry is [string, { id?: number; credits?: unknown }] => Boolean(entry))
     );

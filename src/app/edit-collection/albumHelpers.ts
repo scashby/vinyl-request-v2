@@ -1,5 +1,5 @@
 import type { Database } from '../../types/supabase';
-import type { V3Album } from '../../types/v3-types';
+import type { Album } from '../../types/album';
 
 type ReleaseRow = Database['public']['Tables']['releases']['Row'];
 
@@ -23,16 +23,16 @@ export const extractTagNames = (links?: MasterTagLinkRow[] | null) => {
     .filter((name): name is string => Boolean(name));
 };
 
-export const getAlbumArtist = (album: V3Album) =>
-  album.release?.master?.artist?.name ?? 'Unknown Artist';
+export const getAlbumArtist = (album: Album) =>
+  album.artist ?? album.release?.master?.artist?.name ?? 'Unknown Artist';
 
-export const getAlbumTitle = (album: V3Album) =>
-  album.release?.master?.title ?? 'Untitled';
+export const getAlbumTitle = (album: Album) =>
+  album.title ?? album.release?.master?.title ?? 'Untitled';
 
-export const getAlbumYearValue = (album: V3Album) =>
+export const getAlbumYearValue = (album: Album) =>
   album.release?.release_year ?? album.release?.master?.original_release_year ?? null;
 
-export const getAlbumYearInt = (album: V3Album) => {
+export const getAlbumYearInt = (album: Album) => {
   const yearValue = getAlbumYearValue(album);
   if (typeof yearValue === 'number') return yearValue;
   if (typeof yearValue === 'string') {
@@ -42,16 +42,16 @@ export const getAlbumYearInt = (album: V3Album) => {
   return null;
 };
 
-export const getAlbumDecade = (album: V3Album) => {
+export const getAlbumDecade = (album: Album) => {
   const yearValue = getAlbumYearInt(album);
   return yearValue ? Math.floor(yearValue / 10) * 10 : null;
 };
 
-export const getAlbumFormat = (album: V3Album) =>
+export const getAlbumFormat = (album: Album) =>
   buildFormatLabel(album.release ?? null);
 
-export const getAlbumTags = (album: V3Album) =>
+export const getAlbumTags = (album: Album) =>
   extractTagNames(album.release?.master?.master_tag_links ?? null);
 
-export const getAlbumGenres = (album: V3Album) =>
+export const getAlbumGenres = (album: Album) =>
   album.release?.master?.genres ?? null;

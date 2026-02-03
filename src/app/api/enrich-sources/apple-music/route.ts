@@ -8,6 +8,9 @@ const APPLE_MUSIC_TOKEN = process.env.APPLE_MUSIC_TOKEN;
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 
+const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
+
 async function searchAppleMusic(artist: string, title: string) {
   if (!APPLE_MUSIC_TOKEN) {
     throw new Error('Apple Music token not configured');
@@ -91,9 +94,9 @@ export async function POST(req: Request) {
       }, { status: 404 });
     }
 
-    const release = album.release;
-    const master = release?.master;
-    const artistName = master?.artist?.name ?? 'Unknown Artist';
+    const release = toSingle(album.release);
+    const master = toSingle(release?.master);
+    const artistName = toSingle(master?.artist)?.name ?? 'Unknown Artist';
     const albumTitle = master?.title ?? 'Untitled';
 
     console.log(`✓ Album found: "${artistName}" - "${albumTitle}"`);

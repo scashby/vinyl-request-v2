@@ -3,10 +3,11 @@
 
 import { memo } from 'react';
 import Image from 'next/image';
-import { type V3Album, toSafeStringArray } from '../../../types/v3-types';
+import type { Album } from '../../../types/album';
+import { toSafeStringArray } from '../../../types/album';
 
 interface CollectionInfoPanelProps {
-  album: V3Album | null;
+  album: Album | null;
   onClose?: () => void;
   onEditTags?: () => void;
   onMarkForSale?: () => void;
@@ -17,7 +18,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
     return <div className="py-20 text-center text-gray-400 text-sm italic">Select an album to view details</div>;
   }
 
-  type ReleaseTrack = NonNullable<NonNullable<V3Album['release']>['release_tracks']>[number];
+  type ReleaseTrack = NonNullable<NonNullable<Album['release']>['release_tracks']>[number];
 
   const releaseTracks = album.release?.release_tracks ?? [];
 
@@ -64,9 +65,9 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
     return qty > 1 ? `${qty}x${base}` : base;
   };
 
-  const artistName = album.release?.master?.artist?.name ?? 'Unknown Artist';
-  const albumTitle = album.release?.master?.title ?? 'Untitled';
-  const coverImage = album.release?.master?.cover_image_url;
+  const artistName = album.artist ?? album.release?.master?.artist?.name ?? 'Unknown Artist';
+  const albumTitle = album.title ?? album.release?.master?.title ?? 'Untitled';
+  const coverImage = album.image_url ?? album.release?.master?.cover_image_url ?? null;
   const releaseYear = album.release?.release_year ?? album.release?.master?.original_release_year ?? null;
   const totalTracks = album.release?.track_count ?? releaseTracks.length;
   const totalRuntime = getTotalRuntime();

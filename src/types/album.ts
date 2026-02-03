@@ -13,7 +13,7 @@ type MasterTagLinkRow = {
 };
 
 export type Album = {
-  inventory: InventoryRow;
+  inventory?: InventoryRow | null;
   release?: (ReleaseRow & {
     master?: (MasterRow & {
       artist?: ArtistRow | null;
@@ -46,6 +46,7 @@ export type Album = {
   // ============================================================================
   collection_status?: 'in_collection' | 'for_sale' | 'wish_list' | 'on_order' | 'sold' | 'not_in_collection' | null;
   for_sale?: boolean;
+  status?: string | null;
   
   // Location
   location?: string | null;
@@ -73,7 +74,9 @@ export type Album = {
   // ============================================================================
   // PHYSICAL METADATA
   // ============================================================================
+  media_condition?: string | null;
   package_sleeve_condition?: string | null;
+  sleeve_condition?: string | null;
   barcode?: string | null;
   cat_no?: string | null;
   packaging?: string | null;
@@ -176,6 +179,7 @@ export type Album = {
   
   last_cleaned_date?: string | null;
   last_played_date?: string | null;
+  last_played_at?: string | null;
   play_count?: number | null;
   my_rating?: number | null;
   signed_by?: string[] | null;
@@ -256,17 +260,6 @@ export type Album = {
   // ============================================================================
   parent_id?: string | null;
   child_album_ids?: string[] | null;
-
-export type Album = InventoryRow & {
-  release?: (ReleaseRow & {
-    master?: (MasterRow & {
-      artist?: ArtistRow | null;
-      master_tag_links?: MasterTagLinkRow[] | null;
-    }) | null;
-    release_tracks?: (ReleaseTrackRow & {
-      recording?: RecordingRow | null;
-    })[] | null;
-  }) | null;
 };
 
 export function toSafeStringArray(value: unknown): string[] {

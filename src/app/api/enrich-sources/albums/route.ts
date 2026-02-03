@@ -8,6 +8,9 @@ const supabase = createClient(
   { auth: { persistSession: false } }
 );
 
+const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -56,17 +59,20 @@ export async function GET(req: Request) {
     }
 
     const enrichedAlbums = (albums || []).map((album) => {
-      const release = album.release;
-      const master = release?.master;
+      const release = toSingle(album.release);
+      const master = toSingle(release?.master);
       const credits = (release?.release_tracks ?? [])
-        .map((track) => track.recording?.credits)
+        .map((track) => {
+          const recording = toSingle(track.recording);
+          return recording?.credits;
+        })
         .filter((value) => typeof value === 'object' && value && !Array.isArray(value));
       const musicians = credits.flatMap((credit) => (credit as Record<string, unknown>).musicians as string[] || []);
       const producers = credits.flatMap((credit) => (credit as Record<string, unknown>).producers as string[] || []);
 
       return {
         id: album.id,
-        artist: master?.artist?.name ?? 'Unknown Artist',
+        artist: toSingle(master?.artist)?.name ?? 'Unknown Artist',
         title: master?.title ?? 'Untitled',
         image_url: master?.cover_image_url ?? null,
         musicbrainz_id: master?.musicbrainz_release_group_id ?? null,

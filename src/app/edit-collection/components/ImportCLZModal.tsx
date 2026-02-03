@@ -331,13 +331,23 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
 
     if (Object.keys(inventoryUpdates).length > 0) {
       operations.push(
-        supabase.from('inventory').update(inventoryUpdates as Record<string, unknown>).eq('id', album.id)
+        (async () => {
+          await supabase
+            .from('inventory')
+            .update(inventoryUpdates as Record<string, unknown>)
+            .eq('id', album.id);
+        })()
       );
     }
 
     if (album.release_id && Object.keys(releaseUpdates).length > 0) {
       operations.push(
-        supabase.from('releases').update(releaseUpdates as Record<string, unknown>).eq('id', album.release_id)
+        (async () => {
+          await supabase
+            .from('releases')
+            .update(releaseUpdates as Record<string, unknown>)
+            .eq('id', album.release_id);
+        })()
       );
     }
 

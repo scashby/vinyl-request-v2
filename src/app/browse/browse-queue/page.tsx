@@ -39,25 +39,7 @@ interface EventData {
   queue_type?: string;
 }
 
-type InventoryRow = Database['public']['Tables']['inventory']['Row'];
 type ReleaseRow = Database['public']['Tables']['releases']['Row'];
-type MasterRow = Database['public']['Tables']['masters']['Row'];
-type ArtistRow = Database['public']['Tables']['artists']['Row'];
-type RecordingRow = Database['public']['Tables']['recordings']['Row'];
-type RequestRow = Database['public']['Tables']['requests_v3']['Row'];
-
-type InventoryQueryRow = InventoryRow & {
-  release?: (ReleaseRow & {
-    master?: (MasterRow & {
-      artist?: ArtistRow | null;
-    }) | null;
-  }) | null;
-};
-
-type RequestQueryRow = RequestRow & {
-  inventory?: InventoryQueryRow | null;
-  recording?: RecordingRow | null;
-};
 
 function BrowseQueueContent() {
   const searchParams = useSearchParams();
@@ -77,12 +59,6 @@ function BrowseQueueContent() {
     return qty > 1 ? `${qty}x${base}` : base;
   };
 
-  const formatDuration = (seconds?: number | null) => {
-    if (!seconds && seconds !== 0) return '';
-    const minutes = Math.floor(seconds / 60);
-    const remaining = Math.floor(seconds % 60);
-    return `${minutes}:${remaining.toString().padStart(2, '0')}`;
-  };
 
   const loadEventAndQueue = useCallback(async () => {
     if (!eventId) {
@@ -98,19 +74,19 @@ function BrowseQueueContent() {
         .single();
       setEventData(event || null);
 
-      const { data: v3Requests, error: v3Error } = await supabase
+      const { data: requestRows, error: requestError } = await supabase
         .from("requests_v3")
         .select("id, inventory_id, recording_id, votes, created_at")
         .eq("event_id", eventId)
         .order("id", { ascending: true });
 
-      if (v3Error) throw v3Error;
-      if (!v3Requests?.length) {
+      if (requestError) throw requestError;
+      if (!requestRows?.length) {
         setQueueItems([]);
         return;
       }
 
-      const inventoryIds = v3Requests
+      const inventoryIds = requestRows
         .map((request) => request.inventory_id)
         .filter(Boolean);
 
@@ -133,7 +109,7 @@ function BrowseQueueContent() {
         inventoryRows.map((row) => [row.id, row])
       );
 
-      const queueItems = v3Requests.map((request) => {
+      const queueItems = requestRows.map((request) => {
         const inventory = request.inventory_id
           ? inventoryById.get(request.inventory_id)
           : null;
@@ -150,7 +126,7 @@ function BrowseQueueContent() {
           title,
           side: null,
           track_number: null,
-          track_name: null,
+          track_title: null,
           track_duration: null,
           votes: request.votes ?? 1,
           created_at: request.created_at,
@@ -159,7 +135,7 @@ function BrowseQueueContent() {
             ? {
                 id: inventory.id,
                 image_url: imageUrl,
-                year: release?.release_year ?? "",
+                year: release?.release_year ?? null,
                 format: buildFormatLabel(release),
               }
             : null,

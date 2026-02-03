@@ -17,8 +17,8 @@ interface BrowseAlbum {
   year: string | number;
   format: string;
   media_type: string;
-  release?: (ReleaseRow & {
-    master?: (MasterRow & {
+  release?: (Partial<ReleaseRow> & {
+    master?: (Partial<MasterRow> & {
       artist?: ArtistRow | null;
     }) | null;
   }) | null;
@@ -39,7 +39,6 @@ interface BrowseAlbum {
   image: string;
 }
 
-type InventoryRow = Database['public']['Tables']['inventory']['Row'];
 type ReleaseRow = Database['public']['Tables']['releases']['Row'];
 type MasterRow = Database['public']['Tables']['masters']['Row'];
 type ArtistRow = Database['public']['Tables']['artists']['Row'];
@@ -48,9 +47,14 @@ type MasterTagLinkRow = {
   master_tags?: { name: string | null } | null;
 };
 
-type InventoryQueryRow = InventoryRow & {
-  release?: (ReleaseRow & {
-    master?: (MasterRow & {
+type InventoryBrowseRow = {
+  id: number;
+  personal_notes?: string | null;
+  media_condition?: string | null;
+  created_at?: string | null;
+  location?: string | null;
+  release?: (Partial<ReleaseRow> & {
+    master?: (Partial<MasterRow> & {
       artist?: ArtistRow | null;
       master_tag_links?: MasterTagLinkRow[] | null;
     }) | null;
@@ -107,7 +111,7 @@ function BrowseAlbumsContent() {
     });
   };
 
-  const buildFormatLabel = (release?: ReleaseRow | null) => {
+  const buildFormatLabel = (release?: Partial<ReleaseRow> | null) => {
     if (!release) return '';
     const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
     const base = parts.join(', ');
@@ -166,7 +170,7 @@ function BrowseAlbumsContent() {
       setLoading(true);
 
       try {
-        let allRows: InventoryQueryRow[] = [];
+        let allRows: InventoryBrowseRow[] = [];
         let from = 0;
         const batchSize = 1000;
         let keepGoing = true;
@@ -206,17 +210,20 @@ function BrowseAlbumsContent() {
           if (error) throw error;
           if (!batch || batch.length === 0) break;
 
-          allRows = allRows.concat(batch);
+          allRows = allRows.concat((batch ?? []) as InventoryBrowseRow[]);
           keepGoing = batch.length === batchSize;
           from += batchSize;
         }
 
         if (!isMounted) return;
 
+        const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+          Array.isArray(value) ? value[0] ?? null : value ?? null;
+
         const parsed = allRows.map((row) => {
-          const release = row.release;
-          const master = release?.master;
-          const artist = master?.artist;
+          const release = toSingle(row.release);
+          const master = toSingle(release?.master);
+          const artist = toSingle(master?.artist);
           const imageUrl = master?.cover_image_url || '/images/coverplaceholder.png';
           const tags = extractTagNames(master?.master_tag_links ?? null);
 
@@ -347,7 +354,7 @@ function BrowseAlbumsContent() {
     });
     
     return fa;
-  }, [albums, searchTerm, mediaFilter, allowedFormats, allowedTags, normalizedFormats, normalizedAllowedTags, sortField, sortAsc, showJustAdded]);
+  }, [albums, searchTerm, mediaFilter, normalizedFormats, normalizedAllowedTags, sortField, sortAsc, showJustAdded]);
 
   const justAddedCount = albums.filter(album => album.justAdded).length;
   const hasSearchQuery = searchTerm.trim().length > 0;

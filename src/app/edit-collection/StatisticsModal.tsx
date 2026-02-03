@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
-import { type V3Album } from '../../types/v3-types';
+import type { Album } from '../../types/album';
 import { getAlbumArtist, getAlbumFormat, getAlbumGenres, getAlbumTitle, getAlbumYearValue } from './albumHelpers';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
@@ -17,10 +17,10 @@ interface StatisticsData {
   genreData: Array<{ name: string; count: number }>;
   yearData: Array<{ year: string; count: number }>;
   artistData: Array<{ name: string; count: number }>;
-  recentAdditions: V3Album[];
+  recentAdditions: Album[];
   playedData: Array<{ name: string; value: number; color: string }>;
-  mostPlayed: Array<{ album: V3Album; playCount: number }>;
-  recentlyPlayed: Array<{ album: V3Album; lastPlayed: Date }>;
+  mostPlayed: Array<{ album: Album; playCount: number }>;
+  recentlyPlayed: Array<{ album: Album; lastPlayed: Date }>;
 }
 
 const FORMAT_COLORS: Record<string, string> = {
@@ -39,7 +39,7 @@ const FORMAT_COLORS: Record<string, string> = {
 interface StatisticsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  albums: V3Album[];
+  albums: Album[];
 }
 
 export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProps) {
@@ -170,7 +170,7 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
         }));
 
       // Recently played - not available in current schema
-      const recentlyPlayed: Array<{ album: V3Album; lastPlayed: Date }> = [];
+      const recentlyPlayed: Array<{ album: Album; lastPlayed: Date }> = [];
 
       setStats({
         totalAlbums,

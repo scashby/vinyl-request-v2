@@ -8,6 +8,9 @@ const DISCOGS_TOKEN = process.env.DISCOGS_TOKEN ?? process.env.NEXT_PUBLIC_DISCO
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 
+const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
+
 type DiscogsTrack = {
   position?: string;
   type_?: string;
@@ -104,9 +107,9 @@ export async function POST(req: Request) {
       }, { status: 404 });
     }
 
-    const release = album.release;
-    const master = release?.master;
-    const artistName = master?.artist?.name ?? 'Unknown Artist';
+    const release = toSingle(album.release);
+    const master = toSingle(release?.master);
+    const artistName = toSingle(master?.artist)?.name ?? 'Unknown Artist';
     const albumTitle = master?.title ?? 'Untitled';
 
     console.log(`✓ Album found: "${artistName}" - "${albumTitle}"`);

@@ -78,6 +78,7 @@ export async function POST(req: Request) {
             title,
             cover_image_url,
             discogs_master_id,
+            musicbrainz_release_group_id,
             genres,
             styles,
             original_release_year,
@@ -112,11 +113,12 @@ export async function POST(req: Request) {
 
       // Always advance cursor based on raw fetch to ensure progress
       if (fetched.length > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        nextCursor = (fetched[fetched.length - 1] as any).id;
+        const last = fetched[fetched.length - 1] as { id?: number | string };
+        if (typeof last.id === 'number') nextCursor = last.id;
+        if (typeof last.id === 'string') nextCursor = parseInt(last.id, 10);
       }
 
-      targetAlbums = fetched;
+      targetAlbums = fetched as CandidateAlbumRow[];
     }
 
     if (!targetAlbums.length) {
@@ -128,10 +130,39 @@ export async function POST(req: Request) {
       });
     }
 
-    const results: { album: Record<string, unknown>, candidates: Record<string, CandidateData> }[] = [];
+    const results: { album: ReturnType<typeof mapInventoryToCandidate>, candidates: Record<string, CandidateData> }[] = [];
 
-    const mapInventoryToCandidate = (album: Record<string, unknown>) => {
-      const release = (album as Record<string, any>).release;
+    type CandidateAlbumRow = {
+      id: number;
+      location?: string | null;
+      last_reviewed_at?: string | null;
+      release?: {
+        id?: number | null;
+        media_type?: string | null;
+        format_details?: string[] | null;
+        qty?: number | null;
+        discogs_release_id?: string | null;
+        spotify_album_id?: string | null;
+        apple_music_id?: string | null;
+        release_year?: number | null;
+        label?: string | null;
+        catalog_number?: string | null;
+        master?: {
+          id?: number | null;
+          title?: string | null;
+          cover_image_url?: string | null;
+          discogs_master_id?: string | null;
+          musicbrainz_release_group_id?: string | null;
+          original_release_year?: number | null;
+          genres?: string[] | null;
+          styles?: string[] | null;
+          artist?: { name?: string | null } | null;
+        } | null;
+      } | null;
+    };
+
+    const mapInventoryToCandidate = (album: CandidateAlbumRow) => {
+      const release = album.release;
       const master = release?.master;
       const formatParts = [release?.media_type, ...(release?.format_details ?? [])].filter(Boolean);
       const baseFormat = formatParts.join(', ');
@@ -147,6 +178,7 @@ export async function POST(req: Request) {
         image_url: master?.cover_image_url ?? null,
         discogs_release_id: release?.discogs_release_id ?? null,
         discogs_master_id: master?.discogs_master_id ?? null,
+        musicbrainz_id: master?.musicbrainz_release_group_id ?? null,
         spotify_id: release?.spotify_album_id ?? null,
         apple_music_id: release?.apple_music_id ?? null,
         year: release?.release_year ?? master?.original_release_year ?? null,
@@ -162,7 +194,7 @@ export async function POST(req: Request) {
     // --- UPDATED CONCURRENCY LOGIC ---
     // Process albums in chunks of 5 to speed up response time while respecting rate limits
     const CHUNK_SIZE = 5;
-    const chunks = chunkArray(targetAlbums, CHUNK_SIZE);
+    const chunks = chunkArray(targetAlbums as CandidateAlbumRow[], CHUNK_SIZE);
 
     const isEmptyValue = (value: unknown) => {
       if (value === null || value === undefined) return true;
@@ -177,7 +209,7 @@ export async function POST(req: Request) {
       return false;
     };
 
-    const hasMissingSelectedField = (album: Record<string, unknown>) => {
+    const hasMissingSelectedField = (album: ReturnType<typeof mapInventoryToCandidate>) => {
       if (!missingDataOnly || !fields.length) return true;
       return fields.some((field: string) => {
         const [rootField] = field.split('.');
@@ -190,8 +222,7 @@ export async function POST(req: Request) {
           const candidates: Record<string, CandidateData> = {};
           const promises: Promise<EnrichmentResult | null>[] = [];
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const typedAlbum = mapInventoryToCandidate(album) as any;
+          const typedAlbum = mapInventoryToCandidate(album);
 
           if (!hasMissingSelectedField(typedAlbum)) {
             return null;

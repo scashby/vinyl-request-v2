@@ -265,7 +265,7 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
         artist={album.artist}
         title={album.title}
         barcode={album.barcode || undefined}
-        year={album.year || undefined}
+        year={album.year ? String(album.year) : undefined}
         discogsId={album.discogs_release_id || album.discogs_id || undefined}
         coverType={findCoverType}
       />
