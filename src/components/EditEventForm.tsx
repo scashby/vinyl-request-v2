@@ -105,9 +105,8 @@ interface EventData {
   featured_priority?: number | null;
 }
 
-// Type for database event records (V3 schema, with legacy fallbacks)
+// Type for database event records (V3 schema)
 type DbEvent = Database['public']['Tables']['events']['Row'] & {
-  queue_type?: string | null; // Legacy field
   allowed_tags?: string[] | string | null;
   recurrence_pattern?: string | null;
   recurrence_interval?: number | null;
@@ -194,9 +193,7 @@ function buildEventDataFromDbEvent(dbEvent: DbEvent): EventData {
     info: dbEvent.info ?? '',
     info_url: dbEvent.info_url ?? '',
     has_queue: !!dbEvent.has_queue,
-    queue_types: Array.isArray(dbEvent.queue_types)
-      ? dbEvent.queue_types
-      : dbEvent.queue_type ? [dbEvent.queue_type] : [],
+    queue_types: Array.isArray(dbEvent.queue_types) ? dbEvent.queue_types : [],
     allowed_formats: normalizeStringArray(dbEvent.allowed_formats),
     crate_id: dbEvent.crate_id ?? null,
     is_recurring: !!dbEvent.is_recurring,
@@ -494,9 +491,7 @@ export default function EditEventForm() {
             event_type: getTagValue(normalizedTags, EVENT_TYPE_TAG_PREFIX),
             event_subtype: getTagValue(normalizedTags, EVENT_SUBTYPE_TAG_PREFIX),
             allowed_formats: normalizeStringArray(dbEvent.allowed_formats),
-            queue_types: Array.isArray(dbEvent.queue_types)
-              ? dbEvent.queue_types
-              : dbEvent.queue_type ? [dbEvent.queue_type] : [],
+            queue_types: Array.isArray(dbEvent.queue_types) ? dbEvent.queue_types : [],
             crate_id: dbEvent.crate_id || null,
             
             is_recurring: dbEvent.is_recurring || false,
@@ -568,9 +563,7 @@ export default function EditEventForm() {
         event_type: getTagValue(normalizedTags, EVENT_TYPE_TAG_PREFIX),
         event_subtype: getTagValue(normalizedTags, EVENT_SUBTYPE_TAG_PREFIX),
         allowed_formats: normalizeStringArray(dbEvent.allowed_formats),
-        queue_types: Array.isArray(dbEvent.queue_types)
-          ? dbEvent.queue_types
-          : dbEvent.queue_type ? [dbEvent.queue_type] : [],
+        queue_types: Array.isArray(dbEvent.queue_types) ? dbEvent.queue_types : [],
         crate_id: dbEvent.crate_id || null,
         is_recurring: dbEvent.is_recurring || false,
         recurrence_pattern: dbEvent.recurrence_pattern || 'weekly',
@@ -719,7 +712,7 @@ export default function EditEventForm() {
   const getEventFieldValue = (event: DbEvent, key: string) => {
     switch (key) {
       case 'queue_types':
-        return normalizeArrayValue(event.queue_types ?? event.queue_type ?? []);
+        return normalizeArrayValue(event.queue_types ?? []);
       case 'allowed_formats':
         return normalizeArrayValue(event.allowed_formats ?? []);
       case 'crate_id':

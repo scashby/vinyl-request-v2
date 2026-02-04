@@ -93,7 +93,7 @@ export async function addOrVoteRequest({
       .from("inventory")
       .insert({
         release_id: createdRelease.id,
-        status: "placeholder",
+        status: "active",
       })
       .select("id")
       .single();
