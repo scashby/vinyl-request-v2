@@ -1,0 +1,17 @@
+Files likely stripped/altered vs baseline 143fd8c
+src/app/admin/organize/page.tsx	old=1271	new=18	ratio=0.01
+src/app/admin/edit-entry/[id]/page.tsx	old=2214	new=33	ratio=0.02
+src/app/edit-collection/components/EnrichmentReviewModal.tsx	old=867	new=35	ratio=0.04
+src/app/admin/media-grading/page.tsx	old=1374	new=140	ratio=0.10
+src/app/edit-collection/components/ImportEnrichModal.tsx	old=1586	new=208	ratio=0.13
+src/app/admin/enrich-collection/page.tsx	old=988	new=133	ratio=0.14
+src/app/api/enrich-sources/genius/route.ts	old=315	new=54	ratio=0.17
+src/app/api/enrich-sources/apple-lyrics/route.ts	old=340	new=92	ratio=0.27
+src/app/edit-collection/tabs/DetailsTab.tsx	old=978	new=273	ratio=0.28
+src/app/api/enrich-sources/musicbrainz/route.ts	old=367	new=142	ratio=0.39
+src/app/edit-collection/tabs/PersonalTab.tsx	old=583	new=228	ratio=0.39
+src/app/api/enrich-sources/fetch-candidates/route.ts	old=285	new=115	ratio=0.41
+src/app/api/enrich-sources/images/route.ts	old=242	new=99	ratio=0.41
+src/app/admin/sale-items/page.tsx	old=403	new=167	ratio=0.42
+src/app/edit-collection/tabs/TracksTab.tsx	old=975	new=407	ratio=0.42
+src/types/album.ts	old=274	new=117	ratio=0.43

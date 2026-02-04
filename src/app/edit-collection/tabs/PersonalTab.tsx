@@ -1,27 +1,60 @@
 // src/app/edit-collection/tabs/PersonalTab.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Album } from 'types/album';
 import { DatePicker } from 'components/DatePicker';
 import { UniversalPicker } from '../pickers/UniversalPicker';
-import {
-  fetchOwners,
+import { 
+  fetchPurchaseStores, 
+  fetchOwners, 
+  fetchSignees, 
   fetchTags,
 } from '../pickers/pickerDataUtils';
 
 interface PersonalTabProps {
   album: Album;
-  onChange: <K extends keyof Album>(field: K, value: Album[K]) => void;
+  onChange: (field: keyof Album, value: unknown) => void;
+}
+
+interface PlayedHistoryEntry {
+  year: number;
+  month: number;
+  day: number;
+  count: number;
 }
 
 export function PersonalTab({ album, onChange }: PersonalTabProps) {
+  // Date picker state
   const [showPurchaseDatePicker, setShowPurchaseDatePicker] = useState(false);
+  const [showCleanedDatePicker, setShowCleanedDatePicker] = useState(false);
+  const [showPlayedDatePicker, setShowPlayedDatePicker] = useState(false);
   const [datePickerPosition, setDatePickerPosition] = useState({ top: 0, left: 0 });
 
+  // Picker state
+  const [showPurchaseStorePicker, setShowPurchaseStorePicker] = useState(false);
   const [showOwnerPicker, setShowOwnerPicker] = useState(false);
   const [showTagsPicker, setShowTagsPicker] = useState(false);
+  const [showSigneesPicker, setShowSigneesPicker] = useState(false);
 
+  // Played History
+  const [playedHistory, setPlayedHistory] = useState<PlayedHistoryEntry[]>([]);
+
+  // Parse played history
+  useEffect(() => {
+    if (album.played_history) {
+      try {
+        const parsed = typeof album.played_history === 'string' 
+          ? JSON.parse(album.played_history)
+          : album.played_history;
+        setPlayedHistory(Array.isArray(parsed) ? parsed : []);
+      } catch {
+        setPlayedHistory([]);
+      }
+    }
+  }, [album.played_history]);
+
+  // Date handlers
   const handlePurchaseDateChange = (date: { year: number | null; month: number | null; day: number | null }) => {
     if (date.year && date.month && date.day) {
       const dateStr = `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`;
@@ -30,12 +63,48 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
     setShowPurchaseDatePicker(false);
   };
 
+  const handleCleanedDateChange = (date: { year: number | null; month: number | null; day: number | null }) => {
+    if (date.year && date.month && date.day) {
+      const dateStr = `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`;
+      onChange('last_cleaned_date', dateStr);
+    }
+    setShowCleanedDatePicker(false);
+  };
+
+  const handlePlayedDateChange = (date: { year: number | null; month: number | null; day: number | null }) => {
+    if (date.year && date.month && date.day) {
+      const newEntry: PlayedHistoryEntry = {
+        year: date.year,
+        month: date.month,
+        day: date.day,
+        count: 1 // Always add with count of 1
+      };
+      const updated = [...playedHistory, newEntry];
+      setPlayedHistory(updated);
+      onChange('played_history', JSON.stringify(updated));
+    }
+    setShowPlayedDatePicker(false);
+  };
+
   const handleOpenPurchaseDatePicker = (event: React.MouseEvent) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setDatePickerPosition({ top: rect.bottom + 4, left: rect.left });
     setShowPurchaseDatePicker(true);
   };
 
+  const handleOpenCleanedDatePicker = (event: React.MouseEvent) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setDatePickerPosition({ top: rect.bottom + 4, left: rect.left });
+    setShowCleanedDatePicker(true);
+  };
+
+  const handleOpenPlayedDatePicker = (event: React.MouseEvent) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setDatePickerPosition({ top: rect.bottom + 4, left: rect.left });
+    setShowPlayedDatePicker(true);
+  };
+
+  // Parse dates for display
   const parsePurchaseDate = () => {
     if (!album.purchase_date) return { year: null, month: null, day: null };
     const parts = album.purchase_date.split('-');
@@ -46,21 +115,58 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
     };
   };
 
-  const purchaseDate = parsePurchaseDate();
-
-  const handleRemoveTag = (tag: string) => {
-    const updated = (album.tags || []).filter(t => t !== tag);
-    onChange('tags', updated.length > 0 ? updated : null);
+  const parseCleanedDate = () => {
+    if (!album.last_cleaned_date) return { year: null, month: null, day: null };
+    const parts = album.last_cleaned_date.split('-');
+    return {
+      year: parts[0] ? parseInt(parts[0]) : null,
+      month: parts[1] ? parseInt(parts[1]) : null,
+      day: parts[2] ? parseInt(parts[2]) : null
+    };
   };
+
+  const purchaseDate = parsePurchaseDate();
+  const cleanedDate = parseCleanedDate();
+
+  // Rating handlers
+  const currentRating = album.my_rating || 0;
+  const handleRatingChange = (rating: number) => {
+    onChange('my_rating', rating === currentRating ? 0 : rating);
+  };
+
+  // Played history handlers
+  const totalPlays = playedHistory.reduce((sum, entry) => sum + entry.count, 0);
+
+  const handleDeletePlayedHistory = (index: number) => {
+    const updated = playedHistory.filter((_, i) => i !== index);
+    setPlayedHistory(updated);
+    onChange('played_history', updated.length > 0 ? JSON.stringify(updated) : null);
+  };
+
+  // Remove tag
+  const handleRemoveTag = (tag: string) => {
+    const updated = (album.custom_tags || []).filter(t => t !== tag);
+    onChange('custom_tags', updated.length > 0 ? updated : null);
+  };
+
+  // Remove signee
+  const handleRemoveSignee = (signee: string) => {
+    const updated = (album.signed_by || []).filter(s => s !== signee);
+    onChange('signed_by', updated.length > 0 ? updated : null);
+  };
+
+  // Styles removed in favor of Tailwind classes
 
   return (
     <>
       <div className="w-full">
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr] gap-3 mb-4">
+        {/* ROW 1: Purchase Date | Purchase Store | Owner */}
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3 mb-3">
+          {/* Purchase Date */}
           <div>
             <div className="flex justify-between items-center mb-1.5">
               <label className="block text-[13px] font-semibold text-gray-500">Purchase Date</label>
-              <div
+              <div 
                 onClick={handleOpenPurchaseDatePicker}
                 className="cursor-pointer flex items-center text-gray-500 hover:text-blue-500"
               >
@@ -101,126 +207,375 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
             </div>
           </div>
 
+          {/* Purchase Store */}
           <div>
-            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Owner</label>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Purchase Store</label>
             <div className="flex items-stretch">
-              <input
-                type="text"
-                value={album.owner || ''}
-                onChange={(e) => onChange('owner', e.target.value)}
+              <select 
+                value={album.purchase_store || ''}
+                onChange={(e) => onChange('purchase_store', e.target.value)}
                 className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
-                placeholder="Owner"
-              />
-              <button
-                onClick={() => setShowOwnerPicker(true)}
-                className="px-3 py-2 border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 text-base font-light"
               >
-                +
+                <option value="">Select</option>
+              </select>
+              <button 
+                onClick={() => setShowPurchaseStorePicker(true)}
+                className="w-9 h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                  <circle cx="1.5" cy="2.5" r="1"/>
+                  <rect x="4" y="2" width="10" height="1"/>
+                  <circle cx="1.5" cy="7" r="1"/>
+                  <rect x="4" y="6.5" width="10" height="1"/>
+                  <circle cx="1.5" cy="11.5" r="1"/>
+                  <rect x="4" y="11" width="10" height="1"/>
+                </svg>
               </button>
             </div>
           </div>
 
+          {/* Owner */}
           <div>
-            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Current Value</label>
-            <input
-              type="number"
-              value={album.current_value ?? ''}
-              onChange={(e) => onChange('current_value', e.target.value === '' ? null : Number(e.target.value))}
-              className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500"
-              placeholder="0.00"
-            />
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Owner</label>
+            <div className="flex items-stretch">
+              <select 
+                value={album.owner || ''}
+                onChange={(e) => onChange('owner', e.target.value)}
+                className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
+              >
+                <option value="">Select</option>
+              </select>
+              <button 
+                onClick={() => setShowOwnerPicker(true)}
+                className="w-9 h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                  <circle cx="1.5" cy="2.5" r="1"/>
+                  <rect x="4" y="2" width="10" height="1"/>
+                  <circle cx="1.5" cy="7" r="1"/>
+                  <rect x="4" y="6.5" width="10" height="1"/>
+                  <circle cx="1.5" cy="11.5" r="1"/>
+                  <rect x="4" y="11" width="10" height="1"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr] gap-3 mb-4">
+        {/* ROW 2: Purchase Price | Current Value | My Rating */}
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3 mb-3">
+          {/* Purchase Price */}
           <div>
             <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Purchase Price</label>
-            <input
-              type="number"
-              value={album.purchase_price ?? ''}
-              onChange={(e) => onChange('purchase_price', e.target.value === '' ? null : Number(e.target.value))}
-              className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500"
-              placeholder="0.00"
-            />
+            <div className="flex items-center gap-1">
+              <span className="text-sm text-gray-500">$</span>
+              <input
+                type="number"
+                step="0.01"
+                value={album.purchase_price || ''}
+                onChange={(e) => onChange('purchase_price', e.target.value ? parseFloat(e.target.value) : null)}
+                className="flex-1 px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500"
+              />
+            </div>
           </div>
 
+          {/* Current Value */}
           <div>
-              <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Tags</label>
-            <div className="flex flex-wrap items-center gap-2 min-h-[38px] px-2.5 py-2 border border-gray-300 rounded bg-white">
-              {(album.tags || []).length > 0 ? (
-                album.tags!.map((tag) => (
-                  <span key={tag} className="bg-gray-200 px-2 py-1 rounded text-xs text-gray-700 inline-flex items-center gap-1">
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Current Value</label>
+            <div className="flex items-center gap-1">
+              <span className="text-sm text-gray-500">$</span>
+              <input
+                type="number"
+                step="0.01"
+                value={album.current_value || ''}
+                onChange={(e) => onChange('current_value', e.target.value ? parseFloat(e.target.value) : null)}
+                className="flex-1 px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* My Rating */}
+          <div>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">
+              My Rating {currentRating > 0 ? `(${currentRating} / 10)` : ''}
+            </label>
+            <div className="flex gap-0.5 items-center h-[38px]">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => handleRatingChange(star)}
+                  className={`bg-transparent border-none cursor-pointer text-2xl p-0 leading-none ${
+                    star <= currentRating ? 'text-yellow-400' : 'text-gray-300 hover:text-gray-400'
+                  }`}
+                >
+                  ★
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ROW 3: Tags | Notes */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+          {/* Tags */}
+          <div>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Tags</label>
+            <div className="flex items-start">
+              <div className="flex-1 min-h-[38px] p-1.5 border border-gray-300 rounded-l border-r-0 bg-white flex flex-wrap gap-1.5 items-center">
+                {Array.isArray(album.custom_tags) && album.custom_tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="bg-gray-200 px-2 py-1 rounded text-xs flex items-center gap-1.5 text-gray-700"
+                  >
                     {tag}
                     <button
                       onClick={() => handleRemoveTag(tag)}
-                      className="bg-transparent border-none text-gray-500 hover:text-red-500 cursor-pointer p-0 text-sm leading-none"
+                      className="bg-transparent border-none text-gray-500 cursor-pointer p-0 text-base leading-none font-light hover:text-red-500"
                     >
                       ×
                     </button>
                   </span>
-                ))
-              ) : (
-                <span className="text-gray-400 text-xs">No tags</span>
-              )}
-              <button
+                ))}
+              </div>
+              <button 
                 onClick={() => setShowTagsPicker(true)}
-                className="ml-auto px-2 py-1 text-xs border border-gray-300 rounded text-gray-600 hover:bg-gray-50"
+                className="w-9 min-h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50"
               >
-                Manage
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                  <circle cx="1.5" cy="2.5" r="1"/>
+                  <rect x="4" y="2" width="10" height="1"/>
+                  <circle cx="1.5" cy="7" r="1"/>
+                  <rect x="4" y="6.5" width="10" height="1"/>
+                  <circle cx="1.5" cy="11.5" r="1"/>
+                  <rect x="4" y="11" width="10" height="1"/>
+                </svg>
               </button>
             </div>
           </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Notes</label>
+            <textarea
+              value={album.notes || ''}
+              onChange={(e) => onChange('notes', e.target.value)}
+              rows={3}
+              className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500 min-h-[40px] resize-y"
+            />
+          </div>
         </div>
 
-        <div>
-          <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Personal Notes</label>
-          <textarea
-            value={album.personal_notes || ''}
-            onChange={(e) => onChange('personal_notes', e.target.value)}
-            className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500 min-h-[80px] resize-y"
-            placeholder="Notes..."
-          />
+        {/* ROW 4: Last Cleaned | Played History | Signed */}
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3">
+          {/* Last Cleaned Date */}
+          <div>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="block text-[13px] font-semibold text-gray-500">Last Cleaned Date</label>
+              <div 
+                onClick={handleOpenCleanedDatePicker}
+                className="cursor-pointer flex items-center text-gray-500 hover:text-blue-500"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M2 6h12" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M5 2v2M11 2v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </div>
+            </div>
+            <div className="flex items-center justify-between w-full">
+              <input
+                type="text"
+                value={cleanedDate.year || ''}
+                placeholder="YYYY"
+                readOnly
+                onClick={handleOpenCleanedDatePicker}
+                className="w-[92px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500 cursor-pointer"
+              />
+              <div className="w-[10px] h-px bg-gray-300" />
+              <input
+                type="text"
+                value={cleanedDate.month || ''}
+                placeholder="MM"
+                readOnly
+                onClick={handleOpenCleanedDatePicker}
+                className="w-[56px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500 cursor-pointer"
+              />
+              <div className="w-[10px] h-px bg-gray-300" />
+              <input
+                type="text"
+                value={cleanedDate.day || ''}
+                placeholder="DD"
+                readOnly
+                onClick={handleOpenCleanedDatePicker}
+                className="w-[56px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500 cursor-pointer"
+              />
+            </div>
+          </div>
+
+          {/* Played History */}
+          <div>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="block text-[13px] font-semibold text-gray-500">Played History (total plays: {totalPlays})</label>
+              <div 
+                onClick={handleOpenPlayedDatePicker}
+                className="cursor-pointer flex items-center text-gray-500 hover:text-blue-500"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M2 6h12" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M5 2v2M11 2v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </div>
+            </div>
+            <div className="flex-1 px-2.5 py-2 border border-gray-300 rounded text-sm bg-white min-h-[38px] text-gray-900 max-h-[120px] overflow-y-auto">
+              {playedHistory.length > 0 ? (
+                playedHistory.map((entry, idx) => (
+                  <div key={idx} className="flex items-center justify-between mb-1 last:mb-0 text-xs">
+                    <span>{entry.year}  {String(entry.month).padStart(2, '0')}  {String(entry.day).padStart(2, '0')}</span>
+                    <button
+                      onClick={() => handleDeletePlayedHistory(idx)}
+                      className="bg-transparent border-none text-gray-400 cursor-pointer p-0 text-base leading-none font-light hover:text-red-500"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <span className="text-gray-400 italic">No history</span>
+              )}
+            </div>
+          </div>
+
+          {/* Signed by */}
+          <div>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="block text-[13px] font-semibold text-gray-500">Signed by</label>
+              <span 
+                onClick={() => setShowSigneesPicker(true)}
+                className="text-gray-400 text-xl font-light cursor-pointer hover:text-blue-500"
+              >
+                +
+              </span>
+            </div>
+            <div className="flex-1 px-2.5 py-2 border border-gray-300 rounded text-sm bg-white min-h-[38px] text-gray-900">
+              {Array.isArray(album.signed_by) && album.signed_by.length > 0 ? (
+                album.signed_by.map((signee, idx) => (
+                  <div key={idx} className="flex items-center justify-between mb-1 last:mb-0">
+                    <span>{signee}</span>
+                    <button
+                      onClick={() => handleRemoveSignee(signee)}
+                      className="bg-transparent border-none text-gray-400 cursor-pointer p-0 text-base leading-none font-light hover:text-red-500"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <span className="text-gray-400 italic">Unsigned</span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
+      {/* Date Pickers */}
       {showPurchaseDatePicker && (
         <DatePicker
-          position={datePickerPosition}
-          onClose={() => setShowPurchaseDatePicker(false)}
-          onChange={handlePurchaseDateChange}
           value={purchaseDate}
+          onChange={handlePurchaseDateChange}
+          onClose={() => setShowPurchaseDatePicker(false)}
+          position={datePickerPosition}
+        />
+      )}
+
+      {showCleanedDatePicker && (
+        <DatePicker
+          value={cleanedDate}
+          onChange={handleCleanedDateChange}
+          onClose={() => setShowCleanedDatePicker(false)}
+          position={datePickerPosition}
+        />
+      )}
+
+      {showPlayedDatePicker && (
+        <DatePicker
+          value={{ year: null, month: null, day: null }}
+          onChange={handlePlayedDateChange}
+          onClose={() => setShowPlayedDatePicker(false)}
+          position={datePickerPosition}
+        />
+      )}
+
+      {/* Universal Pickers */}
+      {showPurchaseStorePicker && (
+        <UniversalPicker
+          title="Purchase Stores"
+          isOpen={showPurchaseStorePicker}
+          onClose={() => setShowPurchaseStorePicker(false)}
+          fetchItems={fetchPurchaseStores}
+          selectedItems={album.purchase_store ? [album.purchase_store] : []}
+          onSelect={(items) => {
+            onChange('purchase_store', items.length > 0 ? items[0] : null);
+            setShowPurchaseStorePicker(false);
+          }}
+          multiSelect={false}
+          canManage={true}
+          newItemLabel="Purchase Store"
+          manageItemsLabel="Manage Purchase Stores"
         />
       )}
 
       {showOwnerPicker && (
         <UniversalPicker
-          title="Select Owner"
+          title="Owners"
           isOpen={showOwnerPicker}
           onClose={() => setShowOwnerPicker(false)}
           fetchItems={fetchOwners}
           selectedItems={album.owner ? [album.owner] : []}
-          onSelect={(selectedItems) => onChange('owner', selectedItems[0] ?? null)}
+          onSelect={(items) => {
+            onChange('owner', items.length > 0 ? items[0] : null);
+            setShowOwnerPicker(false);
+          }}
           multiSelect={false}
           canManage={true}
           newItemLabel="Owner"
           manageItemsLabel="Manage Owners"
-          showSortName={false}
         />
       )}
 
       {showTagsPicker && (
         <UniversalPicker
-          title="Select Tags"
+          title="Tags"
           isOpen={showTagsPicker}
           onClose={() => setShowTagsPicker(false)}
           fetchItems={fetchTags}
-          selectedItems={album.tags || []}
-          onSelect={(selectedItems) => onChange('tags', selectedItems.length > 0 ? selectedItems : null)}
+          selectedItems={Array.isArray(album.custom_tags) ? album.custom_tags : []}
+          onSelect={(items) => {
+            onChange('custom_tags', items.length > 0 ? items : null);
+            setShowTagsPicker(false);
+          }}
           multiSelect={true}
           canManage={true}
           newItemLabel="Tag"
           manageItemsLabel="Manage Tags"
-          showSortName={false}
+        />
+      )}
+
+      {showSigneesPicker && (
+        <UniversalPicker
+          title="Signees"
+          isOpen={showSigneesPicker}
+          onClose={() => setShowSigneesPicker(false)}
+          fetchItems={fetchSignees}
+          selectedItems={Array.isArray(album.signed_by) ? album.signed_by : []}
+          onSelect={(items) => {
+            onChange('signed_by', items.length > 0 ? items : null);
+            setShowSigneesPicker(false);
+          }}
+          multiSelect={true}
+          canManage={true}
+          newItemLabel="Signee"
+          manageItemsLabel="Manage Signees"
         />
       )}
     </>

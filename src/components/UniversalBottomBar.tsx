@@ -26,36 +26,6 @@ export function UniversalBottomBar({
   onSave,
   onOpenLocationPicker,
 }: UniversalBottomBarProps) {
-  const mapStatusToLegacy = (status?: string | null) => {
-    switch (status) {
-      case 'wishlist':
-        return 'wish_list';
-      case 'incoming':
-        return 'on_order';
-      case 'sold':
-        return 'sold';
-      default:
-        return 'in_collection';
-    }
-  };
-
-  const mapLegacyToStatus = (value: string) => {
-    switch (value) {
-      case 'wish_list':
-        return 'wishlist';
-      case 'on_order':
-        return 'incoming';
-      case 'sold':
-        return 'sold';
-      case 'not_in_collection':
-        return 'sold';
-      case 'for_sale':
-      case 'in_collection':
-      default:
-        return 'active';
-    }
-  };
-
   return (
     <div>
       <div className="bg-gray-50 p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_2fr] gap-4 items-end">
@@ -63,8 +33,8 @@ export function UniversalBottomBar({
         <div>
           <label className="block text-xs font-semibold text-gray-500 mb-1.5">Collection Status</label>
           <select
-            value={mapStatusToLegacy(album.status)}
-            onChange={(e) => onChange('status', mapLegacyToStatus(e.target.value) as Album['status'])}
+            value={album.collection_status || 'in_collection'}
+            onChange={(e) => onChange('collection_status', e.target.value)}
             className="w-full px-2.5 py-2 border border-gray-300 rounded text-[13px] bg-white text-gray-900 focus:outline-none focus:border-blue-500 cursor-pointer"
           >
             <optgroup label="Collection">
@@ -82,18 +52,13 @@ export function UniversalBottomBar({
           </select>
         </div>
 
-        {/* Index (UI compatibility) */}
+        {/* Index */}
         <div>
           <label className="block text-xs font-semibold text-gray-500 mb-1.5">Index</label>
           <input
             type="number"
             value={album.index_number || ''}
-            onChange={(e) =>
-              onChange(
-                'index_number',
-                (e.target.value ? parseInt(e.target.value, 10) : null) as Album['index_number']
-              )
-            }
+            onChange={(e) => onChange('index_number', e.target.value ? parseInt(e.target.value) : null)}
             placeholder="Index number"
             className="w-full px-2.5 py-2 border border-gray-300 rounded text-[13px] bg-white text-gray-900 focus:outline-none focus:border-blue-500"
           />
@@ -106,9 +71,7 @@ export function UniversalBottomBar({
             type="number"
             min="1"
             value={album.sale_quantity || 1}
-            onChange={(e) =>
-              onChange('sale_quantity', (e.target.value ? parseInt(e.target.value, 10) : 1) as Album['sale_quantity'])
-            }
+            onChange={(e) => onChange('sale_quantity', e.target.value ? parseInt(e.target.value) : 1)}
             className="w-full px-2.5 py-2 border border-gray-300 rounded text-[13px] bg-white text-gray-900 focus:outline-none focus:border-blue-500"
           />
         </div>

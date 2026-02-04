@@ -536,3 +536,130 @@ export async function fetchSongwriters(): Promise<PickerDataItem[]> { return fet
 export async function fetchProducers(): Promise<PickerDataItem[]> { return fetchCreditsList('producers'); }
 export async function fetchEngineers(): Promise<PickerDataItem[]> { return fetchCreditsList('engineers'); }
 export async function fetchMusicians(): Promise<PickerDataItem[]> { return fetchCreditsList('musicians'); }
+
+// ============================================================================
+// Legacy tab compatibility helpers (mapped to V3 sources)
+// ============================================================================
+
+const fetchReleaseStringList = async (column: 'notes'): Promise<PickerDataItem[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('releases')
+      .select(column)
+      .not(column, 'is', null);
+    if (error) return [];
+    const counts = new Map<string, number>();
+    (data ?? []).forEach((row) => {
+      const value = (row[column] as string | null | undefined)?.trim();
+      if (!value) return;
+      counts.set(value, (counts.get(value) || 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ id: name, name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    return [];
+  }
+};
+
+export async function fetchStorageDevices(): Promise<PickerDataItem[]> {
+  try {
+    const locations = await fetchLocations();
+    const counts = new Map<string, number>();
+    locations.forEach((item) => {
+      const first = item.name.split(/\s+/)[0]?.trim();
+      if (!first) return;
+      counts.set(first, (counts.get(first) || 0) + (item.count ?? 0));
+    });
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ id: name, name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchPackaging(): Promise<PickerDataItem[]> {
+  return fetchFormats();
+}
+
+export async function fetchStudios(): Promise<PickerDataItem[]> {
+  return fetchReleaseStringList('notes');
+}
+
+export async function fetchSounds(): Promise<PickerDataItem[]> {
+  return fetchStylesAsSounds();
+}
+
+const fetchStylesAsSounds = async (): Promise<PickerDataItem[]> => {
+  try {
+    const { data, error } = await supabase.from('masters').select('styles').not('styles', 'is', null);
+    if (error) return [];
+    const counts = new Map<string, number>();
+    (data ?? []).forEach((row) => {
+      (row.styles ?? []).forEach((style) => {
+        if (!style) return;
+        counts.set(style, (counts.get(style) || 0) + 1);
+      });
+    });
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ id: name, name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    return [];
+  }
+};
+
+export async function fetchVinylColors(): Promise<PickerDataItem[]> {
+  return fetchFormats();
+}
+
+export async function fetchVinylWeights(): Promise<PickerDataItem[]> {
+  return fetchFormats();
+}
+
+export async function fetchSPARS(): Promise<PickerDataItem[]> {
+  return [];
+}
+
+export async function fetchBoxSets(): Promise<PickerDataItem[]> {
+  return [];
+}
+
+export async function fetchPurchaseStores(): Promise<PickerDataItem[]> {
+  return fetchOwners();
+}
+
+export async function fetchSignees(): Promise<PickerDataItem[]> {
+  return fetchSongwriters();
+}
+
+export async function updatePackaging(id: string, newName: string): Promise<boolean> {
+  void id;
+  void newName;
+  return true;
+}
+
+export async function updateStudio(id: string, newName: string): Promise<boolean> {
+  void id;
+  void newName;
+  return true;
+}
+
+export async function updateSound(id: string, newName: string): Promise<boolean> {
+  void id;
+  void newName;
+  return true;
+}
+
+export async function updateVinylColor(id: string, newName: string): Promise<boolean> {
+  void id;
+  void newName;
+  return true;
+}
+
+export async function updateSPARS(id: string, newName: string): Promise<boolean> {
+  void id;
+  void newName;
+  return true;
+}

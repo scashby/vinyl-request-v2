@@ -5,16 +5,16 @@ import dynamic from 'next/dynamic';
 import { supabase } from 'lib/supabaseClient';
 import { parseDiscogsFormat } from 'lib/formatParser';
 import type { Album } from 'types/album';
-import type { Database, Json } from 'types/supabase';
+import type { Database } from 'types/supabase';
 import { MainTab, type MainTabRef } from './tabs/MainTab';
 import { DetailsTab } from './tabs/DetailsTab';
+import { PeopleTab } from './tabs/PeopleTab';
 import { TracksTab, type TracksTabRef } from './tabs/TracksTab';
 import { PersonalTab } from './tabs/PersonalTab';
 import { LinksTab } from './tabs/LinksTab';
-import { ClassicalTab } from './tabs/ClassicalTab';
-import { PeopleTab } from './tabs/PeopleTab';
 import { UniversalBottomBar } from 'components/UniversalBottomBar';
 
+const ClassicalTab = dynamic(() => import('./tabs/ClassicalTab').then(mod => mod.ClassicalTab));
 const CoverTab = dynamic(() => import('./tabs/CoverTab').then(mod => mod.CoverTab));
 const EnrichmentTab = dynamic(() => import('./tabs/EnrichmentTab').then(mod => mod.EnrichmentTab));
 import { PickerModal } from './pickers/PickerModal';
@@ -22,16 +22,7 @@ import { EditModal } from './pickers/EditModal';
 import ManagePickListsModal from './ManagePickListsModal';
 import { fetchLocations, type PickerDataItem } from './pickers/pickerDataUtils';
 
-type TabId =
-  | 'main'
-  | 'details'
-  | 'enrichment'
-  | 'tracks'
-  | 'classical'
-  | 'people'
-  | 'personal'
-  | 'cover'
-  | 'links';
+type TabId = 'main' | 'details' | 'enrichment' | 'classical' | 'people' | 'tracks' | 'personal' | 'cover' | 'links';
 
 // SVG icon components
 const TabIcons = {
@@ -85,7 +76,7 @@ const TabIcons = {
 const TABS: { id: TabId; label: string; IconComponent: () => React.ReactElement }[] = [
   { id: 'main', label: 'Main', IconComponent: TabIcons.music },
   { id: 'details', label: 'Details', IconComponent: TabIcons.info },
-  { id: 'enrichment', label: 'Enhancement', IconComponent: TabIcons.bolt },
+  { id: 'enrichment', label: 'Facts/Sonic', IconComponent: TabIcons.bolt },
   { id: 'classical', label: 'Classical', IconComponent: TabIcons.violin },
   { id: 'people', label: 'People', IconComponent: TabIcons.users },
   { id: 'tracks', label: 'Tracks', IconComponent: TabIcons.listOrdered },
@@ -121,13 +112,6 @@ type MasterTagLinkRow = {
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
 
-const formatSeconds = (seconds?: number | null) => {
-  if (seconds === null || seconds === undefined || Number.isNaN(seconds)) return null;
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-};
-
 
 export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate, allAlbumIds }: EditAlbumModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>('main');
@@ -149,7 +133,9 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
   const hasPrevious = currentIndex > 0;
   const hasNext = currentIndex < allAlbumIds.length - 1;
 
-  const buildFormatLabel = (release?: ReleaseRow | null) => {
+  const buildFormatLabel = (
+    release?: Pick<ReleaseRow, 'media_type' | 'format_details' | 'qty'> | null,
+  ) => {
     if (!release) return '';
     const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
     const base = parts.join(', ');
@@ -241,22 +227,9 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                discogs_release_id,
                spotify_album_id,
                track_count,
-               created_at,
                notes,
                qty,
                format_details,
-               release_tracks:release_tracks (
-                 id,
-                 position,
-                 side,
-                 title_override,
-                 recording:recordings (
-                   id,
-                   title,
-                   duration_seconds,
-                   credits
-                 )
-               ),
                master:masters (
                  id,
                  title,
@@ -265,7 +238,6 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                  cover_image_url,
                  genres,
                  styles,
-                 musicbrainz_release_group_id,
                  artist:artists (id, name),
                  master_tag_links:master_tag_links (
                    master_tags (name)
@@ -293,64 +265,17 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         const tags = extractTagNames(master?.master_tag_links ?? null);
         const status = data.status ?? 'active';
 
+        let collectionStatus: Album['collection_status'] = 'in_collection';
+        if (status === 'wishlist') collectionStatus = 'wish_list';
+        if (status === 'incoming') collectionStatus = 'on_order';
+        if (status === 'sold') collectionStatus = 'sold';
+
         const normalizedRelease = release
           ? ({
               ...release,
               master,
             } as Album['release'])
           : null;
-
-        const releaseTracks = (release?.release_tracks ?? []) as Array<{
-          position?: string | null;
-          side?: string | null;
-          title_override?: string | null;
-          recording?: {
-            title?: string | null;
-            duration_seconds?: number | null;
-            credits?: unknown;
-          } | null;
-        }>;
-
-        const creditsSource = releaseTracks
-          .map((track) => track.recording?.credits)
-          .find((credits) => typeof credits === 'object' && credits !== null) as
-          | Record<string, unknown>
-          | undefined;
-
-        const albumPeople =
-          creditsSource?.album_people && typeof creditsSource.album_people === 'object'
-            ? (creditsSource.album_people as Record<string, unknown>)
-            : {};
-        const classical =
-          creditsSource?.classical && typeof creditsSource.classical === 'object'
-            ? (creditsSource.classical as Record<string, unknown>)
-            : {};
-
-        const toStringArray = (value: unknown): string[] | null => {
-          if (!value) return null;
-          if (Array.isArray(value)) {
-            const items = value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
-            return items.length > 0 ? items : null;
-          }
-          if (typeof value === 'string' && value.trim().length > 0) return [value.trim()];
-          return null;
-        };
-
-        const toStringValue = (value: unknown): string | null => {
-          if (typeof value === 'string' && value.trim().length > 0) return value.trim();
-          return null;
-        };
-
-        const tracks = releaseTracks
-          .map((track) => ({
-            position: track.position ?? '',
-            title: track.title_override ?? track.recording?.title ?? '',
-            artist: null,
-            duration: formatSeconds(track.recording?.duration_seconds ?? null),
-            type: 'track' as const,
-            side: track.side ?? undefined,
-          }))
-          .filter((track) => track.title || track.position);
 
         const albumData: Album = {
           release: normalizedRelease,
@@ -363,40 +288,15 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           year: master?.original_release_year ? String(master.original_release_year) : null,
           format: buildFormatLabel(release),
           image_url: master?.cover_image_url || null,
-          discogs_release_id: release?.discogs_release_id ?? null,
-          spotify_album_id: release?.spotify_album_id ?? null,
           personal_notes: data.personal_notes ?? null,
           release_notes: release?.notes ?? null,
           media_condition: data.media_condition ?? '',
-          sleeve_condition: data.sleeve_condition ?? null,
           genres: master?.genres || [],
           styles: master?.styles || [],
-          tags,
+          custom_tags: tags,
           location: data.location ?? null,
-          country: release?.country ?? null,
-          barcode: release?.barcode ?? null,
-          catalog_number: release?.catalog_number ?? null,
-          label: release?.label ?? null,
-          status,
-          purchase_price: data.purchase_price ?? null,
-          current_value: data.current_value ?? null,
-          purchase_date: data.purchase_date ?? null,
-          owner: data.owner ?? null,
-          date_added: data.date_added ?? null,
-          last_played_at: data.last_played_at ?? null,
-          play_count: data.play_count ?? null,
-          musicbrainz_release_group_id: master?.musicbrainz_release_group_id ?? null,
-          tracks,
-          sale_quantity: release?.qty ?? 1,
-          composer: toStringValue(classical.composer ?? creditsSource?.composer),
-          conductor: toStringValue(classical.conductor ?? creditsSource?.conductor),
-          chorus: toStringValue(classical.chorus ?? creditsSource?.chorus),
-          composition: toStringValue(classical.composition ?? creditsSource?.composition),
-          orchestra: toStringValue(classical.orchestra ?? creditsSource?.orchestra),
-          songwriters: toStringArray(albumPeople.songwriters ?? creditsSource?.songwriters),
-          producers: toStringArray(albumPeople.producers ?? creditsSource?.producers),
-          engineers: toStringArray(albumPeople.engineers ?? creditsSource?.engineers),
-          musicians: toStringArray(albumPeople.musicians ?? creditsSource?.musicians),
+          collection_status: collectionStatus,
+          for_sale: status === 'for_sale',
         };
 
         setAlbum(albumData);
@@ -446,12 +346,12 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
     );
   }
 
-  const handleFieldChange = <K extends keyof Album>(field: K, value: Album[K]) => {
+  const handleFieldChange = (field: keyof Album, value: unknown) => {
     setEditedAlbum(prev => {
       if (!prev) return prev;
       return {
         ...prev,
-        [field]: value
+        [field]: value as never
       };
     });
   };
@@ -469,18 +369,17 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
 
       console.log('🧭 Saving via inventory tables...');
 
-        const status: string | null = editedAlbum.status ?? 'active';
+        let status: string | null = 'active';
+        if (editedAlbum.collection_status === 'wish_list') status = 'wishlist';
+        if (editedAlbum.collection_status === 'on_order') status = 'incoming';
+        if (editedAlbum.collection_status === 'sold') status = 'sold';
+        if (editedAlbum.collection_status === 'for_sale' || editedAlbum.for_sale) status = 'active';
 
         const inventoryUpdate = {
           personal_notes: editedAlbum.personal_notes ?? null,
           media_condition: editedAlbum.media_condition ?? null,
-          sleeve_condition: editedAlbum.sleeve_condition ?? null,
+          sleeve_condition: editedAlbum.package_sleeve_condition ?? null,
           location: editedAlbum.location ?? null,
-          purchase_price: editedAlbum.purchase_price ?? null,
-          current_value: editedAlbum.current_value ?? null,
-          purchase_date: editedAlbum.purchase_date ?? null,
-          owner: editedAlbum.owner ?? null,
-          date_added: editedAlbum.date_added ?? null,
           status,
         };
 
@@ -511,7 +410,6 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           }
 
           for (const track of tracksData.tracks) {
-            if (track.type === 'header') continue;
             const trackTitle = track.title?.trim() || '';
             if (!trackTitle) continue;
 
@@ -539,6 +437,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                 recording_id: recording.id,
                 position: track.position,
                 side: track.side ?? null,
+                disc_number: track.disc_number ?? 1,
               }]);
 
             if (releaseTrackError) {
@@ -551,14 +450,9 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
 
         if (editedAlbum.release_id) {
           const releaseUpdate: Database['public']['Tables']['releases']['Update'] = {
-            label: editedAlbum.label ?? null,
-            catalog_number: editedAlbum.catalog_number ?? null,
+            label: editedAlbum.labels?.[0] ?? null,
+            catalog_number: editedAlbum.cat_no ?? null,
             release_year: editedAlbum.year ? Number(editedAlbum.year) : null,
-            barcode: editedAlbum.barcode ?? null,
-            country: editedAlbum.country ?? null,
-            discogs_release_id: editedAlbum.discogs_release_id ?? null,
-            spotify_album_id: editedAlbum.spotify_album_id ?? null,
-            qty: editedAlbum.sale_quantity ?? null,
           };
 
           const parsedFormat = editedAlbum.format
@@ -566,7 +460,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             : null;
           const resolvedMediaType = parsedFormat?.media_type ?? editedAlbum.release?.media_type ?? null;
           const resolvedFormatDetails = parsedFormat?.format_details ?? editedAlbum.release?.format_details ?? null;
-          const resolvedQty = parsedFormat?.qty ?? editedAlbum.release?.qty ?? null;
+          const resolvedQty = parsedFormat?.qty ?? editedAlbum.discs ?? editedAlbum.release?.qty ?? null;
 
           if (resolvedMediaType) {
             releaseUpdate.media_type = resolvedMediaType;
@@ -588,78 +482,6 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             alert(`Failed to save album: ${releaseError.message}`);
             return;
           }
-
-          const creditsPayload = {
-            album_people: {
-              songwriters: editedAlbum.songwriters ?? [],
-              producers: editedAlbum.producers ?? [],
-              engineers: editedAlbum.engineers ?? [],
-              musicians: editedAlbum.musicians ?? [],
-            },
-            classical: {
-              composer: editedAlbum.composer ?? null,
-              conductor: editedAlbum.conductor ?? null,
-              chorus: editedAlbum.chorus ?? null,
-              composition: editedAlbum.composition ?? null,
-              orchestra: editedAlbum.orchestra ?? null,
-            },
-          };
-
-          const { data: recordingRows, error: recordingRowsError } = await supabase
-            .from('release_tracks')
-            .select('recording_id')
-            .eq('release_id', editedAlbum.release_id)
-            .not('recording_id', 'is', null);
-
-          if (recordingRowsError) {
-            console.error('❌ Failed to load release recording IDs:', recordingRowsError);
-            alert(`Failed to save credits: ${recordingRowsError.message}`);
-            return;
-          }
-
-          const recordingIds = Array.from(
-            new Set(
-              (recordingRows ?? [])
-                .map((row) => row.recording_id)
-                .filter((id): id is number => typeof id === 'number')
-            )
-          );
-
-          if (recordingIds.length > 0) {
-            const { data: recordingsWithCredits, error: recordingsError } = await supabase
-              .from('recordings')
-              .select('id, credits')
-              .in('id', recordingIds);
-
-            if (recordingsError) {
-              console.error('❌ Failed to load existing recording credits:', recordingsError);
-              alert(`Failed to save credits: ${recordingsError.message}`);
-              return;
-            }
-
-            for (const row of recordingsWithCredits ?? []) {
-              const existing =
-                row.credits && typeof row.credits === 'object' && !Array.isArray(row.credits)
-                  ? (row.credits as Record<string, unknown>)
-                  : {};
-              const merged = {
-                ...existing,
-                album_people: creditsPayload.album_people,
-                classical: creditsPayload.classical,
-              };
-
-              const { error: creditsError } = await supabase
-                .from('recordings')
-                .update({ credits: merged as unknown as Json })
-                .eq('id', row.id);
-
-              if (creditsError) {
-                console.error('❌ Failed to update recording credits:', creditsError);
-                alert(`Failed to save credits: ${creditsError.message}`);
-                return;
-              }
-            }
-          }
         }
 
         if (editedAlbum.master_id) {
@@ -668,9 +490,6 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             original_release_year: editedAlbum.year ? Number(editedAlbum.year) : null,
             genres: editedAlbum.genres ?? [],
             styles: editedAlbum.styles ?? [],
-            cover_image_url: editedAlbum.image_url ?? null,
-            discogs_master_id: editedAlbum.discogs_master_id ?? null,
-            musicbrainz_release_group_id: editedAlbum.musicbrainz_release_group_id ?? null,
           };
 
           const { error: masterError } = await supabase
@@ -684,7 +503,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             return;
           }
 
-          const desiredTags = (editedAlbum.tags ?? [])
+          const desiredTags = (editedAlbum.custom_tags ?? [])
             .map((tag) => tag.trim())
             .filter((tag) => tag.length > 0);
 

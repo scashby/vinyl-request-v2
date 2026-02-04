@@ -38,6 +38,8 @@ export type Album = {
 
   // Location / status
   status?: string | null;
+  collection_status?: string | null;
+  for_sale?: boolean | null;
   location?: string | null;
   country?: string | null;
   date_added?: string | null;
@@ -45,18 +47,33 @@ export type Album = {
   // Notes
   personal_notes?: string | null;
   release_notes?: string | null;
+  notes?: string | null;
 
   // Conditions
   media_condition?: string | null;
   sleeve_condition?: string | null;
+  package_sleeve_condition?: string | null;
+  packaging?: string | null;
+  studio?: string | null;
+  sound?: string | null;
+  vinyl_color?: string[] | null;
+  vinyl_weight?: string | null;
+  spars_code?: string | null;
+  box_set?: string | null;
+  rpm?: string | null;
+  extra?: string | null;
+  is_live?: boolean | null;
 
   // Release metadata
   barcode?: string | null;
   genres?: string[] | null;
   styles?: string[] | null;
   label?: string | null;
+  labels?: string[] | null;
   catalog_number?: string | null;
+  cat_no?: string | null;
   tags?: string[] | null;
+  custom_tags?: string[] | null;
 
   // Tracks
   tracks?: Array<{
@@ -67,12 +84,26 @@ export type Album = {
     type: 'track' | 'header';
     side?: string;
   }> | null;
+  disc_metadata?: Array<Record<string, unknown>> | null;
+  matrix_numbers?: string[] | null;
+  discs?: number | null;
 
   // External IDs
   discogs_release_id?: string | null;
   discogs_master_id?: string | null;
+  discogs_id?: string | null;
   spotify_album_id?: string | null;
+  spotify_id?: string | null;
+  spotify_url?: string | null;
+  apple_music_url?: string | null;
+  lastfm_url?: string | null;
+  spotify_label?: string | null;
+  apple_music_label?: string | null;
   musicbrainz_release_group_id?: string | null;
+  musicbrainz_id?: string | null;
+  allmusic_url?: string | null;
+  wikipedia_url?: string | null;
+  genius_url?: string | null;
 
   // Personal / value
   owner?: string | null;
@@ -81,6 +112,33 @@ export type Album = {
   purchase_date?: string | null;
   play_count?: number | null;
   last_played_at?: string | null;
+  played_history?: string | Array<Record<string, unknown>> | null;
+  purchase_store?: string | null;
+  signed_by?: string[] | null;
+  my_rating?: number | null;
+  last_cleaned_date?: string | null;
+
+  // Additional legacy-compatible metadata fields used by tabs
+  secondary_artists?: string[] | null;
+  original_release_year?: number | null;
+  master_release_date?: string | null;
+  recording_year?: number | null;
+  recording_date?: string | null;
+  sort_title?: string | null;
+  subtitle?: string | null;
+  back_image_url?: string | null;
+  enrichment_sources?: string[] | null;
+  tempo_bpm?: number | null;
+  musical_key?: string | null;
+  energy?: number | null;
+  danceability?: number | null;
+  mood_acoustic?: number | null;
+  mood_electronic?: number | null;
+  mood_happy?: number | null;
+  mood_sad?: number | null;
+  mood_aggressive?: number | null;
+  mood_relaxed?: number | null;
+  mood_party?: number | null;
 
   // UI compatibility fields (legacy modal layout mapped to V3 storage)
   sale_quantity?: number | null;
