@@ -53,19 +53,20 @@ export default function Page() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
+  const eventIdNum = Number(id);
   const [event, setEvent] = useState<EventData | null>(null);
   const [prevEventId, setPrevEventId] = useState<number | null>(null);
   const [nextEventId, setNextEventId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || Number.isNaN(eventIdNum)) return;
 
     const fetchEventAndNavigation = async () => {
       // Fetch current event
       const { data: currentEvent, error } = await supabase
         .from('events')
         .select('*')
-        .eq('id', id)
+        .eq('id', eventIdNum)
         .single();
       
       if (error) {

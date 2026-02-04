@@ -839,12 +839,13 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         } else {
           const { data: existingRaw, error: dbError } = await supabase
             .from('wantlist')
-            .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, discogs_master_id, format, country, year, cover_image');
+            .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, discogs_master_id, format, year, cover_image');
           if (dbError) throw dbError;
           existing = (existingRaw ?? []).map((album) => {
             const wantlistAlbum = album as ExistingAlbum;
             return {
               ...wantlistAlbum,
+              country: null,
               catalog_number: null,
               image_url: wantlistAlbum.cover_image ?? null,
               tracks: null,

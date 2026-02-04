@@ -105,8 +105,8 @@ export default function EditAboutPage() {
           contact_email: aboutContent.contact_email,
           contact_phone: aboutContent.contact_phone,
           calendly_url: aboutContent.calendly_url,
-          services: aboutContent.services as Json,
-          testimonials: aboutContent.testimonials as Json,
+          services: aboutContent.services as unknown as Json,
+          testimonials: aboutContent.testimonials as unknown as Json,
           booking_notes: aboutContent.booking_notes,
           amazon_wishlist_url: aboutContent.amazon_wishlist_url,
           discogs_wantlist_url: aboutContent.discogs_wantlist_url,
@@ -122,8 +122,8 @@ export default function EditAboutPage() {
           .from('about_content')
           .insert([{
             ...aboutContent,
-            services: aboutContent.services as Json,
-            testimonials: aboutContent.testimonials as Json,
+            services: aboutContent.services as unknown as Json,
+            testimonials: aboutContent.testimonials as unknown as Json,
           } as Database['public']['Tables']['about_content']['Insert']]);
       }
 

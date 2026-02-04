@@ -39,7 +39,7 @@ interface QueueSectionProps {
   eventId: string;
 }
 
-function getVoteKey(eventId: string, reqId: string | number) {
+function getVoteKey(eventId: string | number, reqId: string | number) {
   return `queue-vote-${eventId}-${reqId}`;
 }
 
@@ -67,6 +67,7 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
   const [queueType, setQueueType] = useState<string>('side');
   const [voting, setVoting] = useState<{ [key: string]: boolean }>({});
   const router = useRouter();
+  const eventIdNum = Number(eventId);
 
   type InventoryQueryRow = InventoryRow & {
     release?: (ReleaseRow & {
@@ -86,11 +87,11 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
       // Fetch event to get queue type
       const { data: eventData } = await supabase
         .from("events")
-        .select("queue_type")
-        .eq("id", eventId)
+        .select("queue_types")
+        .eq("id", eventIdNum)
         .single();
 
-      const currentQueueType = eventData?.queue_type || 'side';
+      const currentQueueType = eventData?.queue_types?.[0] || 'side';
       setQueueType(currentQueueType);
 
       const { data: requests, error } = await supabase
@@ -117,7 +118,7 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
             duration_seconds
           )
         `)
-        .eq("event_id", eventId)
+        .eq("event_id", eventIdNum)
         .order("id", { ascending: true });
 
       if (error || !requests) {
@@ -172,7 +173,7 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
     const { error } = await supabase
       .from("requests_v3")
       .update({ votes: newVotes })
-      .eq("id", reqId);
+      .eq("id", Number(reqId));
     setVoting((v: { [key: string]: boolean }) => ({ ...v, [reqId]: false }));
 
     if (!error) {

@@ -24,6 +24,17 @@ export async function addOrVoteRequest({
   title,
   status = "pending",
 }: AddOrVoteParams) {
+  const toNumber = (value: number | string | null | undefined) => {
+    if (value === null || value === undefined) return null;
+    const parsed = typeof value === "string" ? Number(value) : value;
+    return Number.isNaN(parsed) ? null : parsed;
+  };
+
+  const eventIdNum = toNumber(eventId);
+  const recordingIdNum = toNumber(recordingId);
+  if (eventIdNum === null) {
+    throw new Error("Invalid event ID");
+  }
   const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
     Array.isArray(value) ? value[0] ?? null : value ?? null;
   const normalizeSide = (value?: string) => {
@@ -33,7 +44,7 @@ export async function addOrVoteRequest({
       ? trimmed
       : `Side ${trimmed}`;
   };
-  let resolvedInventoryId = inventoryId;
+  let resolvedInventoryId = toNumber(inventoryId);
 
   if (!resolvedInventoryId) {
     const { data: existingArtist, error: artistError } = await supabase
@@ -94,7 +105,7 @@ export async function addOrVoteRequest({
   let requestQuery = supabase
     .from("requests_v3")
     .select("id, votes")
-    .eq("event_id", eventId)
+    .eq("event_id", eventIdNum)
     .limit(1);
 
   if (resolvedInventoryId !== null && resolvedInventoryId !== undefined) {
@@ -103,8 +114,8 @@ export async function addOrVoteRequest({
     requestQuery = requestQuery.is("inventory_id", null);
   }
 
-  if (recordingId !== null && recordingId !== undefined) {
-    requestQuery = requestQuery.eq("recording_id", recordingId);
+  if (recordingIdNum !== null && recordingIdNum !== undefined) {
+    requestQuery = requestQuery.eq("recording_id", recordingIdNum);
   } else {
     requestQuery = requestQuery.is("recording_id", null);
   }
@@ -140,11 +151,11 @@ export async function addOrVoteRequest({
 
   if (inventoryDetailsError) throw inventoryDetailsError;
 
-  const { data: recordingDetails, error: recordingDetailsError } = recordingId
+  const { data: recordingDetails, error: recordingDetailsError } = recordingIdNum
     ? await supabase
         .from("recordings")
         .select("title")
-        .eq("id", recordingId)
+        .eq("id", recordingIdNum)
         .single()
     : { data: null, error: null };
 
@@ -160,9 +171,9 @@ export async function addOrVoteRequest({
   const trackTitle = recordingDetails?.title || sideLabel || masterTitle;
 
   const payload = {
-    event_id: eventId,
+    event_id: eventIdNum,
     inventory_id: resolvedInventoryId,
-    recording_id: recordingId,
+    recording_id: recordingIdNum,
     artist_name: artistName,
     track_title: trackTitle,
     status,

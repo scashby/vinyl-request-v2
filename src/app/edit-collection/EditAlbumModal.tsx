@@ -228,6 +228,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                discogs_release_id,
                spotify_album_id,
                track_count,
+               created_at,
                notes,
                qty,
                format_details,
@@ -250,6 +251,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                  cover_image_url,
                  genres,
                  styles,
+                 musicbrainz_release_group_id,
                  artist:artists (id, name),
                  master_tag_links:master_tag_links (
                    master_tags (name)

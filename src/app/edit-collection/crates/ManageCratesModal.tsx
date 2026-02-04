@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from 'lib/supabaseClient';
-import type { Crate } from 'types/crate';
+import type { Crate, SmartRules } from 'types/crate';
 import { BoxIcon } from '../../../components/BoxIcon';
 
 interface ManageCratesModalProps {
@@ -40,8 +40,14 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
 
       if (fetchError) {
         setError(fetchError.message);
+      } else if (data) {
+        const parsed = data.map((row) => ({
+          ...row,
+          smart_rules: (row.smart_rules as unknown as SmartRules | null) ?? null,
+        }));
+        setCrates(parsed as Crate[]);
       } else {
-        setCrates(data || []);
+        setCrates([]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load crates');

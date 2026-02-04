@@ -12,7 +12,7 @@ import {
 
 interface PersonalTabProps {
   album: Album;
-  onChange: (field: keyof Album, value: string | number | string[] | null | boolean) => void;
+  onChange: <K extends keyof Album>(field: K, value: Album[K]) => void;
 }
 
 export function PersonalTab({ album, onChange }: PersonalTabProps) {

@@ -64,6 +64,7 @@ type InventoryBrowseRow = {
 function BrowseAlbumsContent() {
   const searchParams = useSearchParams();
   const eventId = searchParams.get('eventId');
+  const eventIdNum = eventId ? Number(eventId) : null;
   const allowedFormatsParam = searchParams.get('allowedFormats');
   const eventTitleParam = searchParams.get('eventTitle');
 
@@ -130,11 +131,11 @@ function BrowseAlbumsContent() {
   useEffect(() => {
     let isMounted = true;
     async function fetchEventDataIfNeeded() {
-      if (eventId) {
+      if (eventIdNum && !Number.isNaN(eventIdNum)) {
         const { data, error } = await supabase
           .from('events')
           .select('id, title, date, allowed_formats, allowed_tags')
-          .eq('id', eventId)
+          .eq('id', eventIdNum)
           .single();
         if (!error && data && isMounted) {
           const formats = (data.allowed_formats || []).filter(Boolean);
@@ -167,7 +168,7 @@ function BrowseAlbumsContent() {
     }
     fetchEventDataIfNeeded();
     return () => { isMounted = false; };
-  }, [eventId, allowedFormatsParam, eventTitleParam]);
+  }, [eventIdNum, allowedFormatsParam, eventTitleParam]);
 
   useEffect(() => {
     let isMounted = true;

@@ -113,6 +113,8 @@ type DbEvent = Database['public']['Tables']['events']['Row'] & {
   recurrence_interval?: number | null;
   recurrence_end_date?: string | null;
 };
+type EventInsert = Database['public']['Tables']['events']['Insert'];
+type EventUpdate = Database['public']['Tables']['events']['Update'];
 
 // Utility function to generate recurring events
 function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<EventData, 'id'>[] {
@@ -333,7 +335,7 @@ export default function EditEventForm() {
       if (!error && data) {
         const parsed = data.map((row) => ({
           ...row,
-          smart_rules: (row.smart_rules as SmartRules | null) ?? null,
+          smart_rules: (row.smart_rules as unknown as SmartRules | null) ?? null,
         }));
         setCrates(parsed as Crate[]);
       }
@@ -449,7 +451,7 @@ export default function EditEventForm() {
   // Fetch Event Data
   useEffect(() => {
     const fetchEvent = async () => {
-      let copiedEvent: Partial<DbEvent> | null = null;
+      let copiedEvent: Partial<EventData & DbEvent> | null = null;
       if (typeof window !== 'undefined') {
         const stored = sessionStorage.getItem('copiedEvent');
         if (stored) {
@@ -475,7 +477,7 @@ export default function EditEventForm() {
         const { data, error } = await supabase
           .from('events')
           .select('*')
-          .eq('id', id)
+          .eq('id', Number(id))
           .single();
 
         if (error) {
@@ -676,24 +678,31 @@ export default function EditEventForm() {
       const normalizedQueueTypes = baseEvent.queue_types
         .map((type) => type.trim())
         .filter(Boolean);
-      const eventsToInsert = missingChildren.map((event) => {
-        const eventWithoutType: Partial<DbEvent> = { ...event };
-        delete eventWithoutType.event_type;
-        delete eventWithoutType.event_subtype;
-        return {
-          ...eventWithoutType,
-          date: event.date,
-          allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
-          queue_types: baseEvent.has_queue && normalizedQueueTypes.length > 0
-            ? normalizedQueueTypes
-            : null,
-          crate_id: baseEvent.crate_id || null,
-          parent_event_id: seriesParentId,
-          recurrence_pattern: null,
-          recurrence_interval: null,
-          recurrence_end_date: null,
-        };
-      });
+      const allowedTags = [
+        buildTag(EVENT_TYPE_TAG_PREFIX, baseEvent.event_type),
+        buildTag(EVENT_SUBTYPE_TAG_PREFIX, baseEvent.event_subtype),
+      ].filter(Boolean) as string[];
+      const eventsToInsert: EventInsert[] = missingChildren.map((event) => ({
+        title: event.title,
+        date: event.date,
+        time: event.time,
+        location: event.location,
+        image_url: event.image_url || null,
+        info: event.info,
+        info_url: event.info_url,
+        has_queue: event.has_queue,
+        queue_types: baseEvent.has_queue && normalizedQueueTypes.length > 0
+          ? normalizedQueueTypes
+          : null,
+        allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
+        allowed_tags: allowedTags.length > 0 ? allowedTags : null,
+        crate_id: baseEvent.crate_id || null,
+        parent_event_id: seriesParentId,
+        is_recurring: false,
+        is_featured_grid: !!event.is_featured_grid,
+        is_featured_upnext: !!event.is_featured_upnext,
+        featured_priority: event.featured_priority ?? null,
+      }));
 
       const { error: insertError } = await supabase.from('events').insert(eventsToInsert);
       if (insertError) throw insertError;
@@ -838,7 +847,7 @@ export default function EditEventForm() {
         .filter(Boolean);
       const normalizedImageUrl = eventData.image_url.trim();
       
-      const payload: Record<string, unknown> = {
+      const payload: EventInsert = {
         allowed_tags: allowedTags.length > 0 ? allowedTags : null,
         title: eventData.title,
         date: isTBA ? '9999-12-31' : eventData.date,
@@ -855,15 +864,6 @@ export default function EditEventForm() {
         crate_id: eventData.crate_id || null,
         
         is_recurring: isTBA ? false : eventData.is_recurring,
-        ...(!isTBA && eventData.is_recurring ? {
-          recurrence_pattern: eventData.recurrence_pattern,
-          recurrence_interval: eventData.recurrence_interval,
-          recurrence_end_date: eventData.recurrence_end_date || null,
-        } : {
-          recurrence_pattern: null,
-          recurrence_interval: null,
-          recurrence_end_date: null,
-        }),
         ...(eventData.parent_event_id && editMode !== 'single' ? { parent_event_id: eventData.parent_event_id } : {}),
         is_featured_grid: !!eventData.is_featured_grid,
         is_featured_upnext: !!eventData.is_featured_upnext,
@@ -877,7 +877,7 @@ export default function EditEventForm() {
       if (id && (isParentEvent || isPartOfSeries)) {
         if (editMode === 'single') {
            if (!targetEventId) throw new Error('Missing target event ID.');
-           const singlePayload = { ...payload, is_recurring: false, recurrence_pattern: null, recurrence_interval: null, recurrence_end_date: null, parent_event_id: null };
+           const singlePayload: EventUpdate = { ...payload, is_recurring: false, parent_event_id: null };
            await supabase.from('events').update(singlePayload).eq('id', targetEventId);
         } else if (editMode === 'future') {
            if (!targetEventId) throw new Error('Missing target event ID.');
@@ -984,7 +984,7 @@ export default function EditEventForm() {
                return;
              }
            }
-           await supabase.from('events').update(payload).or(`id.eq.${parentId},parent_event_id.eq.${parentId}`);
+           await supabase.from('events').update(payload as EventUpdate).or(`id.eq.${parentId},parent_event_id.eq.${parentId}`);
         }
       } else if (!isTBA && eventData.is_recurring && !id) {
         if (!eventData.recurrence_end_date) {
@@ -1002,24 +1002,30 @@ export default function EditEventForm() {
         if (error) throw error;
         
         const recurringEvents = generateRecurringEvents({ ...eventData, id: savedEvent.id });
-        const eventsToInsert = recurringEvents.slice(1).map((event) => {
-          const eventWithoutType = { ...event };
-          delete eventWithoutType.event_type;
-          delete eventWithoutType.event_subtype;
-          return {
-            ...eventWithoutType,
-            date: event.date,
-            allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
-            queue_types: eventData.has_queue && normalizedQueueTypes.length > 0
-              ? normalizedQueueTypes
-              : null,
-            crate_id: eventData.crate_id || null,
-            parent_event_id: savedEvent.id,
-            recurrence_pattern: null,
-            recurrence_interval: null,
-            recurrence_end_date: null,
-          };
-        });
+        const eventsToInsert: EventInsert[] = recurringEvents.slice(1).map((event) => ({
+          title: event.title,
+          date: event.date,
+          time: event.time,
+          location: event.location,
+          image_url: event.image_url || null,
+          info: event.info,
+          info_url: event.info_url,
+          has_queue: event.has_queue,
+          queue_types: eventData.has_queue && normalizedQueueTypes.length > 0
+            ? normalizedQueueTypes
+            : null,
+          allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
+          allowed_tags: allowedTags.length > 0 ? allowedTags : null,
+          crate_id: eventData.crate_id || null,
+          parent_event_id: savedEvent.id,
+          is_recurring: false,
+          recurrence_pattern: null,
+          recurrence_interval: null,
+          recurrence_end_date: null,
+          is_featured_grid: !!event.is_featured_grid,
+          is_featured_upnext: !!event.is_featured_upnext,
+          featured_priority: event.featured_priority ?? null,
+        }));
         
         if (eventsToInsert.length > 0) {
           const { error: insertError } = await supabase.from('events').insert(eventsToInsert);
@@ -1028,7 +1034,7 @@ export default function EditEventForm() {
       } else {
         // Create/Update Single
         if (id) {
-          const { error } = await supabase.from('events').update(payload).eq('id', id);
+          const { error } = await supabase.from('events').update(payload as EventUpdate).eq('id', Number(id));
           if (error) throw error;
         } else {
           const { error } = await supabase.from('events').insert([payload]);

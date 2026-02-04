@@ -14,7 +14,7 @@ import {
 
 interface DetailsTabProps {
   album: Album;
-  onChange: (field: keyof Album, value: string | number | string[] | null | boolean) => void;
+  onChange: <K extends keyof Album>(field: K, value: Album[K]) => void;
 }
 
 type ModalType = 'picker' | 'manage' | null;

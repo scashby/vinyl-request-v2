@@ -45,12 +45,20 @@ interface Album {
 }
 
 type ReleaseRow = Database['public']['Tables']['releases']['Row'];
-type RecordingRow = Database['public']['Tables']['recordings']['Row'];
 type ReleaseTrackRow = Database['public']['Tables']['release_tracks']['Row'];
+type RecordingRow = Database['public']['Tables']['recordings']['Row'];
+type ReleaseTrackRecording = Pick<
+  RecordingRow,
+  'id' | 'title' | 'duration_seconds' | 'isrc' | 'bpm'
+>;
 
-type ReleaseTrackQueryRow = ReleaseTrackRow & {
-  title_override?: string | null;
-  recording?: RecordingRow | null;
+type ReleaseTrackQueryRow = {
+  id: number;
+  position: string;
+  side: string | null;
+  recording_id: number | null;
+  title_override: string | null;
+  recording?: ReleaseTrackRecording | null;
 };
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
@@ -63,7 +71,6 @@ interface EventData {
   date: string;
   has_queue: boolean;
   queue_types?: string[];
-  queue_type?: string;
 }
 
 function AlbumDetailContent() {
@@ -72,6 +79,8 @@ function AlbumDetailContent() {
   const router = useRouter();
   const id = params?.id as string;
   const eventId = searchParams.get('eventId');
+  const albumIdNum = Number(id);
+  const eventIdNum = eventId ? Number(eventId) : null;
 
   const [album, setAlbum] = useState<Album | null>(null);
   const [eventData, setEventData] = useState<EventData | null>(null);
@@ -136,7 +145,7 @@ function AlbumDetailContent() {
              )
            )`
         )
-        .eq('id', id)
+        .eq('id', albumIdNum)
         .single();
 
       if (error) {
@@ -188,12 +197,12 @@ function AlbumDetailContent() {
   }, [id]);
 
   const fetchEventData = useCallback(async () => {
-    if (!eventId) return;
+    if (!eventIdNum || Number.isNaN(eventIdNum)) return;
     try {
       const { data, error } = await supabase
         .from('events')
         .select('*')
-        .eq('id', eventId)
+        .eq('id', eventIdNum)
         .single();
       if (!error && data) {
         setEventData(data as EventData);
@@ -201,12 +210,12 @@ function AlbumDetailContent() {
     } catch (error) {
       console.error('Error fetching event data:', error);
     }
-  }, [eventId]);
+  }, [eventIdNum]);
 
   useEffect(() => {
     if (id) fetchAlbum();
-    if (eventId) fetchEventData();
-  }, [id, eventId, fetchAlbum, fetchEventData]);
+    if (eventIdNum) fetchEventData();
+  }, [id, eventIdNum, fetchAlbum, fetchEventData]);
 
   const handleAddToQueue = async (side: string) => {
     if (!eventId || !album) return;
@@ -219,7 +228,7 @@ function AlbumDetailContent() {
       const { data: existing, error } = await supabase
         .from('requests_v3')
         .select('id, votes')
-        .eq('event_id', eventId)
+        .eq('event_id', eventIdNum)
         .eq('inventory_id', album.inventory_id)
         .is('recording_id', null)
         .maybeSingle();
@@ -231,7 +240,7 @@ function AlbumDetailContent() {
         setRequestStatus(`Upvoted Side ${side}`);
       } else {
         await supabase.from('requests_v3').insert([{
-          event_id: eventId,
+          event_id: eventIdNum,
           inventory_id: album.inventory_id,
           recording_id: null,
           votes: 1,
@@ -255,7 +264,7 @@ function AlbumDetailContent() {
         const { data: existing, error } = await supabase
           .from('requests_v3')
           .select('id, votes')
-          .eq('event_id', eventId)
+          .eq('event_id', eventIdNum)
           .eq('inventory_id', album.inventory_id)
           .eq('recording_id', track.recording_id)
           .maybeSingle();
@@ -267,7 +276,7 @@ function AlbumDetailContent() {
           setRequestStatus(`Upvoted: ${track.title}`);
         } else {
           await supabase.from('requests_v3').insert([{
-            event_id: eventId,
+            event_id: eventIdNum,
             inventory_id: album.inventory_id,
             recording_id: track.recording_id,
             votes: 1,
@@ -297,7 +306,7 @@ function AlbumDetailContent() {
       const { data: existing, error } = await supabase
         .from('requests_v3')
         .select('id, votes')
-        .eq('event_id', eventId)
+        .eq('event_id', eventIdNum)
         .eq('inventory_id', album.inventory_id)
         .is('recording_id', null)
         .maybeSingle();
@@ -309,7 +318,7 @@ function AlbumDetailContent() {
         setRequestStatus(`Upvoted Album`);
       } else {
         await supabase.from('requests_v3').insert([{
-          event_id: eventId,
+          event_id: eventIdNum,
           inventory_id: album.inventory_id,
           recording_id: null,
           votes: 1,
@@ -355,7 +364,7 @@ function AlbumDetailContent() {
   if (!album) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Album not found</div>;
 
   const imageUrl = album.image_url && album.image_url.toLowerCase() !== 'no' ? album.image_url : '/images/coverplaceholder.png';
-  const queueTypes = eventData?.queue_types || (eventData?.queue_type ? [eventData.queue_type] : ['side']);
+  const queueTypes = eventData?.queue_types || ['side'];
   const queueTypesArray = Array.isArray(queueTypes) ? queueTypes : [queueTypes];
 
   return (

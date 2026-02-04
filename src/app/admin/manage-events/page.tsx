@@ -19,7 +19,7 @@ interface Event {
   has_queue?: boolean;
   is_featured_grid?: boolean;
   featured_priority?: number | null;
-  allowed_tags?: string[] | string | null;
+  allowed_tags?: string[] | null;
   [key: string]: unknown; // Allow for other dynamic fields
 }
 
@@ -75,14 +75,24 @@ export default function Page() {
         .select('*')
         .order('date', { ascending: true });
         
-      if (!error && eventsData) setEvents(eventsData as Event[]);
+      if (!error && eventsData) {
+        const normalized = (eventsData as Event[]).map((event) => ({
+          ...event,
+          allowed_tags: normalizeStringArray(event.allowed_tags),
+        }));
+        setEvents(normalized);
+      }
     }
     fetchData();
   }, []);
 
   const refreshEvents = async () => {
     const { data } = await supabase.from('events').select('*').order('date', { ascending: true });
-    setEvents((data as Event[]) || []);
+    const normalized = ((data as Event[]) || []).map((event) => ({
+      ...event,
+      allowed_tags: normalizeStringArray(event.allowed_tags),
+    }));
+    setEvents(normalized);
   };
 
   const updateEventFlags = async (eventId: number, updates: Partial<Event>) => {

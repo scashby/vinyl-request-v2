@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from 'lib/supabaseClient';
 import type { SmartRule, CrateFieldType, CrateOperatorType, Crate } from 'types/crate';
+import type { Json } from 'types/supabase';
 import { BoxIcon } from '../../../components/BoxIcon';
 
 interface NewSmartCrateModalProps {
@@ -194,7 +195,7 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCra
           .update({
             name: name.trim(),
             icon,
-            smart_rules: { rules },
+            smart_rules: { rules } as unknown as Json,
             match_rules: matchRules,
             live_update: liveUpdate,
           })
@@ -225,7 +226,7 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCra
             icon, // Color value (e.g., "#3b82f6")
             color: icon, // Same color value for consistency
             is_smart: true,
-            smart_rules: { rules },
+            smart_rules: { rules } as unknown as Json,
             match_rules: matchRules,
             live_update: liveUpdate,
             sort_order: nextSortOrder,

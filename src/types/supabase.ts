@@ -84,6 +84,149 @@ export type Database = {
         };
         Relationships: [];
       };
+      album_suggestions: {
+        Row: {
+          id: number;
+          artist: string;
+          album: string;
+          reason: string | null;
+          contributor_name: string | null;
+          contributor_email: string | null;
+          contribution_amount: string | null;
+          context: string | null;
+          status: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+          admin_notes: string | null;
+          estimated_cost: number | null;
+          venmo_transaction_id: string | null;
+          priority_score: number | null;
+        };
+        Insert: {
+          id?: number;
+          artist: string;
+          album: string;
+          reason?: string | null;
+          contributor_name?: string | null;
+          contributor_email?: string | null;
+          contribution_amount?: string | null;
+          context?: string | null;
+          status?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+          admin_notes?: string | null;
+          estimated_cost?: number | null;
+          venmo_transaction_id?: string | null;
+          priority_score?: number | null;
+        };
+        Update: {
+          id?: number;
+          artist?: string;
+          album?: string;
+          reason?: string | null;
+          contributor_name?: string | null;
+          contributor_email?: string | null;
+          contribution_amount?: string | null;
+          context?: string | null;
+          status?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+          admin_notes?: string | null;
+          estimated_cost?: number | null;
+          venmo_transaction_id?: string | null;
+          priority_score?: number | null;
+        };
+        Relationships: [];
+      };
+      lyric_search_tags: {
+        Row: {
+          id: number;
+          inventory_id: number | null;
+          track_title: string | null;
+          track_position: string | null;
+          search_term: string | null;
+          genius_url: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          inventory_id?: number | null;
+          track_title?: string | null;
+          track_position?: string | null;
+          search_term?: string | null;
+          genius_url?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          inventory_id?: number | null;
+          track_title?: string | null;
+          track_position?: string | null;
+          search_term?: string | null;
+          genius_url?: string | null;
+          created_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'lyric_search_tags_inventory_id_fkey';
+            columns: ['inventory_id'];
+            referencedRelation: 'inventory';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+      staff_picks: {
+        Row: {
+          id: number;
+          staff_name: string;
+          staff_title: string | null;
+          staff_photo_url: string | null;
+          staff_bio: string | null;
+          inventory_id: number;
+          pick_order: number | null;
+          reason: string | null;
+          favorite_track: string | null;
+          listening_context: string | null;
+          is_active: boolean | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          staff_name: string;
+          staff_title?: string | null;
+          staff_photo_url?: string | null;
+          staff_bio?: string | null;
+          inventory_id: number;
+          pick_order?: number | null;
+          reason?: string | null;
+          favorite_track?: string | null;
+          listening_context?: string | null;
+          is_active?: boolean | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          staff_name?: string;
+          staff_title?: string | null;
+          staff_photo_url?: string | null;
+          staff_bio?: string | null;
+          inventory_id?: number;
+          pick_order?: number | null;
+          reason?: string | null;
+          favorite_track?: string | null;
+          listening_context?: string | null;
+          is_active?: boolean | null;
+          created_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'staff_picks_inventory_id_fkey';
+            columns: ['inventory_id'];
+            referencedRelation: 'inventory';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
       artist_rules: {
         Row: {
           id: number;

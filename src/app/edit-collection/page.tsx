@@ -262,7 +262,7 @@ function CollectionBrowserPage() {
     if (data) {
       const parsed = data.map((row) => ({
         ...row,
-        smart_rules: (row.smart_rules as SmartRules | null) ?? null,
+        smart_rules: (row.smart_rules as unknown as SmartRules | null) ?? null,
       }));
       setCrates(parsed as Crate[]);
     }

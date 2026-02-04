@@ -5,7 +5,7 @@ import type { Album } from 'types/album';
 
 interface UniversalBottomBarProps {
   album: Album;
-  onChange: (field: keyof Album, value: string | number | null | boolean) => void;
+  onChange: <K extends keyof Album>(field: K, value: Album[K]) => void;
   onPrevious: () => void;
   onNext: () => void;
   hasPrevious?: boolean;

@@ -27,6 +27,14 @@ export default function EventDJSets({ eventId }: EventDJSetsProps) {
   const [djSets, setDjSets] = useState<DJSet[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const toStringArray = (value: unknown): string[] => {
+    if (!value) return [];
+    if (Array.isArray(value)) {
+      return value.filter((item): item is string => typeof item === 'string');
+    }
+    return [];
+  };
+
   useEffect(() => {
     if (!eventId) {
       setLoading(false);
@@ -46,7 +54,12 @@ export default function EventDJSets({ eventId }: EventDJSetsProps) {
           return;
         }
 
-        setDjSets(data || []);
+        const mapped = (data || []).map((row) => ({
+          ...row,
+          tags: toStringArray(row.tags),
+          track_listing: toStringArray(row.track_listing),
+        }));
+        setDjSets(mapped);
       } catch (error) {
         console.error('Error loading DJ sets:', error);
       } finally {

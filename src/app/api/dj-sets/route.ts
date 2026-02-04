@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const eventId = searchParams.get('eventId');
+    const eventIdNum = eventId ? Number(eventId) : null;
     const limit = parseInt(searchParams.get('limit') || '50');
     const recent = searchParams.get('recent') === 'true';
 
@@ -37,8 +38,8 @@ export async function GET(request: NextRequest) {
       .limit(limit);
 
     // Filter by event if specified
-    if (eventId) {
-      query = query.eq('event_id', eventId);
+    if (eventIdNum && !Number.isNaN(eventIdNum)) {
+      query = query.eq('event_id', eventIdNum);
     }
 
     // Filter for recent sets (last 30 days)
@@ -94,13 +95,16 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    const eventIdNum = event_id ? Number(event_id) : null;
+    const inventoryIdNum = inventory_id ? Number(inventory_id) : null;
+
     const { data, error } = await supabase
       .from('dj_sets')
       .insert({
         title,
         description,
-        event_id: event_id || null,
-        inventory_id: inventory_id || null,
+        event_id: eventIdNum && !Number.isNaN(eventIdNum) ? eventIdNum : null,
+        inventory_id: inventoryIdNum && !Number.isNaN(inventoryIdNum) ? inventoryIdNum : null,
         file_url,
         file_size: file_size || null,
         duration: duration || null,
@@ -176,8 +180,9 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
+    const numericId = id ? Number(id) : NaN;
 
-    if (!id) {
+    if (!id || Number.isNaN(numericId)) {
       return NextResponse.json({
         success: false,
         error: 'DJ set ID is required'
@@ -187,7 +192,7 @@ export async function DELETE(request: NextRequest) {
     const { error } = await supabase
       .from('dj_sets')
       .delete()
-      .eq('id', id);
+      .eq('id', numericId);
 
     if (error) {
       throw error;

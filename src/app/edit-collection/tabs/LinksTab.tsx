@@ -4,7 +4,7 @@ import type { Album } from 'types/album';
 
 interface LinksTabProps {
   album: Album;
-  onChange: (field: keyof Album, value: string | null) => void;
+  onChange: <K extends keyof Album>(field: K, value: Album[K]) => void;
 }
 
 export function LinksTab({ album, onChange }: LinksTabProps) {

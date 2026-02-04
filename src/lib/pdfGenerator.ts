@@ -76,11 +76,6 @@ function formatValue(value: unknown, columnId: ColumnId): string {
     }
   }
   
-  // Handle lengths (length is stored as formatted string like "42:15")
-  if (columnId === 'length' && typeof value === 'string') {
-    return value;
-  }
-  
   // Handle currency
   if ((columnId.includes('price') || columnId.includes('value') || columnId.includes('cost')) && typeof value === 'number') {
     return `$${value.toFixed(2)}`;

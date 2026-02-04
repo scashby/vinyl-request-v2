@@ -171,8 +171,9 @@ export default function ConflictResolutionModal({
         throw new Error(`Missing target ID for ${target.table}`);
       }
 
+      const tableName = target.table as 'inventory' | 'releases' | 'masters';
       const { error: updateError } = await supabase
-        .from(target.table)
+        .from(tableName)
         .update({ [target.column]: target.value } as Record<string, unknown>)
         .eq('id', targetId);
 
@@ -181,13 +182,15 @@ export default function ConflictResolutionModal({
       const rejectedValue = getRejectedValue(conflict.current_value, conflict.new_value, strategyResolution);
       
       if (!resolutionTableMissing) {
+        const keptValue = finalValue as import('types/supabase').Json;
+        const rejected = rejectedValue as import('types/supabase').Json;
         const { error: resolutionError } = await supabase
           .from('import_conflict_resolutions')
           .upsert({
             album_id: conflict.album_id,
             field_name: conflict.field_name,
-            kept_value: finalValue,
-            rejected_value: rejectedValue,
+            kept_value: keptValue,
+            rejected_value: rejected,
             resolution: strategyResolution,
             source: source,
           }, {
