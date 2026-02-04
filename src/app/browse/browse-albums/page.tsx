@@ -34,7 +34,7 @@ interface BrowseAlbum {
   media_condition?: string;
   genres?: string[];        // Replaces separate genre arrays
   styles?: string[];
-  tags?: string[];
+  custom_tags?: string[];
   
   image: string;
 }
@@ -64,7 +64,6 @@ type InventoryBrowseRow = {
 function BrowseAlbumsContent() {
   const searchParams = useSearchParams();
   const eventId = searchParams.get('eventId');
-  const eventIdNum = eventId ? Number(eventId) : null;
   const allowedFormatsParam = searchParams.get('allowedFormats');
   const eventTitleParam = searchParams.get('eventTitle');
 
@@ -131,7 +130,9 @@ function BrowseAlbumsContent() {
   useEffect(() => {
     let isMounted = true;
     async function fetchEventDataIfNeeded() {
-      if (eventIdNum && !Number.isNaN(eventIdNum)) {
+      if (eventId) {
+        const eventIdNum = Number(eventId);
+        if (Number.isNaN(eventIdNum)) return;
         const { data, error } = await supabase
           .from('events')
           .select('id, title, date, allowed_formats, allowed_tags')
@@ -168,7 +169,7 @@ function BrowseAlbumsContent() {
     }
     fetchEventDataIfNeeded();
     return () => { isMounted = false; };
-  }, [eventIdNum, allowedFormatsParam, eventTitleParam]);
+  }, [eventId, allowedFormatsParam, eventTitleParam]);
 
   useEffect(() => {
     let isMounted = true;
@@ -211,6 +212,7 @@ function BrowseAlbumsContent() {
                  )
                )`
             )
+            .neq('status', 'for_sale')
             .range(from, from + batchSize - 1);
 
           if (error) throw error;
@@ -249,7 +251,7 @@ function BrowseAlbumsContent() {
             media_condition: row.media_condition,
             genres: master?.genres || [],
             styles: master?.styles || [],
-            tags,
+            custom_tags: tags,
             image:
               imageUrl && imageUrl.trim().toLowerCase() !== 'no'
                 ? imageUrl.trim()
@@ -306,7 +308,7 @@ function BrowseAlbumsContent() {
         (album.release_notes || '').toLowerCase().includes(searchLower) ||
         searchInArray(album.genres) ||
         searchInArray(album.styles) ||
-        searchInArray(album.tags);
+        searchInArray(album.custom_tags);
       
       const albumMediaType = normalizeMediaType(album.media_type || '');
 
@@ -322,7 +324,7 @@ function BrowseAlbumsContent() {
       const matchesAllowedTags =
         !normalizedAllowedTags ||
         normalizedAllowedTags.length === 0 ||
-        normalizedAllowedTags.some((tag) => (album.tags || []).some((value) => value.toLowerCase() === tag));
+        normalizedAllowedTags.some((tag) => (album.custom_tags || []).some((value) => value.toLowerCase() === tag));
         
       const matchesJustAdded =
         !showJustAdded || album.justAdded;

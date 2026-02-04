@@ -21,11 +21,11 @@ type Master = Database['public']['Tables']['masters']['Row'];
 type Artist = Database['public']['Tables']['artists']['Row'];
 
 type Event = {
-  id: number;
+  id: string;
   title: string;
   date: string;
   has_queue: boolean;
-  queue_types?: string[] | null;
+  queue_type: string;
   [key: string]: unknown;
 };
 
@@ -38,7 +38,7 @@ type Request = {
   track_name: string | null;
   track_duration: string | null;
   votes: number;
-  event_id: number;
+  event_id: string;
   created_at: string;
   inventory_id?: number | null;
   [key: string]: unknown;
@@ -87,10 +87,16 @@ function EditQueueContent() {
     }
   };
 
-  const fetchRequestsForEvent = async (eventId: number) => {
+  const fetchRequestsForEvent = async (eventId: string) => {
     try {
       console.log('🔍 Admin Debug: Fetching requests for event_id:', eventId);
       
+      const eventIdNum = Number(eventId);
+      if (Number.isNaN(eventIdNum)) {
+        setRequests([]);
+        return;
+      }
+
       const { data, error: requestsError } = await supabase
         .from('requests_v3')
         .select(`
@@ -111,7 +117,7 @@ function EditQueueContent() {
             duration_seconds
           )
         `)
-        .eq('event_id', eventId)
+        .eq('event_id', eventIdNum)
         .order('id', { ascending: true });
 
       const typedRequests = (data || []) as DbRequestV3[];
@@ -148,7 +154,7 @@ function EditQueueContent() {
           votes: req.votes || 1,
           inventory_id: req.inventory_id,
           created_at: req.created_at,
-          event_id: req.event_id
+          event_id: req.event_id.toString()
         }));
         console.log('🔍 Admin Debug: Mapped requests without albums:', mapped);
         
@@ -182,7 +188,7 @@ function EditQueueContent() {
           votes: req.votes || 1,
           inventory_id: req.inventory_id,
           created_at: req.created_at,
-          event_id: req.event_id
+          event_id: req.event_id.toString()
         };
       });
 
@@ -249,10 +255,8 @@ function EditQueueContent() {
 
   useEffect(() => {
     if (urlEventId && events.length > 0 && !selectedEvent) {
-      const eventIdNum = Number(urlEventId);
-      if (Number.isNaN(eventIdNum)) return;
       console.log('🔍 Admin Debug: Auto-selecting event from URL:', urlEventId);
-      const eventFromUrl = events.find(e => e.id === eventIdNum);
+      const eventFromUrl = events.find(e => e.id === urlEventId);
       if (eventFromUrl) {
         console.log('🔍 Admin Debug: Found event from URL:', eventFromUrl.title);
         setSelectedEvent(eventFromUrl);
@@ -279,7 +283,7 @@ function EditQueueContent() {
     );
   }
 
-  const queueType = selectedEvent?.queue_types?.[0] || 'side';
+  const queueType = selectedEvent?.queue_type || 'side';
 
   return (
     <div className="min-h-screen bg-white text-black">
@@ -316,7 +320,7 @@ function EditQueueContent() {
                       {formatDate(event.date)}
                     </p>
                     <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-                      {getQueueTypeLabel(event.queue_types?.[0] || 'side')}
+                      {getQueueTypeLabel(event.queue_type || 'side')}
                     </div>
                   </Card>
                 ))}

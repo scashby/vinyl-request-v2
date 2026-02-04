@@ -13,7 +13,7 @@ import NewCrateModal from './crates/NewCrateModal';
 import NewSmartCrateModal from './crates/NewSmartCrateModal';
 import { AddToCrateModal } from './crates/AddToCrateModal';
 import Header from './Header';
-import type { Crate, SmartRules } from '../../types/crate';
+import type { Crate } from '../../types/crate';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import CollectionInfoPanel from './components/CollectionInfoPanel';
 import { BoxIcon } from '../../components/BoxIcon';
@@ -260,11 +260,7 @@ function CollectionBrowserPage() {
     }
 
     if (data) {
-      const parsed = data.map((row) => ({
-        ...row,
-        smart_rules: (row.smart_rules as unknown as SmartRules | null) ?? null,
-      }));
-      setCrates(parsed as Crate[]);
+      setCrates(data as unknown as Crate[]);
     }
 
     const { data: crateItems, error: crateItemsError } = await supabase
@@ -293,6 +289,7 @@ function CollectionBrowserPage() {
 
   const filteredAndSortedAlbums = useMemo(() => {
     let filtered = albums.filter(album => {
+      if (collectionFilter === 'For Sale' && album.status !== 'for_sale') return false;
       
       if (selectedLetter !== 'All') {
         const firstChar = getAlbumArtist(album).charAt(0).toUpperCase();
@@ -380,7 +377,7 @@ function CollectionBrowserPage() {
     }
 
     return filtered;
-  }, [albums, selectedLetter, selectedFolderValue, selectedCrateId, folderMode, crates, searchQuery, sortBy, tableSortState]);
+  }, [albums, collectionFilter, selectedLetter, selectedFolderValue, selectedCrateId, folderMode, crates, searchQuery, sortBy, tableSortState]);
 
   useEffect(() => {
     if (filteredAndSortedAlbums.length > 0 && !selectedAlbumId) {
@@ -498,8 +495,6 @@ function CollectionBrowserPage() {
     }
   }, [selectedAlbumIds, crates, loadCrates]);
 
-  // Removed unused handleMarkForSale (no current UI usage).
-
   return (
     <>
       <style>{`
@@ -549,7 +544,7 @@ function CollectionBrowserPage() {
                 <>
                   <div onClick={() => setShowCollectionDropdown(false)} className="fixed inset-0 z-[99]" />
                   <div className="absolute top-full left-0 mt-1 bg-[#2a2a2a] border border-[#555] rounded z-[100] min-w-[150px] shadow-lg">
-                    {['All'].map(filter => (
+                    {['All', 'For Sale'].map(filter => (
                       <button 
                         key={filter}
                         onClick={() => { setCollectionFilter(filter); setShowCollectionDropdown(false); }}

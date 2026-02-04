@@ -46,18 +46,13 @@ interface Album {
 
 type ReleaseRow = Database['public']['Tables']['releases']['Row'];
 type RecordingRow = Database['public']['Tables']['recordings']['Row'];
-type ReleaseTrackRecording = Pick<
-  RecordingRow,
-  'id' | 'title' | 'duration_seconds' | 'isrc' | 'bpm'
->;
-
 type ReleaseTrackQueryRow = {
   id: number;
   position: string;
   side: string | null;
   recording_id: number | null;
-  title_override: string | null;
-  recording?: ReleaseTrackRecording | null;
+  title_override?: string | null;
+  recording?: RecordingRow | null;
 };
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
@@ -70,6 +65,7 @@ interface EventData {
   date: string;
   has_queue: boolean;
   queue_types?: string[];
+  queue_type?: string;
 }
 
 function AlbumDetailContent() {
@@ -79,7 +75,7 @@ function AlbumDetailContent() {
   const id = params?.id as string;
   const eventId = searchParams.get('eventId');
   const albumIdNum = Number(id);
-  const eventIdNum = eventId ? Number(eventId) : null;
+  const eventIdNum = eventId ? Number(eventId) : NaN;
 
   const [album, setAlbum] = useState<Album | null>(null);
   const [eventData, setEventData] = useState<EventData | null>(null);
@@ -161,18 +157,21 @@ function AlbumDetailContent() {
       const artist = toSingle(master?.artist);
       const imageUrl = master?.cover_image_url || '';
 
-      const tracks = (release?.release_tracks || []).map((track: ReleaseTrackQueryRow) => ({
+      const tracks = (release?.release_tracks || []).map((track) => {
+        const typedTrack = track as ReleaseTrackQueryRow;
+        return ({
         id: track.id,
-        recording_id: track.recording_id ?? track.recording?.id,
-        position: track.position,
-        title: track.title_override || track.recording?.title || '',
-        duration_seconds: track.recording?.duration_seconds ?? null,
-        duration: formatDuration(track.recording?.duration_seconds ?? null),
-        isrc: track.recording?.isrc ?? undefined,
-        bpm: track.recording?.bpm ?? undefined,
-        side: track.side,
+        recording_id: typedTrack.recording_id ?? typedTrack.recording?.id,
+        position: typedTrack.position,
+        title: typedTrack.title_override || typedTrack.recording?.title || '',
+        duration_seconds: typedTrack.recording?.duration_seconds ?? null,
+        duration: formatDuration(typedTrack.recording?.duration_seconds ?? null),
+        isrc: typedTrack.recording?.isrc ?? undefined,
+        bpm: typedTrack.recording?.bpm ?? undefined,
+        side: typedTrack.side ?? undefined,
         type: 'track',
-      }));
+      });
+      });
 
       setAlbum({
         id: data.id,
@@ -196,7 +195,7 @@ function AlbumDetailContent() {
   }, [albumIdNum]);
 
   const fetchEventData = useCallback(async () => {
-    if (!eventIdNum || Number.isNaN(eventIdNum)) return;
+      if (!eventId || Number.isNaN(eventIdNum)) return;
     try {
       const { data, error } = await supabase
         .from('events')
@@ -209,18 +208,18 @@ function AlbumDetailContent() {
     } catch (error) {
       console.error('Error fetching event data:', error);
     }
-  }, [eventIdNum]);
+  }, [eventId, eventIdNum]);
 
   useEffect(() => {
     if (id) fetchAlbum();
-    if (eventIdNum) fetchEventData();
-  }, [id, eventIdNum, fetchAlbum, fetchEventData]);
+    if (eventId) fetchEventData();
+  }, [id, eventId, fetchAlbum, fetchEventData]);
 
   const handleAddToQueue = async (side: string) => {
     if (!eventId || !album) return;
     setSubmittingRequest(true);
     try {
-      if (!album.inventory_id) {
+      if (!album.inventory_id || Number.isNaN(eventIdNum)) {
         throw new Error('Missing inventory ID for request.');
       }
 
@@ -243,7 +242,7 @@ function AlbumDetailContent() {
           inventory_id: album.inventory_id,
           recording_id: null,
           votes: 1,
-          status: 'open',
+          status: 'pending',
         }]);
         setRequestStatus(`Requested Side ${side}`);
       }
@@ -256,7 +255,7 @@ function AlbumDetailContent() {
   };
 
   const handleAddTrackToQueue = async (track: DbTrack) => {
-    if (!eventId || !album) return;
+    if (!eventId || Number.isNaN(eventIdNum) || !album) return;
     setSubmittingRequest(true);
     try {
       if (album.inventory_id && track.recording_id) {
@@ -279,7 +278,7 @@ function AlbumDetailContent() {
             inventory_id: album.inventory_id,
             recording_id: track.recording_id,
             votes: 1,
-            status: 'open',
+            status: 'pending',
           }]);
           setRequestStatus(`Requested: ${track.title}`);
         }
@@ -295,7 +294,7 @@ function AlbumDetailContent() {
   };
 
   const handleAddAlbumToQueue = async () => {
-    if (!eventId || !album) return;
+    if (!eventId || Number.isNaN(eventIdNum) || !album) return;
     setSubmittingRequest(true);
     try {
       if (!album.inventory_id) {
@@ -321,7 +320,7 @@ function AlbumDetailContent() {
           inventory_id: album.inventory_id,
           recording_id: null,
           votes: 1,
-          status: 'open',
+          status: 'pending',
         }]);
         setRequestStatus(`Requested Album`);
       }
@@ -363,7 +362,7 @@ function AlbumDetailContent() {
   if (!album) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Album not found</div>;
 
   const imageUrl = album.image_url && album.image_url.toLowerCase() !== 'no' ? album.image_url : '/images/coverplaceholder.png';
-  const queueTypes = eventData?.queue_types || ['side'];
+  const queueTypes = eventData?.queue_types || (eventData?.queue_type ? [eventData.queue_type] : ['side']);
   const queueTypesArray = Array.isArray(queueTypes) ? queueTypes : [queueTypes];
 
   return (

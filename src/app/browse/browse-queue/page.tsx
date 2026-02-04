@@ -36,6 +36,7 @@ interface EventData {
   date: string;
   image_url: string;
   queue_types?: string[];
+  queue_type?: string;
 }
 
 type ReleaseRow = Database['public']['Tables']['releases']['Row'];
@@ -43,7 +44,6 @@ type ReleaseRow = Database['public']['Tables']['releases']['Row'];
 function BrowseQueueContent() {
   const searchParams = useSearchParams();
   const eventId = searchParams.get("eventId");
-  const eventIdNum = eventId ? Number(eventId) : null;
 
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [eventData, setEventData] = useState<EventData | null>(null);
@@ -61,7 +61,12 @@ function BrowseQueueContent() {
 
 
   const loadEventAndQueue = useCallback(async () => {
-    if (!eventIdNum || Number.isNaN(eventIdNum)) {
+    if (!eventId) {
+      setLoading(false);
+      return;
+    }
+    const eventIdNum = Number(eventId);
+    if (Number.isNaN(eventIdNum)) {
       setLoading(false);
       return;
     }
@@ -156,7 +161,7 @@ function BrowseQueueContent() {
     } finally {
       setLoading(false);
     }
-  }, [eventIdNum]);
+  }, [eventId]);
 
   useEffect(() => { loadEventAndQueue(); }, [loadEventAndQueue]);
 
@@ -184,7 +189,7 @@ function BrowseQueueContent() {
     dateString ? new Date(dateString + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "";
 
   // Get primary queue type for display
-  const queueTypes = eventData?.queue_types || ['side'];
+  const queueTypes = eventData?.queue_types || (eventData?.queue_type ? [eventData.queue_type] : ['side']);
   const queueType = Array.isArray(queueTypes) ? queueTypes[0] : queueTypes;
 
   if (loading) return (

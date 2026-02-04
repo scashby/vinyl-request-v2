@@ -53,13 +53,14 @@ export default function Page() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
-  const eventIdNum = Number(id);
   const [event, setEvent] = useState<EventData | null>(null);
   const [prevEventId, setPrevEventId] = useState<number | null>(null);
   const [nextEventId, setNextEventId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!id || Number.isNaN(eventIdNum)) return;
+    if (!id) return;
+    const eventIdNum = Number(id);
+    if (Number.isNaN(eventIdNum)) return;
 
     const fetchEventAndNavigation = async () => {
       // Fetch current event
@@ -88,7 +89,7 @@ export default function Page() {
       }
 
       // Find current event's position and set prev/next
-      const currentIndex = allEvents.findIndex(e => e.id === parseInt(id));
+      const currentIndex = allEvents.findIndex(e => e.id === eventIdNum);
       if (currentIndex > 0) {
         setPrevEventId(allEvents[currentIndex - 1].id);
       } else {
@@ -102,7 +103,7 @@ export default function Page() {
     };
 
     fetchEventAndNavigation();
-  }, [id, eventIdNum]);
+  }, [id]);
 
   if (!event) return <div>Loading...</div>;
 

@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from 'lib/supabaseClient';
-import type { Database, Json } from 'types/supabase';
+import type { Json } from 'types/supabase';
 
 interface Service {
   title: string;
@@ -35,11 +35,27 @@ interface AboutContent {
   updated_at?: string;
 }
 
-type AboutRow = Database['public']['Tables']['about_content']['Row'];
+const toServices = (value: Json | null | undefined): Service[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => (typeof entry === 'object' && entry ? entry : null))
+    .filter((entry): entry is Record<string, Json> => Boolean(entry))
+    .map((entry) => ({
+      title: typeof entry.title === 'string' ? entry.title : '',
+      description: typeof entry.description === 'string' ? entry.description : '',
+      price: typeof entry.price === 'string' ? entry.price : '',
+    }));
+};
 
-const parseJsonArray = <T,>(value: Json | null | undefined): T[] => {
-  if (!value) return [];
-  return Array.isArray(value) ? (value as T[]) : [];
+const toTestimonials = (value: Json | null | undefined): Testimonial[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => (typeof entry === 'object' && entry ? entry : null))
+    .filter((entry): entry is Record<string, Json> => Boolean(entry))
+    .map((entry) => ({
+      text: typeof entry.text === 'string' ? entry.text : '',
+      author: typeof entry.author === 'string' ? entry.author : '',
+    }));
 };
 
 export default function EditAboutPage() {
@@ -69,11 +85,39 @@ export default function EditAboutPage() {
            setMessage('No content found. Database may be empty.');
         }
       } else if (data) {
-        const row = data as AboutRow;
+        const row = data as {
+          id?: number;
+          main_description?: string | null;
+          booking_description?: string | null;
+          contact_name?: string | null;
+          contact_company?: string | null;
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          calendly_url?: string | null;
+          services?: Json | null;
+          testimonials?: Json | null;
+          booking_notes?: string | null;
+          amazon_wishlist_url?: string | null;
+          discogs_wantlist_url?: string | null;
+          linktree_url?: string | null;
+          updated_at?: string | null;
+        };
         setAboutContent({
-          ...row,
-          services: parseJsonArray<Service>(row.services),
-          testimonials: parseJsonArray<Testimonial>(row.testimonials),
+          id: row.id,
+          main_description: row.main_description ?? '',
+          booking_description: row.booking_description ?? '',
+          contact_name: row.contact_name ?? '',
+          contact_company: row.contact_company ?? '',
+          contact_email: row.contact_email ?? '',
+          contact_phone: row.contact_phone ?? '',
+          calendly_url: row.calendly_url ?? '',
+          services: toServices(row.services),
+          testimonials: toTestimonials(row.testimonials),
+          booking_notes: row.booking_notes ?? '',
+          amazon_wishlist_url: row.amazon_wishlist_url ?? '',
+          discogs_wantlist_url: row.discogs_wantlist_url ?? '',
+          linktree_url: row.linktree_url ?? '',
+          updated_at: row.updated_at ?? undefined,
         });
       } 
     } catch (error) {
@@ -97,34 +141,44 @@ export default function EditAboutPage() {
 
       let result;
       if (existingData) {
-        const updatePayload: Database['public']['Tables']['about_content']['Update'] = {
-          main_description: aboutContent.main_description,
-          booking_description: aboutContent.booking_description,
-          contact_name: aboutContent.contact_name,
-          contact_company: aboutContent.contact_company,
-          contact_email: aboutContent.contact_email,
-          contact_phone: aboutContent.contact_phone,
-          calendly_url: aboutContent.calendly_url,
-          services: aboutContent.services as unknown as Json,
-          testimonials: aboutContent.testimonials as unknown as Json,
-          booking_notes: aboutContent.booking_notes,
-          amazon_wishlist_url: aboutContent.amazon_wishlist_url,
-          discogs_wantlist_url: aboutContent.discogs_wantlist_url,
-          linktree_url: aboutContent.linktree_url,
-          updated_at: new Date().toISOString(),
-        };
         result = await supabase
           .from('about_content')
-          .update(updatePayload)
+          .update({
+            main_description: aboutContent.main_description,
+            booking_description: aboutContent.booking_description,
+            contact_name: aboutContent.contact_name,
+            contact_company: aboutContent.contact_company,
+            contact_email: aboutContent.contact_email,
+            contact_phone: aboutContent.contact_phone,
+            calendly_url: aboutContent.calendly_url,
+            services: aboutContent.services as unknown as Json,
+            testimonials: aboutContent.testimonials as unknown as Json,
+            booking_notes: aboutContent.booking_notes,
+            amazon_wishlist_url: aboutContent.amazon_wishlist_url,
+            discogs_wantlist_url: aboutContent.discogs_wantlist_url,
+            linktree_url: aboutContent.linktree_url,
+            updated_at: new Date().toISOString()
+          })
           .eq('id', existingData.id);
       } else {
         result = await supabase
           .from('about_content')
           .insert([{
-            ...aboutContent,
+            main_description: aboutContent.main_description,
+            booking_description: aboutContent.booking_description,
+            contact_name: aboutContent.contact_name,
+            contact_company: aboutContent.contact_company,
+            contact_email: aboutContent.contact_email,
+            contact_phone: aboutContent.contact_phone,
+            calendly_url: aboutContent.calendly_url,
             services: aboutContent.services as unknown as Json,
             testimonials: aboutContent.testimonials as unknown as Json,
-          } as Database['public']['Tables']['about_content']['Insert']]);
+            booking_notes: aboutContent.booking_notes,
+            amazon_wishlist_url: aboutContent.amazon_wishlist_url,
+            discogs_wantlist_url: aboutContent.discogs_wantlist_url,
+            linktree_url: aboutContent.linktree_url,
+            updated_at: new Date().toISOString(),
+          }]);
       }
 
       if (result.error) {

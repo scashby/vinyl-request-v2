@@ -19,7 +19,7 @@ interface Event {
   has_queue?: boolean;
   is_featured_grid?: boolean;
   featured_priority?: number | null;
-  allowed_tags?: string[] | null;
+  allowed_tags?: string[] | string | null;
   [key: string]: unknown; // Allow for other dynamic fields
 }
 
@@ -75,29 +75,23 @@ export default function Page() {
         .select('*')
         .order('date', { ascending: true });
         
-      if (!error && eventsData) {
-        const normalized = (eventsData as Event[]).map((event) => ({
-          ...event,
-          allowed_tags: normalizeStringArray(event.allowed_tags),
-        }));
-        setEvents(normalized);
-      }
+      if (!error && eventsData) setEvents(eventsData as Event[]);
     }
     fetchData();
   }, []);
 
   const refreshEvents = async () => {
     const { data } = await supabase.from('events').select('*').order('date', { ascending: true });
-    const normalized = ((data as Event[]) || []).map((event) => ({
-      ...event,
-      allowed_tags: normalizeStringArray(event.allowed_tags),
-    }));
-    setEvents(normalized);
+    setEvents((data as Event[]) || []);
   };
 
   const updateEventFlags = async (eventId: number, updates: Partial<Event>) => {
     setEvents((prev) => prev.map((ev) => (ev.id === eventId ? { ...ev, ...updates } : ev)));
-    const { error } = await supabase.from('events').update(updates).eq('id', eventId);
+    const normalizedUpdates: Record<string, unknown> = { ...updates };
+    if (typeof normalizedUpdates.allowed_tags === 'string') {
+      normalizedUpdates.allowed_tags = [normalizedUpdates.allowed_tags];
+    }
+    const { error } = await supabase.from('events').update(normalizedUpdates).eq('id', eventId);
     if (error) {
       alert(`Error saving changes: ${error.message}`);
       await refreshEvents();
