@@ -470,3 +470,69 @@ export async function createTag(name: string): Promise<boolean> {
     return !error;
   } catch { return false; }
 }
+
+// ============================================================================
+// Credits / Classical lists (derived from recordings.credits JSONB)
+// ============================================================================
+
+const asStringArray = (value: unknown): string[] => {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+      .filter((entry) => entry.length > 0);
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }
+  return [];
+};
+
+const extractCreditValues = (credits: unknown, key: string): string[] => {
+  if (!credits || typeof credits !== 'object') return [];
+  const record = credits as Record<string, unknown>;
+  const direct = asStringArray(record[key]);
+  const fromPeople = record.album_people && typeof record.album_people === 'object'
+    ? asStringArray((record.album_people as Record<string, unknown>)[key])
+    : [];
+  const fromClassical = record.classical && typeof record.classical === 'object'
+    ? asStringArray((record.classical as Record<string, unknown>)[key])
+    : [];
+  return Array.from(new Set([...direct, ...fromPeople, ...fromClassical]));
+};
+
+async function fetchCreditsList(key: string): Promise<PickerDataItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('recordings')
+      .select('credits')
+      .not('credits', 'is', null);
+
+    if (error) return [];
+
+    const counts = new Map<string, number>();
+    (data ?? []).forEach((row) => {
+      const values = extractCreditValues(row.credits, key);
+      values.forEach((value) => {
+        counts.set(value, (counts.get(value) || 0) + 1);
+      });
+    });
+
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ id: name, name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchComposers(): Promise<PickerDataItem[]> { return fetchCreditsList('composer'); }
+export async function fetchConductors(): Promise<PickerDataItem[]> { return fetchCreditsList('conductor'); }
+export async function fetchChoruses(): Promise<PickerDataItem[]> { return fetchCreditsList('chorus'); }
+export async function fetchCompositions(): Promise<PickerDataItem[]> { return fetchCreditsList('composition'); }
+export async function fetchOrchestras(): Promise<PickerDataItem[]> { return fetchCreditsList('orchestra'); }
+export async function fetchSongwriters(): Promise<PickerDataItem[]> { return fetchCreditsList('songwriters'); }
+export async function fetchProducers(): Promise<PickerDataItem[]> { return fetchCreditsList('producers'); }
+export async function fetchEngineers(): Promise<PickerDataItem[]> { return fetchCreditsList('engineers'); }
+export async function fetchMusicians(): Promise<PickerDataItem[]> { return fetchCreditsList('musicians'); }

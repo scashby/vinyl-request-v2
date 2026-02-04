@@ -5,12 +5,14 @@ import dynamic from 'next/dynamic';
 import { supabase } from 'lib/supabaseClient';
 import { parseDiscogsFormat } from 'lib/formatParser';
 import type { Album } from 'types/album';
-import type { Database } from 'types/supabase';
+import type { Database, Json } from 'types/supabase';
 import { MainTab, type MainTabRef } from './tabs/MainTab';
 import { DetailsTab } from './tabs/DetailsTab';
 import { TracksTab, type TracksTabRef } from './tabs/TracksTab';
 import { PersonalTab } from './tabs/PersonalTab';
 import { LinksTab } from './tabs/LinksTab';
+import { ClassicalTab } from './tabs/ClassicalTab';
+import { PeopleTab } from './tabs/PeopleTab';
 import { UniversalBottomBar } from 'components/UniversalBottomBar';
 
 const CoverTab = dynamic(() => import('./tabs/CoverTab').then(mod => mod.CoverTab));
@@ -20,7 +22,16 @@ import { EditModal } from './pickers/EditModal';
 import ManagePickListsModal from './ManagePickListsModal';
 import { fetchLocations, type PickerDataItem } from './pickers/pickerDataUtils';
 
-type TabId = 'main' | 'details' | 'enrichment' | 'tracks' | 'personal' | 'cover' | 'links';
+type TabId =
+  | 'main'
+  | 'details'
+  | 'enrichment'
+  | 'tracks'
+  | 'classical'
+  | 'people'
+  | 'personal'
+  | 'cover'
+  | 'links';
 
 // SVG icon components
 const TabIcons = {
@@ -74,8 +85,10 @@ const TabIcons = {
 const TABS: { id: TabId; label: string; IconComponent: () => React.ReactElement }[] = [
   { id: 'main', label: 'Main', IconComponent: TabIcons.music },
   { id: 'details', label: 'Details', IconComponent: TabIcons.info },
-  { id: 'enrichment', label: 'Facts/Sonic', IconComponent: TabIcons.bolt },
+  { id: 'enrichment', label: 'Enhancement', IconComponent: TabIcons.bolt },
   { id: 'tracks', label: 'Tracks', IconComponent: TabIcons.listOrdered },
+  { id: 'classical', label: 'Classical', IconComponent: TabIcons.violin },
+  { id: 'people', label: 'People', IconComponent: TabIcons.users },
   { id: 'personal', label: 'Personal', IconComponent: TabIcons.user },
   { id: 'cover', label: 'Cover', IconComponent: TabIcons.camera },
   { id: 'links', label: 'Links', IconComponent: TabIcons.globe },
@@ -240,7 +253,8 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                  recording:recordings (
                    id,
                    title,
-                   duration_seconds
+                   duration_seconds,
+                   credits
                  )
                ),
                master:masters (
@@ -290,8 +304,42 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           position?: string | null;
           side?: string | null;
           title_override?: string | null;
-          recording?: { title?: string | null; duration_seconds?: number | null } | null;
+          recording?: {
+            title?: string | null;
+            duration_seconds?: number | null;
+            credits?: unknown;
+          } | null;
         }>;
+
+        const creditsSource = releaseTracks
+          .map((track) => track.recording?.credits)
+          .find((credits) => typeof credits === 'object' && credits !== null) as
+          | Record<string, unknown>
+          | undefined;
+
+        const albumPeople =
+          creditsSource?.album_people && typeof creditsSource.album_people === 'object'
+            ? (creditsSource.album_people as Record<string, unknown>)
+            : {};
+        const classical =
+          creditsSource?.classical && typeof creditsSource.classical === 'object'
+            ? (creditsSource.classical as Record<string, unknown>)
+            : {};
+
+        const toStringArray = (value: unknown): string[] | null => {
+          if (!value) return null;
+          if (Array.isArray(value)) {
+            const items = value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+            return items.length > 0 ? items : null;
+          }
+          if (typeof value === 'string' && value.trim().length > 0) return [value.trim()];
+          return null;
+        };
+
+        const toStringValue = (value: unknown): string | null => {
+          if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+          return null;
+        };
 
         const tracks = releaseTracks
           .map((track) => ({
@@ -339,6 +387,16 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           play_count: data.play_count ?? null,
           musicbrainz_release_group_id: master?.musicbrainz_release_group_id ?? null,
           tracks,
+          sale_quantity: release?.qty ?? 1,
+          composer: toStringValue(classical.composer ?? creditsSource?.composer),
+          conductor: toStringValue(classical.conductor ?? creditsSource?.conductor),
+          chorus: toStringValue(classical.chorus ?? creditsSource?.chorus),
+          composition: toStringValue(classical.composition ?? creditsSource?.composition),
+          orchestra: toStringValue(classical.orchestra ?? creditsSource?.orchestra),
+          songwriters: toStringArray(albumPeople.songwriters ?? creditsSource?.songwriters),
+          producers: toStringArray(albumPeople.producers ?? creditsSource?.producers),
+          engineers: toStringArray(albumPeople.engineers ?? creditsSource?.engineers),
+          musicians: toStringArray(albumPeople.musicians ?? creditsSource?.musicians),
         };
 
         setAlbum(albumData);
@@ -500,6 +558,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             country: editedAlbum.country ?? null,
             discogs_release_id: editedAlbum.discogs_release_id ?? null,
             spotify_album_id: editedAlbum.spotify_album_id ?? null,
+            qty: editedAlbum.sale_quantity ?? null,
           };
 
           const parsedFormat = editedAlbum.format
@@ -528,6 +587,78 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             console.error('❌ Failed to update release:', releaseError);
             alert(`Failed to save album: ${releaseError.message}`);
             return;
+          }
+
+          const creditsPayload = {
+            album_people: {
+              songwriters: editedAlbum.songwriters ?? [],
+              producers: editedAlbum.producers ?? [],
+              engineers: editedAlbum.engineers ?? [],
+              musicians: editedAlbum.musicians ?? [],
+            },
+            classical: {
+              composer: editedAlbum.composer ?? null,
+              conductor: editedAlbum.conductor ?? null,
+              chorus: editedAlbum.chorus ?? null,
+              composition: editedAlbum.composition ?? null,
+              orchestra: editedAlbum.orchestra ?? null,
+            },
+          };
+
+          const { data: recordingRows, error: recordingRowsError } = await supabase
+            .from('release_tracks')
+            .select('recording_id')
+            .eq('release_id', editedAlbum.release_id)
+            .not('recording_id', 'is', null);
+
+          if (recordingRowsError) {
+            console.error('❌ Failed to load release recording IDs:', recordingRowsError);
+            alert(`Failed to save credits: ${recordingRowsError.message}`);
+            return;
+          }
+
+          const recordingIds = Array.from(
+            new Set(
+              (recordingRows ?? [])
+                .map((row) => row.recording_id)
+                .filter((id): id is number => typeof id === 'number')
+            )
+          );
+
+          if (recordingIds.length > 0) {
+            const { data: recordingsWithCredits, error: recordingsError } = await supabase
+              .from('recordings')
+              .select('id, credits')
+              .in('id', recordingIds);
+
+            if (recordingsError) {
+              console.error('❌ Failed to load existing recording credits:', recordingsError);
+              alert(`Failed to save credits: ${recordingsError.message}`);
+              return;
+            }
+
+            for (const row of recordingsWithCredits ?? []) {
+              const existing =
+                row.credits && typeof row.credits === 'object' && !Array.isArray(row.credits)
+                  ? (row.credits as Record<string, unknown>)
+                  : {};
+              const merged = {
+                ...existing,
+                album_people: creditsPayload.album_people,
+                classical: creditsPayload.classical,
+              };
+
+              const { error: creditsError } = await supabase
+                .from('recordings')
+                .update({ credits: merged as unknown as Json })
+                .eq('id', row.id);
+
+              if (creditsError) {
+                console.error('❌ Failed to update recording credits:', creditsError);
+                alert(`Failed to save credits: ${creditsError.message}`);
+                return;
+              }
+            }
           }
         }
 
@@ -711,6 +842,12 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           </div>
           <div className={activeTab === 'tracks' ? 'block h-full' : 'hidden'}>
             <TracksTab ref={tracksTabRef} album={editedAlbum} onChange={handleFieldChange} />
+          </div>
+          <div className={activeTab === 'classical' ? 'block h-full' : 'hidden'}>
+            <ClassicalTab album={editedAlbum} onChange={handleFieldChange} />
+          </div>
+          <div className={activeTab === 'people' ? 'block h-full' : 'hidden'}>
+            <PeopleTab album={editedAlbum} onChange={handleFieldChange} />
           </div>
           <div className={activeTab === 'personal' ? 'block h-full' : 'hidden'}>
             <PersonalTab album={editedAlbum} onChange={handleFieldChange} />

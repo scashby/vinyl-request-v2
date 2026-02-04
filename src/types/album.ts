@@ -82,6 +82,19 @@ export type Album = {
   play_count?: number | null;
   last_played_at?: string | null;
 
+  // UI compatibility fields (legacy modal layout mapped to V3 storage)
+  sale_quantity?: number | null;
+  index_number?: number | null;
+  composer?: string | null;
+  conductor?: string | null;
+  chorus?: string | null;
+  composition?: string | null;
+  orchestra?: string | null;
+  songwriters?: string[] | null;
+  producers?: string[] | null;
+  engineers?: string[] | null;
+  musicians?: string[] | null;
+
   // Derived
   year_int?: number | null;
 };
