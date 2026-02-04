@@ -8,11 +8,9 @@ export async function GET(request: Request) {
   const supabase = supabaseServer(getAuthHeader(request));
 
   const { data, error, status } = await supabase
-    .from('now_playing')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .from('inventory')
+    .select('id')
+    .limit(1);
 
   return NextResponse.json({ status, error, data });
 }

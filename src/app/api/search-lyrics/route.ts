@@ -22,32 +22,6 @@ type SearchResult = {
   image_url: string | null;
 };
 
-type TagInsert = {
-  inventory_id: number;
-  track_title: string;
-  track_position: string | null;
-  search_term: string;
-  genius_url: string;
-};
-
-type TagQueryResult = {
-  inventory_id: number;
-  track_title: string;
-  track_position: string | null;
-  genius_url: string | null;
-  inventory?: {
-    release?: {
-      master?: {
-        title?: string | null;
-        cover_image_url?: string | null;
-        artist?: {
-          name?: string | null;
-        } | null;
-      } | null;
-    } | null;
-  } | null;
-};
-
 type Body = {
   term: string;
   folder?: string;
@@ -171,53 +145,6 @@ export async function POST(req: Request) {
 
     const searchTerm = body.term.trim().toLowerCase();
     console.log(`\n🔍 LYRICS SEARCH: "${searchTerm}"${body.folder ? ` in folder "${body.folder}"` : ''}`);
-    
-    // Check cache first
-    if (!body.forceRefresh) {
-      console.log(`📋 Checking cache...`);
-      const { data: existingTags, error: tagError } = await supabase
-        .from('lyric_search_tags')
-        .select(`
-          inventory_id,
-          track_title,
-          track_position,
-          genius_url,
-          inventory:inventory_id (
-            id,
-            release:releases (
-              master:masters (
-                title,
-                cover_image_url,
-                artist:artists (name)
-              )
-            )
-          )
-        `)
-        .eq('search_term', searchTerm);
-
-      if (!tagError && existingTags && existingTags.length > 0) {
-        console.log(`✅ Found ${existingTags.length} cached results`);
-        const tagResults = existingTags as unknown as TagQueryResult[];
-        const results: SearchResult[] = tagResults.map((tag) => ({
-          inventory_id: tag.inventory_id,
-          artist: tag.inventory?.release?.master?.artist?.name || 'Unknown Artist',
-          album_title: tag.inventory?.release?.master?.title || 'Unknown Album',
-          track_title: tag.track_title,
-          track_position: tag.track_position,
-          genius_url: tag.genius_url,
-          image_url: tag.inventory?.release?.master?.cover_image_url || null
-        }));
-
-        return NextResponse.json({
-          success: true,
-          cached: true,
-          term: body.term,
-          results,
-          count: results.length
-        });
-      }
-      console.log(`ℹ️ No cache, starting fresh search...`);
-    }
 
     // Get albums with tracklists
     console.log(`📀 Querying albums...`);
@@ -268,7 +195,6 @@ export async function POST(req: Request) {
     console.log(`📀 Found ${albums.length} albums to search`);
 
     const results: SearchResult[] = [];
-    const tagsToInsert: TagInsert[] = [];
     let tracksWithUrls = 0;
     let successfulFetches = 0;
     let failedFetches = 0;
@@ -323,14 +249,6 @@ export async function POST(req: Request) {
               genius_url: track.lyrics_url,
               image_url: master?.cover_image_url || null
             });
-
-            tagsToInsert.push({
-              inventory_id: album.id,
-              track_title: track.title,
-              track_position: track.position || null,
-              search_term: searchTerm,
-              genius_url: track.lyrics_url
-            });
           }
 
           await sleep(1000);
@@ -353,21 +271,8 @@ export async function POST(req: Request) {
       message = `⚠️ Warning: Failed to fetch lyrics from ${failedFetches}/${tracksWithUrls} tracks. Found ${tracksMatched} matches from ${successfulFetches} successful fetches.`;
     }
 
-    // Cache results
-    if (tagsToInsert.length > 0) {
-      console.log(`💾 Caching ${tagsToInsert.length} results...`);
-      const { error: insertError } = await supabase
-        .from('lyric_search_tags')
-        .insert(tagsToInsert);
-
-      if (insertError) {
-        console.error('⚠️ Cache error:', insertError);
-      }
-    }
-
     return NextResponse.json({
       success: true,
-      cached: false,
       term: body.term,
       results,
       count: results.length,
@@ -389,67 +294,18 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
-  const supabase = supabaseServer(getAuthHeader(req));
   try {
     const { searchParams } = new URL(req.url);
     const term = searchParams.get('term');
-
-    if (term) {
-      const { data, error } = await supabase
-        .from('lyric_search_tags')
-        .select(`
-          inventory_id,
-          track_title,
-          track_position,
-          genius_url,
-          inventory:inventory_id (
-            release:releases (
-              master:masters (
-                title,
-                cover_image_url,
-                artist:artists (name)
-              )
-            )
-          )
-        `)
-        .eq('search_term', term.toLowerCase());
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
-      }
-
-      const tagResults = data as unknown as TagQueryResult[] || [];
-      const results: SearchResult[] = tagResults.map((tag) => ({
-        inventory_id: tag.inventory_id,
-        artist: tag.inventory?.release?.master?.artist?.name || 'Unknown Artist',
-        album_title: tag.inventory?.release?.master?.title || 'Unknown Album',
-        track_title: tag.track_title,
-        track_position: tag.track_position,
-        genius_url: tag.genius_url,
-        image_url: tag.inventory?.release?.master?.cover_image_url || null
-      }));
-
-      return NextResponse.json({
-        term,
-        results,
-        count: results.length
-      });
-    } else {
-      const { data, error } = await supabase
-        .from('lyric_search_stats')
-        .select('*')
-        .order('track_count', { ascending: false })
-        .limit(50);
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
-      }
-
-      return NextResponse.json({
-        stats: data || [],
-        count: (data || []).length
-      });
-    }
+    return NextResponse.json(
+      {
+        error:
+          term && term.trim().length > 0
+            ? 'Use POST /api/search-lyrics to run live lyric search.'
+            : 'Lyric search stats are not persisted in V3. Use POST /api/search-lyrics.',
+      },
+      { status: 400 },
+    );
   } catch (error) {
     console.error('Error:', error);
     return NextResponse.json({

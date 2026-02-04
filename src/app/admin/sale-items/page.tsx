@@ -1,167 +1,402 @@
+// src/app/admin/sale-items/page.tsx
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from 'src/lib/supabaseClient';
+import Image from 'next/image';
+import Link from 'next/link';
+import { supabase } from 'lib/supabaseClient'; // Updated import path
 
-type SoldItem = {
+type SaleItem = {
   id: number;
-  status: string | null;
-  location: string | null;
-  purchase_price: number | null;
-  current_value: number | null;
-  date_added: string | null;
-  release?: {
-    id: number;
-    media_type: string | null;
-    release_year: number | null;
-    master?: {
-      title: string | null;
-      artist?: { name: string | null } | null;
-      cover_image_url: string | null;
-    } | null;
-  } | null;
+  artist: string;
+  title: string;
+  year: string | null;
+  format: string;
+  image_url: string | null;
+  location: string | null; // Changed from folder
+  for_sale: boolean;
+  sale_price: number | null;
+  sale_platform: string | null;
+  sale_quantity: number | null;
+  sale_notes: string | null;
+  wholesale_cost: number | null;
+  discogs_release_id: string | null;
+  personal_notes: string | null; // Added for context
 };
 
-const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
-  Array.isArray(value) ? value[0] ?? null : value ?? null;
+const PLATFORMS = [
+  { value: 'discogs', label: 'Discogs', url: 'https://www.discogs.com/sell/list', color: '#333' },
+  { value: 'shopify', label: 'Shopify Store', url: 'https://deadwaxdialogues.com/admin', color: '#96bf48' },
+  { value: 'ebay', label: 'eBay', url: 'https://www.ebay.com/sh/lst/active', color: '#e53238' },
+  { value: 'reverb', label: 'Reverb LP', url: 'https://reverb.com/my/listings', color: '#ff6600' },
+  { value: 'other', label: 'Other', url: null, color: '#6b7280' }
+];
 
 export default function SaleItemsPage() {
-  const [items, setItems] = useState<SoldItem[]>([]);
+  const [items, setItems] = useState<SaleItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [savingId, setSavingId] = useState<number | null>(null);
+  const [filterPlatform, setFilterPlatform] = useState<string>('all');
+  const [filterLocation, setFilterLocation] = useState<string>('all');
+  const [minPrice, setMinPrice] = useState<string>('');
+  const [maxPrice, setMaxPrice] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editValues, setEditValues] = useState<Partial<SaleItem>>({});
+  const [saving, setSaving] = useState(false);
 
-  const loadSoldItems = useCallback(async () => {
+  const [availableLocations, setAvailableLocations] = useState<string[]>([]);
+
+  const loadItems = useCallback(async () => {
     setLoading(true);
-    setError(null);
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('inventory')
-        .select(
-          `
-          id,
-          status,
-          location,
-          purchase_price,
-          current_value,
-          date_added,
-          release:releases (
-            id,
-            media_type,
-            release_year,
-            master:masters (
-              title,
-              cover_image_url,
-              artist:artists ( name )
-            )
+    
+    // Updated query: Removed 'folder', added 'location' and 'personal_notes'
+    const { data, error } = await supabase
+      .from('inventory')
+      .select(`
+        id,
+        status,
+        location,
+        personal_notes,
+        current_value,
+        purchase_price,
+        release:releases (
+          discogs_release_id,
+          release_year,
+          media_type,
+          format_details,
+          qty,
+          master:masters (
+            title,
+            original_release_year,
+            cover_image_url,
+            artist:artists ( name )
           )
-        `
         )
-        .eq('status', 'sold')
-        .order('date_added', { ascending: false });
+      `)
+      .eq('status', 'active')
+      .not('current_value', 'is', null)
+      .order('id', { ascending: true });
 
-      if (fetchError) throw fetchError;
+    if (!error && data) {
+      const mapped = data.map((row) => {
+        const release = row.release as {
+          discogs_release_id?: string | null;
+          release_year?: number | null;
+          media_type?: string | null;
+          format_details?: string[] | null;
+          qty?: number | null;
+          master?: {
+            title?: string | null;
+            original_release_year?: number | null;
+            cover_image_url?: string | null;
+            artist?: { name?: string | null } | null;
+          } | null;
+        } | null;
+        const master = release?.master;
+        const formatParts = [release?.media_type, ...(release?.format_details ?? [])].filter(Boolean);
+        const baseFormat = formatParts.join(', ');
+        const qty = release?.qty ?? 1;
+        const formatLabel = baseFormat ? (qty > 1 ? `${qty}x${baseFormat}` : baseFormat) : '';
+        const yearValue = release?.release_year ?? master?.original_release_year ?? null;
 
-      const normalized = (data ?? []).map((row) => ({
-        ...row,
-        release: toSingle(row.release),
-      })) as SoldItem[];
+        return {
+          id: row.id as number,
+          artist: master?.artist?.name ?? 'Unknown Artist',
+          title: master?.title ?? 'Untitled',
+          year: yearValue ? String(yearValue) : null,
+          format: formatLabel || 'Unknown',
+          image_url: master?.cover_image_url ?? null,
+          location: row.location ?? null,
+          for_sale: row.status === 'active',
+          sale_price: row.current_value ?? null,
+          sale_platform: null,
+          sale_quantity: 1,
+          sale_notes: null,
+          wholesale_cost: row.purchase_price ?? null,
+          discogs_release_id: release?.discogs_release_id ?? null,
+          personal_notes: row.personal_notes ?? null,
+        } satisfies SaleItem;
+      });
 
-      setItems(normalized);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load sold items.');
-    } finally {
-      setLoading(false);
+      setItems(mapped);
+      const locations = Array.from(new Set(mapped.map((item) => item.location).filter(Boolean)));
+      setAvailableLocations(locations.sort() as string[]);
     }
+    
+    setLoading(false);
   }, []);
 
   useEffect(() => {
-    loadSoldItems();
-  }, [loadSoldItems]);
+    loadItems();
+  }, [loadItems]);
 
-  const restoreToActive = async (inventoryId: number) => {
-    setSavingId(inventoryId);
-    try {
-      const { error: updateError } = await supabase
-        .from('inventory')
-        .update({ status: 'active' })
-        .eq('id', inventoryId);
-      if (updateError) throw updateError;
-      setItems((prev) => prev.filter((item) => item.id !== inventoryId));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update item.');
-    } finally {
-      setSavingId(null);
+  const filteredItems = items.filter(item => {
+    if (filterPlatform !== 'all' && item.sale_platform !== filterPlatform) return false;
+    if (filterLocation !== 'all' && item.location !== filterLocation) return false;
+    if (minPrice && (!item.sale_price || item.sale_price < parseFloat(minPrice))) return false;
+    if (maxPrice && (!item.sale_price || item.sale_price > parseFloat(maxPrice))) return false;
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      if (!item.artist.toLowerCase().includes(term) && !item.title.toLowerCase().includes(term)) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  const stats = {
+    total: items.length,
+    totalValue: items.reduce((sum, item) => sum + (item.sale_price || 0), 0),
+    byPlatform: items.reduce((acc, item) => {
+      const platform = item.sale_platform || 'unlisted';
+      acc[platform] = (acc[platform] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>),
+    totalQuantity: items.reduce((sum, item) => sum + (item.sale_quantity || 0), 0)
+  };
+
+  const startEdit = (item: SaleItem) => {
+    setEditingId(item.id);
+    setEditValues({
+      sale_price: item.sale_price,
+      sale_platform: item.sale_platform,
+      sale_quantity: item.sale_quantity,
+      sale_notes: item.sale_notes
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditValues({});
+  };
+
+  const saveEdit = async (id: number) => {
+    setSaving(true);
+    const updatePayload: Record<string, unknown> = {};
+    if (typeof editValues.sale_price === 'number') {
+      updatePayload.current_value = editValues.sale_price;
+    }
+    if (typeof editValues.sale_notes === 'string') {
+      updatePayload.personal_notes = editValues.sale_notes;
+    }
+
+    const { error } = await supabase
+      .from('inventory')
+      .update(updatePayload)
+      .eq('id', id);
+
+    if (!error) {
+      await loadItems();
+      setEditingId(null);
+      setEditValues({});
+    }
+    
+    setSaving(false);
+  };
+
+  const removeFromSale = async (id: number) => {
+    if (!confirm('Remove this item from sale?')) return;
+    
+    const { error } = await supabase
+      .from('inventory')
+      .update({
+        current_value: null
+      } as Record<string, unknown>)
+      .eq('id', id);
+
+    if (!error) {
+      await loadItems();
     }
   };
 
   return (
-    <div className="p-6 text-gray-800">
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Sold Items (V3)</h1>
-          <p className="text-sm text-gray-600">Inventory items marked as sold.</p>
-        </div>
-        <button
-          onClick={loadSoldItems}
-          className="px-4 py-2 rounded bg-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-300"
-        >
-          Refresh
-        </button>
+    <div style={{
+      padding: 24,
+      background: '#f8fafc',
+      minHeight: '100vh',
+      maxWidth: 1600,
+      margin: '0 auto'
+    }}>
+      {/* Header */}
+      <div style={{ marginBottom: 32 }}>
+        <h1 style={{ fontSize: 32, fontWeight: 'bold', color: '#1f2937', margin: '0 0 8px 0' }}>
+          💰 Sale Items & Merchandise
+        </h1>
+        <p style={{ color: '#6b7280', fontSize: 16, margin: 0 }}>
+          Manage pricing, inventory, and listings across platforms
+        </p>
       </div>
 
-      {loading && <div className="text-sm text-gray-600">Loading sold items…</div>}
-      {error && <div className="text-sm text-red-600 mb-4">{error}</div>}
+      {/* Statistics Cards */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: 16,
+        marginBottom: 24
+      }}>
+        {/* Total Items */}
+        <div style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', padding: 20, borderRadius: 12, color: 'white' }}>
+          <div style={{ fontSize: 14, opacity: 0.9, marginBottom: 4 }}>Total Items</div>
+          <div style={{ fontSize: 32, fontWeight: 'bold' }}>{stats.total}</div>
+          <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>{stats.totalQuantity} copies available</div>
+        </div>
 
-      {!loading && items.length === 0 && (
-        <div className="text-sm text-gray-600">No sold items found.</div>
-      )}
+        {/* Total Value */}
+        <div style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', padding: 20, borderRadius: 12, color: 'white' }}>
+          <div style={{ fontSize: 14, opacity: 0.9, marginBottom: 4 }}>Total Value</div>
+          <div style={{ fontSize: 32, fontWeight: 'bold' }}>${stats.totalValue.toFixed(2)}</div>
+          <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>Avg: ${stats.total > 0 ? (stats.totalValue / stats.total).toFixed(2) : '0.00'}</div>
+        </div>
 
-      {!loading && items.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs uppercase text-gray-500 border-b">
-                <th className="py-2 pr-4">Title</th>
-                <th className="py-2 pr-4">Artist</th>
-                <th className="py-2 pr-4">Year</th>
-                <th className="py-2 pr-4">Format</th>
-                <th className="py-2 pr-4">Location</th>
-                <th className="py-2 pr-4">Purchase</th>
-                <th className="py-2 pr-4">Value</th>
-                <th className="py-2 pr-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => {
-                const release = item.release;
-                const master = release?.master;
-                const artist = master?.artist?.name ?? '';
-                return (
-                  <tr key={item.id} className="border-b last:border-b-0">
-                    <td className="py-3 pr-4 font-semibold">{master?.title ?? 'Untitled'}</td>
-                    <td className="py-3 pr-4">{artist}</td>
-                    <td className="py-3 pr-4">{release?.release_year ?? '—'}</td>
-                    <td className="py-3 pr-4">{release?.media_type ?? '—'}</td>
-                    <td className="py-3 pr-4">{item.location ?? '—'}</td>
-                    <td className="py-3 pr-4">{item.purchase_price ?? '—'}</td>
-                    <td className="py-3 pr-4">{item.current_value ?? '—'}</td>
-                    <td className="py-3 pr-4">
-                      <button
-                        onClick={() => restoreToActive(item.id)}
-                        disabled={savingId === item.id}
-                        className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-60"
-                      >
-                        {savingId === item.id ? 'Updating…' : 'Restore'}
-                      </button>
+        {/* By Platform */}
+        <div style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', padding: 20, borderRadius: 12, color: 'white' }}>
+          <div style={{ fontSize: 14, opacity: 0.9, marginBottom: 4 }}>By Platform</div>
+          <div style={{ fontSize: 14, marginTop: 8 }}>
+            {Object.entries(stats.byPlatform).map(([platform, count]) => (
+              <div key={platform} style={{ marginBottom: 4 }}>{platform}: {count}</div>
+            ))}
+          </div>
+        </div>
+
+        {/* Quick Links */}
+        <div style={{ background: 'white', padding: 20, borderRadius: 12, border: '2px solid #e5e7eb' }}>
+          <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 12 }}>Quick Links</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {PLATFORMS.filter(p => p.url).map((platform) => (
+              <Link key={platform.value} href={platform.url!} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 500, color: platform.color, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+                {platform.label} →
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20, marginBottom: 24, boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)' }}>
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1f2937', margin: '0 0 16px 0' }}>🔍 Filter Items</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Search</label>
+            <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Artist or title..." style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }} />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Platform</label>
+            <select value={filterPlatform} onChange={e => setFilterPlatform(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14, backgroundColor: 'white' }}>
+              <option value="all">All Platforms</option>
+              {PLATFORMS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+              <option value="unlisted">Unlisted</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Location</label>
+            <select value={filterLocation} onChange={e => setFilterLocation(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14, backgroundColor: 'white' }}>
+              <option value="all">All Locations</option>
+              {availableLocations.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Min Price</label>
+            <input type="number" value={minPrice} onChange={e => setMinPrice(e.target.value)} placeholder="$0" step="0.01" style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }} />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Max Price</label>
+            <input type="number" value={maxPrice} onChange={e => setMaxPrice(e.target.value)} placeholder="$999" step="0.01" style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Items List */}
+      <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)' }}>
+        {loading ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading sale items...</div>
+        ) : filteredItems.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🏷️</div>
+            <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>{items.length === 0 ? 'No items for sale yet' : 'No items match your filters'}</div>
+            <div style={{ fontSize: 14 }}>{items.length === 0 ? <><Link href="/edit-collection" style={{ color: '#3b82f6' }}>Go to Collection</Link> to mark items for sale.</> : 'Try adjusting your filter settings'}</div>
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#6b7280' }}>Album</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#6b7280' }}>Price</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#6b7280' }}>Platform</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#6b7280' }}>Qty</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#6b7280' }}>Notes</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 13, fontWeight: 600, color: '#6b7280' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredItems.map(item => (
+                  <tr key={item.id} style={{ borderBottom: '1px solid #e5e7eb', background: editingId === item.id ? '#fef3c7' : 'white' }}>
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                        <Image src={item.image_url || '/images/coverplaceholder.png'} alt={item.title} width={50} height={50} style={{ borderRadius: 4, objectFit: 'cover' }} unoptimized />
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937', marginBottom: 2 }}>{item.title}</div>
+                          <div style={{ fontSize: 13, color: '#6b7280' }}>{item.artist}</div>
+                          <div style={{ fontSize: 12, color: '#9ca3af' }}>{item.year} • {item.format} • {item.location || 'No Location'}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '12px 16px' }}>
+                      {editingId === item.id ? (
+                        <input type="number" value={editValues.sale_price ?? ''} onChange={e => setEditValues({ ...editValues, sale_price: parseFloat(e.target.value) || null })} step="0.01" placeholder="0.00" style={{ width: 80, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 13 }} />
+                      ) : (
+                        <span style={{ fontSize: 15, fontWeight: 600, color: item.sale_price ? '#059669' : '#9ca3af' }}>{item.sale_price ? `$${item.sale_price.toFixed(2)}` : 'Not set'}</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '12px 16px' }}>
+                      {editingId === item.id ? (
+                        <select value={editValues.sale_platform ?? ''} onChange={e => setEditValues({ ...editValues, sale_platform: e.target.value || null })} style={{ width: 120, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 13, backgroundColor: 'white' }}>
+                          <option value="">Select...</option>
+                          {PLATFORMS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                        </select>
+                      ) : (
+                        <span style={{ fontSize: 13, color: item.sale_platform ? '#1f2937' : '#9ca3af', fontWeight: item.sale_platform ? 500 : 400 }}>
+                          {item.sale_platform ? PLATFORMS.find(p => p.value === item.sale_platform)?.label || item.sale_platform : 'Unlisted'}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '12px 16px' }}>
+                      {editingId === item.id ? (
+                        <input type="number" value={editValues.sale_quantity ?? ''} onChange={e => setEditValues({ ...editValues, sale_quantity: parseInt(e.target.value) || null })} min="1" style={{ width: 60, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 13 }} />
+                      ) : (
+                        <span style={{ fontSize: 14, color: '#1f2937' }}>{item.sale_quantity || 1}</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '12px 16px', maxWidth: 200 }}>
+                      {editingId === item.id ? (
+                        <input type="text" value={editValues.sale_notes ?? ''} onChange={e => setEditValues({ ...editValues, sale_notes: e.target.value || null })} placeholder="Condition, details..." style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 13 }} />
+                      ) : (
+                        <span style={{ fontSize: 13, color: item.sale_notes ? '#1f2937' : '#9ca3af', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {item.sale_notes || '—'}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                      {editingId === item.id ? (
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <button onClick={() => saveEdit(item.id)} disabled={saving} style={{ padding: '6px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer' }}>{saving ? 'Saving...' : 'Save'}</button>
+                          <button onClick={cancelEdit} disabled={saving} style={{ padding: '6px 12px', background: '#6b7280', color: 'white', border: 'none', borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer' }}>Cancel</button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <Link href={`/admin/edit-entry/${item.id}`} style={{ padding: '6px 12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 4, fontSize: 12, fontWeight: 600, textDecoration: 'none', display: 'inline-block' }}>Edit Full</Link>
+                          <button onClick={() => startEdit(item)} style={{ padding: '6px 12px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Quick Edit</button>
+                          <button onClick={() => removeFromSale(item.id)} style={{ padding: '6px 12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Remove</button>
+                        </div>
+                      )}
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
