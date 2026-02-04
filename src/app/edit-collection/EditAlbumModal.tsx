@@ -86,9 +86,9 @@ const TABS: { id: TabId; label: string; IconComponent: () => React.ReactElement 
   { id: 'main', label: 'Main', IconComponent: TabIcons.music },
   { id: 'details', label: 'Details', IconComponent: TabIcons.info },
   { id: 'enrichment', label: 'Enhancement', IconComponent: TabIcons.bolt },
-  { id: 'tracks', label: 'Tracks', IconComponent: TabIcons.listOrdered },
   { id: 'classical', label: 'Classical', IconComponent: TabIcons.violin },
   { id: 'people', label: 'People', IconComponent: TabIcons.users },
+  { id: 'tracks', label: 'Tracks', IconComponent: TabIcons.listOrdered },
   { id: 'personal', label: 'Personal', IconComponent: TabIcons.user },
   { id: 'cover', label: 'Cover', IconComponent: TabIcons.camera },
   { id: 'links', label: 'Links', IconComponent: TabIcons.globe },
@@ -840,14 +840,14 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           <div className={activeTab === 'enrichment' ? 'block h-full' : 'hidden'}>
             <EnrichmentTab album={editedAlbum} onChange={handleFieldChange} />
           </div>
-          <div className={activeTab === 'tracks' ? 'block h-full' : 'hidden'}>
-            <TracksTab ref={tracksTabRef} album={editedAlbum} onChange={handleFieldChange} />
-          </div>
           <div className={activeTab === 'classical' ? 'block h-full' : 'hidden'}>
             <ClassicalTab album={editedAlbum} onChange={handleFieldChange} />
           </div>
           <div className={activeTab === 'people' ? 'block h-full' : 'hidden'}>
             <PeopleTab album={editedAlbum} onChange={handleFieldChange} />
+          </div>
+          <div className={activeTab === 'tracks' ? 'block h-full' : 'hidden'}>
+            <TracksTab ref={tracksTabRef} album={editedAlbum} onChange={handleFieldChange} />
           </div>
           <div className={activeTab === 'personal' ? 'block h-full' : 'hidden'}>
             <PersonalTab album={editedAlbum} onChange={handleFieldChange} />

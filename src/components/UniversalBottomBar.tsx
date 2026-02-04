@@ -26,28 +26,91 @@ export function UniversalBottomBar({
   onSave,
   onOpenLocationPicker,
 }: UniversalBottomBarProps) {
+  const mapStatusToLegacy = (status?: string | null) => {
+    switch (status) {
+      case 'wishlist':
+        return 'wish_list';
+      case 'incoming':
+        return 'on_order';
+      case 'sold':
+        return 'sold';
+      default:
+        return 'in_collection';
+    }
+  };
+
+  const mapLegacyToStatus = (value: string) => {
+    switch (value) {
+      case 'wish_list':
+        return 'wishlist';
+      case 'on_order':
+        return 'incoming';
+      case 'sold':
+        return 'sold';
+      case 'not_in_collection':
+        return 'sold';
+      case 'for_sale':
+      case 'in_collection':
+      default:
+        return 'active';
+    }
+  };
+
   return (
     <div>
-      <div className="bg-gray-50 p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2fr_2fr] gap-4 items-end">
-        {/* Status */}
+      <div className="bg-gray-50 p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_2fr] gap-4 items-end">
+        {/* Collection Status */}
         <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1.5">Status</label>
+          <label className="block text-xs font-semibold text-gray-500 mb-1.5">Collection Status</label>
           <select
-            value={album.status || 'active'}
-            onChange={(e) => onChange('status', e.target.value)}
+            value={mapStatusToLegacy(album.status)}
+            onChange={(e) => onChange('status', mapLegacyToStatus(e.target.value) as Album['status'])}
             className="w-full px-2.5 py-2 border border-gray-300 rounded text-[13px] bg-white text-gray-900 focus:outline-none focus:border-blue-500 cursor-pointer"
           >
             <optgroup label="Collection">
-              <option value="active">Active</option>
+              <option value="in_collection">In Collection</option>
+              <option value="for_sale">For Sale</option>
             </optgroup>
             <optgroup label="Wish List">
-              <option value="wishlist">Wishlist</option>
-              <option value="incoming">Incoming</option>
+              <option value="wish_list">On Wish List</option>
+              <option value="on_order">On Order</option>
             </optgroup>
             <optgroup label="Not in Collection">
               <option value="sold">Sold</option>
+              <option value="not_in_collection">Not in Collection</option>
             </optgroup>
           </select>
+        </div>
+
+        {/* Index (UI compatibility) */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 mb-1.5">Index</label>
+          <input
+            type="number"
+            value={album.index_number || ''}
+            onChange={(e) =>
+              onChange(
+                'index_number',
+                (e.target.value ? parseInt(e.target.value, 10) : null) as Album['index_number']
+              )
+            }
+            placeholder="Index number"
+            className="w-full px-2.5 py-2 border border-gray-300 rounded text-[13px] bg-white text-gray-900 focus:outline-none focus:border-blue-500"
+          />
+        </div>
+
+        {/* Quantity */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 mb-1.5">Quantity</label>
+          <input
+            type="number"
+            min="1"
+            value={album.sale_quantity || 1}
+            onChange={(e) =>
+              onChange('sale_quantity', (e.target.value ? parseInt(e.target.value, 10) : 1) as Album['sale_quantity'])
+            }
+            className="w-full px-2.5 py-2 border border-gray-300 rounded text-[13px] bg-white text-gray-900 focus:outline-none focus:border-blue-500"
+          />
         </div>
 
         {/* Location */}
@@ -80,6 +143,7 @@ export function UniversalBottomBar({
 
       {/* Bottom buttons row */}
       <div className="flex justify-between items-center px-5 py-4 border-t border-gray-200 bg-gray-50">
+        {/* Left: Previous/Next */}
         <div className="flex gap-2">
           <button
             onClick={onPrevious}
@@ -105,16 +169,17 @@ export function UniversalBottomBar({
           </button>
         </div>
 
+        {/* Right: Cancel/Save */}
         <div className="flex gap-2">
           <button
             onClick={onCancel}
-            className="px-4 py-2 bg-gray-200 text-gray-700 border-none rounded text-[13px] font-medium cursor-pointer hover:bg-gray-300"
+            className="px-5 py-2 bg-gray-400 text-white border-none rounded text-[13px] font-medium cursor-pointer hover:bg-gray-500"
           >
             Cancel
           </button>
           <button
             onClick={onSave}
-            className="px-4 py-2 bg-blue-600 text-white border-none rounded text-[13px] font-semibold cursor-pointer hover:bg-blue-700"
+            className="px-5 py-2 bg-blue-500 text-white border-none rounded text-[13px] font-bold cursor-pointer hover:bg-blue-600"
           >
             Save
           </button>
