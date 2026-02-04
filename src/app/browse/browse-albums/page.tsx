@@ -210,7 +210,6 @@ function BrowseAlbumsContent() {
                  )
                )`
             )
-            .neq('status', 'for_sale')
             .range(from, from + batchSize - 1);
 
           if (error) throw error;

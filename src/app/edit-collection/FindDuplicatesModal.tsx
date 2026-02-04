@@ -14,7 +14,7 @@ interface FindDuplicatesModalProps {
   onDuplicatesRemoved: () => void;
 }
 
-type DetectionMethod = 'title' | 'title_artist' | 'barcode' | 'index';
+type DetectionMethod = 'title' | 'title_artist' | 'barcode';
 
 interface DuplicateGroup {
   key: string;
@@ -52,7 +52,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
     {
       id: 'default',
       name: 'Default',
-      columns: ['Artist', 'Title', 'Release Date', 'Format', 'Discs', 'Tracks', 'Length', 'Genre', 'Label', 'Added Date']
+      columns: ['Artist', 'Title', 'Year', 'Format', 'Label', 'Country', 'Barcode', 'Cat No', 'Added Date', 'Media Condition', 'Sleeve Condition']
     }
   ]);
   const [selectedFavoriteId, setSelectedFavoriteId] = useState('default');
@@ -62,7 +62,6 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
     { value: 'title' as DetectionMethod, label: 'Title' },
     { value: 'title_artist' as DetectionMethod, label: 'Title & Artist' },
     { value: 'barcode' as DetectionMethod, label: 'UPC (Barcode)' },
-    { value: 'index' as DetectionMethod, label: 'Index' },
   ];
 
   const selectedMethodLabel = detectionMethods.find(m => m.value === detectionMethod)?.label || 'Title';
@@ -98,123 +97,36 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
 
     return {
       id: row.id,
+      inventory_id: row.id,
+      release_id: release?.id ?? null,
+      master_id: master?.id ?? null,
       artist,
-      secondary_artists: null,
-      sort_artist: null,
       title: master?.title ?? 'Untitled',
-      sort_title: null,
       year: master?.original_release_year ? String(master.original_release_year) : null,
-      year_int: master?.original_release_year ?? null,
       image_url: master?.cover_image_url ?? null,
-      back_image_url: null,
-      index_number: null,
+      format: buildFormatLabel(release),
       collection_status: collectionStatus,
-      for_sale: false,
       location: row.location ?? null,
-      storage_device: null,
-      storage_device_slot: null,
-      slot: null,
       country: release?.country ?? null,
-      studio: null,
-      recording_location: null,
       date_added: row.date_added ?? null,
-      modified_date: null,
-      last_reviewed_at: null,
-      decade: master?.original_release_year ? Math.floor(master.original_release_year / 10) * 10 : null,
       personal_notes: row.personal_notes ?? null,
       release_notes: release?.notes ?? null,
-      extra: null,
-      format: buildFormatLabel(release),
       media_condition: row.media_condition ?? '',
       package_sleeve_condition: row.sleeve_condition ?? null,
       barcode: release?.barcode ?? null,
       cat_no: release?.catalog_number ?? null,
-      packaging: null,
-      rpm: null,
-      vinyl_weight: null,
-      vinyl_color: null,
-      discs: release?.qty ?? null,
-      sides: null,
-      length_seconds: null,
-      sound: null,
-      spars_code: null,
-      is_live: null,
-      is_box_set: null,
-      box_set: null,
-      time_signature: null,
-      tracks: null,
-      discogs_id: null,
-      discogs_release_id: release?.discogs_release_id ?? null,
-      discogs_master_id: master?.discogs_master_id ?? null,
-      spotify_id: null,
-      spotify_url: null,
-      spotify_album_id: release?.spotify_album_id ?? null,
-      apple_music_id: null,
-      apple_music_url: null,
-      musicbrainz_id: null,
-      musicbrainz_url: null,
-      lastfm_id: null,
-      lastfm_url: null,
-      allmusic_id: null,
-      allmusic_url: null,
-      wikipedia_url: null,
-      dbpedia_uri: null,
-      original_release_date: null,
-      original_release_year: master?.original_release_year ?? null,
-      recording_date: null,
-      recording_year: null,
-      master_release_date: release?.release_date ?? null,
+      labels: label ? [label] : null,
       genres: master?.genres ?? null,
       styles: master?.styles ?? null,
       custom_tags: tags.length > 0 ? tags : null,
-      labels: label ? [label] : null,
-      enrichment_sources: null,
-      finalized_fields: null,
-      musicians: null,
-      producers: null,
-      engineers: null,
-      songwriters: null,
-      writers: null,
-      chorus: null,
-      composer: null,
-      composition: null,
-      conductor: null,
-      orchestra: null,
+      discogs_release_id: release?.discogs_release_id ?? null,
+      discogs_master_id: master?.discogs_master_id ?? null,
+      spotify_album_id: release?.spotify_album_id ?? null,
       owner: row.owner ?? null,
-      due_date: null,
-      loan_date: null,
-      loaned_to: null,
-      last_cleaned_date: null,
-      last_played_date: null,
-      play_count: row.play_count ?? null,
-      my_rating: null,
-      signed_by: null,
       purchase_price: row.purchase_price ?? null,
       current_value: row.current_value ?? null,
       purchase_date: row.purchase_date ?? null,
-      purchase_store: null,
-      sale_price: null,
-      sell_price: null,
-      sale_platform: null,
-      sale_quantity: null,
-      sale_notes: null,
-      wholesale_cost: null,
-      pricing_notes: null,
-      subtitle: null,
-      played_history: null,
-      blocked: null,
-      blocked_sides: null,
-      blocked_tracks: null,
-      disc_metadata: null,
-      matrix_numbers: null,
-      inner_sleeve_images: null,
-      enriched_metadata: null,
-      cultural_significance: null,
-      tempo_bpm: null,
-      musical_key: null,
-      energy: null,
-      danceability: null,
-      valence: null,
+      play_count: row.play_count ?? null,
     };
   };
 
@@ -301,10 +213,6 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
             if (!album.barcode) return;
             key = album.barcode.trim();
             break;
-          case 'index':
-            if (!album.index_number) return;
-            key = String(album.index_number);
-            break;
         }
 
         if (!key) return;
@@ -330,9 +238,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
               ? albums[0].title
               : detectionMethod === 'title'
               ? albums[0].title
-              : detectionMethod === 'barcode'
-              ? `Barcode: ${albums[0].barcode}`
-              : `Index: ${albums[0].index_number}`,
+              : `Barcode: ${albums[0].barcode}`,
             albums,
             keepCount: albums.length,
           });
@@ -447,39 +353,38 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
   if (!isOpen) return null;
 
   const selectedFavorite = columnFavorites.find(f => f.id === selectedFavoriteId);
-  const displayColumns = selectedFavorite?.columns || ['Artist', 'Title', 'Release Date', 'Format', 'Discs', 'Tracks', 'Length', 'Genre', 'Label', 'Added Date'];
+  const displayColumns = selectedFavorite?.columns || ['Artist', 'Title', 'Year', 'Format', 'Label', 'Country', 'Barcode', 'Cat No', 'Added Date', 'Media Condition', 'Sleeve Condition'];
 
   const getColumnValue = (album: Album, columnName: string): string => {
     switch (columnName) {
       case 'Artist': return album.artist || '—';
       case 'Title': return album.title || '—';
-      case 'Release Date':
-      case 'Release Year': return album.year ? String(album.year) : '—';
+      case 'Year': return album.year ? String(album.year) : '—';
       case 'Format': return album.format || '—';
-      case 'Discs': return String(album.discs || 1);
-      case 'Tracks': return String(album.spotify_total_tracks || album.apple_music_track_count || '—');
-      case 'Length': 
-        if (!album.length_seconds) return '—';
-        return `${Math.floor(album.length_seconds / 60)}:${(album.length_seconds % 60).toString().padStart(2, '0')}`;
-      case 'Genre': 
-        // FIXED: Use canonical 'genres'
-        return album.genres ? (Array.isArray(album.genres) ? album.genres[0] : album.genres) : '—';
       case 'Label': 
-        return album.labels ? (Array.isArray(album.labels) ? album.labels[0] : album.labels) : album.spotify_label || album.apple_music_label || '—';
+        return album.labels ? (Array.isArray(album.labels) ? album.labels[0] : album.labels) : '—';
       case 'Added Date': 
         return album.date_added ? new Date(album.date_added).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+      case 'Location': return album.location || '—';
+      case 'Collection Status': return album.collection_status || '—';
       case 'Barcode': return album.barcode || '—';
       case 'Cat No': return album.cat_no || '—';
       case 'Country': return album.country || '—';
-      case 'Original Release Date': return album.original_release_date || '—';
-      case 'Index': return String(album.index_number || '—');
+      case 'Genres':
+        return album.genres ? (Array.isArray(album.genres) ? album.genres.join(', ') : album.genres) : '—';
+      case 'Styles':
+        return album.styles ? (Array.isArray(album.styles) ? album.styles.join(', ') : album.styles) : '—';
+      case 'Tags':
+        return album.custom_tags ? album.custom_tags.join(', ') : '—';
+      case 'Personal Notes': return album.personal_notes || '—';
+      case 'Release Notes': return album.release_notes || '—';
+      case 'Owner': return album.owner || '—';
       case 'Purchase Date': 
         return album.purchase_date ? new Date(album.purchase_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
       case 'Purchase Price': return album.purchase_price ? `$${album.purchase_price.toFixed(2)}` : '—';
       case 'Current Value': return album.current_value ? `$${album.current_value.toFixed(2)}` : '—';
-      case 'My Rating': return album.my_rating ? String(album.my_rating) : '—';
       case 'Media Condition': return album.media_condition || '—';
-      case 'Package/Sleeve Condition': return album.package_sleeve_condition || '—';
+      case 'Sleeve Condition': return album.package_sleeve_condition || '—';
       default: return '—';
     }
   };

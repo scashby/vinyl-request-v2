@@ -1,123 +1,161 @@
 // src/app/edit-collection/tabs/EnrichmentTab.tsx
 'use client';
 
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import type { Album } from 'types/album';
+import { FindCoverModal } from '../enrichment/FindCoverModal';
 
 interface EnrichmentTabProps {
   album: Album;
   onChange: <K extends keyof Album>(field: K, value: Album[K]) => void;
 }
 
+type EnrichResult = {
+  success: boolean;
+  skipped?: boolean;
+  error?: string;
+  message?: string;
+  data?: {
+    updates?: {
+      release?: Record<string, unknown>;
+      master?: Record<string, unknown>;
+    };
+    tracks?: Array<{
+      position: string;
+      title: string;
+      artist: string | null;
+      duration: string | null;
+      type: 'track';
+      side?: string;
+    }>;
+    totalTracks?: number;
+  };
+};
+
 export function EnrichmentTab({ album, onChange }: EnrichmentTabProps) {
-  
-  const renderSlider = (label: string, field: keyof Album, colorClass: string) => {
-    const val = typeof album[field] === 'number' ? album[field] as number : 0;
-    return (
-      <div className="flex items-center gap-3 mb-2">
-        <div className="w-24 text-xs font-semibold text-gray-500">{label}</div>
-        <input 
-          type="range" 
-          min="0" 
-          max="1" 
-          step="0.01"
-          value={val}
-          onChange={(e) => onChange(field, parseFloat(e.target.value))}
-          className={`flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-gray-200 ${colorClass}`}
-        />
-        <div className="w-12 text-right text-xs font-mono text-gray-600">
-          {Math.round(val * 100)}%
-        </div>
-      </div>
-    );
+  const [loadingMetadata, setLoadingMetadata] = useState(false);
+  const [loadingTracklist, setLoadingTracklist] = useState(false);
+  const [showFindCover, setShowFindCover] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  const hasDiscogsId = useMemo(() => Boolean(album.discogs_release_id), [album.discogs_release_id]);
+
+  const handleDiscogsMetadata = async () => {
+    if (!album.id) return;
+    setLoadingMetadata(true);
+    setStatusMessage(null);
+    try {
+      const res = await fetch('/api/enrich-sources/discogs-metadata', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ albumId: album.id })
+      });
+      const data = (await res.json()) as EnrichResult;
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Discogs metadata failed');
+      }
+
+      const updates = data.data?.updates;
+      if (updates?.release?.discogs_release_id) {
+        onChange('discogs_release_id', updates.release.discogs_release_id as Album['discogs_release_id']);
+      }
+      if (updates?.master?.discogs_master_id) {
+        onChange('discogs_master_id', updates.master.discogs_master_id as Album['discogs_master_id']);
+      }
+      if (updates?.master?.cover_image_url) {
+        onChange('image_url', updates.master.cover_image_url as Album['image_url']);
+      }
+      if (updates?.master?.genres) {
+        onChange('genres', updates.master.genres as Album['genres']);
+      }
+      if (updates?.master?.styles) {
+        onChange('styles', updates.master.styles as Album['styles']);
+      }
+
+      setStatusMessage(data.skipped ? 'No new metadata found.' : 'Discogs metadata updated.');
+    } catch (err) {
+      setStatusMessage(err instanceof Error ? err.message : 'Discogs metadata failed.');
+    } finally {
+      setLoadingMetadata(false);
+    }
+  };
+
+  const handleDiscogsTracklist = async () => {
+    if (!album.id) return;
+    setLoadingTracklist(true);
+    setStatusMessage(null);
+    try {
+      const res = await fetch('/api/enrich-sources/discogs-tracklist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ albumId: album.id })
+      });
+      const data = (await res.json()) as EnrichResult;
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Discogs tracklist failed');
+      }
+      if (data.data?.tracks && data.data.tracks.length > 0) {
+        onChange('tracks', data.data.tracks as Album['tracks']);
+      }
+      setStatusMessage(`Tracklist updated (${data.data?.totalTracks ?? 0} tracks).`);
+    } catch (err) {
+      setStatusMessage(err instanceof Error ? err.message : 'Discogs tracklist failed.');
+    } finally {
+      setLoadingTracklist(false);
+    }
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8">
-      
-      {/* SECTION 1: EXTERNAL SOURCES */}
-      <div className="bg-blue-50 border border-blue-100 rounded-lg overflow-hidden">
-        <div className="px-4 py-3 bg-blue-100/50 border-b border-blue-200 flex justify-between items-center">
-          <h3 className="text-sm font-bold text-blue-800 uppercase tracking-wide">
-            Enrichment Sources
-          </h3>
-          <span className="text-xs text-blue-600">
-            {album.enrichment_sources?.length || 0} Sources
-          </span>
-        </div>
-        
-        <div className="p-4">
-          {album.enrichment_sources && album.enrichment_sources.length > 0 ? (
-             <div className="flex flex-wrap gap-2">
-                {album.enrichment_sources.map((source) => (
-                  <span key={source} className="text-xs font-bold text-blue-700 uppercase bg-white border border-blue-200 px-2 py-1 rounded shadow-sm">
-                    {source}
-                  </span>
-                ))}
-             </div>
-          ) : (
-            <div className="text-center text-gray-400 text-sm py-2 italic">
-              No external enrichment data found. Run &quot;Enrich Collection&quot; to populate.
-            </div>
-          )}
-        </div>
+    <div className="p-4 flex flex-col gap-4">
+      <div className="text-sm text-gray-600">
+        V3 enrichment focuses on Discogs metadata, tracklists, and cover art.
       </div>
 
-      {/* SECTION 2: SONIC DNA */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* LEFT: Basic Stats */}
-        <div className="space-y-4">
-          <h3 className="text-sm font-bold text-gray-700 border-b border-gray-200 pb-2">
-            Musical Properties
-          </h3>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">BPM (Tempo)</label>
-              <input 
-                type="number" 
-                value={album.tempo_bpm || ''} 
-                onChange={(e) => onChange('tempo_bpm', parseInt(e.target.value) || null)}
-                className="w-full p-2 border border-gray-300 rounded text-sm"
-                placeholder="e.g. 120"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Musical Key</label>
-              <input 
-                type="text" 
-                value={album.musical_key || ''} 
-                onChange={(e) => onChange('musical_key', e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded text-sm"
-                placeholder="e.g. C Major"
-              />
-            </div>
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <button
+          onClick={handleDiscogsMetadata}
+          disabled={loadingMetadata}
+          className="px-4 py-2.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-60"
+        >
+          {loadingMetadata ? 'Fetching Discogs Metadata…' : 'Fetch Discogs Metadata'}
+        </button>
 
-          <div className="pt-2">
-             {renderSlider('Energy', 'energy', 'accent-orange-500')}
-             {renderSlider('Danceability', 'danceability', 'accent-purple-500')}
-          </div>
-        </div>
+        <button
+          onClick={handleDiscogsTracklist}
+          disabled={loadingTracklist || !hasDiscogsId}
+          className="px-4 py-2.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-60"
+        >
+          {loadingTracklist ? 'Fetching Tracklist…' : 'Fetch Discogs Tracklist'}
+        </button>
 
-        {/* RIGHT: Moods */}
-        <div className="space-y-4">
-          <h3 className="text-sm font-bold text-gray-700 border-b border-gray-200 pb-2">
-            Mood Profile
-          </h3>
-          <div className="pt-2">
-            {renderSlider('Acoustic', 'mood_acoustic', 'accent-slate-500')}
-            {renderSlider('Electronic', 'mood_electronic', 'accent-indigo-500')}
-            {renderSlider('Happy', 'mood_happy', 'accent-yellow-500')}
-            {renderSlider('Sad', 'mood_sad', 'accent-blue-500')}
-            {renderSlider('Aggressive', 'mood_aggressive', 'accent-red-500')}
-            {renderSlider('Relaxed', 'mood_relaxed', 'accent-green-500')}
-            {renderSlider('Party', 'mood_party', 'accent-pink-500')}
-          </div>
-        </div>
+        <button
+          onClick={() => setShowFindCover(true)}
+          className="px-4 py-2.5 text-sm bg-gray-700 text-white rounded hover:bg-gray-800"
+        >
+          Find Cover Art
+        </button>
       </div>
 
+      {statusMessage && (
+        <div className="text-xs text-gray-700 bg-gray-50 border border-gray-200 rounded px-3 py-2">
+          {statusMessage}
+        </div>
+      )}
+
+      {!hasDiscogsId && (
+        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+          Tracklist enrichment requires a Discogs Release ID. Run “Fetch Discogs Metadata” first if missing.
+        </div>
+      )}
+
+      <FindCoverModal
+        isOpen={showFindCover}
+        onClose={() => setShowFindCover(false)}
+        onSelectImage={(imageUrl) => onChange('image_url', imageUrl as Album['image_url'])}
+        defaultQuery={`${album.artist ?? ''} ${album.title ?? ''}`.trim()}
+        artist={album.artist ?? undefined}
+        title={album.title ?? undefined}
+      />
     </div>
   );
 }

@@ -28,26 +28,16 @@ export interface SmartRule {
 export type CrateFieldType = 
   // Text fields - Basic
   | 'artist' | 'title' | 'format' | 'country' | 'location' 
-  | 'owner' | 'notes' | 'barcode' | 'cat_no'
-  // Text fields - Packaging & Condition
-  | 'packaging' | 'package_sleeve_condition' | 'media_condition'
-  // Text fields - Vinyl Details
-  | 'vinyl_weight' | 'rpm' | 'sound' | 'spars_code' | 'studio'
-  // Text fields - Personal
-  | 'purchase_store' | 'box_set'
-  // Text fields - Classical
-  | 'composer' | 'conductor' | 'chorus' | 'composition' | 'orchestra'
+  | 'owner' | 'personal_notes' | 'release_notes' | 'barcode' | 'cat_no'
+  // Text fields - Condition
+  | 'package_sleeve_condition' | 'media_condition'
   // Number fields
-  | 'year_int' | 'my_rating' | 'play_count' | 'discs' | 'sides' | 'index_number'
+  | 'year_int' | 'play_count'
   | 'purchase_price' | 'current_value'
   // Date fields
-  | 'date_added' | 'purchase_date' | 'last_played_date' 
-  | 'original_release_date' | 'recording_date' | 'last_cleaned_date'
-  // Boolean fields
-  | 'for_sale' | 'is_live' | 'is_1001'
+  | 'date_added' | 'purchase_date' | 'last_played_at'
   // Array fields (special handling)
-  | 'custom_tags' | 'discogs_genres' | 'spotify_genres' | 'labels' | 'signed_by'
-  | 'songwriters' | 'producers' | 'engineers' | 'musicians'
+  | 'custom_tags' | 'labels'
   // Derived fields
   | 'decade';
 

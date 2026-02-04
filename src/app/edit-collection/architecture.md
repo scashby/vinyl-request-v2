@@ -158,33 +158,24 @@ PickerModal (shows location picker)
 - media_condition, image_url, package_sleeve_condition
 
 **Sales:**
-- for_sale, sale_price, sale_platform, sale_notes, sale_quantity
 
 **Metadata:**
-- custom_tags, discogs_genres, spotify_genres
 
 **Services:**
-- spotify_label, apple_music_label
 - spotify_total_tracks, apple_music_track_count
 
 **Dates:**
-- date_added, master_release_date, purchase_date
 
 **Enrichment:**
-- last_enriched_at, enrichment_sources
 
 **External IDs:**
 - discogs_master_id, discogs_release_id
-- spotify_id (has alias: spotify_album_id)
-- apple_music_id
 - discogs_id (alias for discogs_release_id)
 
 **Physical:**
 - discs, sides, length_seconds
-- rpm, vinyl_color, vinyl_weight
 
 **Value:**
-- wholesale_cost
 - current_value, purchase_price
 
 ---

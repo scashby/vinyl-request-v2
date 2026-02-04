@@ -192,7 +192,6 @@ This file contains detailed change history for work completed prior to the curre
 ### Evening - Update 3: COLUMN FIXES COMPLETE
 - Fixed "Release Date" column to show year field instead of date_added
 - Removed duplicate "Added Date" column from table
-- Added new "Master Release Date" column with formatted master_release_date
 - Table now has 14 properly mapped columns
 
 ---

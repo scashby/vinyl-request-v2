@@ -214,7 +214,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
           </div>
           <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
             <span className="font-semibold min-w-[180px]">Package/Sleeve Condition</span>
-            <span>{album.sleeve_condition || '—'}</span>
+            <span>{album.package_sleeve_condition || '—'}</span>
           </div>
           <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
             <span className="font-semibold min-w-[180px]">Media Condition</span>
@@ -291,14 +291,6 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
         >
           ✏️ Edit Album
         </button>
-        {album.status !== 'for_sale' && (
-          <button 
-            onClick={onMarkForSale} 
-            className="flex-1 p-2.5 bg-emerald-500 text-white border-none rounded-md text-[13px] font-semibold cursor-pointer hover:bg-emerald-600"
-          >
-            💰 Sell
-          </button>
-        )}
       </div>
     </div>
   );

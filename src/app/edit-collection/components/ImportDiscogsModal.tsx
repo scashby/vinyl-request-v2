@@ -274,9 +274,11 @@ const splitDiscogsUpdates = (payload: Record<string, unknown>) => {
       case 'genres':
       case 'styles':
       case 'discogs_master_id':
+      case 'original_release_year':
         masterUpdates[key] = value ?? null;
         break;
       case 'notes':
+      case 'release_notes':
         releaseUpdates.notes = value ?? null;
         break;
       default:
@@ -304,14 +306,10 @@ interface ParsedAlbum {
   media_condition: string;
   package_sleeve_condition: string | null;
   personal_notes: string | null;
-  my_rating: number | null;
-  decade: number | null;
   artist_norm: string;
   title_norm: string;
   artist_album_norm: string;
   album_norm: string;
-  for_sale: boolean;
-  index_number: number | null;
   cover_image: string | null;
 }
 
@@ -336,7 +334,6 @@ interface ExistingAlbum {
   cover_image?: string | null;
   tracks?: unknown[] | null;
   genres?: string[] | null;
-  packaging?: string | null;
 }
 
 interface ComparedAlbum extends ParsedAlbum {
@@ -352,14 +349,6 @@ interface ImportDiscogsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onImportComplete?: () => void;
-}
-
-// Helper functions
-function calculateDecade(year: string | null): number | null {
-  if (!year) return null;
-  const yearNum = parseInt(year);
-  if (isNaN(yearNum) || yearNum <= 0) return null;
-  return Math.floor(yearNum / 10) * 10;
 }
 
 function getErrorMessage(error: unknown): string {
@@ -521,8 +510,6 @@ function compareAlbums(
       media_condition: '',
       package_sleeve_condition: null,
       personal_notes: null,
-      my_rating: null,
-      decade: null,
       artist_norm: normalizeArtist(existingAlbum.artist),
       title_norm: normalizeTitle(existingAlbum.title),
       artist_album_norm: normalizedKey,
@@ -533,8 +520,6 @@ function compareAlbums(
       existingMasterId: existingAlbum.master_id ?? null,
       needsEnrichment: false,
       missingFields: [],
-      for_sale: false,
-      index_number: null,
       cover_image: existingAlbum.image_url ?? existingAlbum.cover_image ?? null
     });
   }
@@ -558,12 +543,8 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
   // Extract data
   const enriched: Record<string, unknown> = {
     image_url: data.images?.[0]?.uri || null,
-    back_image_url: data.images?.[1]?.uri || null,
     genres: data.genres || [],
     styles: data.styles || [],
-    packaging: data.formats?.[0]?.descriptions?.find((d) => 
-      ['Gatefold', 'Single Sleeve', 'Digipak'].some(p => d.includes(p))
-    ) || null,
     release_notes: data.notes || null,
     country: data.country || null,
   };
@@ -577,9 +558,6 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
       } 
       else if (/^\d{4}-\d{2}$/.test(dateStr)) {
           dateStr = `${dateStr}-01`;
-      }
-      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-          enriched.original_release_date = dateStr;
       }
       const year = parseInt(data.released.substring(0, 4));
       if (!isNaN(year)) enriched.original_release_year = year;
@@ -600,120 +578,6 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     if (labels.length > 0) {
       enriched.labels = labels;
     }
-  }
-
-  // Format & Sound parsing
-  if (data.formats && Array.isArray(data.formats)) {
-    const soundDescriptions = data.formats[0]?.descriptions || [];
-    const soundTypes = ['Stereo', 'Mono', 'Quadraphonic', 'Surround'];
-    const sound = soundDescriptions.find((d) => 
-      soundTypes.some(type => d.includes(type))
-    );
-    if (sound) enriched.sound = sound;
-  }
-
-  // Matrix & Identifiers parsing
-  if (data.identifiers && Array.isArray(data.identifiers)) {
-    const matrixEntries: Record<string, string> = {};
-    
-    data.identifiers.forEach((identifier) => {
-      if (identifier.type === 'Matrix / Runout') {
-        const desc = identifier.description || '';
-        if (desc.toLowerCase().includes('side a') || desc.toLowerCase().includes('a-side')) {
-          matrixEntries.side_a = identifier.value;
-        } else if (desc.toLowerCase().includes('side b') || desc.toLowerCase().includes('b-side')) {
-          matrixEntries.side_b = identifier.value;
-        } else if (desc.toLowerCase().includes('side c')) {
-          matrixEntries.side_c = identifier.value;
-        } else if (desc.toLowerCase().includes('side d')) {
-          matrixEntries.side_d = identifier.value;
-        } else if (!matrixEntries.side_a) {
-          matrixEntries.side_a = identifier.value;
-        } else if (!matrixEntries.side_b) {
-          matrixEntries.side_b = identifier.value;
-        }
-      } else if (identifier.type === 'SPARS Code') {
-        enriched.spars_code = identifier.value;
-      }
-    });
-
-    if (Object.keys(matrixEntries).length > 0) {
-      enriched.matrix_numbers = matrixEntries;
-    }
-  }
-
-  // Track parsing
-  if (data.tracklist && Array.isArray(data.tracklist)) {
-    const tracks: unknown[] = [];
-    const discMetadata: { disc_number: number; title: string | null }[] = [];
-    let position = 1;
-    let currentDiscNumber = 1;
-    let currentDiscTitle: string | null = null;
-
-    data.tracklist.forEach((track) => {
-      const positionStr = track.position || '';
-      let discNumber = 1;
-      let side = '';
-      
-      const sideMatch = positionStr.match(/^([A-Z])(\d+)?/);
-      if (sideMatch) {
-        side = sideMatch[1];
-        discNumber = Math.ceil((side.charCodeAt(0) - 64) / 2);
-      } else {
-        const discMatch = positionStr.match(/^(\d+)-(\d+)?/);
-        if (discMatch) {
-          discNumber = parseInt(discMatch[1]);
-        }
-      }
-
-      if (track.type_ === 'heading') {
-        if (discNumber !== currentDiscNumber) {
-            currentDiscNumber = discNumber;
-            currentDiscTitle = track.title || null;
-            if (!discMetadata.find(d => d.disc_number === discNumber)) {
-                discMetadata.push({ disc_number: discNumber, title: currentDiscTitle });
-            }
-        }
-        return;
-      }
-
-      tracks.push({
-        position: position.toString(),
-        title: track.title || '',
-        artist: track.artists?.[0]?.name || null,
-        duration: track.duration || null,
-        type: 'track',
-        disc_number: discNumber,
-        side: side || undefined,
-      });
-
-      position++;
-    });
-
-    enriched.tracks = tracks;
-    
-    if (discMetadata.length > 0) {
-      enriched.disc_metadata = discMetadata;
-    }
-  }
-
-  // Credits parsing - Map to Objects for JSONB
-  if (data.extraartists && Array.isArray(data.extraartists)) {
-    enriched.musicians = data.extraartists
-      .filter((a) => a.role && (a.role.toLowerCase().includes('musician') || a.role.toLowerCase().includes('performer')))
-      .map((a) => ({ name: a.name, role: a.role }));
-      
-    enriched.producers = data.extraartists
-      .filter((a) => a.role && a.role.toLowerCase().includes('producer'))
-      .map((a) => ({ name: a.name, role: a.role }));
-      
-    enriched.engineers = data.extraartists
-      .filter((a) => a.role && a.role.toLowerCase().includes('engineer'))
-      .map((a) => ({ name: a.name, role: a.role }));
-      
-    enriched.songwriters = data.extraartists
-      .filter((a) => a.role && (a.role.toLowerCase().includes('written-by') || a.role.toLowerCase().includes('songwriter')))
-      .map((a) => ({ name: a.name, role: a.role }));
   }
 
   return enriched;
@@ -868,10 +732,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     if (f.descriptions) fullFormat += `, ${f.descriptions.join(', ')}`;
                 }
 
-                // Map Folder to Location & For Sale
-                const folderName = folders[item.folder_id] || 'Uncategorized';
-                const isForSale = folderName.toLowerCase().includes('sale') || folderName.toLowerCase().includes('sell');
-
                 // Ensure date is YYYY-MM-DD
                 const dateAdded = item.date_added ? item.date_added.split('T')[0] : new Date().toISOString().split('T')[0];
 
@@ -886,20 +746,16 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     year,
                     year_int: isNaN(yearInt!) ? null : yearInt,
                     location: sourceType === 'collection' && item.folder_id === 0 ? 'All' : 'Uncategorized',
-                    for_sale: isForSale,
                     discogs_release_id: item.id.toString(),
                     discogs_master_id: info.master_id?.toString() || null,
                     date_added: dateAdded,
                     media_condition: mediaCond,
                     package_sleeve_condition: sleeveCond,
                     personal_notes: personalNoteStr,
-                    my_rating: item.rating || null,
-                    decade: calculateDecade(year),
                     artist_norm: normalizeArtist(artist),
                     title_norm: normalizeTitle(title),
                     artist_album_norm: normalizeArtistAlbum(artist, title),
                     album_norm: normalizeTitle(title),
-                    index_number: item.instance_id,
                     cover_image: info.thumb || null
                 });
             }
@@ -994,7 +850,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               cover_image: master?.cover_image_url ?? null,
               tracks: null,
               genres: master?.genres ?? null,
-              packaging: null,
             } satisfies ExistingAlbum;
           });
         } else {
@@ -1009,7 +864,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               image_url: wantlistAlbum.cover_image ?? null,
               tracks: null,
               genres: null,
-              packaging: null,
             };
           });
         }

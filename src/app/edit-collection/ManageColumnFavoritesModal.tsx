@@ -19,13 +19,10 @@ interface ManageColumnFavoritesModalProps {
 }
 
 const COLUMN_FIELDS = {
-  Main: ['Artist', 'Artist Sort', 'Barcode', 'Cat No', 'Format', 'Genre', 'Label', 'Original Release Date', 'Original Release Year', 'Recording Date', 'Recording Year', 'Release Date', 'Release Year', 'Sort Title', 'Subtitle', 'Title'],
-  Details: ['Box Set', 'Country', 'Extra', 'Is Live', 'Media Condition', 'Package/Sleeve Condition', 'Packaging', 'RPM', 'Sound', 'SPARS', 'Storage Device', 'Storage Device Slot', 'Studio', 'Vinyl Color', 'Vinyl Weight'],
-  Edition: ['Discs', 'Length', 'Tracks'],
-  Classical: ['Chorus', 'Composer', 'Composition', 'Conductor', 'Orchestra'],
-  People: ['Engineer', 'Musician', 'Producer', 'Songwriter'],
-  Personal: ['Added Date', 'Added Year', 'Collection Status', 'Current Value', 'Index', 'Last Cleaned Date', 'Last Cleaned Year', 'Last Played Date', 'Location', 'Modified Date', 'My Rating', 'Notes', 'Owner', 'Play Count', 'Played Year', 'Purchase Date', 'Purchase Price', 'Purchase Store', 'Purchase Year', 'Quantity', 'Signed by', 'Tags'],
-  Loan: ['Due Date', 'Loan Date', 'Loaned To'],
+  Main: ['Artist', 'Title', 'Year', 'Format', 'Label', 'Barcode', 'Cat No'],
+  Details: ['Location', 'Country', 'Media Condition', 'Sleeve Condition', 'Added Date', 'Collection Status'],
+  Metadata: ['Genres', 'Styles', 'Tags'],
+  Personal: ['Personal Notes', 'Release Notes', 'Owner', 'Purchase Date', 'Purchase Price', 'Current Value'],
 };
 
 export function ManageColumnFavoritesModal({

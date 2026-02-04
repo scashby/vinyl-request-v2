@@ -91,11 +91,6 @@ function formatValue(value: unknown, columnId: ColumnId): string {
     return value ? 'Yes' : 'No';
   }
   
-  // Handle ratings
-  if (columnId === 'my_rating' && typeof value === 'number') {
-    return '★'.repeat(value);
-  }
-  
   return String(value);
 }
 

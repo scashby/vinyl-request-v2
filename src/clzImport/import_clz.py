@@ -45,7 +45,6 @@ def parse_tracks(music):
                 'position': raw_pos or str(len(tracks) + 1),
                 'side': raw_pos[0] if raw_pos and raw_pos[0].isalpha() else None,
                 'duration_seconds': seconds_val,
-                'disc_number': disc_index,
             })
     return tracks
 
@@ -76,14 +75,11 @@ def parse_clz_xml(xml_path):
         location = f"{storage} {slot}".strip()
 
         tracks = parse_tracks(music)
-        disc_count = max({t['disc_number'] for t in tracks} or {1})
-
         clz_data.append({
             'artist': primary_artist,
             'title': title,
             'year': year,
             'tracks': tracks,
-            'disc_count': disc_count,
             'barcode': music.findtext('barcode', ''),
             'cat_no': music.findtext('labelnumber', ''),
             'personal_notes': notes,
@@ -100,8 +96,6 @@ def build_album_sql(item):
     catalog_number = clean_text(item['cat_no']) or None
     location = clean_text(item['location']) or None
     personal_notes = clean_text(item['personal_notes']) or None
-    disc_count = item.get('disc_count') or 1
-
     return f"""
 WITH artist_row AS (
   INSERT INTO public.artists (name)
@@ -130,7 +124,7 @@ release_row AS (
   VALUES (
     (SELECT id FROM master_id),
     'Unknown',
-    {disc_count},
+    1,
     {f"'{catalog_number}'" if catalog_number else 'NULL'},
     {f"'{barcode}'" if barcode else 'NULL'},
     {year if year else 'NULL'}

@@ -28,7 +28,7 @@ export function UniversalBottomBar({
 }: UniversalBottomBarProps) {
   return (
     <div>
-      <div className="bg-gray-50 p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_2fr] gap-4 items-end">
+      <div className="bg-gray-50 p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2fr_2fr] gap-4 items-end">
         {/* Collection Status */}
         <div>
           <label className="block text-xs font-semibold text-gray-500 mb-1.5">Collection Status</label>
@@ -39,7 +39,6 @@ export function UniversalBottomBar({
           >
             <optgroup label="Collection">
               <option value="in_collection">In Collection</option>
-              <option value="for_sale">For Sale</option>
             </optgroup>
             <optgroup label="Wish List">
               <option value="wish_list">On Wish List</option>
@@ -47,33 +46,8 @@ export function UniversalBottomBar({
             </optgroup>
             <optgroup label="Not in Collection">
               <option value="sold">Sold</option>
-              <option value="not_in_collection">Not in Collection</option>
             </optgroup>
           </select>
-        </div>
-
-        {/* Index */}
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1.5">Index</label>
-          <input
-            type="number"
-            value={album.index_number || ''}
-            onChange={(e) => onChange('index_number', e.target.value ? parseInt(e.target.value) : null)}
-            placeholder="Index number"
-            className="w-full px-2.5 py-2 border border-gray-300 rounded text-[13px] bg-white text-gray-900 focus:outline-none focus:border-blue-500"
-          />
-        </div>
-
-        {/* Quantity */}
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1.5">Quantity</label>
-          <input
-            type="number"
-            min="1"
-            value={album.sale_quantity || 1}
-            onChange={(e) => onChange('sale_quantity', e.target.value ? parseInt(e.target.value) : 1)}
-            className="w-full px-2.5 py-2 border border-gray-300 rounded text-[13px] bg-white text-gray-900 focus:outline-none focus:border-blue-500"
-          />
         </div>
 
         {/* Location */}
@@ -106,7 +80,6 @@ export function UniversalBottomBar({
 
       {/* Bottom buttons row */}
       <div className="flex justify-between items-center px-5 py-4 border-t border-gray-200 bg-gray-50">
-        {/* Left: Previous/Next */}
         <div className="flex gap-2">
           <button
             onClick={onPrevious}
@@ -132,17 +105,16 @@ export function UniversalBottomBar({
           </button>
         </div>
 
-        {/* Right: Cancel/Save */}
         <div className="flex gap-2">
           <button
             onClick={onCancel}
-            className="px-5 py-2 bg-gray-400 text-white border-none rounded text-[13px] font-medium cursor-pointer hover:bg-gray-500"
+            className="px-4 py-2 bg-gray-200 text-gray-700 border-none rounded text-[13px] font-medium cursor-pointer hover:bg-gray-300"
           >
             Cancel
           </button>
           <button
             onClick={onSave}
-            className="px-5 py-2 bg-blue-500 text-white border-none rounded text-[13px] font-bold cursor-pointer hover:bg-blue-600"
+            className="px-4 py-2 bg-blue-600 text-white border-none rounded text-[13px] font-semibold cursor-pointer hover:bg-blue-700"
           >
             Save
           </button>

@@ -162,9 +162,7 @@ async function getOrCreateInventory(
         ? 'incoming'
         : data.collection_status === 'sold'
           ? 'sold'
-          : data.collection_status === 'for_sale'
-            ? 'for_sale'
-            : 'in_collection';
+          : 'active';
 
   const { data: created, error } = await supabase
     .from('inventory')
@@ -181,6 +179,78 @@ async function getOrCreateInventory(
 
   if (error || !created) throw error;
   return { row: created, created: true };
+}
+
+async function upsertMasterTags(
+  supabase: SupabaseClient,
+  masterId: number,
+  tags: string[] | undefined
+): Promise<void> {
+  if (!tags || tags.length === 0) return;
+  const cleaned = tags.map((t) => t.trim()).filter((t) => t.length > 0);
+  if (cleaned.length === 0) return;
+
+  for (const tag of cleaned) {
+    const { data: tagRow } = await supabase
+      .from('master_tags')
+      .upsert({ name: tag }, { onConflict: 'name' })
+      .select('id')
+      .single();
+    if (!tagRow?.id) continue;
+    await supabase
+      .from('master_tag_links')
+      .upsert({ master_id: masterId, tag_id: tagRow.id }, { onConflict: 'master_id,tag_id' });
+  }
+}
+
+async function insertReleaseTracks(
+  supabase: SupabaseClient,
+  releaseId: number,
+  tracks: Array<{ position?: string; title?: string; duration?: string; side?: string }>
+): Promise<void> {
+  if (!tracks || tracks.length === 0) return;
+
+  const { count } = await supabase
+    .from('release_tracks')
+    .select('id', { count: 'exact', head: true })
+    .eq('release_id', releaseId);
+
+  if ((count ?? 0) > 0) return;
+
+  for (const track of tracks) {
+    const title = (track.title || '').trim();
+    if (!title) continue;
+
+    const recordingPayload = {
+      title,
+      duration_seconds: (() => {
+        if (!track.duration) return null;
+        const parts = track.duration.split(':').map((part) => Number(part));
+        if (parts.some((part) => Number.isNaN(part))) return null;
+        if (parts.length === 1) return parts[0];
+        if (parts.length === 2) return parts[0] * 60 + parts[1];
+        if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+        return null;
+      })(),
+    };
+
+    const { data: recording } = await supabase
+      .from('recordings')
+      .insert([recordingPayload])
+      .select('id')
+      .single();
+
+    if (!recording?.id) continue;
+
+    await supabase
+      .from('release_tracks')
+      .insert([{
+        release_id: releaseId,
+        recording_id: recording.id,
+        position: track.position || '',
+        side: track.side ?? null,
+      }]);
+  }
 }
 
 /**
@@ -253,6 +323,9 @@ export async function importCLZData(
             collection_status: clzData.collection_status,
           }
         );
+
+        await upsertMasterTags(supabase, masterRow.id, clzData.custom_tags ?? []);
+        await insertReleaseTracks(supabase, releaseRow.id, clzData.tracks ?? []);
 
         if (masterCreated || releaseCreated || inventoryCreated) {
           result.newAlbums++;
@@ -449,7 +522,6 @@ export async function previewCLZImport(
       format: buildFormatLabel(release),
       location: (row as { location?: string | null }).location ?? '',
       media_condition: (row as { media_condition?: string | null }).media_condition ?? '',
-      discs: release?.qty ?? 1,
     };
   });
 

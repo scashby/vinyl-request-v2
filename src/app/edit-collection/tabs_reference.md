@@ -81,7 +81,6 @@ Reference document for all tabs and fields in the Edit Album Modal. This replica
 - Opens modal on button click
 - Selects from database using pickerDataUtils
 - Clear buttons functional
-- Database fields: composer, conductor, chorus, composition, orchestra
 
 ---
 
@@ -102,7 +101,6 @@ Reference document for all tabs and fields in the Edit Album Modal. This replica
 - Display as lists with remove buttons
 - Opens modal on "Select..." button click
 - Prevents duplicates
-- Database fields: songwriters[], producers[], engineers[], musicians[]
 
 ---
 
@@ -172,7 +170,7 @@ Reference document for all tabs and fields in the Edit Album Modal. This replica
 - Image preview ✅
 
 ### What Actually Works:
-- ✅ Upload: Saves image to Supabase Storage bucket `album-images`, updates album.image_url or album.back_image_url
+- ✅ Upload: Saves image to Supabase Storage bucket `album-images`, updates album.image_url
 - ✅ Remove: Deletes file from storage, clears URL from database
 - ✅ Find Online: Opens Google Images search with album info (artist + title + year)
 - 🔴 Crop/Rotate: Shows alert with implementation instructions
@@ -184,7 +182,7 @@ npm install react-easy-crop
 ```
 Then follow guide in `/CROP_ROTATE_IMPLEMENTATION.md`
 
-**Note:** page.tsx already displays both front (image_url) and back (back_image_url) covers with carousel
+**Note:** page.tsx displays the front cover (image_url)
 
 ---
 
@@ -200,10 +198,8 @@ Then follow guide in `/CROP_ROTATE_IMPLEMENTATION.md`
   - Drag handle (≡) for reordering ✅ **Working**
 - **➕ New Link** button ✅ **Working**
 - Drag-drop reordering ✅ **Working**
-- Stores in album.extra as JSON string ✅ **Working**
 
 **Implementation:**
-- Links stored as JSON array in album.extra field
 - Drag-drop reordering functional
 - Add/remove working
 - No ESLint errors, properly typed
@@ -239,8 +235,6 @@ src/app/edit-collection/
 ├── tabs/
 │   ├── MainTab.tsx             # Basic info ✅ 100%
 │   ├── DetailsTab.tsx          # Extended metadata ✅ 100%
-│   ├── ClassicalTab.tsx        # Composer, conductor, etc. ✅ 100%
-│   ├── PeopleTab.tsx           # Credits & musicians ✅ 100%
 │   ├── TracksTab.tsx           # Tracklist management ✅ 100%
 │   ├── PersonalTab.tsx         # Purchase, ratings, tags ✅ 100%
 │   ├── CoverTab.tsx            # Front/back cover ✅ 90% (needs crop library)

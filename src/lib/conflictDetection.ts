@@ -20,35 +20,13 @@ export const IDENTIFYING_FIELDS = [
 
 export const CONFLICTABLE_FIELDS = [
   'tracks',
-  'disc_metadata',
-  'discs',
-  'musicians',
-  'producers',
-  'engineers',
-  'songwriters',
-  'packaging',
-  'sound',
-  'spars_code',
-  'rpm',
-  'vinyl_color',
-  'vinyl_weight',
-  'matrix_numbers',
   'image_url',
-  'back_image_url',
   'genres', // FIXED: Was discogs_genres
   'styles', // FIXED: Was discogs_styles
   'personal_notes', // FIXED: Was notes
   'release_notes',
-  'studio',
-  'my_rating',
   'media_condition',
   'package_sleeve_condition',
-  'composer',
-  'conductor',
-  'orchestra',
-  'chorus',
-  'length_seconds',
-  'is_live',
 ] as const;
 
 export interface Track {
@@ -57,7 +35,6 @@ export interface Track {
   title: string;
   artist?: string | null;
   duration?: string;
-  disc_number?: number;
   side?: string | null;
   type?: string;
   lyrics_url?: string;
@@ -79,39 +56,14 @@ export interface CollectionRow extends Record<string, unknown> {
   labels?: string[];
   personal_notes?: string;
   release_notes?: string;
-  index_number?: number;
   package_sleeve_condition?: string;
-  vinyl_weight?: string;
-  rpm?: string;
-  vinyl_color?: string[]; 
-  packaging?: string;
-  sound?: string;
-  spars_code?: string;
-  discs: number;
   date_added?: Date | string;
-  modified_date?: Date | string;
   collection_status?: string;
-  is_live?: boolean;
-  my_rating?: number;
   custom_tags?: string[];
-  musicians?: unknown;
-  producers?: unknown;
-  engineers?: unknown;
-  songwriters?: unknown;
-  composer?: string;
-  conductor?: string;
-  orchestra?: string;
-  chorus?: string;
   tracks?: unknown;
-  disc_metadata?: unknown;
-  studio?: string;
-  extra?: string;
-  length_seconds?: number;
   image_url?: string;
-  back_image_url?: string;
   genres?: string[];
   styles?: string[];
-  matrix_numbers?: unknown;
   discogs_release_id?: string;
   discogs_master_id?: string;
 }
@@ -218,21 +170,6 @@ function normalizeTrack(track: unknown): Record<string, unknown> {
   };
 }
 
-function normalizeDiscMetadata(disc: unknown): Record<string, unknown> {
-  if (!disc || typeof disc !== 'object') return {};
-  const d = disc as Record<string, unknown>;
-  return {
-    disc_number: d.disc_number ? Number(d.disc_number) : d.index ? Number(d.index) : undefined,
-    track_count: d.track_count ? Number(d.track_count) : undefined
-  };
-}
-
-function areDiscMetadataEqual(current: unknown, incoming: unknown): boolean {
-  if (!Array.isArray(current) || !Array.isArray(incoming)) return isEqual(current, incoming);
-  if (current.length !== incoming.length) return false;
-  return isEqual(current.map(normalizeDiscMetadata), incoming.map(normalizeDiscMetadata));
-}
-
 function areTracksEqual(current: unknown, incoming: unknown): boolean {
   if (!Array.isArray(current) || !Array.isArray(incoming)) return isEqual(current, incoming);
   
@@ -274,7 +211,7 @@ export function detectConflicts(existingAlbum: Record<string, unknown>, imported
   const resolutionMap = new Map<string, PreviousResolution>();
   for (const res of previousResolutions) resolutionMap.set(res.field_name, res);
   
-  const TAG_LIKE_FIELDS = ['genres', 'styles', 'tags', 'custom_tags', 'labels', 'musicians', 'producers', 'engineers', 'songwriters'];
+  const TAG_LIKE_FIELDS = ['genres', 'styles', 'tags', 'custom_tags', 'labels'];
 
   for (const field of CONFLICTABLE_FIELDS) {
     const existingValue = existingAlbum[field];
@@ -288,7 +225,6 @@ export function detectConflicts(existingAlbum: Record<string, unknown>, imported
     
     let valuesAreDifferent = false;
     if (field === 'tracks') valuesAreDifferent = !areTracksEqual(existingValue, newValue);
-    else if (field === 'disc_metadata') valuesAreDifferent = !areDiscMetadataEqual(existingValue, newValue);
     else if (TAG_LIKE_FIELDS.includes(field)) valuesAreDifferent = !areStringArraysEqual(existingValue, newValue);
     else valuesAreDifferent = !isEqual(existingValue, newValue);
       
@@ -412,35 +348,13 @@ export function getRejectedValue(
 export function getFieldDisplayName(fieldName: string): string {
   const nameMap: Record<string, string> = {
     tracks: 'Tracks',
-    disc_metadata: 'Disc Metadata',
-    discs: 'Number of Discs',
-    musicians: 'Musicians',
-    producers: 'Producers',
-    engineers: 'Engineers',
-    songwriters: 'Songwriters',
-    packaging: 'Packaging',
-    sound: 'Sound',
-    spars_code: 'SPARS Code',
-    rpm: 'RPM',
-    vinyl_color: 'Vinyl Color',
-    vinyl_weight: 'Vinyl Weight',
-    matrix_numbers: 'Matrix Numbers',
     image_url: 'Cover Image',
-    back_image_url: 'Back Cover Image',
     genres: 'Genres',
     styles: 'Styles',
     personal_notes: 'My Notes', // FIXED
     release_notes: 'Release Notes',
-    studio: 'Studio',
-    my_rating: 'Rating',
     media_condition: 'Media Condition',
     package_sleeve_condition: 'Sleeve Condition',
-    composer: 'Composer',
-    conductor: 'Conductor',
-    orchestra: 'Orchestra',
-    chorus: 'Chorus',
-    length_seconds: 'Length',
-    is_live: 'Live Recording',
   };
   return nameMap[fieldName] || fieldName;
 }

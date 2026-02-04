@@ -42,8 +42,6 @@ const getAlbumColumnValue = (album: Album, column: string) => {
       return getAlbumYearValue(album) ?? '—';
     case 'Format':
       return getAlbumFormat(album) || '—';
-    case 'Discs':
-      return album.release?.qty ?? '—';
     case 'Tracks':
       return album.release?.release_tracks?.length ?? 0;
     case 'Length':
@@ -97,12 +95,12 @@ export function PrintToPDFModal({
     {
       id: '1',
       name: 'My List View columns',
-      columns: ['Artist', 'Title', 'Release Date', 'Format', 'Discs', 'Tracks', 'Length', 'Genre', 'Label', 'Added Date']
+      columns: ['Artist', 'Title', 'Release Date', 'Format', 'Tracks', 'Length', 'Genre', 'Label', 'Added Date']
     },
     {
       id: '2',
       name: 'My Find Duplicates columns',
-      columns: ['Artist', 'Title', 'Release Date', 'Label', 'Discs', 'Tracks', 'Added Date']
+      columns: ['Artist', 'Title', 'Release Date', 'Label', 'Tracks', 'Added Date']
     }
   ]);
   const [selectedColumnFavoriteId, setSelectedColumnFavoriteId] = useState('1');
@@ -590,7 +588,7 @@ export function PrintToPDFModal({
                           <td className="py-2 px-1 text-gray-900 truncate">{album.title}</td>
                           <td className="py-2 px-1 text-gray-800">{album.year || '—'}</td>
                           <td className="py-2 px-1 text-gray-800">{album.format || '—'}</td>
-                          <td className="py-2 px-1 text-gray-800">{album.discs || '—'}</td>
+                          <td className="py-2 px-1 text-gray-800">{album.release?.qty ?? '—'}</td>
                           <td className="py-2 px-1 text-gray-800">{album.tracks?.filter(t => t.type === 'track').length || '—'}</td>
                         </tr>
                       ))}

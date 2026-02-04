@@ -220,7 +220,17 @@ export async function POST(req: Request) {
         artist: artistName,
         title: albumTitle,
         totalTracks: enrichedTracks.length,
-        tracksWithArtists
+        tracksWithArtists,
+        tracks: enrichedTracks
+          .filter((track) => track.type_ !== 'heading')
+          .map((track) => ({
+            position: track.position || '',
+            title: track.title || '',
+            artist: track.artist || null,
+            duration: track.duration || null,
+            type: 'track' as const,
+            side: getSideFromPosition(track.position) || undefined
+          }))
       }
     });
 

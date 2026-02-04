@@ -10,6 +10,9 @@ type DiscogsResponse = {
   images?: Array<{ uri: string }>;
   genres?: string[];
   styles?: string[];
+  labels?: Array<{ name?: string; catno?: string }>;
+  country?: string;
+  year?: number;
   tracklist?: Array<{
     position?: string;
     type_?: string;
@@ -159,21 +162,14 @@ export async function POST(req: Request) {
     // Check what needs enrichment
     const needsMasterId = !hasValidDiscogsId(master.discogs_master_id);
     const needsImage = !master.cover_image_url;
-    const needsGenres = !master.genres || master.genres.length === 0 || !master.styles || master.styles.length === 0;
+    const needsGenres = !master.genres || master.genres.length === 0;
+    const needsStyles = !master.styles || master.styles.length === 0;
+    const needsLabel = !release.label;
+    const needsCatalog = !release.catalog_number;
+    const needsCountry = !release.country;
+    const needsYear = !release.release_year;
 
-    const { data: existingTracks, error: trackError } = await supabase
-      .from('release_tracks')
-      .select('id')
-      .eq('release_id', release.id)
-      .limit(1);
-
-    if (trackError) {
-      console.warn('Unable to check release tracks:', trackError);
-    }
-
-    const needsTracklist = !existingTracks || existingTracks.length === 0;
-
-    if (!foundReleaseId && !needsMasterId && !needsImage && !needsGenres && !needsTracklist) {
+    if (!foundReleaseId && !needsMasterId && !needsImage && !needsGenres && !needsStyles && !needsLabel && !needsCatalog && !needsCountry && !needsYear) {
       console.log('⏭️ Album already has all Discogs metadata');
       return NextResponse.json({
         success: true,
@@ -203,36 +199,37 @@ export async function POST(req: Request) {
       console.log('✓ Found image');
     }
 
-    if (needsGenres) {
-      const combined = [
-        ...(discogsData.genres || []),
-        ...(discogsData.styles || [])
-      ];
-      const unique = Array.from(new Set(combined));
-      
-      if (unique.length > 0) {
-        masterUpdate.genres = unique;
-        masterUpdate.styles = unique;
-        console.log(`✓ Found ${unique.length} genres/styles: ${unique.join(', ')}`);
-      }
+    if (needsGenres && discogsData.genres && discogsData.genres.length > 0) {
+      masterUpdate.genres = Array.from(new Set(discogsData.genres));
+      console.log(`✓ Found ${masterUpdate.genres.length} genres`);
     }
 
-    const tracklistEntries = needsTracklist && discogsData.tracklist
-      ? discogsData.tracklist
-          .filter(track => !track.type_ || track.type_ === 'track')
-          .map(track => ({
-            release_id: release.id,
-            position: track.position || '',
-            title_override: track.title || ''
-          }))
-          .filter(track => track.position || track.title_override)
-      : [];
-
-    if (tracklistEntries.length > 0) {
-      console.log(`✓ Found ${tracklistEntries.length} tracks`);
+    if (needsStyles && discogsData.styles && discogsData.styles.length > 0) {
+      masterUpdate.styles = Array.from(new Set(discogsData.styles));
+      console.log(`✓ Found ${masterUpdate.styles.length} styles`);
     }
 
-    if (Object.keys(releaseUpdate).length === 0 && Object.keys(masterUpdate).length === 0 && tracklistEntries.length === 0) {
+    if (needsLabel && discogsData.labels && discogsData.labels[0]?.name) {
+      releaseUpdate.label = discogsData.labels[0].name;
+      console.log(`✓ Found label: ${discogsData.labels[0].name}`);
+    }
+
+    if (needsCatalog && discogsData.labels && discogsData.labels[0]?.catno) {
+      releaseUpdate.catalog_number = discogsData.labels[0].catno;
+      console.log(`✓ Found catalog number: ${discogsData.labels[0].catno}`);
+    }
+
+    if (needsCountry && discogsData.country) {
+      releaseUpdate.country = discogsData.country;
+      console.log(`✓ Found country: ${discogsData.country}`);
+    }
+
+    if (needsYear && discogsData.year) {
+      releaseUpdate.release_year = discogsData.year;
+      console.log(`✓ Found release year: ${discogsData.year}`);
+    }
+    
+    if (Object.keys(releaseUpdate).length === 0 && Object.keys(masterUpdate).length === 0) {
       console.log('⚠️ No new data found to update');
       return NextResponse.json({
         success: true,
@@ -270,19 +267,6 @@ export async function POST(req: Request) {
       }
     }
 
-    if (tracklistEntries.length > 0) {
-      const { error: trackInsertError } = await supabase
-        .from('release_tracks')
-        .insert(tracklistEntries);
-
-      if (trackInsertError) {
-        return NextResponse.json({
-          success: false,
-          error: `Tracklist update failed: ${trackInsertError.message}`
-        }, { status: 500 });
-      }
-    }
-
     console.log(`✅ Successfully enriched with Discogs metadata\n`);
 
     return NextResponse.json({
@@ -292,10 +276,10 @@ export async function POST(req: Request) {
         artist: artistName,
         title: master.title,
         foundReleaseId: foundReleaseId ? releaseId : undefined,
-        addedMasterId: !!masterUpdate.discogs_master_id,
-        addedImage: !!masterUpdate.cover_image_url,
-        addedGenres: !!masterUpdate.genres,
-        addedTracklist: tracklistEntries.length > 0
+        updates: {
+          release: releaseUpdate,
+          master: masterUpdate
+        }
       }
     });
 

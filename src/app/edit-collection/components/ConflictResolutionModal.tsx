@@ -103,10 +103,8 @@ export default function ConflictResolutionModal({
       case 'country':
       case 'discogs_release_id':
         return { table: 'releases', column: fieldName, value };
-      case 'spotify_id':
+      case 'spotify_album_id':
         return { table: 'releases', column: 'spotify_album_id', value };
-      case 'apple_music_id':
-        return { table: 'releases', column: 'apple_music_id', value };
       case 'release_notes':
         return { table: 'releases', column: 'notes', value };
       case 'year':

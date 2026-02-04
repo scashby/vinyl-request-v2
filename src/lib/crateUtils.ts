@@ -112,12 +112,18 @@ function getAlbumFieldValue(album: Album, field: string): unknown {
       return release?.label ? [release.label] : null;
     case 'media_condition':
       return album.media_condition ?? null;
+    case 'personal_notes':
+      return album.personal_notes ?? null;
+    case 'release_notes':
+      return album.release_notes ?? null;
     case 'owner':
       return album.owner ?? null;
     case 'decade': {
       const year = release?.release_year ?? master?.original_release_year;
       return year ? Math.floor(year / 10) * 10 : null;
     }
+    case 'last_played_at':
+      return album.last_played_at ?? null;
     default:
       return null;
   }

@@ -29,7 +29,7 @@ interface UniversalPickerProps {
   newItemLabel?: string;
   manageItemsLabel?: string;
   showSortName?: boolean; // NEW: Show sort name fields
-  showDefaultInstrument?: boolean; // NEW: Show default instrument field (for musicians)
+  showDefaultInstrument?: boolean; // Optional instrument field (not used in V3 flows)
 }
 
 export function UniversalPicker({

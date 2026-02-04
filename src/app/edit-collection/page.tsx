@@ -289,7 +289,6 @@ function CollectionBrowserPage() {
 
   const filteredAndSortedAlbums = useMemo(() => {
     let filtered = albums.filter(album => {
-      if (collectionFilter === 'For Sale' && album.status !== 'for_sale') return false;
       
       if (selectedLetter !== 'All') {
         const firstChar = getAlbumArtist(album).charAt(0).toUpperCase();
@@ -499,11 +498,11 @@ function CollectionBrowserPage() {
   const handleMarkForSale = useCallback(async (albumId: number) => {
     const { error } = await supabase
       .from('inventory')
-      .update({ status: 'for_sale' })
+      .update({ status: 'active' })
       .eq('id', albumId);
     
     if (!error) {
-      setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, status: 'for_sale' } : a));
+      setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, status: 'active' } : a));
     } else {
       console.error('Error marking album for sale:', error);
     }
@@ -558,7 +557,7 @@ function CollectionBrowserPage() {
                 <>
                   <div onClick={() => setShowCollectionDropdown(false)} className="fixed inset-0 z-[99]" />
                   <div className="absolute top-full left-0 mt-1 bg-[#2a2a2a] border border-[#555] rounded z-[100] min-w-[150px] shadow-lg">
-                    {['All', 'For Sale'].map(filter => (
+                    {['All'].map(filter => (
                       <button 
                         key={filter}
                         onClick={() => { setCollectionFilter(filter); setShowCollectionDropdown(false); }}

@@ -7,18 +7,7 @@ interface CLZTrack {
   title: string;
   duration?: string; // Formatted as MM:SS or HH:MM:SS to match database
   artist?: string;
-  disc_number?: number; // Added to match database schema
-}
-
-interface CLZDisc {
-  disc_number: number;
-  track_count: number;
-  tracks: CLZTrack[];
-}
-
-interface CLZCredit {
-  name: string;
-  role?: string;
+  side?: string;
 }
 
 export interface CLZAlbumData extends Record<string, unknown> {
@@ -32,67 +21,21 @@ export interface CLZAlbumData extends Record<string, unknown> {
   country?: string;
   labels?: string[];
   personal_notes?: string; // CHANGED: Renamed from 'notes'
-  index_number?: number;
   location?: string; // ADDED: New field for storage location
-  
-  // Condition & Physical
+
+  // Condition
   media_condition?: string;
   package_sleeve_condition?: string;
-  vinyl_weight?: string;
-  rpm?: string;
-  vinyl_color?: string;
-  packaging?: string;
-  sound?: string;
-  spars_code?: string;
-  discs: number;
-  
-  // Dates
-  date_added?: Date;
-  modified_date?: Date;
-  purchase_date?: Date;
-  recording_date?: Date;
-  original_release_date?: Date;
-  
+
   // Status & Organization
   collection_status?: string;
-  is_live: boolean;
-  my_rating?: number;
   custom_tags?: string[];
-  
-  // Credits (as JSONB)
-  musicians?: CLZCredit[];
-  producers?: CLZCredit[];
-  engineers?: CLZCredit[];
-  songwriters?: CLZCredit[];
-  composer?: string;
-  conductor?: string;
-  orchestra?: string;
-  chorus?: string;
-  
+
   // Track data
   tracks: CLZTrack[];
-  disc_metadata: CLZDisc[];
-  
-  // Other
-  studio?: string;
-  extra?: string;
-  
-  // CLZ-specific identifiers
-  clz_album_id?: string;
-  clz_hash?: string;
-  
+
   // Genres from CLZ
   clz_genres?: string[];
-}
-
-/**
- * Converts Unix timestamp to Date object
- */
-function timestampToDate(timestamp: string | number | undefined): Date | undefined {
-  if (!timestamp) return undefined;
-  const ts = typeof timestamp === 'string' ? parseInt(timestamp, 10) : timestamp;
-  if (isNaN(ts)) return undefined;
-  return new Date(ts * 1000); // Unix timestamp is in seconds
 }
 
 /**
@@ -149,29 +92,6 @@ function getDisplayName(node: unknown): string | undefined {
 }
 
 /**
- * Extracts boolean value from node with boolvalue attribute
- */
-function getBoolValue(node: unknown): boolean {
-  if (!node) return false;
-  if (typeof node === 'boolean') return node;
-  if (typeof node === 'string') return node.toLowerCase() === 'yes' || node === '1' || node.toLowerCase() === 'true';
-  if (Array.isArray(node) && node.length > 0) {
-    return getBoolValue(node[0]);
-  }
-  if (typeof node === 'object' && node !== null) {
-    const obj = node as Record<string, unknown>;
-    if ('$' in obj && typeof obj.$ === 'object' && obj.$ !== null) {
-      const attrs = obj.$ as Record<string, unknown>;
-      if ('boolvalue' in attrs) {
-        const val = String(attrs.boolvalue).toLowerCase();
-        return val === '1' || val === 'yes' || val === 'true';
-      }
-    }
-  }
-  return false;
-}
-
-/**
  * Extracts array of display names from a collection of nodes
  */
 function getDisplayNameArray(nodes: unknown): string[] {
@@ -213,27 +133,6 @@ function parseLabels(labelsString: string | undefined): string[] {
 }
 
 /**
- * Parses credits (musicians, producers, etc.) from CLZ XML
- */
-function parseCredits(creditsNode: unknown): CLZCredit[] {
-  if (!creditsNode) return [];
-  
-  const creditItems = typeof creditsNode === 'object' && creditsNode !== null
-    ? Object.values(creditsNode as Record<string, unknown>)
-    : [];
-    
-  if (!Array.isArray(creditItems) || creditItems.length === 0) return [];
-  
-  return creditItems
-    .flat()
-    .map(item => {
-      const name = getDisplayName(item);
-      return name ? { name } : null;
-    })
-    .filter((credit): credit is CLZCredit => credit !== null);
-}
-
-/**
  * Parses tracks from a disc
  */
 function parseTracks(tracksNode: unknown): CLZTrack[] {
@@ -265,11 +164,16 @@ function parseTracks(tracksNode: unknown): CLZTrack[] {
     const length = getTextValue(trackObj.length);
     const durationSeconds = length ? parseInt(length, 10) : undefined;
     
+    const position = getTextValue(trackObj.position) || '';
+    const sideMatch = position.match(/^([A-Z])/);
+    const side = sideMatch ? sideMatch[1] : undefined;
+
     return {
-      position: getTextValue(trackObj.position) || '',
+      position,
       title: getTextValue(trackObj.title) || 'Unknown Track',
       duration: formatDuration(durationSeconds),
-      artist: trackArtist
+      artist: trackArtist,
+      side,
     };
   });
 }
@@ -277,50 +181,29 @@ function parseTracks(tracksNode: unknown): CLZTrack[] {
 /**
  * Parses disc structure from CLZ XML
  */
-function parseDiscs(discsNode: unknown): { tracks: CLZTrack[]; disc_metadata: CLZDisc[]; disc_count: number } {
+function parseDiscs(discsNode: unknown): { tracks: CLZTrack[] } {
   if (!discsNode) {
-    return { tracks: [], disc_metadata: [], disc_count: 1 };
+    return { tracks: [] };
   }
-  
+
   const discNodes = typeof discsNode === 'object' && discsNode !== null
     ? (discsNode as Record<string, unknown>).disc
     : undefined;
-    
+
   if (!discNodes) {
-    return { tracks: [], disc_metadata: [], disc_count: 1 };
+    return { tracks: [] };
   }
-  
+
   const discArray = Array.isArray(discNodes) ? discNodes : [discNodes];
-  
   const allTracks: CLZTrack[] = [];
-  const discMetadata: CLZDisc[] = [];
-  
-  discArray.forEach((disc, idx) => {
+
+  discArray.forEach((disc) => {
     const discObj = disc as Record<string, unknown>;
-    const discNumber = idx + 1;
-    
     const discTracks = parseTracks(discObj.tracks);
-    
-    // Add disc_number to each track to match database schema
-    const tracksWithDisc = discTracks.map(track => ({
-      ...track,
-      disc_number: discNumber
-    }));
-    
-    discMetadata.push({
-      disc_number: discNumber,
-      track_count: discTracks.length,
-      tracks: discTracks
-    });
-    
-    allTracks.push(...tracksWithDisc);
+    allTracks.push(...discTracks);
   });
-  
-  return {
-    tracks: allTracks,
-    disc_metadata: discMetadata,
-    disc_count: discArray.length
-  };
+
+  return { tracks: allTracks };
 }
 
 /**
@@ -375,7 +258,7 @@ export async function parseCLZXML(xmlContent: string): Promise<CLZAlbumData[]> {
 
     return albums.map((album: Record<string, unknown>) => {
       // Parse disc structure first
-      const { tracks, disc_metadata, disc_count } = parseDiscs(album.discs);
+      const { tracks } = parseDiscs(album.discs);
       
       // Extract all fields
       const artist = parseArtists(album.artists);
@@ -393,10 +276,6 @@ export async function parseCLZXML(xmlContent: string): Promise<CLZAlbumData[]> {
         }
       }
       
-      // Ratings (0-5 scale in CLZ)
-      const ratingStr = getTextValue(album.myrating);
-      const my_rating = ratingStr ? parseInt(ratingStr, 10) : undefined;
-      
       // Notes (may be in CDATA)
       // CHANGED: Mapped directly to internal variable for clean assignment
       const notes = getTextValue(album.notes);
@@ -407,34 +286,9 @@ export async function parseCLZXML(xmlContent: string): Promise<CLZAlbumData[]> {
       const slot = getTextValue(album.slot) || '';
       const location = `${storage} ${slot}`.trim();
       
-      // Index number
-      const indexStr = getTextValue(album.index);
-      const index_number = indexStr ? parseInt(indexStr, 10) : undefined;
-      
-      // Parse all credits
-      const musicians = parseCredits(album.musicians);
-      const producers = parseCredits(album.producers);
-      const engineers = parseCredits(album.engineers);
-      const songwriters = parseCredits(album.songwriters);
-      
-      const composer = getDisplayName(album.composers);
-      const conductor = getDisplayName(album.conductors);
-      const orchestra = getDisplayName(album.orchestras);
-      const chorus = getDisplayName(album.choruses);
-      
       // Parse genres and tags
       const clz_genres = parseGenres(album.genres);
       const custom_tags = parseTags(album.tags);
-      
-      // Dates - safely access nested timestamp properties
-      const addedDateObj = album.addeddate as Record<string, unknown> | undefined;
-      const modifiedDateObj = album.modifieddate as Record<string, unknown> | undefined;
-      const date_added = timestampToDate(addedDateObj?.timestamp as string | number | undefined);
-      const modified_date = timestampToDate(modifiedDateObj?.timestamp as string | number | undefined);
-      
-      // Other text fields
-      const studio = getDisplayName(album.studios);
-      const extra = getDisplayName(album.extras);
       
       const albumData: CLZAlbumData = {
         // Core data
@@ -450,49 +304,17 @@ export async function parseCLZXML(xmlContent: string): Promise<CLZAlbumData[]> {
         personal_notes: notes,
         // ADDED: Map combined string to location property
         location: location || undefined,
-        index_number,
         
-        // Condition & Physical
+        // Condition
         media_condition: getDisplayName(album.mediacondition),
         package_sleeve_condition: getDisplayName(album.condition),
-        vinyl_weight: getTextValue(album.vinylweight),
-        rpm: getTextValue(album.rpm),
-        packaging: getTextValue(album.packaging),
-        sound: getTextValue(album.sound),
-        spars_code: getTextValue(album.sparscode),
-        discs: disc_count,
-        
-        // Dates
-        date_added,
-        modified_date,
         
         // Status
         collection_status: getDisplayName(album.collectionstatus),
-        is_live: getBoolValue(album.islive),
-        my_rating: my_rating && !isNaN(my_rating) ? my_rating : undefined,
         custom_tags,
-        
-        // Credits
-        musicians: musicians.length > 0 ? musicians : undefined,
-        producers: producers.length > 0 ? producers : undefined,
-        engineers: engineers.length > 0 ? engineers : undefined,
-        songwriters: songwriters.length > 0 ? songwriters : undefined,
-        composer,
-        conductor,
-        orchestra,
-        chorus,
-        
+
         // Track data
         tracks,
-        disc_metadata,
-        
-        // Other
-        studio,
-        extra,
-        
-        // CLZ identifiers
-        clz_album_id: getTextValue(album.bpalbumid),
-        clz_hash: getTextValue(album.hash),
         
         // Genres
         clz_genres: clz_genres.length > 0 ? clz_genres : undefined

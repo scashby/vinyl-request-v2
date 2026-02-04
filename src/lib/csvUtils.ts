@@ -1,6 +1,5 @@
 // src/lib/csvUtils.ts
 import Papa from 'papaparse';
-import { extractSecondaryArtists } from './importUtils';
 
 // Matches the exact headers from your uploaded CSV
 export interface DiscogsCSVRow {
@@ -22,11 +21,9 @@ export interface DiscogsCSVRow {
 export interface ProcessedRelease {
   artist: string;
   sort_artist: string;
-  secondary_artists: string[];
   title: string;
   format: string;
   location: string;
-  for_sale: boolean;
   year: number | null;
   media_condition: string;
   package_sleeve_condition: string;
@@ -42,25 +39,21 @@ export function parseDiscogsCSV(file: File, callback: (rows: ProcessedRelease[])
     skipEmptyLines: true,
     complete: (results) => {
       const rows = (results.data as DiscogsCSVRow[]).map((row) => {
-        // 1. Clean Artist & Split Secondary
-        const { primary, secondary } = extractSecondaryArtists(row['Artist'] || '');
-        
-        // 2. Logic: Folder -> Location/Sale
+        // 1. Clean Artist
+        const primary = row['Artist'] || '';
+
+        // 2. Logic: Folder -> Location
         const folder = row['CollectionFolder'] || '';
-        const isSale = folder.toLowerCase() === 'sale' || folder.toLowerCase().includes('for sale');
-        const location = isSale ? '' : folder;
+        const location = folder;
 
         return {
           artist: primary,
           sort_artist: primary, // Will be refined by server-side rules later, default to primary
-          secondary_artists: secondary,
           title: row['Title'] || '',
           format: row['Format'] || '',
           
           // Map Folder Logic
           location: location,
-          for_sale: isSale,
-          
           year: parseInt(row['Released'], 10) || null,
           media_condition: row['Collection Media Condition'] || '',
           package_sleeve_condition: row['Collection Sleeve Condition'] || '',

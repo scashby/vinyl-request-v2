@@ -11,29 +11,10 @@ import {
   fetchGenres,
   fetchLocations, updateLocation, deleteLocation, mergeLocations,
   fetchCountries,
-  fetchPackaging, updatePackaging, deletePackaging, mergePackaging,
   fetchMediaConditions,
   fetchPackageConditions,
-  fetchVinylColors, updateVinylColor, mergeVinylColors,
-  fetchVinylWeights,
-  fetchSPARS, updateSPARS, mergeSPARS,
-  fetchBoxSets,
-  fetchTags,
-  fetchSignees,
-  fetchStorageDevices,
-  fetchPurchaseStores, updatePurchaseStore, deletePurchaseStore, mergePurchaseStores,
-  fetchOwners, updateOwner, deleteOwner, mergeOwners,
-  fetchStudios, updateStudio, mergeStudios,
-  fetchSounds, updateSound, mergeSounds,
-  fetchComposers, updateComposer, mergeComposers,
-  fetchConductors, updateConductor, mergeConductors,
-  fetchChoruses, updateChorus, mergeChorus,
-  fetchCompositions, updateComposition, mergeCompositions,
-  fetchOrchestras, updateOrchestra, mergeOrchestras,
-  fetchSongwriters, updateSongwriter, deleteSongwriter, mergeSongwriters,
-  fetchProducers, updateProducer, deleteProducer, mergeProducers,
-  fetchEngineers, updateEngineer, deleteEngineer, mergeEngineers,
-  fetchMusicians, updateMusician, deleteMusician, mergeMusicians
+  fetchTags, renameTag, deleteTag, mergeTags,
+  fetchOwners, updateOwner, deleteOwner, mergeOwners
 } from './pickers/pickerDataUtils';
 
 interface ManagePickListsModalProps {
@@ -56,9 +37,6 @@ interface PickListConfig {
 }
 
 const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
-  // --------------------------------------------------------------------------
-  // COMPLEX LISTS (Name + Sort Name)
-  // --------------------------------------------------------------------------
   artist: { 
     label: 'Artist', 
     fetchFn: fetchArtists, 
@@ -67,123 +45,17 @@ const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
     mergeFn: mergeArtists, 
     allowDelete: true, 
     allowMerge: true, 
-    hasSortName: true 
+    hasSortName: false 
   },
-  composer: { 
-    label: 'Composer', 
-    fetchFn: fetchComposers, 
-    updateFn: updateComposer, 
-    mergeFn: mergeComposers, 
-    allowDelete: false, 
-    allowMerge: true, 
-    hasSortName: true 
-  },
-  conductor: { 
-    label: 'Conductor', 
-    fetchFn: fetchConductors, 
-    updateFn: updateConductor, 
-    mergeFn: mergeConductors, 
-    allowDelete: false, 
-    allowMerge: true, 
-    hasSortName: true 
-  },
-  chorus: { 
-    label: 'Chorus', 
-    fetchFn: fetchChoruses, 
-    updateFn: updateChorus, 
-    mergeFn: mergeChorus, 
-    allowDelete: false, 
-    allowMerge: true, 
-    hasSortName: true 
-  },
-  composition: { 
-    label: 'Composition', 
-    fetchFn: fetchCompositions, 
-    updateFn: updateComposition, 
-    mergeFn: mergeCompositions, 
-    allowDelete: false, 
-    allowMerge: true, 
-    hasSortName: true 
-  },
-  orchestra: { 
-    label: 'Orchestra', 
-    fetchFn: fetchOrchestras, 
-    updateFn: updateOrchestra, 
-    mergeFn: mergeOrchestras, 
-    allowDelete: false, 
-    allowMerge: true, 
-    hasSortName: true 
-  },
-  
-  // PEOPLE (Smart Lists)
-  musician: { 
-    label: 'Musician', 
-    fetchFn: fetchMusicians, 
-    updateFn: updateMusician, 
-    deleteFn: deleteMusician,
-    mergeFn: mergeMusicians, 
-    allowDelete: true, 
-    allowMerge: true, 
-    hasSortName: true 
-  },
-  songwriter: { 
-    label: 'Songwriter', 
-    fetchFn: fetchSongwriters, 
-    updateFn: updateSongwriter, 
-    deleteFn: deleteSongwriter,
-    mergeFn: mergeSongwriters, 
-    allowDelete: true, 
-    allowMerge: true, 
-    hasSortName: true 
-  },
-  producer: { 
-    label: 'Producer', 
-    fetchFn: fetchProducers, 
-    updateFn: updateProducer, 
-    deleteFn: deleteProducer,
-    mergeFn: mergeProducers, 
-    allowDelete: true, 
-    allowMerge: true, 
-    hasSortName: true 
-  },
-  engineer: { 
-    label: 'Engineer', 
-    fetchFn: fetchEngineers, 
-    updateFn: updateEngineer, 
-    deleteFn: deleteEngineer,
-    mergeFn: mergeEngineers, 
-    allowDelete: true, 
-    allowMerge: true, 
-    hasSortName: true 
-  },
-
-  // --------------------------------------------------------------------------
-  // SIMPLE LISTS (Name Only - Sort Name Field Hidden)
-  // --------------------------------------------------------------------------
   label: { label: 'Label', fetchFn: fetchLabels, updateFn: updateLabel, deleteFn: deleteLabel, mergeFn: mergeLabels, allowDelete: true, allowMerge: true, hasSortName: false },
-  genre: { label: 'Genre', fetchFn: fetchGenres, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false },
-  
-  // GRADE ORDER PRESERVED (keepOriginalOrder: true)
-  'media-condition': { label: 'Media Condition', fetchFn: fetchMediaConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false, keepOriginalOrder: true },
-  'package-sleeve-condition': { label: 'Package/Sleeve Condition', fetchFn: fetchPackageConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false, keepOriginalOrder: true },
-  'vinyl-weight': { label: 'Vinyl Weight', fetchFn: fetchVinylWeights, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false, keepOriginalOrder: true },
-  
-  tag: { label: 'Tag', fetchFn: fetchTags, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false },
-  'vinyl-color': { label: 'Vinyl Color', fetchFn: fetchVinylColors, updateFn: updateVinylColor, deleteFn: async () => false, mergeFn: mergeVinylColors, allowDelete: true, allowMerge: true, hasSortName: false },
-  
-  // Others
-  'box-set': { label: 'Box Set', fetchFn: fetchBoxSets, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false },
-  country: { label: 'Country', fetchFn: fetchCountries, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false },
   format: { label: 'Format', fetchFn: fetchFormats, updateFn: updateFormat, deleteFn: async () => false, mergeFn: mergeFormats, allowDelete: true, allowMerge: true, hasSortName: false },
+  genre: { label: 'Genre', fetchFn: fetchGenres, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false, hasSortName: false },
+  tag: { label: 'Tag', fetchFn: fetchTags, updateFn: renameTag, deleteFn: deleteTag, mergeFn: mergeTags, allowDelete: true, allowMerge: true, hasSortName: false },
   location: { label: 'Location', fetchFn: fetchLocations, updateFn: updateLocation, deleteFn: deleteLocation, mergeFn: mergeLocations, allowDelete: true, allowMerge: true, hasSortName: false },
   owner: { label: 'Owner', fetchFn: fetchOwners, updateFn: updateOwner, deleteFn: deleteOwner, mergeFn: mergeOwners, allowDelete: true, allowMerge: true, hasSortName: false },
-  packaging: { label: 'Packaging', fetchFn: fetchPackaging, updateFn: updatePackaging, deleteFn: deletePackaging, mergeFn: mergePackaging, allowDelete: true, allowMerge: true, hasSortName: false },
-  'purchase-store': { label: 'Purchase Store', fetchFn: fetchPurchaseStores, updateFn: updatePurchaseStore, deleteFn: deletePurchaseStore, mergeFn: mergePurchaseStores, allowDelete: true, allowMerge: true, hasSortName: false },
-  signee: { label: 'Signee', fetchFn: fetchSignees, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false },
-  sound: { label: 'Sound', fetchFn: fetchSounds, updateFn: updateSound, mergeFn: mergeSounds, allowDelete: false, allowMerge: true, hasSortName: false },
-  spars: { label: 'SPARS', fetchFn: fetchSPARS, updateFn: updateSPARS, deleteFn: async () => false, mergeFn: mergeSPARS, allowDelete: true, allowMerge: true, hasSortName: false },
-  'storage-device': { label: 'Storage Device', fetchFn: fetchStorageDevices, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false },
-  studio: { label: 'Studio', fetchFn: fetchStudios, updateFn: updateStudio, mergeFn: mergeStudios, allowDelete: false, allowMerge: true, hasSortName: false },
+  country: { label: 'Country', fetchFn: fetchCountries, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false, hasSortName: false },
+  'media-condition': { label: 'Media Condition', fetchFn: fetchMediaConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false, hasSortName: false, keepOriginalOrder: true },
+  'package-sleeve-condition': { label: 'Sleeve Condition', fetchFn: fetchPackageConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false, hasSortName: false, keepOriginalOrder: true },
 };
 
 export default function ManagePickListsModal({ isOpen, onClose, initialList, hideListSelector = false }: ManagePickListsModalProps) {
@@ -201,7 +73,7 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
   const [showMergeModal, setShowMergeModal] = useState(false);
   
   // Sort toggle state
-  const [sortBy, setSortBy] = useState<'name' | 'sortName' | 'none'>('sortName');
+  const [sortBy, setSortBy] = useState<'name' | 'sortName' | 'none'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const getSortName = useCallback((name: string) => {

@@ -8,13 +8,11 @@ import type { Album } from 'types/album';
 import type { Database } from 'types/supabase';
 import { MainTab, type MainTabRef } from './tabs/MainTab';
 import { DetailsTab } from './tabs/DetailsTab';
-import { PeopleTab } from './tabs/PeopleTab';
 import { TracksTab, type TracksTabRef } from './tabs/TracksTab';
 import { PersonalTab } from './tabs/PersonalTab';
 import { LinksTab } from './tabs/LinksTab';
 import { UniversalBottomBar } from 'components/UniversalBottomBar';
 
-const ClassicalTab = dynamic(() => import('./tabs/ClassicalTab').then(mod => mod.ClassicalTab));
 const CoverTab = dynamic(() => import('./tabs/CoverTab').then(mod => mod.CoverTab));
 const EnrichmentTab = dynamic(() => import('./tabs/EnrichmentTab').then(mod => mod.EnrichmentTab));
 import { PickerModal } from './pickers/PickerModal';
@@ -22,7 +20,7 @@ import { EditModal } from './pickers/EditModal';
 import ManagePickListsModal from './ManagePickListsModal';
 import { fetchLocations, type PickerDataItem } from './pickers/pickerDataUtils';
 
-type TabId = 'main' | 'details' | 'enrichment' | 'classical' | 'people' | 'tracks' | 'personal' | 'cover' | 'links';
+type TabId = 'main' | 'details' | 'enrichment' | 'tracks' | 'personal' | 'cover' | 'links';
 
 // SVG icon components
 const TabIcons = {
@@ -77,8 +75,6 @@ const TABS: { id: TabId; label: string; IconComponent: () => React.ReactElement 
   { id: 'main', label: 'Main', IconComponent: TabIcons.music },
   { id: 'details', label: 'Details', IconComponent: TabIcons.info },
   { id: 'enrichment', label: 'Facts/Sonic', IconComponent: TabIcons.bolt },
-  { id: 'classical', label: 'Classical', IconComponent: TabIcons.violin },
-  { id: 'people', label: 'People', IconComponent: TabIcons.users },
   { id: 'tracks', label: 'Tracks', IconComponent: TabIcons.listOrdered },
   { id: 'personal', label: 'Personal', IconComponent: TabIcons.user },
   { id: 'cover', label: 'Cover', IconComponent: TabIcons.camera },
@@ -111,6 +107,13 @@ type MasterTagLinkRow = {
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
+
+const formatSeconds = (seconds?: number | null) => {
+  if (seconds === null || seconds === undefined || Number.isNaN(seconds)) return null;
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
 
 
 export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate, allAlbumIds }: EditAlbumModalProps) {
@@ -228,6 +231,17 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                notes,
                qty,
                format_details,
+               release_tracks:release_tracks (
+                 id,
+                 position,
+                 side,
+                 title_override,
+                 recording:recordings (
+                   id,
+                   title,
+                   duration_seconds
+                 )
+               ),
                master:masters (
                  id,
                  title,
@@ -267,7 +281,6 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         if (status === 'wishlist') collectionStatus = 'wish_list';
         if (status === 'incoming') collectionStatus = 'on_order';
         if (status === 'sold') collectionStatus = 'sold';
-        if (status === 'for_sale') collectionStatus = 'for_sale';
 
         const normalizedRelease = release
           ? ({
@@ -275,6 +288,24 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               master,
             } as Album['release'])
           : null;
+
+        const releaseTracks = (release?.release_tracks ?? []) as Array<{
+          position?: string | null;
+          side?: string | null;
+          title_override?: string | null;
+          recording?: { title?: string | null; duration_seconds?: number | null } | null;
+        }>;
+
+        const tracks = releaseTracks
+          .map((track) => ({
+            position: track.position ?? '',
+            title: track.title_override ?? track.recording?.title ?? '',
+            artist: null,
+            duration: formatSeconds(track.recording?.duration_seconds ?? null),
+            type: 'track' as const,
+            side: track.side ?? undefined,
+          }))
+          .filter((track) => track.title || track.position);
 
         const albumData: Album = {
           release: normalizedRelease,
@@ -287,15 +318,29 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           year: master?.original_release_year ? String(master.original_release_year) : null,
           format: buildFormatLabel(release),
           image_url: master?.cover_image_url || null,
+          discogs_release_id: release?.discogs_release_id ?? null,
+          spotify_album_id: release?.spotify_album_id ?? null,
           personal_notes: data.personal_notes ?? null,
           release_notes: release?.notes ?? null,
           media_condition: data.media_condition ?? '',
+          package_sleeve_condition: data.sleeve_condition ?? null,
           genres: master?.genres || [],
           styles: master?.styles || [],
           custom_tags: tags,
           location: data.location ?? null,
+          country: release?.country ?? null,
+          barcode: release?.barcode ?? null,
+          cat_no: release?.catalog_number ?? null,
+          labels: release?.label ? [release.label] : [],
+          purchase_price: data.purchase_price ?? null,
+          current_value: data.current_value ?? null,
+          purchase_date: data.purchase_date ?? null,
+          owner: data.owner ?? null,
+          date_added: data.date_added ?? null,
+          last_played_at: data.last_played_at ?? null,
+          play_count: data.play_count ?? null,
           collection_status: collectionStatus,
-          for_sale: status === 'for_sale',
+          tracks,
         };
 
         setAlbum(albumData);
@@ -372,13 +417,17 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         if (editedAlbum.collection_status === 'wish_list') status = 'wishlist';
         if (editedAlbum.collection_status === 'on_order') status = 'incoming';
         if (editedAlbum.collection_status === 'sold') status = 'sold';
-        if (editedAlbum.collection_status === 'for_sale' || editedAlbum.for_sale) status = 'for_sale';
 
         const inventoryUpdate = {
           personal_notes: editedAlbum.personal_notes ?? null,
           media_condition: editedAlbum.media_condition ?? null,
           sleeve_condition: editedAlbum.package_sleeve_condition ?? null,
           location: editedAlbum.location ?? null,
+          purchase_price: editedAlbum.purchase_price ?? null,
+          current_value: editedAlbum.current_value ?? null,
+          purchase_date: editedAlbum.purchase_date ?? null,
+          owner: editedAlbum.owner ?? null,
+          date_added: editedAlbum.date_added ?? null,
           status,
         };
 
@@ -409,6 +458,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           }
 
           for (const track of tracksData.tracks) {
+            if (track.type === 'header') continue;
             const trackTitle = track.title?.trim() || '';
             if (!trackTitle) continue;
 
@@ -436,7 +486,6 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                 recording_id: recording.id,
                 position: track.position,
                 side: track.side ?? null,
-                disc_number: track.disc_number ?? 1,
               }]);
 
             if (releaseTrackError) {
@@ -452,6 +501,8 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             label: editedAlbum.labels?.[0] ?? null,
             catalog_number: editedAlbum.cat_no ?? null,
             release_year: editedAlbum.year ? Number(editedAlbum.year) : null,
+            barcode: editedAlbum.barcode ?? null,
+            country: editedAlbum.country ?? null,
           };
 
           const parsedFormat = editedAlbum.format
@@ -459,7 +510,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             : null;
           const resolvedMediaType = parsedFormat?.media_type ?? editedAlbum.release?.media_type ?? null;
           const resolvedFormatDetails = parsedFormat?.format_details ?? editedAlbum.release?.format_details ?? null;
-          const resolvedQty = parsedFormat?.qty ?? editedAlbum.discs ?? editedAlbum.release?.qty ?? null;
+          const resolvedQty = parsedFormat?.qty ?? editedAlbum.release?.qty ?? null;
 
           if (resolvedMediaType) {
             releaseUpdate.media_type = resolvedMediaType;
@@ -489,6 +540,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             original_release_year: editedAlbum.year ? Number(editedAlbum.year) : null,
             genres: editedAlbum.genres ?? [],
             styles: editedAlbum.styles ?? [],
+            cover_image_url: editedAlbum.image_url ?? null,
           };
 
           const { error: masterError } = await supabase
@@ -657,12 +709,6 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           </div>
           <div className={activeTab === 'enrichment' ? 'block h-full' : 'hidden'}>
             <EnrichmentTab album={editedAlbum} onChange={handleFieldChange} />
-          </div>
-          <div className={activeTab === 'classical' ? 'block h-full' : 'hidden'}>
-            <ClassicalTab album={editedAlbum} onChange={handleFieldChange} />
-          </div>
-          <div className={activeTab === 'people' ? 'block h-full' : 'hidden'}>
-            <PeopleTab album={editedAlbum} onChange={handleFieldChange} />
           </div>
           <div className={activeTab === 'tracks' ? 'block h-full' : 'hidden'}>
             <TracksTab ref={tracksTabRef} album={editedAlbum} onChange={handleFieldChange} />

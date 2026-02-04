@@ -18,10 +18,10 @@ const CATEGORY_OPTIONS = [
   { value: 'pressing_plant', label: 'Pressing Plant' },
   { value: 'color', label: 'Color' },
   { value: 'edition', label: 'Edition' },
-  { value: 'packaging', label: 'Packaging' },
+  { value: 'packaging', label: 'Packaging (Format Detail)' },
   { value: 'cassette_feature', label: 'Cassette Feature' },
   { value: 'cd_feature', label: 'CD Feature' },
-  { value: 'vinyl_material', label: 'Vinyl Material' },
+  { value: 'vinyl_material', label: 'Vinyl Material (Format Detail)' },
   { value: 'sound', label: 'Sound' },
   { value: 'other', label: 'Other' },
 ];

@@ -8,7 +8,6 @@ interface Track {
   title: string;
   artist: string;
   duration: string;
-  disc_number: number;
   side?: string;
   is_header?: boolean;
 }
@@ -27,7 +26,6 @@ interface SpotifyTrack {
   name?: string;
   artists?: { name: string }[];
   duration_ms?: number;
-  disc_number?: number;
   track_number?: number;
 }
 
@@ -85,7 +83,6 @@ export async function importTracksFromDiscogs(
       data.tracklist.forEach((track: DiscogsTrack) => {
         // Determine disc number from position (e.g., "A1", "B1", "C1" or "1-1", "2-1")
         const positionStr = track.position || '';
-        let discNumber = 1;
         let side = '';
         let trackPosition = position; // Fallback to sequential
         
@@ -95,13 +92,10 @@ export async function importTracksFromDiscogs(
           side = sideMatch[1];
           // Extract track number from position (A1 = 1, A2 = 2, etc.)
           trackPosition = parseInt(sideMatch[2] || '1');
-          // A/B = disc 1, C/D = disc 2, etc.
-          discNumber = Math.ceil((side.charCodeAt(0) - 64) / 2);
         } else {
           // Handle disc-track format (1-1, 2-1)
           const discMatch = positionStr.match(/^(\d+)-(\d+)?/);
           if (discMatch) {
-            discNumber = parseInt(discMatch[1]);
             trackPosition = parseInt(discMatch[2] || position.toString());
           }
         }
@@ -115,7 +109,6 @@ export async function importTracksFromDiscogs(
           title: track.title || '',
           artist: track.artists?.[0]?.name || '',
           duration: parseDuration(track.duration),
-          disc_number: discNumber,
           side: side,
           is_header: isHeader,
         });
@@ -157,8 +150,6 @@ export async function importTracksFromSpotify(
     // Spotify tracks format
     if (data.tracks && Array.isArray(data.tracks.items)) {
       data.tracks.items.forEach((track: SpotifyTrack) => {
-        // Determine disc number and track position
-        const discNumber = track.disc_number || 1;
         const trackPosition = track.track_number || position;
 
         tracks.push({
@@ -167,7 +158,6 @@ export async function importTracksFromSpotify(
           title: track.name || '',
           artist: track.artists?.[0]?.name || '',
           duration: parseDuration(Math.floor((track.duration_ms || 0) / 1000)),
-          disc_number: discNumber,
           is_header: false,
         });
         

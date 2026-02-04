@@ -25,19 +25,9 @@ interface ParsedCLZAlbum {
     position: number;
     side: string | null;
     duration: string;
-    disc_number: number;
     type: 'track';
     artist: null;
   }>;
-  disc_metadata: Array<{
-    index: number;
-    name: string;
-  }>;
-  disc_count: number;
-  musicians: string[];
-  producers: string[];
-  engineers: string[];
-  songwriters: string[];
   barcode: string;
   cat_no: string;
   artist_norm: string;
@@ -105,13 +95,10 @@ function parseCLZXML(xmlText: string): ParsedCLZAlbum[] {
 
     // Parse tracks and discs
     const tracks: ParsedCLZAlbum['tracks'] = [];
-    const discMetadata: ParsedCLZAlbum['disc_metadata'] = [];
     const discsNodes = music.querySelectorAll('discs disc');
     
     if (discsNodes.length === 0) {
       // Single disc album
-      discMetadata.push({ index: 1, name: 'Disc 1' });
-      
       const trackNodes = music.querySelectorAll('tracks track');
       trackNodes.forEach(track => {
         const position = track.querySelector('position')?.textContent || '0';
@@ -124,7 +111,6 @@ function parseCLZXML(xmlText: string): ParsedCLZAlbum[] {
           position: cleanPosition(position),
           side: position[0]?.match(/[A-Z]/) ? position[0] : null,
           duration: formatDuration(seconds),
-          disc_number: 1,
           type: 'track',
           artist: null,
         });
@@ -132,10 +118,6 @@ function parseCLZXML(xmlText: string): ParsedCLZAlbum[] {
     } else {
       // Multi-disc album
       discsNodes.forEach((disc, index) => {
-        const discIndex = index + 1;
-        const discName = disc.querySelector('displayname')?.textContent || `Disc ${discIndex}`;
-        discMetadata.push({ index: discIndex, name: discName });
-        
         const trackNodes = disc.querySelectorAll('track');
         trackNodes.forEach(track => {
           const position = track.querySelector('position')?.textContent || '0';
@@ -148,32 +130,12 @@ function parseCLZXML(xmlText: string): ParsedCLZAlbum[] {
             position: cleanPosition(position),
             side: position[0]?.match(/[A-Z]/) ? position[0] : null,
             duration: formatDuration(seconds),
-            disc_number: discIndex,
             type: 'track',
             artist: null,
           });
         });
       });
     }
-
-    // Extract credits
-    const musicians: string[] = [];
-    const producers: string[] = [];
-    const engineers: string[] = [];
-    const songwriters: string[] = [];
-
-    music.querySelectorAll('musicians musician displayname').forEach(node => {
-      if (node.textContent) musicians.push(node.textContent);
-    });
-    music.querySelectorAll('producers producer displayname').forEach(node => {
-      if (node.textContent) producers.push(node.textContent);
-    });
-    music.querySelectorAll('engineers engineer displayname').forEach(node => {
-      if (node.textContent) engineers.push(node.textContent);
-    });
-    music.querySelectorAll('songwriters songwriter displayname').forEach(node => {
-      if (node.textContent) songwriters.push(node.textContent);
-    });
 
     // FIXED: Added notes and location parsing
     const notes = music.querySelector('notes')?.textContent || '';
@@ -186,12 +148,6 @@ function parseCLZXML(xmlText: string): ParsedCLZAlbum[] {
       title,
       year,
       tracks,
-      disc_metadata: discMetadata,
-      disc_count: discMetadata.length,
-      musicians,
-      producers,
-      engineers,
-      songwriters,
       barcode: music.querySelector('barcode')?.textContent || '',
       cat_no: music.querySelector('labelnumber')?.textContent || '',
       labels,

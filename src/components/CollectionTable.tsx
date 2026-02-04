@@ -111,8 +111,6 @@ const CollectionTable = memo(function CollectionTable({
           return 'On Order';
         case 'sold':
           return 'Sold';
-        case 'for_sale':
-          return 'For Sale';
         case 'active':
           return 'In Collection';
         default:
@@ -157,7 +155,6 @@ const CollectionTable = memo(function CollectionTable({
     return {
       checkbox: () => null,
       owned: () => <span className="text-green-500 text-sm">✓</span>,
-      for_sale_indicator: (album: Album) => album.status === 'for_sale' ? <span className="text-amber-500 text-sm">$</span> : null,
       menu: (album: Album) => (
         <span 
           className="text-blue-500 text-sm cursor-pointer"
@@ -180,70 +177,25 @@ const CollectionTable = memo(function CollectionTable({
       year: (album: Album) => getAlbumYear(album),
       barcode: (album: Album) => getAlbumBarcode(album),
       cat_no: (album: Album) => getAlbumCatalogNumber(album),
-      sort_title: (album: Album) => album.sort_title || '—',
-      subtitle: (album: Album) => album.subtitle || '—',
-      index_number: (album: Album) => album.index_number || '—',
       format: (album: Album) => getDisplayFormat(getAlbumFormat(album)),
-      discs: (album: Album) => album.discs || '—',
       tracks: (album: Album) => formatTrackCount(album),
-      length: (album: Album) => formatLength(album.length_seconds),
-      box_set: (album: Album) => album.is_box_set ? 'Yes' : 'No',
       country: (album: Album) => album.country || '—',
-      extra: (album: Album) => album.extra || '—',
-      is_live: (album: Album) => album.is_live ? 'Yes' : 'No',
       media_condition: (album: Album) => album.media_condition || '—',
-      package_sleeve_condition: (album: Album) => album.sleeve_condition || album.package_sleeve_condition || '—',
-      packaging: () => '—',
-      rpm: () => '—',
-      sound: () => '—',
-      spars_code: () => '—',
-      storage_device_slot: () => '—',
-      studio: () => '—',
-      vinyl_color: () => '—',
-      vinyl_weight: () => '—',
+      package_sleeve_condition: (album: Album) => album.package_sleeve_condition || '—',
       
       genres: (album: Album) => formatArray(getAlbumGenres(album)),
       styles: (album: Album) => formatArray(getAlbumStyles(album)),
-      label: (album: Album) => formatArray(getAlbumLabels(album)),
-      original_release_date: (album: Album) => formatDate(album.original_release_date),
-      original_release_year: (album: Album) => album.original_release_year || '—',
-      recording_date: (album: Album) => formatDate(album.recording_date),
-      recording_year: (album: Album) => album.recording_year || '—',
-      master_release_date: (album: Album) => album.master_release_date || '—',
-      chorus: (album: Album) => album.chorus || '—',
-      composer: (album: Album) => album.composer || '—',
-      composition: (album: Album) => album.composition || '—',
-      conductor: (album: Album) => album.conductor || '—',
-      orchestra: (album: Album) => album.orchestra || '—',
-      engineers: (album: Album) => formatArray(album.engineers),
-      musicians: (album: Album) => formatArray(album.musicians),
-      producers: (album: Album) => formatArray(album.producers),
-      songwriters: (album: Album) => formatArray(album.songwriters),
+      labels: (album: Album) => formatArray(getAlbumLabels(album)),
       added_date: (album: Album) => formatDate(album.date_added),
       collection_status: (album: Album) => getAlbumStatus(album),
       location: (album: Album) => getAlbumLocation(album),
-      my_rating: () => '—',
-      notes: (album: Album) => album.personal_notes || '—',
+      personal_notes: (album: Album) => album.personal_notes || '—',
+      release_notes: (album: Album) => album.release_notes || '—',
       owner: (album: Album) => album.owner || '—',
-      play_count: (album: Album) => album.play_count || 0,
-      last_played_date: (album: Album) => formatDate(album.last_played_at),
-      last_cleaned_date: () => '—',
-      signed_by: () => '—',
       custom_tags: (album: Album) => formatArray(getAlbumTags(album)),
-      modified_date: () => '—',
-      due_date: () => '—',
-      loan_date: () => '—',
-      loaned_to: () => '—',
-      for_sale: (album: Album) => album.status === 'for_sale' ? 'Yes' : 'No',
       purchase_date: (album: Album) => formatDate(album.purchase_date),
-      purchase_store: () => '—',
       purchase_price: (album: Album) => formatCurrency(album.purchase_price),
       current_value: (album: Album) => formatCurrency(album.current_value),
-      sale_price: () => '—',
-      sale_platform: () => '—',
-      sale_quantity: () => '—',
-      wholesale_cost: () => '—',
-      pricing_notes: () => '—',
     } as Record<string, (album: Album) => React.ReactNode>;
   }, [onEditAlbum]);
 
