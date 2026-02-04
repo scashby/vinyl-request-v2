@@ -34,7 +34,7 @@ interface BrowseAlbum {
   media_condition?: string;
   genres?: string[];        // Replaces separate genre arrays
   styles?: string[];
-  custom_tags?: string[];
+  tags?: string[];
   
   image: string;
 }
@@ -248,7 +248,7 @@ function BrowseAlbumsContent() {
             media_condition: row.media_condition,
             genres: master?.genres || [],
             styles: master?.styles || [],
-            custom_tags: tags,
+            tags,
             image:
               imageUrl && imageUrl.trim().toLowerCase() !== 'no'
                 ? imageUrl.trim()
@@ -305,7 +305,7 @@ function BrowseAlbumsContent() {
         (album.release_notes || '').toLowerCase().includes(searchLower) ||
         searchInArray(album.genres) ||
         searchInArray(album.styles) ||
-        searchInArray(album.custom_tags);
+        searchInArray(album.tags);
       
       const albumMediaType = normalizeMediaType(album.media_type || '');
 
@@ -321,7 +321,7 @@ function BrowseAlbumsContent() {
       const matchesAllowedTags =
         !normalizedAllowedTags ||
         normalizedAllowedTags.length === 0 ||
-        normalizedAllowedTags.some((tag) => (album.custom_tags || []).some((value) => value.toLowerCase() === tag));
+        normalizedAllowedTags.some((tag) => (album.tags || []).some((value) => value.toLowerCase() === tag));
         
       const matchesJustAdded =
         !showJustAdded || album.justAdded;

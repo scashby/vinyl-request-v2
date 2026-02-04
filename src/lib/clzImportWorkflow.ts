@@ -96,13 +96,13 @@ async function getOrCreateRelease(
     format_details?: string[] | null;
     qty?: number | null;
     label?: string;
-    cat_no?: string;
+    catalog_number?: string;
     barcode?: string;
     country?: string;
     year?: string;
   }
 ): Promise<{ row: ReleaseRow; created: boolean }> {
-  const catalogNumber = normalizeText(data.cat_no);
+  const catalogNumber = normalizeText(data.catalog_number);
   const mediaType = normalizeText(data.media_type) || 'Unknown';
 
   const query = supabase
@@ -144,7 +144,7 @@ async function getOrCreateInventory(
     media_condition?: string;
     sleeve_condition?: string;
     personal_notes?: string;
-    collection_status?: string;
+    status?: string;
   }
 ): Promise<{ row: InventoryRow; created: boolean }> {
   const { data: existing } = await supabase
@@ -156,11 +156,11 @@ async function getOrCreateInventory(
   if (existing) return { row: existing, created: false };
 
   const status =
-    data.collection_status === 'wishlist'
+    data.status === 'wishlist'
       ? 'wishlist'
-      : data.collection_status === 'incoming'
+      : data.status === 'incoming'
         ? 'incoming'
-        : data.collection_status === 'sold'
+        : data.status === 'sold'
           ? 'sold'
           : 'active';
 
@@ -304,8 +304,8 @@ export async function importCLZData(
             media_type: parsedFormat.media_type,
             format_details: parsedFormat.format_details,
             qty: parsedFormat.qty,
-            label: clzData.labels?.[0],
-            cat_no: clzData.cat_no,
+            label: clzData.label ?? null,
+            catalog_number: clzData.catalog_number,
             barcode: clzData.barcode,
             country: clzData.country,
             year: clzData.year,
@@ -318,13 +318,13 @@ export async function importCLZData(
           {
             location: clzData.location || defaultFolder,
             media_condition: clzData.media_condition,
-            sleeve_condition: clzData.package_sleeve_condition,
+            sleeve_condition: clzData.sleeve_condition,
             personal_notes: clzData.personal_notes,
-            collection_status: clzData.collection_status,
+            status: clzData.status,
           }
         );
 
-        await upsertMasterTags(supabase, masterRow.id, clzData.custom_tags ?? []);
+        await upsertMasterTags(supabase, masterRow.id, clzData.tags ?? []);
         await insertReleaseTracks(supabase, releaseRow.id, clzData.tracks ?? []);
 
         if (masterCreated || releaseCreated || inventoryCreated) {
@@ -341,8 +341,8 @@ export async function importCLZData(
             media_type: parsedFormat.media_type ?? 'Unknown',
             format_details: parsedFormat.format_details ?? null,
             qty: parsedFormat.qty ?? null,
-            label: clzData.labels?.[0] ?? null,
-            catalog_number: clzData.cat_no ?? null,
+            label: clzData.label ?? null,
+            catalog_number: clzData.catalog_number ?? null,
             barcode: clzData.barcode ?? null,
             country: clzData.country ?? null,
             release_year: clzData.year ? Number(clzData.year) : null,
@@ -352,7 +352,7 @@ export async function importCLZData(
           const inventoryUpdate = {
             location: clzData.location || defaultFolder,
             media_condition: clzData.media_condition ?? null,
-            sleeve_condition: clzData.package_sleeve_condition ?? null,
+            sleeve_condition: clzData.sleeve_condition ?? null,
             personal_notes: clzData.personal_notes ?? null,
           };
           await supabase.from('inventory').update(inventoryUpdate).eq('id', inventoryRow.id);

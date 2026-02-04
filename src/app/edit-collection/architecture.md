@@ -155,7 +155,7 @@ PickerModal (shows location picker)
 - id, artist, title, year, year_int, format, folder
 
 **Media:**
-- media_condition, image_url, package_sleeve_condition
+- media_condition, image_url, sleeve_condition
 
 **Sales:**
 

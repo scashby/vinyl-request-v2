@@ -2,12 +2,6 @@
 'use client';
 
 import React from 'react';
-import type { Album } from 'types/album';
-
-interface PeopleTabProps {
-  album: Album;
-  onChange: <K extends keyof Album>(field: K, value: Album[K]) => void;
-}
 
 export function PeopleTab() {
   return (

@@ -129,9 +129,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   const getCurrentSelection = () => {
     switch (activeField) {
       case 'label': 
-        return album.labels && album.labels.length > 0 
-          ? album.labels[0]
-          : '';
+        return album.label || album.release?.label || '';
       case 'format': return album.format || '';
       case 'genre': return album.genres || [];
       case 'location': return album.location || '';
@@ -176,7 +174,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
       const selectedName = items.find(item => item.id === selectedIds)?.name || '';
       
       if (activeField === 'label') {
-        onChange('labels', selectedName ? [selectedName] : null);
+        onChange('label', selectedName || null);
       } else if (activeField === 'format') {
         onChange('format', selectedName);
       } else if (activeField === 'location') {
@@ -347,20 +345,14 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
               <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Label</label>
               <div className="flex items-stretch">
                 <select 
-                  value={
-                    album.labels && album.labels.length > 0 
-                      ? album.labels[0] 
-                      : (album.labels && album.labels.length > 0 ? album.labels[0] : '')
-                    }
+                  value={album.label || album.release?.label || ''}
                     onChange={(e) => {
-                    onChange('labels', e.target.value ? [e.target.value] : null);
+                    onChange('label', e.target.value || null);
                     }}
                   className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
                 >
                   <option>
-                    {album.labels && album.labels.length > 0 
-                      ? album.labels.join(', ') 
-                      : (album.labels && album.labels.length > 0 ? album.labels[0] : 'Select label')}
+                    {album.label || album.release?.label || 'Select label'}
                   </option>
                 </select>
                 <button 
@@ -420,13 +412,13 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
             </div>
           </div>
 
-          {/* Row 4: Cat No */}
+          {/* Row 4: Catalog Number */}
           <div>
-            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Cat No</label>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Catalog #</label>
             <input
               type="text"
-              value={album.cat_no || ''}
-              onChange={(e) => onChange('cat_no', e.target.value)}
+              value={album.catalog_number || ''}
+              onChange={(e) => onChange('catalog_number', e.target.value)}
               className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500"
             />
           </div>

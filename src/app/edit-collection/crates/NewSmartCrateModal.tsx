@@ -38,13 +38,15 @@ const FIELD_OPTIONS: { value: CrateFieldType; label: string; type: 'text' | 'num
   { value: 'title', label: 'Album Title', type: 'text' },
   { value: 'format', label: 'Format', type: 'text' },
   { value: 'barcode', label: 'Barcode', type: 'text' },
-  { value: 'cat_no', label: 'Catalog Number', type: 'text' },
+  { value: 'catalog_number', label: 'Catalog Number', type: 'text' },
+  { value: 'label', label: 'Label', type: 'text' },
   { value: 'country', label: 'Country', type: 'text' },
   { value: 'location', label: 'Location', type: 'text' },
+  { value: 'status', label: 'Status', type: 'text' },
   { value: 'owner', label: 'Owner', type: 'text' },
   { value: 'personal_notes', label: 'Personal Notes', type: 'text' },
   { value: 'release_notes', label: 'Release Notes', type: 'text' },
-  { value: 'package_sleeve_condition', label: 'Sleeve Condition', type: 'text' },
+  { value: 'sleeve_condition', label: 'Sleeve Condition', type: 'text' },
   { value: 'media_condition', label: 'Media Condition', type: 'text' },
 
   // Number fields
@@ -60,8 +62,7 @@ const FIELD_OPTIONS: { value: CrateFieldType; label: string; type: 'text' | 'num
   { value: 'last_played_at', label: 'Last Played Date', type: 'date' },
 
   // Array fields
-  { value: 'custom_tags', label: 'Tags', type: 'array' },
-  { value: 'labels', label: 'Labels', type: 'array' },
+  { value: 'tags', label: 'Tags', type: 'array' },
 ];
 
 // Get operators for a field type

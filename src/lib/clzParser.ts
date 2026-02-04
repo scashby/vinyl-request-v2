@@ -17,19 +17,19 @@ export interface CLZAlbumData extends Record<string, unknown> {
   year?: string;
   format: string;
   barcode?: string;
-  cat_no?: string;
+  catalog_number?: string;
   country?: string;
-  labels?: string[];
+  label?: string | null;
   personal_notes?: string; // CHANGED: Renamed from 'notes'
   location?: string; // ADDED: New field for storage location
 
   // Condition
   media_condition?: string;
-  package_sleeve_condition?: string;
+  sleeve_condition?: string;
 
   // Status & Organization
-  collection_status?: string;
-  custom_tags?: string[];
+  status?: string;
+  tags?: string[];
 
   // Track data
   tracks: CLZTrack[];
@@ -266,6 +266,7 @@ export async function parseCLZXML(xmlContent: string): Promise<CLZAlbumData[]> {
       const format = getDisplayName(album.format) || 'Unknown';
       const labelsString = getDisplayName(album.label);
       const labels = parseLabels(labelsString);
+      const label = labels.length > 0 ? labels[0] : null;
       
       // Year handling
       let year: string | undefined;
@@ -288,7 +289,7 @@ export async function parseCLZXML(xmlContent: string): Promise<CLZAlbumData[]> {
       
       // Parse genres and tags
       const clz_genres = parseGenres(album.genres);
-      const custom_tags = parseTags(album.tags);
+      const tags = parseTags(album.tags);
       
       const albumData: CLZAlbumData = {
         // Core data
@@ -297,9 +298,9 @@ export async function parseCLZXML(xmlContent: string): Promise<CLZAlbumData[]> {
         year,
         format,
         barcode: getTextValue(album.upc),
-        cat_no: getTextValue(album.labelnumber),
+        catalog_number: getTextValue(album.labelnumber),
         country: getDisplayName(album.country),
-        labels,
+        label,
         // CHANGED: Map XML notes to personal_notes property
         personal_notes: notes,
         // ADDED: Map combined string to location property
@@ -307,11 +308,11 @@ export async function parseCLZXML(xmlContent: string): Promise<CLZAlbumData[]> {
         
         // Condition
         media_condition: getDisplayName(album.mediacondition),
-        package_sleeve_condition: getDisplayName(album.condition),
+        sleeve_condition: getDisplayName(album.condition),
         
         // Status
-        collection_status: getDisplayName(album.collectionstatus),
-        custom_tags,
+        status: getDisplayName(album.collectionstatus),
+        tags,
 
         // Track data
         tracks,

@@ -277,11 +277,6 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         const tags = extractTagNames(master?.master_tag_links ?? null);
         const status = data.status ?? 'active';
 
-        let collectionStatus: Album['collection_status'] = 'in_collection';
-        if (status === 'wishlist') collectionStatus = 'wish_list';
-        if (status === 'incoming') collectionStatus = 'on_order';
-        if (status === 'sold') collectionStatus = 'sold';
-
         const normalizedRelease = release
           ? ({
               ...release,
@@ -323,15 +318,16 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           personal_notes: data.personal_notes ?? null,
           release_notes: release?.notes ?? null,
           media_condition: data.media_condition ?? '',
-          package_sleeve_condition: data.sleeve_condition ?? null,
+          sleeve_condition: data.sleeve_condition ?? null,
           genres: master?.genres || [],
           styles: master?.styles || [],
-          custom_tags: tags,
+          tags,
           location: data.location ?? null,
           country: release?.country ?? null,
           barcode: release?.barcode ?? null,
-          cat_no: release?.catalog_number ?? null,
-          labels: release?.label ? [release.label] : [],
+          catalog_number: release?.catalog_number ?? null,
+          label: release?.label ?? null,
+          status,
           purchase_price: data.purchase_price ?? null,
           current_value: data.current_value ?? null,
           purchase_date: data.purchase_date ?? null,
@@ -339,7 +335,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           date_added: data.date_added ?? null,
           last_played_at: data.last_played_at ?? null,
           play_count: data.play_count ?? null,
-          collection_status: collectionStatus,
+          musicbrainz_release_group_id: master?.musicbrainz_release_group_id ?? null,
           tracks,
         };
 
@@ -413,15 +409,12 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
 
       console.log('🧭 Saving via inventory tables...');
 
-        let status: string | null = 'active';
-        if (editedAlbum.collection_status === 'wish_list') status = 'wishlist';
-        if (editedAlbum.collection_status === 'on_order') status = 'incoming';
-        if (editedAlbum.collection_status === 'sold') status = 'sold';
+        const status: string | null = editedAlbum.status ?? 'active';
 
         const inventoryUpdate = {
           personal_notes: editedAlbum.personal_notes ?? null,
           media_condition: editedAlbum.media_condition ?? null,
-          sleeve_condition: editedAlbum.package_sleeve_condition ?? null,
+          sleeve_condition: editedAlbum.sleeve_condition ?? null,
           location: editedAlbum.location ?? null,
           purchase_price: editedAlbum.purchase_price ?? null,
           current_value: editedAlbum.current_value ?? null,
@@ -498,11 +491,13 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
 
         if (editedAlbum.release_id) {
           const releaseUpdate: Database['public']['Tables']['releases']['Update'] = {
-            label: editedAlbum.labels?.[0] ?? null,
-            catalog_number: editedAlbum.cat_no ?? null,
+            label: editedAlbum.label ?? null,
+            catalog_number: editedAlbum.catalog_number ?? null,
             release_year: editedAlbum.year ? Number(editedAlbum.year) : null,
             barcode: editedAlbum.barcode ?? null,
             country: editedAlbum.country ?? null,
+            discogs_release_id: editedAlbum.discogs_release_id ?? null,
+            spotify_album_id: editedAlbum.spotify_album_id ?? null,
           };
 
           const parsedFormat = editedAlbum.format
@@ -541,6 +536,8 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             genres: editedAlbum.genres ?? [],
             styles: editedAlbum.styles ?? [],
             cover_image_url: editedAlbum.image_url ?? null,
+            discogs_master_id: editedAlbum.discogs_master_id ?? null,
+            musicbrainz_release_group_id: editedAlbum.musicbrainz_release_group_id ?? null,
           };
 
           const { error: masterError } = await supabase
@@ -554,7 +551,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             return;
           }
 
-          const desiredTags = (editedAlbum.custom_tags ?? [])
+          const desiredTags = (editedAlbum.tags ?? [])
             .map((tag) => tag.trim())
             .filter((tag) => tag.length > 0);
 

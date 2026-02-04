@@ -29,20 +29,20 @@ export function UniversalBottomBar({
   return (
     <div>
       <div className="bg-gray-50 p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2fr_2fr] gap-4 items-end">
-        {/* Collection Status */}
+        {/* Status */}
         <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1.5">Collection Status</label>
+          <label className="block text-xs font-semibold text-gray-500 mb-1.5">Status</label>
           <select
-            value={album.collection_status || 'in_collection'}
-            onChange={(e) => onChange('collection_status', e.target.value)}
+            value={album.status || 'active'}
+            onChange={(e) => onChange('status', e.target.value)}
             className="w-full px-2.5 py-2 border border-gray-300 rounded text-[13px] bg-white text-gray-900 focus:outline-none focus:border-blue-500 cursor-pointer"
           >
             <optgroup label="Collection">
-              <option value="in_collection">In Collection</option>
+              <option value="active">Active</option>
             </optgroup>
             <optgroup label="Wish List">
-              <option value="wish_list">On Wish List</option>
-              <option value="on_order">On Order</option>
+              <option value="wishlist">Wishlist</option>
+              <option value="incoming">Incoming</option>
             </optgroup>
             <optgroup label="Not in Collection">
               <option value="sold">Sold</option>

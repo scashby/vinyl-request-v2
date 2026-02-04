@@ -93,11 +93,11 @@ export default function ConflictResolutionModal({
       case 'personal_notes':
       case 'media_condition':
         return { table: 'inventory', column: fieldName, value };
-      case 'package_sleeve_condition':
+      case 'sleeve_condition':
         return { table: 'inventory', column: 'sleeve_condition', value };
-      case 'labels':
-        return { table: 'releases', column: 'label', value: Array.isArray(value) ? value[0] ?? null : value };
-      case 'cat_no':
+      case 'label':
+        return { table: 'releases', column: 'label', value };
+      case 'catalog_number':
         return { table: 'releases', column: 'catalog_number', value };
       case 'barcode':
       case 'country':
@@ -319,10 +319,10 @@ export default function ConflictResolutionModal({
                           <th className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">Title</th>
                           <th className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">Format</th>
                           <th className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">Barcode</th>
-                          <th className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">Cat No</th>
+                          <th className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">Catalog #</th>
                           <th className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">Country</th>
                           <th className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">Year</th>
-                          <th className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">Labels</th>
+                          <th className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">Label</th>
                         </tr>
 
                         {/* Identifying Data Values Row */}
@@ -331,11 +331,11 @@ export default function ConflictResolutionModal({
                           <td className="px-3 py-2 border border-black text-black bg-white align-top">{firstConflict.title}</td>
                           <td className="px-3 py-2 border border-black text-black bg-white align-top">{firstConflict.format}</td>
                           <td className="px-3 py-2 border border-black text-black bg-white align-top">{firstConflict.barcode || '—'}</td>
-                          <td className="px-3 py-2 border border-black text-black bg-white align-top">{firstConflict.cat_no || '—'}</td>
+                          <td className="px-3 py-2 border border-black text-black bg-white align-top">{firstConflict.catalog_number || '—'}</td>
                           <td className="px-3 py-2 border border-black text-black bg-white align-top">{firstConflict.country || '—'}</td>
                           <td className="px-3 py-2 border border-black text-black bg-white align-top">{firstConflict.year || '—'}</td>
                           <td className="px-3 py-2 border border-black text-black bg-white align-top">
-                            {firstConflict.labels.length > 0 ? firstConflict.labels.join(', ') : '—'}
+                            {firstConflict.label || '—'}
                           </td>
                         </tr>
 

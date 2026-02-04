@@ -7,7 +7,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from 'src/lib/supabaseClient';
-import type { Crate } from 'src/types/crate';
+import type { Crate, SmartRules } from 'src/types/crate';
+import type { Database } from 'types/supabase';
 import {
   defaultEventTypeConfig,
   type EventSubtypeDefaults,
@@ -104,12 +105,14 @@ interface EventData {
   featured_priority?: number | null;
 }
 
-// Type for database event records
-interface DbEvent extends EventData {
-  id: number;
-  queue_type?: string; // Legacy field
+// Type for database event records (V3 schema, with legacy fallbacks)
+type DbEvent = Database['public']['Tables']['events']['Row'] & {
+  queue_type?: string | null; // Legacy field
   allowed_tags?: string[] | string | null;
-}
+  recurrence_pattern?: string | null;
+  recurrence_interval?: number | null;
+  recurrence_end_date?: string | null;
+};
 
 // Utility function to generate recurring events
 function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<EventData, 'id'>[] {
@@ -328,7 +331,11 @@ export default function EditEventForm() {
         .order('sort_order', { ascending: true });
       
       if (!error && data) {
-        setCrates(data as Crate[]);
+        const parsed = data.map((row) => ({
+          ...row,
+          smart_rules: (row.smart_rules as SmartRules | null) ?? null,
+        }));
+        setCrates(parsed as Crate[]);
       }
     };
     

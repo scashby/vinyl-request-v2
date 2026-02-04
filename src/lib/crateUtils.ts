@@ -93,6 +93,12 @@ function getAlbumFieldValue(album: Album, field: string): unknown {
       return master?.title ?? null;
     case 'year':
       return release?.release_year ?? master?.original_release_year ?? null;
+    case 'year_int': {
+      const year = release?.release_year ?? master?.original_release_year;
+      if (!year) return null;
+      const parsed = typeof year === 'string' ? parseInt(year, 10) : year;
+      return Number.isNaN(parsed) ? null : parsed;
+    }
     case 'format': {
       if (!release) return null;
       const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
@@ -100,18 +106,33 @@ function getAlbumFieldValue(album: Album, field: string): unknown {
       const qty = release.qty ?? 1;
       return base ? (qty > 1 ? `${qty}x${base}` : base) : null;
     }
+    case 'country':
+      return release?.country ?? album.country ?? null;
     case 'location':
       return album.location ?? null;
-    case 'collection_status':
+    case 'status':
       return album.status ?? null;
+    case 'barcode':
+      return release?.barcode ?? album.barcode ?? null;
+    case 'catalog_number':
+      return release?.catalog_number ?? album.catalog_number ?? null;
+    case 'label':
+      return release?.label ?? album.label ?? null;
     case 'genres':
       return master?.genres ?? null;
     case 'styles':
       return master?.styles ?? null;
-    case 'labels':
-      return release?.label ? [release.label] : null;
+    case 'tags': {
+      const links = master?.master_tag_links ?? [];
+      const tags = links
+        .map((link) => link.master_tags?.name)
+        .filter((name): name is string => Boolean(name));
+      return tags.length > 0 ? tags : null;
+    }
     case 'media_condition':
       return album.media_condition ?? null;
+    case 'sleeve_condition':
+      return album.sleeve_condition ?? null;
     case 'personal_notes':
       return album.personal_notes ?? null;
     case 'release_notes':
@@ -122,8 +143,18 @@ function getAlbumFieldValue(album: Album, field: string): unknown {
       const year = release?.release_year ?? master?.original_release_year;
       return year ? Math.floor(year / 10) * 10 : null;
     }
+    case 'play_count':
+      return album.play_count ?? null;
     case 'last_played_at':
       return album.last_played_at ?? null;
+    case 'date_added':
+      return album.date_added ?? null;
+    case 'purchase_date':
+      return album.purchase_date ?? null;
+    case 'purchase_price':
+      return album.purchase_price ?? null;
+    case 'current_value':
+      return album.current_value ?? null;
     default:
       return null;
   }

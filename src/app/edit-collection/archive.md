@@ -51,16 +51,16 @@ This file contains detailed change history for work completed prior to the curre
 - **DECISION**: UniversalBottomBar used by EditAlbumModal, NOT by individual tabs
 - Removed UniversalBottomBar from MainTab.tsx
 - UniversalBottomBar.tsx ready for modal integration:
-  - Sectioned Collection Status dropdown (Collection, Wish List, Not in Collection)
+- Sectioned Status dropdown (Collection, Wish List, Not in Collection)
   - Location picker button ready for modal→tab callback chain
-  - All fields: Collection Status, Index, Qty, Location
+- All fields: Status, Index, Qty, Location
   - Bottom buttons: Previous, Next, Cancel, Save
 - Architecture: Modal will pass onOpenLocationPicker callback to active tab's handleOpenPicker
 
 ---
 
 ### UniversalBottomBar Improvements
-- Added sectioned dropdown for Collection Status using `<optgroup>`:
+- Added sectioned dropdown for Status using `<optgroup>`:
   - Collection: In Collection, For Sale
   - Wish List: On Wish List, On Order
   - Not in Collection: Sold, Not in Collection
@@ -128,7 +128,7 @@ This file contains detailed change history for work completed prior to the curre
 - **Solution:** Always explicitly set text color in input field styles to prevent inheritance
 - Adjusted date field widths for better balance: YYYY: 70px→88px (+25%), MM/DD: 50px→52px (+5%)
 - This reduces connector line width proportionally while improving input field usability
-- Applied to all inputs: Title, Sort Title, Subtitle, all date fields, Label, Format, Barcode, Cat No
+- Applied to all inputs: Title, Label, Format, Barcode, Catalog #
 
 ---
 

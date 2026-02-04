@@ -82,17 +82,13 @@ const CollectionTable = memo(function CollectionTable({
     const getAlbumStyles = (album: Album) =>
       album.styles || album.release?.master?.styles || null;
 
-    const getAlbumLabels = (album: Album) => {
-      if (album.labels) return album.labels;
-      const releaseLabel = album.release?.label;
-      return releaseLabel ? [releaseLabel] : null;
-    };
+    const getAlbumLabel = (album: Album) => album.release?.label || '—';
 
     const getAlbumBarcode = (album: Album) =>
       album.barcode || album.release?.barcode || '—';
 
     const getAlbumCatalogNumber = (album: Album) =>
-      album.cat_no || album.release?.catalog_number || '—';
+      album.release?.catalog_number || '—';
 
     const getAlbumTags = (album: Album) => {
       const links = album.release?.master?.master_tag_links ?? [];
@@ -123,13 +119,6 @@ const CollectionTable = memo(function CollectionTable({
     const formatTrackCount = (album: Album) => {
       const trackCount = album.release?.release_tracks?.length ?? 0;
       return trackCount > 0 ? trackCount : '—';
-    };
-
-    const formatLength = (seconds: number | null | undefined): string => {
-      if (!seconds) return '—';
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      return `${mins}:${String(secs).padStart(2, '0')}`;
     };
 
     const formatDate = (date: string | Date | null | undefined): string => {
@@ -176,23 +165,23 @@ const CollectionTable = memo(function CollectionTable({
       ),
       year: (album: Album) => getAlbumYear(album),
       barcode: (album: Album) => getAlbumBarcode(album),
-      cat_no: (album: Album) => getAlbumCatalogNumber(album),
+      catalog_number: (album: Album) => getAlbumCatalogNumber(album),
       format: (album: Album) => getDisplayFormat(getAlbumFormat(album)),
       tracks: (album: Album) => formatTrackCount(album),
       country: (album: Album) => album.country || '—',
       media_condition: (album: Album) => album.media_condition || '—',
-      package_sleeve_condition: (album: Album) => album.package_sleeve_condition || '—',
+      sleeve_condition: (album: Album) => album.sleeve_condition || '—',
       
       genres: (album: Album) => formatArray(getAlbumGenres(album)),
       styles: (album: Album) => formatArray(getAlbumStyles(album)),
-      labels: (album: Album) => formatArray(getAlbumLabels(album)),
+      label: (album: Album) => getAlbumLabel(album),
       added_date: (album: Album) => formatDate(album.date_added),
-      collection_status: (album: Album) => getAlbumStatus(album),
+      status: (album: Album) => getAlbumStatus(album),
       location: (album: Album) => getAlbumLocation(album),
       personal_notes: (album: Album) => album.personal_notes || '—',
       release_notes: (album: Album) => album.release_notes || '—',
       owner: (album: Album) => album.owner || '—',
-      custom_tags: (album: Album) => formatArray(getAlbumTags(album)),
+      tags: (album: Album) => formatArray(getAlbumTags(album)),
       purchase_date: (album: Album) => formatDate(album.purchase_date),
       purchase_price: (album: Album) => formatCurrency(album.purchase_price),
       current_value: (album: Album) => formatCurrency(album.current_value),

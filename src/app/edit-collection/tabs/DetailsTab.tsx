@@ -21,7 +21,7 @@ type ModalType = 'picker' | 'manage' | null;
 
 type FieldType =
   | 'media_condition'
-  | 'package_sleeve_condition'
+  | 'sleeve_condition'
   | 'country';
 
 export function DetailsTab({ album, onChange }: DetailsTabProps) {
@@ -55,7 +55,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
       case 'media_condition':
         setMediaConditions(await fetchMediaConditions());
         break;
-      case 'package_sleeve_condition':
+      case 'sleeve_condition':
         setPackageConditions(await fetchPackageConditions());
         break;
       case 'country':
@@ -67,7 +67,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
   const getCurrentItems = () => {
     switch (activeField) {
       case 'media_condition': return mediaConditions;
-      case 'package_sleeve_condition': return packageConditions;
+      case 'sleeve_condition': return packageConditions;
       case 'country': return countries;
       default: return [];
     }
@@ -76,7 +76,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
   const getCurrentSelection = () => {
     switch (activeField) {
       case 'media_condition': return album.media_condition || '';
-      case 'package_sleeve_condition': return album.package_sleeve_condition || '';
+      case 'sleeve_condition': return album.sleeve_condition || '';
       case 'country': return album.country || '';
       default: return '';
     }
@@ -85,7 +85,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
   const getFieldConfig = () => {
     switch (activeField) {
       case 'media_condition': return { title: 'Select Media Condition', itemLabel: 'Media Condition' };
-      case 'package_sleeve_condition': return { title: 'Select Sleeve Condition', itemLabel: 'Sleeve Condition' };
+      case 'sleeve_condition': return { title: 'Select Sleeve Condition', itemLabel: 'Sleeve Condition' };
       case 'country': return { title: 'Select Country', itemLabel: 'Country' };
       default: return { title: '', itemLabel: '' };
     }
@@ -94,7 +94,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
   const getManageListKey = (field: FieldType | null): string => {
     switch (field) {
       case 'media_condition': return 'media-condition';
-      case 'package_sleeve_condition': return 'package-sleeve-condition';
+      case 'sleeve_condition': return 'sleeve-condition';
       case 'country': return 'country';
       default: return '';
     }
@@ -114,8 +114,8 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
       case 'media_condition':
         onChange('media_condition', selectedName);
         break;
-      case 'package_sleeve_condition':
-        onChange('package_sleeve_condition', selectedName);
+      case 'sleeve_condition':
+        onChange('sleeve_condition', selectedName);
         break;
       case 'country':
         onChange('country', selectedName);
@@ -179,8 +179,8 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
             <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Sleeve Condition</label>
             <div className="flex items-stretch">
               <select
-                value={album.package_sleeve_condition || ''}
-                onChange={(e) => onChange('package_sleeve_condition', e.target.value)}
+                value={album.sleeve_condition || ''}
+                onChange={(e) => onChange('sleeve_condition', e.target.value)}
                 className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
               >
                 <option value="">Select...</option>
@@ -189,7 +189,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
                 ))}
               </select>
               <button
-                onClick={() => handleOpenPicker('package_sleeve_condition')}
+                onClick={() => handleOpenPicker('sleeve_condition')}
                 disabled={dataLoading}
                 className="w-9 h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-wait"
               >

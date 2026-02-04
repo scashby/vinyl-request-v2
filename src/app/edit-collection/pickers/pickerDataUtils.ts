@@ -10,9 +10,6 @@ export interface PickerDataItem {
   sortName?: string;
 }
 
-// Helper type for dynamic row access
-
-type CollectionRow = Record<string, unknown>;
 
 // Sorting helper for Grades (Mint -> Poor)
 const GRADE_RANKS: Record<string, number> = {

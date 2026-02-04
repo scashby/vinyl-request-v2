@@ -10,10 +10,9 @@ interface CollectionInfoPanelProps {
   album: Album | null;
   onClose?: () => void;
   onEditTags?: () => void;
-  onMarkForSale?: () => void;
 }
 
-const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, onEditTags, onMarkForSale }: CollectionInfoPanelProps) {
+const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, onEditTags }: CollectionInfoPanelProps) {
   if (!album) {
     return <div className="py-20 text-center text-gray-400 text-sm italic">Select an album to view details</div>;
   }
@@ -213,8 +212,8 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
             <span>{album.release?.master?.original_release_year ?? '—'}</span>
           </div>
           <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
-            <span className="font-semibold min-w-[180px]">Package/Sleeve Condition</span>
-            <span>{album.package_sleeve_condition || '—'}</span>
+            <span className="font-semibold min-w-[180px]">Sleeve Condition</span>
+            <span>{album.sleeve_condition || '—'}</span>
           </div>
           <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
             <span className="font-semibold min-w-[180px]">Media Condition</span>

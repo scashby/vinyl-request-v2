@@ -95,12 +95,6 @@ interface DiscogsField {
     name: string;
     position: number;
 }
-
-interface DiscogsFolder {
-    id: number;
-    name: string;
-    count: number;
-}
 // --------------------------------------------
 
 const coerceYear = (value?: string | null): number | null => {
@@ -250,13 +244,13 @@ const splitDiscogsUpdates = (payload: Record<string, unknown>) => {
       case 'date_added':
         inventoryUpdates[key] = value ?? null;
         break;
-      case 'package_sleeve_condition':
+      case 'sleeve_condition':
         inventoryUpdates.sleeve_condition = value ?? null;
         break;
-      case 'labels':
-        releaseUpdates.label = Array.isArray(value) ? value[0] ?? null : value;
+      case 'label':
+        releaseUpdates.label = value ?? null;
         break;
-      case 'cat_no':
+      case 'catalog_number':
         releaseUpdates.catalog_number = value ?? null;
         break;
       case 'barcode':
@@ -293,8 +287,8 @@ interface ParsedAlbum {
   artist: string;
   title: string;
   format: string;
-  labels: string[];
-  cat_no: string | null;
+  label: string | null;
+  catalog_number: string | null;
   barcode: string | null;
   country: string | null;
   year: string | null;
@@ -304,7 +298,7 @@ interface ParsedAlbum {
   discogs_master_id: string | null;
   date_added: string;
   media_condition: string;
-  package_sleeve_condition: string | null;
+  sleeve_condition: string | null;
   personal_notes: string | null;
   artist_norm: string;
   title_norm: string;
@@ -325,9 +319,9 @@ interface ExistingAlbum {
   discogs_release_id: string | null;
   discogs_master_id?: string | null;
   format?: string | null;
-  cat_no?: string | null;
+  catalog_number?: string | null;
   media_condition?: string | null;
-  package_sleeve_condition?: string | null;
+  sleeve_condition?: string | null;
   country?: string | null;
   year?: string | null;
   image_url?: string | null;
@@ -374,18 +368,18 @@ function normalizeComparable(value?: string | null): string {
 
 function buildComparisonKey(data: {
   format?: string | null;
-  cat_no?: string | null;
+  catalog_number?: string | null;
   media_condition?: string | null;
-  package_sleeve_condition?: string | null;
+  sleeve_condition?: string | null;
   country?: string | null;
   year?: string | null;
   discogs_master_id?: string | null;
 }): string {
   return [
     normalizeComparable(data.format),
-    normalizeComparable(data.cat_no),
+    normalizeComparable(data.catalog_number),
     normalizeComparable(data.media_condition),
-    normalizeComparable(data.package_sleeve_condition),
+    normalizeComparable(data.sleeve_condition),
     normalizeComparable(data.country),
     normalizeComparable(data.year),
     normalizeComparable(data.discogs_master_id),
@@ -497,8 +491,8 @@ function compareAlbums(
       artist: existingAlbum.artist,
       title: existingAlbum.title,
       format: '',
-      labels: [],
-      cat_no: null,
+      label: null,
+      catalog_number: null,
       barcode: null,
       country: null,
       year: null,
@@ -508,7 +502,7 @@ function compareAlbums(
       discogs_master_id: null,
       date_added: new Date().toISOString(),
       media_condition: '',
-      package_sleeve_condition: null,
+      sleeve_condition: null,
       personal_notes: null,
       artist_norm: normalizeArtist(existingAlbum.artist),
       title_norm: normalizeTitle(existingAlbum.title),
@@ -576,7 +570,7 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
       .map((c) => c.name);
     
     if (labels.length > 0) {
-      enriched.labels = labels;
+      enriched.label = labels[0] ?? null;
     }
   }
 
@@ -593,7 +587,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   const [isConnected, setIsConnected] = useState(false);
   
   // Metadata Definitions
-  const [folders, setFolders] = useState<Record<number, string>>({});
   const [fields, setFields] = useState<{media: number, sleeve: number, notes: number}>({ media: 0, sleeve: 0, notes: 0 });
 
   const [progress, setProgress] = useState({ current: 0, total: 0, status: '' });
@@ -638,15 +631,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   const fetchDefinitions = async () => {
       setStage('fetching_definitions');
       try {
-          // Fetch Folders
-          const folderRes = await fetch('/api/discogs/folders');
-          if (folderRes.ok) {
-              const folderData = await folderRes.json();
-              const folderMap: Record<number, string> = {};
-              folderData.folders?.forEach((f: DiscogsFolder) => folderMap[f.id] = f.name);
-              setFolders(folderMap);
-          }
-
           // Fetch Fields
           const fieldRes = await fetch('/api/discogs/fields');
           if (fieldRes.ok) {
@@ -739,8 +723,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     artist,
                     title,
                     format: fullFormat,
-                    labels: info.labels?.map((l: DiscogsEntity) => l.name) || [],
-                    cat_no: info.labels?.[0]?.catno || null,
+                    label: info.labels?.[0]?.name || null,
+                    catalog_number: info.labels?.[0]?.catno || null,
                     barcode: null, 
                     country: null,
                     year,
@@ -750,7 +734,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     discogs_master_id: info.master_id?.toString() || null,
                     date_added: dateAdded,
                     media_condition: mediaCond,
-                    package_sleeve_condition: sleeveCond,
+                    sleeve_condition: sleeveCond,
                     personal_notes: personalNoteStr,
                     artist_norm: normalizeArtist(artist),
                     title_norm: normalizeTitle(title),
@@ -841,9 +825,9 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               discogs_release_id: release?.discogs_release_id ?? null,
               discogs_master_id: master?.discogs_master_id ?? null,
               format: formatLabel,
-              cat_no: release?.catalog_number ?? null,
+              catalog_number: release?.catalog_number ?? null,
               media_condition: row.media_condition ?? null,
-              package_sleeve_condition: row.sleeve_condition ?? null,
+              sleeve_condition: row.sleeve_condition ?? null,
               country: release?.country ?? null,
               year: (release?.release_year ?? master?.original_release_year)?.toString() ?? null,
               image_url: master?.cover_image_url ?? null,
@@ -855,12 +839,13 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         } else {
           const { data: existingRaw, error: dbError } = await supabase
             .from('wantlist')
-            .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, discogs_master_id, format, cat_no, country, year, cover_image');
+            .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, discogs_master_id, format, country, year, cover_image');
           if (dbError) throw dbError;
           existing = (existingRaw ?? []).map((album) => {
             const wantlistAlbum = album as ExistingAlbum;
             return {
               ...wantlistAlbum,
+              catalog_number: null,
               image_url: wantlistAlbum.cover_image ?? null,
               tracks: null,
               genres: null,
@@ -952,11 +937,11 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 year: album.year || undefined,
                 discogs_release_id: album.discogs_release_id || undefined,
                 discogs_master_id: album.discogs_master_id || undefined,
-                cat_no: album.cat_no,
-                labels: album.labels,
+                catalog_number: album.catalog_number,
+                label: album.label,
                 location: album.location,
                 date_added: album.date_added,
-                package_sleeve_condition: album.package_sleeve_condition,
+                sleeve_condition: album.sleeve_condition,
                 personal_notes: album.personal_notes,
                 media_condition: album.status === 'NEW' || normalizedMediaCondition ? normalizedMediaCondition || 'Unknown' : undefined,
                 cover_image: album.cover_image || undefined,

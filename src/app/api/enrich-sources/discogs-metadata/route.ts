@@ -200,13 +200,15 @@ export async function POST(req: Request) {
     }
 
     if (needsGenres && discogsData.genres && discogsData.genres.length > 0) {
-      masterUpdate.genres = Array.from(new Set(discogsData.genres));
-      console.log(`✓ Found ${masterUpdate.genres.length} genres`);
+      const genres = Array.from(new Set(discogsData.genres));
+      masterUpdate.genres = genres;
+      console.log(`✓ Found ${genres.length} genres`);
     }
 
     if (needsStyles && discogsData.styles && discogsData.styles.length > 0) {
-      masterUpdate.styles = Array.from(new Set(discogsData.styles));
-      console.log(`✓ Found ${masterUpdate.styles.length} styles`);
+      const styles = Array.from(new Set(discogsData.styles));
+      masterUpdate.styles = styles;
+      console.log(`✓ Found ${styles.length} styles`);
     }
 
     if (needsLabel && discogsData.labels && discogsData.labels[0]?.name) {

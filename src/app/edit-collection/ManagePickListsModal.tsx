@@ -55,7 +55,7 @@ const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
   owner: { label: 'Owner', fetchFn: fetchOwners, updateFn: updateOwner, deleteFn: deleteOwner, mergeFn: mergeOwners, allowDelete: true, allowMerge: true, hasSortName: false },
   country: { label: 'Country', fetchFn: fetchCountries, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false, hasSortName: false },
   'media-condition': { label: 'Media Condition', fetchFn: fetchMediaConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false, hasSortName: false, keepOriginalOrder: true },
-  'package-sleeve-condition': { label: 'Sleeve Condition', fetchFn: fetchPackageConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false, hasSortName: false, keepOriginalOrder: true },
+  'sleeve-condition': { label: 'Sleeve Condition', fetchFn: fetchPackageConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false, hasSortName: false, keepOriginalOrder: true },
 };
 
 export default function ManagePickListsModal({ isOpen, onClose, initialList, hideListSelector = false }: ManagePickListsModalProps) {

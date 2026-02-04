@@ -26,7 +26,7 @@ export interface ProcessedRelease {
   location: string;
   year: number | null;
   media_condition: string;
-  package_sleeve_condition: string;
+  sleeve_condition: string;
   discogs_release_id: string;
   personal_notes: string;
   date_added: string;
@@ -56,7 +56,7 @@ export function parseDiscogsCSV(file: File, callback: (rows: ProcessedRelease[])
           location: location,
           year: parseInt(row['Released'], 10) || null,
           media_condition: row['Collection Media Condition'] || '',
-          package_sleeve_condition: row['Collection Sleeve Condition'] || '',
+          sleeve_condition: row['Collection Sleeve Condition'] || '',
           
           // Map IDs
           discogs_release_id: row['release_id'] || '',

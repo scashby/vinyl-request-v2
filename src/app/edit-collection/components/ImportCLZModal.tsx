@@ -29,10 +29,10 @@ interface ParsedCLZAlbum {
     artist: null;
   }>;
   barcode: string;
-  cat_no: string;
+  catalog_number: string;
   artist_norm: string;
   title_norm: string;
-  labels: string[];
+  label: string | null;
   personal_notes: string;
   location: string;
 }
@@ -45,13 +45,13 @@ type ExistingAlbum = Record<string, unknown> & {
   artist: string;
   title: string;
   year: string | null;
-  labels: string[] | null;
-  cat_no: string | null;
+  label: string | null;
+  catalog_number: string | null;
   barcode: string | null;
   country: string | null;
   location: string | null;
   media_condition: string | null;
-  package_sleeve_condition: string | null;
+  sleeve_condition: string | null;
   personal_notes: string | null;
 };
 
@@ -87,11 +87,12 @@ function parseCLZXML(xmlText: string): ParsedCLZAlbum[] {
     const title = music.querySelector('title')?.textContent || 'Unknown Title';
     const year = music.querySelector('releaseyear')?.textContent || '';
 
-    // Get labels
+    // Get label (first label only for V3)
     const labels: string[] = [];
     music.querySelectorAll('labels label displayname').forEach(node => {
       if (node.textContent) labels.push(node.textContent);
     });
+    const label = labels[0] ?? null;
 
     // Parse tracks and discs
     const tracks: ParsedCLZAlbum['tracks'] = [];
@@ -117,7 +118,7 @@ function parseCLZXML(xmlText: string): ParsedCLZAlbum[] {
       });
     } else {
       // Multi-disc album
-      discsNodes.forEach((disc, index) => {
+      discsNodes.forEach((disc) => {
         const trackNodes = disc.querySelectorAll('track');
         trackNodes.forEach(track => {
           const position = track.querySelector('position')?.textContent || '0';
@@ -149,8 +150,8 @@ function parseCLZXML(xmlText: string): ParsedCLZAlbum[] {
       year,
       tracks,
       barcode: music.querySelector('barcode')?.textContent || '',
-      cat_no: music.querySelector('labelnumber')?.textContent || '',
-      labels,
+      catalog_number: music.querySelector('labelnumber')?.textContent || '',
+      label,
       artist_norm: normalizeArtist(artist),
       title_norm: normalizeTitle(title),
       personal_notes: notes,
@@ -257,13 +258,13 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
         case 'media_condition':
           inventoryUpdates[key] = value ?? null;
           break;
-        case 'package_sleeve_condition':
+        case 'sleeve_condition':
           inventoryUpdates.sleeve_condition = value ?? null;
           break;
-        case 'labels':
-          releaseUpdates.label = Array.isArray(value) ? value[0] ?? null : value;
+        case 'label':
+          releaseUpdates.label = value ?? null;
           break;
-        case 'cat_no':
+        case 'catalog_number':
           releaseUpdates.catalog_number = value ?? null;
           break;
         case 'barcode':
@@ -387,13 +388,13 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
           artist: master?.artist?.name ?? 'Unknown Artist',
           title: master?.title ?? 'Untitled',
           year: (release?.release_year ?? master?.original_release_year)?.toString() ?? null,
-          labels: release?.label ? [release.label] : null,
-          cat_no: release?.catalog_number ?? null,
+          label: release?.label ?? null,
+          catalog_number: release?.catalog_number ?? null,
           barcode: release?.barcode ?? null,
           country: release?.country ?? null,
           location: row.location ?? null,
           media_condition: row.media_condition ?? null,
-          package_sleeve_condition: row.sleeve_condition ?? null,
+          sleeve_condition: row.sleeve_condition ?? null,
           personal_notes: row.personal_notes ?? null,
         } satisfies ExistingAlbum;
       });
@@ -475,8 +476,8 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
             title: album.title,
             year: album.year,
             barcode: album.barcode,
-            cat_no: album.cat_no,
-            labels: album.labels,
+            catalog_number: album.catalog_number,
+            label: album.label,
             // FIXED: Included personal_notes and location
             personal_notes: album.personal_notes,
             location: album.location,

@@ -7,8 +7,8 @@ export const IDENTIFYING_FIELDS = [
   'artist',
   'title',
   'format',
-  'labels',
-  'cat_no',
+  'label',
+  'catalog_number',
   'barcode',
   'country',
   'year',
@@ -26,7 +26,7 @@ export const CONFLICTABLE_FIELDS = [
   'personal_notes', // FIXED: Was notes
   'release_notes',
   'media_condition',
-  'package_sleeve_condition',
+  'sleeve_condition',
 ] as const;
 
 export interface Track {
@@ -51,15 +51,15 @@ export interface CollectionRow extends Record<string, unknown> {
   location: string;
   media_condition: string;
   barcode?: string;
-  cat_no?: string;
+  catalog_number?: string;
   country?: string;
-  labels?: string[];
+  label?: string;
   personal_notes?: string;
   release_notes?: string;
-  package_sleeve_condition?: string;
+  sleeve_condition?: string;
   date_added?: Date | string;
-  collection_status?: string;
-  custom_tags?: string[];
+  status?: string;
+  tags?: string[];
   tracks?: unknown;
   image_url?: string;
   genres?: string[];
@@ -86,11 +86,11 @@ export interface FieldConflict {
   artist: string;
   title: string;
   format: string;
-  cat_no: string | null;
+  catalog_number: string | null;
   barcode: string | null;
   country: string | null;
   year: string | null;
-  labels: string[];
+  label: string | null;
   release_id?: number | null;
   master_id?: number | null;
 }
@@ -211,7 +211,7 @@ export function detectConflicts(existingAlbum: Record<string, unknown>, imported
   const resolutionMap = new Map<string, PreviousResolution>();
   for (const res of previousResolutions) resolutionMap.set(res.field_name, res);
   
-  const TAG_LIKE_FIELDS = ['genres', 'styles', 'tags', 'custom_tags', 'labels'];
+  const TAG_LIKE_FIELDS = ['genres', 'styles', 'tags'];
 
   for (const field of CONFLICTABLE_FIELDS) {
     const existingValue = existingAlbum[field];
@@ -240,11 +240,11 @@ export function detectConflicts(existingAlbum: Record<string, unknown>, imported
         artist: existingAlbum.artist as string,
         title: existingAlbum.title as string,
         format: existingAlbum.format as string,
-        cat_no: existingAlbum.cat_no as string | null,
+        catalog_number: existingAlbum.catalog_number as string | null,
         barcode: existingAlbum.barcode as string | null,
         country: existingAlbum.country as string | null,
         year: existingAlbum.year as string | null,
-        labels: (existingAlbum.labels as string[]) || [],
+        label: (existingAlbum.label as string | null) || null,
         release_id: existingAlbum.release_id as number | null,
         master_id: existingAlbum.master_id as number | null,
       });
@@ -354,7 +354,9 @@ export function getFieldDisplayName(fieldName: string): string {
     personal_notes: 'My Notes', // FIXED
     release_notes: 'Release Notes',
     media_condition: 'Media Condition',
-    package_sleeve_condition: 'Sleeve Condition',
+    sleeve_condition: 'Sleeve Condition',
+    label: 'Label',
+    catalog_number: 'Catalog #',
   };
   return nameMap[fieldName] || fieldName;
 }

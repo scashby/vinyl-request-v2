@@ -52,7 +52,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
     {
       id: 'default',
       name: 'Default',
-      columns: ['Artist', 'Title', 'Year', 'Format', 'Label', 'Country', 'Barcode', 'Cat No', 'Added Date', 'Media Condition', 'Sleeve Condition']
+      columns: ['Artist', 'Title', 'Year', 'Format', 'Label', 'Country', 'Barcode', 'Catalog #', 'Added Date', 'Media Condition', 'Sleeve Condition']
     }
   ]);
   const [selectedFavoriteId, setSelectedFavoriteId] = useState('default');
@@ -90,11 +90,6 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
     const tags = extractTagNames(master?.master_tag_links ?? null);
     const status = row.status ?? 'active';
 
-    let collectionStatus: Album['collection_status'] = 'in_collection';
-    if (status === 'wishlist') collectionStatus = 'wish_list';
-    if (status === 'incoming') collectionStatus = 'on_order';
-    if (status === 'sold') collectionStatus = 'sold';
-
     return {
       id: row.id,
       inventory_id: row.id,
@@ -105,20 +100,20 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
       year: master?.original_release_year ? String(master.original_release_year) : null,
       image_url: master?.cover_image_url ?? null,
       format: buildFormatLabel(release),
-      collection_status: collectionStatus,
+      status,
       location: row.location ?? null,
       country: release?.country ?? null,
       date_added: row.date_added ?? null,
       personal_notes: row.personal_notes ?? null,
       release_notes: release?.notes ?? null,
       media_condition: row.media_condition ?? '',
-      package_sleeve_condition: row.sleeve_condition ?? null,
+      sleeve_condition: row.sleeve_condition ?? null,
       barcode: release?.barcode ?? null,
-      cat_no: release?.catalog_number ?? null,
-      labels: label ? [label] : null,
+      catalog_number: release?.catalog_number ?? null,
+      label,
       genres: master?.genres ?? null,
       styles: master?.styles ?? null,
-      custom_tags: tags.length > 0 ? tags : null,
+      tags: tags.length > 0 ? tags : null,
       discogs_release_id: release?.discogs_release_id ?? null,
       discogs_master_id: master?.discogs_master_id ?? null,
       spotify_album_id: release?.spotify_album_id ?? null,
@@ -353,7 +348,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
   if (!isOpen) return null;
 
   const selectedFavorite = columnFavorites.find(f => f.id === selectedFavoriteId);
-  const displayColumns = selectedFavorite?.columns || ['Artist', 'Title', 'Year', 'Format', 'Label', 'Country', 'Barcode', 'Cat No', 'Added Date', 'Media Condition', 'Sleeve Condition'];
+  const displayColumns = selectedFavorite?.columns || ['Artist', 'Title', 'Year', 'Format', 'Label', 'Country', 'Barcode', 'Catalog #', 'Added Date', 'Media Condition', 'Sleeve Condition'];
 
   const getColumnValue = (album: Album, columnName: string): string => {
     switch (columnName) {
@@ -362,20 +357,20 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
       case 'Year': return album.year ? String(album.year) : '—';
       case 'Format': return album.format || '—';
       case 'Label': 
-        return album.labels ? (Array.isArray(album.labels) ? album.labels[0] : album.labels) : '—';
+        return album.label || '—';
       case 'Added Date': 
         return album.date_added ? new Date(album.date_added).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
       case 'Location': return album.location || '—';
-      case 'Collection Status': return album.collection_status || '—';
+      case 'Status': return album.status || '—';
       case 'Barcode': return album.barcode || '—';
-      case 'Cat No': return album.cat_no || '—';
+      case 'Catalog #': return album.catalog_number || '—';
       case 'Country': return album.country || '—';
       case 'Genres':
         return album.genres ? (Array.isArray(album.genres) ? album.genres.join(', ') : album.genres) : '—';
       case 'Styles':
         return album.styles ? (Array.isArray(album.styles) ? album.styles.join(', ') : album.styles) : '—';
       case 'Tags':
-        return album.custom_tags ? album.custom_tags.join(', ') : '—';
+        return album.tags ? album.tags.join(', ') : '—';
       case 'Personal Notes': return album.personal_notes || '—';
       case 'Release Notes': return album.release_notes || '—';
       case 'Owner': return album.owner || '—';
@@ -384,7 +379,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
       case 'Purchase Price': return album.purchase_price ? `$${album.purchase_price.toFixed(2)}` : '—';
       case 'Current Value': return album.current_value ? `$${album.current_value.toFixed(2)}` : '—';
       case 'Media Condition': return album.media_condition || '—';
-      case 'Sleeve Condition': return album.package_sleeve_condition || '—';
+      case 'Sleeve Condition': return album.sleeve_condition || '—';
       default: return '—';
     }
   };

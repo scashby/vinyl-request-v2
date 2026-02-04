@@ -19,8 +19,8 @@ interface ManageColumnFavoritesModalProps {
 }
 
 const COLUMN_FIELDS = {
-  Main: ['Artist', 'Title', 'Year', 'Format', 'Label', 'Barcode', 'Cat No'],
-  Details: ['Location', 'Country', 'Media Condition', 'Sleeve Condition', 'Added Date', 'Collection Status'],
+  Main: ['Artist', 'Title', 'Year', 'Format', 'Label', 'Barcode', 'Catalog #'],
+  Details: ['Location', 'Country', 'Media Condition', 'Sleeve Condition', 'Added Date', 'Status'],
   Metadata: ['Genres', 'Styles', 'Tags'],
   Personal: ['Personal Notes', 'Release Notes', 'Owner', 'Purchase Date', 'Purchase Price', 'Current Value'],
 };

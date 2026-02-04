@@ -9,21 +9,21 @@ export type ColumnId =
   | 'title'
   | 'year'
   | 'barcode'
-  | 'cat_no'
+  | 'catalog_number'
   | 'format'
-  | 'labels'
+  | 'label'
   // Details
   | 'location'
   | 'country'
   | 'media_condition'
-  | 'package_sleeve_condition'
+  | 'sleeve_condition'
   // Metadata
   | 'genres'
   | 'styles'
-  | 'custom_tags'
+  | 'tags'
   // Personal
   | 'added_date'
-  | 'collection_status'
+  | 'status'
   | 'personal_notes'
   | 'release_notes'
   | 'owner'
@@ -51,24 +51,24 @@ export const COLUMN_DEFINITIONS: Record<ColumnId, ColumnDefinition> = {
   title: { id: 'title', label: 'Title', width: '300px', sortable: true, lockable: true },
   year: { id: 'year', label: 'Year', width: '80px', lockable: true },
   barcode: { id: 'barcode', label: 'Barcode', width: '150px' },
-  cat_no: { id: 'cat_no', label: 'Cat No', width: '120px' },
+  catalog_number: { id: 'catalog_number', label: 'Catalog #', width: '120px' },
   format: { id: 'format', label: 'Format', width: '180px' },
-  labels: { id: 'labels', label: 'Label', width: '160px' },
+  label: { id: 'label', label: 'Label', width: '160px' },
 
   // Details
   location: { id: 'location', label: 'Location', width: '150px' },
   country: { id: 'country', label: 'Country', width: '110px' },
   media_condition: { id: 'media_condition', label: 'Media Cond', width: '140px' },
-  package_sleeve_condition: { id: 'package_sleeve_condition', label: 'Sleeve Cond', width: '140px' },
+  sleeve_condition: { id: 'sleeve_condition', label: 'Sleeve Cond', width: '140px' },
 
   // Metadata
   genres: { id: 'genres', label: 'Genre', width: '150px' },
   styles: { id: 'styles', label: 'Styles', width: '150px' },
-  custom_tags: { id: 'custom_tags', label: 'Tags', width: '200px' },
+  tags: { id: 'tags', label: 'Tags', width: '200px' },
 
   // Personal
   added_date: { id: 'added_date', label: 'Added', width: '120px' },
-  collection_status: { id: 'collection_status', label: 'Status', width: '150px' },
+  status: { id: 'status', label: 'Status', width: '150px' },
   personal_notes: { id: 'personal_notes', label: 'My Notes', width: '250px' },
   release_notes: { id: 'release_notes', label: 'Release Notes', width: '250px' },
   owner: { id: 'owner', label: 'Owner', width: '120px' },
@@ -89,7 +89,7 @@ export const COLUMN_GROUPS = [
     icon: '📋',
     columns: [
       'checkbox', 'owned', 'menu', 'artist', 'title',
-      'year', 'barcode', 'cat_no', 'format', 'labels'
+      'year', 'barcode', 'catalog_number', 'format', 'label'
     ] as ColumnId[]
   },
   {
@@ -97,21 +97,21 @@ export const COLUMN_GROUPS = [
     label: 'Details',
     icon: '📝',
     columns: [
-      'location', 'country', 'media_condition', 'package_sleeve_condition'
+      'location', 'country', 'media_condition', 'sleeve_condition'
     ] as ColumnId[]
   },
   {
     id: 'metadata',
     label: 'Metadata',
     icon: '📊',
-    columns: ['genres', 'styles', 'custom_tags'] as ColumnId[]
+    columns: ['genres', 'styles', 'tags'] as ColumnId[]
   },
   {
     id: 'personal',
     label: 'Personal',
     icon: '👤',
     columns: [
-      'added_date', 'collection_status', 'personal_notes', 'release_notes', 'owner',
+      'added_date', 'status', 'personal_notes', 'release_notes', 'owner',
       'purchase_price', 'current_value', 'purchase_date'
     ] as ColumnId[]
   },

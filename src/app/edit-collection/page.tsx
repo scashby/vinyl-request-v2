@@ -13,7 +13,7 @@ import NewCrateModal from './crates/NewCrateModal';
 import NewSmartCrateModal from './crates/NewSmartCrateModal';
 import { AddToCrateModal } from './crates/AddToCrateModal';
 import Header from './Header';
-import type { Crate } from '../../types/crate';
+import type { Crate, SmartRules } from '../../types/crate';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import CollectionInfoPanel from './components/CollectionInfoPanel';
 import { BoxIcon } from '../../components/BoxIcon';
@@ -260,7 +260,11 @@ function CollectionBrowserPage() {
     }
 
     if (data) {
-      setCrates(data as Crate[]);
+      const parsed = data.map((row) => ({
+        ...row,
+        smart_rules: (row.smart_rules as SmartRules | null) ?? null,
+      }));
+      setCrates(parsed as Crate[]);
     }
 
     const { data: crateItems, error: crateItemsError } = await supabase
@@ -376,7 +380,7 @@ function CollectionBrowserPage() {
     }
 
     return filtered;
-  }, [albums, collectionFilter, selectedLetter, selectedFolderValue, selectedCrateId, folderMode, crates, searchQuery, sortBy, tableSortState]);
+  }, [albums, selectedLetter, selectedFolderValue, selectedCrateId, folderMode, crates, searchQuery, sortBy, tableSortState]);
 
   useEffect(() => {
     if (filteredAndSortedAlbums.length > 0 && !selectedAlbumId) {
@@ -757,7 +761,6 @@ function CollectionBrowserPage() {
                 album={selectedAlbum} 
                 onClose={() => setSelectedAlbumId(null)}
                 onEditTags={() => selectedAlbumId && handleEditAlbum(selectedAlbumId)}
-                onMarkForSale={() => selectedAlbumId && handleMarkForSale(selectedAlbumId)}
             />
           </div>
         </div>

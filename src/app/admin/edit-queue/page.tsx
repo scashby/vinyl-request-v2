@@ -11,14 +11,21 @@ import { formatEventText } from 'src/utils/textFormatter';
 import { Button } from 'components/ui/Button';
 import { Card } from 'components/ui/Card';
 import { Container } from 'components/ui/Container';
-import type { DbEvent, DbRequestV3, Inventory, Release, Master, Artist } from 'types/supabase';
+import type { Database } from 'types/supabase';
+
+type DbEvent = Database['public']['Tables']['events']['Row'];
+type DbRequestV3 = Database['public']['Tables']['requests_v3']['Row'];
+type Inventory = Database['public']['Tables']['inventory']['Row'];
+type Release = Database['public']['Tables']['releases']['Row'];
+type Master = Database['public']['Tables']['masters']['Row'];
+type Artist = Database['public']['Tables']['artists']['Row'];
 
 type Event = {
-  id: string;
+  id: number;
   title: string;
   date: string;
   has_queue: boolean;
-  queue_type: string;
+  queue_types?: string[] | null;
   [key: string]: unknown;
 };
 
@@ -31,7 +38,7 @@ type Request = {
   track_name: string | null;
   track_duration: string | null;
   votes: number;
-  event_id: string;
+  event_id: number;
   created_at: string;
   inventory_id?: number | null;
   [key: string]: unknown;
@@ -80,7 +87,7 @@ function EditQueueContent() {
     }
   };
 
-  const fetchRequestsForEvent = async (eventId: string) => {
+  const fetchRequestsForEvent = async (eventId: number) => {
     try {
       console.log('🔍 Admin Debug: Fetching requests for event_id:', eventId);
       
@@ -141,7 +148,7 @@ function EditQueueContent() {
           votes: req.votes || 1,
           inventory_id: req.inventory_id,
           created_at: req.created_at,
-          event_id: req.event_id.toString()
+          event_id: req.event_id
         }));
         console.log('🔍 Admin Debug: Mapped requests without albums:', mapped);
         
@@ -175,7 +182,7 @@ function EditQueueContent() {
           votes: req.votes || 1,
           inventory_id: req.inventory_id,
           created_at: req.created_at,
-          event_id: req.event_id.toString()
+          event_id: req.event_id
         };
       });
 
@@ -242,8 +249,10 @@ function EditQueueContent() {
 
   useEffect(() => {
     if (urlEventId && events.length > 0 && !selectedEvent) {
+      const eventIdNum = Number(urlEventId);
+      if (Number.isNaN(eventIdNum)) return;
       console.log('🔍 Admin Debug: Auto-selecting event from URL:', urlEventId);
-      const eventFromUrl = events.find(e => e.id === urlEventId);
+      const eventFromUrl = events.find(e => e.id === eventIdNum);
       if (eventFromUrl) {
         console.log('🔍 Admin Debug: Found event from URL:', eventFromUrl.title);
         setSelectedEvent(eventFromUrl);
@@ -270,7 +279,7 @@ function EditQueueContent() {
     );
   }
 
-  const queueType = selectedEvent?.queue_type || 'side';
+  const queueType = selectedEvent?.queue_types?.[0] || 'side';
 
   return (
     <div className="min-h-screen bg-white text-black">
@@ -307,7 +316,7 @@ function EditQueueContent() {
                       {formatDate(event.date)}
                     </p>
                     <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-                      {getQueueTypeLabel(event.queue_type || 'side')}
+                      {getQueueTypeLabel(event.queue_types?.[0] || 'side')}
                     </div>
                   </Card>
                 ))}

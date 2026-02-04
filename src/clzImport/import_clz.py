@@ -141,7 +141,7 @@ release_id AS (
 INSERT INTO public.inventory (release_id, status, location, personal_notes)
 VALUES (
   (SELECT id FROM release_id),
-  'in_collection',
+  'active',
   {f"'{location}'" if location else 'NULL'},
   {f"'{personal_notes}'" if personal_notes else 'NULL'}
 );

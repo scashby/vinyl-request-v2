@@ -112,7 +112,7 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags }: AlbumDe
             {renderField('Format', album.format)}
             {renderField('Location', album.location)}
             {renderField('Condition', album.media_condition)}
-            {renderField('Sleeve', album.package_sleeve_condition)}
+            {renderField('Sleeve', album.sleeve_condition)}
             {renderField('Date Added', album.date_added ? new Date(album.date_added).toLocaleDateString() : null)}
             {renderField('Country', album.country)}
 
@@ -123,7 +123,7 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags }: AlbumDe
           <div>
             {renderArrayField('Genres', album.genres)}
             {renderArrayField('Styles', album.styles)}
-            {renderField('Catalog #', album.cat_no)}
+            {renderField('Catalog #', album.release?.catalog_number)}
             {renderField('Barcode', album.barcode)}
             {renderField('Country', album.country)}
           </div>
@@ -153,18 +153,21 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags }: AlbumDe
 
         {activeTab === 'tags' && (
           <div>
-            {album.custom_tags && album.custom_tags.length > 0 ? (
+            {album.release?.master?.master_tag_links && album.release?.master?.master_tag_links.length > 0 ? (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {album.custom_tags.map((tag, idx) => (
-                  <span key={idx} style={{ fontSize: 13, padding: '8px 14px', borderRadius: 6, background: '#8b5cf6', color: 'white', fontWeight: 600 }}>
-                    {tag}
-                  </span>
-                ))}
+                {album.release?.master?.master_tag_links
+                  ?.map((link) => link.master_tags?.name)
+                  .filter((name): name is string => Boolean(name))
+                  .map((tag, idx) => (
+                    <span key={`${tag}-${idx}`} style={{ fontSize: 13, padding: '8px 14px', borderRadius: 6, background: '#8b5cf6', color: 'white', fontWeight: 600 }}>
+                      {tag}
+                    </span>
+                  ))}
               </div>
             ) : (
               <div style={{ padding: 20, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>🏷️</div>
-                No custom tags
+                No tags
               </div>
             )}
 
@@ -212,9 +215,9 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags }: AlbumDe
             {renderField('Discogs Master ID', album.discogs_master_id, album.discogs_master_id ? `https://www.discogs.com/master/${album.discogs_master_id}` : undefined)}
             {renderField('Discogs Release ID', album.discogs_release_id, album.discogs_release_id ? `https://www.discogs.com/release/${album.discogs_release_id}` : undefined)}
             {renderField('Spotify Album ID', album.spotify_album_id)}
-            {renderField('MusicBrainz ID', album.musicbrainz_id)}
+            {renderField('MusicBrainz Release Group ID', album.release?.master?.musicbrainz_release_group_id)}
 
-            {(!album.discogs_master_id && !album.discogs_release_id && !album.spotify_album_id) && (
+            {(!album.discogs_master_id && !album.discogs_release_id && !album.spotify_album_id && !album.release?.master?.musicbrainz_release_group_id) && (
               <div className="p-5 text-center text-gray-400 text-[13px]">
                 <div className="text-[32px] mb-2">🔗</div>
                 No external IDs available

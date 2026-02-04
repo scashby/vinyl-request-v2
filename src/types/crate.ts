@@ -28,16 +28,16 @@ export interface SmartRule {
 export type CrateFieldType = 
   // Text fields - Basic
   | 'artist' | 'title' | 'format' | 'country' | 'location' 
-  | 'owner' | 'personal_notes' | 'release_notes' | 'barcode' | 'cat_no'
+  | 'owner' | 'personal_notes' | 'release_notes' | 'barcode' | 'catalog_number' | 'label' | 'status'
   // Text fields - Condition
-  | 'package_sleeve_condition' | 'media_condition'
+  | 'sleeve_condition' | 'media_condition'
   // Number fields
   | 'year_int' | 'play_count'
   | 'purchase_price' | 'current_value'
   // Date fields
   | 'date_added' | 'purchase_date' | 'last_played_at'
   // Array fields (special handling)
-  | 'custom_tags' | 'labels'
+  | 'tags'
   // Derived fields
   | 'decade';
 

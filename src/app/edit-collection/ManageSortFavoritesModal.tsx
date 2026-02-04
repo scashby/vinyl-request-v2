@@ -24,13 +24,11 @@ interface ManageSortFavoritesModalProps {
 }
 
 const SORT_FIELDS = {
-  Main: ['Artist', 'Barcode', 'Cat No', 'Core AlbumID', 'Format', 'Genre', 'Label', 'Original Release Date', 'Original Release Month', 'Original Release Year', 'Recording Date', 'Recording Month', 'Recording Year', 'Release Date', 'Release Month', 'Release Year', 'Sort Title', 'Subtitle', 'Title'],
-  Details: ['Box Set', 'Country', 'Extra', 'Is Live', 'Media Condition', 'Package/Sleeve Condition', 'Packaging', 'RPM', 'Sound', 'SPARS', 'Storage Device', 'Storage Device Slot', 'Studio', 'Vinyl Color', 'Vinyl Weight'],
-  Edition: ['Discs', 'Length', 'Tracks'],
-  Classical: ['Chorus', 'Composer', 'Composition', 'Conductor', 'Orchestra'],
-  People: ['Engineer', 'Musician', 'Producer', 'Songwriter'],
-  Personal: ['Added Date', 'Added Year', 'Collection Status', 'Current Value', 'Index', 'Last Cleaned Date', 'Last Cleaned Year', 'Last Played Date', 'Location', 'Modified Date', 'My Rating', 'Notes', 'Owner', 'Play Count', 'Played Year', 'Purchase Date', 'Purchase Price', 'Purchase Store', 'Purchase Year', 'Quantity', 'Signed by', 'Tags'],
-  Loan: ['Due Date', 'Loan Date', 'Loaned To'],
+  Main: ['Artist', 'Title', 'Year', 'Format', 'Label', 'Barcode', 'Catalog #'],
+  Details: ['Location', 'Country', 'Media Condition', 'Sleeve Condition'],
+  Metadata: ['Genres', 'Styles', 'Tags'],
+  Personal: ['Added Date', 'Status', 'Personal Notes', 'Release Notes', 'Owner', 'Purchase Date', 'Purchase Price', 'Current Value'],
+  Counts: ['Tracks'],
 };
 
 export function ManageSortFavoritesModal({

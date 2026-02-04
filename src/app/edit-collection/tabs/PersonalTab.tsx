@@ -49,8 +49,8 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
   const purchaseDate = parsePurchaseDate();
 
   const handleRemoveTag = (tag: string) => {
-    const updated = (album.custom_tags || []).filter(t => t !== tag);
-    onChange('custom_tags', updated.length > 0 ? updated : null);
+    const updated = (album.tags || []).filter(t => t !== tag);
+    onChange('tags', updated.length > 0 ? updated : null);
   };
 
   return (
@@ -145,10 +145,10 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
           </div>
 
           <div>
-            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Tags</label>
+              <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Tags</label>
             <div className="flex flex-wrap items-center gap-2 min-h-[38px] px-2.5 py-2 border border-gray-300 rounded bg-white">
-              {(album.custom_tags || []).length > 0 ? (
-                album.custom_tags!.map((tag) => (
+              {(album.tags || []).length > 0 ? (
+                album.tags!.map((tag) => (
                   <span key={tag} className="bg-gray-200 px-2 py-1 rounded text-xs text-gray-700 inline-flex items-center gap-1">
                     {tag}
                     <button
@@ -188,7 +188,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
           position={datePickerPosition}
           onClose={() => setShowPurchaseDatePicker(false)}
           onChange={handlePurchaseDateChange}
-          initialDate={purchaseDate}
+          value={purchaseDate}
         />
       )}
 
@@ -214,8 +214,8 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
           isOpen={showTagsPicker}
           onClose={() => setShowTagsPicker(false)}
           fetchItems={fetchTags}
-          selectedItems={album.custom_tags || []}
-          onSelect={(selectedItems) => onChange('custom_tags', selectedItems.length > 0 ? selectedItems : null)}
+          selectedItems={album.tags || []}
+          onSelect={(selectedItems) => onChange('tags', selectedItems.length > 0 ? selectedItems : null)}
           multiSelect={true}
           canManage={true}
           newItemLabel="Tag"

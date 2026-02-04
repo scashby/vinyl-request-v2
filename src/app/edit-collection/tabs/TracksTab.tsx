@@ -55,6 +55,15 @@ export interface TracksData {
   }>;
 }
 
+type AlbumTrack = NonNullable<Album['tracks']>[number];
+type ImportedTrack = {
+  title?: string | null;
+  artist?: string | null;
+  duration?: string | null;
+  side?: string | null;
+  position?: string | number | null;
+};
+
 function SortableTrackRow({
   track,
   isSelected,
@@ -194,9 +203,9 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
 
     useEffect(() => {
       if (album.tracks && Array.isArray(album.tracks) && album.tracks.length > 0) {
-        const loadedTracks: Track[] = album.tracks.map((dbTrack: any, index: number) => ({
+        const loadedTracks: Track[] = album.tracks.map((dbTrack: AlbumTrack, index: number) => ({
           id: `track-${index}`,
-          position: parseInt(dbTrack.position || '0'),
+          position: parseInt(dbTrack.position || '0', 10),
           title: dbTrack.title || '',
           artist: dbTrack.artist || '',
           duration: dbTrack.duration || '',
@@ -261,7 +270,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
         setImporting(true);
         setImportError(null);
 
-        let imported: any[] = [];
+        let imported: ImportedTrack[] = [];
         if (importSource === 'discogs') {
           if (!album.discogs_release_id) {
             setImportError('Discogs Release ID is required for Discogs import.');

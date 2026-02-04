@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from 'lib/supabaseClient';
+import type { Database, Json } from 'types/supabase';
 
 interface Service {
   title: string;
@@ -34,6 +35,13 @@ interface AboutContent {
   updated_at?: string;
 }
 
+type AboutRow = Database['public']['Tables']['about_content']['Row'];
+
+const parseJsonArray = <T,>(value: Json | null | undefined): T[] => {
+  if (!value) return [];
+  return Array.isArray(value) ? (value as T[]) : [];
+};
+
 export default function EditAboutPage() {
   const [aboutContent, setAboutContent] = useState<AboutContent | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,7 +69,12 @@ export default function EditAboutPage() {
            setMessage('No content found. Database may be empty.');
         }
       } else if (data) {
-        setAboutContent(data as AboutContent);
+        const row = data as AboutRow;
+        setAboutContent({
+          ...row,
+          services: parseJsonArray<Service>(row.services),
+          testimonials: parseJsonArray<Testimonial>(row.testimonials),
+        });
       } 
     } catch (error) {
       setMessage('Error loading content. Please check database setup.');
@@ -84,29 +97,34 @@ export default function EditAboutPage() {
 
       let result;
       if (existingData) {
+        const updatePayload: Database['public']['Tables']['about_content']['Update'] = {
+          main_description: aboutContent.main_description,
+          booking_description: aboutContent.booking_description,
+          contact_name: aboutContent.contact_name,
+          contact_company: aboutContent.contact_company,
+          contact_email: aboutContent.contact_email,
+          contact_phone: aboutContent.contact_phone,
+          calendly_url: aboutContent.calendly_url,
+          services: aboutContent.services as Json,
+          testimonials: aboutContent.testimonials as Json,
+          booking_notes: aboutContent.booking_notes,
+          amazon_wishlist_url: aboutContent.amazon_wishlist_url,
+          discogs_wantlist_url: aboutContent.discogs_wantlist_url,
+          linktree_url: aboutContent.linktree_url,
+          updated_at: new Date().toISOString(),
+        };
         result = await supabase
           .from('about_content')
-          .update({
-            main_description: aboutContent.main_description,
-            booking_description: aboutContent.booking_description,
-            contact_name: aboutContent.contact_name,
-            contact_company: aboutContent.contact_company,
-            contact_email: aboutContent.contact_email,
-            contact_phone: aboutContent.contact_phone,
-            calendly_url: aboutContent.calendly_url,
-            services: aboutContent.services,
-            testimonials: aboutContent.testimonials,
-            booking_notes: aboutContent.booking_notes,
-            amazon_wishlist_url: aboutContent.amazon_wishlist_url,
-            discogs_wantlist_url: aboutContent.discogs_wantlist_url,
-            linktree_url: aboutContent.linktree_url,
-            updated_at: new Date().toISOString()
-          })
+          .update(updatePayload)
           .eq('id', existingData.id);
       } else {
         result = await supabase
           .from('about_content')
-          .insert([aboutContent]);
+          .insert([{
+            ...aboutContent,
+            services: aboutContent.services as Json,
+            testimonials: aboutContent.testimonials as Json,
+          } as Database['public']['Tables']['about_content']['Insert']]);
       }
 
       if (result.error) {

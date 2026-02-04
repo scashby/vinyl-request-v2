@@ -37,7 +37,6 @@ export type Album = {
   format?: string | null;
 
   // Location / status
-  collection_status?: 'in_collection' | 'wish_list' | 'on_order' | 'sold' | 'not_in_collection' | null;
   status?: string | null;
   location?: string | null;
   country?: string | null;
@@ -49,15 +48,15 @@ export type Album = {
 
   // Conditions
   media_condition?: string | null;
-  package_sleeve_condition?: string | null;
+  sleeve_condition?: string | null;
 
   // Release metadata
   barcode?: string | null;
-  cat_no?: string | null;
-  labels?: string[] | null;
   genres?: string[] | null;
   styles?: string[] | null;
-  custom_tags?: string[] | null;
+  label?: string | null;
+  catalog_number?: string | null;
+  tags?: string[] | null;
 
   // Tracks
   tracks?: Array<{
@@ -73,7 +72,7 @@ export type Album = {
   discogs_release_id?: string | null;
   discogs_master_id?: string | null;
   spotify_album_id?: string | null;
-  musicbrainz_id?: string | null;
+  musicbrainz_release_group_id?: string | null;
 
   // Personal / value
   owner?: string | null;
@@ -85,4 +84,21 @@ export type Album = {
 
   // Derived
   year_int?: number | null;
+};
+
+export const toSafeStringArray = (value: unknown): string[] => {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string');
+  }
+  if (typeof value === 'string') return [value];
+  return [];
+};
+
+export const toSafeSearchString = (value: unknown): string => {
+  return toSafeStringArray(value)
+    .join(' ')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
 };
