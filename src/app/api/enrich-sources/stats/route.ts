@@ -1,127 +1,207 @@
-import { NextResponse } from 'next/server';
-import { getAuthHeader, supabaseServer } from 'src/lib/supabaseServer';
+import { NextResponse } from "next/server";
+import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 
-type StatsCounts = {
-  total: number;
-  withDiscogsReleaseId: number;
-  withDiscogsMasterId: number;
-  withCoverImage: number;
-  withGenres: number;
-  withStyles: number;
-  withLabel: number;
-  withCatalogNumber: number;
-  withCountry: number;
-  withReleaseYear: number;
-  withTracks: number;
-  withTags: number;
-  missing: Record<string, number>;
-};
+export const dynamic = 'force-dynamic';
 
-const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
-  Array.isArray(value) ? value[0] ?? null : value ?? null;
+export async function GET(request: Request) {
+  const supabase = supabaseServer(getAuthHeader(request));
 
-export async function GET(req: Request) {
-  const supabase = supabaseServer(getAuthHeader(req));
-
-  const { data, error } = await supabase
-    .from('inventory')
-    .select(`
-      id,
-      release:releases (
+  try {
+    // 1. Fetch Albums
+    const { data: albums, error } = await supabase
+      .from('inventory')
+      .select(`
         id,
-        discogs_release_id,
-        label,
-        catalog_number,
-        country,
-        release_year,
-        release_tracks:release_tracks ( id ),
-        master:masters (
+        release:releases (
           id,
-          discogs_master_id,
-          cover_image_url,
-          genres,
-          styles,
-          master_tag_links:master_tag_links ( tag_id )
+          barcode,
+          label,
+          catalog_number,
+          release_date,
+          release_year,
+          spotify_album_id,
+          master:masters (
+            id,
+            cover_image_url,
+            genres,
+            styles,
+            original_release_year
+          ),
+          release_tracks:release_tracks (
+            recording:recordings (
+              duration_seconds
+            )
+          )
         )
-      )
-    `);
+      `);
 
-  if (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    if (error) throw error;
+    if (!albums) return NextResponse.json({ success: true, stats: null });
+
+    const albumsWithTracks = new Set<string>();
+    const albumsWithMissingDurations = new Set<string>();
+
+    // Initialize Counters
+    let fullyEnriched = 0;
+    let needsEnrichment = 0;
+    
+    // Artwork
+    let missingArtwork = 0;
+    let missingFrontCover = 0;
+    const missingBackCover = 0;
+    const missingInnerSleeve = 0;
+    
+    // Credits
+    const missingCredits = 0;
+    const missingMusicians = 0;
+    const missingProducers = 0;
+    const missingEngineers = 0;
+    const missingSongwriters = 0;
+    
+    // Tracklists
+    let missingTracklists = 0;
+    let missingDurations = 0; // NEW STAT
+    
+    // Audio
+    const missingAudioAnalysis = 0;
+    const missingTempo = 0;
+    const missingMusicalKey = 0;
+    const missingDanceability = 0;
+    const missingEnergy = 0;
+    
+    // Genres
+    let missingGenres = 0;
+    let missingStyles = 0;
+    
+    // Streaming
+    let missingStreamingLinks = 0;
+    let missingSpotify = 0;
+    let missingAppleMusic = 0;
+    const missingLastFM = 0;
+    
+    // Metadata
+    let missingReleaseMetadata = 0;
+    let missingBarcode = 0;
+    let missingLabels = 0;
+    let missingOriginalDate = 0;
+    let missingCatalogNumber = 0;
+
+    const folders = new Set<string>();
+
+    const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+      Array.isArray(value) ? value[0] ?? null : value ?? null;
+
+    albums.forEach(album => {
+      const albumIdStr = String(album.id);
+      const release = toSingle(album.release);
+      const master = toSingle(release?.master);
+      const releaseTracks = release?.release_tracks ?? [];
+
+      if (releaseTracks.length > 0) {
+        albumsWithTracks.add(albumIdStr);
+      }
+
+      const missingDuration = releaseTracks.some((track) => {
+        const recording = toSingle(track.recording);
+        return !recording?.duration_seconds && recording?.duration_seconds !== 0;
+      });
+      if (missingDuration) {
+        albumsWithMissingDurations.add(albumIdStr);
+      }
+
+      const hasFront = !!master?.cover_image_url;
+      if (!hasFront) {
+        missingArtwork++;
+        missingFrontCover++;
+      }
+
+      const hasTracks = albumsWithTracks.has(albumIdStr);
+      const hasMissingDurations = albumsWithMissingDurations.has(albumIdStr);
+      if (!hasTracks) missingTracklists++;
+      if (hasMissingDurations) missingDurations++;
+
+      const hasGenres = Array.isArray(master?.genres) && master?.genres.length > 0;
+      const hasStyles = Array.isArray(master?.styles) && master?.styles.length > 0;
+      if (!hasGenres || !hasStyles) missingGenres++;
+      if (!hasStyles) missingStyles++;
+
+      const hasSpotify = !!release?.spotify_album_id;
+      const hasApple = false;
+      if (!hasSpotify || !hasApple) missingStreamingLinks++;
+      if (!hasSpotify) missingSpotify++;
+      if (!hasApple) missingAppleMusic++;
+
+      const hasOriginalDate = !!master?.original_release_year || !!release?.release_year;
+      const hasBarcode = !!release?.barcode;
+      const hasLabel = !!release?.label;
+      const hasCatalogNumber = !!release?.catalog_number;
+      if (!hasOriginalDate || !hasBarcode || !hasLabel || !hasCatalogNumber) {
+        missingReleaseMetadata++;
+      }
+      if (!hasOriginalDate) missingOriginalDate++;
+      if (!hasBarcode) missingBarcode++;
+      if (!hasLabel) missingLabels++;
+      if (!hasCatalogNumber) missingCatalogNumber++;
+
+      const isComplete =
+        hasFront &&
+        hasTracks &&
+        hasGenres &&
+        (hasSpotify || hasApple) &&
+        (hasBarcode && hasLabel && hasOriginalDate);
+
+      if (isComplete) fullyEnriched++;
+      else needsEnrichment++;
+    });
+
+    const stats = {
+      total: albums.length,
+      fullyEnriched,
+      needsEnrichment,
+      
+      missingArtwork,
+      missingFrontCover,
+      missingBackCover,
+      missingInnerSleeve,
+      
+      missingCredits,
+      missingMusicians,
+      missingProducers,
+      missingEngineers,
+      missingSongwriters,
+      
+      missingTracklists,
+      missingDurations, // Added to response
+      
+      missingAudioAnalysis,
+      missingTempo,
+      missingMusicalKey,
+      missingDanceability,
+      missingEnergy,
+      
+      missingGenres,
+      missingStyles,
+      
+      missingStreamingLinks,
+      missingSpotify,
+      missingAppleMusic,
+      missingLastFM,
+      
+      missingReleaseMetadata,
+      missingBarcode,
+      missingLabels,
+      missingOriginalDate,
+      missingCatalogNumber
+    };
+
+    return NextResponse.json({ 
+      success: true, 
+      stats,
+      folders: Array.from(folders).sort()
+    });
+
+  } catch (error) {
+    console.error("Stats Error:", error);
+    return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
   }
-
-  const stats: StatsCounts = {
-    total: data?.length ?? 0,
-    withDiscogsReleaseId: 0,
-    withDiscogsMasterId: 0,
-    withCoverImage: 0,
-    withGenres: 0,
-    withStyles: 0,
-    withLabel: 0,
-    withCatalogNumber: 0,
-    withCountry: 0,
-    withReleaseYear: 0,
-    withTracks: 0,
-    withTags: 0,
-    missing: {},
-  };
-
-  const missingKeys = [
-    'discogs_release_id',
-    'discogs_master_id',
-    'cover_image',
-    'genres',
-    'styles',
-    'label',
-    'catalog_number',
-    'country',
-    'release_year',
-    'tracks',
-    'tags',
-  ];
-  missingKeys.forEach((key) => {
-    stats.missing[key] = 0;
-  });
-
-  (data ?? []).forEach((row) => {
-    const release = toSingle(row.release);
-    const master = toSingle(release?.master);
-    const trackCount = release?.release_tracks?.length ?? 0;
-    const tagCount = master?.master_tag_links?.length ?? 0;
-
-    if (release?.discogs_release_id) stats.withDiscogsReleaseId += 1;
-    else stats.missing.discogs_release_id += 1;
-
-    if (master?.discogs_master_id) stats.withDiscogsMasterId += 1;
-    else stats.missing.discogs_master_id += 1;
-
-    if (master?.cover_image_url) stats.withCoverImage += 1;
-    else stats.missing.cover_image += 1;
-
-    if (master?.genres && master.genres.length > 0) stats.withGenres += 1;
-    else stats.missing.genres += 1;
-
-    if (master?.styles && master.styles.length > 0) stats.withStyles += 1;
-    else stats.missing.styles += 1;
-
-    if (release?.label) stats.withLabel += 1;
-    else stats.missing.label += 1;
-
-    if (release?.catalog_number) stats.withCatalogNumber += 1;
-    else stats.missing.catalog_number += 1;
-
-    if (release?.country) stats.withCountry += 1;
-    else stats.missing.country += 1;
-
-    if (release?.release_year) stats.withReleaseYear += 1;
-    else stats.missing.release_year += 1;
-
-    if (trackCount > 0) stats.withTracks += 1;
-    else stats.missing.tracks += 1;
-
-    if (tagCount > 0) stats.withTags += 1;
-    else stats.missing.tags += 1;
-  });
-
-  return NextResponse.json({ success: true, stats });
 }

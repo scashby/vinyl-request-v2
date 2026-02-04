@@ -625,9 +625,9 @@ function CollectionBrowserPage() {
             </div>
 
             <div className="p-2.5 border-b border-[#1a1a1a] shrink-0">
-              <input type="text" placeholder={folderMode === 'crates' ? 'Search crates...' : 'Search format...'} value={folderSearch} onChange={(e) => setFolderSearch(e.target.value)} title={folderMode === 'crates' ? 'Filter crates' : 'Filter formats'} className="w-full px-2 py-1.5 bg-[#3a3a3a] text-white border border-[#555] rounded text-xs outline-none" />
-              <div className="mt-2 flex gap-1.5">
-                <button onClick={() => setFolderSortByCount(!folderSortByCount)} title={folderSortByCount ? "Sort alphabetically" : "Sort by count"} className="bg-[#3a3a3a] text-white border border-[#555] px-2 py-1 rounded cursor-pointer text-xs">{folderSortByCount ? '🔢' : '🔤'}</button>
+              <div className="flex gap-1.5">
+                <input type="text" placeholder={folderMode === 'crates' ? 'Search crates...' : 'Search format...'} value={folderSearch} onChange={(e) => setFolderSearch(e.target.value)} title={folderMode === 'crates' ? 'Filter crates' : 'Filter formats'} className="flex-1 px-2 py-1.5 bg-[#3a3a3a] text-white border border-[#555] rounded text-xs outline-none" />
+                <button onClick={() => setFolderSortByCount(!folderSortByCount)} title={folderSortByCount ? "Sort alphabetically" : "Sort by count"} className="bg-[#3a3a3a] text-white border border-[#555] px-2 py-1 rounded cursor-pointer text-xs shrink-0">{folderSortByCount ? '🔢' : '🔤'}</button>
               </div>
             </div>
 
@@ -743,7 +743,6 @@ function CollectionBrowserPage() {
             <CollectionInfoPanel 
                 album={selectedAlbum} 
                 onClose={() => setSelectedAlbumId(null)}
-                onEditTags={() => selectedAlbumId && handleEditAlbum(selectedAlbumId)}
             />
           </div>
         </div>

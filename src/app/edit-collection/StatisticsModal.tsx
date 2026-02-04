@@ -36,6 +36,18 @@ const FORMAT_COLORS: Record<string, string> = {
   'Other': '#8C8C8C',
 };
 
+const FORMAT_COLOR_PALETTE = [
+  '#C44E52',
+  '#DD8452',
+  '#55A868',
+  '#4C72B0',
+  '#8172B2',
+  '#CCB974',
+  '#64B5CD',
+  '#937860',
+  '#DA8BC3',
+];
+
 interface StatisticsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -93,10 +105,10 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
       const otherCount = otherFormats.reduce((sum, [, count]) => sum + count, 0);
       
       // Build format data with top 9 + Other
-      const formatData = top9Formats.map(([name, value]) => ({
+      const formatData = top9Formats.map(([name, value], index) => ({
         name,
         value,
-        color: FORMAT_COLORS[name] || '#8C8C8C'
+        color: FORMAT_COLORS[name] || FORMAT_COLOR_PALETTE[index % FORMAT_COLOR_PALETTE.length] || '#8C8C8C'
       }));
       
       if (otherCount > 0) {

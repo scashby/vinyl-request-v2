@@ -3,8 +3,13 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
-import { type ExtendedFieldConflict } from './ImportEnrichModal';
 import { SERVICE_ICONS } from 'lib/enrichment-data-mapping';
+import type { FieldConflict } from 'lib/conflictDetection';
+
+type ExtendedFieldConflict = FieldConflict & {
+  source: string;
+  candidates?: Record<string, unknown>;
+};
 
 interface EnrichmentReviewModalProps {
   conflicts: ExtendedFieldConflict[];
@@ -293,7 +298,8 @@ const ConflictRow = React.memo(({
     onFinalize: (key: string, val: boolean) => void;
 }) => {
     const key = `${conflict.album_id}-${conflict.field_name}`;
-    const selected = resolutions[key] || { value: conflict.current_value, source: 'current' };
+    const selected: { value: unknown; source: string; selectedSources?: string[] } =
+      resolutions[key] || { value: conflict.current_value, source: 'current', selectedSources: ['current'] };
     const isImageArrayField = isImageArray(conflict.current_value) || isImageArray(conflict.new_value);
     
     // Explicitly add Engineers/Producers here

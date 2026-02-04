@@ -663,3 +663,239 @@ export async function updateSPARS(id: string, newName: string): Promise<boolean>
   void newName;
   return true;
 }
+
+const unique = (items: string[]): string[] => Array.from(new Set(items.filter(Boolean)));
+
+const setCreditsList = (credits: unknown, key: string, values: string[]) => {
+  const next = (typeof credits === 'object' && credits !== null)
+    ? { ...(credits as Record<string, unknown>) }
+    : {};
+  next[key] = unique(values);
+  return next;
+};
+
+const updateCreditsFieldName = async (key: string, oldName: string, newName: string): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .from('recordings')
+      .select('id, credits')
+      .not('credits', 'is', null);
+    if (error) return false;
+
+    const rows = (data ?? []).map((row) => {
+      const existing = extractCreditValues(row.credits, key);
+      if (!existing.includes(oldName)) return null;
+      const nextValues = unique(existing.map((entry) => (entry === oldName ? newName : entry)));
+      return { id: row.id, credits: setCreditsList(row.credits, key, nextValues) };
+    }).filter(Boolean) as { id: number; credits: Record<string, unknown> }[];
+
+    if (!rows.length) return true;
+    const results = await Promise.all(
+      rows.map((row) =>
+        supabase
+          .from('recordings')
+          .update({ credits: row.credits as unknown as import('types/supabase').Json })
+          .eq('id', row.id)
+      )
+    );
+    return results.every((res) => !res.error);
+  } catch {
+    return false;
+  }
+};
+
+const deleteCreditsFieldName = async (key: string, nameToDelete: string): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .from('recordings')
+      .select('id, credits')
+      .not('credits', 'is', null);
+    if (error) return false;
+
+    const rows = (data ?? []).map((row) => {
+      const existing = extractCreditValues(row.credits, key);
+      if (!existing.includes(nameToDelete)) return null;
+      const nextValues = unique(existing.filter((entry) => entry !== nameToDelete));
+      return { id: row.id, credits: setCreditsList(row.credits, key, nextValues) };
+    }).filter(Boolean) as { id: number; credits: Record<string, unknown> }[];
+
+    if (!rows.length) return true;
+    const results = await Promise.all(
+      rows.map((row) =>
+        supabase
+          .from('recordings')
+          .update({ credits: row.credits as unknown as import('types/supabase').Json })
+          .eq('id', row.id)
+      )
+    );
+    return results.every((res) => !res.error);
+  } catch {
+    return false;
+  }
+};
+
+const mergeCreditsFieldNames = async (key: string, targetName: string, sourceNames: string[]): Promise<boolean> => {
+  try {
+    const sourceSet = new Set(sourceNames);
+    if (!sourceSet.size) return true;
+
+    const { data, error } = await supabase
+      .from('recordings')
+      .select('id, credits')
+      .not('credits', 'is', null);
+    if (error) return false;
+
+    const rows = (data ?? []).map((row) => {
+      const existing = extractCreditValues(row.credits, key);
+      if (!existing.some((entry) => sourceSet.has(entry))) return null;
+      const nextValues = unique(
+        existing
+          .filter((entry) => !sourceSet.has(entry))
+          .concat(targetName)
+      );
+      return { id: row.id, credits: setCreditsList(row.credits, key, nextValues) };
+    }).filter(Boolean) as { id: number; credits: Record<string, unknown> }[];
+
+    if (!rows.length) return true;
+    const results = await Promise.all(
+      rows.map((row) =>
+        supabase
+          .from('recordings')
+          .update({ credits: row.credits as unknown as import('types/supabase').Json })
+          .eq('id', row.id)
+      )
+    );
+    return results.every((res) => !res.error);
+  } catch {
+    return false;
+  }
+};
+
+export async function deletePackaging(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('releases').update({ format_details: [] }).contains('format_details', [id]);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function mergePackaging(targetId: string, sourceIds: string[]): Promise<boolean> {
+  return mergeFormats(targetId, sourceIds);
+}
+
+export async function mergeVinylColors(targetId: string, sourceIds: string[]): Promise<boolean> {
+  return mergeFormats(targetId, sourceIds);
+}
+
+export async function mergeSPARS(targetId: string, sourceIds: string[]): Promise<boolean> {
+  return mergeFormats(targetId, sourceIds);
+}
+
+export async function updatePurchaseStore(id: string, newName: string): Promise<boolean> {
+  return updateOwner(id, newName);
+}
+
+export async function deletePurchaseStore(id: string): Promise<boolean> {
+  return deleteOwner(id);
+}
+
+export async function mergePurchaseStores(targetId: string, sourceIds: string[]): Promise<boolean> {
+  return mergeOwners(targetId, sourceIds);
+}
+
+export async function mergeStudios(targetId: string, sourceIds: string[]): Promise<boolean> {
+  return mergeFormats(targetId, sourceIds);
+}
+
+export async function mergeSounds(targetId: string, sourceIds: string[]): Promise<boolean> {
+  return mergeFormats(targetId, sourceIds);
+}
+
+export async function updateComposer(id: string, newName: string): Promise<boolean> {
+  return updateCreditsFieldName('composer', id, newName);
+}
+
+export async function mergeComposers(targetId: string, sourceIds: string[]): Promise<boolean> {
+  return mergeCreditsFieldNames('composer', targetId, sourceIds);
+}
+
+export async function updateConductor(id: string, newName: string): Promise<boolean> {
+  return updateCreditsFieldName('conductor', id, newName);
+}
+
+export async function mergeConductors(targetId: string, sourceIds: string[]): Promise<boolean> {
+  return mergeCreditsFieldNames('conductor', targetId, sourceIds);
+}
+
+export async function updateChorus(id: string, newName: string): Promise<boolean> {
+  return updateCreditsFieldName('chorus', id, newName);
+}
+
+export async function mergeChorus(targetId: string, sourceIds: string[]): Promise<boolean> {
+  return mergeCreditsFieldNames('chorus', targetId, sourceIds);
+}
+
+export async function updateComposition(id: string, newName: string): Promise<boolean> {
+  return updateCreditsFieldName('composition', id, newName);
+}
+
+export async function mergeCompositions(targetId: string, sourceIds: string[]): Promise<boolean> {
+  return mergeCreditsFieldNames('composition', targetId, sourceIds);
+}
+
+export async function updateOrchestra(id: string, newName: string): Promise<boolean> {
+  return updateCreditsFieldName('orchestra', id, newName);
+}
+
+export async function mergeOrchestras(targetId: string, sourceIds: string[]): Promise<boolean> {
+  return mergeCreditsFieldNames('orchestra', targetId, sourceIds);
+}
+
+export async function updateSongwriter(id: string, newName: string): Promise<boolean> {
+  return updateCreditsFieldName('songwriters', id, newName);
+}
+
+export async function deleteSongwriter(id: string): Promise<boolean> {
+  return deleteCreditsFieldName('songwriters', id);
+}
+
+export async function mergeSongwriters(targetId: string, sourceIds: string[]): Promise<boolean> {
+  return mergeCreditsFieldNames('songwriters', targetId, sourceIds);
+}
+
+export async function updateProducer(id: string, newName: string): Promise<boolean> {
+  return updateCreditsFieldName('producers', id, newName);
+}
+
+export async function deleteProducer(id: string): Promise<boolean> {
+  return deleteCreditsFieldName('producers', id);
+}
+
+export async function mergeProducers(targetId: string, sourceIds: string[]): Promise<boolean> {
+  return mergeCreditsFieldNames('producers', targetId, sourceIds);
+}
+
+export async function updateEngineer(id: string, newName: string): Promise<boolean> {
+  return updateCreditsFieldName('engineers', id, newName);
+}
+
+export async function deleteEngineer(id: string): Promise<boolean> {
+  return deleteCreditsFieldName('engineers', id);
+}
+
+export async function mergeEngineers(targetId: string, sourceIds: string[]): Promise<boolean> {
+  return mergeCreditsFieldNames('engineers', targetId, sourceIds);
+}
+
+export async function updateMusician(id: string, newName: string): Promise<boolean> {
+  return updateCreditsFieldName('musicians', id, newName);
+}
+
+export async function deleteMusician(id: string): Promise<boolean> {
+  return deleteCreditsFieldName('musicians', id);
+}
+
+export async function mergeMusicians(targetId: string, sourceIds: string[]): Promise<boolean> {
+  return mergeCreditsFieldNames('musicians', targetId, sourceIds);
+}

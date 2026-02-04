@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { MergeModal } from './pickers/MergeModal';
 import { EditModal } from './pickers/EditModal';
+import { supabase } from '../../lib/supabaseClient';
 import {
   fetchArtists, updateArtist, mergeArtists, deleteArtist,
   fetchLabels, updateLabel, deleteLabel, mergeLabels,
@@ -11,10 +12,29 @@ import {
   fetchGenres,
   fetchLocations, updateLocation, deleteLocation, mergeLocations,
   fetchCountries,
+  fetchPackaging, updatePackaging, deletePackaging, mergePackaging,
   fetchMediaConditions,
   fetchPackageConditions,
-  fetchTags, renameTag, deleteTag, mergeTags,
-  fetchOwners, updateOwner, deleteOwner, mergeOwners
+  fetchVinylColors, updateVinylColor, mergeVinylColors,
+  fetchVinylWeights,
+  fetchSPARS, updateSPARS, mergeSPARS,
+  fetchBoxSets,
+  fetchTags,
+  fetchSignees,
+  fetchStorageDevices,
+  fetchPurchaseStores, updatePurchaseStore, deletePurchaseStore, mergePurchaseStores,
+  fetchOwners, updateOwner, deleteOwner, mergeOwners,
+  fetchStudios, updateStudio, mergeStudios,
+  fetchSounds, updateSound, mergeSounds,
+  fetchComposers, updateComposer, mergeComposers,
+  fetchConductors, updateConductor, mergeConductors,
+  fetchChoruses, updateChorus, mergeChorus,
+  fetchCompositions, updateComposition, mergeCompositions,
+  fetchOrchestras, updateOrchestra, mergeOrchestras,
+  fetchSongwriters, updateSongwriter, deleteSongwriter, mergeSongwriters,
+  fetchProducers, updateProducer, deleteProducer, mergeProducers,
+  fetchEngineers, updateEngineer, deleteEngineer, mergeEngineers,
+  fetchMusicians, updateMusician, deleteMusician, mergeMusicians
 } from './pickers/pickerDataUtils';
 
 interface ManagePickListsModalProps {
@@ -37,6 +57,9 @@ interface PickListConfig {
 }
 
 const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
+  // --------------------------------------------------------------------------
+  // COMPLEX LISTS (Name + Sort Name)
+  // --------------------------------------------------------------------------
   artist: { 
     label: 'Artist', 
     fetchFn: fetchArtists, 
@@ -45,23 +68,130 @@ const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
     mergeFn: mergeArtists, 
     allowDelete: true, 
     allowMerge: true, 
-    hasSortName: false 
+    hasSortName: true 
   },
+  composer: { 
+    label: 'Composer', 
+    fetchFn: fetchComposers, 
+    updateFn: updateComposer, 
+    mergeFn: mergeComposers, 
+    allowDelete: false, 
+    allowMerge: true, 
+    hasSortName: true 
+  },
+  conductor: { 
+    label: 'Conductor', 
+    fetchFn: fetchConductors, 
+    updateFn: updateConductor, 
+    mergeFn: mergeConductors, 
+    allowDelete: false, 
+    allowMerge: true, 
+    hasSortName: true 
+  },
+  chorus: { 
+    label: 'Chorus', 
+    fetchFn: fetchChoruses, 
+    updateFn: updateChorus, 
+    mergeFn: mergeChorus, 
+    allowDelete: false, 
+    allowMerge: true, 
+    hasSortName: true 
+  },
+  composition: { 
+    label: 'Composition', 
+    fetchFn: fetchCompositions, 
+    updateFn: updateComposition, 
+    mergeFn: mergeCompositions, 
+    allowDelete: false, 
+    allowMerge: true, 
+    hasSortName: true 
+  },
+  orchestra: { 
+    label: 'Orchestra', 
+    fetchFn: fetchOrchestras, 
+    updateFn: updateOrchestra, 
+    mergeFn: mergeOrchestras, 
+    allowDelete: false, 
+    allowMerge: true, 
+    hasSortName: true 
+  },
+  
+  // PEOPLE (Smart Lists)
+  musician: { 
+    label: 'Musician', 
+    fetchFn: fetchMusicians, 
+    updateFn: updateMusician, 
+    deleteFn: deleteMusician,
+    mergeFn: mergeMusicians, 
+    allowDelete: true, 
+    allowMerge: true, 
+    hasSortName: true 
+  },
+  songwriter: { 
+    label: 'Songwriter', 
+    fetchFn: fetchSongwriters, 
+    updateFn: updateSongwriter, 
+    deleteFn: deleteSongwriter,
+    mergeFn: mergeSongwriters, 
+    allowDelete: true, 
+    allowMerge: true, 
+    hasSortName: true 
+  },
+  producer: { 
+    label: 'Producer', 
+    fetchFn: fetchProducers, 
+    updateFn: updateProducer, 
+    deleteFn: deleteProducer,
+    mergeFn: mergeProducers, 
+    allowDelete: true, 
+    allowMerge: true, 
+    hasSortName: true 
+  },
+  engineer: { 
+    label: 'Engineer', 
+    fetchFn: fetchEngineers, 
+    updateFn: updateEngineer, 
+    deleteFn: deleteEngineer,
+    mergeFn: mergeEngineers, 
+    allowDelete: true, 
+    allowMerge: true, 
+    hasSortName: true 
+  },
+
+  // --------------------------------------------------------------------------
+  // SIMPLE LISTS (Name Only - Sort Name Field Hidden)
+  // --------------------------------------------------------------------------
   label: { label: 'Label', fetchFn: fetchLabels, updateFn: updateLabel, deleteFn: deleteLabel, mergeFn: mergeLabels, allowDelete: true, allowMerge: true, hasSortName: false },
+  genre: { label: 'Genre', fetchFn: fetchGenres, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false },
+  
+  // GRADE ORDER PRESERVED (keepOriginalOrder: true)
+  'media-condition': { label: 'Media Condition', fetchFn: fetchMediaConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false, keepOriginalOrder: true },
+  'package-sleeve-condition': { label: 'Package/Sleeve Condition', fetchFn: fetchPackageConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false, keepOriginalOrder: true },
+  'vinyl-weight': { label: 'Vinyl Weight', fetchFn: fetchVinylWeights, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false, keepOriginalOrder: true },
+  
+  tag: { label: 'Tag', fetchFn: fetchTags, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false },
+  'vinyl-color': { label: 'Vinyl Color', fetchFn: fetchVinylColors, updateFn: updateVinylColor, deleteFn: async () => false, mergeFn: mergeVinylColors, allowDelete: true, allowMerge: true, hasSortName: false },
+  
+  // Others
+  'box-set': { label: 'Box Set', fetchFn: fetchBoxSets, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false },
+  country: { label: 'Country', fetchFn: fetchCountries, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false },
   format: { label: 'Format', fetchFn: fetchFormats, updateFn: updateFormat, deleteFn: async () => false, mergeFn: mergeFormats, allowDelete: true, allowMerge: true, hasSortName: false },
-  genre: { label: 'Genre', fetchFn: fetchGenres, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false, hasSortName: false },
-  tag: { label: 'Tag', fetchFn: fetchTags, updateFn: renameTag, deleteFn: deleteTag, mergeFn: mergeTags, allowDelete: true, allowMerge: true, hasSortName: false },
   location: { label: 'Location', fetchFn: fetchLocations, updateFn: updateLocation, deleteFn: deleteLocation, mergeFn: mergeLocations, allowDelete: true, allowMerge: true, hasSortName: false },
   owner: { label: 'Owner', fetchFn: fetchOwners, updateFn: updateOwner, deleteFn: deleteOwner, mergeFn: mergeOwners, allowDelete: true, allowMerge: true, hasSortName: false },
-  country: { label: 'Country', fetchFn: fetchCountries, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false, hasSortName: false },
-  'media-condition': { label: 'Media Condition', fetchFn: fetchMediaConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false, hasSortName: false, keepOriginalOrder: true },
-  'sleeve-condition': { label: 'Sleeve Condition', fetchFn: fetchPackageConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false, hasSortName: false, keepOriginalOrder: true },
+  packaging: { label: 'Packaging', fetchFn: fetchPackaging, updateFn: updatePackaging, deleteFn: deletePackaging, mergeFn: mergePackaging, allowDelete: true, allowMerge: true, hasSortName: false },
+  'purchase-store': { label: 'Purchase Store', fetchFn: fetchPurchaseStores, updateFn: updatePurchaseStore, deleteFn: deletePurchaseStore, mergeFn: mergePurchaseStores, allowDelete: true, allowMerge: true, hasSortName: false },
+  signee: { label: 'Signee', fetchFn: fetchSignees, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false },
+  sound: { label: 'Sound', fetchFn: fetchSounds, updateFn: updateSound, mergeFn: mergeSounds, allowDelete: false, allowMerge: true, hasSortName: false },
+  spars: { label: 'SPARS', fetchFn: fetchSPARS, updateFn: updateSPARS, deleteFn: async () => false, mergeFn: mergeSPARS, allowDelete: true, allowMerge: true, hasSortName: false },
+  'storage-device': { label: 'Storage Device', fetchFn: fetchStorageDevices, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false },
+  studio: { label: 'Studio', fetchFn: fetchStudios, updateFn: updateStudio, mergeFn: mergeStudios, allowDelete: false, allowMerge: true, hasSortName: false },
 };
 
 export default function ManagePickListsModal({ isOpen, onClose, initialList, hideListSelector = false }: ManagePickListsModalProps) {
   const [selectedList, setSelectedList] = useState<string>('');
   const [items, setItems] = useState<{ id: string; name: string; count?: number; sortName?: string }[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [newItemName, setNewItemName] = useState('');
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   
   // Edit State
@@ -73,7 +203,7 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
   const [showMergeModal, setShowMergeModal] = useState(false);
   
   // Sort toggle state
-  const [sortBy, setSortBy] = useState<'name' | 'sortName' | 'none'>('name');
+  const [sortBy, setSortBy] = useState<'name' | 'sortName' | 'none'>('sortName');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const getSortName = useCallback((name: string) => {
@@ -82,6 +212,33 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
     return name;
   }, []);
 
+  const customListKey = useCallback((listKey: string) => `pick_list:${listKey}`, []);
+
+  const loadCustomItems = useCallback(async (listKey: string): Promise<string[]> => {
+    const { data } = await supabase
+      .from('admin_settings')
+      .select('value')
+      .eq('key', customListKey(listKey))
+      .maybeSingle();
+    if (!data?.value) return [];
+    try {
+      const parsed = JSON.parse(data.value);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map((v) => String(v).trim()).filter(Boolean);
+    } catch {
+      return [];
+    }
+  }, [customListKey]);
+
+  const saveCustomItems = useCallback(async (listKey: string, names: string[]) => {
+    await supabase
+      .from('admin_settings')
+      .upsert({
+        key: customListKey(listKey),
+        value: JSON.stringify(Array.from(new Set(names.map((n) => n.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)))
+      });
+  }, [customListKey]);
+
   const loadItems = useCallback(async () => {
     if (!selectedList) {
       setItems([]);
@@ -89,10 +246,17 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
     }
     const config = PICK_LIST_CONFIGS[selectedList];
     if (config) {
-      const data = await config.fetchFn();
-      setItems(data);
+      const [data, customNames] = await Promise.all([
+        config.fetchFn(),
+        loadCustomItems(selectedList)
+      ]);
+      const existing = new Set(data.map((item) => item.name.toLowerCase()));
+      const customItems = customNames
+        .filter((name) => !existing.has(name.toLowerCase()))
+        .map((name) => ({ id: name, name, count: 0, sortName: getSortName(name) }));
+      setItems([...data, ...customItems]);
     }
-  }, [selectedList]);
+  }, [getSortName, loadCustomItems, selectedList]);
 
   useEffect(() => {
     if (isOpen) {
@@ -100,6 +264,7 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
         setSelectedList(initialList);
       }
       setSearchQuery('');
+      setNewItemName('');
       setMergeMode(false);
       setSelectedItems(new Set());
       setShowMergeModal(false);
@@ -111,6 +276,7 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
       loadItems();
       setSelectedItems(new Set());
       setMergeMode(false);
+      setNewItemName('');
       
       const config = PICK_LIST_CONFIGS[selectedList];
       
@@ -142,6 +308,11 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
     const sortNameToSave = config.hasSortName ? newSortName : undefined;
     
     const success = await config.updateFn(editingItem.id, newName, sortNameToSave);
+    const customItems = await loadCustomItems(selectedList);
+    if (customItems.includes(editingItem.id)) {
+      const replaced = customItems.map((name) => (name === editingItem.id ? newName : name));
+      await saveCustomItems(selectedList, replaced);
+    }
     
     if (success) {
       await loadItems();
@@ -168,6 +339,10 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
       setTimeout(async () => {
         if (window.confirm(confirmMessage)) {
           const success = await config.deleteFn!(itemId);
+          const customItems = await loadCustomItems(selectedList);
+          if (customItems.includes(itemId)) {
+            await saveCustomItems(selectedList, customItems.filter((name) => name !== itemId));
+          }
           if (success) await loadItems();
         }
       }, 0);
@@ -185,12 +360,32 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
     const config = PICK_LIST_CONFIGS[selectedList];
     
     const success = await config.mergeFn(primaryId, mergeIntoIds);
+    const customItems = await loadCustomItems(selectedList);
+    if (customItems.length > 0) {
+      const pruned = customItems.filter((name) => !mergeIntoIds.includes(name));
+      if (!pruned.includes(primaryId) && customItems.includes(primaryId)) {
+        pruned.push(primaryId);
+      }
+      await saveCustomItems(selectedList, pruned);
+    }
     if (success) {
       await loadItems();
       setSelectedItems(new Set());
       setMergeMode(false);
       setShowMergeModal(false);
     }
+  };
+
+  const handleAddNewItem = async () => {
+    if (!selectedList) return;
+    const trimmed = newItemName.trim();
+    if (!trimmed) return;
+    const customItems = await loadCustomItems(selectedList);
+    if (!customItems.some((name) => name.toLowerCase() === trimmed.toLowerCase())) {
+      await saveCustomItems(selectedList, [...customItems, trimmed]);
+    }
+    setNewItemName('');
+    await loadItems();
   };
 
   const toggleSelection = (itemId: string) => {
@@ -282,6 +477,34 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full px-2.5 py-1.5 border border-gray-300 rounded text-[13px] outline-none bg-white text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
+            </div>
+
+            <div className="w-full md:w-[35%] flex gap-1.5">
+              <input
+                type="text"
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void handleAddNewItem();
+                  }
+                }}
+                placeholder={selectedList ? `Add ${config?.label ?? 'item'}...` : 'Select a list first'}
+                disabled={!selectedList}
+                className="flex-1 px-2.5 py-1.5 border border-gray-300 rounded text-[13px] outline-none bg-white text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
+              />
+              <button
+                onClick={() => void handleAddNewItem()}
+                disabled={!selectedList || !newItemName.trim()}
+                className={`px-3 py-1.5 rounded text-[12px] font-semibold ${
+                  !selectedList || !newItemName.trim()
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                }`}
+              >
+                Add
+              </button>
             </div>
 
             <div className="flex-1 flex justify-center items-center">

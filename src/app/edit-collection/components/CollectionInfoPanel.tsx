@@ -9,10 +9,9 @@ import { toSafeStringArray } from '../../../types/album';
 interface CollectionInfoPanelProps {
   album: Album | null;
   onClose?: () => void;
-  onEditTags?: () => void;
 }
 
-const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, onEditTags }: CollectionInfoPanelProps) {
+const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }: CollectionInfoPanelProps) {
   if (!album) {
     return <div className="py-20 text-center text-gray-400 text-sm italic">Select an album to view details</div>;
   }
@@ -280,16 +279,6 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
         ) : (
           <div className="text-[13px] text-gray-400 font-normal">No tags</div>
         )}
-      </div>
-      
-      {/* Edit/Sell Buttons from previous page.tsx */}
-      <div className="p-4 border-t border-gray-200 flex gap-2">
-        <button 
-           onClick={onEditTags} // Using onEditTags as proxy for "Edit Album"
-           className="flex-1 p-2.5 bg-blue-500 text-white border-none rounded-md text-[13px] font-semibold text-center no-underline cursor-pointer hover:bg-blue-600"
-        >
-          ✏️ Edit Album
-        </button>
       </div>
     </div>
   );

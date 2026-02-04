@@ -95,6 +95,17 @@ const parseDurationToSeconds = (duration?: string | null) => {
   return null;
 };
 
+const extractIdFromUrl = (value: string | null | undefined, marker: string): string | null => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (!trimmed.includes('http')) return trimmed;
+  const idx = trimmed.indexOf(marker);
+  if (idx === -1) return null;
+  const part = trimmed.slice(idx + marker.length);
+  return part.split(/[/?#]/)[0] || null;
+};
+
 interface EditAlbumModalProps {
   albumId: number;
   onClose: () => void;
@@ -235,6 +246,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                  title,
                  original_release_year,
                  discogs_master_id,
+                 musicbrainz_release_group_id,
                  cover_image_url,
                  genres,
                  styles,
@@ -288,6 +300,15 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           year: master?.original_release_year ? String(master.original_release_year) : null,
           format: buildFormatLabel(release),
           image_url: master?.cover_image_url || null,
+          discogs_release_id: release?.discogs_release_id ?? null,
+          discogs_master_id: master?.discogs_master_id ?? null,
+          musicbrainz_id: master?.musicbrainz_release_group_id ?? null,
+          spotify_id: release?.spotify_album_id ?? null,
+          spotify_url: release?.spotify_album_id ? `https://open.spotify.com/album/${release.spotify_album_id}` : null,
+          apple_music_url: null,
+          lastfm_url: null,
+          allmusic_url: null,
+          wikipedia_url: null,
           personal_notes: data.personal_notes ?? null,
           release_notes: release?.notes ?? null,
           media_condition: data.media_condition ?? '',
@@ -453,6 +474,12 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             label: editedAlbum.labels?.[0] ?? null,
             catalog_number: editedAlbum.cat_no ?? null,
             release_year: editedAlbum.year ? Number(editedAlbum.year) : null,
+            discogs_release_id: extractIdFromUrl(editedAlbum.discogs_release_id, '/release/') ?? editedAlbum.discogs_release_id ?? null,
+            spotify_album_id:
+              editedAlbum.spotify_id ??
+              extractIdFromUrl(editedAlbum.spotify_url, '/album/') ??
+              editedAlbum.release?.spotify_album_id ??
+              null,
           };
 
           const parsedFormat = editedAlbum.format
@@ -490,6 +517,11 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             original_release_year: editedAlbum.year ? Number(editedAlbum.year) : null,
             genres: editedAlbum.genres ?? [],
             styles: editedAlbum.styles ?? [],
+            discogs_master_id: extractIdFromUrl(editedAlbum.discogs_master_id, '/master/') ?? editedAlbum.discogs_master_id ?? null,
+            musicbrainz_release_group_id:
+              editedAlbum.musicbrainz_id
+                ? extractIdFromUrl(editedAlbum.musicbrainz_id, '/release-group/') ?? editedAlbum.musicbrainz_id
+                : null,
           };
 
           const { error: masterError } = await supabase
