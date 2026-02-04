@@ -132,7 +132,7 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags }: AlbumDe
         {activeTab === 'enrichment' && (
           <div className="p-5 text-center text-gray-500 text-[13px]">
             <div className="text-[32px] mb-2">⚡</div>
-            Use the Edit modal → Enrichment tab to pull Discogs metadata, tracklists, and cover art.
+            Use the Edit modal → Enrichment tab to pull Discogs metadata/tracklists, cover art, and external IDs.
           </div>
         )}
 

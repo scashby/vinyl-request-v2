@@ -17,9 +17,9 @@ export default function EnrichmentReviewModal({ isOpen, onClose }: EnrichmentRev
         className="bg-white rounded-lg shadow-xl w-full max-w-[540px] p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-lg font-semibold text-gray-900 mb-2">Enrichment Review Disabled</div>
+        <div className="text-lg font-semibold text-gray-900 mb-2">Enrichment Review</div>
         <div className="text-sm text-gray-600 mb-4">
-          Enrichment review is disabled for the V3 schema.
+          There are no pending enrichment conflicts to review right now.
         </div>
         <div className="flex justify-end">
           <button

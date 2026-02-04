@@ -498,19 +498,7 @@ function CollectionBrowserPage() {
     }
   }, [selectedAlbumIds, crates, loadCrates]);
 
-  // Handler for marking an album as for sale
-  const handleMarkForSale = useCallback(async (albumId: number) => {
-    const { error } = await supabase
-      .from('inventory')
-      .update({ status: 'active' })
-      .eq('id', albumId);
-    
-    if (!error) {
-      setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, status: 'active' } : a));
-    } else {
-      console.error('Error marking album for sale:', error);
-    }
-  }, []);
+  // Removed unused handleMarkForSale (no current UI usage).
 
   return (
     <>

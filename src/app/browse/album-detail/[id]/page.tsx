@@ -45,7 +45,6 @@ interface Album {
 }
 
 type ReleaseRow = Database['public']['Tables']['releases']['Row'];
-type ReleaseTrackRow = Database['public']['Tables']['release_tracks']['Row'];
 type RecordingRow = Database['public']['Tables']['recordings']['Row'];
 type ReleaseTrackRecording = Pick<
   RecordingRow,
@@ -194,7 +193,7 @@ function AlbumDetailContent() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [albumIdNum]);
 
   const fetchEventData = useCallback(async () => {
     if (!eventIdNum || Number.isNaN(eventIdNum)) return;

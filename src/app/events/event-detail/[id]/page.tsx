@@ -102,7 +102,7 @@ export default function Page() {
     };
 
     fetchEventAndNavigation();
-  }, [id]);
+  }, [id, eventIdNum]);
 
   if (!event) return <div>Loading...</div>;
 

@@ -1,9 +1,18 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
 export default function OrganizePage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace('/edit-collection');
+  }, [router]);
+
   return (
     <div className="p-6 text-sm text-gray-700">
-      This legacy organize tool relies on non‑V3 tables and fields. It is disabled for V3 schema alignment.
+      Redirecting to the V3 Edit Collection experience…
     </div>
   );
 }

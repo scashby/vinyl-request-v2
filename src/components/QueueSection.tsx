@@ -159,7 +159,7 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
     };
 
     fetchQueue();
-  }, [eventId]);
+  }, [eventId, eventIdNum]);
 
   const handleUpvote = async (reqId: string | number) => {
     const key = getVoteKey(eventId, reqId);
@@ -170,10 +170,10 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
     setVoting((v: { [key: string]: boolean }) => ({ ...v, [reqId]: true }));
     const item = queue.find((q: QueueItem) => q.id === reqId);
     const newVotes = (item?.votes || 1) + 1;
-    const { error } = await supabase
-      .from("requests_v3")
-      .update({ votes: newVotes })
-      .eq("id", Number(reqId));
+      const { error } = await supabase
+        .from("requests_v3")
+        .update({ votes: newVotes })
+      .eq("id", String(reqId));
     setVoting((v: { [key: string]: boolean }) => ({ ...v, [reqId]: false }));
 
     if (!error) {

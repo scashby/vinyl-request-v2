@@ -35,6 +35,8 @@ type EnrichResult = {
 export function EnrichmentTab({ album, onChange }: EnrichmentTabProps) {
   const [loadingMetadata, setLoadingMetadata] = useState(false);
   const [loadingTracklist, setLoadingTracklist] = useState(false);
+  const [loadingSpotify, setLoadingSpotify] = useState(false);
+  const [loadingMusicBrainz, setLoadingMusicBrainz] = useState(false);
   const [showFindCover, setShowFindCover] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -105,10 +107,62 @@ export function EnrichmentTab({ album, onChange }: EnrichmentTabProps) {
     }
   };
 
+  const handleSpotifyEnrich = async () => {
+    if (!album.id) return;
+    setLoadingSpotify(true);
+    setStatusMessage(null);
+    try {
+      const res = await fetch('/api/enrich-sources/spotify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ albumId: album.id })
+      });
+      const data = (await res.json()) as { success?: boolean; error?: string; data?: { spotify?: { id?: string } } };
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'Spotify enrichment failed');
+      }
+      const spotifyId = data.data?.spotify?.id;
+      if (spotifyId) {
+        onChange('spotify_album_id', spotifyId as Album['spotify_album_id']);
+      }
+      setStatusMessage(spotifyId ? 'Spotify album ID updated.' : 'No Spotify match found.');
+    } catch (err) {
+      setStatusMessage(err instanceof Error ? err.message : 'Spotify enrichment failed.');
+    } finally {
+      setLoadingSpotify(false);
+    }
+  };
+
+  const handleMusicBrainzEnrich = async () => {
+    if (!album.id) return;
+    setLoadingMusicBrainz(true);
+    setStatusMessage(null);
+    try {
+      const res = await fetch('/api/enrich-sources/musicbrainz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ albumId: album.id })
+      });
+      const data = (await res.json()) as { success?: boolean; error?: string; data?: { musicbrainz?: { id?: string } } };
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'MusicBrainz enrichment failed');
+      }
+      const mbId = data.data?.musicbrainz?.id;
+      if (mbId) {
+        onChange('musicbrainz_release_group_id', mbId as Album['musicbrainz_release_group_id']);
+      }
+      setStatusMessage(mbId ? 'MusicBrainz release group ID updated.' : 'No MusicBrainz match found.');
+    } catch (err) {
+      setStatusMessage(err instanceof Error ? err.message : 'MusicBrainz enrichment failed.');
+    } finally {
+      setLoadingMusicBrainz(false);
+    }
+  };
+
   return (
     <div className="p-4 flex flex-col gap-4">
       <div className="text-sm text-gray-600">
-        V3 enrichment focuses on Discogs metadata, tracklists, and cover art.
+        V3 enrichment pulls Discogs metadata/tracklists, cover art, and external IDs from Spotify and MusicBrainz.
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -126,6 +180,22 @@ export function EnrichmentTab({ album, onChange }: EnrichmentTabProps) {
           className="px-4 py-2.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-60"
         >
           {loadingTracklist ? 'Fetching Tracklist…' : 'Fetch Discogs Tracklist'}
+        </button>
+
+        <button
+          onClick={handleSpotifyEnrich}
+          disabled={loadingSpotify}
+          className="px-4 py-2.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60"
+        >
+          {loadingSpotify ? 'Searching Spotify…' : 'Find Spotify Album ID'}
+        </button>
+
+        <button
+          onClick={handleMusicBrainzEnrich}
+          disabled={loadingMusicBrainz}
+          className="px-4 py-2.5 text-sm bg-slate-700 text-white rounded hover:bg-slate-800 disabled:opacity-60"
+        >
+          {loadingMusicBrainz ? 'Searching MusicBrainz…' : 'Find MusicBrainz Release Group'}
         </button>
 
         <button
