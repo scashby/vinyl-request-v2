@@ -625,7 +625,7 @@ function CollectionBrowserPage() {
             </div>
 
             <div className="p-2.5 border-b border-[#1a1a1a] shrink-0">
-              <div className="flex gap-1.5">
+              <div className="flex gap-1.5 items-center flex-nowrap">
                 <input type="text" placeholder={folderMode === 'crates' ? 'Search crates...' : 'Search format...'} value={folderSearch} onChange={(e) => setFolderSearch(e.target.value)} title={folderMode === 'crates' ? 'Filter crates' : 'Filter formats'} className="flex-1 px-2 py-1.5 bg-[#3a3a3a] text-white border border-[#555] rounded text-xs outline-none" />
                 <button onClick={() => setFolderSortByCount(!folderSortByCount)} title={folderSortByCount ? "Sort alphabetically" : "Sort by count"} className="bg-[#3a3a3a] text-white border border-[#555] px-2 py-1 rounded cursor-pointer text-xs shrink-0">{folderSortByCount ? '🔢' : '🔤'}</button>
               </div>
@@ -768,4 +768,4 @@ export default function Page() {
     </Suspense>
   );
 }
-// AUDIT: inspected, no changes.
+// AUDIT: updated for UI parity (sort control alignment).

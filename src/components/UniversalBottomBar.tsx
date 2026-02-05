@@ -28,7 +28,7 @@ export function UniversalBottomBar({
 }: UniversalBottomBarProps) {
   return (
     <div>
-      <div className="bg-gray-50 p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_2fr] gap-4 items-end">
+      <div className="bg-white p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_2fr] gap-4 items-end">
         {/* Collection Status */}
         <div>
           <label className="block text-xs font-semibold text-gray-500 mb-1.5">Collection Status</label>
@@ -105,7 +105,7 @@ export function UniversalBottomBar({
       </div>
 
       {/* Bottom buttons row */}
-      <div className="flex justify-between items-center px-5 py-4 border-t border-gray-200 bg-gray-50">
+      <div className="flex justify-between items-center px-4 py-3 border-t border-gray-200 bg-white">
         {/* Left: Previous/Next */}
         <div className="flex gap-2">
           <button
@@ -136,7 +136,7 @@ export function UniversalBottomBar({
         <div className="flex gap-2">
           <button
             onClick={onCancel}
-            className="px-5 py-2 bg-gray-400 text-white border-none rounded text-[13px] font-medium cursor-pointer hover:bg-gray-500"
+            className="px-5 py-2 bg-gray-300 text-gray-800 border-none rounded text-[13px] font-medium cursor-pointer hover:bg-gray-400"
           >
             Cancel
           </button>
@@ -151,4 +151,4 @@ export function UniversalBottomBar({
     </div>
   );
 }
-// AUDIT: inspected, no changes.
+// AUDIT: updated for UI parity with CLZ reference.

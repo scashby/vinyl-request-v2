@@ -1040,7 +1040,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         </div>
 
         {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto p-4 bg-white relative">
+        <div className="flex-1 overflow-y-auto bg-white relative">
           <div className={activeTab === 'main' ? 'block h-full' : 'hidden'}>
             <MainTab ref={mainTabRef} album={editedAlbum} onChange={handleFieldChange} />
           </div>

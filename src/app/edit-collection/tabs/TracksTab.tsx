@@ -587,7 +587,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
   return (
     <div className="flex flex-col gap-4 p-4 bg-white text-gray-900">
       {/* Disc Tabs */}
-      <div className="flex gap-1 border-b border-gray-200 bg-white overflow-x-auto">
+      <div className="flex gap-1 border-b border-gray-200 bg-white overflow-x-auto items-center">
         {discs.map(disc => (
           <button
             key={disc.disc_number}
@@ -613,7 +613,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
           </button>
         ))}
         <button 
-          className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-t whitespace-nowrap cursor-pointer bg-transparent border-none" 
+          className="ml-auto px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-t whitespace-nowrap cursor-pointer bg-transparent border-none" 
           onClick={handleAddDisc}
         >
           + Add Disc

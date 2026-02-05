@@ -19,6 +19,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
   type ReleaseTrack = NonNullable<NonNullable<Album['release']>['release_tracks']>[number];
 
   const releaseTracks = album.release?.release_tracks ?? [];
+  const fallbackTracks = album.tracks ?? [];
 
   const formatDuration = (totalSeconds: number | null): string => {
     if (!totalSeconds || totalSeconds <= 0) return '—';
@@ -28,8 +29,20 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
   };
 
   const getTotalRuntime = (): string => {
-    if (releaseTracks.length === 0) return '—';
-    const totalSeconds = releaseTracks.reduce((sum, track) => sum + (track.recording?.duration_seconds ?? 0), 0);
+    if (releaseTracks.length === 0 && fallbackTracks.length === 0) return '—';
+    if (releaseTracks.length > 0) {
+      const totalSeconds = releaseTracks.reduce((sum, track) => sum + (track.recording?.duration_seconds ?? 0), 0);
+      return formatDuration(totalSeconds);
+    }
+    const totalSeconds = fallbackTracks.reduce((sum, track) => {
+      if (!track.duration) return sum;
+      const parts = track.duration.split(':').map((part) => Number(part));
+      if (parts.some((part) => Number.isNaN(part))) return sum;
+      if (parts.length === 1) return sum + parts[0];
+      if (parts.length === 2) return sum + (parts[0] * 60 + parts[1]);
+      if (parts.length === 3) return sum + (parts[0] * 3600 + parts[1] * 60 + parts[2]);
+      return sum;
+    }, 0);
     return formatDuration(totalSeconds);
   };
 
@@ -67,7 +80,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
   const albumTitle = album.title ?? album.release?.master?.title ?? 'Untitled';
   const coverImage = album.image_url ?? album.release?.master?.cover_image_url ?? null;
   const releaseYear = album.release?.release_year ?? album.release?.master?.original_release_year ?? null;
-  const totalTracks = album.release?.track_count ?? releaseTracks.length;
+  const totalTracks = album.release?.track_count ?? (releaseTracks.length > 0 ? releaseTracks.length : fallbackTracks.length);
   const totalRuntime = getTotalRuntime();
   const notes = album.personal_notes ?? album.release?.notes ?? null;
 
@@ -105,7 +118,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
   });
 
   return (
-    <div className="p-4 flex-1 overflow-y-auto bg-gradient-to-br from-[#f5f7fa] to-[#c3cfe2]">
+    <div className="p-4 flex-1 overflow-y-auto bg-white">
       {/* Mobile Close Button */}
       {onClose && (
         <div className="lg:hidden flex justify-end mb-2">
@@ -167,34 +180,50 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
       </a>
 
       {(() => {
-        if (releaseTracks.length === 0) return null;
+        if (releaseTracks.length === 0 && fallbackTracks.length === 0) return null;
+
+        if (releaseTracks.length > 0) {
+          return (
+            <div className="mb-4">
+              {sortedTrackGroups.map(({ side, tracks }) => {
+                return (
+                  <div key={side} className="mb-4">
+                    {tracksHaveSide && (
+                      <div className="text-xs font-bold text-white mb-1.5 p-2 px-3 bg-[#2196F3] rounded flex justify-between items-center shadow-sm uppercase tracking-wider">
+                        <span>{side}</span>
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-px">
+                      {tracks.map((track, idx) => {
+                        const title = track.title_override ?? track.recording?.title ?? 'Untitled';
+                        const duration = formatDuration(track.recording?.duration_seconds ?? null);
+                        return (
+                          <div key={track.id ?? `${track.position}-${idx}`} className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                            <div className="min-w-[28px] text-gray-500 text-[13px]">{track.position}</div>
+                            <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{title}</div>
+                            {duration !== '—' && <div className="text-gray-500 text-[13px] min-w-[40px] text-right">{duration}</div>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        }
 
         return (
           <div className="mb-4">
-            {sortedTrackGroups.map(({ side, tracks }) => {
-              return (
-                <div key={side} className="mb-4">
-                  {tracksHaveSide && (
-                    <div className="text-xs font-bold text-white mb-1.5 p-2 px-3 bg-[#2196F3] rounded flex justify-between items-center shadow-sm uppercase tracking-wider">
-                      <span>{side}</span>
-                    </div>
-                  )}
-                  <div className="flex flex-col gap-px">
-                    {tracks.map((track, idx) => {
-                      const title = track.title_override ?? track.recording?.title ?? 'Untitled';
-                      const duration = formatDuration(track.recording?.duration_seconds ?? null);
-                      return (
-                        <div key={track.id ?? `${track.position}-${idx}`} className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                          <div className="min-w-[28px] text-gray-500 text-[13px]">{track.position}</div>
-                          <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{title}</div>
-                          {duration !== '—' && <div className="text-gray-500 text-[13px] min-w-[40px] text-right">{duration}</div>}
-                        </div>
-                      );
-                    })}
-                  </div>
+            <div className="flex flex-col gap-px">
+              {fallbackTracks.map((track, idx) => (
+                <div key={`${track.position}-${idx}`} className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                  <div className="min-w-[28px] text-gray-500 text-[13px]">{track.position}</div>
+                  <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{track.title}</div>
+                  {track.duration && <div className="text-gray-500 text-[13px] min-w-[40px] text-right">{track.duration}</div>}
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
         );
       })()}
@@ -285,4 +314,4 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
 });
 
 export default CollectionInfoPanel;
-// AUDIT: inspected, no changes.
+// AUDIT: updated for UI parity with CLZ reference.
