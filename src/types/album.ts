@@ -108,6 +108,7 @@ export type Album = {
   allmusic_url?: string | null;
   wikipedia_url?: string | null;
   genius_url?: string | null;
+  custom_links?: Array<{ url: string; description?: string | null }> | null;
 
   // Personal / value
   owner?: string | null;
@@ -180,4 +181,4 @@ export const toSafeSearchString = (value: unknown): string => {
     .replace(/\s+/g, ' ')
     .trim();
 };
-// AUDIT: inspected, no changes.
+// AUDIT: updated for custom links support.

@@ -165,12 +165,26 @@ const getAlbumCredits = (credits: unknown) => {
   const classical = asRecord(record.classical);
   const artwork = asRecord(record.artwork ?? record.album_artwork ?? record.albumArtwork);
   const albumDetails = asRecord(record.album_details ?? record.albumDetails ?? record.album_metadata);
+  const rawCustomLinks = albumDetails.custom_links ?? albumDetails.links_list ?? albumDetails.customLinks;
+  const customLinks = Array.isArray(rawCustomLinks)
+    ? (rawCustomLinks
+        .map((entry) => {
+          if (!entry || typeof entry !== 'object') return null;
+          const recordEntry = entry as Record<string, unknown>;
+          const url = asString(recordEntry.url);
+          const description = asString(recordEntry.description) ?? null;
+          if (!url && !description) return null;
+          return { url: url ?? '', description };
+        })
+        .filter((entry) => Boolean(entry)) as Array<{ url: string; description?: string | null }>)
+    : [];
 
   return {
     albumPeople,
     classical,
     artwork,
     albumDetails,
+    customLinks,
   };
 };
 
@@ -237,6 +251,7 @@ const buildAlbumCredits = (album: Album): Record<string, unknown> => {
       wikipedia_url: normalizeEmpty(album.wikipedia_url),
       genius_url: normalizeEmpty(album.genius_url),
     }),
+    custom_links: (album.custom_links ?? []).filter((link) => link.url || link.description),
   });
 
   return discardEmpty({
@@ -435,6 +450,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         const albumPeople = creditsInfo.albumPeople;
         const classical = creditsInfo.classical;
         const artwork = creditsInfo.artwork;
+        const customLinks = creditsInfo.customLinks;
         const links = asRecord(albumDetails.links ?? albumDetails.link ?? {});
         const trackList = (releaseTracks ?? []).map((track, index) => {
           const recording = toSingle(track.recording);
@@ -498,6 +514,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           apple_music_id: asString(albumDetails.apple_music_id),
           lastfm_id: asString(albumDetails.lastfm_id),
           musicbrainz_url: asString(albumDetails.musicbrainz_url),
+          custom_links: customLinks,
           personal_notes: data.personal_notes ?? null,
           release_notes: release?.notes ?? null,
           media_condition: data.media_condition ?? '',
