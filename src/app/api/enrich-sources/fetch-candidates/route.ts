@@ -64,6 +64,7 @@ export async function POST(req: Request) {
           release_year,
           label,
           catalog_number,
+          notes,
           media_type,
           format_details,
           qty,
@@ -76,7 +77,10 @@ export async function POST(req: Request) {
             genres,
             styles,
             original_release_year,
-            artist:artists (name)
+            artist:artists (name),
+            master_tag_links:master_tag_links (
+              tag:master_tags ( name )
+            )
           ),
           release_tracks:release_tracks (
             id,
@@ -138,6 +142,7 @@ export async function POST(req: Request) {
         release_year?: number | null;
         label?: string | null;
         catalog_number?: string | null;
+        notes?: string | null;
         release_tracks?: {
           id?: number | null;
           recording?: { credits?: unknown } | { credits?: unknown }[] | null;
@@ -152,6 +157,9 @@ export async function POST(req: Request) {
           genres?: string[] | null;
           styles?: string[] | null;
           artist?: { name?: string | null } | null;
+          master_tag_links?: {
+            tag?: { name?: string | null } | null;
+          }[] | null;
         } | null;
       } | null;
     };
@@ -193,6 +201,10 @@ export async function POST(req: Request) {
       const baseFormat = formatParts.join(', ');
       const qty = release?.qty ?? 1;
       const formatLabel = baseFormat ? (qty > 1 ? `${qty}x${baseFormat}` : baseFormat) : '';
+      const tags = (master?.master_tag_links ?? [])
+        .map((link) => link.tag?.name)
+        .filter((name): name is string => typeof name === 'string' && name.length > 0);
+
       return {
         id: album.id,
         release_id: release?.id ?? null,
@@ -201,6 +213,8 @@ export async function POST(req: Request) {
         title: master?.title ?? 'Untitled',
         format: formatLabel,
         image_url: master?.cover_image_url ?? null,
+        notes: release?.notes ?? null,
+        tags: tags.length > 0 ? tags : null,
         back_image_url: artwork.back_image_url ?? null,
         spine_image_url: artwork.spine_image_url ?? null,
         inner_sleeve_images: asStringArray(artwork.inner_sleeve_images),
@@ -229,6 +243,10 @@ export async function POST(req: Request) {
         cat_no: release?.catalog_number ?? null,
         genres: master?.genres ?? null,
         styles: master?.styles ?? null,
+        tracks: releaseTracks.length > 0 ? ['has_tracks'] : [],
+        tracklists: releaseTracks.length > 0 ? ['has_tracks'] : [],
+        disc_metadata: albumDetails.disc_metadata ?? null,
+        matrix_numbers: albumDetails.matrix_numbers ?? null,
         location: album.location ?? null,
         enriched_metadata: albumDetails.enriched_metadata ?? null,
         enrichment_summary: albumDetails.enrichment_summary ?? null,

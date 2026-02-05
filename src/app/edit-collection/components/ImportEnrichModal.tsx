@@ -28,10 +28,10 @@ const ALLOWED_COLUMNS = new Set([
   'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
   'apple_music_id', 'apple_music_url', 'lastfm_id', 'lastfm_url', 
   'musicbrainz_id', 'musicbrainz_url', 'wikipedia_url', 'genius_url', 
-  'lastfm_tags', 'notes', 'enriched_metadata', 'enrichment_summary', 'genres', 'styles', 'original_release_date',
+  'tags', 'lastfm_tags', 'notes', 'enriched_metadata', 'enrichment_summary', 'companies', 'genres', 'styles', 'original_release_date',
   'inner_sleeve_images', 'musicians', 'credits', 'producers', 'engineers', 
   'songwriters', 'composer', 'conductor', 'orchestra',
-  'tempo_bpm', 'musical_key', 'lyrics', 'time_signature', 
+  'tempo_bpm', 'musical_key', 'lyrics', 'lyrics_url', 'time_signature', 
   'danceability', 'energy', 'mood_acoustic', 'mood_happy', 'mood_sad',
   'mood_aggressive', 'mood_electronic', 'mood_party', 'mood_relaxed',
   // --- UNBLOCKED FIELDS ---
@@ -217,6 +217,7 @@ type UpdateBatch = {
   releaseUpdates: Record<string, unknown>;
   masterUpdates: Record<string, unknown>;
   albumCredits: Record<string, unknown>;
+  tagNames: string[];
 };
 
 const coerceYear = (value: unknown): number | null => {
@@ -257,6 +258,7 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
   const releaseUpdates: Record<string, unknown> = {};
   const masterUpdates: Record<string, unknown> = {};
   const albumCredits: Record<string, unknown> = {};
+  const tagNames: string[] = [];
   const albumPeople: Record<string, unknown> = {};
   const classical: Record<string, unknown> = {};
   const artwork: Record<string, unknown> = {};
@@ -318,6 +320,18 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'discogs_master_id':
         masterUpdates[key] = value ?? null;
         break;
+      case 'tags':
+      case 'lastfm_tags':
+        if (Array.isArray(value)) {
+          value.forEach((tag) => {
+            const cleaned = String(tag ?? '').trim();
+            if (cleaned) tagNames.push(cleaned);
+          });
+        } else if (typeof value === 'string') {
+          const cleaned = value.trim();
+          if (cleaned) tagNames.push(cleaned);
+        }
+        break;
       case 'musicbrainz_id':
         masterUpdates.musicbrainz_release_group_id = value ?? null;
         break;
@@ -356,6 +370,8 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'musical_key':
       case 'energy':
       case 'danceability':
+      case 'lyrics':
+      case 'lyrics_url':
       case 'mood_acoustic':
       case 'mood_electronic':
       case 'mood_happy':
@@ -365,6 +381,7 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'mood_party':
       case 'master_release_date':
       case 'recording_date':
+      case 'companies':
       case 'enrichment_sources':
       case 'purchase_store':
       case 'signed_by':
@@ -408,7 +425,7 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
     albumCredits.album_details = albumDetails;
   }
 
-  return { inventoryUpdates, releaseUpdates, masterUpdates, albumCredits };
+  return { inventoryUpdates, releaseUpdates, masterUpdates, albumCredits, tagNames };
 };
 
 const mergeRecordingCredits = (
@@ -472,6 +489,41 @@ const applyAlbumCreditsToRecordings = async (
 
   if (updates.length > 0) {
     await Promise.all(updates);
+  }
+};
+
+const addTagsToMaster = async (masterId: number, tags: string[]) => {
+  const cleaned = Array.from(new Set(tags.map(tag => tag.trim()).filter(Boolean)));
+  if (!masterId || cleaned.length === 0) return;
+
+  await supabase
+    .from('master_tags')
+    .upsert(
+      cleaned.map((name) => ({ name, category: 'custom' })),
+      { onConflict: 'name' }
+    );
+
+  const { data: tagRows } = await supabase
+    .from('master_tags')
+    .select('id, name')
+    .in('name', cleaned);
+
+  if (!tagRows || tagRows.length === 0) return;
+
+  const tagIds = tagRows.map((row) => row.id).filter(Boolean);
+  const { data: existingLinks } = await supabase
+    .from('master_tag_links')
+    .select('tag_id')
+    .eq('master_id', masterId)
+    .in('tag_id', tagIds);
+
+  const existingIds = new Set((existingLinks ?? []).map((row) => row.tag_id));
+  const newLinks = tagIds
+    .filter((id) => !existingIds.has(id))
+    .map((tag_id) => ({ master_id: masterId, tag_id }));
+
+  if (newLinks.length > 0) {
+    await supabase.from('master_tag_links').insert(newLinks);
   }
 };
 
@@ -750,7 +802,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
 
   const applyAlbumUpdates = async (album: Album, updates: Record<string, unknown>) => {
-    const { inventoryUpdates, releaseUpdates, masterUpdates, albumCredits } = splitV3Updates(updates);
+    const { inventoryUpdates, releaseUpdates, masterUpdates, albumCredits, tagNames } = splitV3Updates(updates);
     const operations: Promise<unknown>[] = [];
 
     if (Object.keys(inventoryUpdates).length > 0) {
@@ -792,6 +844,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     if (Object.keys(albumCredits).length > 0) {
       await applyAlbumCreditsToRecordings(album.id, albumCredits);
+    }
+
+    if (tagNames.length > 0 && album.master_id) {
+      await addTagsToMaster(album.master_id, tagNames);
     }
   };
 
@@ -899,7 +955,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             }
             
             if (newVal !== null && newVal !== undefined && newVal !== '') {
-               const targetKey = key === 'label' ? 'labels' : key;
+               const targetKey = key === 'label' ? 'labels' : key === 'lastfm_tags' ? 'tags' : key;
                if (!fieldCandidates[targetKey]) fieldCandidates[targetKey] = {};
                fieldCandidates[targetKey][source] = newVal;
             }
