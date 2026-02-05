@@ -337,6 +337,8 @@ interface ComparedAlbum extends ParsedAlbum {
   existingMasterId?: number | null;
   needsEnrichment: boolean;
   missingFields: string[];
+  matchType?: 'discogs_id' | 'artist_title' | 'unmatched';
+  discogsIdMismatch?: boolean;
 }
 
 interface ImportDiscogsModalProps {
@@ -410,9 +412,11 @@ function compareAlbums(
 
   for (const parsedAlbum of parsed) {
     let existingAlbum: ExistingAlbum | undefined;
+    let matchType: ComparedAlbum['matchType'] = 'unmatched';
     
     if (parsedAlbum.discogs_release_id) {
       existingAlbum = releaseIdMap.get(parsedAlbum.discogs_release_id);
+      if (existingAlbum) matchType = 'discogs_id';
     }
     
     if (!existingAlbum) {
@@ -424,6 +428,7 @@ function compareAlbums(
         );
         if (matchIndex >= 0) {
           existingAlbum = candidates[matchIndex];
+          matchType = 'artist_title';
           candidates.splice(matchIndex, 1);
           if (candidates.length === 0) {
             artistAlbumMap.delete(parsedAlbum.artist_album_norm);
@@ -438,6 +443,7 @@ function compareAlbums(
         status: 'NEW',
         needsEnrichment: true,
         missingFields: ['all'],
+        matchType,
       });
     } else {
       const missingFields: string[] = [];
@@ -459,6 +465,8 @@ function compareAlbums(
         existingMasterId: existingAlbum.master_id ?? null,
         needsEnrichment: missingFields.length > 0,
         missingFields,
+        matchType,
+        discogsIdMismatch: isChanged,
       });
 
       matchedDbIds.add(existingAlbum.id);
@@ -514,6 +522,8 @@ function compareAlbums(
       existingMasterId: existingAlbum.master_id ?? null,
       needsEnrichment: false,
       missingFields: [],
+      matchType: 'unmatched',
+      discogsIdMismatch: false,
       cover_image: existingAlbum.image_url ?? existingAlbum.cover_image ?? null
     });
   }
@@ -1095,6 +1105,23 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     : syncMode === 'full_sync'
       ? comparedAlbums.filter(a => a.status === 'REMOVED').length
       : 0;
+  const changedCount = comparedAlbums.filter(a => a.status === 'CHANGED').length;
+  const enrichmentCount = comparedAlbums.filter(a => a.status === 'CHANGED' && a.needsEnrichment).length;
+  const matchedByDiscogsId = comparedAlbums.filter(a => a.matchType === 'discogs_id').length;
+  const matchedByArtistTitle = comparedAlbums.filter(a => a.matchType === 'artist_title').length;
+
+  const missingFieldCounts = comparedAlbums.reduce<Record<string, number>>((acc, album) => {
+    if (!album.missingFields || album.missingFields.length === 0) return acc;
+    album.missingFields.forEach((field) => {
+      if (field === 'all') return;
+      acc[field] = (acc[field] || 0) + 1;
+    });
+    return acc;
+  }, {});
+
+  const topMissingFields = Object.entries(missingFieldCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30000]">
@@ -1207,22 +1234,51 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
             <>
               <div className="text-sm mb-4 bg-blue-50 p-3 rounded text-blue-800 border border-blue-200">
                 Analyzed <strong>{comparedAlbums.length}</strong> items from your {sourceType}.
+                <div className="text-[12px] text-blue-700 mt-1">
+                  “NEW” means not found in your collection. “CHANGED” means an existing album will be updated or enriched.
+                </div>
               </div>
 
               {/* Summary Stats */}
-              <div className="flex justify-between mb-4 text-center gap-2">
-                <div className="flex-1 bg-green-50 p-2 rounded border border-green-200">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 text-center">
+                <div className="bg-green-50 p-2 rounded border border-green-200">
                   <div className="text-xl font-bold text-green-700">{newCount}</div>
-                  <div className="text-xs text-green-600 font-semibold">NEW</div>
+                  <div className="text-[11px] text-green-600 font-semibold">NEW IMPORTS</div>
                 </div>
-                <div className="flex-1 bg-gray-50 p-2 rounded border border-gray-200">
+                <div className="bg-amber-50 p-2 rounded border border-amber-200">
+                  <div className="text-xl font-bold text-amber-700">{changedCount}</div>
+                  <div className="text-[11px] text-amber-600 font-semibold">CHANGED</div>
+                </div>
+                <div className="bg-blue-50 p-2 rounded border border-blue-200">
+                  <div className="text-xl font-bold text-blue-700">{enrichmentCount}</div>
+                  <div className="text-[11px] text-blue-600 font-semibold">NEEDS ENRICHMENT</div>
+                </div>
+                <div className="bg-gray-50 p-2 rounded border border-gray-200">
                   <div className="text-xl font-bold text-gray-700">{unchangedCount}</div>
-                  <div className="text-xs text-gray-600 font-semibold">UNCHANGED</div>
+                  <div className="text-[11px] text-gray-600 font-semibold">UNCHANGED</div>
                 </div>
                 {(syncMode === 'full_sync' || syncMode === 'full_replacement') && (
-                  <div className="flex-1 bg-red-50 p-2 rounded border border-red-200">
+                  <div className="bg-red-50 p-2 rounded border border-red-200 sm:col-span-2">
                     <div className="text-xl font-bold text-red-700">{removedCount}</div>
-                    <div className="text-xs text-red-600 font-semibold">REMOVED</div>
+                    <div className="text-[11px] text-red-600 font-semibold">REMOVED</div>
+                  </div>
+                )}
+              </div>
+
+              <div className="text-[12px] text-gray-600 mb-4">
+                <div className="mb-1">
+                  Matched by Discogs ID: <strong>{matchedByDiscogsId}</strong> · Matched by Artist/Title: <strong>{matchedByArtistTitle}</strong>
+                </div>
+                {topMissingFields.length > 0 && (
+                  <div>
+                    Top missing fields: {topMissingFields.map(([field, count]) => (
+                      <span key={field} className="inline-flex items-center gap-1 mr-2">
+                        <span className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-[11px]">
+                          {field}
+                        </span>
+                        <span className="text-[11px] text-gray-500">({count})</span>
+                      </span>
+                    ))}
                   </div>
                 )}
               </div>
@@ -1238,7 +1294,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                       <tr className="border-b border-gray-200">
                         <th className="px-3 py-2 text-left font-semibold text-gray-500">Artist</th>
                         <th className="px-3 py-2 text-left font-semibold text-gray-500">Title</th>
-                        <th className="px-3 py-2 text-left font-semibold text-gray-500">Status</th>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-500">Action</th>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-500">Reason</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1247,14 +1304,27 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                           if (album.status === 'NEW') statusColor = 'text-emerald-600';
                           if (album.status === 'REMOVED') statusColor = 'text-red-600';
                           if (album.status === 'CHANGED') statusColor = 'text-amber-600';
+                          const action =
+                            album.status === 'NEW' ? 'ADD' :
+                            album.status === 'REMOVED' ? 'REMOVE' :
+                            album.status === 'CHANGED' ? (album.needsEnrichment ? 'ENRICH' : 'UPDATE') :
+                            'SKIP';
+                          const reasons: string[] = [];
+                          if (album.status === 'NEW') reasons.push('Not found in collection');
+                          if (album.status === 'REMOVED') reasons.push('Missing from Discogs');
+                          if (album.discogsIdMismatch) reasons.push('Discogs ID differs');
+                          if (album.missingFields?.length) {
+                            const filtered = album.missingFields.filter((field) => field !== 'all');
+                            if (filtered.length > 0) reasons.push(`Missing ${filtered.join(', ')}`);
+                          }
+                          if (reasons.length === 0 && album.status === 'UNCHANGED') reasons.push('No changes detected');
 
                           return (
                             <tr key={idx} className="border-b border-gray-100 last:border-none">
                               <td className="px-3 py-2 text-gray-900">{album.artist}</td>
                               <td className="px-3 py-2 text-gray-900">{album.title}</td>
-                              <td className={`px-3 py-2 font-semibold ${statusColor}`}>
-                                {album.status}
-                              </td>
+                              <td className={`px-3 py-2 font-semibold ${statusColor}`}>{action}</td>
+                              <td className="px-3 py-2 text-gray-600 text-[12px]">{reasons.join(' • ')}</td>
                             </tr>
                           );
                         })
