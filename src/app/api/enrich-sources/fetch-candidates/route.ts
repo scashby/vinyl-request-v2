@@ -169,6 +169,12 @@ export async function POST(req: Request) {
       return value as Record<string, unknown>;
     };
 
+    const asString = (value: unknown): string | null => {
+      if (value === null || value === undefined) return null;
+      const str = String(value).trim();
+      return str.length > 0 ? str : null;
+    };
+
     const asStringArray = (value: unknown): string[] => {
       if (!value) return [];
       if (Array.isArray(value)) {
@@ -231,13 +237,13 @@ export async function POST(req: Request) {
         discogs_master_id: master?.discogs_master_id ?? null,
         musicbrainz_id: master?.musicbrainz_release_group_id ?? null,
         spotify_id: release?.spotify_album_id ?? null,
-        apple_music_id: albumDetails.apple_music_id ?? null,
-        lastfm_id: albumDetails.lastfm_id ?? null,
-        musicbrainz_url: albumDetails.musicbrainz_url ?? null,
-        wikipedia_url: links.wikipedia_url ?? null,
-        genius_url: links.genius_url ?? null,
-        apple_music_url: links.apple_music_url ?? null,
-        lastfm_url: links.lastfm_url ?? null,
+        apple_music_id: asString(albumDetails.apple_music_id),
+        lastfm_id: asString(albumDetails.lastfm_id),
+        musicbrainz_url: asString(albumDetails.musicbrainz_url),
+        wikipedia_url: asString(links.wikipedia_url),
+        genius_url: asString(links.genius_url),
+        apple_music_url: asString(links.apple_music_url),
+        lastfm_url: asString(links.lastfm_url),
         year: release?.release_year ?? master?.original_release_year ?? null,
         label: release?.label ?? null,
         cat_no: release?.catalog_number ?? null,
