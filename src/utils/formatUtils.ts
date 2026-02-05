@@ -7,6 +7,11 @@ export interface ParsedFormat {
   rpm: string | null;
   weight: string | null;          // "180g"
   color: string | null;           // "Blue"
+
+  // Packaging / set metadata
+  packaging: string | null;       // "Gatefold", "Digipak", "Box Set"
+  is_box_set: boolean;
+  box_set: string | null;         // Optional label like "Box Set"
   
   // Descriptions meant for the "Extra" text field (pressing info, etc)
   extraText: string;
@@ -44,6 +49,9 @@ export function parseDiscogsFormat(
     rpm: null,
     weight: null,
     color: null,
+    packaging: null,
+    is_box_set: false,
+    box_set: null,
     extraText: ''
   };
 
@@ -130,6 +138,19 @@ export function parseDiscogsFormat(
   // Final cleanup: If we have "LP" in details but media_type is unknown/default, ensure it's Vinyl
   if (result.format_details.includes('LP') || result.format_details.includes('EP')) {
     if (result.media_type === 'Unknown') result.media_type = 'Vinyl';
+  }
+
+  // Packaging / box set inference
+  if (result.format_details.includes('Gatefold')) {
+    result.packaging = 'Gatefold';
+  } else if (result.format_details.includes('Digipak')) {
+    result.packaging = 'Digipak';
+  }
+
+  if (result.media_type === 'Box Set' || result.format_details.includes('Box Set')) {
+    result.is_box_set = true;
+    result.box_set = 'Box Set';
+    if (!result.packaging) result.packaging = 'Box Set';
   }
 
   result.extraText = extraParts.join(', ');

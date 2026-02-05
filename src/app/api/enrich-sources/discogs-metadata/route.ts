@@ -2,6 +2,8 @@
 import { NextResponse } from "next/server";
 import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 import { hasValidDiscogsId } from 'lib/discogs-validation';
+import { parseDiscogsFormat } from "src/utils/formatUtils";
+import type { Database } from "src/types/supabase";
 
 const DISCOGS_TOKEN = process.env.DISCOGS_TOKEN ?? process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
 
@@ -13,6 +15,9 @@ type DiscogsResponse = {
   labels?: Array<{ name?: string; catno?: string }>;
   country?: string;
   year?: number;
+  released?: string;
+  identifiers?: Array<{ type?: string; value?: string }>;
+  formats?: Array<{ name?: string; qty?: string | number; descriptions?: string[] }>;
   tracklist?: Array<{
     position?: string;
     type_?: string;
@@ -20,6 +25,70 @@ type DiscogsResponse = {
     duration?: string;
     artists?: Array<{ name: string }>;
   }>;
+};
+
+const buildDiscogsFormatString = (formats?: { name?: string; qty?: string | number; descriptions?: string[] }[]) => {
+  if (!formats || formats.length === 0) return '';
+  const format = formats[0];
+  const qty = format.qty ? String(format.qty).trim() : '';
+  const name = format.name?.trim() ?? '';
+  const details = format.descriptions?.filter(Boolean) ?? [];
+  const qtyPrefix = qty ? `${qty}x` : '';
+  const base = `${qtyPrefix}${name}`.trim();
+  if (details.length === 0) return base;
+  return `${base}, ${details.join(', ')}`.trim();
+};
+
+const normalizeReleaseDate = (released?: string | null): string | null => {
+  if (!released) return null;
+  const value = released.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  if (/^\d{4}-\d{2}$/.test(value)) return `${value}-01`;
+  if (/^\d{4}$/.test(value)) return `${value}-01-01`;
+  return null;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
+};
+
+const applyAlbumDetailsToReleaseRecordings = async (
+  supabase: ReturnType<typeof supabaseServer>,
+  releaseId: number,
+  albumDetails: Record<string, unknown>
+) => {
+  if (!releaseId || Object.keys(albumDetails).length === 0) return;
+
+  const { data: tracks, error } = await supabase
+    .from('release_tracks')
+    .select('recording:recordings ( id, credits )')
+    .eq('release_id', releaseId);
+
+  if (error || !tracks) return;
+
+  const updates = tracks
+    .map((track) => {
+      const recording = Array.isArray(track.recording) ? track.recording[0] : track.recording;
+      if (!recording?.id) return null;
+      const credits = asRecord(recording.credits);
+      const merged = {
+        ...credits,
+        album_details: {
+          ...(asRecord(credits.album_details ?? credits.albumDetails ?? credits.album_metadata)),
+          ...albumDetails,
+        },
+      };
+      return supabase
+        .from('recordings')
+        .update({ credits: merged as Database['public']['Tables']['recordings']['Update']['credits'] })
+        .eq('id', recording.id);
+    })
+    .filter(Boolean);
+
+  if (updates.length > 0) {
+    await Promise.all(updates);
+  }
 };
 
 async function fetchDiscogsRelease(releaseId: string): Promise<DiscogsResponse> {
@@ -168,8 +237,13 @@ export async function POST(req: Request) {
     const needsCatalog = !release.catalog_number;
     const needsCountry = !release.country;
     const needsYear = !release.release_year;
+    const needsBarcode = !release.barcode;
+    const needsReleaseDate = !release.release_date;
+    const needsMediaType = !release.media_type;
+    const needsFormatDetails = !release.format_details || release.format_details.length === 0;
+    const needsQty = !release.qty;
 
-    if (!foundReleaseId && !needsMasterId && !needsImage && !needsGenres && !needsStyles && !needsLabel && !needsCatalog && !needsCountry && !needsYear) {
+    if (!foundReleaseId && !needsMasterId && !needsImage && !needsGenres && !needsStyles && !needsLabel && !needsCatalog && !needsCountry && !needsYear && !needsBarcode && !needsReleaseDate && !needsMediaType && !needsFormatDetails && !needsQty) {
       console.log('⏭️ Album already has all Discogs metadata');
       return NextResponse.json({
         success: true,
@@ -230,6 +304,39 @@ export async function POST(req: Request) {
       releaseUpdate.release_year = discogsData.year;
       console.log(`✓ Found release year: ${discogsData.year}`);
     }
+
+    if (needsBarcode && discogsData.identifiers && discogsData.identifiers.length > 0) {
+      const barcode = discogsData.identifiers.find((id) => id.type === 'Barcode')?.value;
+      if (barcode) {
+        releaseUpdate.barcode = barcode;
+        console.log(`✓ Found barcode: ${barcode}`);
+      }
+    }
+
+    if (needsReleaseDate) {
+      const releaseDate = normalizeReleaseDate(discogsData.released ?? null);
+      if (releaseDate) {
+        releaseUpdate.release_date = releaseDate;
+        console.log(`✓ Found release date: ${releaseDate}`);
+      }
+    }
+
+    const formatString = buildDiscogsFormatString(discogsData.formats);
+    const parsedFormat = formatString ? parseDiscogsFormat(formatString) : null;
+    if (parsedFormat) {
+      if (needsMediaType && parsedFormat.media_type) {
+        releaseUpdate.media_type = parsedFormat.media_type;
+        console.log(`✓ Found media type: ${parsedFormat.media_type}`);
+      }
+      if (needsFormatDetails && parsedFormat.format_details?.length) {
+        releaseUpdate.format_details = parsedFormat.format_details;
+        console.log(`✓ Found format details: ${parsedFormat.format_details.join(', ')}`);
+      }
+      if (needsQty && parsedFormat.qty) {
+        releaseUpdate.qty = parsedFormat.qty;
+        console.log(`✓ Found qty: ${parsedFormat.qty}`);
+      }
+    }
     
     if (Object.keys(releaseUpdate).length === 0 && Object.keys(masterUpdate).length === 0) {
       console.log('⚠️ No new data found to update');
@@ -267,6 +374,19 @@ export async function POST(req: Request) {
           error: `Master update failed: ${masterError.message}`
         }, { status: 500 });
       }
+    }
+
+    if (parsedFormat && release.id) {
+      const albumDetails = {
+        rpm: parsedFormat.rpm ?? null,
+        vinyl_weight: parsedFormat.weight ?? null,
+        vinyl_color: parsedFormat.color ? [parsedFormat.color] : null,
+        extra: parsedFormat.extraText || null,
+        packaging: parsedFormat.packaging ?? null,
+        is_box_set: parsedFormat.is_box_set ?? false,
+        box_set: parsedFormat.box_set ?? null,
+      };
+      await applyAlbumDetailsToReleaseRecordings(supabase, release.id, albumDetails);
     }
 
     console.log(`✅ Successfully enriched with Discogs metadata\n`);

@@ -1145,6 +1145,9 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 vinyl_weight: formatData.weight ?? null,
                 vinyl_color: formatData.color ? [formatData.color] : null,
                 extra: formatData.extraText || null,
+                packaging: formatData.packaging ?? null,
+                is_box_set: formatData.is_box_set ?? false,
+                box_set: formatData.box_set ?? null,
               };
 
               // Enrichment Logic (Only if NEW or Full Sync/Partial Sync needs it)

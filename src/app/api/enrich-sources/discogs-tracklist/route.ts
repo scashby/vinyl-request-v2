@@ -153,6 +153,9 @@ export async function POST(req: Request) {
       vinyl_weight: parsedFormat.weight ?? null,
       vinyl_color: parsedFormat.color ? [parsedFormat.color] : null,
       extra: parsedFormat.extraText || null,
+      packaging: parsedFormat.packaging ?? null,
+      is_box_set: parsedFormat.is_box_set ?? false,
+      box_set: parsedFormat.box_set ?? null,
     } : {};
 
     // Process tracks with per-track artist info
