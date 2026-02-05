@@ -259,6 +259,7 @@ interface DiscogsTrack {
   position: string;
   title: string;
   duration: string;
+  type_?: string;
 }
 
 interface DiscogsIdentifier {
