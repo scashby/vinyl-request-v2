@@ -389,8 +389,8 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
     <>
       <div className="p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full">
-        {/* LEFT COLUMN - PACKAGING */}
-        <div className="flex flex-col gap-4">
+          {/* LEFT COLUMN - PACKAGING */}
+          <div className="flex flex-col gap-4">
           <div className="text-[15px] font-bold text-gray-700 mb-1 pb-2 border-b-2 border-gray-200">
             Packaging
           </div>
@@ -569,21 +569,13 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
               </button>
             </div>
           </div>
-        </div>
-      </div>
-
-        {/* RIGHT COLUMN - VINYL */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ 
-            fontSize: '15px', 
-            fontWeight: '700', 
-            color: '#374151', 
-            marginBottom: '4px',
-            paddingBottom: '8px',
-            borderBottom: '2px solid #e5e7eb' 
-          }}>
-            Vinyl
           </div>
+
+          {/* RIGHT COLUMN - VINYL */}
+          <div className="flex flex-col gap-4">
+            <div className="text-[15px] font-bold text-gray-700 mb-1 pb-2 border-b-2 border-gray-200">
+              Vinyl
+            </div>
 
           {/* Vinyl Color - MULTI-SELECT */}
           <div>
@@ -772,6 +764,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
               ))}
             </div>
           </div>
+        </div>
         </div>
       </div>
 

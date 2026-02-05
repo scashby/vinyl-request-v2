@@ -211,8 +211,8 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
               </>
             )}
           </div>
-          <div className="mt-2 bg-white border border-gray-300 rounded p-2">
-            <div className="relative w-full aspect-square bg-white border border-gray-200 rounded overflow-hidden flex items-center justify-center">
+          <div className="mt-2 bg-white border border-gray-300 rounded overflow-hidden">
+            <div className="relative w-full aspect-square min-h-[260px] sm:min-h-[320px] bg-white overflow-hidden flex items-center justify-center">
               {album.image_url ? (
                 <Image src={album.image_url} alt="Front Cover" fill style={{ objectFit: 'contain' }} unoptimized />
               ) : (
@@ -255,8 +255,8 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
               </>
             )}
           </div>
-          <div className="mt-2 bg-white border border-gray-300 rounded p-2">
-            <div className="relative w-full aspect-square bg-white border border-gray-200 rounded overflow-hidden flex items-center justify-center">
+          <div className="mt-2 bg-white border border-gray-300 rounded overflow-hidden">
+            <div className="relative w-full aspect-square min-h-[260px] sm:min-h-[320px] bg-white overflow-hidden flex items-center justify-center">
               {album.back_image_url ? (
                 <Image src={album.back_image_url} alt="Back Cover" fill style={{ objectFit: 'contain' }} unoptimized />
               ) : (
@@ -268,7 +268,7 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
       </div>
 
       {/* INNER SLEEVES GALLERY */}
-      <div className="flex flex-col border border-gray-200 rounded-md p-3 bg-gray-50">
+      <div className="flex flex-col border border-gray-200 rounded-md p-3 bg-white">
         <div className="flex justify-between items-center mb-3">
           <h3 className="text-sm font-bold text-gray-700 m-0">Inner Sleeves</h3>
           <button 
@@ -281,11 +281,11 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
         </div>
 
         {(!album.inner_sleeve_images || album.inner_sleeve_images.length === 0) ? (
-          <div className="p-8 text-center border-2 border-dashed border-gray-300 rounded bg-gray-50/50">
+          <div className="p-8 text-center border-2 border-dashed border-gray-300 rounded bg-white">
             <span className="text-gray-400 text-sm">No inner sleeves added</span>
           </div>
         ) : (
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
             {album.inner_sleeve_images.map((imgUrl, idx) => (
               <div key={idx} className="group relative aspect-square bg-white border border-gray-200 rounded overflow-hidden">
                 <Image src={imgUrl} alt={`Inner ${idx + 1}`} fill style={{ objectFit: 'cover' }} unoptimized />
@@ -304,7 +304,7 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
 
       {/* SPINE + VINYL LABELS */}
       <div className="flex gap-4">
-        <div className="flex-1 flex flex-col border border-gray-200 rounded-md p-3 bg-gray-50">
+        <div className="flex-1 flex flex-col border border-gray-200 rounded-md p-3 bg-white">
           <div className="flex justify-between items-center mb-2">
             <h3 className="text-sm font-bold text-gray-700 m-0">Spine</h3>
             <div className="flex gap-1">
@@ -342,7 +342,7 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col border border-gray-200 rounded-md p-3 bg-gray-50">
+        <div className="flex-1 flex flex-col border border-gray-200 rounded-md p-3 bg-white">
           <div className="flex justify-between items-center mb-2">
             <h3 className="text-sm font-bold text-gray-700 m-0">Vinyl Labels</h3>
             <button
@@ -355,11 +355,11 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
           </div>
 
           {(!album.vinyl_label_images || album.vinyl_label_images.length === 0) ? (
-            <div className="p-6 text-center border-2 border-dashed border-gray-300 rounded bg-gray-50/50">
+            <div className="p-6 text-center border-2 border-dashed border-gray-300 rounded bg-white">
               <span className="text-gray-400 text-sm">No vinyl label images added</span>
             </div>
           ) : (
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
               {album.vinyl_label_images.map((imgUrl, idx) => (
                 <div key={idx} className="group relative aspect-square bg-white border border-gray-200 rounded overflow-hidden">
                   <Image src={imgUrl} alt={`Label ${idx + 1}`} fill style={{ objectFit: 'cover' }} unoptimized />

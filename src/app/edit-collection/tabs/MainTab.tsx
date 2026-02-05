@@ -326,7 +326,8 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full">
+      <div className="w-full p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
         {/* LEFT COLUMN */}
         <div className="flex flex-col gap-4">
           {/* Title with Aa */}
@@ -491,8 +492,11 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
               <div className="flex items-center justify-between w-full">
                 <input
                   type="text"
-                  value={album.master_release_date || ''}
-                  onChange={(e) => onChange('master_release_date', e.target.value)}
+                  value={album.original_release_year ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value.trim();
+                    onChange('original_release_year', value ? Number(value) : null);
+                  }}
                   placeholder="YYYY"
                   className="w-[92px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
                 />
@@ -569,6 +573,11 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
               <div className="flex items-center justify-between w-full">
                 <input
                   type="text"
+                  value={album.recording_year ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value.trim();
+                    onChange('recording_year', value ? Number(value) : null);
+                  }}
                   placeholder="YYYY"
                   className="w-[92px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
                 />
@@ -653,6 +662,10 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
                         {genre}
                         <button
                           className="bg-transparent border-none text-gray-500 cursor-pointer p-0 text-base leading-none font-light hover:text-red-500"
+                          onClick={() => {
+                            const newGenres = album.genres?.filter((_, i) => i !== idx) || [];
+                            onChange('genres', newGenres.length > 0 ? newGenres : null);
+                          }}
                         >
                           ×
                         </button>
@@ -678,6 +691,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       {/* MODAL COMPONENTS */}
@@ -751,4 +765,4 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
     </>
   );
 });
-// AUDIT: inspected, no changes.
+// AUDIT: updated for UI parity and V3 field mapping.

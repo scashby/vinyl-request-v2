@@ -107,9 +107,9 @@ export function PeopleTab({ album, onChange }: PeopleTabProps) {
 
   return (
     <div className="p-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[980px]">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* LEFT COLUMN - Credits */}
-        <div className="border border-gray-200 rounded-md p-4 bg-white">
+        <div>
           <h3 className="text-sm font-semibold text-gray-600 mb-3 mt-0">
             Credits
           </h3>
@@ -119,7 +119,7 @@ export function PeopleTab({ album, onChange }: PeopleTabProps) {
         </div>
 
         {/* RIGHT COLUMN - Musicians */}
-        <div className="border border-gray-200 rounded-md p-4 bg-white">
+        <div>
           <h3 className="text-sm font-semibold text-gray-600 mb-3 mt-0">
             Musicians
           </h3>
