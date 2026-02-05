@@ -14,7 +14,7 @@ interface FindDuplicatesModalProps {
   onDuplicatesRemoved: () => void;
 }
 
-type DetectionMethod = 'title' | 'title_artist' | 'barcode';
+type DetectionMethod = 'title' | 'title_artist' | 'barcode' | 'index';
 
 interface DuplicateGroup {
   key: string;
@@ -52,7 +52,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
     {
       id: 'default',
       name: 'Default',
-      columns: ['Artist', 'Title', 'Year', 'Format', 'Label', 'Country', 'Barcode', 'Catalog #', 'Added Date', 'Media Condition', 'Sleeve Condition']
+      columns: ['Artist', 'Title', 'Release Date', 'Format', 'Discs', 'Tracks', 'Length', 'Genre', 'Label', 'Added Date']
     }
   ]);
   const [selectedFavoriteId, setSelectedFavoriteId] = useState('default');
@@ -62,6 +62,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
     { value: 'title' as DetectionMethod, label: 'Title' },
     { value: 'title_artist' as DetectionMethod, label: 'Title & Artist' },
     { value: 'barcode' as DetectionMethod, label: 'UPC (Barcode)' },
+    { value: 'index' as DetectionMethod, label: 'Index' },
   ];
 
   const selectedMethodLabel = detectionMethods.find(m => m.value === detectionMethod)?.label || 'Title';
@@ -91,15 +92,19 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
     const status = row.status ?? 'active';
 
     return {
+      release,
       id: row.id,
       inventory_id: row.id,
+      index_number: row.id,
       release_id: release?.id ?? null,
       master_id: master?.id ?? null,
       artist,
       title: master?.title ?? 'Untitled',
       year: master?.original_release_year ? String(master.original_release_year) : null,
+      year_int: master?.original_release_year ?? null,
       image_url: master?.cover_image_url ?? null,
       format: buildFormatLabel(release),
+      discs: release?.qty ?? null,
       status,
       location: row.location ?? null,
       country: release?.country ?? null,
@@ -107,7 +112,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
       personal_notes: row.personal_notes ?? null,
       release_notes: release?.notes ?? null,
       media_condition: row.media_condition ?? '',
-      sleeve_condition: row.sleeve_condition ?? null,
+      package_sleeve_condition: row.sleeve_condition ?? null,
       barcode: release?.barcode ?? null,
       catalog_number: release?.catalog_number ?? null,
       label,
@@ -163,6 +168,11 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
               discogs_release_id,
               spotify_album_id,
               notes,
+              release_tracks:release_tracks (
+                recording:recordings (
+                  duration_seconds
+                )
+              ),
               master:masters (
                 title,
                 original_release_year,
@@ -208,6 +218,10 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
             if (!album.barcode) return;
             key = album.barcode.trim();
             break;
+          case 'index':
+            if (!album.index_number) return;
+            key = String(album.index_number);
+            break;
         }
 
         if (!key) return;
@@ -233,7 +247,9 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
               ? albums[0].title
               : detectionMethod === 'title'
               ? albums[0].title
-              : `Barcode: ${albums[0].barcode}`,
+              : detectionMethod === 'barcode'
+              ? `Barcode: ${albums[0].barcode}`
+              : `Index: ${albums[0].index_number}`,
             albums,
             keepCount: albums.length,
           });
@@ -348,38 +364,46 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
   if (!isOpen) return null;
 
   const selectedFavorite = columnFavorites.find(f => f.id === selectedFavoriteId);
-  const displayColumns = selectedFavorite?.columns || ['Artist', 'Title', 'Year', 'Format', 'Label', 'Country', 'Barcode', 'Catalog #', 'Added Date', 'Media Condition', 'Sleeve Condition'];
+  const displayColumns = selectedFavorite?.columns || ['Artist', 'Title', 'Release Date', 'Format', 'Discs', 'Tracks', 'Length', 'Genre', 'Label', 'Added Date'];
 
   const getColumnValue = (album: Album, columnName: string): string => {
     switch (columnName) {
       case 'Artist': return album.artist || '—';
       case 'Title': return album.title || '—';
-      case 'Year': return album.year ? String(album.year) : '—';
+      case 'Release Date':
+      case 'Release Year':
+        return album.release?.release_date
+          ? new Date(album.release.release_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+          : (album.year ? String(album.year) : '—');
       case 'Format': return album.format || '—';
-      case 'Label': 
-        return album.label || '—';
+      case 'Discs': return String(album.discs || 1);
+      case 'Tracks': {
+        const trackCount = album.release?.release_tracks?.length;
+        return trackCount ? String(trackCount) : '—';
+      }
+      case 'Length': {
+        const totalSeconds = (album.release?.release_tracks ?? [])
+          .reduce((sum, track) => sum + (track.recording?.duration_seconds ?? 0), 0);
+        if (!totalSeconds) return '—';
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      }
+      case 'Genre': 
+        return album.genres ? (Array.isArray(album.genres) ? album.genres[0] : album.genres) : '—';
+      case 'Label': return album.label || '—';
       case 'Added Date': 
         return album.date_added ? new Date(album.date_added).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
-      case 'Location': return album.location || '—';
-      case 'Status': return album.status || '—';
       case 'Barcode': return album.barcode || '—';
-      case 'Catalog #': return album.catalog_number || '—';
+      case 'Cat No': return album.catalog_number || '—';
       case 'Country': return album.country || '—';
-      case 'Genres':
-        return album.genres ? (Array.isArray(album.genres) ? album.genres.join(', ') : album.genres) : '—';
-      case 'Styles':
-        return album.styles ? (Array.isArray(album.styles) ? album.styles.join(', ') : album.styles) : '—';
-      case 'Tags':
-        return album.tags ? album.tags.join(', ') : '—';
-      case 'Personal Notes': return album.personal_notes || '—';
-      case 'Release Notes': return album.release_notes || '—';
-      case 'Owner': return album.owner || '—';
+      case 'Index': return String(album.index_number || '—');
       case 'Purchase Date': 
         return album.purchase_date ? new Date(album.purchase_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
       case 'Purchase Price': return album.purchase_price ? `$${album.purchase_price.toFixed(2)}` : '—';
       case 'Current Value': return album.current_value ? `$${album.current_value.toFixed(2)}` : '—';
       case 'Media Condition': return album.media_condition || '—';
-      case 'Sleeve Condition': return album.sleeve_condition || '—';
+      case 'Package/Sleeve Condition': return album.package_sleeve_condition || '—';
       default: return '—';
     }
   };

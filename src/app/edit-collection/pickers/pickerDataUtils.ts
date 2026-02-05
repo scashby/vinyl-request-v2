@@ -502,6 +502,141 @@ const extractCreditValues = (credits: unknown, key: string): string[] => {
   return Array.from(new Set([...direct, ...fromPeople, ...fromClassical]));
 };
 
+const extractAlbumDetailValues = (credits: unknown, key: string): string[] => {
+  if (!credits || typeof credits !== 'object') return [];
+  const record = credits as Record<string, unknown>;
+  const details = (record.album_details ?? record.albumDetails ?? record.album_metadata) as Record<string, unknown> | undefined;
+  if (!details || typeof details !== 'object') return [];
+  return asStringArray(details[key]);
+};
+
+const setAlbumDetailsList = (credits: unknown, key: string, values: string[]) => {
+  const base = (typeof credits === 'object' && credits !== null && !Array.isArray(credits))
+    ? { ...(credits as Record<string, unknown>) }
+    : {};
+  const details = (typeof base.album_details === 'object' && base.album_details !== null && !Array.isArray(base.album_details))
+    ? { ...(base.album_details as Record<string, unknown>) }
+    : {};
+  details[key] = unique(values);
+  base.album_details = details;
+  return base;
+};
+
+const updateAlbumDetailsFieldName = async (key: string, oldName: string, newName: string): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .from('recordings')
+      .select('id, credits')
+      .not('credits', 'is', null);
+    if (error) return false;
+
+    const rows = (data ?? []).map((row) => {
+      const existing = extractAlbumDetailValues(row.credits, key);
+      if (!existing.includes(oldName)) return null;
+      const nextValues = unique(existing.map((entry) => (entry === oldName ? newName : entry)));
+      return { id: row.id, credits: setAlbumDetailsList(row.credits, key, nextValues) };
+    }).filter(Boolean) as { id: number; credits: Record<string, unknown> }[];
+
+    if (!rows.length) return true;
+    const results = await Promise.all(
+      rows.map((row) =>
+        supabase
+          .from('recordings')
+          .update({ credits: row.credits as unknown as import('types/supabase').Json })
+          .eq('id', row.id)
+      )
+    );
+    return results.every((res) => !res.error);
+  } catch {
+    return false;
+  }
+};
+
+const deleteAlbumDetailsFieldName = async (key: string, nameToDelete: string): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .from('recordings')
+      .select('id, credits')
+      .not('credits', 'is', null);
+    if (error) return false;
+
+    const rows = (data ?? []).map((row) => {
+      const existing = extractAlbumDetailValues(row.credits, key);
+      if (!existing.includes(nameToDelete)) return null;
+      const nextValues = unique(existing.filter((entry) => entry !== nameToDelete));
+      return { id: row.id, credits: setAlbumDetailsList(row.credits, key, nextValues) };
+    }).filter(Boolean) as { id: number; credits: Record<string, unknown> }[];
+
+    if (!rows.length) return true;
+    const results = await Promise.all(
+      rows.map((row) =>
+        supabase
+          .from('recordings')
+          .update({ credits: row.credits as unknown as import('types/supabase').Json })
+          .eq('id', row.id)
+      )
+    );
+    return results.every((res) => !res.error);
+  } catch {
+    return false;
+  }
+};
+
+const mergeAlbumDetailsFieldName = async (key: string, targetId: string, sourceIds: string[]): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .from('recordings')
+      .select('id, credits')
+      .not('credits', 'is', null);
+    if (error) return false;
+
+    const rows = (data ?? []).map((row) => {
+      const existing = extractAlbumDetailValues(row.credits, key);
+      const updated = existing.map((entry) => (sourceIds.includes(entry) ? targetId : entry));
+      if (existing.join('|') === updated.join('|')) return null;
+      return { id: row.id, credits: setAlbumDetailsList(row.credits, key, updated) };
+    }).filter(Boolean) as { id: number; credits: Record<string, unknown> }[];
+
+    if (!rows.length) return true;
+    const results = await Promise.all(
+      rows.map((row) =>
+        supabase
+          .from('recordings')
+          .update({ credits: row.credits as unknown as import('types/supabase').Json })
+          .eq('id', row.id)
+      )
+    );
+    return results.every((res) => !res.error);
+  } catch {
+    return false;
+  }
+};
+
+const fetchAlbumDetailsList = async (key: string): Promise<PickerDataItem[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('recordings')
+      .select('credits')
+      .not('credits', 'is', null);
+
+    if (error) return [];
+
+    const counts = new Map<string, number>();
+    (data ?? []).forEach((row) => {
+      const values = extractAlbumDetailValues(row.credits, key);
+      values.forEach((value) => {
+        counts.set(value, (counts.get(value) || 0) + 1);
+      });
+    });
+
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ id: name, name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    return [];
+  }
+};
+
 async function fetchCreditsList(key: string): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase
@@ -580,15 +715,42 @@ export async function fetchStorageDevices(): Promise<PickerDataItem[]> {
 }
 
 export async function fetchPackaging(): Promise<PickerDataItem[]> {
-  return fetchFormats();
+  const [detailValues, formatValues] = await Promise.all([
+    fetchAlbumDetailsList('packaging'),
+    fetchFormats(),
+  ]);
+  const map = new Map<string, PickerDataItem>();
+  detailValues.forEach((item) => map.set(item.name, item));
+  formatValues.forEach((item) => {
+    if (!map.has(item.name)) map.set(item.name, item);
+  });
+  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function fetchStudios(): Promise<PickerDataItem[]> {
-  return fetchReleaseStringList('notes');
+  const [detailValues, noteValues] = await Promise.all([
+    fetchAlbumDetailsList('studio'),
+    fetchReleaseStringList('notes'),
+  ]);
+  const map = new Map<string, PickerDataItem>();
+  detailValues.forEach((item) => map.set(item.name, item));
+  noteValues.forEach((item) => {
+    if (!map.has(item.name)) map.set(item.name, item);
+  });
+  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function fetchSounds(): Promise<PickerDataItem[]> {
-  return fetchStylesAsSounds();
+  const [detailValues, styleValues] = await Promise.all([
+    fetchAlbumDetailsList('sound'),
+    fetchStylesAsSounds(),
+  ]);
+  const map = new Map<string, PickerDataItem>();
+  detailValues.forEach((item) => map.set(item.name, item));
+  styleValues.forEach((item) => {
+    if (!map.has(item.name)) map.set(item.name, item);
+  });
+  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 const fetchStylesAsSounds = async (): Promise<PickerDataItem[]> => {
@@ -611,57 +773,65 @@ const fetchStylesAsSounds = async (): Promise<PickerDataItem[]> => {
 };
 
 export async function fetchVinylColors(): Promise<PickerDataItem[]> {
-  return fetchFormats();
+  const [detailValues, formatValues] = await Promise.all([
+    fetchAlbumDetailsList('vinyl_color'),
+    fetchFormats(),
+  ]);
+  const map = new Map<string, PickerDataItem>();
+  detailValues.forEach((item) => map.set(item.name, item));
+  formatValues.forEach((item) => {
+    if (!map.has(item.name)) map.set(item.name, item);
+  });
+  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function fetchVinylWeights(): Promise<PickerDataItem[]> {
-  return fetchFormats();
+  const [detailValues, formatValues] = await Promise.all([
+    fetchAlbumDetailsList('vinyl_weight'),
+    fetchFormats(),
+  ]);
+  const map = new Map<string, PickerDataItem>();
+  detailValues.forEach((item) => map.set(item.name, item));
+  formatValues.forEach((item) => {
+    if (!map.has(item.name)) map.set(item.name, item);
+  });
+  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function fetchSPARS(): Promise<PickerDataItem[]> {
-  return [];
+  return fetchAlbumDetailsList('spars_code');
 }
 
 export async function fetchBoxSets(): Promise<PickerDataItem[]> {
-  return [];
+  return fetchAlbumDetailsList('box_set');
 }
 
 export async function fetchPurchaseStores(): Promise<PickerDataItem[]> {
-  return fetchOwners();
+  return fetchAlbumDetailsList('purchase_store');
 }
 
 export async function fetchSignees(): Promise<PickerDataItem[]> {
-  return fetchSongwriters();
+  return fetchAlbumDetailsList('signed_by');
 }
 
 export async function updatePackaging(id: string, newName: string): Promise<boolean> {
-  void id;
-  void newName;
-  return true;
+  return updateAlbumDetailsFieldName('packaging', id, newName);
 }
 
 export async function updateStudio(id: string, newName: string): Promise<boolean> {
-  void id;
-  void newName;
-  return true;
+  return updateAlbumDetailsFieldName('studio', id, newName);
 }
 
 export async function updateSound(id: string, newName: string): Promise<boolean> {
-  void id;
-  void newName;
-  return true;
+  return updateAlbumDetailsFieldName('sound', id, newName);
 }
 
 export async function updateVinylColor(id: string, newName: string): Promise<boolean> {
-  void id;
-  void newName;
-  return true;
+  return updateAlbumDetailsFieldName('vinyl_color', id, newName);
 }
 
 export async function updateSPARS(id: string, newName: string): Promise<boolean> {
-  void id;
-  void newName;
-  return true;
+  return updateAlbumDetailsFieldName('spars_code', id, newName);
 }
 
 const unique = (items: string[]): string[] => Array.from(new Set(items.filter(Boolean)));
@@ -772,44 +942,39 @@ const mergeCreditsFieldNames = async (key: string, targetName: string, sourceNam
 };
 
 export async function deletePackaging(id: string): Promise<boolean> {
-  try {
-    const { error } = await supabase.from('releases').update({ format_details: [] }).contains('format_details', [id]);
-    return !error;
-  } catch {
-    return false;
-  }
+  return deleteAlbumDetailsFieldName('packaging', id);
 }
 
 export async function mergePackaging(targetId: string, sourceIds: string[]): Promise<boolean> {
-  return mergeFormats(targetId, sourceIds);
+  return mergeAlbumDetailsFieldName('packaging', targetId, sourceIds);
 }
 
 export async function mergeVinylColors(targetId: string, sourceIds: string[]): Promise<boolean> {
-  return mergeFormats(targetId, sourceIds);
+  return mergeAlbumDetailsFieldName('vinyl_color', targetId, sourceIds);
 }
 
 export async function mergeSPARS(targetId: string, sourceIds: string[]): Promise<boolean> {
-  return mergeFormats(targetId, sourceIds);
+  return mergeAlbumDetailsFieldName('spars_code', targetId, sourceIds);
 }
 
 export async function updatePurchaseStore(id: string, newName: string): Promise<boolean> {
-  return updateOwner(id, newName);
+  return updateAlbumDetailsFieldName('purchase_store', id, newName);
 }
 
 export async function deletePurchaseStore(id: string): Promise<boolean> {
-  return deleteOwner(id);
+  return deleteAlbumDetailsFieldName('purchase_store', id);
 }
 
 export async function mergePurchaseStores(targetId: string, sourceIds: string[]): Promise<boolean> {
-  return mergeOwners(targetId, sourceIds);
+  return mergeAlbumDetailsFieldName('purchase_store', targetId, sourceIds);
 }
 
 export async function mergeStudios(targetId: string, sourceIds: string[]): Promise<boolean> {
-  return mergeFormats(targetId, sourceIds);
+  return mergeAlbumDetailsFieldName('studio', targetId, sourceIds);
 }
 
 export async function mergeSounds(targetId: string, sourceIds: string[]): Promise<boolean> {
-  return mergeFormats(targetId, sourceIds);
+  return mergeAlbumDetailsFieldName('sound', targetId, sourceIds);
 }
 
 export async function updateComposer(id: string, newName: string): Promise<boolean> {

@@ -107,6 +107,70 @@ function buildFormatLabel(release?: { media_type?: string | null; format_details
   return qty > 1 ? `${qty}x${base}` : base;
 }
 
+const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
+
+const asRecord = (value: unknown): Record<string, unknown> => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
+};
+
+const asString = (value: unknown): string | null => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  return null;
+};
+
+const asStringArray = (value: unknown): string[] => {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string');
+  }
+  if (typeof value === 'string') return [value];
+  return [];
+};
+
+const secondsToDuration = (seconds?: number | null): string => {
+  if (!seconds && seconds !== 0) return '';
+  const minutes = Math.floor(seconds / 60);
+  const remaining = Math.floor(seconds % 60);
+  return `${minutes}:${remaining.toString().padStart(2, '0')}`;
+};
+
+const parseDurationToSeconds = (duration?: string | null): number | null => {
+  if (!duration) return null;
+  const parts = duration.split(':').map((part) => Number(part));
+  if (parts.some((part) => Number.isNaN(part))) return null;
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+};
+
+const getAlbumCredits = (credits: unknown) => {
+  const record = asRecord(credits);
+  const albumDetails = asRecord(record.album_details ?? record.albumDetails ?? record.album_metadata);
+  const albumLinks = asRecord(albumDetails.links ?? albumDetails.link ?? {});
+  return { albumDetails, albumLinks };
+};
+
+const buildEntryCredits = (entry: CollectionEntry): Record<string, unknown> => {
+  const albumDetails: Record<string, unknown> = {};
+  const albumLinks: Record<string, unknown> = {};
+
+  if (entry.apple_music_id) albumDetails.apple_music_id = entry.apple_music_id;
+  if (entry.apple_music_url) albumLinks.apple_music_url = entry.apple_music_url;
+  if (entry.spotify_url) albumLinks.spotify_url = entry.spotify_url;
+
+  if (Object.keys(albumLinks).length > 0) {
+    albumDetails.links = albumLinks;
+  }
+
+  return Object.keys(albumDetails).length > 0
+    ? { album_details: albumDetails }
+    : {};
+};
+
 async function fetchDiscogsRelease(releaseId: string): Promise<DiscogsData> {
   const res = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);
   if (!res.ok) throw new Error('Discogs fetch failed');
@@ -206,12 +270,23 @@ export default function EditEntryPage() {
           id,
           discogs_release_id,
           spotify_album_id,
-          apple_music_id,
           release_year,
           release_date,
           media_type,
           format_details,
           qty,
+          release_tracks:release_tracks (
+            id,
+            position,
+            side,
+            title_override,
+            recording:recordings (
+              id,
+              title,
+              duration_seconds,
+              credits
+            )
+          ),
           master:masters (
             id,
             title,
@@ -231,12 +306,23 @@ export default function EditEntryPage() {
       id?: number | null;
       discogs_release_id?: string | null;
       spotify_album_id?: string | null;
-      apple_music_id?: string | null;
       release_year?: number | null;
       release_date?: string | null;
       media_type?: string | null;
       format_details?: string[] | null;
       qty?: number | null;
+      release_tracks?: Array<{
+        id?: number;
+        position?: string | null;
+        side?: string | null;
+        title_override?: string | null;
+        recording?: {
+          id?: number | null;
+          title?: string | null;
+          duration_seconds?: number | null;
+          credits?: unknown;
+        } | null;
+      }> | null;
       master?: {
         id?: number | null;
         title?: string | null;
@@ -251,6 +337,17 @@ export default function EditEntryPage() {
     const master = release?.master;
     const artist = master?.artist;
     const yearValue = release?.release_year ?? master?.original_release_year ?? null;
+    const releaseTracks = release?.release_tracks ?? [];
+    const firstRecording = toSingle(releaseTracks[0]?.recording);
+    const { albumDetails, albumLinks } = getAlbumCredits(firstRecording?.credits);
+    const tracklist = releaseTracks.map((track) => {
+      const recording = toSingle(track.recording);
+      return cleanTrack({
+        position: track.position ?? '',
+        title: track.title_override || recording?.title || '',
+        duration: secondsToDuration(recording?.duration_seconds ?? null),
+      });
+    });
 
     return {
       id: String(data?.id ?? rowId),
@@ -270,7 +367,7 @@ export default function EditEntryPage() {
       blocked: null,
       blocked_sides: null,
       blocked_tracks: null,
-      tracklists: null,
+      tracklists: tracklist.length > 0 ? JSON.stringify(tracklist) : null,
       discogs_release_id: release?.discogs_release_id ?? null,
       discogs_genres: master?.genres ?? null,
       discogs_styles: master?.styles ?? null,
@@ -278,15 +375,15 @@ export default function EditEntryPage() {
       master_release_id: master?.discogs_master_id ?? null,
       master_release_date: release?.release_date ?? null,
       spotify_id: release?.spotify_album_id ?? null,
-      spotify_url: null,
+      spotify_url: release?.spotify_album_id ? `https://open.spotify.com/album/${release.spotify_album_id}` : null,
       spotify_popularity: null,
       spotify_genres: null,
       spotify_label: null,
       spotify_release_date: null,
       spotify_total_tracks: null,
       spotify_image_url: null,
-      apple_music_id: release?.apple_music_id ?? null,
-      apple_music_url: null,
+      apple_music_id: asString(albumDetails.apple_music_id),
+      apple_music_url: asString(albumLinks.apple_music_url ?? albumDetails.apple_music_url),
       apple_music_genre: null,
       apple_music_genres: null,
       apple_music_label: null,
@@ -759,7 +856,6 @@ export default function EditEntryPage() {
     const releaseUpdate: Record<string, unknown> = {
       discogs_release_id: entry.discogs_release_id || null,
       spotify_album_id: entry.spotify_id || null,
-      apple_music_id: entry.apple_music_id || null,
       release_year: entry.year ? parseInt(entry.year, 10) : null,
       release_date: entry.master_release_date || null,
     };
@@ -798,6 +894,80 @@ export default function EditEntryPage() {
           .from('masters')
           .update(masterUpdate)
           .eq('id', entry.master_id);
+      }
+
+      if (entry.release_id && tracks && tracks.length > 0) {
+        await supabase
+          .from('release_tracks')
+          .delete()
+          .eq('release_id', entry.release_id);
+
+        const albumCredits = buildEntryCredits(entry);
+
+        for (const track of tracks) {
+          const title = track.title?.trim() || '';
+          if (!title) continue;
+          const recordingPayload: Record<string, unknown> = {
+            title,
+            duration_seconds: parseDurationToSeconds(track.duration),
+          };
+          if (track.artist) {
+            recordingPayload.credits = { ...albumCredits, track_artist: track.artist };
+          } else if (Object.keys(albumCredits).length > 0) {
+            recordingPayload.credits = albumCredits;
+          }
+
+          const { data: recording, error: recordingError } = await supabase
+            .from('recordings')
+            .insert([recordingPayload])
+            .select('id')
+            .single();
+
+          if (recordingError || !recording?.id) {
+            throw recordingError ?? new Error('Failed to create recording');
+          }
+
+          await supabase
+            .from('release_tracks')
+            .insert([{
+              release_id: entry.release_id,
+              recording_id: recording.id,
+              position: track.position || '',
+              side: getSideFromPosition(track.position) !== 'Unknown' ? getSideFromPosition(track.position) : null,
+            }]);
+        }
+      } else if (entry.release_id) {
+        const albumCredits = buildEntryCredits(entry);
+        if (Object.keys(albumCredits).length > 0) {
+          const { data: releaseRow } = await supabase
+            .from('releases')
+            .select(`
+              id,
+              release_tracks:release_tracks (
+                recording:recordings ( id, credits )
+              )
+            `)
+            .eq('id', entry.release_id)
+            .single();
+
+          const releaseTracks = releaseRow?.release_tracks ?? [];
+          await Promise.all(
+            releaseTracks
+              .map((track) => {
+                const recording = toSingle(track.recording);
+                if (!recording?.id) return null;
+                const existing = asRecord(recording.credits);
+                const merged = { ...existing, ...albumCredits };
+                return Promise.resolve(
+                  supabase
+                    .from('recordings')
+                    .update({ credits: merged as unknown as import('types/supabase').Json })
+                    .eq('id', recording.id)
+                );
+              })
+              .filter(Boolean) as Promise<unknown>[]
+          );
+        }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';

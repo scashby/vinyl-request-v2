@@ -88,7 +88,7 @@ const CollectionTable = memo(function CollectionTable({
       album.barcode || album.release?.barcode || '—';
 
     const getAlbumCatalogNumber = (album: Album) =>
-      album.release?.catalog_number || '—';
+      album.catalog_number || album.cat_no || album.release?.catalog_number || '—';
 
     const getAlbumTags = (album: Album) => {
       const links = album.release?.master?.master_tag_links ?? [];
@@ -98,17 +98,21 @@ const CollectionTable = memo(function CollectionTable({
     };
 
     const getAlbumStatus = (album: Album) => {
-      const status = album.status ?? null;
+      const status = album.collection_status ?? album.status ?? null;
       if (!status) return '—';
       switch (status) {
         case 'wishlist':
+        case 'wish_list':
           return 'Wish List';
         case 'incoming':
+        case 'on_order':
           return 'On Order';
         case 'sold':
           return 'Sold';
         case 'active':
           return 'In Collection';
+        case 'for_sale':
+          return 'For Sale';
         default:
           return status;
       }
@@ -119,6 +123,29 @@ const CollectionTable = memo(function CollectionTable({
     const formatTrackCount = (album: Album) => {
       const trackCount = album.release?.release_tracks?.length ?? 0;
       return trackCount > 0 ? trackCount : '—';
+    };
+
+    const formatDiscCount = (album: Album) => {
+      return album.discs ?? album.release?.qty ?? '—';
+    };
+
+    const formatSides = (album: Album) => {
+      const sides = new Set(
+        (album.release?.release_tracks ?? [])
+          .map((track) => track.side)
+          .filter(Boolean) as string[]
+      );
+      if (sides.size === 0) return '—';
+      return Array.from(sides).join(', ');
+    };
+
+    const formatLength = (album: Album) => {
+      const totalSeconds = (album.release?.release_tracks ?? [])
+        .reduce((sum, track) => sum + (track.recording?.duration_seconds ?? 0), 0);
+      if (!totalSeconds) return '—';
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     };
 
     const formatDate = (date: string | Date | null | undefined): string => {
@@ -144,6 +171,7 @@ const CollectionTable = memo(function CollectionTable({
     return {
       checkbox: () => null,
       owned: () => <span className="text-green-500 text-sm">✓</span>,
+      for_sale_indicator: (album: Album) => (album.for_sale ? '$' : ''),
       menu: (album: Album) => (
         <span 
           className="text-blue-500 text-sm cursor-pointer"
@@ -165,26 +193,48 @@ const CollectionTable = memo(function CollectionTable({
       ),
       year: (album: Album) => getAlbumYear(album),
       barcode: (album: Album) => getAlbumBarcode(album),
-      catalog_number: (album: Album) => getAlbumCatalogNumber(album),
+      cat_no: (album: Album) => getAlbumCatalogNumber(album),
+      sort_title: (album: Album) => album.sort_title || getAlbumTitle(album),
+      subtitle: (album: Album) => album.subtitle || '—',
       format: (album: Album) => getDisplayFormat(getAlbumFormat(album)),
+      discs: (album: Album) => formatDiscCount(album),
+      sides: (album: Album) => formatSides(album),
       tracks: (album: Album) => formatTrackCount(album),
+      length: (album: Album) => formatLength(album),
       country: (album: Album) => album.country || '—',
       media_condition: (album: Album) => album.media_condition || '—',
-      sleeve_condition: (album: Album) => album.sleeve_condition || '—',
+      package_sleeve_condition: (album: Album) => album.package_sleeve_condition || album.sleeve_condition || '—',
+      extra: (album: Album) => album.extra || '—',
+      rpm: (album: Album) => album.rpm || '—',
+      vinyl_color: (album: Album) => formatArray(album.vinyl_color),
+      vinyl_weight: (album: Album) => album.vinyl_weight || '—',
       
       genres: (album: Album) => formatArray(getAlbumGenres(album)),
       styles: (album: Album) => formatArray(getAlbumStyles(album)),
+      labels: (album: Album) => formatArray(album.labels || (album.label ? [album.label] : [])),
+      engineers: (album: Album) => formatArray(album.engineers),
+      musicians: (album: Album) => formatArray(album.musicians),
+      producers: (album: Album) => formatArray(album.producers),
+      songwriters: (album: Album) => formatArray(album.songwriters),
+      secondary_artists: (album: Album) => formatArray(album.secondary_artists),
       label: (album: Album) => getAlbumLabel(album),
       added_date: (album: Album) => formatDate(album.date_added),
-      status: (album: Album) => getAlbumStatus(album),
+      collection_status: (album: Album) => getAlbumStatus(album),
+      my_rating: (album: Album) => (album.my_rating ? String(album.my_rating) : '—'),
       location: (album: Album) => getAlbumLocation(album),
       personal_notes: (album: Album) => album.personal_notes || '—',
       release_notes: (album: Album) => album.release_notes || '—',
       owner: (album: Album) => album.owner || '—',
-      tags: (album: Album) => formatArray(getAlbumTags(album)),
+      custom_tags: (album: Album) => formatArray(album.custom_tags ?? getAlbumTags(album)),
+      modified_date: (album: Album) => (album.last_played_at ? formatDate(album.last_played_at) : '—'),
       purchase_date: (album: Album) => formatDate(album.purchase_date),
       purchase_price: (album: Album) => formatCurrency(album.purchase_price),
       current_value: (album: Album) => formatCurrency(album.current_value),
+      for_sale: (album: Album) => (album.for_sale ? 'Yes' : 'No'),
+      sale_price: (album: Album) => {
+        const salePrice = (album as Album & { sale_price?: number | null }).sale_price;
+        return salePrice ? formatCurrency(salePrice) : '—';
+      },
     } as Record<string, (album: Album) => React.ReactNode>;
   }, [onEditAlbum]);
 

@@ -87,6 +87,7 @@ export type Album = {
   disc_metadata?: Array<Record<string, unknown>> | null;
   matrix_numbers?: string[] | null;
   discs?: number | null;
+  sides?: number | null;
 
   // External IDs
   discogs_release_id?: string | null;
@@ -95,12 +96,15 @@ export type Album = {
   spotify_album_id?: string | null;
   spotify_id?: string | null;
   spotify_url?: string | null;
+  apple_music_id?: string | null;
   apple_music_url?: string | null;
   lastfm_url?: string | null;
+  lastfm_id?: string | null;
   spotify_label?: string | null;
   apple_music_label?: string | null;
   musicbrainz_release_group_id?: string | null;
   musicbrainz_id?: string | null;
+  musicbrainz_url?: string | null;
   allmusic_url?: string | null;
   wikipedia_url?: string | null;
   genius_url?: string | null;
@@ -127,6 +131,9 @@ export type Album = {
   sort_title?: string | null;
   subtitle?: string | null;
   back_image_url?: string | null;
+  spine_image_url?: string | null;
+  inner_sleeve_images?: string[] | null;
+  vinyl_label_images?: string[] | null;
   enrichment_sources?: string[] | null;
   tempo_bpm?: number | null;
   musical_key?: string | null;

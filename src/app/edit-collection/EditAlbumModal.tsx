@@ -123,6 +123,146 @@ type MasterTagLinkRow = {
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
 
+const asString = (value: unknown): string | null => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  return null;
+};
+
+const asStringArray = (value: unknown): string[] => {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string');
+  }
+  if (typeof value === 'string') return [value];
+  return [];
+};
+
+const asRecord = (value: unknown): Record<string, unknown> => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
+};
+
+function normalizeEmpty<T>(value: T | null | undefined): T | null {
+  if (value === undefined) return null;
+  return value ?? null;
+}
+
+const discardEmpty = (record: Record<string, unknown>): Record<string, unknown> => {
+  const next: Record<string, unknown> = {};
+  Object.entries(record).forEach(([key, value]) => {
+    if (value === undefined) return;
+    if (Array.isArray(value) && value.length === 0) return;
+    if (value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) return;
+    next[key] = value;
+  });
+  return next;
+};
+
+const getAlbumCredits = (credits: unknown) => {
+  const record = asRecord(credits);
+  const albumPeople = asRecord(record.album_people ?? record.albumPeople);
+  const classical = asRecord(record.classical);
+  const artwork = asRecord(record.artwork ?? record.album_artwork ?? record.albumArtwork);
+  const albumDetails = asRecord(record.album_details ?? record.albumDetails ?? record.album_metadata);
+
+  return {
+    albumPeople,
+    classical,
+    artwork,
+    albumDetails,
+  };
+};
+
+const buildAlbumCredits = (album: Album): Record<string, unknown> => {
+  const albumPeople = discardEmpty({
+    musicians: album.musicians ?? undefined,
+    producers: album.producers ?? undefined,
+    engineers: album.engineers ?? undefined,
+    songwriters: album.songwriters ?? undefined,
+  });
+
+  const classical = discardEmpty({
+    composer: normalizeEmpty(album.composer),
+    conductor: normalizeEmpty(album.conductor),
+    chorus: normalizeEmpty(album.chorus),
+    composition: normalizeEmpty(album.composition),
+    orchestra: normalizeEmpty(album.orchestra),
+  });
+
+  const artwork = discardEmpty({
+    back_image_url: normalizeEmpty(album.back_image_url),
+    spine_image_url: normalizeEmpty(album.spine_image_url),
+    inner_sleeve_images: album.inner_sleeve_images ?? undefined,
+    vinyl_label_images: album.vinyl_label_images ?? undefined,
+  });
+
+  const albumDetails = discardEmpty({
+    packaging: normalizeEmpty(album.packaging),
+    vinyl_color: album.vinyl_color ?? undefined,
+    vinyl_weight: normalizeEmpty(album.vinyl_weight),
+    rpm: normalizeEmpty(album.rpm),
+    spars_code: normalizeEmpty(album.spars_code),
+    box_set: normalizeEmpty(album.box_set),
+    sound: normalizeEmpty(album.sound),
+    studio: normalizeEmpty(album.studio),
+    disc_metadata: album.disc_metadata ?? undefined,
+    matrix_numbers: album.matrix_numbers ?? undefined,
+    master_release_date: normalizeEmpty(album.master_release_date),
+    recording_date: normalizeEmpty(album.recording_date),
+    tempo_bpm: album.tempo_bpm ?? undefined,
+    musical_key: normalizeEmpty(album.musical_key),
+    energy: album.energy ?? undefined,
+    danceability: album.danceability ?? undefined,
+    mood_acoustic: album.mood_acoustic ?? undefined,
+    mood_electronic: album.mood_electronic ?? undefined,
+    mood_happy: album.mood_happy ?? undefined,
+    mood_sad: album.mood_sad ?? undefined,
+    mood_aggressive: album.mood_aggressive ?? undefined,
+    mood_relaxed: album.mood_relaxed ?? undefined,
+    mood_party: album.mood_party ?? undefined,
+    enrichment_sources: album.enrichment_sources ?? undefined,
+    purchase_store: normalizeEmpty(album.purchase_store),
+    signed_by: album.signed_by ?? undefined,
+    my_rating: album.my_rating ?? undefined,
+    last_cleaned_date: normalizeEmpty(album.last_cleaned_date),
+    played_history: album.played_history ?? undefined,
+    apple_music_id: normalizeEmpty(album.apple_music_id),
+    lastfm_id: normalizeEmpty(album.lastfm_id),
+    musicbrainz_url: normalizeEmpty(album.musicbrainz_url),
+    links: discardEmpty({
+      apple_music_url: normalizeEmpty(album.apple_music_url),
+      lastfm_url: normalizeEmpty(album.lastfm_url),
+      allmusic_url: normalizeEmpty(album.allmusic_url),
+      wikipedia_url: normalizeEmpty(album.wikipedia_url),
+      genius_url: normalizeEmpty(album.genius_url),
+    }),
+  });
+
+  return discardEmpty({
+    album_people: albumPeople,
+    classical,
+    artwork,
+    album_details: albumDetails,
+  });
+};
+
+const secondsToDuration = (seconds?: number | null): string | null => {
+  if (!seconds || Number.isNaN(seconds)) return null;
+  const totalSeconds = Math.max(0, Math.floor(seconds));
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  return `${mins}:${String(secs).padStart(2, '0')}`;
+};
+
+const discNumberFromSide = (side?: string | null): number => {
+  if (!side) return 1;
+  const letter = side.trim().toUpperCase();
+  if (!letter) return 1;
+  const code = letter.charCodeAt(0) - 64;
+  return Math.max(1, Math.ceil(code / 2));
+};
+
 
 export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate, allAlbumIds }: EditAlbumModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>('main');
@@ -241,6 +381,18 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                notes,
                qty,
                format_details,
+               release_tracks:release_tracks (
+                 id,
+                 position,
+                 side,
+                 title_override,
+                 recording:recordings (
+                   id,
+                   title,
+                   duration_seconds,
+                   credits
+                 )
+               ),
                master:masters (
                  id,
                  title,
@@ -276,6 +428,36 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         const artist = toSingle(master?.artist);
         const tags = extractTagNames(master?.master_tag_links ?? null);
         const status = data.status ?? 'active';
+        const releaseTracks = release?.release_tracks ?? [];
+        const firstRecording = toSingle(releaseTracks[0]?.recording);
+        const creditsInfo = getAlbumCredits(firstRecording?.credits);
+        const albumDetails = creditsInfo.albumDetails;
+        const albumPeople = creditsInfo.albumPeople;
+        const classical = creditsInfo.classical;
+        const artwork = creditsInfo.artwork;
+        const links = asRecord(albumDetails.links ?? albumDetails.link ?? {});
+        const trackList = (releaseTracks ?? []).map((track, index) => {
+          const recording = toSingle(track.recording);
+          const recordingCredits = asRecord(recording?.credits);
+          const trackArtist = asString(recordingCredits.track_artist);
+          const discNumberRaw = recordingCredits.disc_number;
+          const discNumber =
+            typeof discNumberRaw === 'number'
+              ? discNumberRaw
+              : discNumberFromSide(track.side ?? undefined);
+
+          return {
+            position: track.position ?? `${index + 1}`,
+            title: track.title_override || recording?.title || '',
+            artist: trackArtist ?? null,
+            duration: secondsToDuration(recording?.duration_seconds ?? null),
+            type: 'track' as const,
+            disc_number: discNumber,
+            side: track.side ?? undefined,
+          };
+        });
+        const maxDiscNumber = trackList.reduce((max, track) => Math.max(max, track.disc_number ?? 1), 1);
+        const uniqueSides = new Set(trackList.map((track) => track.side).filter(Boolean));
 
         let collectionStatus: Album['collection_status'] = 'in_collection';
         if (status === 'wishlist') collectionStatus = 'wish_list';
@@ -297,7 +479,10 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           release_id: release?.id ?? null,
           artist: artist?.name || '',
           title: master?.title || '',
-          year: master?.original_release_year ? String(master.original_release_year) : null,
+          year: release?.release_year
+            ? String(release.release_year)
+            : (master?.original_release_year ? String(master.original_release_year) : null),
+          original_release_year: master?.original_release_year ?? null,
           format: buildFormatLabel(release),
           image_url: master?.cover_image_url || null,
           discogs_release_id: release?.discogs_release_id ?? null,
@@ -305,19 +490,82 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           musicbrainz_id: master?.musicbrainz_release_group_id ?? null,
           spotify_id: release?.spotify_album_id ?? null,
           spotify_url: release?.spotify_album_id ? `https://open.spotify.com/album/${release.spotify_album_id}` : null,
-          apple_music_url: null,
-          lastfm_url: null,
-          allmusic_url: null,
-          wikipedia_url: null,
+          apple_music_url: asString(links.apple_music_url ?? albumDetails.apple_music_url),
+          lastfm_url: asString(links.lastfm_url ?? albumDetails.lastfm_url),
+          allmusic_url: asString(links.allmusic_url ?? albumDetails.allmusic_url),
+          wikipedia_url: asString(links.wikipedia_url ?? albumDetails.wikipedia_url),
+          genius_url: asString(links.genius_url ?? albumDetails.genius_url),
+          apple_music_id: asString(albumDetails.apple_music_id),
+          lastfm_id: asString(albumDetails.lastfm_id),
+          musicbrainz_url: asString(albumDetails.musicbrainz_url),
           personal_notes: data.personal_notes ?? null,
           release_notes: release?.notes ?? null,
           media_condition: data.media_condition ?? '',
+          package_sleeve_condition: data.sleeve_condition ?? null,
+          sleeve_condition: data.sleeve_condition ?? null,
           genres: master?.genres || [],
           styles: master?.styles || [],
+          labels: release?.label ? [release.label] : [],
+          label: release?.label ?? null,
+          cat_no: release?.catalog_number ?? null,
+          barcode: release?.barcode ?? null,
+          country: release?.country ?? null,
           custom_tags: tags,
           location: data.location ?? null,
           collection_status: collectionStatus,
           for_sale: status === 'for_sale',
+          tracks: trackList,
+          disc_metadata: (albumDetails.disc_metadata as Album['disc_metadata']) ?? null,
+          matrix_numbers: (albumDetails.matrix_numbers as Album['matrix_numbers']) ?? null,
+          discs: maxDiscNumber || release?.qty || null,
+          sides: uniqueSides.size || null,
+          back_image_url: asString(artwork.back_image_url),
+          spine_image_url: asString(artwork.spine_image_url),
+          inner_sleeve_images: asStringArray(artwork.inner_sleeve_images),
+          vinyl_label_images: asStringArray(artwork.vinyl_label_images),
+          musicians: asStringArray(albumPeople.musicians),
+          producers: asStringArray(albumPeople.producers),
+          engineers: asStringArray(albumPeople.engineers),
+          songwriters: asStringArray(albumPeople.songwriters),
+          composer: asString(classical.composer),
+          conductor: asString(classical.conductor),
+          chorus: asString(classical.chorus),
+          composition: asString(classical.composition),
+          orchestra: asString(classical.orchestra),
+          packaging: asString(albumDetails.packaging),
+          vinyl_color: asStringArray(albumDetails.vinyl_color),
+          vinyl_weight: asString(albumDetails.vinyl_weight),
+          rpm: asString(albumDetails.rpm),
+          spars_code: asString(albumDetails.spars_code),
+          box_set: asString(albumDetails.box_set),
+          sound: asString(albumDetails.sound),
+          studio: asString(albumDetails.studio),
+          master_release_date: asString(albumDetails.master_release_date),
+          recording_date: asString(albumDetails.recording_date),
+          tempo_bpm: typeof albumDetails.tempo_bpm === 'number' ? albumDetails.tempo_bpm : null,
+          musical_key: asString(albumDetails.musical_key),
+          energy: typeof albumDetails.energy === 'number' ? albumDetails.energy : null,
+          danceability: typeof albumDetails.danceability === 'number' ? albumDetails.danceability : null,
+          mood_acoustic: typeof albumDetails.mood_acoustic === 'number' ? albumDetails.mood_acoustic : null,
+          mood_electronic: typeof albumDetails.mood_electronic === 'number' ? albumDetails.mood_electronic : null,
+          mood_happy: typeof albumDetails.mood_happy === 'number' ? albumDetails.mood_happy : null,
+          mood_sad: typeof albumDetails.mood_sad === 'number' ? albumDetails.mood_sad : null,
+          mood_aggressive: typeof albumDetails.mood_aggressive === 'number' ? albumDetails.mood_aggressive : null,
+          mood_relaxed: typeof albumDetails.mood_relaxed === 'number' ? albumDetails.mood_relaxed : null,
+          mood_party: typeof albumDetails.mood_party === 'number' ? albumDetails.mood_party : null,
+          enrichment_sources: asStringArray(albumDetails.enrichment_sources),
+          purchase_store: asString(albumDetails.purchase_store),
+          signed_by: asStringArray(albumDetails.signed_by),
+          my_rating: typeof albumDetails.my_rating === 'number' ? albumDetails.my_rating : null,
+          last_cleaned_date: asString(albumDetails.last_cleaned_date),
+          played_history: (albumDetails.played_history as Album['played_history']) ?? null,
+          owner: data.owner ?? null,
+          purchase_price: data.purchase_price ?? null,
+          current_value: data.current_value ?? null,
+          purchase_date: data.purchase_date ?? null,
+          play_count: data.play_count ?? null,
+          last_played_at: data.last_played_at ?? null,
+          date_added: data.date_added ?? null,
         };
 
         setAlbum(albumData);
@@ -377,6 +625,52 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
     });
   };
 
+  const updateRecordingAlbumCredits = async (releaseId: number, albumCredits: Record<string, unknown>) => {
+    if (!releaseId || Object.keys(albumCredits).length === 0) return;
+
+    const { data: releaseRow, error } = await supabase
+      .from('releases')
+      .select(`
+        id,
+        release_tracks:release_tracks (
+          id,
+          recording:recordings ( id, credits )
+        )
+      `)
+      .eq('id', releaseId)
+      .single();
+
+    if (error || !releaseRow) {
+      console.error('❌ Failed to load recordings for album credits:', error);
+      return;
+    }
+
+    const releaseTracks = releaseRow.release_tracks ?? [];
+    const updates: Promise<unknown>[] = [];
+
+    releaseTracks.forEach((track) => {
+      const recording = toSingle(track.recording);
+      if (!recording?.id) return;
+      const existingCredits = asRecord(recording.credits);
+      const mergedCredits = {
+        ...existingCredits,
+        ...albumCredits,
+      };
+      updates.push(
+        Promise.resolve(
+          supabase
+            .from('recordings')
+            .update({ credits: mergedCredits as unknown as Database['public']['Tables']['recordings']['Update']['credits'] })
+            .eq('id', recording.id)
+        )
+      );
+    });
+
+    if (updates.length > 0) {
+      await Promise.all(updates);
+    }
+  };
+
   // Core save logic - can be called with or without closing modal
   const performSave = async () => {
     if (!editedAlbum) return;
@@ -402,6 +696,12 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           sleeve_condition: editedAlbum.package_sleeve_condition ?? null,
           location: editedAlbum.location ?? null,
           status,
+          owner: editedAlbum.owner ?? null,
+          purchase_price: editedAlbum.purchase_price ?? null,
+          current_value: editedAlbum.current_value ?? null,
+          purchase_date: editedAlbum.purchase_date ?? null,
+          play_count: editedAlbum.play_count ?? null,
+          last_played_at: editedAlbum.last_played_at ?? null,
         };
 
         const { error: inventoryError } = await supabase
@@ -431,12 +731,23 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           }
 
           for (const track of tracksData.tracks) {
+            if (track.type === 'header') continue;
             const trackTitle = track.title?.trim() || '';
             if (!trackTitle) continue;
+
+            const albumCredits = buildAlbumCredits(editedAlbum);
+            const recordingCredits = discardEmpty({
+              ...albumCredits,
+              track_artist: track.artist ?? null,
+              disc_number: track.disc_number ?? null,
+            });
 
             const recordingPayload = {
               title: trackTitle,
               duration_seconds: parseDurationToSeconds(track.duration),
+              credits: Object.keys(recordingCredits).length > 0
+                ? (recordingCredits as unknown as Database['public']['Tables']['recordings']['Insert']['credits'])
+                : undefined,
             };
 
             const { data: recording, error: recordingError } = await supabase
@@ -456,9 +767,8 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               .insert([{
                 release_id: editedAlbum.release_id,
                 recording_id: recording.id,
-                position: track.position,
+                position: String(track.position ?? ''),
                 side: track.side ?? null,
-                disc_number: track.disc_number ?? 1,
               }]);
 
             if (releaseTrackError) {
@@ -470,9 +780,12 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         }
 
         if (editedAlbum.release_id) {
+          const trackCount = tracksData?.tracks?.filter((track) => track.type === 'track').length;
           const releaseUpdate: Database['public']['Tables']['releases']['Update'] = {
-            label: editedAlbum.labels?.[0] ?? null,
-            catalog_number: editedAlbum.cat_no ?? null,
+            label: editedAlbum.labels?.[0] ?? editedAlbum.label ?? null,
+            catalog_number: editedAlbum.cat_no ?? editedAlbum.catalog_number ?? null,
+            barcode: editedAlbum.barcode ?? null,
+            country: editedAlbum.country ?? null,
             release_year: editedAlbum.year ? Number(editedAlbum.year) : null,
             discogs_release_id: extractIdFromUrl(editedAlbum.discogs_release_id, '/release/') ?? editedAlbum.discogs_release_id ?? null,
             spotify_album_id:
@@ -480,6 +793,8 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               extractIdFromUrl(editedAlbum.spotify_url, '/album/') ??
               editedAlbum.release?.spotify_album_id ??
               null,
+            notes: editedAlbum.release_notes ?? null,
+            track_count: typeof trackCount === 'number' ? trackCount : editedAlbum.release?.track_count ?? null,
           };
 
           const parsedFormat = editedAlbum.format
@@ -512,9 +827,46 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         }
 
         if (editedAlbum.master_id) {
+          let mainArtistId: number | null | undefined = undefined;
+          const artistName = editedAlbum.artist?.trim();
+          if (artistName) {
+            const { data: existingArtist, error: artistLookupError } = await supabase
+              .from('artists')
+              .select('id')
+              .ilike('name', artistName)
+              .maybeSingle();
+
+            if (artistLookupError) {
+              console.error('❌ Failed to lookup artist:', artistLookupError);
+              alert(`Failed to save artist: ${artistLookupError.message}`);
+              return;
+            }
+
+            if (existingArtist?.id) {
+              mainArtistId = existingArtist.id;
+            } else {
+              const { data: createdArtist, error: artistCreateError } = await supabase
+                .from('artists')
+                .insert({ name: artistName })
+                .select('id')
+                .single();
+
+              if (artistCreateError) {
+                console.error('❌ Failed to create artist:', artistCreateError);
+                alert(`Failed to save artist: ${artistCreateError.message}`);
+                return;
+              }
+              mainArtistId = createdArtist?.id ?? null;
+            }
+          } else {
+            mainArtistId = null;
+          }
+
           const masterUpdate: Database['public']['Tables']['masters']['Update'] = {
             title: editedAlbum.title ?? null,
-            original_release_year: editedAlbum.year ? Number(editedAlbum.year) : null,
+            original_release_year: editedAlbum.original_release_year
+              ? Number(editedAlbum.original_release_year)
+              : (editedAlbum.year ? Number(editedAlbum.year) : null),
             genres: editedAlbum.genres ?? [],
             styles: editedAlbum.styles ?? [],
             discogs_master_id: extractIdFromUrl(editedAlbum.discogs_master_id, '/master/') ?? editedAlbum.discogs_master_id ?? null,
@@ -522,6 +874,8 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               editedAlbum.musicbrainz_id
                 ? extractIdFromUrl(editedAlbum.musicbrainz_id, '/release-group/') ?? editedAlbum.musicbrainz_id
                 : null,
+            cover_image_url: editedAlbum.image_url ?? null,
+            main_artist_id: mainArtistId,
           };
 
           const { error: masterError } = await supabase
@@ -626,6 +980,11 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               return;
             }
           }
+        }
+
+        if (editedAlbum.release_id) {
+          const albumCredits = buildAlbumCredits(editedAlbum);
+          await updateRecordingAlbumCredits(editedAlbum.release_id, albumCredits);
         }
 
       console.log('✅ Save complete!');

@@ -137,10 +137,18 @@ export async function POST(req: Request) {
         id,
         release:releases (
           id,
+          label,
+          release_date,
+          track_count,
           release_tracks:release_tracks (
             id,
             position,
             recording:recordings ( id, title, credits )
+          ),
+          master:masters (
+            id,
+            genres,
+            cover_image_url
           )
         )
       `)
@@ -152,10 +160,34 @@ export async function POST(req: Request) {
     }
 
     const release = toSingle(inventoryRow.release);
+    const master = toSingle(release?.master);
     const releaseTracks = release?.release_tracks ?? [];
     const albumMeta = albums[0];
     const normalized = (value: string) =>
       value.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+
+    if (release?.id) {
+      const releaseUpdate: Record<string, unknown> = {};
+      if (!release.release_date && albumMeta?.releaseDate) {
+        releaseUpdate.release_date = albumMeta.releaseDate;
+      }
+      if (!release.track_count && albumMeta?.trackCount) {
+        releaseUpdate.track_count = albumMeta.trackCount;
+      }
+      if (Object.keys(releaseUpdate).length > 0) {
+        await supabase.from('releases').update(releaseUpdate).eq('id', release.id);
+      }
+    }
+
+    if (master?.id) {
+      const masterUpdate: Record<string, unknown> = {};
+      if (!master.cover_image_url && albumMeta?.artworkUrl) {
+        masterUpdate.cover_image_url = albumMeta.artworkUrl;
+      }
+      if (Object.keys(masterUpdate).length > 0) {
+        await supabase.from('masters').update(masterUpdate).eq('id', master.id);
+      }
+    }
 
     const trackIndex = new Map<string, AppleMusicTrack>();
     (tracks ?? []).forEach((track) => {
@@ -189,7 +221,7 @@ export async function POST(req: Request) {
 
       const { error: updateError } = await supabase
         .from('recordings')
-        .update({ credits: nextCredits })
+        .update({ credits: nextCredits as unknown as import('types/supabase').Json })
         .eq('id', recording.id);
 
       if (!updateError) {

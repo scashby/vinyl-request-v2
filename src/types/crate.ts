@@ -28,16 +28,26 @@ export interface SmartRule {
 export type CrateFieldType = 
   // Text fields - Basic
   | 'artist' | 'title' | 'format' | 'country' | 'location' 
-  | 'owner' | 'personal_notes' | 'release_notes' | 'barcode' | 'catalog_number' | 'label' | 'status'
+  | 'owner' | 'personal_notes' | 'release_notes' | 'barcode' | 'catalog_number' | 'cat_no' | 'label' | 'labels' | 'status'
   // Text fields - Condition
-  | 'sleeve_condition' | 'media_condition'
+  | 'sleeve_condition' | 'package_sleeve_condition' | 'media_condition'
+  // Text fields - Packaging/Metadata
+  | 'packaging' | 'vinyl_weight' | 'rpm' | 'sound' | 'spars_code' | 'studio'
+  // Text fields - Personal/Other
+  | 'purchase_store' | 'notes' | 'box_set'
+  // Text fields - Classical
+  | 'composer' | 'conductor' | 'chorus' | 'composition' | 'orchestra'
   // Number fields
-  | 'year_int' | 'play_count'
+  | 'year_int' | 'decade' | 'my_rating' | 'play_count' | 'discs' | 'sides' | 'index_number'
   | 'purchase_price' | 'current_value'
   // Date fields
-  | 'date_added' | 'purchase_date' | 'last_played_at'
+  | 'date_added' | 'purchase_date' | 'last_played_at' | 'last_played_date' | 'last_cleaned_date'
+  | 'original_release_date' | 'recording_date'
+  // Boolean fields
+  | 'for_sale' | 'is_live' | 'is_1001'
   // Array fields (special handling)
-  | 'tags'
+  | 'tags' | 'custom_tags' | 'discogs_genres' | 'spotify_genres' | 'signed_by'
+  | 'songwriters' | 'producers' | 'engineers' | 'musicians'
   // Derived fields
   | 'decade';
 

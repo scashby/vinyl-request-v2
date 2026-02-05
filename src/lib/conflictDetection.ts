@@ -7,8 +7,8 @@ export const IDENTIFYING_FIELDS = [
   'artist',
   'title',
   'format',
-  'label',
-  'catalog_number',
+  'labels',
+  'cat_no',
   'barcode',
   'country',
   'year',
@@ -20,13 +20,35 @@ export const IDENTIFYING_FIELDS = [
 
 export const CONFLICTABLE_FIELDS = [
   'tracks',
+  'disc_metadata',
+  'discs',
+  'musicians',
+  'producers',
+  'engineers',
+  'songwriters',
+  'packaging',
+  'sound',
+  'spars_code',
+  'rpm',
+  'vinyl_color',
+  'vinyl_weight',
+  'matrix_numbers',
   'image_url',
+  'back_image_url',
   'genres', // FIXED: Was discogs_genres
   'styles', // FIXED: Was discogs_styles
   'personal_notes', // FIXED: Was notes
   'release_notes',
+  'studio',
+  'my_rating',
   'media_condition',
-  'sleeve_condition',
+  'package_sleeve_condition',
+  'composer',
+  'conductor',
+  'orchestra',
+  'chorus',
+  'length_seconds',
+  'is_live',
 ] as const;
 
 export interface Track {
@@ -35,6 +57,7 @@ export interface Track {
   title: string;
   artist?: string | null;
   duration?: string;
+  disc_number?: number;
   side?: string | null;
   type?: string;
   lyrics_url?: string;
@@ -51,19 +74,44 @@ export interface CollectionRow extends Record<string, unknown> {
   location: string;
   media_condition: string;
   barcode?: string;
-  catalog_number?: string;
+  cat_no?: string;
   country?: string;
-  label?: string;
+  labels?: string[];
   personal_notes?: string;
   release_notes?: string;
-  sleeve_condition?: string;
+  index_number?: number;
+  package_sleeve_condition?: string;
+  vinyl_weight?: string;
+  rpm?: string;
+  vinyl_color?: string[]; 
+  packaging?: string;
+  sound?: string;
+  spars_code?: string;
+  discs: number;
   date_added?: Date | string;
-  status?: string;
-  tags?: string[];
+  modified_date?: Date | string;
+  collection_status?: string;
+  is_live?: boolean;
+  my_rating?: number;
+  custom_tags?: string[];
+  musicians?: unknown;
+  producers?: unknown;
+  engineers?: unknown;
+  songwriters?: unknown;
+  composer?: string;
+  conductor?: string;
+  orchestra?: string;
+  chorus?: string;
   tracks?: unknown;
+  disc_metadata?: unknown;
+  studio?: string;
+  extra?: string;
+  length_seconds?: number;
   image_url?: string;
+  back_image_url?: string;
   genres?: string[];
   styles?: string[];
+  matrix_numbers?: unknown;
   discogs_release_id?: string;
   discogs_master_id?: string;
 }
@@ -86,11 +134,13 @@ export interface FieldConflict {
   artist: string;
   title: string;
   format: string;
-  catalog_number: string | null;
+  cat_no: string | null;
+  catalog_number?: string | null;
   barcode: string | null;
   country: string | null;
   year: string | null;
-  label: string | null;
+  labels: string[];
+  label?: string | null;
   release_id?: number | null;
   master_id?: number | null;
 }
@@ -170,6 +220,21 @@ function normalizeTrack(track: unknown): Record<string, unknown> {
   };
 }
 
+function normalizeDiscMetadata(disc: unknown): Record<string, unknown> {
+  if (!disc || typeof disc !== 'object') return {};
+  const d = disc as Record<string, unknown>;
+  return {
+    disc_number: d.disc_number ? Number(d.disc_number) : d.index ? Number(d.index) : undefined,
+    track_count: d.track_count ? Number(d.track_count) : undefined
+  };
+}
+
+function areDiscMetadataEqual(current: unknown, incoming: unknown): boolean {
+  if (!Array.isArray(current) || !Array.isArray(incoming)) return isEqual(current, incoming);
+  if (current.length !== incoming.length) return false;
+  return isEqual(current.map(normalizeDiscMetadata), incoming.map(normalizeDiscMetadata));
+}
+
 function areTracksEqual(current: unknown, incoming: unknown): boolean {
   if (!Array.isArray(current) || !Array.isArray(incoming)) return isEqual(current, incoming);
   
@@ -205,17 +270,29 @@ export function buildIdentifyingFieldUpdates(existingAlbum: Record<string, unkno
   return updates;
 }
 
+const normalizeAlbumForConflicts = (album: Record<string, unknown>) => {
+  const next = { ...album };
+  if (!next.labels && next.label) next.labels = [next.label];
+  if (!next.cat_no && next.catalog_number) next.cat_no = next.catalog_number;
+  if (!next.package_sleeve_condition && next.sleeve_condition) next.package_sleeve_condition = next.sleeve_condition;
+  if (!next.personal_notes && next.notes) next.personal_notes = next.notes;
+  if (!next.custom_tags && next.tags) next.custom_tags = next.tags;
+  return next;
+};
+
 export function detectConflicts(existingAlbum: Record<string, unknown>, importedData: Record<string, unknown>, source: ImportSource, previousResolutions: PreviousResolution[]): ConflictDetectionResult {
   const conflicts: FieldConflict[] = [];
   const safeUpdates: Record<string, unknown> = {};
   const resolutionMap = new Map<string, PreviousResolution>();
   for (const res of previousResolutions) resolutionMap.set(res.field_name, res);
   
-  const TAG_LIKE_FIELDS = ['genres', 'styles', 'tags'];
+  const TAG_LIKE_FIELDS = ['genres', 'styles', 'tags', 'custom_tags', 'labels', 'musicians', 'producers', 'engineers', 'songwriters'];
+  const normalizedExistingAlbum = normalizeAlbumForConflicts(existingAlbum);
+  const normalizedImportedData = normalizeAlbumForConflicts(importedData);
 
   for (const field of CONFLICTABLE_FIELDS) {
-    const existingValue = existingAlbum[field];
-    const newValue = importedData[field];
+    const existingValue = normalizedExistingAlbum[field];
+    const newValue = normalizedImportedData[field];
     const normalizedExisting = normalizeEmptyValue(existingValue);
     const normalizedNew = normalizeEmptyValue(newValue);
     
@@ -225,6 +302,7 @@ export function detectConflicts(existingAlbum: Record<string, unknown>, imported
     
     let valuesAreDifferent = false;
     if (field === 'tracks') valuesAreDifferent = !areTracksEqual(existingValue, newValue);
+    else if (field === 'disc_metadata') valuesAreDifferent = !areDiscMetadataEqual(existingValue, newValue);
     else if (TAG_LIKE_FIELDS.includes(field)) valuesAreDifferent = !areStringArraysEqual(existingValue, newValue);
     else valuesAreDifferent = !isEqual(existingValue, newValue);
       
@@ -233,20 +311,22 @@ export function detectConflicts(existingAlbum: Record<string, unknown>, imported
       if (previousResolution && isEqual(previousResolution.kept_value, existingValue) && isEqual(previousResolution.rejected_value, newValue)) continue;
       
       conflicts.push({
-        album_id: existingAlbum.id as number,
+        album_id: normalizedExistingAlbum.id as number,
         field_name: field,
         current_value: existingValue,
         new_value: newValue,
-        artist: existingAlbum.artist as string,
-        title: existingAlbum.title as string,
-        format: existingAlbum.format as string,
-        catalog_number: existingAlbum.catalog_number as string | null,
-        barcode: existingAlbum.barcode as string | null,
-        country: existingAlbum.country as string | null,
-        year: existingAlbum.year as string | null,
-        label: (existingAlbum.label as string | null) || null,
-        release_id: existingAlbum.release_id as number | null,
-        master_id: existingAlbum.master_id as number | null,
+        artist: normalizedExistingAlbum.artist as string,
+        title: normalizedExistingAlbum.title as string,
+        format: normalizedExistingAlbum.format as string,
+        cat_no: normalizedExistingAlbum.cat_no as string | null,
+        catalog_number: normalizedExistingAlbum.catalog_number as string | null,
+        barcode: normalizedExistingAlbum.barcode as string | null,
+        country: normalizedExistingAlbum.country as string | null,
+        year: normalizedExistingAlbum.year as string | null,
+        labels: (normalizedExistingAlbum.labels as string[]) || [],
+        label: (normalizedExistingAlbum.label as string | null) || null,
+        release_id: normalizedExistingAlbum.release_id as number | null,
+        master_id: normalizedExistingAlbum.master_id as number | null,
       });
     }
   }
@@ -348,15 +428,35 @@ export function getRejectedValue(
 export function getFieldDisplayName(fieldName: string): string {
   const nameMap: Record<string, string> = {
     tracks: 'Tracks',
+    disc_metadata: 'Disc Metadata',
+    discs: 'Number of Discs',
+    musicians: 'Musicians',
+    producers: 'Producers',
+    engineers: 'Engineers',
+    songwriters: 'Songwriters',
+    packaging: 'Packaging',
+    sound: 'Sound',
+    spars_code: 'SPARS Code',
+    rpm: 'RPM',
+    vinyl_color: 'Vinyl Color',
+    vinyl_weight: 'Vinyl Weight',
+    matrix_numbers: 'Matrix Numbers',
     image_url: 'Cover Image',
+    back_image_url: 'Back Cover Image',
     genres: 'Genres',
     styles: 'Styles',
     personal_notes: 'My Notes', // FIXED
     release_notes: 'Release Notes',
+    studio: 'Studio',
+    my_rating: 'Rating',
     media_condition: 'Media Condition',
-    sleeve_condition: 'Sleeve Condition',
-    label: 'Label',
-    catalog_number: 'Catalog #',
+    package_sleeve_condition: 'Sleeve Condition',
+    composer: 'Composer',
+    conductor: 'Conductor',
+    orchestra: 'Orchestra',
+    chorus: 'Chorus',
+    length_seconds: 'Length',
+    is_live: 'Live Recording',
   };
   return nameMap[fieldName] || fieldName;
 }

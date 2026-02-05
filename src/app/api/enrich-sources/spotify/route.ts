@@ -1,144 +1,285 @@
+// src/app/api/enrich-sources/spotify/route.ts - WITH COMPREHENSIVE LOGGING
 import { NextResponse } from "next/server";
 import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
-import { getSpotifyToken } from "src/lib/spotify";
-
-type SpotifyAlbumResult = {
-  id: string;
-  name: string;
-  artists: string[];
-  release_date?: string;
-  image_url?: string;
-  external_url?: string;
-};
+const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
+const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
 
-async function searchSpotifyAlbum(artist: string, album: string): Promise<SpotifyAlbumResult | null> {
-  const token = await getSpotifyToken();
-  const q = encodeURIComponent(`album:"${album}" artist:"${artist}"`);
-  const res = await fetch(`https://api.spotify.com/v1/search?type=album&limit=1&q=${q}`, {
-    headers: { Authorization: `Bearer ${token}` },
+let spotifyToken: { token: string; expires: number } | null = null;
+
+async function getSpotifyToken(): Promise<string> {
+  if (spotifyToken && Date.now() < spotifyToken.expires) {
+    console.log('  → Using cached Spotify token');
+    return spotifyToken.token;
+  }
+
+  if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
+    throw new Error('Missing Spotify credentials');
+  }
+
+  console.log('  → Fetching new Spotify token...');
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': 'Basic ' + Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64')
+    },
+    body: 'grant_type=client_credentials'
   });
 
   if (!res.ok) {
-    throw new Error(`Spotify search failed: HTTP ${res.status}`);
+    console.log(`  → Spotify auth failed: HTTP ${res.status}`);
+    throw new Error('Spotify auth failed');
+  }
+  
+  const data = await res.json();
+  spotifyToken = {
+    token: data.access_token,
+    expires: Date.now() + (data.expires_in - 60) * 1000
+  };
+  
+  console.log('  → New Spotify token acquired');
+  return spotifyToken.token;
+}
+
+async function searchSpotify(artist: string, title: string) {
+  const token = await getSpotifyToken();
+  const query = encodeURIComponent(`artist:${artist} album:${title}`);
+  
+  console.log(`  → Searching Spotify: "${artist}" - "${title}"`);
+  
+  const res = await fetch(`https://api.spotify.com/v1/search?type=album&limit=1&q=${query}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+
+  if (!res.ok) {
+    console.log(`  → Spotify search failed: HTTP ${res.status}`);
+    throw new Error(`Spotify API returned ${res.status}`);
+  }
+  
+  const data = await res.json();
+  const album = data?.albums?.items?.[0];
+  
+  if (!album) {
+    console.log(`  → No Spotify match found`);
+    return null;
   }
 
-  const data = await res.json();
-  const item = data?.albums?.items?.[0];
-  if (!item?.id) return null;
+  console.log(`  → Found Spotify album: "${album.name}" (ID: ${album.id})`);
+
+  // Get artist genres
+  let genres: string[] = [];
+  if (album.artists && album.artists.length > 0) {
+    const artistId = album.artists[0].id;
+    
+    try {
+      console.log(`  → Fetching artist genres for ${artistId}...`);
+      const artistRes = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (artistRes.ok) {
+        const artistData = await artistRes.json();
+        genres = artistData.genres || [];
+        console.log(`  → Got ${genres.length} genres: ${genres.join(', ')}`);
+      }
+    } catch (err) {
+      console.error('  → Failed to fetch artist genres:', err);
+    }
+  }
 
   return {
-    id: item.id,
-    name: item.name ?? album,
-    artists: (item.artists ?? []).map((a: { name: string }) => a.name).filter(Boolean),
-    release_date: item.release_date ?? undefined,
-    image_url: item.images?.[0]?.url ?? undefined,
-    external_url: item.external_urls?.spotify ?? undefined,
+    spotify_id: album.id,
+    spotify_url: album.external_urls?.spotify,
+    spotify_popularity: album.popularity,
+    spotify_genres: genres,
+    spotify_label: album.label,
+    spotify_release_date: album.release_date,
+    spotify_total_tracks: album.total_tracks,
+    spotify_image_url: album.images?.[0]?.url
   };
 }
 
 export async function POST(req: Request) {
   const supabase = supabaseServer(getAuthHeader(req));
   try {
-    const body = await req.json().catch(() => ({}));
-    const albumId = body?.albumId ? Number(body.albumId) : null;
-    const force = Boolean(body?.force);
+    const body = await req.json();
+    const { albumId } = body;
 
-    let artist = typeof body?.artist === "string" ? body.artist.trim() : "";
-    let album = typeof body?.album === "string" ? body.album.trim() : "";
-    let releaseId: number | null = null;
-    let existingSpotifyId: string | null = null;
+    console.log(`\n🎵 === SPOTIFY ENRICHMENT for Album ID: ${albumId} ===`);
 
-    if (albumId) {
-      const { data: inventoryRow, error: inventoryError } = await supabase
-        .from("inventory")
-        .select(
-          `
+    if (!albumId) {
+      console.log('❌ ERROR: No albumId provided');
+      return NextResponse.json({
+        success: false,
+        error: 'albumId required'
+      }, { status: 400 });
+    }
+
+    // Get album info
+    const { data: album, error: dbError } = await supabase
+      .from('inventory')
+      .select(`
+        id,
+        release:releases (
           id,
-          release:releases (
+          spotify_album_id,
+          master:masters (
             id,
-            spotify_album_id,
-            master:masters (
-              id,
-              title,
-              artist:artists ( name )
-            )
+            title,
+            cover_image_url,
+            genres,
+            artist:artists (name)
           )
-        `
         )
-        .eq("id", albumId)
-        .single();
+      `)
+      .eq('id', albumId)
+      .single();
 
-      if (inventoryError || !inventoryRow) {
-        return NextResponse.json({ success: false, error: "Album not found" }, { status: 404 });
-      }
+    if (dbError || !album) {
+      console.log('❌ ERROR: Album not found in database', dbError);
+      return NextResponse.json({
+        success: false,
+        error: 'Album not found'
+      }, { status: 404 });
+    }
 
-      const release = toSingle(inventoryRow.release);
-      const master = toSingle(release?.master);
-      const artistRow = toSingle(master?.artist);
+    const release = toSingle(album.release);
+    const master = toSingle(release?.master);
+    const artistName = toSingle(master?.artist)?.name ?? 'Unknown Artist';
+    const albumTitle = master?.title ?? 'Untitled';
 
-      releaseId = release?.id ?? null;
-      existingSpotifyId = release?.spotify_album_id ?? null;
-      artist = artist || artistRow?.name || "";
-      album = album || master?.title || "";
+    console.log(`✓ Album found: "${artistName}" - "${albumTitle}"`);
 
-      if (existingSpotifyId && !force) {
+    // Skip if already has Spotify ID
+    if (release?.spotify_album_id) {
+      console.log(`⏭️ Album already has Spotify ID: ${release.spotify_album_id}`);
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        message: 'Album already has Spotify ID',
+        data: {
+          albumId: album.id,
+          artist: artistName,
+          title: albumTitle,
+          spotify_id: release?.spotify_album_id
+        }
+      });
+    }
+
+    // Search Spotify
+    try {
+      const spotifyData = await searchSpotify(artistName, albumTitle);
+
+      if (!spotifyData) {
+        console.log(`❌ No Spotify match found for "${artistName}" - "${albumTitle}"`);
         return NextResponse.json({
-          success: true,
-          skipped: true,
-          message: "Spotify album ID already set.",
+          success: false,
+          error: 'No match found on Spotify',
           data: {
-            albumId: inventoryRow.id,
-            spotify_album_id: existingSpotifyId,
-          },
+            albumId: album.id,
+            artist: artistName,
+            title: albumTitle,
+            searchQuery: `${artistName} ${albumTitle}`
+          }
         });
       }
-    }
 
-    if (!artist || !album) {
-      return NextResponse.json(
-        { success: false, error: "artist and album are required (or provide albumId)." },
-        { status: 400 }
-      );
-    }
+      console.log(`💾 Updating database with Spotify data...`);
+      
+      // Update database
+      if (release?.id) {
+        const { error: releaseError } = await supabase
+          .from('releases')
+          .update({
+            spotify_album_id: spotifyData.spotify_id,
+          })
+          .eq('id', release.id);
 
-    const result = await searchSpotifyAlbum(artist, album);
-    if (!result) {
-      return NextResponse.json({ success: false, error: "No Spotify album match found." }, { status: 404 });
-    }
-
-    let updated = false;
-    if (releaseId) {
-      const { error: updateError } = await supabase
-        .from("releases")
-        .update({ spotify_album_id: result.id })
-        .eq("id", releaseId);
-
-      if (updateError) {
-        return NextResponse.json(
-          { success: false, error: `Release update failed: ${updateError.message}` },
-          { status: 500 }
-        );
+        if (releaseError) {
+          console.log('❌ ERROR: Database update failed', releaseError);
+          return NextResponse.json({
+            success: false,
+            error: `Database update failed: ${releaseError.message}`,
+            data: {
+              albumId: album.id,
+              artist: artistName,
+              title: albumTitle,
+              foundData: spotifyData
+            }
+          }, { status: 500 });
+        }
       }
-      updated = true;
+
+      if (master?.id) {
+        const masterUpdate: Record<string, unknown> = {};
+        if (spotifyData.spotify_genres?.length) {
+          masterUpdate.genres = spotifyData.spotify_genres;
+        }
+        if (!master.cover_image_url && spotifyData.spotify_image_url) {
+          masterUpdate.cover_image_url = spotifyData.spotify_image_url;
+        }
+
+        if (Object.keys(masterUpdate).length > 0) {
+          const { error: masterError } = await supabase
+            .from('masters')
+            .update(masterUpdate)
+            .eq('id', master.id);
+
+          if (masterError) {
+            console.log('❌ ERROR: Database update failed', masterError);
+            return NextResponse.json({
+              success: false,
+              error: `Database update failed: ${masterError.message}`,
+              data: {
+                albumId: album.id,
+                artist: artistName,
+                title: albumTitle,
+                foundData: spotifyData
+              }
+            }, { status: 500 });
+          }
+        }
+      }
+
+      console.log(`✅ Successfully enriched with Spotify data\n`);
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          albumId: album.id,
+          artist: artistName,
+          title: albumTitle,
+          spotify_id: spotifyData.spotify_id,
+          spotify_url: spotifyData.spotify_url,
+          genres: spotifyData.spotify_genres,
+          popularity: spotifyData.spotify_popularity,
+          label: spotifyData.spotify_label,
+          release_date: spotifyData.spotify_release_date,
+          total_tracks: spotifyData.spotify_total_tracks
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ FATAL ERROR:', error);
+      return NextResponse.json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Spotify search failed',
+        data: {
+          albumId: album.id,
+          artist: artistName,
+          title: albumTitle
+        }
+      }, { status: 500 });
     }
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        albumId: albumId ?? null,
-        artist,
-        album,
-        spotify: result,
-        updated,
-      },
-    });
   } catch (error) {
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
-    );
+    console.error('❌ FATAL ERROR in Spotify enrichment:', error);
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }

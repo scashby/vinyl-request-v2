@@ -29,7 +29,8 @@ export async function GET(request: Request) {
           ),
           release_tracks:release_tracks (
             recording:recordings (
-              duration_seconds
+              duration_seconds,
+              credits
             )
           )
         )
@@ -48,26 +49,26 @@ export async function GET(request: Request) {
     // Artwork
     let missingArtwork = 0;
     let missingFrontCover = 0;
-    const missingBackCover = 0;
-    const missingInnerSleeve = 0;
+    let missingBackCover = 0;
+    let missingInnerSleeve = 0;
     
     // Credits
-    const missingCredits = 0;
-    const missingMusicians = 0;
-    const missingProducers = 0;
-    const missingEngineers = 0;
-    const missingSongwriters = 0;
+    let missingCredits = 0;
+    let missingMusicians = 0;
+    let missingProducers = 0;
+    let missingEngineers = 0;
+    let missingSongwriters = 0;
     
     // Tracklists
     let missingTracklists = 0;
     let missingDurations = 0; // NEW STAT
     
     // Audio
-    const missingAudioAnalysis = 0;
-    const missingTempo = 0;
-    const missingMusicalKey = 0;
-    const missingDanceability = 0;
-    const missingEnergy = 0;
+    let missingAudioAnalysis = 0;
+    let missingTempo = 0;
+    let missingMusicalKey = 0;
+    let missingDanceability = 0;
+    let missingEnergy = 0;
     
     // Genres
     let missingGenres = 0;
@@ -91,11 +92,37 @@ export async function GET(request: Request) {
     const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
       Array.isArray(value) ? value[0] ?? null : value ?? null;
 
+    const asRecord = (value: unknown): Record<string, unknown> => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+      return value as Record<string, unknown>;
+    };
+
+    const asStringArray = (value: unknown): string[] => {
+      if (!value) return [];
+      if (Array.isArray(value)) {
+        return value.filter((item): item is string => typeof item === 'string');
+      }
+      if (typeof value === 'string') return [value];
+      return [];
+    };
+
+    const getAlbumCredits = (credits: unknown) => {
+      const record = asRecord(credits);
+      const albumPeople = asRecord(record.album_people ?? record.albumPeople);
+      const classical = asRecord(record.classical);
+      const artwork = asRecord(record.artwork ?? record.album_artwork ?? record.albumArtwork);
+      const albumDetails = asRecord(record.album_details ?? record.albumDetails ?? record.album_metadata);
+      const links = asRecord(albumDetails.links ?? albumDetails.link ?? {});
+      return { albumPeople, classical, artwork, albumDetails, links };
+    };
+
     albums.forEach(album => {
       const albumIdStr = String(album.id);
       const release = toSingle(album.release);
       const master = toSingle(release?.master);
       const releaseTracks = release?.release_tracks ?? [];
+      const firstRecording = toSingle(releaseTracks[0]?.recording);
+      const creditInfo = getAlbumCredits(firstRecording?.credits);
 
       if (releaseTracks.length > 0) {
         albumsWithTracks.add(albumIdStr);
@@ -115,6 +142,33 @@ export async function GET(request: Request) {
         missingFrontCover++;
       }
 
+      const hasBack = !!creditInfo.artwork.back_image_url;
+      const hasInnerSleeve = asStringArray(creditInfo.artwork.inner_sleeve_images).length > 0;
+      if (!hasBack) missingBackCover++;
+      if (!hasInnerSleeve) missingInnerSleeve++;
+
+      const musicians = asStringArray(creditInfo.albumPeople.musicians);
+      const producers = asStringArray(creditInfo.albumPeople.producers);
+      const engineers = asStringArray(creditInfo.albumPeople.engineers);
+      const songwriters = asStringArray(creditInfo.albumPeople.songwriters);
+      const hasCredits = musicians.length > 0 || producers.length > 0 || engineers.length > 0 || songwriters.length > 0;
+      if (!hasCredits) missingCredits++;
+      if (musicians.length === 0) missingMusicians++;
+      if (producers.length === 0) missingProducers++;
+      if (engineers.length === 0) missingEngineers++;
+      if (songwriters.length === 0) missingSongwriters++;
+
+      const tempo = creditInfo.albumDetails.tempo_bpm ?? null;
+      const musicalKey = creditInfo.albumDetails.musical_key ?? null;
+      const energy = creditInfo.albumDetails.energy ?? null;
+      const danceability = creditInfo.albumDetails.danceability ?? null;
+      const hasAudio = tempo || musicalKey || energy || danceability;
+      if (!hasAudio) missingAudioAnalysis++;
+      if (!tempo) missingTempo++;
+      if (!musicalKey) missingMusicalKey++;
+      if (!danceability) missingDanceability++;
+      if (!energy) missingEnergy++;
+
       const hasTracks = albumsWithTracks.has(albumIdStr);
       const hasMissingDurations = albumsWithMissingDurations.has(albumIdStr);
       if (!hasTracks) missingTracklists++;
@@ -126,7 +180,7 @@ export async function GET(request: Request) {
       if (!hasStyles) missingStyles++;
 
       const hasSpotify = !!release?.spotify_album_id;
-      const hasApple = false;
+      const hasApple = !!(creditInfo.links.apple_music_url ?? creditInfo.albumDetails.apple_music_url);
       if (!hasSpotify || !hasApple) missingStreamingLinks++;
       if (!hasSpotify) missingSpotify++;
       if (!hasApple) missingAppleMusic++;

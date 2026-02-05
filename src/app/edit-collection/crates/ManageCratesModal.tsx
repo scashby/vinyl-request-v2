@@ -40,14 +40,12 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
 
       if (fetchError) {
         setError(fetchError.message);
-      } else if (data) {
-        const parsed = data.map((row) => ({
-          ...row,
-          smart_rules: (row.smart_rules as unknown as SmartRules | null) ?? null,
-        }));
-        setCrates(parsed as Crate[]);
       } else {
-        setCrates([]);
+        const normalized = (data || []).map((row) => ({
+          ...row,
+          smart_rules: row.smart_rules as unknown as SmartRules | null
+        })) as Crate[];
+        setCrates(normalized);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load crates');

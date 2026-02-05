@@ -10,11 +10,12 @@ interface AlbumDetailPanelProps {
   album: Album;
   onClose: () => void;
   onEditTags: () => void;
+  onMarkForSale: () => void;
 }
 
 type TabId = 'main' | 'details' | 'enrichment' | 'personal' | 'tags' | 'notes' | 'ids';
 
-export default function AlbumDetailPanel({ album, onClose, onEditTags }: AlbumDetailPanelProps) {
+export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkForSale }: AlbumDetailPanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>('main');
 
   const tabs: { id: TabId; label: string; icon: string }[] = [
@@ -112,10 +113,22 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags }: AlbumDe
             {renderField('Format', album.format)}
             {renderField('Location', album.location)}
             {renderField('Condition', album.media_condition)}
-            {renderField('Sleeve', album.sleeve_condition)}
+            {renderField('Sleeve', album.package_sleeve_condition)}
+            {renderField('Discs', album.discs)}
+            {renderField('Sides', album.sides)}
             {renderField('Date Added', album.date_added ? new Date(album.date_added).toLocaleDateString() : null)}
-            {renderField('Country', album.country)}
+            {renderField('Features', album.extra)}
 
+            {album.for_sale && (
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                <div className="text-xs font-semibold text-green-600 mb-2">
+                  💰 Sale Info
+                </div>
+                <div className="text-sm text-green-800">
+                    Item is marked for sale.
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -123,16 +136,43 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags }: AlbumDe
           <div>
             {renderArrayField('Genres', album.genres)}
             {renderArrayField('Styles', album.styles)}
-            {renderField('Catalog #', album.release?.catalog_number)}
+            {renderField('Catalog #', album.cat_no)}
             {renderField('Barcode', album.barcode)}
-            {renderField('Country', album.country)}
+            {renderField('RPM', album.rpm)}
+            {renderField('Weight', album.vinyl_weight)}
+            {renderArrayField('Color', album.vinyl_color)}
           </div>
         )}
 
         {activeTab === 'enrichment' && (
-          <div className="p-5 text-center text-gray-500 text-[13px]">
-            <div className="text-[32px] mb-2">⚡</div>
-            Use the Edit modal → Enrichment tab to pull Discogs metadata/tracklists, cover art, and external IDs.
+          <div className="flex flex-col gap-6">
+            {(album.musicians?.length || album.producers?.length || album.engineers?.length) && (
+              <div>
+                <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  Credits
+                </div>
+                <div className="flex flex-col gap-3">
+                  {album.musicians && album.musicians.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-semibold text-gray-400 uppercase mb-0.5">Musicians</div>
+                      <div className="text-sm text-gray-800 leading-snug">{album.musicians.join(', ')}</div>
+                    </div>
+                  )}
+                  {album.producers && album.producers.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-semibold text-gray-400 uppercase mb-0.5">Producers</div>
+                      <div className="text-sm text-gray-800 leading-snug">{album.producers.join(', ')}</div>
+                    </div>
+                  )}
+                  {album.engineers && album.engineers.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-semibold text-gray-400 uppercase mb-0.5">Engineers</div>
+                      <div className="text-sm text-gray-800 leading-snug">{album.engineers.join(', ')}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -153,21 +193,18 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags }: AlbumDe
 
         {activeTab === 'tags' && (
           <div>
-            {album.release?.master?.master_tag_links && album.release?.master?.master_tag_links.length > 0 ? (
+            {album.custom_tags && album.custom_tags.length > 0 ? (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {album.release?.master?.master_tag_links
-                  ?.map((link) => link.master_tags?.name)
-                  .filter((name): name is string => Boolean(name))
-                  .map((tag, idx) => (
-                    <span key={`${tag}-${idx}`} style={{ fontSize: 13, padding: '8px 14px', borderRadius: 6, background: '#8b5cf6', color: 'white', fontWeight: 600 }}>
-                      {tag}
-                    </span>
-                  ))}
+                {album.custom_tags.map((tag, idx) => (
+                  <span key={idx} style={{ fontSize: 13, padding: '8px 14px', borderRadius: 6, background: '#8b5cf6', color: 'white', fontWeight: 600 }}>
+                    {tag}
+                  </span>
+                ))}
               </div>
             ) : (
               <div style={{ padding: 20, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>🏷️</div>
-                No tags
+                No custom tags
               </div>
             )}
 
@@ -214,10 +251,11 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags }: AlbumDe
           <div>
             {renderField('Discogs Master ID', album.discogs_master_id, album.discogs_master_id ? `https://www.discogs.com/master/${album.discogs_master_id}` : undefined)}
             {renderField('Discogs Release ID', album.discogs_release_id, album.discogs_release_id ? `https://www.discogs.com/release/${album.discogs_release_id}` : undefined)}
-            {renderField('Spotify Album ID', album.spotify_album_id)}
-            {renderField('MusicBrainz Release Group ID', album.release?.master?.musicbrainz_release_group_id)}
+            {renderField('Spotify ID', album.spotify_id)}
+            {renderField('Apple Music ID', album.apple_music_id)}
+            {renderField('MusicBrainz ID', album.musicbrainz_id)}
 
-            {(!album.discogs_master_id && !album.discogs_release_id && !album.spotify_album_id && !album.release?.master?.musicbrainz_release_group_id) && (
+            {(!album.discogs_master_id && !album.discogs_release_id && !album.spotify_id && !album.apple_music_id) && (
               <div className="p-5 text-center text-gray-400 text-[13px]">
                 <div className="text-[32px] mb-2">🔗</div>
                 No external IDs available
@@ -231,6 +269,11 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags }: AlbumDe
         <Link href={`/admin/edit-entry/${album.id}`} className="flex-1 p-2.5 bg-blue-500 text-white border-none rounded-md text-[13px] font-semibold text-center no-underline cursor-pointer hover:bg-blue-600">
           ✏️ Edit Album
         </Link>
+        {!album.for_sale && (
+          <button onClick={onMarkForSale} className="flex-1 p-2.5 bg-emerald-500 text-white border-none rounded-md text-[13px] font-semibold cursor-pointer hover:bg-emerald-600">
+            💰 Sell
+          </button>
+        )}
       </div>
     </div>
   );

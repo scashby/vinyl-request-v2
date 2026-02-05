@@ -520,6 +520,7 @@ export async function previewCLZImport(
       artist: master?.artist?.name ?? 'Unknown Artist',
       title: master?.title ?? 'Untitled',
       format: buildFormatLabel(release),
+      discs: release?.qty ?? 1,
       location: (row as { location?: string | null }).location ?? '',
       media_condition: (row as { media_condition?: string | null }).media_condition ?? '',
     };

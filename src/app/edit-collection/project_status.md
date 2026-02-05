@@ -24,11 +24,11 @@
 
 ---
 
-🎯 **V3 BASELINE** - Edit Album Modal tabs aligned to V3 schema, Discogs enrichment and tracklist import active, CLZ import aligned to V3.
+🎯 **ROLLBACK POINT ESTABLISHED** - All 8 Edit Album Modal tabs functional, Cover search working, CLZ XML import complete with full track data and listen history.
 
 ## Executive Summary
 
-The DWD Collection Management System is now aligned to the V3 schema. Core edit flows (Main, Details, Tracks, Personal, Cover, Links, Enrichment) use V3 tables only. Enrichment focuses on Discogs metadata, tracklists, and cover art. CLZ and Discogs imports write to V3 tables (artists, masters, releases, inventory, recordings, release_tracks).
+The DWD Collection Management System has successfully completed all 8 Edit Album Modal tabs (Main, Details, Classical, People, Tracks, Personal, Cover, Links) with full CLZ Music Web design replication. Cover tab includes working upload, search (Discogs/Last.fm), and crop/rotate UI. **CLZ XML import has been completed offline**, capturing comprehensive track-level data, listen history with timestamps, and detailed disc metadata. The system now transitions to implementing menu features and collection management functionality while maintaining pixel-perfect replication standards and building towards comprehensive DJ functionality and community features.
 
 ---
 
@@ -36,10 +36,18 @@ The DWD Collection Management System is now aligned to the V3 schema. Core edit 
 
 **All environment variables are already configured in Vercel. DO NOT ASK AGAIN.**
 
-### Music Services APIs (V3)
-- ✅ `NEXT_PUBLIC_DISCOGS_TOKEN` - Discogs API (metadata, tracklists, cover search)
-- ✅ `SPOTIFY_CLIENT_ID` + `SPOTIFY_CLIENT_SECRET` - Spotify (tracklist import)
-- ✅ `GENIUS_API_TOKEN` - Genius (lyrics lookup, optional)
+### Music Services APIs:
+- ✅ `APPLE_MUSIC_TOKEN` - Apple Music API access
+- ✅ `SPOTIFY_CLIENT_ID` + `SPOTIFY_CLIENT_SECRET` - Spotify Web API
+- ✅ `LASTFM_API_KEY` + `LASTFM_API_SECRET` - Last.fm API
+- ✅ `GENIUS_API_TOKEN` - Genius lyrics API
+- ✅ `NEXT_PUBLIC_DISCOGS_TOKEN` - Discogs API (cover search, metadata)
+
+### Audio Recognition Services:
+- ✅ `AUDD_API_TOKEN` - AudD audio recognition
+- ✅ `ACOUSTID_CLIENT_KEY` - AcoustID audio fingerprinting
+- ✅ `SHAZAM_RAPID_API_KEY` - Shazam music recognition API
+- ✅ `ACRCLOUD_ENDPOINT` + `ACRCLOUD_SECRET_KEY` + `ACRCLOUD_ACCESS_KEY` - ACRCloud music recognition
 
 ### Google Services:
 - ✅ `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` - Google OAuth (for Drive, etc.)
@@ -51,9 +59,10 @@ The DWD Collection Management System is now aligned to the V3 schema. Core edit 
 - ✅ `NEXT_PUBLIC_SUPABASE_URL` - Database connection URL
 - ✅ `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` - Public client authentication key
 
-### Cover Search Implementation Status (V3)
+### Cover Search Implementation Status:
 - **Discogs**: ✅ Fully configured (uses NEXT_PUBLIC_DISCOGS_TOKEN)
-- **MusicBrainz / CAA**: ✅ Enabled
+- **Last.fm**: ✅ Fully configured (uses LASTFM_API_KEY)
+- **Google Custom Search**: ❌ Missing GOOGLE_CX - will be skipped in searches
 
 ---
 
@@ -76,20 +85,76 @@ The DWD Collection Management System is now aligned to the V3 schema. Core edit 
 - Loading states and error handling
 
 ### Phase 2.2: Main Tab Completion ✅
-- V3 field set only (artist, title, year, label, format, barcode, catalog #, location, genres)
-- Picker integration for artist/label/format/genre/location
-- Input field visibility fixes and consistent styling
+- All Main tab fields styled to CLZ Music Web standards
+- Date picker inputs with calendar icons
+- Connected date fields with horizontal connector lines
+- Unified selector patterns across all dropdown fields
+- Input field white text visibility fix (site-wide)
+- Form state management and validation
+- Complete pixel-perfect replication achieved
 
 ### Phase 2.3: Additional Tabs Implementation ✅
-- **Details Tab**: Genres, styles, catalog #, barcode, country
-- **Tracks Tab**: DnD track editor; V3 `release_tracks` + `recordings`
-- **Personal Tab**: Owner, purchase info, notes, tags
-- **Cover Tab**: Front cover only (V3), upload/search/replace
-- **Links Tab**: Optional external links (V3 safe if stored locally)
-- **Enrichment Tab**: Discogs metadata + tracklist + cover search
+**Classical Tab** - Completed December 17, 2024
+- Composer field with picker integration
+- Conductor field with picker integration  
+- Chorus field with picker integration
+- Composition field with picker integration
+- Orchestra field with picker integration
+- Reuses Main tab selector pattern
+- Clear button functionality for all fields
+
+**People Tab** - Completed December 17, 2024
+- Credits section (Songwriter, Producer, Engineer)
+- Musicians section
+- Multi-value field support with individual remove buttons
+- Add new items via picker modals
+- Section headers with visual hierarchy
+
+**Cover Tab** - Completed December 17, 2024 (95%)
+- Front cover image display with upload/remove/find online
+- Back cover image display with upload/remove/find online
+- Find Online functionality - searches Discogs + Last.fm with barcode support
+- Upload to Supabase Storage (`album-images` bucket)
+- Remove from storage with proper cleanup
+- Crop/Rotate UI fully functional:
+  - Crop box constrains to actual image bounds
+  - 8 drag handles for precise cropping
+  - Per-cover rotation (front and back independent)
+  - Overlay masks non-cropped areas correctly
+- **Known Issue**: Apply Crop logs data but needs backend canvas processing
+  - Deferred to end-of-project polish phase
+  - See CROP_ROTATE_IMPLEMENTATION.md when ready to implement
+
+**Links Tab** - Completed December 17, 2024
+- URL list with drag-and-drop reordering
+- Add new link modal with URL and description
+- Remove link functionality
+- Grip handle for visual drag feedback
+- Two-line display (URL + description)
+- Empty state messaging
+
+**Tracks Tab** - Previously Completed
+- Track list with drag-and-drop reordering
+- Checkbox selection for bulk operations
+- Add/Edit/Remove track functionality
+- Position, Title, Duration display
+- Track migration system ready
+
+**Main Tab** - Previously Completed
+- All core fields with exact styling
+- Connected date inputs
+- Selector buttons with dropdown arrows
+- Clear button functionality
+- Pixel-perfect match to CLZ Music Web
 
 ### Phase 2.3.5: CLZ XML Import ✅
-- V3‑aligned import: artists, masters, releases, inventory, recordings, release_tracks
+**Completed December 19, 2024 (Offline)**
+- ✅ Track-level data parsing from XML export
+- ✅ Listen history with timestamps captured
+- ✅ Detailed disc metadata imported
+- ✅ Track position, title, and duration data
+- ✅ Disc titles and runtime information
+- ✅ Comprehensive metadata enrichment beyond CSV capabilities
 
 ---
 
@@ -104,7 +169,7 @@ The DWD Collection Management System is now aligned to the V3 schema. Core edit 
   - Dynamic bottom collection tabs from database
 
 ### Recently Completed
-✅ CLZ XML import aligned to V3 tables
+✅ CLZ XML import completed with full track and listen history data
 ✅ All 8 Edit Album Modal tabs functional
 ✅ Cover tab with Discogs + Last.fm search integration
 ✅ Comprehensive AlbumData type definitions
@@ -116,10 +181,13 @@ The DWD Collection Management System is now aligned to the V3 schema. Core edit 
 ## Remaining Work
 
 ### Immediate Next Steps (Phase 2.4 - Menu Features) 🔄
-**Priority 1: Manage Pick Lists Modal (V3 fields only)**
+**Priority 1: Manage Pick Lists Modal**
 - [ ] Create dropdown showing all 30+ picker list types
-  - Artist, Country, Format, Genre, Label, Location
-  - Media Condition, Sleeve Condition, Owner, Tags
+  - Artist, Box Set, Chorus, Composer, Conductor, Country, Engineer
+  - Format, Genre, Label, Location, Media Condition, Musician, Orchestra
+  - Owner, Package/Sleeve Condition, Packaging, Producer, Purchase Store
+  - RPM, SPARS, Signee, Songwriter, Sound, Storage Device, Studio
+  - Tag, Vinyl Color, Vinyl Weight
 - [ ] Wire to existing ManageModal component
 - [ ] Search box to filter list types
 - [ ] "Merge Mode" toggle for batch operations
