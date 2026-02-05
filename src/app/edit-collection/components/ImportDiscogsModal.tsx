@@ -610,6 +610,9 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     unchanged: 0,
     errors: 0,
   });
+  const [previewLimit, setPreviewLimit] = useState<number>(50);
+  const [previewFilter, setPreviewFilter] = useState<'all' | 'new' | 'changed' | 'unchanged' | 'removed'>('all');
+  const [previewSearch, setPreviewSearch] = useState('');
 
   // Check connection on open
   useEffect(() => {
@@ -1123,6 +1126,38 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4);
 
+  const shouldProcess = (album: ComparedAlbum) => {
+    if (syncMode === 'full_replacement') return album.status !== 'REMOVED';
+    if (syncMode === 'full_sync') return true;
+    if (syncMode === 'new_only') return album.status === 'NEW';
+    if (syncMode === 'partial_sync') return album.status === 'NEW' || (album.status === 'CHANGED' && album.needsEnrichment);
+    return true;
+  };
+
+  const actionLabel = (album: ComparedAlbum) => {
+    if (album.status === 'NEW') return 'ADD';
+    if (album.status === 'REMOVED') return 'REMOVE';
+    if (album.status === 'CHANGED') return album.needsEnrichment ? 'ENRICH' : 'UPDATE';
+    return 'SKIP';
+  };
+
+  const filteredPreview = comparedAlbums.filter((album) => {
+    if (previewFilter !== 'all' && album.status !== previewFilter.toUpperCase()) return false;
+    if (previewSearch.trim()) {
+      const term = previewSearch.trim().toLowerCase();
+      return `${album.artist} ${album.title}`.toLowerCase().includes(term);
+    }
+    return true;
+  });
+
+  const previewRows = previewLimit > 0 ? filteredPreview.slice(0, previewLimit) : filteredPreview;
+
+  const willAdd = comparedAlbums.filter(a => actionLabel(a) === 'ADD' && shouldProcess(a)).length;
+  const willUpdate = comparedAlbums.filter(a => actionLabel(a) === 'UPDATE' && shouldProcess(a)).length;
+  const willEnrich = comparedAlbums.filter(a => actionLabel(a) === 'ENRICH' && shouldProcess(a)).length;
+  const willRemove = comparedAlbums.filter(a => actionLabel(a) === 'REMOVE' && shouldProcess(a)).length;
+  const willSkip = comparedAlbums.filter(a => actionLabel(a) === 'SKIP' && shouldProcess(a)).length;
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30000]">
       {/* FIXED: Added text-gray-900 to ensure text is visible on white background */}
@@ -1269,6 +1304,9 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 <div className="mb-1">
                   Matched by Discogs ID: <strong>{matchedByDiscogsId}</strong> · Matched by Artist/Title: <strong>{matchedByArtistTitle}</strong>
                 </div>
+                <div className="mb-1">
+                  Will add: <strong>{willAdd}</strong> · Will update: <strong>{willUpdate}</strong> · Will enrich: <strong>{willEnrich}</strong> · Will remove: <strong>{willRemove}</strong> · Will skip: <strong>{willSkip}</strong>
+                </div>
                 {topMissingFields.length > 0 && (
                   <div>
                     Top missing fields: {topMissingFields.map(([field, count]) => (
@@ -1285,8 +1323,42 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
               {/* Preview Table */}
               <div className="border border-gray-200 rounded-md overflow-hidden">
-                <div className="px-3 py-2.5 bg-gray-50 border-b border-gray-200 font-semibold text-[13px] text-gray-500">
-                  Preview (first 10 affected items)
+                <div className="px-3 py-2.5 bg-gray-50 border-b border-gray-200">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-semibold text-[13px] text-gray-500">
+                      Preview ({previewRows.length} of {filteredPreview.length} shown)
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={previewFilter}
+                        onChange={(e) => setPreviewFilter(e.target.value as typeof previewFilter)}
+                        className="text-[12px] px-2 py-1 border border-gray-300 rounded bg-white"
+                      >
+                        <option value="all">All</option>
+                        <option value="new">New</option>
+                        <option value="changed">Changed</option>
+                        <option value="unchanged">Unchanged</option>
+                        <option value="removed">Removed</option>
+                      </select>
+                      <select
+                        value={previewLimit}
+                        onChange={(e) => setPreviewLimit(Number(e.target.value))}
+                        className="text-[12px] px-2 py-1 border border-gray-300 rounded bg-white"
+                      >
+                        <option value={10}>10</option>
+                        <option value={50}>50</option>
+                        <option value={200}>200</option>
+                        <option value={0}>All</option>
+                      </select>
+                      <input
+                        type="text"
+                        value={previewSearch}
+                        onChange={(e) => setPreviewSearch(e.target.value)}
+                        placeholder="Search..."
+                        className="text-[12px] px-2 py-1 border border-gray-300 rounded bg-white"
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div className="max-h-[300px] overflow-y-auto">
                   <table className="w-full text-[13px] border-collapse">
@@ -1299,16 +1371,12 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                       </tr>
                     </thead>
                     <tbody>
-                      {comparedAlbums.slice(0, 10).map((album, idx) => {
+                      {previewRows.map((album, idx) => {
                           let statusColor = 'text-gray-500';
                           if (album.status === 'NEW') statusColor = 'text-emerald-600';
                           if (album.status === 'REMOVED') statusColor = 'text-red-600';
                           if (album.status === 'CHANGED') statusColor = 'text-amber-600';
-                          const action =
-                            album.status === 'NEW' ? 'ADD' :
-                            album.status === 'REMOVED' ? 'REMOVE' :
-                            album.status === 'CHANGED' ? (album.needsEnrichment ? 'ENRICH' : 'UPDATE') :
-                            'SKIP';
+                          const action = actionLabel(album);
                           const reasons: string[] = [];
                           if (album.status === 'NEW') reasons.push('Not found in collection');
                           if (album.status === 'REMOVED') reasons.push('Missing from Discogs');
