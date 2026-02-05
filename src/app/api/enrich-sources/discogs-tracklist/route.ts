@@ -1,6 +1,7 @@
 // src/app/api/enrich-sources/discogs-tracklist/route.ts
 import { NextResponse } from "next/server";
 import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
+import { parseDiscogsFormat } from "src/utils/formatUtils";
 const DISCOGS_TOKEN = process.env.DISCOGS_TOKEN ?? process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
@@ -19,6 +20,7 @@ type DiscogsResponse = {
   tracklist?: DiscogsTrack[];
   genres?: string[];
   styles?: string[];
+  formats?: { name?: string; qty?: string | number; descriptions?: string[] }[];
 };
 
 const parseDurationToSeconds = (duration?: string) => {
@@ -35,6 +37,18 @@ const getSideFromPosition = (position?: string) => {
   if (!position) return null;
   const match = position.trim().match(/^([A-Za-z]+)/);
   return match ? match[1].toUpperCase() : null;
+};
+
+const buildDiscogsFormatString = (formats?: { name?: string; qty?: string | number; descriptions?: string[] }[]) => {
+  if (!formats || formats.length === 0) return '';
+  const format = formats[0];
+  const qty = format.qty ? String(format.qty).trim() : '';
+  const name = format.name?.trim() ?? '';
+  const details = format.descriptions?.filter(Boolean) ?? [];
+  const qtyPrefix = qty ? `${qty}x` : '';
+  const base = `${qtyPrefix}${name}`.trim();
+  if (details.length === 0) return base;
+  return `${base}, ${details.join(', ')}`.trim();
 };
 
 async function fetchDiscogsRelease(releaseId: string): Promise<DiscogsResponse> {
@@ -132,6 +146,15 @@ export async function POST(req: Request) {
 
     console.log(`✓ Found ${discogsData.tracklist.length} tracks`);
 
+    const formatString = buildDiscogsFormatString(discogsData.formats);
+    const parsedFormat = formatString ? parseDiscogsFormat(formatString) : null;
+    const albumDetails = parsedFormat ? {
+      rpm: parsedFormat.rpm ?? null,
+      vinyl_weight: parsedFormat.weight ?? null,
+      vinyl_color: parsedFormat.color ? [parsedFormat.color] : null,
+      extra: parsedFormat.extraText || null,
+    } : {};
+
     // Process tracks with per-track artist info
     const enrichedTracks = discogsData.tracklist.map((track: DiscogsTrack) => {
       let trackArtist = undefined;
@@ -180,6 +203,7 @@ export async function POST(req: Request) {
         .insert({
           title: track.title || null,
           duration_seconds: parseDurationToSeconds(track.duration),
+          credits: Object.keys(albumDetails).length > 0 ? { album_details: albumDetails } : undefined,
         })
         .select('id')
         .single();

@@ -4,11 +4,12 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { parseDiscogsFormat } from '../../../lib/formatParser';
+import type { Database } from '../../../types/supabase';
 import { normalizeArtist, normalizeTitle, normalizeArtistAlbum } from '../../../lib/importUtils';
 
 type SyncMode = 'full_replacement' | 'full_sync' | 'partial_sync' | 'new_only';
 type ImportStage = 'select_mode' | 'fetching_definitions' | 'fetching' | 'preview' | 'importing' | 'complete';
-type AlbumStatus = 'NEW' | 'CHANGED' | 'UNCHANGED' | 'REMOVED';
+type AlbumStatus = 'NEW' | 'CHANGED' | 'UNCHANGED' | 'REMOVED' | 'REVIEW';
 type DiscogsSourceType = 'collection' | 'wantlist';
 
 // --- Interfaces for Discogs API Responses ---
@@ -110,6 +111,48 @@ const buildFormatLabel = (release?: { media_type?: string | null; format_details
   const qty = release.qty ?? 1;
   if (!base) return '';
   return qty > 1 ? `${qty}x${base}` : base;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
+};
+
+const applyAlbumDetailsToReleaseRecordings = async (
+  releaseId: number,
+  albumDetails: Record<string, unknown>
+) => {
+  if (!releaseId || Object.keys(albumDetails).length === 0) return;
+
+  const { data: tracks, error } = await supabase
+    .from('release_tracks')
+    .select('recording:recordings ( id, credits )')
+    .eq('release_id', releaseId);
+
+  if (error || !tracks) return;
+
+  const updates = tracks
+    .map((track) => {
+      const recording = Array.isArray(track.recording) ? track.recording[0] : track.recording;
+      if (!recording?.id) return null;
+      const credits = asRecord(recording.credits);
+      const merged = {
+        ...credits,
+        album_details: {
+          ...(asRecord(credits.album_details ?? credits.albumDetails ?? credits.album_metadata)),
+          ...albumDetails,
+        },
+      };
+      return supabase
+        .from('recordings')
+        .update({ credits: merged as Database['public']['Tables']['recordings']['Update']['credits'] })
+        .eq('id', recording.id);
+    })
+    .filter(Boolean);
+
+  if (updates.length > 0) {
+    await Promise.all(updates);
+  }
 };
 
 const getOrCreateArtist = async (name: string) => {
@@ -330,6 +373,21 @@ interface ExistingAlbum {
   genres?: string[] | null;
 }
 
+interface CandidateMatch {
+  id: number;
+  release_id?: number | null;
+  master_id?: number | null;
+  artist: string;
+  title: string;
+  discogs_release_id?: string | null;
+  discogs_master_id?: string | null;
+  year?: string | null;
+  format?: string | null;
+  catalog_number?: string | null;
+  country?: string | null;
+  score: number;
+}
+
 interface ComparedAlbum extends ParsedAlbum {
   status: AlbumStatus;
   existingId?: number;
@@ -339,6 +397,11 @@ interface ComparedAlbum extends ParsedAlbum {
   missingFields: string[];
   matchType?: 'discogs_id' | 'artist_title' | 'unmatched';
   discogsIdMismatch?: boolean;
+  weakMatch?: boolean;
+  matchScore?: number;
+  candidateCount?: number;
+  candidateMatches?: CandidateMatch[];
+  matchedSummary?: Pick<ExistingAlbum, 'id' | 'release_id' | 'master_id' | 'artist' | 'title' | 'discogs_release_id' | 'discogs_master_id' | 'year' | 'format' | 'catalog_number' | 'country'>;
 }
 
 interface ImportDiscogsModalProps {
@@ -388,6 +451,26 @@ function buildComparisonKey(data: {
   ].join('|');
 }
 
+function scoreCandidateMatch(parsed: ParsedAlbum, candidate: ExistingAlbum): number {
+  let score = 0;
+  if (parsed.catalog_number && candidate.catalog_number && normalizeComparable(parsed.catalog_number) === normalizeComparable(candidate.catalog_number)) {
+    score += 3;
+  }
+  if (parsed.discogs_master_id && candidate.discogs_master_id && normalizeComparable(parsed.discogs_master_id) === normalizeComparable(candidate.discogs_master_id)) {
+    score += 2;
+  }
+  if (parsed.year && candidate.year && normalizeComparable(parsed.year) === normalizeComparable(candidate.year)) {
+    score += 1;
+  }
+  if (parsed.country && candidate.country && normalizeComparable(parsed.country) === normalizeComparable(candidate.country)) {
+    score += 1;
+  }
+  if (parsed.format && candidate.format && normalizeComparable(parsed.format) === normalizeComparable(candidate.format)) {
+    score += 1;
+  }
+  return score;
+}
+
 // Compare albums logic
 function compareAlbums(
   parsed: ParsedAlbum[],
@@ -413,6 +496,11 @@ function compareAlbums(
   for (const parsedAlbum of parsed) {
     let existingAlbum: ExistingAlbum | undefined;
     let matchType: ComparedAlbum['matchType'] = 'unmatched';
+    let weakMatch = false;
+    let ambiguousCandidates = false;
+    let matchScore = 0;
+    let candidateCount = 0;
+    let candidateMatches: CandidateMatch[] = [];
     
     if (parsedAlbum.discogs_release_id) {
       existingAlbum = releaseIdMap.get(parsedAlbum.discogs_release_id);
@@ -422,16 +510,43 @@ function compareAlbums(
     if (!existingAlbum) {
       const candidates = artistAlbumMap.get(parsedAlbum.artist_album_norm);
       if (candidates && candidates.length > 0) {
-        const parsedKey = buildComparisonKey(parsedAlbum);
-        const matchIndex = candidates.findIndex(
-          (candidate) => buildComparisonKey(candidate) === parsedKey
-        );
-        if (matchIndex >= 0) {
-          existingAlbum = candidates[matchIndex];
-          matchType = 'artist_title';
-          candidates.splice(matchIndex, 1);
-          if (candidates.length === 0) {
-            artistAlbumMap.delete(parsedAlbum.artist_album_norm);
+        ambiguousCandidates = candidates.length > 1;
+        candidateCount = candidates.length;
+        let bestIndex = 0;
+        let bestScore = -1;
+        candidateMatches = candidates.map((candidate) => ({
+          id: candidate.id,
+          release_id: candidate.release_id ?? null,
+          master_id: candidate.master_id ?? null,
+          artist: candidate.artist,
+          title: candidate.title,
+          discogs_release_id: candidate.discogs_release_id ?? null,
+          discogs_master_id: candidate.discogs_master_id ?? null,
+          year: candidate.year ?? null,
+          format: candidate.format ?? null,
+          catalog_number: candidate.catalog_number ?? null,
+          country: candidate.country ?? null,
+          score: scoreCandidateMatch(parsedAlbum, candidate),
+        })).sort((a, b) => b.score - a.score);
+        candidates.forEach((candidate, index) => {
+          const score = scoreCandidateMatch(parsedAlbum, candidate);
+          if (score > bestScore) {
+            bestScore = score;
+            bestIndex = index;
+          }
+        });
+        const candidate = candidates[bestIndex];
+        if (candidate) {
+          const ambiguous = candidates.length > 1 && bestScore < 3;
+          if (!ambiguous) {
+            existingAlbum = candidate;
+            matchType = 'artist_title';
+            weakMatch = bestScore < 3 || candidates.length > 1;
+            matchScore = bestScore;
+            candidates.splice(bestIndex, 1);
+            if (candidates.length === 0) {
+              artistAlbumMap.delete(parsedAlbum.artist_album_norm);
+            }
           }
         }
       }
@@ -440,10 +555,13 @@ function compareAlbums(
     if (!existingAlbum) {
       compared.push({
         ...parsedAlbum,
-        status: 'NEW',
+        status: ambiguousCandidates ? 'REVIEW' : 'NEW',
         needsEnrichment: true,
         missingFields: ['all'],
         matchType,
+        matchScore,
+        candidateCount,
+        candidateMatches,
       });
     } else {
       const missingFields: string[] = [];
@@ -467,6 +585,23 @@ function compareAlbums(
         missingFields,
         matchType,
         discogsIdMismatch: isChanged,
+        weakMatch,
+        matchScore,
+        candidateCount,
+        candidateMatches,
+        matchedSummary: {
+          id: existingAlbum.id,
+          release_id: existingAlbum.release_id ?? null,
+          master_id: existingAlbum.master_id ?? null,
+          artist: existingAlbum.artist,
+          title: existingAlbum.title,
+          discogs_release_id: existingAlbum.discogs_release_id,
+          discogs_master_id: existingAlbum.discogs_master_id ?? null,
+          year: existingAlbum.year ?? null,
+          format: existingAlbum.format ?? null,
+          catalog_number: existingAlbum.catalog_number ?? null,
+          country: existingAlbum.country ?? null,
+        },
       });
 
       matchedDbIds.add(existingAlbum.id);
@@ -521,10 +656,10 @@ function compareAlbums(
       existingReleaseId: existingAlbum.release_id ?? null,
       existingMasterId: existingAlbum.master_id ?? null,
       needsEnrichment: false,
-      missingFields: [],
-      matchType: 'unmatched',
-      discogsIdMismatch: false,
-      cover_image: existingAlbum.image_url ?? existingAlbum.cover_image ?? null
+        missingFields: [],
+        matchType: 'unmatched',
+        discogsIdMismatch: false,
+        cover_image: existingAlbum.image_url ?? existingAlbum.cover_image ?? null
     });
   }
 
@@ -611,7 +746,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     errors: 0,
   });
   const [previewLimit, setPreviewLimit] = useState<number>(50);
-  const [previewFilter, setPreviewFilter] = useState<'all' | 'new' | 'changed' | 'unchanged' | 'removed'>('all');
+  const [previewFilter, setPreviewFilter] = useState<'all' | 'new' | 'changed' | 'unchanged' | 'removed' | 'review'>('all');
   const [previewSearch, setPreviewSearch] = useState('');
 
   // Check connection on open
@@ -767,104 +902,141 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         // 2. Fetch Existing from DB to Compare
         let existing: ExistingAlbum[] = [];
         if (sourceType === 'collection') {
-          const { data: existingRaw, error: dbError } = await supabase
-            .from('inventory')
-            .select(`
-              id,
-              location,
-              media_condition,
-              sleeve_condition,
-              personal_notes,
-              release:releases (
+          const pageSize = 1000;
+          let from = 0;
+          let hasMore = true;
+          const fetched: ExistingAlbum[] = [];
+
+          while (hasMore) {
+            const { data: existingRaw, error: dbError } = await supabase
+              .from('inventory')
+              .select(`
                 id,
-                label,
-                catalog_number,
-                barcode,
-                country,
-                release_year,
-                discogs_release_id,
-                media_type,
-                format_details,
-                qty,
-                master:masters (
+                location,
+                media_condition,
+                sleeve_condition,
+                personal_notes,
+                release:releases (
                   id,
-                  title,
-                  original_release_year,
-                  cover_image_url,
-                  genres,
-                  styles,
-                  discogs_master_id,
-                  artist:artists ( name )
+                  label,
+                  catalog_number,
+                  barcode,
+                  country,
+                  release_year,
+                  discogs_release_id,
+                  media_type,
+                  format_details,
+                  qty,
+                  master:masters (
+                    id,
+                    title,
+                    original_release_year,
+                    cover_image_url,
+                    genres,
+                    styles,
+                    discogs_master_id,
+                    artist:artists ( name )
+                  )
                 )
-              )
-            `);
-          if (dbError) throw dbError;
-          existing = (existingRaw ?? []).map((row) => {
-            const release = row.release as {
-              id?: number | null;
-              label?: string | null;
-              catalog_number?: string | null;
-              barcode?: string | null;
-              country?: string | null;
-              release_year?: number | null;
-              discogs_release_id?: string | null;
-              media_type?: string | null;
-              format_details?: string[] | null;
-              qty?: number | null;
-              master?: {
+              `)
+              .range(from, from + pageSize - 1);
+
+            if (dbError) throw dbError;
+
+            const mapped = (existingRaw ?? []).map((row) => {
+              const release = row.release as {
                 id?: number | null;
-                title?: string | null;
-                original_release_year?: number | null;
-                cover_image_url?: string | null;
-                genres?: string[] | null;
-                styles?: string[] | null;
-                discogs_master_id?: string | null;
-                artist?: { name?: string | null } | null;
+                label?: string | null;
+                catalog_number?: string | null;
+                barcode?: string | null;
+                country?: string | null;
+                release_year?: number | null;
+                discogs_release_id?: string | null;
+                media_type?: string | null;
+                format_details?: string[] | null;
+                qty?: number | null;
+                master?: {
+                  id?: number | null;
+                  title?: string | null;
+                  original_release_year?: number | null;
+                  cover_image_url?: string | null;
+                  genres?: string[] | null;
+                  styles?: string[] | null;
+                  discogs_master_id?: string | null;
+                  artist?: { name?: string | null } | null;
+                } | null;
               } | null;
-            } | null;
-            const master = release?.master;
-            const formatLabel = buildFormatLabel(release);
-            const artistName = master?.artist?.name ?? 'Unknown Artist';
-            const title = master?.title ?? 'Untitled';
-            return {
-              id: row.id as number,
-              release_id: release?.id ?? null,
-              master_id: master?.id ?? null,
-              artist: artistName,
-              title,
-              artist_norm: normalizeArtist(artistName),
-              title_norm: normalizeTitle(title),
-              artist_album_norm: normalizeArtistAlbum(artistName, title),
-              discogs_release_id: release?.discogs_release_id ?? null,
-              discogs_master_id: master?.discogs_master_id ?? null,
-              format: formatLabel,
-              catalog_number: release?.catalog_number ?? null,
-              media_condition: row.media_condition ?? null,
-              sleeve_condition: row.sleeve_condition ?? null,
-              country: release?.country ?? null,
-              year: (release?.release_year ?? master?.original_release_year)?.toString() ?? null,
-              image_url: master?.cover_image_url ?? null,
-              cover_image: master?.cover_image_url ?? null,
-              tracks: null,
-              genres: master?.genres ?? null,
-            } satisfies ExistingAlbum;
-          });
+              const master = release?.master;
+              const formatLabel = buildFormatLabel(release);
+              const artistName = master?.artist?.name ?? 'Unknown Artist';
+              const title = master?.title ?? 'Untitled';
+              return {
+                id: row.id as number,
+                release_id: release?.id ?? null,
+                master_id: master?.id ?? null,
+                artist: artistName,
+                title,
+                artist_norm: normalizeArtist(artistName),
+                title_norm: normalizeTitle(title),
+                artist_album_norm: normalizeArtistAlbum(artistName, title),
+                discogs_release_id: release?.discogs_release_id ?? null,
+                discogs_master_id: master?.discogs_master_id ?? null,
+                format: formatLabel,
+                catalog_number: release?.catalog_number ?? null,
+                media_condition: row.media_condition ?? null,
+                sleeve_condition: row.sleeve_condition ?? null,
+                country: release?.country ?? null,
+                year: (release?.release_year ?? master?.original_release_year)?.toString() ?? null,
+                image_url: master?.cover_image_url ?? null,
+                cover_image: master?.cover_image_url ?? null,
+                tracks: null,
+                genres: master?.genres ?? null,
+              } satisfies ExistingAlbum;
+            });
+
+            fetched.push(...mapped);
+
+            if (!existingRaw || existingRaw.length < pageSize) {
+              hasMore = false;
+            } else {
+              from += pageSize;
+            }
+          }
+
+          existing = fetched;
         } else {
-          const { data: existingRaw, error: dbError } = await supabase
-            .from('wantlist')
-            .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, discogs_master_id, format, year, cover_image');
-          if (dbError) throw dbError;
-          existing = (existingRaw ?? []).map((album) => {
-            const wantlistAlbum = album as ExistingAlbum;
-            return {
-              ...wantlistAlbum,
-              country: null,
-              catalog_number: null,
-              image_url: wantlistAlbum.cover_image ?? null,
-              tracks: null,
-              genres: null,
-            };
-          });
+          const pageSize = 1000;
+          let from = 0;
+          let hasMore = true;
+          const fetched: ExistingAlbum[] = [];
+
+          while (hasMore) {
+            const { data: existingRaw, error: dbError } = await supabase
+              .from('wantlist')
+              .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, discogs_master_id, format, year, cover_image')
+              .range(from, from + pageSize - 1);
+            if (dbError) throw dbError;
+            const mapped = (existingRaw ?? []).map((album) => {
+              const wantlistAlbum = album as ExistingAlbum;
+              return {
+                ...wantlistAlbum,
+                country: null,
+                catalog_number: null,
+                image_url: wantlistAlbum.cover_image ?? null,
+                tracks: null,
+                genres: null,
+              };
+            });
+            fetched.push(...mapped);
+
+            if (!existingRaw || existingRaw.length < pageSize) {
+              hasMore = false;
+            } else {
+              from += pageSize;
+            }
+          }
+
+          existing = fetched;
         }
 
         setTotalDatabaseCount(existing.length);
@@ -968,6 +1140,13 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               releaseUpdates.format_details = formatData.format_details ?? null;
               releaseUpdates.qty = formatData.qty ?? 1;
 
+              const albumDetailsUpdate = {
+                rpm: formatData.rpm ?? null,
+                vinyl_weight: formatData.weight ?? null,
+                vinyl_color: formatData.color ? [formatData.color] : null,
+                extra: formatData.extraText || null,
+              };
+
               // Enrichment Logic (Only if NEW or Full Sync/Partial Sync needs it)
               if (
                 album.status === 'NEW' ||
@@ -1029,6 +1208,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               if (Object.keys(masterUpdates).length > 0) {
                 await supabase.from('masters').update(masterUpdates as Record<string, unknown>).eq('id', masterRow.id);
               }
+
+              await applyAlbumDetailsToReleaseRecordings(releaseRow.id, albumDetailsUpdate);
 
               if (album.status === 'NEW') {
                 resultCounts.added++;
@@ -1097,9 +1278,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
   if (!isOpen) return null;
 
-  const newCount = syncMode === 'full_replacement' 
-    ? comparedAlbums.filter(a => a.status !== 'REMOVED').length 
-    : comparedAlbums.filter(a => a.status === 'NEW').length;
+  const newCount = comparedAlbums.filter(a => a.status === 'NEW').length;
+  const reviewCount = comparedAlbums.filter(a => a.status === 'REVIEW').length;
   const unchangedCount = syncMode === 'full_replacement'
     ? 0
     : comparedAlbums.filter(a => a.status === 'UNCHANGED').length;
@@ -1127,6 +1307,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     .slice(0, 4);
 
   const shouldProcess = (album: ComparedAlbum) => {
+    if (album.status === 'REVIEW') return false;
     if (syncMode === 'full_replacement') return album.status !== 'REMOVED';
     if (syncMode === 'full_sync') return true;
     if (syncMode === 'new_only') return album.status === 'NEW';
@@ -1135,6 +1316,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   };
 
   const actionLabel = (album: ComparedAlbum) => {
+    if (album.status === 'REVIEW') return 'REVIEW';
     if (album.status === 'NEW') return 'ADD';
     if (album.status === 'REMOVED') return 'REMOVE';
     if (album.status === 'CHANGED') return album.needsEnrichment ? 'ENRICH' : 'UPDATE';
@@ -1157,6 +1339,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   const willEnrich = comparedAlbums.filter(a => actionLabel(a) === 'ENRICH' && shouldProcess(a)).length;
   const willRemove = comparedAlbums.filter(a => actionLabel(a) === 'REMOVE' && shouldProcess(a)).length;
   const willSkip = comparedAlbums.filter(a => actionLabel(a) === 'SKIP' && shouldProcess(a)).length;
+  const willReview = comparedAlbums.filter(a => actionLabel(a) === 'REVIEW').length;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30000]">
@@ -1292,6 +1475,12 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                   <div className="text-xl font-bold text-gray-700">{unchangedCount}</div>
                   <div className="text-[11px] text-gray-600 font-semibold">UNCHANGED</div>
                 </div>
+                {reviewCount > 0 && (
+                  <div className="bg-yellow-50 p-2 rounded border border-yellow-200 sm:col-span-2">
+                    <div className="text-xl font-bold text-yellow-800">{reviewCount}</div>
+                    <div className="text-[11px] text-yellow-700 font-semibold">REVIEW REQUIRED</div>
+                  </div>
+                )}
                 {(syncMode === 'full_sync' || syncMode === 'full_replacement') && (
                   <div className="bg-red-50 p-2 rounded border border-red-200 sm:col-span-2">
                     <div className="text-xl font-bold text-red-700">{removedCount}</div>
@@ -1305,7 +1494,10 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                   Matched by Discogs ID: <strong>{matchedByDiscogsId}</strong> · Matched by Artist/Title: <strong>{matchedByArtistTitle}</strong>
                 </div>
                 <div className="mb-1">
-                  Will add: <strong>{willAdd}</strong> · Will update: <strong>{willUpdate}</strong> · Will enrich: <strong>{willEnrich}</strong> · Will remove: <strong>{willRemove}</strong> · Will skip: <strong>{willSkip}</strong>
+                  Existing albums loaded from DB: <strong>{totalDatabaseCount}</strong> · Discogs items pulled: <strong>{comparedAlbums.length}</strong>
+                </div>
+                <div className="mb-1">
+                  Will add: <strong>{willAdd}</strong> · Will update: <strong>{willUpdate}</strong> · Will enrich: <strong>{willEnrich}</strong> · Will remove: <strong>{willRemove}</strong> · Will skip: <strong>{willSkip}</strong> · Needs review: <strong>{willReview}</strong>
                 </div>
                 {topMissingFields.length > 0 && (
                   <div>
@@ -1339,6 +1531,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                         <option value="changed">Changed</option>
                         <option value="unchanged">Unchanged</option>
                         <option value="removed">Removed</option>
+                        <option value="review">Review</option>
                       </select>
                       <select
                         value={previewLimit}
@@ -1368,6 +1561,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                         <th className="px-3 py-2 text-left font-semibold text-gray-500">Title</th>
                         <th className="px-3 py-2 text-left font-semibold text-gray-500">Action</th>
                         <th className="px-3 py-2 text-left font-semibold text-gray-500">Reason</th>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-500">Details</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1380,7 +1574,11 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                           const reasons: string[] = [];
                           if (album.status === 'NEW') reasons.push('Not found in collection');
                           if (album.status === 'REMOVED') reasons.push('Missing from Discogs');
+                          if (album.status === 'REVIEW') reasons.push('Multiple possible matches');
                           if (album.discogsIdMismatch) reasons.push('Discogs ID differs');
+                          if (album.matchType === 'artist_title') {
+                            reasons.push(album.weakMatch ? 'Matched by artist/title (weak)' : 'Matched by artist/title');
+                          }
                           if (album.missingFields?.length) {
                             const filtered = album.missingFields.filter((field) => field !== 'all');
                             if (filtered.length > 0) reasons.push(`Missing ${filtered.join(', ')}`);
@@ -1393,6 +1591,82 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                               <td className="px-3 py-2 text-gray-900">{album.title}</td>
                               <td className={`px-3 py-2 font-semibold ${statusColor}`}>{action}</td>
                               <td className="px-3 py-2 text-gray-600 text-[12px]">{reasons.join(' • ')}</td>
+                              <td className="px-3 py-2">
+                                <details className="text-[12px] text-gray-600">
+                                  <summary className="cursor-pointer text-blue-600">View</summary>
+                                  <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-[12px] text-gray-700">
+                                    <div className="border border-gray-200 rounded p-2 bg-gray-50">
+                                      <div className="font-semibold mb-1">Discogs Pulled</div>
+                                      <div>Release ID: {album.discogs_release_id || '—'}</div>
+                                      <div>Master ID: {album.discogs_master_id || '—'}</div>
+                                      <div>Artist: {album.artist}</div>
+                                      <div>Title: {album.title}</div>
+                                      <div>Year: {album.year || '—'}</div>
+                                      <div>Label: {album.label || '—'}</div>
+                                      <div>Cat No: {album.catalog_number || '—'}</div>
+                                      <div>Country: {album.country || '—'}</div>
+                                      <div>Format: {album.format || '—'}</div>
+                                      <div>Media Cond: {album.media_condition || '—'}</div>
+                                      <div>Sleeve Cond: {album.sleeve_condition || '—'}</div>
+                                      <div>Date Added: {album.date_added || '—'}</div>
+                                      <div>Cover: {album.cover_image ? 'yes' : 'no'}</div>
+                                      {album.discogs_release_id && (
+                                        <div>
+                                          Discogs URL:{' '}
+                                          <a
+                                            href={`https://www.discogs.com/release/${album.discogs_release_id}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-blue-600 underline"
+                                          >
+                                            View release
+                                          </a>
+                                        </div>
+                                      )}
+                                      <div>Normalized key: {album.artist_album_norm || '—'}</div>
+                                    </div>
+                                    <div className="border border-gray-200 rounded p-2 bg-white">
+                                      <div className="font-semibold mb-1">Matched Existing</div>
+                                      {album.matchedSummary ? (
+                                        <>
+                                          <div>ID: {album.matchedSummary.id}</div>
+                                          <div>Release ID: {album.matchedSummary.release_id ?? '—'}</div>
+                                          <div>Master ID: {album.matchedSummary.master_id ?? '—'}</div>
+                                          <div>Discogs ID: {album.matchedSummary.discogs_release_id || '—'}</div>
+                                          <div>Master Discogs ID: {album.matchedSummary.discogs_master_id || '—'}</div>
+                                          <div>Artist: {album.matchedSummary.artist}</div>
+                                          <div>Title: {album.matchedSummary.title}</div>
+                                          <div>Year: {album.matchedSummary.year || '—'}</div>
+                                          <div>Country: {album.matchedSummary.country || '—'}</div>
+                                          <div>Format: {album.matchedSummary.format || '—'}</div>
+                                          <div>Cat No: {album.matchedSummary.catalog_number || '—'}</div>
+                                          <div>Match score: {album.matchScore ?? 0}</div>
+                                          <div>Candidate count: {album.candidateCount ?? 0}</div>
+                                        </>
+                                      ) : (
+                                        <div>None</div>
+                                      )}
+                                    </div>
+                                    {album.candidateMatches && album.candidateMatches.length > 0 && (
+                                      <div className="border border-gray-200 rounded p-2 bg-white md:col-span-2">
+                                        <div className="font-semibold mb-1">Candidate Matches (Top 5)</div>
+                                        <div className="space-y-1">
+                                          {album.candidateMatches.slice(0, 5).map((candidate) => (
+                                            <div key={candidate.id} className="flex flex-wrap gap-2 text-[12px] text-gray-600">
+                                              <span className="font-semibold text-gray-800">#{candidate.id}</span>
+                                              <span>{candidate.artist} — {candidate.title}</span>
+                                              <span>Score: {candidate.score}</span>
+                                              <span>Discogs: {candidate.discogs_release_id || '—'}</span>
+                                              <span>Year: {candidate.year || '—'}</span>
+                                              <span>Format: {candidate.format || '—'}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </details>
+                              </td>
                             </tr>
                           );
                         })
