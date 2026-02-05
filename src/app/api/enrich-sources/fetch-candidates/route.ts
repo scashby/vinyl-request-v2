@@ -77,6 +77,10 @@ export async function POST(req: Request) {
             styles,
             original_release_year,
             artist:artists (name)
+          ),
+          release_tracks:release_tracks (
+            id,
+            recording:recordings ( credits )
           )
         )
       `);
@@ -134,6 +138,10 @@ export async function POST(req: Request) {
         release_year?: number | null;
         label?: string | null;
         catalog_number?: string | null;
+        release_tracks?: {
+          id?: number | null;
+          recording?: { credits?: unknown } | { credits?: unknown }[] | null;
+        }[] | null;
         master?: {
           id?: number | null;
           title?: string | null;
@@ -148,9 +156,39 @@ export async function POST(req: Request) {
       } | null;
     };
 
+    const asRecord = (value: unknown): Record<string, unknown> => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+      return value as Record<string, unknown>;
+    };
+
+    const asStringArray = (value: unknown): string[] => {
+      if (!value) return [];
+      if (Array.isArray(value)) {
+        return value.filter((item): item is string => typeof item === 'string');
+      }
+      if (typeof value === 'string') return [value];
+      return [];
+    };
+
+    const getAlbumCredits = (credits: unknown) => {
+      const record = asRecord(credits);
+      const albumPeople = asRecord(record.album_people ?? record.albumPeople);
+      const classical = asRecord(record.classical);
+      const artwork = asRecord(record.artwork ?? record.album_artwork ?? record.albumArtwork);
+      const albumDetails = asRecord(record.album_details ?? record.albumDetails ?? record.album_metadata);
+      const links = asRecord(albumDetails.links ?? albumDetails.link ?? {});
+      return { albumPeople, classical, artwork, albumDetails, links };
+    };
+
     const mapInventoryToCandidate = (album: CandidateAlbumRow) => {
       const release = album.release;
       const master = release?.master;
+      const releaseTracks = release?.release_tracks ?? [];
+      const firstRecording = releaseTracks[0]?.recording
+        ? (Array.isArray(releaseTracks[0].recording) ? releaseTracks[0].recording[0] : releaseTracks[0].recording)
+        : null;
+      const creditsInfo = getAlbumCredits(firstRecording?.credits);
+      const { albumPeople, classical, artwork, albumDetails, links } = creditsInfo;
       const formatParts = [release?.media_type, ...(release?.format_details ?? [])].filter(Boolean);
       const baseFormat = formatParts.join(', ');
       const qty = release?.qty ?? 1;
@@ -163,18 +201,40 @@ export async function POST(req: Request) {
         title: master?.title ?? 'Untitled',
         format: formatLabel,
         image_url: master?.cover_image_url ?? null,
+        back_image_url: artwork.back_image_url ?? null,
+        spine_image_url: artwork.spine_image_url ?? null,
+        inner_sleeve_images: asStringArray(artwork.inner_sleeve_images),
+        vinyl_label_images: asStringArray(artwork.vinyl_label_images),
+        musicians: asStringArray(albumPeople.musicians),
+        producers: asStringArray(albumPeople.producers),
+        engineers: asStringArray(albumPeople.engineers),
+        songwriters: asStringArray(albumPeople.songwriters),
+        composer: classical.composer ?? null,
+        conductor: classical.conductor ?? null,
+        orchestra: classical.orchestra ?? null,
+        chorus: classical.chorus ?? null,
         discogs_release_id: release?.discogs_release_id ?? null,
         discogs_master_id: master?.discogs_master_id ?? null,
         musicbrainz_id: master?.musicbrainz_release_group_id ?? null,
         spotify_id: release?.spotify_album_id ?? null,
-        apple_music_id: null,
+        apple_music_id: albumDetails.apple_music_id ?? null,
+        lastfm_id: albumDetails.lastfm_id ?? null,
+        musicbrainz_url: albumDetails.musicbrainz_url ?? null,
+        wikipedia_url: links.wikipedia_url ?? null,
+        genius_url: links.genius_url ?? null,
+        apple_music_url: links.apple_music_url ?? null,
+        lastfm_url: links.lastfm_url ?? null,
         year: release?.release_year ?? master?.original_release_year ?? null,
         label: release?.label ?? null,
         cat_no: release?.catalog_number ?? null,
         genres: master?.genres ?? null,
         styles: master?.styles ?? null,
         location: album.location ?? null,
-        last_reviewed_at: null
+        enriched_metadata: albumDetails.enriched_metadata ?? null,
+        enrichment_summary: albumDetails.enrichment_summary ?? null,
+        enrichment_sources: albumDetails.enrichment_sources ?? null,
+        finalized_fields: albumDetails.finalized_fields ?? null,
+        last_reviewed_at: albumDetails.last_reviewed_at ?? null
       };
     };
 

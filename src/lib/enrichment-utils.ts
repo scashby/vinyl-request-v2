@@ -682,7 +682,14 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
       country: data.country,
       notes: data.notes, 
       companies: data.companies?.map((c: DiscogsCompany) => c.name),
-      tracklist: data.tracklist?.map((t: DiscogsTrack) => `${t.position} - ${t.title} (${t.duration})`).join('\n')
+      tracklist: data.tracklist?.map((t: DiscogsTrack) => `${t.position} - ${t.title} (${t.duration})`).join('\n'),
+      tracks: data.tracklist
+        ?.filter((t: DiscogsTrack) => t.type_ !== 'heading')
+        .map((t: DiscogsTrack) => ({
+          position: t.position || '',
+          title: t.title || '',
+          duration: t.duration || undefined
+        }))
     };
 
     if (data.identifiers) {

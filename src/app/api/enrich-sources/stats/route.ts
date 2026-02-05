@@ -100,6 +100,8 @@ export async function GET(request: Request) {
     let missingFrontCover = 0;
     let missingBackCover = 0;
     let missingInnerSleeve = 0;
+    let missingSpine = 0;
+    let missingVinylLabel = 0;
     
     // Credits
     let missingCredits = 0;
@@ -193,8 +195,12 @@ export async function GET(request: Request) {
 
       const hasBack = !!creditInfo.artwork.back_image_url;
       const hasInnerSleeve = asStringArray(creditInfo.artwork.inner_sleeve_images).length > 0;
+      const hasSpine = !!creditInfo.artwork.spine_image_url;
+      const hasVinylLabel = asStringArray(creditInfo.artwork.vinyl_label_images).length > 0;
       if (!hasBack) missingBackCover++;
       if (!hasInnerSleeve) missingInnerSleeve++;
+      if (!hasSpine) missingSpine++;
+      if (!hasVinylLabel) missingVinylLabel++;
 
       const musicians = asStringArray(creditInfo.albumPeople.musicians);
       const producers = asStringArray(creditInfo.albumPeople.producers);
@@ -266,6 +272,8 @@ export async function GET(request: Request) {
       missingFrontCover,
       missingBackCover,
       missingInnerSleeve,
+      missingSpine,
+      missingVinylLabel,
       
       missingCredits,
       missingMusicians,

@@ -6,6 +6,7 @@ import Image from 'next/image';
 import type { Album } from 'types/album';
 import { supabase } from 'lib/supabaseClient';
 import { FindCoverModal } from '../enrichment/FindCoverModal';
+import { CropRotateModal } from '../enrichment/CropRotateModal';
 
 interface CoverTabProps {
   album: Album;
@@ -15,15 +16,17 @@ interface CoverTabProps {
 // Extend Album locally to include Inner Sleeve Images until global types are updated
 interface ExtendedAlbum extends Album {
   inner_sleeve_images?: string[] | null;
+  vinyl_label_images?: string[] | null;
 }
 
 export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
   const album = baseAlbum as ExtendedAlbum;
-  const [uploading, setUploading] = useState<'front' | 'back' | 'inner' | null>(null);
+  const [uploading, setUploading] = useState<'front' | 'back' | 'inner' | 'spine' | 'vinyl' | null>(null);
   const [showFindCover, setShowFindCover] = useState(false);
   const [findCoverType, setFindCoverType] = useState<'front' | 'back'>('front');
+  const [cropTarget, setCropTarget] = useState<{ type: 'front' | 'back'; url: string } | null>(null);
 
-  const handleUpload = async (coverType: 'front' | 'back' | 'inner') => {
+  const handleUpload = async (coverType: 'front' | 'back' | 'inner' | 'spine' | 'vinyl') => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -56,6 +59,12 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
           const currentImages = album.inner_sleeve_images || [];
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           onChange('inner_sleeve_images' as any, [...currentImages, publicUrl]);
+        } else if (coverType === 'vinyl') {
+          const currentImages = album.vinyl_label_images || [];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          onChange('vinyl_label_images' as any, [...currentImages, publicUrl]);
+        } else if (coverType === 'spine') {
+          onChange('spine_image_url', publicUrl as Album['spine_image_url']);
         } else {
           const field = coverType === 'front' ? 'image_url' : 'back_image_url';
           onChange(field, publicUrl as Album[typeof field]);
@@ -71,8 +80,8 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
     input.click();
   };
 
-  const handleRemove = async (coverType: 'front' | 'back') => {
-    const field = coverType === 'front' ? 'image_url' : 'back_image_url';
+  const handleRemove = async (coverType: 'front' | 'back' | 'spine') => {
+    const field = coverType === 'front' ? 'image_url' : coverType === 'back' ? 'back_image_url' : 'spine_image_url';
     const currentUrl = album[field];
 
     if (currentUrl && currentUrl.includes('album-images/')) {
@@ -122,6 +131,33 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
     onChange('inner_sleeve_images' as any, newImages);
   };
 
+  const handleRemoveVinyl = async (index: number) => {
+    const currentImages = album.vinyl_label_images || [];
+    const imageUrl = currentImages[index];
+
+    if (imageUrl && imageUrl.includes('album-images/')) {
+      try {
+        const urlParts = imageUrl.split('/album-images/');
+        if (urlParts.length > 1) {
+          const filePath = `album-images/${urlParts[1].split('?')[0]}`;
+          
+          const { error } = await supabase.storage
+            .from('album-images')
+            .remove([filePath]);
+
+          if (error) console.error('Error deleting file:', error);
+        }
+      } catch (error) {
+        console.error('Error removing file:', error);
+      }
+    }
+
+    const newImages = [...currentImages];
+    newImages.splice(index, 1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onChange('vinyl_label_images' as any, newImages);
+  };
+
   const handleFindOnline = (coverType: 'front' | 'back') => {
     setFindCoverType(coverType);
     setShowFindCover(true);
@@ -132,7 +168,11 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
     onChange(field, imageUrl as Album[typeof field]);
   };
 
-  // Legacy cropping logic removed
+  const handleCrop = (type: 'front' | 'back') => {
+    const url = type === 'front' ? album.image_url : album.back_image_url;
+    if (!url) return;
+    setCropTarget({ type, url });
+  };
 
   return (
     <div className="h-full flex flex-col overflow-y-auto p-4 gap-4">
@@ -150,6 +190,12 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
                     className="px-2 py-1 text-[10px] bg-blue-600 text-white rounded hover:bg-blue-700"
                   >
                     Replace
+                  </button>
+                  <button
+                    onClick={() => handleCrop('front')}
+                    className="px-2 py-1 text-[10px] bg-amber-500 text-white rounded hover:bg-amber-600"
+                  >
+                    Crop/Rotate
                   </button>
                   <button 
                     onClick={() => handleRemove('front')}
@@ -196,6 +242,14 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
               >
                 {album.back_image_url ? 'Replace' : 'Search'}
               </button>
+              {album.back_image_url && (
+                <button
+                  onClick={() => handleCrop('back')}
+                  className="px-2 py-1 text-[10px] bg-amber-500 text-white rounded hover:bg-amber-600"
+                >
+                  Crop/Rotate
+                </button>
+              )}
               <button 
                 onClick={() => handleUpload('back')}
                 className="px-2 py-1 text-[10px] bg-gray-600 text-white rounded hover:bg-gray-700"
@@ -257,6 +311,81 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
         )}
       </div>
 
+      {/* SPINE + VINYL LABELS */}
+      <div className="flex gap-4">
+        <div className="flex-1 flex flex-col border border-gray-200 rounded-md p-3 bg-gray-50">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-sm font-bold text-gray-700 m-0">Spine</h3>
+            <div className="flex gap-1">
+              {album.spine_image_url ? (
+                <>
+                  <button
+                    onClick={() => handleUpload('spine')}
+                    className="px-2 py-1 text-[10px] bg-gray-600 text-white rounded hover:bg-gray-700"
+                  >
+                    Upload New
+                  </button>
+                  <button
+                    onClick={() => handleRemove('spine')}
+                    className="px-2 py-1 text-[10px] bg-red-600 text-white rounded hover:bg-red-700"
+                  >
+                    Remove
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => handleUpload('spine')}
+                  className="px-2 py-1 text-[10px] bg-gray-600 text-white rounded hover:bg-gray-700"
+                >
+                  Upload
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="flex-1 relative bg-white border border-gray-300 rounded overflow-hidden flex items-center justify-center min-h-[120px]">
+            {album.spine_image_url ? (
+              <Image src={album.spine_image_url} alt="Spine" fill style={{ objectFit: 'contain' }} unoptimized />
+            ) : (
+              <span className="text-gray-400 text-xs">No Spine Image</span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 flex flex-col border border-gray-200 rounded-md p-3 bg-gray-50">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-sm font-bold text-gray-700 m-0">Vinyl Labels</h3>
+            <button
+              onClick={() => handleUpload('vinyl')}
+              disabled={uploading === 'vinyl'}
+              className="px-3 py-1.5 text-xs bg-gray-800 text-white rounded hover:bg-black disabled:opacity-50"
+            >
+              {uploading === 'vinyl' ? 'Uploading...' : '+ Add Image'}
+            </button>
+          </div>
+
+          {(!album.vinyl_label_images || album.vinyl_label_images.length === 0) ? (
+            <div className="p-6 text-center border-2 border-dashed border-gray-300 rounded bg-gray-50/50">
+              <span className="text-gray-400 text-sm">No vinyl label images added</span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-4 gap-3">
+              {album.vinyl_label_images.map((imgUrl, idx) => (
+                <div key={idx} className="group relative aspect-square bg-white border border-gray-200 rounded overflow-hidden">
+                  <Image src={imgUrl} alt={`Label ${idx + 1}`} fill style={{ objectFit: 'cover' }} unoptimized />
+                  <button
+                    onClick={() => handleRemoveVinyl(idx)}
+                    className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
+                    title="Remove Image"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       <FindCoverModal
         isOpen={showFindCover}
         onClose={() => setShowFindCover(false)}
@@ -269,6 +398,19 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
         discogsId={album.discogs_release_id || album.discogs_id || undefined}
         coverType={findCoverType}
       />
+
+      {cropTarget && (
+        <CropRotateModal
+          imageUrl={cropTarget.url}
+          albumId={String(album.id || '')}
+          coverType={cropTarget.type}
+          onSave={(newUrl) => {
+            const field = cropTarget.type === 'front' ? 'image_url' : 'back_image_url';
+            onChange(field, newUrl as Album[typeof field]);
+          }}
+          onClose={() => setCropTarget(null)}
+        />
+      )}
     </div>
   );
 }

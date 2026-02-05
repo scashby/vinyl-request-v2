@@ -182,6 +182,29 @@ const toJsonValue = (value: unknown): import('types/supabase').Json | null => {
   }
 };
 
+const parseDurationToSeconds = (value: unknown): number | null => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? Math.round(value) : null;
+  const str = String(value).trim();
+  if (!str) return null;
+  if (/^\d+$/.test(str)) return parseInt(str, 10);
+  if (str.endsWith('s')) {
+    const num = parseInt(str.slice(0, -1), 10);
+    return Number.isNaN(num) ? null : num;
+  }
+  const parts = str.split(':').map(p => parseInt(p, 10));
+  if (parts.some(Number.isNaN)) return null;
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+};
+
+const extractSide = (position: unknown): string | null => {
+  if (typeof position !== 'string') return null;
+  const match = position.trim().match(/^([A-Za-z])/);
+  return match ? match[1].toUpperCase() : null;
+};
+
 // Helper to validate Postgres dates
 const isValidDate = (dateStr: unknown): boolean => {
   if (typeof dateStr !== 'string') return false;
@@ -275,6 +298,7 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
         releaseUpdates.spotify_album_id =
           extractIdFromUrl(value, '/album/') ?? value ?? null;
         break;
+      case 'notes':
       case 'release_notes':
         releaseUpdates.notes = value ?? null;
         break;
@@ -326,6 +350,8 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'studio':
       case 'disc_metadata':
       case 'matrix_numbers':
+      case 'tracklist':
+      case 'tracklists':
       case 'tempo_bpm':
       case 'musical_key':
       case 'energy':
@@ -348,6 +374,10 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'apple_music_id':
       case 'lastfm_id':
       case 'musicbrainz_url':
+      case 'enriched_metadata':
+      case 'enrichment_summary':
+      case 'finalized_fields':
+      case 'last_reviewed_at':
         appendAlbumCredits(albumDetails, key, value);
         break;
       case 'apple_music_url':
@@ -862,16 +892,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             );
             if (alreadySeen) return; 
 
-            // *** REDIRECT 'NOTES' TO ENRICHED_METADATA ***
-            if (key === 'notes' && value) {
-               // We don't want to conflict with the 'notes' column (which is personal).
-               // We map it to 'enriched_metadata' instead.
-               if (!fieldCandidates['enriched_metadata']) fieldCandidates['enriched_metadata'] = {};
-               // Store it keyed by source
-               fieldCandidates['enriched_metadata'][source] = value;
-               return; 
-            }
-
             let newVal = value;
             if (key === 'original_release_date' && typeof newVal === 'string') {
                  if (/^\d{4}$/.test(newVal)) newVal = `${newVal}-12-25`;
@@ -1067,6 +1087,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           }
       });
 
+      const hasConflictsForAlbum = newConflicts.some(c => c.album_id === album.id);
+      if (!hasConflictsForAlbum) {
+        updatesForAlbum.last_reviewed_at = new Date().toISOString();
+      }
+
       if (Object.keys(updatesForAlbum).length > 0) {
         autoUpdates.push({ album, fields: updatesForAlbum });
         
@@ -1092,12 +1117,12 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
        await supabase.from('import_conflict_resolutions').upsert(historyUpdates, { onConflict: 'album_id,field_name,source' });
     }
 
-    if (autoUpdates.length > 0) {
-      await Promise.all(autoUpdates.map(u => applyAlbumUpdates(u.album, u.fields)));
-    }
-    
     if (trackSavePromises.length > 0) {
       await Promise.all(trackSavePromises);
+    }
+
+    if (autoUpdates.length > 0) {
+      await Promise.all(autoUpdates.map(u => applyAlbumUpdates(u.album, u.fields)));
     }
 
     return { conflicts: newConflicts, summary: localBatchSummary };
@@ -1124,7 +1149,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     if (error || !inventoryRow) return 0;
     const release = toSingle(inventoryRow.release);
     const releaseTracks = release?.release_tracks ?? [];
-    if (releaseTracks.length === 0) return 0;
 
     const updates: Promise<unknown>[] = [];
     const enriched = enrichedTracks as Record<string, unknown>[];
@@ -1134,6 +1158,62 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         .toLowerCase()
         .replace(/[^\w\s]/g, '')
         .trim();
+
+    const buildTrackCredits = (track: Record<string, unknown>) => {
+      const credits: Record<string, unknown> = {};
+      if (track.tempo_bpm) credits.tempo_bpm = track.tempo_bpm;
+      if (track.musical_key) credits.musical_key = track.musical_key;
+      if (track.lyrics) credits.lyrics = track.lyrics;
+      if (track.is_cover !== undefined) credits.is_cover = track.is_cover;
+      if (track.original_artist) credits.original_artist = track.original_artist;
+      if (track.original_year) credits.original_year = track.original_year;
+      if (track.mb_work_id) credits.mb_work_id = track.mb_work_id;
+      return credits;
+    };
+
+    if (releaseTracks.length === 0) {
+      if (!release?.id) return 0;
+      const payloads = enriched
+        .map((track) => ({
+          title: String(track.title ?? '').trim(),
+          duration_seconds: parseDurationToSeconds(track.duration),
+          credits: (() => {
+            const credits = buildTrackCredits(track);
+            return Object.keys(credits).length > 0
+              ? (credits as unknown as import('types/supabase').Json)
+              : undefined;
+          })(),
+        }))
+        .filter((track) => track.title.length > 0);
+
+      if (payloads.length === 0) return 0;
+
+      const { data: recordings, error: insertError } = await supabase
+        .from('recordings')
+        .insert(payloads)
+        .select('id');
+
+      if (insertError || !recordings) return 0;
+
+      const releaseTrackRows = recordings.map((recording, index) => {
+        const src = enriched[index] || {};
+        const position = String(src.position ?? index + 1);
+        return {
+          release_id: release.id,
+          recording_id: recording.id,
+          position,
+          side: extractSide(position),
+          title_override: null,
+        };
+      });
+
+      const { error: releaseTrackError } = await supabase
+        .from('release_tracks')
+        .insert(releaseTrackRows);
+
+      if (releaseTrackError) return 0;
+      return releaseTrackRows.length;
+    }
 
     for (const track of releaseTracks) {
       const recording = toSingle(track.recording);
@@ -1152,14 +1232,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         ? (recording.credits as Record<string, unknown>)
         : {};
 
-      const nextCredits: Record<string, unknown> = { ...currentCredits };
-      if (match.tempo_bpm) nextCredits.tempo_bpm = match.tempo_bpm;
-      if (match.musical_key) nextCredits.musical_key = match.musical_key;
-      if (match.lyrics) nextCredits.lyrics = match.lyrics;
-      if (match.is_cover !== undefined) nextCredits.is_cover = match.is_cover;
-      if (match.original_artist) nextCredits.original_artist = match.original_artist;
-      if (match.original_year) nextCredits.original_year = match.original_year;
-      if (match.mb_work_id) nextCredits.mb_work_id = match.mb_work_id;
+      const nextCredits: Record<string, unknown> = { ...currentCredits, ...buildTrackCredits(match) };
 
       updates.push(
         Promise.resolve(
@@ -1265,6 +1338,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         image_url: null,
     };
 
+    if (trackSavePromises.length > 0) {
+        await Promise.all(trackSavePromises);
+    }
+
     if (Object.keys(updates).length > 0) {
         ['labels', 'genres', 'styles'].forEach(field => {
             if (updates[field] !== undefined && !Array.isArray(updates[field])) {
@@ -1287,8 +1364,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             onConflict: 'album_id,field_name,source' 
         });
     }
-
-    await Promise.all(trackSavePromises);
 
     // 4. Remove from Queue
     setConflicts(prev => {
@@ -1698,7 +1773,9 @@ function DataCategoryCard({
     if (!stats) return 0;
     if (field === 'image_url') return stats.missingFrontCover || 0;
     if (field === 'back_image_url') return stats.missingBackCover;
+    if (field === 'spine_image_url') return stats.missingSpine || 0;
     if (field === 'inner_sleeve_images') return stats.missingInnerSleeve || 0;
+    if (field === 'vinyl_label_images') return stats.missingVinylLabel || 0;
     if (field.includes('musicians')) return stats.missingMusicians;
     if (field.includes('producers')) return stats.missingProducers;
     if (field.includes('engineers')) return stats.missingEngineers || 0;
