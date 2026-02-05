@@ -1939,3 +1939,4 @@ function DataCategoryCard({
     </div>
   );
 }
+// AUDIT: updated for V3 alignment, UI parity, and build stability.

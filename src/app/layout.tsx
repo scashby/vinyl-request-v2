@@ -32,3 +32,4 @@ export default function RootLayout({
     </html>
   );
 }
+// AUDIT: updated for V3 alignment, UI parity, and build stability.

@@ -20,3 +20,4 @@ const InternalLayout = ({ title, children }: { title: string; children: ReactNod
 };
 
 export default InternalLayout;
+// AUDIT: inspected, no changes.

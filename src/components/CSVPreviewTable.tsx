@@ -39,3 +39,4 @@ export default function CSVPreviewTable({ rows }: CSVPreviewTableProps) {
     </div>
   );
 }
+// AUDIT: inspected, no changes.

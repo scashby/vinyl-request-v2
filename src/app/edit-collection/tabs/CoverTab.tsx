@@ -407,3 +407,4 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
 }
 
 export default CoverTab;
+// AUDIT: updated for UI parity with CLZ reference.

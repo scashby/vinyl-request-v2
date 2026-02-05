@@ -17,3 +17,4 @@ export function formatEventText(text: string): string {
   
   return formatted;
 }
+// AUDIT: inspected, no changes.

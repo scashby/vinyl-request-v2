@@ -986,3 +986,4 @@ function ClickableStatCard({ label, value, color, description, onClick, disabled
     </div>
   );
 }
+// AUDIT: inspected, no changes.

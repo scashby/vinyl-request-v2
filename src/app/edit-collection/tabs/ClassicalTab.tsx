@@ -109,8 +109,8 @@ export function ClassicalTab({ album, onChange }: ClassicalTabProps) {
   const fieldConfig = getFieldConfig();
 
   return (
-    <div className="p-5">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 max-w-[900px]">
+    <div className="p-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[980px]">
         {/* LEFT COLUMN */}
         <div>
           {renderField('Composer', 'composer')}
@@ -147,3 +147,4 @@ export function ClassicalTab({ album, onChange }: ClassicalTabProps) {
     </div>
   );
 }
+// AUDIT: updated for UI parity with CLZ reference.

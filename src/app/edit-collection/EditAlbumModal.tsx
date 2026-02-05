@@ -1004,7 +1004,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[20001]">
-      <div className="bg-white rounded w-[90vw] max-w-[1100px] h-[85vh] flex flex-col overflow-hidden shadow-2xl">
+      <div className="bg-white rounded w-[90vw] max-w-[1200px] h-[85vh] flex flex-col overflow-hidden shadow-2xl">
         {/* Header - BOLD TITLE */}
         <div className="bg-[#F7941D] text-white px-4 py-3 flex justify-between items-center shrink-0">
           <h2 className="m-0 text-lg font-bold font-sans">
@@ -1019,17 +1019,17 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-200 bg-white flex shrink-0 overflow-x-auto">
+        <div className="border-b border-gray-200 bg-[#f3f3f3] flex shrink-0 overflow-x-auto px-2">
           {TABS.map((tab) => {
             const Icon = tab.IconComponent;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-3 border-none bg-transparent text-[13px] cursor-pointer whitespace-nowrap flex items-center gap-1.5 font-sans transition-colors ${
-                  activeTab === tab.id 
-                    ? 'border-b-2 border-b-[#F7941D] text-gray-900 font-semibold' 
-                    : 'border-b-2 border-b-transparent text-gray-500 font-normal hover:text-gray-700'
+                className={`px-3 py-2 mx-1 my-2 rounded border text-[12px] cursor-pointer whitespace-nowrap flex items-center gap-1.5 font-sans transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-[#c9c9c9] bg-white text-gray-900 font-semibold shadow-sm'
+                    : 'border-transparent bg-transparent text-gray-600 hover:text-gray-800'
                 }`}
               >
                 <Icon />
@@ -1152,3 +1152,4 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
     </div>
   );
 }
+// AUDIT: updated for UI parity with CLZ reference.

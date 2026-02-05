@@ -14,3 +14,4 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ status, error, data });
 }
+// AUDIT: inspected, no changes.

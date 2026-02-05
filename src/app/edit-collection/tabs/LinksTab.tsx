@@ -38,7 +38,8 @@ export function LinksTab({ album, onChange }: LinksTabProps) {
   );
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+    <div className="p-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
       {/* Streaming Services */}
       <div className="flex flex-col">
         <h3 className="text-sm font-bold text-gray-900 border-b border-gray-200 pb-2 mb-4">Streaming</h3>
@@ -63,6 +64,8 @@ export function LinksTab({ album, onChange }: LinksTabProps) {
         {renderLinkInput('AllMusic URL', 'allmusic_url')}
         {renderLinkInput('Wikipedia URL', 'wikipedia_url')}
       </div>
+      </div>
     </div>
   );
 }
+// AUDIT: updated for UI parity with CLZ reference.

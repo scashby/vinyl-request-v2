@@ -328,3 +328,4 @@ export async function parseCLZXML(xmlContent: string): Promise<CLZAlbumData[]> {
     throw new Error(`Failed to parse CLZ XML: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
+// AUDIT: inspected, no changes.

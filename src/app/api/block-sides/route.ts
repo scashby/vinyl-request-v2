@@ -8,3 +8,4 @@ export async function GET() {
     status: 'active'
   });
 }
+// AUDIT: inspected, no changes.

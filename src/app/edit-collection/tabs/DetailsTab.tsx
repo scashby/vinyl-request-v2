@@ -387,7 +387,8 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full">
+      <div className="p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full">
         {/* LEFT COLUMN - PACKAGING */}
         <div className="flex flex-col gap-4">
           <div className="text-[15px] font-bold text-gray-700 mb-1 pb-2 border-b-2 border-gray-200">
@@ -569,6 +570,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
             </div>
           </div>
         </div>
+      </div>
 
         {/* RIGHT COLUMN - VINYL */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -976,3 +978,4 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
     </>
   );
 }
+// AUDIT: updated for UI parity with CLZ reference.

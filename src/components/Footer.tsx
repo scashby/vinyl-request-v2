@@ -73,3 +73,4 @@ export default function Footer() {
     </footer>
   );
 }
+// AUDIT: inspected, no changes.

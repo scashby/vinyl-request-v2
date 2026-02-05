@@ -92,3 +92,4 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     </AuthProvider>
   );
 }
+// AUDIT: inspected, no changes.

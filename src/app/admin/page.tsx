@@ -5,3 +5,4 @@ import LoginPage from './login/page';
 export default function AdminIndex() {
   return <LoginPage />;
 }
+// AUDIT: inspected, no changes.

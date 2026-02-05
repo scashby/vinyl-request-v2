@@ -60,3 +60,4 @@ export type CrateOperatorType =
   | 'before' | 'after'
   // Array operators
   | 'includes' | 'excludes';
+// AUDIT: inspected, no changes.

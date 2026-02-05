@@ -279,3 +279,4 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
     </>
   );
 }
+// AUDIT: inspected, no changes.

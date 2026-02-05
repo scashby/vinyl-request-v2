@@ -50,3 +50,4 @@ export const useSession = () => {
   if (!context) throw new Error("useSession must be used within AuthProvider");
   return context;
 };
+// AUDIT: inspected, no changes.

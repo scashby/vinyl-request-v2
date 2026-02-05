@@ -296,3 +296,4 @@ export function AutoCapExceptions({ isOpen, onClose, exceptions, onSave }: AutoC
     </div>
   );
 }
+// AUDIT: inspected, no changes.

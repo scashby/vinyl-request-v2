@@ -465,3 +465,4 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
     </>
   );
 }
+// AUDIT: inspected, no changes.

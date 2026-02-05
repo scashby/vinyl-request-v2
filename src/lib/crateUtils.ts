@@ -168,3 +168,4 @@ export async function getManualCrateAlbumIds(): Promise<number[]> {
   // Placeholder - will be implemented in Phase 2
   return [];
 }
+// AUDIT: inspected, no changes.

@@ -58,3 +58,4 @@ export function BoxIcon({ color, size = 32 }: BoxIconProps) {
     </svg>
   );
 }
+// AUDIT: inspected, no changes.

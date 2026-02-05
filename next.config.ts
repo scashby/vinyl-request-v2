@@ -57,3 +57,4 @@ const nextConfig = {
 };
 
 export default nextConfig;
+// AUDIT: inspected, no changes.

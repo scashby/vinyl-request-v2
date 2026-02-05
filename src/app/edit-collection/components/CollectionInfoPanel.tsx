@@ -285,3 +285,4 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
 });
 
 export default CollectionInfoPanel;
+// AUDIT: inspected, no changes.

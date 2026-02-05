@@ -23,3 +23,4 @@ export const supabaseAdmin = createClient<Database>(supabaseUrl, supabaseKey, {
     persistSession: false,
   },
 });
+// AUDIT: inspected, no changes.

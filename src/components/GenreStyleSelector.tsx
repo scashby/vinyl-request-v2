@@ -234,3 +234,4 @@ export default function GenreStyleSelector({ value, onChange, type, placeholder 
     </div>
   );
 }
+// AUDIT: inspected, no changes.

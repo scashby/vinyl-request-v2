@@ -286,3 +286,4 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
 }
 
 export default ManageCratesModal;
+// AUDIT: inspected, no changes.

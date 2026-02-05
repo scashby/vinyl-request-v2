@@ -461,3 +461,4 @@ const CollectionTable = memo(function CollectionTable({
 });
 
 export default CollectionTable;
+// AUDIT: inspected, no changes.

@@ -260,3 +260,4 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }:
 }
 
 export default NewCrateModal;
+// AUDIT: inspected, no changes.

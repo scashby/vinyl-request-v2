@@ -232,3 +232,4 @@ export function splitColumnsByLock(columns: ColumnDefinition[], lockedIds: Colum
 
   return { locked, unlocked };
 }
+// AUDIT: inspected, no changes.

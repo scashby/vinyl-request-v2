@@ -121,3 +121,4 @@ export function EnrichmentTab({ album, onChange }: EnrichmentTabProps) {
     </div>
   );
 }
+// AUDIT: inspected, no changes.

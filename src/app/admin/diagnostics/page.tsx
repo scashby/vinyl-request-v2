@@ -369,3 +369,4 @@ function StatBox({ label, value, color }: { label: string; value: number; color:
     </div>
   );
 }
+// AUDIT: inspected, no changes.

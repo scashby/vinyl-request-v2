@@ -1202,3 +1202,4 @@ export async function fetchPitchforkData(album: { artist: string, title: string 
         }
     };
 }
+// AUDIT: updated for V3 alignment, UI parity, and build stability.

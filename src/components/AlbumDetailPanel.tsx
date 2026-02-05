@@ -278,3 +278,4 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
     </div>
   );
 }
+// AUDIT: inspected, no changes.

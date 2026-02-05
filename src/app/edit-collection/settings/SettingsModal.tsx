@@ -144,3 +144,4 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     </div>
   );
 }
+// AUDIT: inspected, no changes.

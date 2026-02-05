@@ -180,3 +180,4 @@ export const toSafeSearchString = (value: unknown): string => {
     .replace(/\s+/g, ' ')
     .trim();
 };
+// AUDIT: inspected, no changes.

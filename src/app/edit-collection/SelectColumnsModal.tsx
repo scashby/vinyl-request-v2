@@ -153,3 +153,4 @@ export function SelectColumnsModal({ isOpen, onClose, initialColumns, onSave }: 
     </div>
   );
 }
+// AUDIT: inspected, no changes.

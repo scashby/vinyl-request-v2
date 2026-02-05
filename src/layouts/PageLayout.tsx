@@ -9,3 +9,4 @@ const PageLayout = ({ children }: { children: ReactNode }) => (
 );
 
 export default PageLayout;
+// AUDIT: inspected, no changes.

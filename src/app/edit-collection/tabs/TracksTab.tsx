@@ -585,7 +585,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
   const currentDisc = discs.find(d => d.disc_number === activeDisc) || discs[0];
 
   return (
-    <div className="flex flex-col gap-4 p-5 bg-white text-gray-900">
+    <div className="flex flex-col gap-4 p-4 bg-white text-gray-900">
       {/* Disc Tabs */}
       <div className="flex gap-1 border-b border-gray-200 bg-white overflow-x-auto">
         {discs.map(disc => (
@@ -621,7 +621,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
       </div>
 
       {/* Disc Metadata */}
-      <div className="bg-gray-50 p-4 rounded-md flex flex-col gap-3 border border-gray-200">
+      <div className="bg-white p-4 rounded-md flex flex-col gap-3 border border-gray-200">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 flex flex-col gap-1">
             <label className="text-xs font-medium text-gray-500">Disc Title</label>
@@ -973,3 +973,4 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
     </div>
   );
 });
+// AUDIT: updated for UI parity with CLZ reference.

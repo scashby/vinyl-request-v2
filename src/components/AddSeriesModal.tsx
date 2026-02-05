@@ -45,3 +45,4 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({ onClose, onAddSeries })
 };
 
 export default AddSeriesModal;
+// AUDIT: inspected, no changes.

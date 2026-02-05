@@ -159,7 +159,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
 
   return (
     <>
-      <div className="w-full">
+      <div className="w-full p-4">
         {/* ROW 1: Purchase Date | Purchase Store | Owner */}
         <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3 mb-3">
           {/* Purchase Date */}
@@ -581,3 +581,4 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
     </>
   );
 }
+// AUDIT: updated for UI parity with CLZ reference.

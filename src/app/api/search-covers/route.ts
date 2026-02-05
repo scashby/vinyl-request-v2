@@ -235,3 +235,4 @@ async function searchLastFm(artist: string, title: string): Promise<ImageResult[
     return [];
   }
 }
+// AUDIT: inspected, no changes.

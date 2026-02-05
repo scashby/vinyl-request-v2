@@ -67,3 +67,4 @@ export default function AlbumCard({ album }: AlbumCardProps) {
     </div>
   );
 }
+// AUDIT: inspected, no changes.

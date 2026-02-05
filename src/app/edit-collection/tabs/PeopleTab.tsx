@@ -106,11 +106,11 @@ export function PeopleTab({ album, onChange }: PeopleTabProps) {
   const fieldConfig = getFieldConfig();
 
   return (
-    <div className="p-5">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 max-w-[900px]">
+    <div className="p-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[980px]">
         {/* LEFT COLUMN - Credits */}
-        <div className="border border-gray-200 rounded-md p-4 bg-gray-50">
-          <h3 className="text-sm font-semibold text-gray-500 mb-4 mt-0">
+        <div className="border border-gray-200 rounded-md p-4 bg-white">
+          <h3 className="text-sm font-semibold text-gray-600 mb-3 mt-0">
             Credits
           </h3>
           {renderField('Songwriter', 'songwriters')}
@@ -119,8 +119,8 @@ export function PeopleTab({ album, onChange }: PeopleTabProps) {
         </div>
 
         {/* RIGHT COLUMN - Musicians */}
-        <div className="border border-gray-200 rounded-md p-4 bg-gray-50">
-          <h3 className="text-sm font-semibold text-gray-500 mb-4 mt-0">
+        <div className="border border-gray-200 rounded-md p-4 bg-white">
+          <h3 className="text-sm font-semibold text-gray-600 mb-3 mt-0">
             Musicians
           </h3>
           {renderField('Musician', 'musicians')}
@@ -150,3 +150,4 @@ export function PeopleTab({ album, onChange }: PeopleTabProps) {
     </div>
   );
 }
+// AUDIT: updated for UI parity with CLZ reference.

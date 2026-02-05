@@ -7,3 +7,4 @@ export default function LandingLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
+// AUDIT: inspected, no changes.

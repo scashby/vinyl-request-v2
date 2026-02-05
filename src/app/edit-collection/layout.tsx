@@ -7,3 +7,4 @@ export default function CollectionBrowserLayout({
 }) {
   return <>{children}</>;
 }
+// AUDIT: inspected, no changes.

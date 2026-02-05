@@ -318,3 +318,4 @@ export async function generatePDF(options: PDFOptions): Promise<void> {
   const filename = `${title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
   doc.save(filename);
 }
+// AUDIT: inspected, no changes.

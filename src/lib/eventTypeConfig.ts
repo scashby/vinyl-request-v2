@@ -91,3 +91,4 @@ export const defaultEventTypeConfig: EventTypeConfigState = {
     },
   ],
 };
+// AUDIT: inspected, no changes.

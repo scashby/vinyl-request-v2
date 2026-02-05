@@ -249,3 +249,4 @@ export function toSafeSearchString(value: unknown): string {
   if (Array.isArray(value)) return value.join(' ').toLowerCase();
   return '';
 }
+// AUDIT: inspected, no changes.

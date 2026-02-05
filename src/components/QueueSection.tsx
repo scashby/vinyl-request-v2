@@ -315,3 +315,4 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
     </div>
   );
 }
+// AUDIT: inspected, no changes.

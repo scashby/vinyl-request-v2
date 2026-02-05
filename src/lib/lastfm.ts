@@ -21,3 +21,4 @@ export async function searchLastFMTrack(artist: string, title: string) {
     service: 'Last.fm',
   };
 }
+// AUDIT: inspected, no changes.

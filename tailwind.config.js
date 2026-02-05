@@ -20,3 +20,4 @@ module.exports = {
   },
   plugins: [],
 }
+// AUDIT: inspected, no changes.

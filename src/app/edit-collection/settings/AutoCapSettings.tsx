@@ -202,3 +202,4 @@ export function AutoCapSettings({ isOpen, onClose, currentMode, onSave, onManage
     </div>
   );
 }
+// AUDIT: inspected, no changes.

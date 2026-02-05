@@ -529,3 +529,4 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCra
 }
 
 export default NewSmartCrateModal;
+// AUDIT: inspected, no changes.

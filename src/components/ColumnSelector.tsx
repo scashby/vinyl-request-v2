@@ -490,3 +490,4 @@ const ColumnSelector = memo(function ColumnSelector({ visibleColumns, onColumnsC
 });
 
 export default ColumnSelector;
+// AUDIT: inspected, no changes.

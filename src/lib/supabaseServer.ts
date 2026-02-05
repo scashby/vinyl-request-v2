@@ -31,3 +31,4 @@ export function supabaseServer(authHeader?: string) {
 export function getAuthHeader(request: Request) {
   return request.headers.get('authorization') ?? undefined;
 }
+// AUDIT: inspected, no changes.
