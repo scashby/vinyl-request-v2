@@ -175,103 +175,94 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
   };
 
   return (
-    <div className="h-full flex flex-col overflow-y-auto p-4 gap-4">
+    <div className="h-full flex flex-col overflow-y-auto p-4 gap-5">
       {/* FRONT & BACK ROW */}
-      <div className="flex gap-4 h-[350px]">
+      <div className="flex gap-4">
         {/* FRONT COVER */}
-        <div className="flex-1 flex flex-col border border-gray-200 rounded-md p-3 bg-gray-50">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-sm font-bold text-gray-700 m-0">Front Cover</h3>
-            <div className="flex gap-1">
+        <div className="flex-1 flex flex-col">
+          <div className="text-sm font-semibold text-gray-800 mb-1">Front Cover</div>
+          <div className="flex items-center gap-2 bg-[#2b2b2b] text-white rounded px-2 py-1.5 text-[11px]">
+            <button
+              onClick={() => handleFindOnline('front')}
+              className="px-2 py-1 bg-[#3a3a3a] rounded hover:bg-[#4a4a4a]"
+            >
+              Find Online
+            </button>
+            <button
+              onClick={() => handleUpload('front')}
+              className="px-2 py-1 bg-[#3a3a3a] rounded hover:bg-[#4a4a4a]"
+            >
+              Upload
+            </button>
+            {album.image_url && (
+              <>
+                <button
+                  onClick={() => handleRemove('front')}
+                  className="px-2 py-1 bg-[#3a3a3a] rounded hover:bg-[#4a4a4a]"
+                >
+                  Remove
+                </button>
+                <button
+                  onClick={() => handleCrop('front')}
+                  className="px-2 py-1 bg-[#3a3a3a] rounded hover:bg-[#4a4a4a]"
+                >
+                  Crop / Rotate
+                </button>
+              </>
+            )}
+          </div>
+          <div className="mt-2 bg-white border border-gray-300 rounded p-2">
+            <div className="relative w-full aspect-square bg-white border border-gray-200 rounded overflow-hidden flex items-center justify-center">
               {album.image_url ? (
-                <>
-                  <button 
-                    onClick={() => handleFindOnline('front')}
-                    className="px-2 py-1 text-[10px] bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    Replace
-                  </button>
-                  <button
-                    onClick={() => handleCrop('front')}
-                    className="px-2 py-1 text-[10px] bg-amber-500 text-white rounded hover:bg-amber-600"
-                  >
-                    Crop/Rotate
-                  </button>
-                  <button 
-                    onClick={() => handleRemove('front')}
-                    className="px-2 py-1 text-[10px] bg-red-600 text-white rounded hover:bg-red-700"
-                  >
-                    Remove
-                  </button>
-                </>
+                <Image src={album.image_url} alt="Front Cover" fill style={{ objectFit: 'contain' }} unoptimized />
               ) : (
-                <>
-                  <button 
-                    onClick={() => handleFindOnline('front')}
-                    className="px-2 py-1 text-[10px] bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    Search
-                  </button>
-                  <button 
-                    onClick={() => handleUpload('front')}
-                    className="px-2 py-1 text-[10px] bg-gray-600 text-white rounded hover:bg-gray-700"
-                  >
-                    Upload
-                  </button>
-                </>
+                <span className="text-gray-400 text-xs">No Front Cover</span>
               )}
             </div>
-          </div>
-          <div className="flex-1 relative bg-white border border-gray-300 rounded overflow-hidden flex items-center justify-center">
-            {album.image_url ? (
-              <Image src={album.image_url} alt="Front Cover" fill style={{ objectFit: 'contain' }} unoptimized />
-            ) : (
-              <span className="text-gray-400 text-xs">No Front Cover</span>
-            )}
           </div>
         </div>
 
         {/* BACK COVER */}
-        <div className="flex-1 flex flex-col border border-gray-200 rounded-md p-3 bg-gray-50">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-sm font-bold text-gray-700 m-0">Back Cover</h3>
-            <div className="flex gap-1">
-              <button 
-                onClick={() => handleFindOnline('back')}
-                className="px-2 py-1 text-[10px] bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                {album.back_image_url ? 'Replace' : 'Search'}
-              </button>
-              {album.back_image_url && (
+        <div className="flex-1 flex flex-col">
+          <div className="text-sm font-semibold text-gray-800 mb-1">Back Cover</div>
+          <div className="flex items-center gap-2 bg-[#2b2b2b] text-white rounded px-2 py-1.5 text-[11px]">
+            <button
+              onClick={() => handleFindOnline('back')}
+              className="px-2 py-1 bg-[#3a3a3a] rounded hover:bg-[#4a4a4a]"
+            >
+              Find Online
+            </button>
+            <button
+              onClick={() => handleUpload('back')}
+              className="px-2 py-1 bg-[#3a3a3a] rounded hover:bg-[#4a4a4a]"
+            >
+              Upload
+            </button>
+            {album.back_image_url && (
+              <>
                 <button
-                  onClick={() => handleCrop('back')}
-                  className="px-2 py-1 text-[10px] bg-amber-500 text-white rounded hover:bg-amber-600"
-                >
-                  Crop/Rotate
-                </button>
-              )}
-              <button 
-                onClick={() => handleUpload('back')}
-                className="px-2 py-1 text-[10px] bg-gray-600 text-white rounded hover:bg-gray-700"
-              >
-                {album.back_image_url ? 'Upload New' : 'Upload'}
-              </button>
-              {album.back_image_url && (
-                <button 
                   onClick={() => handleRemove('back')}
-                  className="px-2 py-1 text-[10px] bg-red-600 text-white rounded hover:bg-red-700"
+                  className="px-2 py-1 bg-[#3a3a3a] rounded hover:bg-[#4a4a4a]"
                 >
                   Remove
                 </button>
+                <button
+                  onClick={() => handleCrop('back')}
+                  className="px-2 py-1 bg-[#3a3a3a] rounded hover:bg-[#4a4a4a]"
+                >
+                  Crop / Rotate
+                </button>
+              </>
+            )}
+          </div>
+          <div className="mt-2 bg-white border border-gray-300 rounded p-2">
+            <div className="relative w-full aspect-square bg-white border border-gray-200 rounded overflow-hidden flex items-center justify-center">
+              {album.back_image_url ? (
+                <Image src={album.back_image_url} alt="Back Cover" fill style={{ objectFit: 'contain' }} unoptimized />
+              ) : (
+                <span className="text-gray-400 text-xs">No Back Cover</span>
               )}
             </div>
-          </div>
-          <div className="flex-1 relative bg-white border border-gray-300 rounded overflow-hidden flex items-center justify-center">
-            {album.back_image_url ? (
-              <Image src={album.back_image_url} alt="Back Cover" fill style={{ objectFit: 'contain' }} unoptimized />
-            ) : (
-              <span className="text-gray-400 text-xs">No Back Cover</span>
-            )}
           </div>
         </div>
       </div>
