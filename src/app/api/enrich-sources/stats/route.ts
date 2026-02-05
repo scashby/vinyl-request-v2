@@ -3,41 +3,90 @@ import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 
 export const dynamic = 'force-dynamic';
 
+type RecordingRow = {
+  duration_seconds: number | null;
+  credits: unknown;
+};
+
+type ReleaseTrackRow = {
+  recording?: RecordingRow | RecordingRow[] | null;
+};
+
+type MasterRow = {
+  id?: number | string | null;
+  cover_image_url?: string | null;
+  genres?: string[] | null;
+  styles?: string[] | null;
+  original_release_year?: number | null;
+};
+
+type ReleaseRow = {
+  id?: number | string | null;
+  barcode?: string | null;
+  label?: string | null;
+  catalog_number?: string | null;
+  release_date?: string | null;
+  release_year?: number | null;
+  spotify_album_id?: string | null;
+  master?: MasterRow | MasterRow[] | null;
+  release_tracks?: ReleaseTrackRow[] | null;
+};
+
 export async function GET(request: Request) {
   const supabase = supabaseServer(getAuthHeader(request));
 
   try {
-    // 1. Fetch Albums
-    const { data: albums, error } = await supabase
-      .from('inventory')
-      .select(`
-        id,
-        release:releases (
+    // 1. Fetch Albums (paginate to avoid Supabase 1000-row default cap)
+    const albums: Array<{
+      id: string | number;
+      release?: ReleaseRow | ReleaseRow[] | null;
+    }> = [];
+    const batchSize = 1000;
+    let from = 0;
+    let done = false;
+
+    while (!done) {
+      const { data: batch, error } = await supabase
+        .from('inventory')
+        .select(`
           id,
-          barcode,
-          label,
-          catalog_number,
-          release_date,
-          release_year,
-          spotify_album_id,
-          master:masters (
+          release:releases (
             id,
-            cover_image_url,
-            genres,
-            styles,
-            original_release_year
-          ),
-          release_tracks:release_tracks (
-            recording:recordings (
-              duration_seconds,
-              credits
+            barcode,
+            label,
+            catalog_number,
+            release_date,
+            release_year,
+            spotify_album_id,
+            master:masters (
+              id,
+              cover_image_url,
+              genres,
+              styles,
+              original_release_year
+            ),
+            release_tracks:release_tracks (
+              recording:recordings (
+                duration_seconds,
+                credits
+              )
             )
           )
-        )
-      `);
+        `)
+        .range(from, from + batchSize - 1);
 
-    if (error) throw error;
-    if (!albums) return NextResponse.json({ success: true, stats: null });
+      if (error) throw error;
+      if (!batch || batch.length === 0) break;
+
+      albums.push(...batch);
+      if (batch.length < batchSize) {
+        done = true;
+      } else {
+        from += batchSize;
+      }
+    }
+
+    if (albums.length === 0) return NextResponse.json({ success: true, stats: null });
 
     const albumsWithTracks = new Set<string>();
     const albumsWithMissingDurations = new Set<string>();
@@ -118,10 +167,10 @@ export async function GET(request: Request) {
 
     albums.forEach(album => {
       const albumIdStr = String(album.id);
-      const release = toSingle(album.release);
-      const master = toSingle(release?.master);
+      const release = toSingle<ReleaseRow>(album.release);
+      const master = toSingle<MasterRow>(release?.master ?? null);
       const releaseTracks = release?.release_tracks ?? [];
-      const firstRecording = toSingle(releaseTracks[0]?.recording);
+      const firstRecording = toSingle<RecordingRow>(releaseTracks[0]?.recording ?? null);
       const creditInfo = getAlbumCredits(firstRecording?.credits);
 
       if (releaseTracks.length > 0) {
