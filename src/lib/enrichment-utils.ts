@@ -258,6 +258,7 @@ interface SpotifyAudioFeature {
 
 interface DiscogsImage {
   uri: string;
+  type?: 'primary' | 'secondary';
 }
 
 interface DiscogsLabel {

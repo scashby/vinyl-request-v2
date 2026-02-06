@@ -416,14 +416,18 @@ interface ExistingAlbum {
   discogs_master_id?: string | null;
   format?: string | null;
   catalog_number?: string | null;
+  label?: string | null;
+  barcode?: string | null;
   media_condition?: string | null;
   sleeve_condition?: string | null;
   country?: string | null;
+  release_date?: string | null;
   year?: string | null;
   image_url?: string | null;
   cover_image?: string | null;
   tracks?: boolean | null;
   genres?: string[] | null;
+  styles?: string[] | null;
 }
 
 interface CandidateMatch {
