@@ -637,7 +637,7 @@ function compareAlbums(
         })).sort((a, b) => b.score - a.score);
         candidateMatches = filterCandidateMatches(candidateMatches);
         candidateCount = candidateMatches.length;
-        ambiguousCandidates = true;
+        ambiguousCandidates = candidateMatches.length > 1;
         if (exactMatches.length === 1) {
           existingAlbum = exactMatches[0];
           matchType = 'discogs_id';
@@ -668,6 +668,7 @@ function compareAlbums(
         })).sort((a, b) => b.score - a.score);
         candidateMatches = filterCandidateMatches(candidateMatches);
         candidateCount = candidateMatches.length;
+        ambiguousCandidates = candidateMatches.length > 1;
         let bestIndex = 0;
         let bestScore = -1;
         masterCandidates.forEach((candidate, index) => {
@@ -738,6 +739,7 @@ function compareAlbums(
         })).sort((a, b) => b.score - a.score);
         candidateMatches = filterCandidateMatches(candidateMatches);
         candidateCount = candidateMatches.length;
+        ambiguousCandidates = candidateMatches.length > 1;
         candidates.forEach((candidate, index) => {
           const score = scoreCandidateMatch(parsedAlbum, candidate);
           if (score > bestScore) {
