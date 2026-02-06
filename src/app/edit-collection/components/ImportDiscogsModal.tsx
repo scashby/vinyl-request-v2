@@ -572,6 +572,10 @@ function compareAlbums(
     let candidateCount = 0;
     let candidateMatches: CandidateMatch[] = [];
     const parsedFormatKey = formatKeyFromString(parsedAlbum.format);
+    const filterCandidateMatches = (list: CandidateMatch[]) => {
+      if (!parsedFormatKey) return list;
+      return list.filter((candidate) => formatKeyFromString(candidate.format ?? null) === parsedFormatKey);
+    };
     
     if (parsedAlbum.discogs_release_id) {
       const candidates = releaseIdMap.get(parsedAlbum.discogs_release_id) ?? [];
@@ -631,8 +635,9 @@ function compareAlbums(
           country: candidate.country ?? null,
           score: scoreCandidateMatch(parsedAlbum, candidate),
         })).sort((a, b) => b.score - a.score);
+        candidateMatches = filterCandidateMatches(candidateMatches);
+        candidateCount = candidateMatches.length;
         ambiguousCandidates = true;
-        candidateCount = candidates.length;
         if (exactMatches.length === 1) {
           existingAlbum = exactMatches[0];
           matchType = 'discogs_id';
@@ -661,6 +666,8 @@ function compareAlbums(
           country: candidate.country ?? null,
           score: scoreCandidateMatch(parsedAlbum, candidate),
         })).sort((a, b) => b.score - a.score);
+        candidateMatches = filterCandidateMatches(candidateMatches);
+        candidateCount = candidateMatches.length;
         let bestIndex = 0;
         let bestScore = -1;
         masterCandidates.forEach((candidate, index) => {
@@ -729,6 +736,8 @@ function compareAlbums(
           country: candidate.country ?? null,
           score: scoreCandidateMatch(parsedAlbum, candidate),
         })).sort((a, b) => b.score - a.score);
+        candidateMatches = filterCandidateMatches(candidateMatches);
+        candidateCount = candidateMatches.length;
         candidates.forEach((candidate, index) => {
           const score = scoreCandidateMatch(parsedAlbum, candidate);
           if (score > bestScore) {
