@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 import { parseDiscogsFormat } from "src/utils/formatUtils";
+import type { Json } from "types/supabase";
 const DISCOGS_TOKEN = process.env.DISCOGS_TOKEN ?? process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
@@ -221,7 +222,7 @@ export async function POST(req: Request) {
             if (Object.keys(albumDetails).length > 0) baseCredits.album_details = albumDetails;
             if (Object.keys(artwork).length > 0) baseCredits.artwork = artwork;
             if (track.artist) baseCredits.track_artist = track.artist;
-            return Object.keys(baseCredits).length > 0 ? baseCredits : undefined;
+            return Object.keys(baseCredits).length > 0 ? (baseCredits as Json) : undefined;
           })(),
         })
         .select('id')
