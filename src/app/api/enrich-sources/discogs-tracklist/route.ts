@@ -21,6 +21,7 @@ type DiscogsResponse = {
   genres?: string[];
   styles?: string[];
   formats?: { name?: string; qty?: string | number; descriptions?: string[] }[];
+  images?: Array<{ uri: string; type?: 'primary' | 'secondary' }>;
 };
 
 const parseDurationToSeconds = (duration?: string) => {
@@ -158,6 +159,15 @@ export async function POST(req: Request) {
       box_set: parsedFormat.box_set ?? null,
     } : {};
 
+    const primaryImage = discogsData.images?.find((img) => img.type === 'primary')?.uri ?? discogsData.images?.[0]?.uri ?? null;
+    const secondaryImages = (discogsData.images ?? []).filter((img) => img.type !== 'primary');
+    const backImage = secondaryImages[0]?.uri ?? null;
+    const galleryImages = secondaryImages.slice(1).map((img) => img.uri).filter(Boolean);
+    const artwork = (backImage || galleryImages.length > 0) ? {
+      back_image_url: backImage ?? null,
+      inner_sleeve_images: galleryImages.length > 0 ? galleryImages : null,
+    } : {};
+
     // Process tracks with per-track artist info
     const enrichedTracks = discogsData.tracklist.map((track: DiscogsTrack) => {
       let trackArtist = undefined;
@@ -206,7 +216,13 @@ export async function POST(req: Request) {
         .insert({
           title: track.title || null,
           duration_seconds: parseDurationToSeconds(track.duration),
-          credits: Object.keys(albumDetails).length > 0 ? { album_details: albumDetails } : undefined,
+          credits: (() => {
+            const baseCredits: Record<string, unknown> = {};
+            if (Object.keys(albumDetails).length > 0) baseCredits.album_details = albumDetails;
+            if (Object.keys(artwork).length > 0) baseCredits.artwork = artwork;
+            if (track.artist) baseCredits.track_artist = track.artist;
+            return Object.keys(baseCredits).length > 0 ? baseCredits : undefined;
+          })(),
         })
         .select('id')
         .single();

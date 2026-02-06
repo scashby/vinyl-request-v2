@@ -70,14 +70,20 @@ interface DiscogsWantlistResponse {
 }
 
 // Interface for Enrichment Data (Detailed Release)
+interface DiscogsReleaseImage {
+  uri: string;
+  type?: 'primary' | 'secondary';
+}
+
 interface DiscogsReleaseData {
-  images?: { uri: string }[];
+  images?: DiscogsReleaseImage[];
   genres?: string[];
   styles?: string[];
   notes?: string;
   country?: string;
   released?: string;
   identifiers?: { type: string; value: string; description?: string }[];
+  labels?: { name?: string; catno?: string }[];
   tracklist?: {
     position?: string;
     title?: string;
@@ -102,6 +108,15 @@ const coerceYear = (value?: string | null): number | null => {
   if (!value) return null;
   const parsed = parseInt(value, 10);
   return Number.isNaN(parsed) ? null : parsed;
+};
+
+const normalizeReleaseDate = (released?: string | null): string | null => {
+  if (!released) return null;
+  const value = released.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  if (/^\d{4}-\d{2}$/.test(value)) return `${value}-01`;
+  if (/^\d{4}$/.test(value)) return `${value}-01-01`;
+  return null;
 };
 
 const buildFormatLabel = (release?: { media_type?: string | null; format_details?: string[] | null; qty?: number | null } | null) => {
@@ -141,6 +156,43 @@ const applyAlbumDetailsToReleaseRecordings = async (
         album_details: {
           ...(asRecord(credits.album_details ?? credits.albumDetails ?? credits.album_metadata)),
           ...albumDetails,
+        },
+      };
+      return supabase
+        .from('recordings')
+        .update({ credits: merged as Database['public']['Tables']['recordings']['Update']['credits'] })
+        .eq('id', recording.id);
+    })
+    .filter(Boolean);
+
+  if (updates.length > 0) {
+    await Promise.all(updates);
+  }
+};
+
+const applyArtworkToReleaseRecordings = async (
+  releaseId: number,
+  artwork: Record<string, unknown>
+) => {
+  if (!releaseId || Object.keys(artwork).length === 0) return;
+
+  const { data: tracks, error } = await supabase
+    .from('release_tracks')
+    .select('recording:recordings ( id, credits )')
+    .eq('release_id', releaseId);
+
+  if (error || !tracks) return;
+
+  const updates = tracks
+    .map((track) => {
+      const recording = Array.isArray(track.recording) ? track.recording[0] : track.recording;
+      if (!recording?.id) return null;
+      const credits = asRecord(recording.credits);
+      const merged = {
+        ...credits,
+        artwork: {
+          ...(asRecord(credits.artwork ?? credits.album_artwork ?? credits.albumArtwork)),
+          ...artwork,
         },
       };
       return supabase
@@ -298,6 +350,7 @@ const splitDiscogsUpdates = (payload: Record<string, unknown>) => {
         break;
       case 'barcode':
       case 'country':
+      case 'release_date':
       case 'discogs_release_id':
         releaseUpdates[key] = value ?? null;
         break;
@@ -369,7 +422,7 @@ interface ExistingAlbum {
   year?: string | null;
   image_url?: string | null;
   cover_image?: string | null;
-  tracks?: unknown[] | null;
+  tracks?: boolean | null;
   genres?: string[] | null;
 }
 
@@ -395,7 +448,7 @@ interface ComparedAlbum extends ParsedAlbum {
   existingMasterId?: number | null;
   needsEnrichment: boolean;
   missingFields: string[];
-  matchType?: 'discogs_id' | 'artist_title' | 'unmatched';
+  matchType?: 'discogs_id' | 'master_id' | 'artist_title' | 'unmatched';
   discogsIdMismatch?: boolean;
   weakMatch?: boolean;
   matchScore?: number;
@@ -478,12 +531,18 @@ function compareAlbums(
   sourceType: DiscogsSourceType
 ): ComparedAlbum[] {
   const releaseIdMap = new Map<string, ExistingAlbum>();
+  const masterIdMap = new Map<string, ExistingAlbum[]>();
   const artistAlbumMap = new Map<string, ExistingAlbum[]>();
   const matchedDbIds = new Set<number>();
   
   existing.forEach(album => {
     if (album.discogs_release_id) {
       releaseIdMap.set(album.discogs_release_id, album);
+    }
+    if (album.discogs_master_id) {
+      const entries = masterIdMap.get(album.discogs_master_id) ?? [];
+      entries.push(album);
+      masterIdMap.set(album.discogs_master_id, entries);
     }
     const normalizedKey = normalizeArtistAlbum(album.artist, album.title);
     const entries = artistAlbumMap.get(normalizedKey) ?? [];
@@ -505,6 +564,53 @@ function compareAlbums(
     if (parsedAlbum.discogs_release_id) {
       existingAlbum = releaseIdMap.get(parsedAlbum.discogs_release_id);
       if (existingAlbum) matchType = 'discogs_id';
+    }
+
+    if (!existingAlbum && parsedAlbum.discogs_master_id) {
+      const masterCandidates = masterIdMap.get(parsedAlbum.discogs_master_id) ?? [];
+      if (masterCandidates.length > 0) {
+        ambiguousCandidates = masterCandidates.length > 1;
+        candidateCount = masterCandidates.length;
+        candidateMatches = masterCandidates.map((candidate) => ({
+          id: candidate.id,
+          release_id: candidate.release_id ?? null,
+          master_id: candidate.master_id ?? null,
+          artist: candidate.artist,
+          title: candidate.title,
+          discogs_release_id: candidate.discogs_release_id ?? null,
+          discogs_master_id: candidate.discogs_master_id ?? null,
+          year: candidate.year ?? null,
+          format: candidate.format ?? null,
+          catalog_number: candidate.catalog_number ?? null,
+          country: candidate.country ?? null,
+          score: scoreCandidateMatch(parsedAlbum, candidate),
+        })).sort((a, b) => b.score - a.score);
+        let bestIndex = 0;
+        let bestScore = -1;
+        masterCandidates.forEach((candidate, index) => {
+          const score = scoreCandidateMatch(parsedAlbum, candidate);
+          if (score > bestScore) {
+            bestScore = score;
+            bestIndex = index;
+          }
+        });
+        const candidate = masterCandidates[bestIndex];
+        if (candidate) {
+          const ambiguous = masterCandidates.length > 1 && bestScore < 3;
+          if (!ambiguous) {
+            existingAlbum = candidate;
+            matchType = 'master_id';
+            weakMatch = bestScore < 3 || masterCandidates.length > 1;
+            matchScore = bestScore;
+            masterCandidates.splice(bestIndex, 1);
+            if (masterCandidates.length === 0) {
+              masterIdMap.delete(parsedAlbum.discogs_master_id);
+            } else {
+              masterIdMap.set(parsedAlbum.discogs_master_id, masterCandidates);
+            }
+          }
+        }
+      }
     }
     
     if (!existingAlbum) {
@@ -569,7 +675,7 @@ function compareAlbums(
       const existingCoverImage = existingAlbum.image_url ?? existingAlbum.cover_image;
       if (!existingCoverImage) missingFields.push('cover images');
       if (sourceType === 'collection') {
-        if (!existingAlbum.tracks || existingAlbum.tracks.length === 0) missingFields.push('tracks');
+        if (!existingAlbum.tracks) missingFields.push('tracks');
         if (!existingAlbum.genres || existingAlbum.genres.length === 0) missingFields.push('genres');
       }
       
@@ -680,8 +786,15 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
   const data = (await response.json()) as DiscogsReleaseData;
 
   // Extract data
+  const primaryImage = data.images?.find((img) => img.type === 'primary')?.uri ?? data.images?.[0]?.uri ?? null;
+  const secondaryImages = (data.images ?? []).filter((img) => img.type !== 'primary');
+  const backImage = secondaryImages[0]?.uri ?? null;
+  const galleryImages = secondaryImages.slice(1).map((img) => img.uri).filter(Boolean);
+
   const enriched: Record<string, unknown> = {
-    image_url: data.images?.[0]?.uri || null,
+    image_url: primaryImage,
+    back_image_url: backImage,
+    inner_sleeve_images: galleryImages.length > 0 ? galleryImages : null,
     genres: data.genres || [],
     styles: data.styles || [],
     release_notes: data.notes || null,
@@ -702,6 +815,11 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
       if (!isNaN(year)) enriched.original_release_year = year;
   }
 
+  const releaseDate = normalizeReleaseDate(data.released ?? null);
+  if (releaseDate) {
+    enriched.release_date = releaseDate;
+  }
+
   if (data.identifiers && Array.isArray(data.identifiers)) {
     const barcode = data.identifiers.find((i) => i.type === 'Barcode');
     if (barcode) {
@@ -716,6 +834,15 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     
     if (labels.length > 0) {
       enriched.label = labels[0] ?? null;
+    }
+  }
+
+  if (data.labels && Array.isArray(data.labels) && data.labels[0]) {
+    if (!enriched.label && data.labels[0].name) {
+      enriched.label = data.labels[0].name;
+    }
+    if (data.labels[0].catno) {
+      enriched.catalog_number = data.labels[0].catno;
     }
   }
 
@@ -927,6 +1054,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                   media_type,
                   format_details,
                   qty,
+                  release_tracks ( id ),
                   master:masters (
                     id,
                     title,
@@ -955,6 +1083,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 media_type?: string | null;
                 format_details?: string[] | null;
                 qty?: number | null;
+                release_tracks?: Array<{ id?: number | null }> | null;
                 master?: {
                   id?: number | null;
                   title?: string | null;
@@ -989,7 +1118,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 year: (release?.release_year ?? master?.original_release_year)?.toString() ?? null,
                 image_url: master?.cover_image_url ?? null,
                 cover_image: master?.cover_image_url ?? null,
-                tracks: null,
+                tracks: (release?.release_tracks?.length ?? 0) > 0,
                 genres: master?.genres ?? null,
               } satisfies ExistingAlbum;
             });
@@ -1151,21 +1280,23 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               };
 
               // Enrichment Logic (Only if NEW or Full Sync/Partial Sync needs it)
+              let enrichedData: Record<string, unknown> | null = null;
+
               if (
                 album.status === 'NEW' ||
                 syncMode === 'full_sync' ||
                 (syncMode === 'partial_sync' && album.needsEnrichment)
               ) {
-                const enrichedData = await enrichFromDiscogs(album.discogs_release_id);
+                enrichedData = await enrichFromDiscogs(album.discogs_release_id);
 
                 if (syncMode === 'full_sync' || album.status === 'NEW') {
-                  const enrichedSplit = splitDiscogsUpdates({ ...payload, ...enrichedData });
+                  const enrichedSplit = splitDiscogsUpdates({ ...payload, ...(enrichedData ?? {}) });
                   Object.assign(inventoryUpdates, enrichedSplit.inventoryUpdates);
                   Object.assign(releaseUpdates, enrichedSplit.releaseUpdates);
                   Object.assign(masterUpdates, enrichedSplit.masterUpdates);
                 } else {
                   album.missingFields.forEach((field) => {
-                    if (enrichedData[field]) {
+                    if (enrichedData && enrichedData[field]) {
                       const enrichedSplit = splitDiscogsUpdates({ [field]: enrichedData[field] });
                       Object.assign(inventoryUpdates, enrichedSplit.inventoryUpdates);
                       Object.assign(releaseUpdates, enrichedSplit.releaseUpdates);
@@ -1213,6 +1344,40 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               }
 
               await applyAlbumDetailsToReleaseRecordings(releaseRow.id, albumDetailsUpdate);
+              if (enrichedData) {
+                const artworkUpdate = {
+                  back_image_url: enrichedData.back_image_url ?? null,
+                  inner_sleeve_images: enrichedData.inner_sleeve_images ?? null,
+                };
+                await applyArtworkToReleaseRecordings(releaseRow.id, artworkUpdate);
+              }
+
+              const shouldFetchTracks =
+                Boolean(album.discogs_release_id) &&
+                (album.status === 'NEW' || album.missingFields.includes('tracks'));
+              if (shouldFetchTracks) {
+                try {
+                  const trackRes = await fetch('/api/enrich-sources/discogs-tracklist', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ albumId: inventoryRow.id }),
+                  });
+                  if (!trackRes.ok) {
+                    const errText = await trackRes.text();
+                    console.warn('Discogs tracklist enrichment failed:', errText);
+                    setImportErrors(prev => ([
+                      ...prev,
+                      `${album.artist} — ${album.title}: Tracklist enrichment failed (${trackRes.status})`
+                    ]));
+                  }
+                } catch (trackErr) {
+                  console.warn('Discogs tracklist enrichment exception:', trackErr);
+                  setImportErrors(prev => ([
+                    ...prev,
+                    `${album.artist} — ${album.title}: Tracklist enrichment exception`
+                  ]));
+                }
+              }
 
               if (album.status === 'NEW') {
                 resultCounts.added++;
@@ -1294,6 +1459,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   const changedCount = comparedAlbums.filter(a => a.status === 'CHANGED').length;
   const enrichmentCount = comparedAlbums.filter(a => a.status === 'CHANGED' && a.needsEnrichment).length;
   const matchedByDiscogsId = comparedAlbums.filter(a => a.matchType === 'discogs_id').length;
+  const matchedByMasterId = comparedAlbums.filter(a => a.matchType === 'master_id').length;
   const matchedByArtistTitle = comparedAlbums.filter(a => a.matchType === 'artist_title').length;
 
   const missingFieldCounts = comparedAlbums.reduce<Record<string, number>>((acc, album) => {
@@ -1347,7 +1513,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30000]">
       {/* FIXED: Added text-gray-900 to ensure text is visible on white background */}
-      <div className="bg-white text-gray-900 rounded-lg w-[600px] max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-white text-gray-900 rounded-lg w-[1280px] max-w-[96vw] max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-5 py-4 border-b border-gray-200 bg-orange-500 text-white flex justify-between items-center">
           <h2 className="m-0 text-lg font-semibold">
@@ -1494,7 +1660,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
               <div className="text-[12px] text-gray-600 mb-4">
                 <div className="mb-1">
-                  Matched by Discogs ID: <strong>{matchedByDiscogsId}</strong> · Matched by Artist/Title: <strong>{matchedByArtistTitle}</strong>
+                  Matched by Discogs ID: <strong>{matchedByDiscogsId}</strong> · Matched by Master ID: <strong>{matchedByMasterId}</strong> · Matched by Artist/Title: <strong>{matchedByArtistTitle}</strong>
                 </div>
                 <div className="mb-1">
                   Existing albums loaded from DB: <strong>{totalDatabaseCount}</strong> · Discogs items pulled: <strong>{comparedAlbums.length}</strong>

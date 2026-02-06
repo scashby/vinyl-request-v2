@@ -147,13 +147,39 @@ async function fetchDiscogsImages(artist: string, album: string): Promise<ImageC
 
     if (!releaseData.images) return [];
 
-    return releaseData.images.map((img) => ({
-      source: 'Discogs',
+    const secondaryImages = releaseData.images.filter((img) => img.type !== 'primary');
+    const backImage = secondaryImages[0];
+    const galleryImages = secondaryImages.slice(1);
+
+    const mapped: ImageCandidate[] = releaseData.images.map((img) => ({
+      source: 'Discogs' as const,
       url: img.uri,
       width: img.width,
       height: img.height,
-      type: img.type === 'primary' ? 'front' : 'gallery' 
+      type: img.type === 'primary' ? 'front' : 'gallery',
     }));
+
+    if (backImage) {
+      mapped.push({
+        source: 'Discogs',
+        url: backImage.uri,
+        width: backImage.width,
+        height: backImage.height,
+        type: 'back',
+      });
+    }
+
+    if (galleryImages.length > 0) {
+      mapped.push(...galleryImages.map((img) => ({
+        source: 'Discogs' as const,
+        url: img.uri,
+        width: img.width,
+        height: img.height,
+        type: 'gallery' as const,
+      })));
+    }
+
+    return mapped;
 
   } catch (error) {
     console.error("Error fetching Discogs images:", error);

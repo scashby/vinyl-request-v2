@@ -29,7 +29,7 @@ const KNOWN_DESCRIPTIONS = new Set([
   'Album', 'Compilation', 'Comp', 'EP', 'LP', 'Mini-Album', 'Maxi-Single', 'Single',
   'Remastered', 'Reissue', 'Repress', 'Mono', 'Stereo', 'Quadraphonic', 'Mixed',
   'Limited Edition', 'Promo', 'Test Pressing', 'Unofficial Release', 'Gatefold',
-  'Digipak', 'Club Edition', 'Jukebox'
+  'Digipak', 'Club Edition', 'Jukebox', 'Picture Disc', 'Box Set'
 ]);
 
 // Normalize helper (Discogs sometimes uses "Cass" for "Cassette")

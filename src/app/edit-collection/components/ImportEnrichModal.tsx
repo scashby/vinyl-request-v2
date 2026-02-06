@@ -11,6 +11,7 @@ import Image from 'next/image';
 import { supabase } from 'lib/supabaseClient';
 import EnrichmentReviewModal from './EnrichmentReviewModal';
 import { type FieldConflict } from 'lib/conflictDetection';
+import { parseDiscogsFormat } from 'lib/formatParser';
 import { 
   type DataCategory, 
   type EnrichmentService,
@@ -34,6 +35,7 @@ const ALLOWED_COLUMNS = new Set([
   'tempo_bpm', 'musical_key', 'lyrics', 'lyrics_url', 'time_signature', 
   'danceability', 'energy', 'mood_acoustic', 'mood_happy', 'mood_sad',
   'mood_aggressive', 'mood_electronic', 'mood_party', 'mood_relaxed',
+  'rpm', 'vinyl_weight', 'vinyl_color', 'packaging', 'is_box_set', 'box_set', 'extra',
   // --- UNBLOCKED FIELDS ---
   'samples', 'sampled_by',
   'is_cover', 'original_artist', 'original_year',
@@ -285,6 +287,23 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'labels':
         releaseUpdates.label = Array.isArray(value) ? value[0] ?? null : value;
         break;
+      case 'format': {
+        const formatString = typeof value === 'string' ? value.trim() : '';
+        if (formatString) {
+          const parsed = parseDiscogsFormat(formatString);
+          releaseUpdates.media_type = parsed.media_type ?? releaseUpdates.media_type;
+          releaseUpdates.format_details = parsed.format_details ?? releaseUpdates.format_details;
+          releaseUpdates.qty = parsed.qty ?? releaseUpdates.qty;
+          albumDetails.rpm = parsed.rpm ?? albumDetails.rpm ?? null;
+          albumDetails.vinyl_weight = parsed.weight ?? albumDetails.vinyl_weight ?? null;
+          albumDetails.vinyl_color = parsed.color ? [parsed.color] : albumDetails.vinyl_color ?? null;
+          albumDetails.packaging = parsed.packaging ?? albumDetails.packaging ?? null;
+          albumDetails.is_box_set = parsed.is_box_set ?? albumDetails.is_box_set ?? false;
+          albumDetails.box_set = parsed.box_set ?? albumDetails.box_set ?? null;
+          albumDetails.extra = parsed.extraText || albumDetails.extra || null;
+        }
+        break;
+      }
       case 'cat_no':
         releaseUpdates.catalog_number = value ?? null;
         break;
@@ -310,6 +329,13 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'original_release_date':
         if (isValidDate(value)) {
           releaseUpdates.release_date = value;
+          const yearMatch = String(value).match(/^(\d{4})/);
+          if (yearMatch) {
+            const yearNum = Number(yearMatch[1]);
+            if (!Number.isNaN(yearNum)) {
+              masterUpdates.original_release_year = yearNum;
+            }
+          }
         }
         break;
       case 'image_url':
@@ -358,6 +384,7 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'vinyl_color':
       case 'vinyl_weight':
       case 'rpm':
+      case 'is_box_set':
       case 'spars_code':
       case 'box_set':
       case 'sound':
@@ -950,7 +977,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
             let newVal = value;
             if (key === 'original_release_date' && typeof newVal === 'string') {
-                 if (/^\d{4}$/.test(newVal)) newVal = `${newVal}-12-25`;
+                 if (/^\d{4}$/.test(newVal)) newVal = `${newVal}-01-01`;
                  if (!isValidDate(newVal)) return;
             }
             

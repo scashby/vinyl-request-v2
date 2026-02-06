@@ -9,7 +9,7 @@ const DISCOGS_TOKEN = process.env.DISCOGS_TOKEN ?? process.env.NEXT_PUBLIC_DISCO
 
 type DiscogsResponse = {
   master_id?: number;
-  images?: Array<{ uri: string }>;
+  images?: Array<{ uri: string; type?: 'primary' | 'secondary' }>;
   genres?: string[];
   styles?: string[];
   labels?: Array<{ name?: string; catno?: string }>;
@@ -77,6 +77,44 @@ const applyAlbumDetailsToReleaseRecordings = async (
         album_details: {
           ...(asRecord(credits.album_details ?? credits.albumDetails ?? credits.album_metadata)),
           ...albumDetails,
+        },
+      };
+      return supabase
+        .from('recordings')
+        .update({ credits: merged as Database['public']['Tables']['recordings']['Update']['credits'] })
+        .eq('id', recording.id);
+    })
+    .filter(Boolean);
+
+  if (updates.length > 0) {
+    await Promise.all(updates);
+  }
+};
+
+const applyArtworkToReleaseRecordings = async (
+  supabase: ReturnType<typeof supabaseServer>,
+  releaseId: number,
+  artwork: Record<string, unknown>
+) => {
+  if (!releaseId || Object.keys(artwork).length === 0) return;
+
+  const { data: tracks, error } = await supabase
+    .from('release_tracks')
+    .select('recording:recordings ( id, credits )')
+    .eq('release_id', releaseId);
+
+  if (error || !tracks) return;
+
+  const updates = tracks
+    .map((track) => {
+      const recording = Array.isArray(track.recording) ? track.recording[0] : track.recording;
+      if (!recording?.id) return null;
+      const credits = asRecord(recording.credits);
+      const merged = {
+        ...credits,
+        artwork: {
+          ...(asRecord(credits.artwork ?? credits.album_artwork ?? credits.albumArtwork)),
+          ...artwork,
         },
       };
       return supabase
@@ -239,6 +277,7 @@ export async function POST(req: Request) {
     const needsYear = !release.release_year;
     const needsBarcode = !release.barcode;
     const needsReleaseDate = !release.release_date;
+    const needsOriginalYear = !master.original_release_year;
     const needsMediaType = !release.media_type;
     const needsFormatDetails = !release.format_details || release.format_details.length === 0;
     const needsQty = !release.qty;
@@ -268,10 +307,15 @@ export async function POST(req: Request) {
       console.log(`✓ Found master ID: ${discogsData.master_id}`);
     }
 
-    if (needsImage && discogsData.images && discogsData.images.length > 0) {
-      masterUpdate.cover_image_url = discogsData.images[0].uri;
+    const primaryImage = discogsData.images?.find((img) => img.type === 'primary')?.uri ?? discogsData.images?.[0]?.uri ?? null;
+    if (needsImage && primaryImage) {
+      masterUpdate.cover_image_url = primaryImage;
       console.log('✓ Found image');
     }
+
+    const secondaryImages = (discogsData.images ?? []).filter((img) => img.type !== 'primary');
+    const backImage = secondaryImages[0]?.uri ?? null;
+    const galleryImages = secondaryImages.slice(1).map((img) => img.uri).filter(Boolean);
 
     if (needsGenres && discogsData.genres && discogsData.genres.length > 0) {
       const genres = Array.from(new Set(discogsData.genres));
@@ -318,6 +362,15 @@ export async function POST(req: Request) {
       if (releaseDate) {
         releaseUpdate.release_date = releaseDate;
         console.log(`✓ Found release date: ${releaseDate}`);
+      }
+    }
+
+    if (needsOriginalYear) {
+      const yearFromReleaseDate = normalizeReleaseDate(discogsData.released ?? null)?.slice(0, 4);
+      const yearVal = discogsData.year ?? (yearFromReleaseDate ? Number(yearFromReleaseDate) : undefined);
+      if (yearVal && !Number.isNaN(yearVal)) {
+        masterUpdate.original_release_year = yearVal;
+        console.log(`✓ Found original release year: ${yearVal}`);
       }
     }
 
@@ -387,6 +440,14 @@ export async function POST(req: Request) {
         box_set: parsedFormat.box_set ?? null,
       };
       await applyAlbumDetailsToReleaseRecordings(supabase, release.id, albumDetails);
+    }
+
+    if (release.id && (backImage || galleryImages.length > 0)) {
+      const artwork = {
+        back_image_url: backImage ?? null,
+        inner_sleeve_images: galleryImages.length > 0 ? galleryImages : null,
+      };
+      await applyArtworkToReleaseRecordings(supabase, release.id, artwork);
     }
 
     console.log(`✅ Successfully enriched with Discogs metadata\n`);

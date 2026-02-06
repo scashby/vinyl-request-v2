@@ -1,5 +1,6 @@
 // src/lib/enrichment-utils.ts
 import Genius from 'genius-lyrics';
+import { parseDiscogsFormat } from './formatParser';
 
 // Initialize Genius Client if token exists
 const GENIUS_TOKEN = process.env.GENIUS_ACCESS_TOKEN;
@@ -32,6 +33,7 @@ export type CandidateData = {
   cat_no?: string;
   barcode?: string;
   country?: string;
+  format?: string;
   
   // Images
   image_url?: string;
@@ -61,6 +63,13 @@ export type CandidateData = {
   notes?: string; // Wikipedia/Discogs Notes
   enrichment_summary?: Record<string, string>; // Structured External Data (Setlist.fm, WhoSampled, etc)
   companies?: string[]; // Discogs Companies
+  rpm?: string;
+  vinyl_weight?: string;
+  vinyl_color?: string[];
+  packaging?: string;
+  is_box_set?: boolean;
+  box_set?: string;
+  extra?: string;
   
   // Sonic Domain
   is_cover?: boolean;
@@ -253,6 +262,7 @@ interface DiscogsImage {
 
 interface DiscogsLabel {
   name: string;
+  catno?: string;
 }
 
 interface DiscogsTrack {
@@ -286,6 +296,7 @@ interface DiscogsRelease {
   images?: DiscogsImage[];
   labels?: DiscogsLabel[];
   country?: string;
+  formats?: Array<{ name?: string; qty?: string | number; descriptions?: string[] }>;
   tracklist?: DiscogsTrack[];
   identifiers?: DiscogsIdentifier[];
   extraartists?: DiscogsArtist[];
@@ -626,6 +637,18 @@ export async function fetchAppleMusicData(album: { artist: string, title: string
 // ============================================================================
 const DISCOGS_TOKEN = process.env.DISCOGS_ACCESS_TOKEN!;
 
+const buildDiscogsFormatString = (formats?: Array<{ name?: string; qty?: string | number; descriptions?: string[] }>) => {
+  if (!formats || formats.length === 0) return '';
+  const format = formats[0];
+  const qty = format.qty ? String(format.qty).trim() : '';
+  const name = format.name?.trim() ?? '';
+  const details = format.descriptions?.filter(Boolean) ?? [];
+  const qtyPrefix = qty ? `${qty}x` : '';
+  const base = `${qtyPrefix}${name}`.trim();
+  if (details.length === 0) return base;
+  return `${base}, ${details.join(', ')}`.trim();
+};
+
 export async function fetchDiscogsData(album: { artist: string, title: string, discogs_release_id?: string }): Promise<EnrichmentResult> {
   try {
     let releaseId = album.discogs_release_id;
@@ -648,6 +671,9 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
 
     const data = await releaseRes.json() as DiscogsRelease;
 
+    const formatString = buildDiscogsFormatString(data.formats as Array<{ name?: string; qty?: string | number; descriptions?: string[] }> | undefined);
+    const parsedFormat = formatString ? parseDiscogsFormat(formatString) : null;
+
     // 2. Fetch Master Release (Definitive Original Date)
     let masterData: { year?: number } | null = null;
     if (data.master_id) {
@@ -657,16 +683,16 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
         if (masterRes.ok) masterData = await masterRes.json();
     }
 
-    // Capture all images
+    // Capture all images (prefer Discogs type hints)
     const allImages = data.images || [];
     const galleryImages: string[] = [];
-    let primaryImage: string | undefined = undefined;
-    let backImage: string | undefined = undefined;
-
-    if (allImages.length > 0) primaryImage = toHttps(allImages[0].uri);
-    if (allImages.length > 1) backImage = toHttps(allImages[1].uri);
-    if (allImages.length > 2) {
-       galleryImages.push(...allImages.slice(2).map((i: DiscogsImage) => toHttps(i.uri)!));
+    const primaryImage = toHttps(
+      allImages.find((img) => img.type === 'primary')?.uri ?? allImages[0]?.uri
+    );
+    const secondaryImages = allImages.filter((img) => img.type !== 'primary');
+    const backImage = toHttps(secondaryImages[0]?.uri);
+    if (secondaryImages.length > 1) {
+       galleryImages.push(...secondaryImages.slice(1).map((i: DiscogsImage) => toHttps(i.uri)!));
     }
 
     const candidate: CandidateData = {
@@ -680,6 +706,7 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
       back_image_url: backImage,
       inner_sleeve_images: galleryImages.length > 0 ? galleryImages : undefined,
       labels: data.labels?.map((l: DiscogsLabel) => l.name),
+      cat_no: data.labels?.[0]?.catno,
       country: data.country,
       notes: data.notes, 
       companies: data.companies?.map((c: DiscogsCompany) => c.name),
@@ -692,6 +719,19 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
           duration: t.duration || undefined
         }))
     };
+
+    if (formatString) {
+      candidate.format = formatString;
+    }
+    if (parsedFormat) {
+      candidate.rpm = parsedFormat.rpm ?? undefined;
+      candidate.vinyl_weight = parsedFormat.weight ?? undefined;
+      candidate.vinyl_color = parsedFormat.color ? [parsedFormat.color] : undefined;
+      candidate.packaging = parsedFormat.packaging ?? undefined;
+      candidate.is_box_set = parsedFormat.is_box_set ?? false;
+      candidate.box_set = parsedFormat.box_set ?? undefined;
+      candidate.extra = parsedFormat.extraText || undefined;
+    }
 
     if (data.identifiers) {
         const barcode = data.identifiers.find((id: DiscogsIdentifier) => id.type === 'Barcode');
