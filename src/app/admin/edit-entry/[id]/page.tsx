@@ -121,15 +121,6 @@ const asString = (value: unknown): string | null => {
   return null;
 };
 
-const asStringArray = (value: unknown): string[] => {
-  if (!value) return [];
-  if (Array.isArray(value)) {
-    return value.filter((item): item is string => typeof item === 'string');
-  }
-  if (typeof value === 'string') return [value];
-  return [];
-};
-
 const secondsToDuration = (seconds?: number | null): string => {
   if (!seconds && seconds !== 0) return '';
   const minutes = Math.floor(seconds / 60);

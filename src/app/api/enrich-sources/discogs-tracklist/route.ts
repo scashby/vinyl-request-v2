@@ -160,7 +160,6 @@ export async function POST(req: Request) {
       box_set: parsedFormat.box_set ?? null,
     } : {};
 
-    const primaryImage = discogsData.images?.find((img) => img.type === 'primary')?.uri ?? discogsData.images?.[0]?.uri ?? null;
     const secondaryImages = (discogsData.images ?? []).filter((img) => img.type !== 'primary');
     const backImage = secondaryImages[0]?.uri ?? null;
     const galleryImages = secondaryImages.slice(1).map((img) => img.uri).filter(Boolean);

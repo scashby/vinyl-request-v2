@@ -488,25 +488,14 @@ function normalizeComparable(value?: string | null): string {
   return value?.trim().toLowerCase() ?? '';
 }
 
-function buildComparisonKey(data: {
-  format?: string | null;
-  catalog_number?: string | null;
-  media_condition?: string | null;
-  sleeve_condition?: string | null;
-  country?: string | null;
-  year?: string | null;
-  discogs_master_id?: string | null;
-}): string {
-  return [
-    normalizeComparable(data.format),
-    normalizeComparable(data.catalog_number),
-    normalizeComparable(data.media_condition),
-    normalizeComparable(data.sleeve_condition),
-    normalizeComparable(data.country),
-    normalizeComparable(data.year),
-    normalizeComparable(data.discogs_master_id),
-  ].join('|');
-}
+const formatKeyFromString = (format?: string | null): string => {
+  if (!format) return '';
+  const parsed = parseDiscogsFormat(format);
+  const details = (parsed.format_details ?? []).map((d) => d.toLowerCase()).sort().join('|');
+  const mediaType = parsed.media_type?.toLowerCase() ?? '';
+  const qty = parsed.qty ? String(parsed.qty) : '';
+  return [qty, mediaType, details].filter(Boolean).join('|');
+};
 
 function scoreCandidateMatch(parsed: ParsedAlbum, candidate: ExistingAlbum): number {
   let score = 0;
@@ -564,6 +553,7 @@ function compareAlbums(
     let matchScore = 0;
     let candidateCount = 0;
     let candidateMatches: CandidateMatch[] = [];
+    const parsedFormatKey = formatKeyFromString(parsedAlbum.format);
     
     if (parsedAlbum.discogs_release_id) {
       existingAlbum = releaseIdMap.get(parsedAlbum.discogs_release_id);
@@ -600,17 +590,23 @@ function compareAlbums(
         });
         const candidate = masterCandidates[bestIndex];
         if (candidate) {
-          const ambiguous = masterCandidates.length > 1 && bestScore < 3;
-          if (!ambiguous) {
-            existingAlbum = candidate;
-            matchType = 'master_id';
-            weakMatch = bestScore < 3 || masterCandidates.length > 1;
-            matchScore = bestScore;
-            masterCandidates.splice(bestIndex, 1);
-            if (masterCandidates.length === 0) {
-              masterIdMap.delete(parsedAlbum.discogs_master_id);
-            } else {
-              masterIdMap.set(parsedAlbum.discogs_master_id, masterCandidates);
+          const candidateFormatKey = formatKeyFromString(candidate.format);
+          const formatMismatch = parsedFormatKey && candidateFormatKey && parsedFormatKey !== candidateFormatKey;
+          if (formatMismatch) {
+            ambiguousCandidates = true;
+          } else {
+            const ambiguous = masterCandidates.length > 1 && bestScore < 3;
+            if (!ambiguous) {
+              existingAlbum = candidate;
+              matchType = 'master_id';
+              weakMatch = bestScore < 3 || masterCandidates.length > 1;
+              matchScore = bestScore;
+              masterCandidates.splice(bestIndex, 1);
+              if (masterCandidates.length === 0) {
+                masterIdMap.delete(parsedAlbum.discogs_master_id);
+              } else {
+                masterIdMap.set(parsedAlbum.discogs_master_id, masterCandidates);
+              }
             }
           }
         }
@@ -647,6 +643,11 @@ function compareAlbums(
         });
         const candidate = candidates[bestIndex];
         if (candidate) {
+          const candidateFormatKey = formatKeyFromString(candidate.format);
+          const formatMismatch = parsedFormatKey && candidateFormatKey && parsedFormatKey !== candidateFormatKey;
+          if (formatMismatch) {
+            ambiguousCandidates = true;
+          } else {
           const ambiguous = candidates.length > 1 && bestScore < 3;
           if (!ambiguous) {
             existingAlbum = candidate;
@@ -657,6 +658,7 @@ function compareAlbums(
             if (candidates.length === 0) {
               artistAlbumMap.delete(parsedAlbum.artist_album_norm);
             }
+          }
           }
         }
       }
