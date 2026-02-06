@@ -711,9 +711,10 @@ function compareAlbums(
     
     if (!existingAlbum) {
       if (parsedAlbum.discogs_release_id) {
+        const needsReview = ambiguousCandidates && candidateMatches.length > 1;
         compared.push({
           ...parsedAlbum,
-          status: ambiguousCandidates ? 'REVIEW' : 'NEW',
+          status: needsReview ? 'REVIEW' : 'NEW',
           needsEnrichment: true,
           missingFields: ['all'],
           matchType,
@@ -780,9 +781,10 @@ function compareAlbums(
     }
 
     if (!existingAlbum) {
+      const needsReview = ambiguousCandidates && candidateMatches.length > 1;
       compared.push({
         ...parsedAlbum,
-        status: ambiguousCandidates ? 'REVIEW' : 'NEW',
+        status: needsReview ? 'REVIEW' : 'NEW',
         needsEnrichment: true,
         missingFields: ['all'],
         matchType,
