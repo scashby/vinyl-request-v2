@@ -681,6 +681,12 @@ function compareAlbums(
       if (sourceType === 'collection') {
         if (!existingAlbum.tracks) missingFields.push('tracks');
         if (!existingAlbum.genres || existingAlbum.genres.length === 0) missingFields.push('genres');
+        if (!existingAlbum.styles || existingAlbum.styles.length === 0) missingFields.push('styles');
+        if (!existingAlbum.label) missingFields.push('label');
+        if (!existingAlbum.catalog_number) missingFields.push('catalog');
+        if (!existingAlbum.barcode) missingFields.push('barcode');
+        if (!existingAlbum.country) missingFields.push('country');
+        if (!existingAlbum.release_date) missingFields.push('release date');
       }
       
       const isChanged = parsedAlbum.discogs_release_id !== existingAlbum.discogs_release_id;
@@ -1054,6 +1060,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                   barcode,
                   country,
                   release_year,
+                  release_date,
                   discogs_release_id,
                   media_type,
                   format_details,
@@ -1083,6 +1090,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 barcode?: string | null;
                 country?: string | null;
                 release_year?: number | null;
+                release_date?: string | null;
                 discogs_release_id?: string | null;
                 media_type?: string | null;
                 format_details?: string[] | null;
@@ -1116,14 +1124,18 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 discogs_master_id: master?.discogs_master_id ?? null,
                 format: formatLabel,
                 catalog_number: release?.catalog_number ?? null,
+                label: release?.label ?? null,
+                barcode: release?.barcode ?? null,
                 media_condition: row.media_condition ?? null,
                 sleeve_condition: row.sleeve_condition ?? null,
                 country: release?.country ?? null,
+                release_date: release?.release_date ?? null,
                 year: (release?.release_year ?? master?.original_release_year)?.toString() ?? null,
                 image_url: master?.cover_image_url ?? null,
                 cover_image: master?.cover_image_url ?? null,
                 tracks: (release?.release_tracks?.length ?? 0) > 0,
                 genres: master?.genres ?? null,
+                styles: master?.styles ?? null,
               } satisfies ExistingAlbum;
             });
 
