@@ -47,6 +47,7 @@ export type Album = {
   // Notes
   personal_notes?: string | null;
   release_notes?: string | null;
+  master_notes?: string | null;
   notes?: string | null;
 
   // Conditions
@@ -83,6 +84,7 @@ export type Album = {
     duration: string | null;
     type: 'track' | 'header';
     side?: string;
+    note?: string | null;
   }> | null;
   disc_metadata?: Array<Record<string, unknown>> | null;
   matrix_numbers?: string[] | null;

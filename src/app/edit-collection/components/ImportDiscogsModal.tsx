@@ -641,6 +641,15 @@ function compareAlbums(
         if (candidateMatches.length === 0) {
           ambiguousCandidates = false;
         }
+        if (candidateMatches.length === 1) {
+          const match = candidates.find((candidate) => candidate.id === candidateMatches[0].id);
+          if (match) {
+            existingAlbum = match;
+            matchType = 'discogs_id';
+            weakMatch = false;
+            matchScore = candidateMatches[0].score;
+          }
+        }
         if (exactMatches.length === 1) {
           existingAlbum = exactMatches[0];
           matchType = 'discogs_id';
@@ -653,8 +662,6 @@ function compareAlbums(
     if (!existingAlbum && parsedAlbum.discogs_master_id) {
       const masterCandidates = masterIdMap.get(parsedAlbum.discogs_master_id) ?? [];
       if (masterCandidates.length > 0) {
-        ambiguousCandidates = masterCandidates.length > 1;
-        candidateCount = masterCandidates.length;
         candidateMatches = masterCandidates.map((candidate) => ({
           id: candidate.id,
           release_id: candidate.release_id ?? null,
@@ -675,29 +682,18 @@ function compareAlbums(
         if (candidateMatches.length === 0) {
           ambiguousCandidates = false;
         }
-        let bestIndex = 0;
-        let bestScore = -1;
-        masterCandidates.forEach((candidate, index) => {
-          const score = scoreCandidateMatch(parsedAlbum, candidate);
-          if (score > bestScore) {
-            bestScore = score;
-            bestIndex = index;
-          }
-        });
-        const candidate = masterCandidates[bestIndex];
-        if (candidate) {
-          const candidateFormatKey = formatKeyFromString(candidate.format);
-          const formatMismatch = parsedFormatKey && candidateFormatKey && parsedFormatKey !== candidateFormatKey;
-          if (formatMismatch) {
-            ambiguousCandidates = true;
-          } else {
-            const ambiguous = masterCandidates.length > 1 && bestScore < 3;
+        const bestMatch = candidateMatches[0];
+        if (bestMatch) {
+          const candidateIndex = masterCandidates.findIndex((candidate) => candidate.id === bestMatch.id);
+          const candidate = candidateIndex >= 0 ? masterCandidates[candidateIndex] : undefined;
+          if (candidate) {
+            const ambiguous = candidateMatches.length > 1 && bestMatch.score < 3;
             if (!ambiguous) {
               existingAlbum = candidate;
               matchType = 'master_id';
-              weakMatch = bestScore < 3 || masterCandidates.length > 1;
-              matchScore = bestScore;
-              masterCandidates.splice(bestIndex, 1);
+              weakMatch = bestMatch.score < 3 || candidateMatches.length > 1;
+              matchScore = bestMatch.score;
+              masterCandidates.splice(candidateIndex, 1);
               if (masterCandidates.length === 0) {
                 masterIdMap.delete(parsedAlbum.discogs_master_id);
               } else {
@@ -726,10 +722,6 @@ function compareAlbums(
       }
       const candidates = artistAlbumMap.get(parsedAlbum.artist_album_norm);
       if (candidates && candidates.length > 0) {
-        ambiguousCandidates = candidates.length > 1;
-        candidateCount = candidates.length;
-        let bestIndex = 0;
-        let bestScore = -1;
         candidateMatches = candidates.map((candidate) => ({
           id: candidate.id,
           release_id: candidate.release_id ?? null,
@@ -750,31 +742,22 @@ function compareAlbums(
         if (candidateMatches.length === 0) {
           ambiguousCandidates = false;
         }
-        candidates.forEach((candidate, index) => {
-          const score = scoreCandidateMatch(parsedAlbum, candidate);
-          if (score > bestScore) {
-            bestScore = score;
-            bestIndex = index;
-          }
-        });
-        const candidate = candidates[bestIndex];
-        if (candidate) {
-          const candidateFormatKey = formatKeyFromString(candidate.format);
-          const formatMismatch = parsedFormatKey && candidateFormatKey && parsedFormatKey !== candidateFormatKey;
-          if (formatMismatch) {
-            ambiguousCandidates = true;
-          } else {
-          const ambiguous = candidates.length > 1 && bestScore < 3;
-          if (!ambiguous) {
-            existingAlbum = candidate;
-            matchType = 'artist_title';
-            weakMatch = bestScore < 3 || candidates.length > 1;
-            matchScore = bestScore;
-            candidates.splice(bestIndex, 1);
-            if (candidates.length === 0) {
-              artistAlbumMap.delete(parsedAlbum.artist_album_norm);
+        const bestMatch = candidateMatches[0];
+        if (bestMatch) {
+          const candidateIndex = candidates.findIndex((candidate) => candidate.id === bestMatch.id);
+          const candidate = candidateIndex >= 0 ? candidates[candidateIndex] : undefined;
+          if (candidate) {
+            const ambiguous = candidateMatches.length > 1 && bestMatch.score < 3;
+            if (!ambiguous) {
+              existingAlbum = candidate;
+              matchType = 'artist_title';
+              weakMatch = bestMatch.score < 3 || candidateMatches.length > 1;
+              matchScore = bestMatch.score;
+              candidates.splice(candidateIndex, 1);
+              if (candidates.length === 0) {
+                artistAlbumMap.delete(parsedAlbum.artist_album_norm);
+              }
             }
-          }
           }
         }
       }

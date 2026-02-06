@@ -218,10 +218,11 @@ function CollectionBrowserPage() {
                  id,
                  title,
                  original_release_year,
-               discogs_master_id,
-               cover_image_url,
-               genres,
-               styles,
+                 notes,
+                 discogs_master_id,
+                 cover_image_url,
+                 genres,
+                 styles,
                artist:artists (id, name),
                master_tag_links:master_tag_links (
                  master_tags (name)
@@ -244,7 +245,21 @@ function CollectionBrowserPage() {
       from += batchSize;
     }
 
-    setAlbums(allRows as Album[]);
+    const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+      Array.isArray(value) ? value[0] ?? null : value ?? null;
+
+    const mapped = allRows.map((row) => {
+      const release = toSingle(row.release);
+      const master = toSingle(release?.master);
+      return {
+        ...row,
+        release,
+        release_notes: release?.notes ?? null,
+        master_notes: master?.notes ?? null,
+      };
+    });
+
+    setAlbums(mapped as Album[]);
     setLoading(false);
   }, []);
 

@@ -405,7 +405,8 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                    id,
                    title,
                    duration_seconds,
-                   credits
+                   credits,
+                   notes
                  )
                ),
                master:masters (
@@ -417,6 +418,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                  cover_image_url,
                  genres,
                  styles,
+                 notes,
                  artist:artists (id, name),
                  master_tag_links:master_tag_links (
                    master_tags (name)
@@ -470,6 +472,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             type: 'track' as const,
             disc_number: discNumber,
             side: track.side ?? undefined,
+            note: recording?.notes ?? null,
           };
         });
         const maxDiscNumber = trackList.reduce((max, track) => Math.max(max, track.disc_number ?? 1), 1);
@@ -517,6 +520,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           custom_links: customLinks,
           personal_notes: data.personal_notes ?? null,
           release_notes: release?.notes ?? null,
+          master_notes: master?.notes ?? null,
           media_condition: data.media_condition ?? '',
           package_sleeve_condition: data.sleeve_condition ?? null,
           sleeve_condition: data.sleeve_condition ?? null,
@@ -762,6 +766,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             const recordingPayload = {
               title: trackTitle,
               duration_seconds: parseDurationToSeconds(track.duration),
+              notes: track.note ?? null,
               credits: Object.keys(recordingCredits).length > 0
                 ? (recordingCredits as unknown as Database['public']['Tables']['recordings']['Insert']['credits'])
                 : undefined,
@@ -892,6 +897,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                 ? extractIdFromUrl(editedAlbum.musicbrainz_id, '/release-group/') ?? editedAlbum.musicbrainz_id
                 : null,
             cover_image_url: editedAlbum.image_url ?? null,
+            notes: editedAlbum.master_notes ?? null,
             main_artist_id: mainArtistId,
           };
 

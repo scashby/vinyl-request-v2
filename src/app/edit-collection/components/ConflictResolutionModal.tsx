@@ -107,6 +107,8 @@ export default function ConflictResolutionModal({
         return { table: 'releases', column: 'spotify_album_id', value };
       case 'release_notes':
         return { table: 'releases', column: 'notes', value };
+      case 'master_notes':
+        return { table: 'masters', column: 'notes', value };
       case 'year':
         return { table: 'releases', column: 'release_year', value: coerceYear(value) };
       case 'format':

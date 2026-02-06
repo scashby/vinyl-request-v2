@@ -224,6 +224,7 @@ const CollectionTable = memo(function CollectionTable({
       location: (album: Album) => getAlbumLocation(album),
       personal_notes: (album: Album) => album.personal_notes || '—',
       release_notes: (album: Album) => album.release_notes || '—',
+      master_notes: (album: Album) => album.master_notes || '—',
       owner: (album: Album) => album.owner || '—',
       custom_tags: (album: Album) => formatArray(album.custom_tags ?? getAlbumTags(album)),
       modified_date: (album: Album) => (album.last_played_at ? formatDate(album.last_played_at) : '—'),

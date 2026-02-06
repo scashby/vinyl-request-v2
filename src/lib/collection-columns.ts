@@ -34,6 +34,7 @@ export type Album = {
   personal_notes: string | null;
   notes?: string | null;         // Alias
   release_notes: string | null;
+  master_notes: string | null;
   extra: string | null;
   discogs_notes: string | null;
 

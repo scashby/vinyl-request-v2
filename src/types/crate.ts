@@ -28,7 +28,7 @@ export interface SmartRule {
 export type CrateFieldType = 
   // Text fields - Basic
   | 'artist' | 'title' | 'format' | 'country' | 'location' 
-  | 'owner' | 'personal_notes' | 'release_notes' | 'barcode' | 'catalog_number' | 'cat_no' | 'label' | 'labels' | 'status'
+  | 'owner' | 'personal_notes' | 'release_notes' | 'master_notes' | 'barcode' | 'catalog_number' | 'cat_no' | 'label' | 'labels' | 'status'
   // Text fields - Condition
   | 'sleeve_condition' | 'package_sleeve_condition' | 'media_condition'
   // Text fields - Packaging/Metadata

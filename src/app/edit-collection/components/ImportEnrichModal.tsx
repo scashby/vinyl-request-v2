@@ -29,7 +29,7 @@ const ALLOWED_COLUMNS = new Set([
   'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
   'apple_music_id', 'apple_music_url', 'lastfm_id', 'lastfm_url', 
   'musicbrainz_id', 'musicbrainz_url', 'wikipedia_url', 'genius_url', 
-  'tags', 'lastfm_tags', 'notes', 'enriched_metadata', 'enrichment_summary', 'companies', 'genres', 'styles', 'original_release_date',
+  'tags', 'lastfm_tags', 'notes', 'release_notes', 'master_notes', 'enriched_metadata', 'enrichment_summary', 'companies', 'genres', 'styles', 'original_release_date',
   'inner_sleeve_images', 'musicians', 'credits', 'producers', 'engineers', 
   'songwriters', 'composer', 'conductor', 'orchestra',
   'tempo_bpm', 'musical_key', 'lyrics', 'lyrics_url', 'time_signature', 
@@ -322,6 +322,9 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'notes':
       case 'release_notes':
         releaseUpdates.notes = value ?? null;
+        break;
+      case 'master_notes':
+        masterUpdates.notes = value ?? null;
         break;
       case 'year':
         releaseUpdates.release_year = coerceYear(value);
@@ -982,9 +985,12 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             }
             
             if (newVal !== null && newVal !== undefined && newVal !== '') {
-               const targetKey = key === 'label' ? 'labels' : key === 'lastfm_tags' ? 'tags' : key;
-               if (!fieldCandidates[targetKey]) fieldCandidates[targetKey] = {};
-               fieldCandidates[targetKey][source] = newVal;
+            let targetKey = key === 'label' ? 'labels' : key === 'lastfm_tags' ? 'tags' : key;
+            if (key === 'notes') {
+              targetKey = normalizedSource === 'discogs' ? 'release_notes' : 'master_notes';
+            }
+            if (!fieldCandidates[targetKey]) fieldCandidates[targetKey] = {};
+            fieldCandidates[targetKey][source] = newVal;
             }
          });
 

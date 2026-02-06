@@ -8,6 +8,7 @@ interface Track {
   title: string;
   artist: string;
   duration: string;
+  note: string;
   disc_number: number;
   side?: string;
   is_header?: boolean;
@@ -115,6 +116,7 @@ export async function importTracksFromDiscogs(
           title: track.title || '',
           artist: track.artists?.[0]?.name || '',
           duration: parseDuration(track.duration),
+          note: '',
           disc_number: discNumber,
           side: side,
           is_header: isHeader,
@@ -167,6 +169,7 @@ export async function importTracksFromSpotify(
           title: track.name || '',
           artist: track.artists?.[0]?.name || '',
           duration: parseDuration(Math.floor((track.duration_ms || 0) / 1000)),
+          note: '',
           disc_number: discNumber,
           is_header: false,
         });

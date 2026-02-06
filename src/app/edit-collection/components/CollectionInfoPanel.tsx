@@ -82,7 +82,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
   const releaseYear = album.release?.release_year ?? album.release?.master?.original_release_year ?? null;
   const totalTracks = album.release?.track_count ?? (releaseTracks.length > 0 ? releaseTracks.length : fallbackTracks.length);
   const totalRuntime = getTotalRuntime();
-  const notes = album.personal_notes ?? album.release?.notes ?? null;
+  const notes = album.personal_notes ?? album.release?.notes ?? album.release?.master?.notes ?? album.master_notes ?? null;
 
   // Combine canonical genres and styles for display
   const displayGenres = Array.from(new Set([

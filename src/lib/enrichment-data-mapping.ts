@@ -93,10 +93,10 @@ export const DATA_CATEGORY_DESCRIPTIONS: Record<DataCategory, string> = {
   streaming_links: 'Service IDs and links (Spotify, Apple, WhoSampled, SecondHandSongs, etc)',
   reviews: 'Professional reviews, ratings, playcounts, popularity scores, and editorial notes',
   chart_data: 'Chart positions, sales certifications (Gold/Platinum/Diamond), and awards',
-  release_metadata: 'Labels, catalog numbers, barcodes, countries, release dates, notes, and companies',
+  release_metadata: 'Labels, catalog numbers, barcodes, countries, release dates, release notes, and companies',
   lyrics: 'Song lyrics and Genius annotations with URLs',
   similar_albums: 'Algorithmically generated similar album recommendations',
-  cultural_context: 'Historical significance, cultural impact, and recording locations from Wikipedia',
+  cultural_context: 'Historical significance, cultural impact, and master-level notes from Wikipedia',
 };
 
 /**
@@ -204,7 +204,7 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
     'studio',
     'recording_location',
     'companies',
-    'notes'
+    'release_notes'
   ],
   lyrics: [
     'tracks.lyrics_url',
@@ -218,7 +218,7 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
     'cultural_significance',
     'recording_location',
     'critical_reception',
-    'notes', // Maps to Wikipedia Summaries
+    'master_notes', // Maps to Wikipedia/AllMusic summaries
     'wikipedia_url'
   ],
 };
@@ -288,7 +288,9 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'companies': ['discogs'],
   
   // --- CONTEXT ---
-  'notes': ['wikipedia', 'discogs', 'appleMusic'],
+  'notes': ['wikipedia', 'discogs', 'allmusic', 'appleMusic'],
+  'release_notes': ['discogs'],
+  'master_notes': ['wikipedia', 'allmusic', 'appleMusic'],
   'wikipedia_url': ['wikipedia'],
   'cultural_significance': ['wikipedia'],
   'critical_reception': ['wikipedia'],

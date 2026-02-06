@@ -31,6 +31,7 @@ interface BrowseAlbum {
   // Metadata for search
   personal_notes?: string;  // Replaces 'notes'
   release_notes?: string;
+  master_notes?: string;
   media_condition?: string;
   genres?: string[];        // Replaces separate genre arrays
   styles?: string[];
@@ -50,6 +51,7 @@ type MasterTagLinkRow = {
 type InventoryBrowseRow = {
   id: number;
   personal_notes?: string | null;
+  master_notes?: string | null;
   media_condition?: string | null;
   created_at?: string | null;
   location?: string | null;
@@ -202,6 +204,7 @@ function BrowseAlbumsContent() {
                  master:masters (
                    id,
                    title,
+                   notes,
                    cover_image_url,
                    genres,
                    styles,
@@ -248,6 +251,7 @@ function BrowseAlbumsContent() {
             justAdded: isJustAdded(row.created_at),
             personal_notes: row.personal_notes,
             release_notes: release?.notes,
+            master_notes: master?.notes ?? null,
             media_condition: row.media_condition,
             genres: master?.genres || [],
             styles: master?.styles || [],
@@ -306,6 +310,7 @@ function BrowseAlbumsContent() {
         (album.media_condition || '').toLowerCase().includes(searchLower) ||
         (album.personal_notes || '').toLowerCase().includes(searchLower) ||
         (album.release_notes || '').toLowerCase().includes(searchLower) ||
+        (album.master_notes || '').toLowerCase().includes(searchLower) ||
         searchInArray(album.genres) ||
         searchInArray(album.styles) ||
         searchInArray(album.custom_tags);

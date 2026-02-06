@@ -729,6 +729,7 @@ export type Database = {
           styles: string[] | null;
           discogs_master_id: string | null;
           musicbrainz_release_group_id: string | null;
+          notes: string | null;
           created_at: string | null;
         };
         Insert: {
@@ -741,6 +742,7 @@ export type Database = {
           styles?: string[] | null;
           discogs_master_id?: string | null;
           musicbrainz_release_group_id?: string | null;
+          notes?: string | null;
           created_at?: string | null;
         };
         Update: {
@@ -753,6 +755,7 @@ export type Database = {
           styles?: string[] | null;
           discogs_master_id?: string | null;
           musicbrainz_release_group_id?: string | null;
+          notes?: string | null;
           created_at?: string | null;
         };
         Relationships: [
@@ -822,6 +825,7 @@ export type Database = {
           danceability: number | null;
           valence: number | null;
           credits: Json | null;
+          notes: string | null;
           created_at: string | null;
         };
         Insert: {
@@ -836,6 +840,7 @@ export type Database = {
           danceability?: number | null;
           valence?: number | null;
           credits?: Json | null;
+          notes?: string | null;
           created_at?: string | null;
         };
         Update: {
@@ -850,6 +855,7 @@ export type Database = {
           danceability?: number | null;
           valence?: number | null;
           credits?: Json | null;
+          notes?: string | null;
           created_at?: string | null;
         };
         Relationships: [

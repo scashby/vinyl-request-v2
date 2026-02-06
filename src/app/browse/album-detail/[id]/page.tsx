@@ -19,6 +19,7 @@ interface DbTrack {
   bpm?: number;
   side?: string;
   artist?: string;
+  note?: string | null;
   type?: 'track' | 'header';
 }
 
@@ -36,6 +37,7 @@ interface Album {
   location?: string;        // Was 'folder'
   personal_notes?: string;  // Was 'notes'
   release_notes?: string;   // New field
+  master_notes?: string;
   media_condition?: string;
   
   // Phase 4 Fixes: JSON Data source
@@ -121,6 +123,7 @@ function AlbumDetailContent() {
              master:masters (
                id,
                title,
+               notes,
                cover_image_url,
                artist:artists (id, name)
              ),
@@ -135,7 +138,8 @@ function AlbumDetailContent() {
                  title,
                  duration_seconds,
                  isrc,
-                 bpm
+                 bpm,
+                 notes
                )
              )
            )`
@@ -169,6 +173,7 @@ function AlbumDetailContent() {
         isrc: typedTrack.recording?.isrc ?? undefined,
         bpm: typedTrack.recording?.bpm ?? undefined,
         side: typedTrack.side ?? undefined,
+        note: typedTrack.recording?.notes ?? null,
         type: 'track',
       });
       });
@@ -184,6 +189,7 @@ function AlbumDetailContent() {
         location: data.location,
         personal_notes: data.personal_notes,
         release_notes: release?.notes,
+        master_notes: master?.notes,
         media_condition: data.media_condition,
         tracks,
       } as Album);
@@ -443,10 +449,11 @@ function AlbumDetailContent() {
           </div>
 
           {/* Fixed: Use 'personal_notes' */}
-          {(album.personal_notes || album.release_notes) && (
+          {(album.personal_notes || album.release_notes || album.master_notes) && (
             <div className="bg-black/30 backdrop-blur-md p-4 rounded-lg border border-white/5 mb-8 text-gray-300 text-sm leading-relaxed max-w-2xl">
               {album.personal_notes && <p className="mb-2">{album.personal_notes}</p>}
               {album.release_notes && <p className="text-gray-400 italic">{album.release_notes}</p>}
+              {album.master_notes && <p className="text-gray-500 italic">{album.master_notes}</p>}
             </div>
           )}
 
@@ -519,6 +526,9 @@ function AlbumDetailContent() {
                       <div className="flex-1 px-4 min-w-0">
                         <div className="text-sm font-bold text-white truncate">{track.title}</div>
                         <div className="text-xs text-gray-400 truncate">{track.artist || album.artist}</div>
+                        {track.note && (
+                          <div className="text-[11px] text-gray-500 italic truncate">{track.note}</div>
+                        )}
                       </div>
                       <span className="text-xs font-mono text-gray-600 mr-4">{track.duration || '--:--'}</span>
                       {queueTypesArray.includes('track') && eventId && eventData?.has_queue && !blocked && (

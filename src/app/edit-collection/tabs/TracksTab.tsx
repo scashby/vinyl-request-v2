@@ -40,6 +40,7 @@ interface Track {
   title: string;
   artist: string;
   duration: string;
+  note: string;
   disc_number: number;
   side?: string; // Vinyl side (A, B, C, D, etc.)
   is_header?: boolean;
@@ -71,6 +72,7 @@ export interface TracksData {
     title: string;
     artist: string | null;
     duration: string | null;
+    note?: string | null;
     type: 'track' | 'header';
     disc_number: number;
     side?: string;
@@ -122,7 +124,7 @@ function SortableTrackRow({
       <div
         ref={setNodeRef}
         style={style}
-        className="grid grid-cols-[40px_40px_60px_1fr_200px_80px] py-2 items-center bg-gray-50 border-y border-gray-200 text-gray-500 font-semibold text-sm"
+        className="grid grid-cols-[40px_40px_60px_1fr_200px_220px_80px] py-2 items-center bg-gray-50 border-y border-gray-200 text-gray-500 font-semibold text-sm"
       >
         <div className="flex justify-center">
           <input
@@ -138,7 +140,7 @@ function SortableTrackRow({
         <div className="text-center text-gray-500">
           <span className="text-lg">▬</span>
         </div>
-        <div className="italic text-gray-500 col-span-2 px-2">
+        <div className="italic text-gray-500 col-span-3 px-2">
           {track.title || 'Add tracks to this header'}
         </div>
         <div></div>
@@ -151,7 +153,7 @@ function SortableTrackRow({
     <div
       ref={setNodeRef}
       style={style}
-      className="grid grid-cols-[40px_40px_60px_1fr_200px_80px] py-2 border-b border-gray-100 items-center bg-white hover:bg-gray-50"
+      className="grid grid-cols-[40px_40px_60px_1fr_200px_220px_80px] py-2 border-b border-gray-100 items-center bg-white hover:bg-gray-50"
     >
       <div className="flex justify-center">
         <input
@@ -182,6 +184,15 @@ function SortableTrackRow({
           value={track.artist}
           onChange={(e) => onUpdate(track.id, 'artist', e.target.value)}
           placeholder="Artist"
+          className="w-full px-2 py-1 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500"
+        />
+      </div>
+      <div className="px-1">
+        <input
+          type="text"
+          value={track.note}
+          onChange={(e) => onUpdate(track.id, 'note', e.target.value)}
+          placeholder="Track notes"
           className="w-full px-2 py-1 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500"
         />
       </div>
@@ -244,6 +255,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
         title: track.title,
         artist: track.artist || null,
         duration: track.duration || null,
+        note: track.note || null,
         type: track.is_header ? ('header' as const) : ('track' as const),
         disc_number: track.disc_number,
         side: track.side,
@@ -292,6 +304,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
           title: dbTrack.title || '',
           artist: dbTrack.artist || '',
           duration: dbTrack.duration || '',
+          note: dbTrack.note || '',
           disc_number: dbTrack.disc_number || 1,
           side: dbTrack.side || 'A',
           is_header: dbTrack.type === 'header',
@@ -388,6 +401,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
       title: '',
       artist: album.artist || '',
       duration: '0:00',
+      note: '',
       disc_number: activeDisc,
     };
     setTracks([...tracks, newTrack]);
@@ -400,6 +414,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
       title: '',
       artist: '',
       duration: '',
+      note: '',
       disc_number: activeDisc,
       is_header: true,
     };
@@ -730,12 +745,13 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
 
       {/* Tracks Table */}
       <div className="flex flex-col bg-white border border-gray-200 rounded-md overflow-hidden">
-        <div className="grid grid-cols-[40px_40px_60px_1fr_200px_80px] py-2 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+        <div className="grid grid-cols-[40px_40px_60px_1fr_200px_220px_80px] py-2 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
           <div className="text-center"></div>
           <div className="text-center"></div>
           <div className="text-center">#</div>
           <div className="px-2">Title</div>
           <div className="px-2">Artist</div>
+          <div className="px-2">Notes</div>
           <div className="px-2">Length</div>
         </div>
 

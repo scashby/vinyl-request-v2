@@ -44,6 +44,7 @@ export type ColumnId =
   | 'my_rating'
   | 'personal_notes'
   | 'release_notes'
+  | 'master_notes'
   | 'owner'
   | 'custom_tags'
   | 'modified_date'
@@ -110,6 +111,7 @@ export const COLUMN_DEFINITIONS: Record<ColumnId, ColumnDefinition> = {
   my_rating: { id: 'my_rating', label: 'Rating', width: '100px' },
   personal_notes: { id: 'personal_notes', label: 'My Notes', width: '250px' },
   release_notes: { id: 'release_notes', label: 'Release Notes', width: '250px' },
+  master_notes: { id: 'master_notes', label: 'Master Notes', width: '250px' },
   owner: { id: 'owner', label: 'Owner', width: '120px' },
   custom_tags: { id: 'custom_tags', label: 'Tags', width: '200px' },
   modified_date: { id: 'modified_date', label: 'Modified', width: '140px' },
@@ -163,7 +165,7 @@ export const COLUMN_GROUPS = [
     label: 'Personal',
     icon: '👤',
     columns: [
-      'added_date', 'collection_status', 'location', 'my_rating', 'personal_notes', 'release_notes',
+      'added_date', 'collection_status', 'location', 'my_rating', 'personal_notes', 'release_notes', 'master_notes',
       'owner', 'custom_tags', 'modified_date'
     ] as ColumnId[]
   },

@@ -137,6 +137,8 @@ function getAlbumFieldValue(album: Album, field: string): unknown {
       return album.personal_notes ?? null;
     case 'release_notes':
       return album.release_notes ?? null;
+    case 'master_notes':
+      return album.master_notes ?? null;
     case 'owner':
       return album.owner ?? null;
     case 'decade': {

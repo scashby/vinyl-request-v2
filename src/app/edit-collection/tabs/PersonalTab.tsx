@@ -355,10 +355,28 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
 
           {/* Notes */}
           <div>
-            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Notes</label>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">My Notes (Media/Copy)</label>
             <textarea
-              value={album.notes || ''}
-              onChange={(e) => onChange('notes', e.target.value)}
+              value={album.personal_notes || ''}
+              onChange={(e) => onChange('personal_notes', e.target.value)}
+              rows={3}
+              className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500 min-h-[40px] resize-y"
+            />
+          </div>
+          <div>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Release Notes (Pressing/Format)</label>
+            <textarea
+              value={album.release_notes || ''}
+              onChange={(e) => onChange('release_notes', e.target.value)}
+              rows={3}
+              className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500 min-h-[40px] resize-y"
+            />
+          </div>
+          <div>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Master Notes (Release‑Group)</label>
+            <textarea
+              value={album.master_notes || ''}
+              onChange={(e) => onChange('master_notes', e.target.value)}
               rows={3}
               className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500 min-h-[40px] resize-y"
             />

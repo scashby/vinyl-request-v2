@@ -238,7 +238,18 @@ export default function AlbumDetailPanel({ album, onClose, onEditTags, onMarkFor
               </div>
             )}
 
-            {(!album.personal_notes && !album.release_notes) && (
+            {album.master_notes && (
+              <div className="mb-4">
+                <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.5px] mb-1.5">
+                  Master Notes
+                </div>
+                <div className="text-[13px] text-gray-700 leading-relaxed p-3 bg-gray-50 rounded-md whitespace-pre-wrap">
+                  {album.master_notes}
+                </div>
+              </div>
+            )}
+
+            {(!album.personal_notes && !album.release_notes && !album.master_notes) && (
               <div className="p-5 text-center text-gray-400 text-[13px]">
                 <div className="text-[32px] mb-2">📝</div>
                 No notes available

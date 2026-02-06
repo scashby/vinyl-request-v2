@@ -39,6 +39,7 @@ export const CONFLICTABLE_FIELDS = [
   'styles', // FIXED: Was discogs_styles
   'personal_notes', // FIXED: Was notes
   'release_notes',
+  'master_notes',
   'studio',
   'my_rating',
   'media_condition',
@@ -79,6 +80,7 @@ export interface CollectionRow extends Record<string, unknown> {
   labels?: string[];
   personal_notes?: string;
   release_notes?: string;
+  master_notes?: string;
   index_number?: number;
   package_sleeve_condition?: string;
   vinyl_weight?: string;
