@@ -423,6 +423,7 @@ interface ExistingAlbum {
   country?: string | null;
   release_date?: string | null;
   year?: string | null;
+  date_added?: string | null;
   image_url?: string | null;
   cover_image?: string | null;
   tracks?: boolean | null;
@@ -502,7 +503,13 @@ function scoreCandidateMatch(parsed: ParsedAlbum, candidate: ExistingAlbum): num
   if (parsed.catalog_number && candidate.catalog_number && normalizeComparable(parsed.catalog_number) === normalizeComparable(candidate.catalog_number)) {
     score += 3;
   }
+  if (parsed.label && candidate.label && normalizeComparable(parsed.label) === normalizeComparable(candidate.label)) {
+    score += 2;
+  }
   if (parsed.discogs_master_id && candidate.discogs_master_id && normalizeComparable(parsed.discogs_master_id) === normalizeComparable(candidate.discogs_master_id)) {
+    score += 2;
+  }
+  if (parsed.barcode && candidate.barcode && normalizeComparable(parsed.barcode) === normalizeComparable(candidate.barcode)) {
     score += 2;
   }
   if (parsed.year && candidate.year && normalizeComparable(parsed.year) === normalizeComparable(candidate.year)) {
@@ -512,6 +519,15 @@ function scoreCandidateMatch(parsed: ParsedAlbum, candidate: ExistingAlbum): num
     score += 1;
   }
   if (parsed.format && candidate.format && normalizeComparable(parsed.format) === normalizeComparable(candidate.format)) {
+    score += 1;
+  }
+  if (parsed.media_condition && candidate.media_condition && normalizeComparable(parsed.media_condition) === normalizeComparable(candidate.media_condition)) {
+    score += 1;
+  }
+  if (parsed.sleeve_condition && candidate.sleeve_condition && normalizeComparable(parsed.sleeve_condition) === normalizeComparable(candidate.sleeve_condition)) {
+    score += 1;
+  }
+  if (parsed.date_added && candidate.date_added && normalizeComparable(parsed.date_added) === normalizeComparable(candidate.date_added)) {
     score += 1;
   }
   return score;
@@ -570,6 +586,14 @@ function compareAlbums(
             !parsedAlbum.catalog_number ||
             !candidate.catalog_number ||
             normalizeComparable(parsedAlbum.catalog_number) === normalizeComparable(candidate.catalog_number);
+          const labelMatches =
+            !parsedAlbum.label ||
+            !candidate.label ||
+            normalizeComparable(parsedAlbum.label) === normalizeComparable(candidate.label);
+          const barcodeMatches =
+            !parsedAlbum.barcode ||
+            !candidate.barcode ||
+            normalizeComparable(parsedAlbum.barcode) === normalizeComparable(candidate.barcode);
           const mediaMatches =
             !parsedAlbum.media_condition ||
             !candidate.media_condition ||
@@ -586,16 +610,12 @@ function compareAlbums(
             !parsedAlbum.year ||
             !candidate.year ||
             normalizeComparable(parsedAlbum.year) === normalizeComparable(candidate.year);
-          return formatMatches && catalogMatches && mediaMatches && sleeveMatches && countryMatches && yearMatches;
+          const dateMatches =
+            !parsedAlbum.date_added ||
+            !candidate.date_added ||
+            normalizeComparable(parsedAlbum.date_added) === normalizeComparable(candidate.date_added);
+          return formatMatches && catalogMatches && labelMatches && barcodeMatches && mediaMatches && sleeveMatches && countryMatches && yearMatches && dateMatches;
         });
-
-        const bestList = exactMatches.length > 0 ? exactMatches : candidates;
-        const scored = bestList
-          .map((candidate) => ({
-            candidate,
-            score: scoreCandidateMatch(parsedAlbum, candidate),
-          }))
-          .sort((a, b) => b.score - a.score);
 
         candidateMatches = candidates.map((candidate) => ({
           id: candidate.id,
@@ -613,12 +633,11 @@ function compareAlbums(
         })).sort((a, b) => b.score - a.score);
         ambiguousCandidates = true;
         candidateCount = candidates.length;
-
-        if (scored[0]?.candidate) {
-          existingAlbum = scored[0].candidate;
+        if (exactMatches.length === 1) {
+          existingAlbum = exactMatches[0];
           matchType = 'discogs_id';
-          weakMatch = true;
-          matchScore = scored[0].score;
+          weakMatch = false;
+          matchScore = scoreCandidateMatch(parsedAlbum, exactMatches[0]);
         }
       }
     }
@@ -680,7 +699,7 @@ function compareAlbums(
       if (parsedAlbum.discogs_release_id) {
         compared.push({
           ...parsedAlbum,
-          status: 'NEW',
+          status: ambiguousCandidates ? 'REVIEW' : 'NEW',
           needsEnrichment: true,
           missingFields: ['all'],
           matchType,
@@ -1136,6 +1155,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 media_condition,
                 sleeve_condition,
                 personal_notes,
+                date_added,
                 release:releases (
                   id,
                   label,
@@ -1214,6 +1234,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 country: release?.country ?? null,
                 release_date: release?.release_date ?? null,
                 year: (release?.release_year ?? master?.original_release_year)?.toString() ?? null,
+                date_added: row.date_added ?? null,
                 image_url: master?.cover_image_url ?? null,
                 cover_image: master?.cover_image_url ?? null,
                 tracks: (release?.release_tracks?.length ?? 0) > 0,
