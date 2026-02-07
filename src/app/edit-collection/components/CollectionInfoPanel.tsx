@@ -28,6 +28,16 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  const parseDurationToSeconds = (duration?: string | null): number => {
+    if (!duration) return 0;
+    const parts = duration.split(':').map((part) => Number(part));
+    if (parts.some((part) => Number.isNaN(part))) return 0;
+    if (parts.length === 1) return parts[0];
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return 0;
+  };
+
   const getTotalRuntime = (): string => {
     if (releaseTracks.length === 0 && fallbackTracks.length === 0) return '—';
     if (releaseTracks.length > 0) {
@@ -35,13 +45,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
       return formatDuration(totalSeconds);
     }
     const totalSeconds = fallbackTracks.reduce((sum, track) => {
-      if (!track.duration) return sum;
-      const parts = track.duration.split(':').map((part) => Number(part));
-      if (parts.some((part) => Number.isNaN(part))) return sum;
-      if (parts.length === 1) return sum + parts[0];
-      if (parts.length === 2) return sum + (parts[0] * 60 + parts[1]);
-      if (parts.length === 3) return sum + (parts[0] * 3600 + parts[1] * 60 + parts[2]);
-      return sum;
+      return sum + parseDurationToSeconds(track.duration);
     }, 0);
     return formatDuration(totalSeconds);
   };
@@ -101,21 +105,94 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
     return `https://www.ebay.com/sch/i.html?_nkw=${query}&LH_Sold=1&LH_Complete=1`;
   };
 
-  const tracksHaveSide = releaseTracks.some((track) => Boolean(track.side));
-  const groupedTracks = releaseTracks.reduce<Map<string, ReleaseTrack[]>>((map, track) => {
-    const sideKey = track.side ?? 'Tracks';
-    const existing = map.get(sideKey) ?? [];
-    existing.push(track);
-    map.set(sideKey, existing);
-    return map;
-  }, new Map());
+  const formatBarcode = (value?: string | null) => {
+    if (!value) return '—';
+    const cleaned = value.replace(/[^0-9Xx]/g, '');
+    return cleaned || value;
+  };
 
-  const sortedTrackGroups = Array.from(groupedTracks.entries()).map(([side, tracks]) => {
-    const sortedTracks = [...tracks].sort((a, b) =>
-      a.position.localeCompare(b.position, undefined, { numeric: true, sensitivity: 'base' })
-    );
-    return { side, tracks: sortedTracks };
-  });
+  const getDiscNumber = (track: ReleaseTrack, fallbackIndex: number): number => {
+    const credits = track.recording?.credits as Record<string, unknown> | undefined;
+    const creditDisc = credits?.disc_number;
+    if (typeof creditDisc === 'number' && creditDisc > 0) return creditDisc;
+    if (typeof creditDisc === 'string' && creditDisc.trim()) {
+      const parsed = Number(creditDisc);
+      if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+    }
+    const sideLabel = (track.side ?? track.position ?? '').trim().toUpperCase();
+    const sideMatch = sideLabel.match(/^([A-Z])\d*/);
+    if (sideMatch?.[1]) {
+      const code = sideMatch[1].charCodeAt(0) - 64;
+      return Math.max(1, Math.ceil(code / 2));
+    }
+    const discMatch = (track.position ?? '').match(/^(\d+)[-.:]/);
+    if (discMatch?.[1]) {
+      const parsed = Number(discMatch[1]);
+      if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+    }
+    return fallbackIndex > 0 ? 1 : 1;
+  };
+
+  const getTrackOrder = (track: ReleaseTrack, fallbackIndex: number): number => {
+    const position = (track.position ?? '').trim();
+    const numberMatch = position.match(/(\d+)/g);
+    if (numberMatch && numberMatch.length > 0) {
+      const last = Number(numberMatch[numberMatch.length - 1]);
+      if (!Number.isNaN(last)) return last;
+    }
+    return fallbackIndex + 1;
+  };
+
+  const buildDiscGroups = () => {
+    if (releaseTracks.length > 0) {
+      const withSort = releaseTracks.map((track, index) => {
+        const discNumber = getDiscNumber(track, index);
+        const order = getTrackOrder(track, index);
+        return { track, discNumber, order, index };
+      });
+
+      withSort.sort((a, b) => {
+        if (a.discNumber !== b.discNumber) return a.discNumber - b.discNumber;
+        if (a.order !== b.order) return a.order - b.order;
+        return a.index - b.index;
+      });
+
+      const groups = new Map<number, { tracks: ReleaseTrack[]; totalSeconds: number }>();
+      withSort.forEach(({ track, discNumber }) => {
+        const existing = groups.get(discNumber) ?? { tracks: [], totalSeconds: 0 };
+        existing.tracks.push(track);
+        existing.totalSeconds += track.recording?.duration_seconds ?? 0;
+        groups.set(discNumber, existing);
+      });
+
+      return Array.from(groups.entries()).map(([disc, info]) => ({
+        disc,
+        tracks: info.tracks,
+        totalSeconds: info.totalSeconds,
+      }));
+    }
+
+    if (fallbackTracks.length > 0) {
+      const groups = new Map<number, { tracks: typeof fallbackTracks; totalSeconds: number }>();
+      fallbackTracks.forEach((track, idx) => {
+        const discMatch = (track.position ?? '').match(/^(\d+)[-.:]/);
+        const disc = discMatch?.[1] ? Number(discMatch[1]) : 1;
+        const existing = groups.get(disc) ?? { tracks: [], totalSeconds: 0 };
+        existing.tracks.push(track);
+        existing.totalSeconds += parseDurationToSeconds(track.duration);
+        groups.set(disc, existing);
+      });
+      return Array.from(groups.entries()).map(([disc, info]) => ({
+        disc,
+        tracks: info.tracks,
+        totalSeconds: info.totalSeconds,
+      }));
+    }
+
+    return [];
+  };
+
+  const discGroups = buildDiscGroups();
 
   return (
     <div className="p-4 flex-1 overflow-y-auto bg-white">
@@ -158,7 +235,10 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
         </div>
       )}
 
-      <div className="text-xs text-[#333] mb-2 font-mono font-normal">||||| {album.release?.barcode || '—'}</div>
+      <div className="text-xs text-[#333] mb-2 font-normal flex items-center gap-2">
+        <span className="barcode-font">{formatBarcode(album.release?.barcode)}</span>
+        <span className="font-mono">{formatBarcode(album.release?.barcode)}</span>
+      </div>
       <div className="text-[13px] text-[#333] mb-2 font-normal">{album.release?.country || '—'}</div>
       <div className="text-[13px] text-[#333] mb-3 font-normal">
         {buildFormatLabel()}
@@ -176,57 +256,44 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
       </div>
 
       <a href={getEbayUrl()} target="_blank" rel="noopener noreferrer" className="text-[13px] text-[#2196F3] mb-4 block no-underline font-normal hover:underline">
-        Find solid listings on eBay
+        Find sold listings on eBay
       </a>
 
-      {(() => {
-        if (releaseTracks.length === 0 && fallbackTracks.length === 0) return null;
-
-        if (releaseTracks.length > 0) {
-          return (
-            <div className="mb-4">
-              {sortedTrackGroups.map(({ side, tracks }) => {
-                return (
-                  <div key={side} className="mb-4">
-                    {tracksHaveSide && (
-                      <div className="text-xs font-bold text-white mb-1.5 p-2 px-3 bg-[#2196F3] rounded flex justify-between items-center shadow-sm uppercase tracking-wider">
-                        <span>{side}</span>
+      {discGroups.length > 0 && (
+        <div className="mb-4">
+          {discGroups.map((group) => (
+            <div key={`disc-${group.disc}`} className="mb-4">
+              <div className="text-xs font-bold text-white mb-1.5 p-2 px-3 bg-[#2196F3] rounded flex justify-between items-center shadow-sm uppercase tracking-wider">
+                <span>{`Disc #${group.disc}`}</span>
+                <span>{formatDuration(group.totalSeconds)}</span>
+              </div>
+              <div className="flex flex-col gap-px">
+                {group.tracks.map((track, idx) => {
+                  if ('recording' in track) {
+                    const title = track.title_override ?? track.recording?.title ?? 'Untitled';
+                    const duration = formatDuration(track.recording?.duration_seconds ?? null);
+                    return (
+                      <div key={track.id ?? `${track.position}-${idx}`} className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                        <div className="min-w-[28px] text-gray-500 text-[13px]">{idx + 1}</div>
+                        <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{title}</div>
+                        {duration !== '—' && <div className="text-gray-500 text-[13px] min-w-[40px] text-right">{duration}</div>}
                       </div>
-                    )}
-                    <div className="flex flex-col gap-px">
-                      {tracks.map((track, idx) => {
-                        const title = track.title_override ?? track.recording?.title ?? 'Untitled';
-                        const duration = formatDuration(track.recording?.duration_seconds ?? null);
-                        return (
-                          <div key={track.id ?? `${track.position}-${idx}`} className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                            <div className="min-w-[28px] text-gray-500 text-[13px]">{track.position}</div>
-                            <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{title}</div>
-                            {duration !== '—' && <div className="text-gray-500 text-[13px] min-w-[40px] text-right">{duration}</div>}
-                          </div>
-                        );
-                      })}
+                    );
+                  }
+                  const fallback = track as NonNullable<Album['tracks']>[number];
+                  return (
+                    <div key={`${fallback.position}-${idx}`} className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                      <div className="min-w-[28px] text-gray-500 text-[13px]">{idx + 1}</div>
+                      <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{fallback.title}</div>
+                      {fallback.duration && <div className="text-gray-500 text-[13px] min-w-[40px] text-right">{fallback.duration}</div>}
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          );
-        }
-
-        return (
-          <div className="mb-4">
-            <div className="flex flex-col gap-px">
-              {fallbackTracks.map((track, idx) => (
-                <div key={`${track.position}-${idx}`} className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                  <div className="min-w-[28px] text-gray-500 text-[13px]">{track.position}</div>
-                  <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{track.title}</div>
-                  {track.duration && <div className="text-gray-500 text-[13px] min-w-[40px] text-right">{track.duration}</div>}
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
+          ))}
+        </div>
+      )}
 
       <div className="mb-4">
         <div className="text-base font-bold text-[#2196F3] mb-3">Details</div>
