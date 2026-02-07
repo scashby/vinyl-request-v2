@@ -500,6 +500,8 @@ export type Database = {
           allowed_formats: string[] | null;
           allowed_tags: string[] | null;
           crate_id: number | null;
+          has_games: boolean | null;
+          game_modes: string[] | null;
           is_featured_grid: boolean | null;
           is_featured_upnext: boolean | null;
           featured_priority: number | null;
@@ -521,6 +523,8 @@ export type Database = {
           allowed_formats?: string[] | null;
           allowed_tags?: string[] | null;
           crate_id?: number | null;
+          has_games?: boolean | null;
+          game_modes?: string[] | null;
           is_featured_grid?: boolean | null;
           is_featured_upnext?: boolean | null;
           featured_priority?: number | null;
@@ -542,6 +546,8 @@ export type Database = {
           allowed_formats?: string[] | null;
           allowed_tags?: string[] | null;
           crate_id?: number | null;
+          has_games?: boolean | null;
+          game_modes?: string[] | null;
           is_featured_grid?: boolean | null;
           is_featured_upnext?: boolean | null;
           featured_priority?: number | null;
