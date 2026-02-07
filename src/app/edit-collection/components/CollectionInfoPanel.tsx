@@ -108,13 +108,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
   const formatBarcode = (value?: string | null) => {
     if (!value) return '—';
     const cleaned = value.replace(/[^0-9Xx]/g, '');
-    if (cleaned.length === 12) {
-      return `${cleaned.slice(0, 1)} ${cleaned.slice(1, 6)} ${cleaned.slice(6, 11)} ${cleaned.slice(11)}`;
-    }
-    if (cleaned.length === 13) {
-      return `${cleaned.slice(0, 1)} ${cleaned.slice(1, 7)} ${cleaned.slice(7)}`;
-    }
-    return value;
+    return cleaned || value;
   };
 
   const getDiscNumber = (track: ReleaseTrack, fallbackIndex: number): number => {
@@ -241,8 +235,9 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
         </div>
       )}
 
-      <div className="text-xs text-[#333] mb-2 font-mono font-normal">
-        <span className="font-semibold mr-1">Barcode</span>{formatBarcode(album.release?.barcode)}
+      <div className="text-xs text-[#333] mb-2 font-normal flex items-center gap-2">
+        <span className="barcode-font">{formatBarcode(album.release?.barcode)}</span>
+        <span className="font-mono">{formatBarcode(album.release?.barcode)}</span>
       </div>
       <div className="text-[13px] text-[#333] mb-2 font-normal">{album.release?.country || '—'}</div>
       <div className="text-[13px] text-[#333] mb-3 font-normal">
