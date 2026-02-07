@@ -229,7 +229,9 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
         </div>
       )}
 
-      <div className="text-xs text-[#333] mb-2 font-mono font-normal">||||| {album.release?.barcode || '—'}</div>
+      <div className="text-xs text-[#333] mb-2 font-mono font-normal">
+        {album.release?.barcode || '—'}
+      </div>
       <div className="text-[13px] text-[#333] mb-2 font-normal">{album.release?.country || '—'}</div>
       <div className="text-[13px] text-[#333] mb-3 font-normal">
         {buildFormatLabel()}
@@ -247,7 +249,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
       </div>
 
       <a href={getEbayUrl()} target="_blank" rel="noopener noreferrer" className="text-[13px] text-[#2196F3] mb-4 block no-underline font-normal hover:underline">
-        Find solid listings on eBay
+        Find sold listings on eBay
       </a>
 
       {discGroups.length > 0 && (
