@@ -20,6 +20,11 @@ export type CandidateData = {
   lastfm_url?: string;
   wikipedia_url?: string;
   genius_url?: string;
+  allmusic_url?: string;
+  allmusic_rating?: string | number;
+  allmusic_review?: string;
+  apple_music_editorial_notes?: string;
+  pitchfork_score?: string | number;
 
   // Canonical Metadata
   genres?: string[];
@@ -61,6 +66,13 @@ export type CandidateData = {
   lyrics?: string;
   lyrics_url?: string;
   notes?: string; // Wikipedia/Discogs Notes
+  master_notes?: string;
+  cultural_significance?: string;
+  recording_location?: string;
+  critical_reception?: string;
+  chart_positions?: string[];
+  awards?: string[];
+  certifications?: string[];
   enrichment_summary?: Record<string, string>; // Structured External Data (Setlist.fm, WhoSampled, etc)
   companies?: string[]; // Discogs Companies
   rpm?: string;
@@ -86,6 +98,10 @@ export type CandidateData = {
     tempo_bpm?: number;
     musical_key?: string;
     lyrics?: string;
+    lyrics_url?: string;
+    lyrics_source?: string;
+    artist?: string;
+    note?: string;
     is_cover?: boolean;
     original_artist?: string;
   }>;
@@ -96,6 +112,95 @@ export type EnrichmentResult = {
   source: string;
   data?: CandidateData;
   error?: string;
+};
+
+// ============================================================================
+// HELPERS (Text Cleanup)
+// ============================================================================
+const decodeHtml = (text: string) =>
+  text
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+
+const cleanWikiText = (text: string) => {
+  if (!text) return '';
+  return decodeHtml(text)
+    .replace(/<ref[^>]*>[\s\S]*?<\/ref>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\{\{[^}]+\}\}/g, ' ')
+    .replace(/\[\[(?:[^\]|]+\|)?([^\]|]+)\]\]/g, '$1')
+    .replace(/\[http[^\s\]]+\s?([^\]]+)?\]/g, '$1')
+    .replace(/''+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const truncateText = (text: string, max = 1400) =>
+  text.length > max ? `${text.slice(0, max).trim()}…` : text;
+
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const extractWikiSection = (wikitext: string, titles: string[]) => {
+  if (!wikitext) return '';
+  for (const title of titles) {
+    const re = new RegExp(`==+\\s*${escapeRegex(title)}\\s*==+([\\s\\S]*?)(?=\\n==[^=]|$)`, 'i');
+    const match = wikitext.match(re);
+    if (match?.[1]) {
+      const cleaned = cleanWikiText(match[1]);
+      if (cleaned) return truncateText(cleaned);
+    }
+  }
+  return '';
+};
+
+const extractInfoboxField = (wikitext: string, fields: string[]) => {
+  if (!wikitext) return '';
+  for (const field of fields) {
+    const re = new RegExp(`\\|\\s*${escapeRegex(field)}\\s*=\\s*([^\\n]+)`, 'i');
+    const match = wikitext.match(re);
+    if (match?.[1]) {
+      const cleaned = cleanWikiText(match[1]);
+      if (cleaned) return truncateText(cleaned, 600);
+    }
+  }
+  return '';
+};
+
+const cleanWikiTextLines = (text: string) => {
+  if (!text) return '';
+  return decodeHtml(text)
+    .replace(/<ref[^>]*>[\s\S]*?<\/ref>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\{\{[^}]+\}\}/g, '')
+    .replace(/\[\[(?:[^\]|]+\|)?([^\]|]+)\]\]/g, '$1')
+    .replace(/\[http[^\s\]]+\s?([^\]]+)?\]/g, '$1')
+    .replace(/''+/g, '')
+    .replace(/\r/g, '');
+};
+
+const extractWikiSectionRaw = (wikitext: string, titles: string[]) => {
+  if (!wikitext) return '';
+  for (const title of titles) {
+    const re = new RegExp(`==+\\s*${escapeRegex(title)}\\s*==+([\\s\\S]*?)(?=\\n==[^=]|$)`, 'i');
+    const match = wikitext.match(re);
+    if (match?.[1]) return match[1];
+  }
+  return '';
+};
+
+const extractWikiList = (wikitext: string, titles: string[]) => {
+  const raw = extractWikiSectionRaw(wikitext, titles);
+  if (!raw) return [];
+  const cleaned = cleanWikiTextLines(raw);
+  return cleaned
+    .split(/\n+/)
+    .map((line) => line.replace(/^[*#;:\-\s]+/, '').trim())
+    .filter((line) => line.length > 0)
+    .slice(0, 50);
 };
 
 // --- TYPE DEFINITIONS FOR API RESPONSES ---
@@ -271,6 +376,7 @@ interface DiscogsTrack {
   title: string;
   duration: string;
   type_?: string;
+  artists?: Array<{ name: string }>;
 }
 
 interface DiscogsIdentifier {
@@ -563,13 +669,14 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
                     if (feat && feat.key >= 0 && feat.key < KEY_MAP.length) {
                         keyStr = `${KEY_MAP[feat.key]} ${feat.mode === 1 ? 'Major' : 'Minor'}`;
                     }
-                    return {
-                        position: String(i + 1),
-                        title: t.name,
-                        duration: t.duration_ms ? `${Math.floor(t.duration_ms / 1000)}s` : undefined,
-                        tempo_bpm: feat ? Math.round(feat.tempo) : undefined,
-                        musical_key: keyStr
-                    };
+                        return {
+                            position: String(i + 1),
+                            title: t.name,
+                            artist: (t as any)?.artists?.[0]?.name ?? undefined,
+                            duration: t.duration_ms ? `${Math.floor(t.duration_ms / 1000)}s` : undefined,
+                            tempo_bpm: feat ? Math.round(feat.tempo) : undefined,
+                            musical_key: keyStr
+                        };
                 });
             }
         }
@@ -609,6 +716,7 @@ export async function fetchAppleMusicData(album: { artist: string, title: string
     const data = await albumRes.json();
     const attrs = data.data?.[0]?.attributes;
 
+    const editorialNotes = attrs?.editorialNotes?.standard || attrs?.editorialNotes?.short;
     const candidate: CandidateData = {
         apple_music_id: amId,
         image_url: attrs?.artwork?.url?.replace('{w}', '1000').replace('{h}', '1000'),
@@ -616,13 +724,16 @@ export async function fetchAppleMusicData(album: { artist: string, title: string
         labels: attrs?.recordLabel ? [attrs.recordLabel] : undefined,
         original_release_date: attrs?.releaseDate,
         // NEW: Notes and UPC
-        notes: attrs?.editorialNotes?.standard || attrs?.editorialNotes?.short,
+        notes: editorialNotes,
+        master_notes: editorialNotes,
+        apple_music_editorial_notes: editorialNotes,
         barcode: attrs?.upc,
         // NEW: Tracks
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         tracks: data.data?.[0]?.relationships?.tracks?.data?.map((t: any) => ({
             position: String(t.attributes?.trackNumber),
             title: t.attributes?.name,
+            artist: (t.attributes?.artistName as string | undefined) ?? undefined,
             duration: t.attributes?.durationInMillis ? `${Math.floor(t.attributes.durationInMillis / 1000)}s` : undefined
         }))
     };
@@ -714,11 +825,17 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
       tracklist: data.tracklist?.map((t: DiscogsTrack) => `${t.position} - ${t.title} (${t.duration})`).join('\n'),
       tracks: data.tracklist
         ?.filter((t: DiscogsTrack) => t.type_ !== 'heading')
-        .map((t: DiscogsTrack) => ({
-          position: t.position || '',
-          title: t.title || '',
-          duration: t.duration || undefined
-        }))
+        .map((t: DiscogsTrack) => {
+          const artistName = t.artists && t.artists.length > 0
+            ? t.artists.map(a => a.name).join(', ')
+            : undefined;
+          return {
+            position: t.position || '',
+            title: t.title || '',
+            duration: t.duration || undefined,
+            artist: artistName
+          };
+        })
     };
 
     if (formatString) {
@@ -913,17 +1030,123 @@ export async function fetchWikipediaData(album: { artist: string, title: string 
         const summaryRes = await fetch(summaryUrl);
         const summaryData = await summaryRes.json();
         const extract = summaryData.query?.pages?.[pageId]?.extract;
+        
+        // Step 3: Pull wikitext for deeper parsing (sections + infobox)
+        let wikitext = '';
+        try {
+          const parseUrl = `https://en.wikipedia.org/w/api.php?action=parse&pageid=${pageId}&prop=wikitext&format=json`;
+          const parseRes = await fetch(parseUrl);
+          const parseData = await parseRes.json();
+          wikitext = parseData?.parse?.wikitext?.['*'] ?? '';
+        } catch {
+          wikitext = '';
+        }
+
+        const criticalReception = extractWikiSection(wikitext, [
+          'Critical reception',
+          'Reception',
+          'Reviews'
+        ]);
+        const culturalSignificance = extractWikiSection(wikitext, [
+          'Legacy',
+          'Influence',
+          'Impact',
+          'Cultural impact'
+        ]) || (extract ? truncateText(cleanWikiText(extract), 900) : '');
+
+        const recordingLocation = extractInfoboxField(wikitext, [
+          'recorded',
+          'studio',
+          'venue',
+          'location'
+        ]) || extractWikiSection(wikitext, [
+          'Recording',
+          'Recording and composition',
+          'Background',
+          'Production'
+        ]);
+        
+        const chartPositions = extractWikiList(wikitext, [
+          'Charts',
+          'Chart performance',
+          'Chart positions'
+        ]);
+        const certifications = extractWikiList(wikitext, ['Certifications']);
+        const awards = extractWikiList(wikitext, ['Awards', 'Accolades', 'Honors']);
 
         return { 
             success: true, 
             source: 'wikipedia', 
             data: { 
                 wikipedia_url: `https://en.wikipedia.org/?curid=${pageId}`,
-                notes: extract // Map summary to 'notes' field
+                notes: extract, // Legacy mapping
+                master_notes: extract ? truncateText(cleanWikiText(extract), 1200) : undefined,
+                cultural_significance: culturalSignificance || undefined,
+                recording_location: recordingLocation || undefined,
+                critical_reception: criticalReception || undefined,
+                chart_positions: chartPositions.length > 0 ? chartPositions : undefined,
+                certifications: certifications.length > 0 ? certifications : undefined,
+                awards: awards.length > 0 ? awards : undefined
             } 
         };
     } catch (e) {
         return { success: false, source: 'wikipedia', error: (e as Error).message };
+    }
+}
+
+// ============================================================================
+// 8b. ALLMUSIC (Review Snippet + Link)
+// ============================================================================
+export async function fetchAllMusicData(album: { artist: string, title: string, allmusic_url?: string }): Promise<EnrichmentResult> {
+    try {
+        let allmusicUrl = album.allmusic_url;
+        if (!allmusicUrl) {
+            const query = `${album.artist} ${album.title}`;
+            const searchUrl = `https://www.allmusic.com/search/albums/${encodeURIComponent(query)}`;
+            const searchRes = await fetch(searchUrl);
+            const html = await searchRes.text();
+
+            const match = html.match(/href="(\/album\/[^"?]+)"/i);
+            if (match?.[1]) {
+                allmusicUrl = `https://www.allmusic.com${match[1]}`;
+            } else {
+                return { success: false, source: 'allmusic', error: 'Not found' };
+            }
+        }
+
+        let reviewSnippet: string | undefined;
+        let allmusicRating: string | undefined;
+        if (allmusicUrl) {
+            const pageRes = await fetch(allmusicUrl);
+            if (pageRes.ok) {
+                const pageHtml = await pageRes.text();
+                const descMatch = pageHtml.match(/<meta\\s+name="description"\\s+content="([^"]+)"/i);
+                if (descMatch?.[1]) {
+                    const cleaned = decodeHtml(descMatch[1]).trim();
+                    reviewSnippet = truncateText(cleaned, 900);
+                }
+                const ratingMatch = pageHtml.match(/class="allmusic-rating[^"]*"[^>]*>([0-9.]+)</i)
+                  || pageHtml.match(/data-rating="([0-9.]+)"/i)
+                  || pageHtml.match(/"ratingValue"\\s*:\\s*"?([0-9.]+)"?/i);
+                if (ratingMatch?.[1]) {
+                    allmusicRating = ratingMatch[1].trim();
+                }
+            }
+        }
+
+        return {
+            success: true,
+            source: 'allmusic',
+            data: {
+                allmusic_url: allmusicUrl,
+                critical_reception: reviewSnippet,
+                master_notes: reviewSnippet,
+                allmusic_review: reviewSnippet,
+                allmusic_rating: allmusicRating
+            }
+        };
+    } catch (e) {
+        return { success: false, source: 'allmusic', error: (e as Error).message };
     }
 }
 // ============================================================================
@@ -1234,13 +1457,43 @@ export async function fetchPopsikeData(album: { artist: string, title: string })
 // 19. PITCHFORK (Reviews)
 // ============================================================================
 export async function fetchPitchforkData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
-    const url = `https://pitchfork.com/search/?query=${encodeURIComponent(album.artist + ' ' + album.title)}`;
-    return {
-        success: true,
-        source: 'pitchfork',
-        data: {
-            enrichment_summary: { pitchfork: `Pitchfork Reviews: ${url}` }
+    try {
+        const searchUrl = `https://pitchfork.com/search/?query=${encodeURIComponent(album.artist + ' ' + album.title)}`;
+        let reviewUrl: string | undefined;
+        let score: string | undefined;
+
+        const searchRes = await fetch(searchUrl);
+        if (searchRes.ok) {
+            const html = await searchRes.text();
+            const match = html.match(/href="(\/reviews\/(?:albums|reissues)\/[^"?]+)"/i);
+            if (match?.[1]) {
+                reviewUrl = `https://pitchfork.com${match[1]}`;
+            }
         }
-    };
+
+        if (reviewUrl) {
+            const reviewRes = await fetch(reviewUrl);
+            if (reviewRes.ok) {
+                const reviewHtml = await reviewRes.text();
+                const scoreMatch = reviewHtml.match(/class="score"[^>]*>([0-9.]+)</i)
+                  || reviewHtml.match(/"ratingValue"\s*:\s*"?([0-9.]+)"?/i)
+                  || reviewHtml.match(/"score"\s*:\s*"?([0-9.]+)"?/i);
+                if (scoreMatch?.[1]) {
+                    score = scoreMatch[1].trim();
+                }
+            }
+        }
+
+        return {
+            success: true,
+            source: 'pitchfork',
+            data: {
+                pitchfork_score: score,
+                enrichment_summary: { pitchfork: `Pitchfork Reviews: ${reviewUrl ?? searchUrl}` }
+            }
+        };
+    } catch (e) {
+        return { success: false, source: 'pitchfork', error: (e as Error).message };
+    }
 }
 // AUDIT: updated for V3 alignment, UI parity, and build stability.
