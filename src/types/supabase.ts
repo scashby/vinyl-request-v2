@@ -227,6 +227,58 @@ export type Database = {
           }
         ];
       };
+      tournament_candidates: {
+        Row: {
+          id: number;
+          event_id: number;
+          inventory_id: number | null;
+          artist: string;
+          title: string;
+          cover_image: string | null;
+          vote_count: number;
+          is_write_in: boolean;
+          status: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          event_id: number;
+          inventory_id?: number | null;
+          artist: string;
+          title: string;
+          cover_image?: string | null;
+          vote_count?: number;
+          is_write_in?: boolean;
+          status?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          event_id?: number;
+          inventory_id?: number | null;
+          artist?: string;
+          title?: string;
+          cover_image?: string | null;
+          vote_count?: number;
+          is_write_in?: boolean;
+          status?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'tournament_candidates_event_id_fkey';
+            columns: ['event_id'];
+            referencedRelation: 'events';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'tournament_candidates_inventory_id_fkey';
+            columns: ['inventory_id'];
+            referencedRelation: 'inventory';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
       artist_rules: {
         Row: {
           id: number;
@@ -448,6 +500,8 @@ export type Database = {
           allowed_formats: string[] | null;
           allowed_tags: string[] | null;
           crate_id: number | null;
+          has_games: boolean | null;
+          game_modes: string[] | null;
           is_featured_grid: boolean | null;
           is_featured_upnext: boolean | null;
           featured_priority: number | null;
@@ -469,6 +523,8 @@ export type Database = {
           allowed_formats?: string[] | null;
           allowed_tags?: string[] | null;
           crate_id?: number | null;
+          has_games?: boolean | null;
+          game_modes?: string[] | null;
           is_featured_grid?: boolean | null;
           is_featured_upnext?: boolean | null;
           featured_priority?: number | null;
@@ -490,6 +546,8 @@ export type Database = {
           allowed_formats?: string[] | null;
           allowed_tags?: string[] | null;
           crate_id?: number | null;
+          has_games?: boolean | null;
+          game_modes?: string[] | null;
           is_featured_grid?: boolean | null;
           is_featured_upnext?: boolean | null;
           featured_priority?: number | null;
@@ -541,6 +599,49 @@ export type Database = {
           created_at?: string | null;
         };
         Relationships: [];
+      };
+      game_sessions: {
+        Row: {
+          id: number;
+          event_id: number | null;
+          crate_id: number | null;
+          game_type: string;
+          game_state: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          event_id?: number | null;
+          crate_id?: number | null;
+          game_type: string;
+          game_state?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          event_id?: number | null;
+          crate_id?: number | null;
+          game_type?: string;
+          game_state?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'game_sessions_crate_id_fkey';
+            columns: ['crate_id'];
+            referencedRelation: 'crates';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'game_sessions_event_id_fkey';
+            columns: ['event_id'];
+            referencedRelation: 'events';
+            referencedColumns: ['id'];
+          }
+        ];
       };
       import_conflict_resolutions: {
         Row: {
@@ -1134,7 +1235,20 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      get_game_manifest: {
+        Args: {
+          session_id: number;
+        };
+        Returns: {
+          game_session_id: number;
+          crate_id: number;
+          crate_name: string;
+          inventory_id: number;
+          inventory_location: string | null;
+        }[];
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
