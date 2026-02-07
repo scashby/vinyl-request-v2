@@ -131,6 +131,9 @@ export type Album = {
   master_release_date?: string | null;
   recording_year?: number | null;
   recording_date?: string | null;
+  chart_positions?: string[] | null;
+  awards?: string[] | null;
+  certifications?: string[] | null;
   sort_title?: string | null;
   subtitle?: string | null;
   back_image_url?: string | null;

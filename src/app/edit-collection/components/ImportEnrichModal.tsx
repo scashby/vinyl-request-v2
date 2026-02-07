@@ -28,7 +28,7 @@ const ALLOWED_COLUMNS = new Set([
   'image_url', 'back_image_url', 'sell_price', 'media_condition', 'location', // FIXED: Was 'folder'
   'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
   'apple_music_id', 'apple_music_url', 'lastfm_id', 'lastfm_url', 
-  'musicbrainz_id', 'musicbrainz_url', 'wikipedia_url', 'genius_url', 
+  'musicbrainz_id', 'musicbrainz_url', 'wikipedia_url', 'genius_url', 'allmusic_url',
   'tags', 'lastfm_tags', 'notes', 'release_notes', 'master_notes', 'enriched_metadata', 'enrichment_summary', 'companies', 'genres', 'styles', 'original_release_date',
   'inner_sleeve_images', 'musicians', 'credits', 'producers', 'engineers', 
   'songwriters', 'composer', 'conductor', 'orchestra',
@@ -41,7 +41,8 @@ const ALLOWED_COLUMNS = new Set([
   'is_cover', 'original_artist', 'original_year',
   'tracks.lyrics', 'tracks.lyrics_url',
   'cultural_significance', 'recording_location', 'critical_reception', 'awards', 'certifications',
-  'allmusic_rating', 'pitchfork_score'
+  'chart_positions',
+  'allmusic_rating', 'allmusic_review', 'apple_music_editorial_notes', 'pitchfork_score'
 ]);
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
@@ -411,6 +412,16 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'mood_party':
       case 'master_release_date':
       case 'recording_date':
+      case 'recording_location':
+      case 'critical_reception':
+      case 'cultural_significance':
+      case 'chart_positions':
+      case 'awards':
+      case 'certifications':
+      case 'allmusic_rating':
+      case 'allmusic_review':
+      case 'apple_music_editorial_notes':
+      case 'pitchfork_score':
       case 'companies':
       case 'enrichment_sources':
       case 'purchase_store':
@@ -646,6 +657,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       discogs: activeServices.has('discogs'),
       lastfm: activeServices.has('lastfm'),
       appleMusicEnhanced: activeServices.has('appleMusic'),
+      allmusic: activeServices.has('allmusic'),
       wikipedia: activeServices.has('wikipedia'),
       genius: activeServices.has('genius'),
       coverArt: activeServices.has('coverArtArchive'),
@@ -749,7 +761,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     let collectedSummary: {album: string, field: string, action: string}[] = [];
 
     while ((collectedConflicts.length < targetConflicts || specificAlbumIds) && hasMoreRef.current) {
-      setStatus(`Scanning (Cursor: ${cursorRef.current})... Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
+      setStatus(`Scanning... Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
 
       try {
         const payload = {
@@ -783,6 +795,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         }
 
         const candidates = result.results || [];
+        const lastCheckedAlbum = candidates.length > 0 ? candidates[candidates.length - 1].album : null;
+        const lastCheckedLabel = lastCheckedAlbum
+          ? `${lastCheckedAlbum.artist} - ${lastCheckedAlbum.title}`
+          : (result.processedCount ? `No matches in last batch (${result.processedCount} checked)` : 'No matches in last batch');
+        setStatus(`Scanning... Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
 
         if (result.processedCount > candidates.length) {
           // This is fine, logs empty results if any
@@ -797,6 +814,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         collectedConflicts = [...collectedConflicts, ...batchConflicts];
         if (batchSummaryItems && batchSummaryItems.length > 0) {
             collectedSummary = [...collectedSummary, ...batchSummaryItems];
+        }
+        if (batchConflicts.length > 0) {
+          setStatus(`Scanning... Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
         }
 
         if (specificAlbumIds) break;
@@ -882,6 +902,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   };
 
   async function processBatchAndSave(results: CandidateResult[]) {
+    const activeServices = getServicesForSelection();
+    const wantsLyrics = !!fieldConfig['tracks.lyrics'] || !!fieldConfig['tracks.lyrics_url'];
+    const runGeniusLyrics = wantsLyrics && activeServices.genius;
+
     const albumIds = results.map(r => r.album.id);
     const { data: resolutions, error: resError } = await supabase
       .from('import_conflict_resolutions')
@@ -896,6 +920,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const processedIds: number[] = [];
     const historyUpdates: { album_id: number; field_name: string; source: string; resolution: string; kept_value: import('types/supabase').Json | null; resolved_at: string }[] = [];
     const trackSavePromises: Promise<unknown>[] = [];
+    const lyricJobs: { albumId: number; artist: string; title: string; appleMusicId?: string | null }[] = [];
     
     const GLOBAL_PRIORITY = [
       'discogs', 'musicbrainz', 'spotify', 'appleMusic', 'deezer', 
@@ -938,6 +963,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       }
 
       if (Object.keys(candidates).length === 0) return;
+
+      if (runGeniusLyrics && Array.isArray(album.tracks) && album.tracks.length > 0) {
+        lyricJobs.push({
+          albumId: album.id,
+          artist: album.artist,
+          title: album.title,
+          appleMusicId: (album as Record<string, unknown>).apple_music_id as string | null
+        });
+      }
 
       const updatesForAlbum: Record<string, unknown> = {};
       const autoFilledFields: string[] = [];
@@ -1214,6 +1248,27 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       await Promise.all(autoUpdates.map(u => applyAlbumUpdates(u.album, u.fields)));
     }
 
+    if (runGeniusLyrics && lyricJobs.length > 0) {
+      const lyricResults = await Promise.all(lyricJobs.map(async (job) => {
+        try {
+          const res = await fetch('/api/enrich-sources/genius', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ albumId: job.albumId })
+          });
+          const data = await res.json();
+          if (data?.success) {
+            addLog(`${job.artist} - ${job.title}`, 'info', `Lyrics URLs: ${data.data?.enrichedCount ?? 0}/${data.data?.totalTracks ?? 0}`);
+          } else {
+            addLog(`${job.artist} - ${job.title}`, 'skipped', `Lyrics enrichment failed: ${data?.error ?? 'Unknown error'}`);
+          }
+        } catch (error) {
+          addLog(`${job.artist} - ${job.title}`, 'skipped', `Lyrics enrichment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }));
+      void lyricResults;
+    }
+
     return { conflicts: newConflicts, summary: localBatchSummary };
   }
   
@@ -1253,6 +1308,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       if (track.tempo_bpm) credits.tempo_bpm = track.tempo_bpm;
       if (track.musical_key) credits.musical_key = track.musical_key;
       if (track.lyrics) credits.lyrics = track.lyrics;
+      if (track.lyrics_url) credits.lyrics_url = track.lyrics_url;
+      if (track.lyrics_source) credits.lyrics_source = track.lyrics_source;
+      if (track.artist) credits.track_artist = track.artist;
+      if (track.note) credits.track_note = track.note;
       if (track.is_cover !== undefined) credits.is_cover = track.is_cover;
       if (track.original_artist) credits.original_artist = track.original_artist;
       if (track.original_year) credits.original_year = track.original_year;
