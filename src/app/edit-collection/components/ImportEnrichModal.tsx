@@ -208,6 +208,46 @@ const extractSide = (position: unknown): string | null => {
   return match ? match[1].toUpperCase() : null;
 };
 
+const extractDiscNumber = (position: string): number => {
+  const trimmed = position.trim().toUpperCase();
+  const sideMatch = trimmed.match(/^([A-Z])/);
+  if (sideMatch?.[1]) {
+    const idx = sideMatch[1].charCodeAt(0) - 65;
+    if (idx >= 0) return Math.floor(idx / 2) + 1;
+  }
+  const discMatch = trimmed.match(/^(\d+)[-./]/);
+  if (discMatch?.[1]) {
+    const num = Number(discMatch[1]);
+    if (!Number.isNaN(num) && num > 0) return num;
+  }
+  return 1;
+};
+
+const deriveDiscDataFromTracks = (tracks: Record<string, unknown>[]) => {
+  const discMap = new Map<number, Set<string>>();
+  tracks.forEach((track) => {
+    const pos = String(track.position ?? '').trim();
+    if (!pos) return;
+    const discNumber = extractDiscNumber(pos);
+    const side = extractSide(pos);
+    if (!discMap.has(discNumber)) discMap.set(discNumber, new Set());
+    if (side) discMap.get(discNumber)?.add(side);
+  });
+  if (discMap.size === 0) return null;
+  const discNumbers = Array.from(discMap.keys()).sort((a, b) => a - b);
+  const disc_metadata = discNumbers.map((num) => ({
+    disc_number: num,
+    title: `Disc #${num}`,
+    storage_device: null,
+    slot: null
+  }));
+  const matrix_numbers: Record<string, { side_a: string; side_b: string }> = {};
+  discNumbers.forEach((num) => {
+    matrix_numbers[String(num)] = { side_a: '', side_b: '' };
+  });
+  return { disc_metadata, matrix_numbers };
+};
+
 // Helper to validate Postgres dates
 const isValidDate = (dateStr: unknown): boolean => {
   if (typeof dateStr !== 'string') return false;
@@ -976,6 +1016,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const updatesForAlbum: Record<string, unknown> = {};
       const autoFilledFields: string[] = [];
       const fieldCandidates: Record<string, Record<string, unknown>> = {};
+      let derivedDiscData: { disc_metadata: unknown; matrix_numbers: unknown } | null = null;
 
       for (const source of GLOBAL_PRIORITY) {
          const sourceData = (candidates as Record<string, Record<string, unknown>>)[source];
@@ -1043,6 +1084,17 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                  kept_value: toJsonValue('tracks_updated'),
                  resolved_at: new Date().toISOString()
                });
+            }
+
+            if (!derivedDiscData) {
+              derivedDiscData = deriveDiscDataFromTracks(tracks as Record<string, unknown>[]);
+            }
+
+            if (derivedDiscData?.disc_metadata && !fieldCandidates.disc_metadata) {
+              fieldCandidates.disc_metadata = { [source]: derivedDiscData.disc_metadata };
+            }
+            if (derivedDiscData?.matrix_numbers && !fieldCandidates.matrix_numbers) {
+              fieldCandidates.matrix_numbers = { [source]: derivedDiscData.matrix_numbers };
             }
          }
       }
