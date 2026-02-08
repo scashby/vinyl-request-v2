@@ -136,6 +136,13 @@ export type Album = {
   certifications?: string[] | null;
   sort_title?: string | null;
   subtitle?: string | null;
+  cultural_significance?: string | null;
+  critical_reception?: string | null;
+  recording_location?: string | null;
+  allmusic_rating?: number | string | null;
+  allmusic_review?: string | null;
+  pitchfork_score?: number | string | null;
+  pitchfork_review?: string | null;
   back_image_url?: string | null;
   spine_image_url?: string | null;
   inner_sleeve_images?: string[] | null;
