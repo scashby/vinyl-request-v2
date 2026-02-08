@@ -40,6 +40,13 @@ const eventSubtypeLabels: Record<string, string> = {
   'vinyl-sundays': 'Vinyl Sundays',
   'vinyl-trivia': 'Vinyl Trivia',
   'vinyl-bingo': 'Vinyl Music Bingo',
+  'vinyl-bracketology': 'Vinyl Bracketology',
+};
+
+const GAME_MODE_LABELS: Record<string, string> = {
+  bracketology: 'Bracketology',
+  bingo: 'Vinyl Bingo',
+  trivia: 'Needle Drop Trivia',
 };
 
 const gameModeLabels: Record<string, string> = {

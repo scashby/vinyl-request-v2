@@ -21,7 +21,7 @@ const EVENT_TYPE_SETTINGS_KEY = 'event_type_config';
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
 const EVENT_SUBTYPE_TAG_PREFIX = 'event_subtype:';
 
-const TEMPLATE_FIELDS = ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'queue', 'recurrence', 'crate', 'formats'];
+const TEMPLATE_FIELDS = ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'queue', 'games', 'recurrence', 'crate', 'formats'];
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 const GOOGLE_MAPS_LIBRARIES = 'places';
 let googleMapsScriptPromise: Promise<void> | null = null;
@@ -737,6 +737,7 @@ export default function EditEventForm() {
     setEventData((prev) => ({
       ...prev,
       [name]: checked,
+      ...(name === 'has_games' && !checked ? { game_modes: [] } : {}),
       ...(name === 'is_recurring' && !checked ? { recurrence_end_date: '' } : {})
     }));
   };
@@ -786,6 +787,10 @@ export default function EditEventForm() {
         ? { has_queue: defaults.has_queue }
         : {}),
       ...(enabledFields.includes('queue') && defaults.queue_types ? { queue_types: defaults.queue_types } : {}),
+      ...(enabledFields.includes('games') && typeof defaults.has_games === 'boolean'
+        ? { has_games: defaults.has_games }
+        : {}),
+      ...(enabledFields.includes('games') && defaults.game_modes ? { game_modes: defaults.game_modes } : {}),
       ...(enabledFields.includes('recurrence') && typeof defaults.is_recurring === 'boolean'
         ? { is_recurring: defaults.is_recurring }
         : {}),
