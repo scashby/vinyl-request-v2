@@ -21,7 +21,7 @@ const EVENT_TYPE_SETTINGS_KEY = 'event_type_config';
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
 const EVENT_SUBTYPE_TAG_PREFIX = 'event_subtype:';
 
-const TEMPLATE_FIELDS = ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'queue', 'recurrence', 'crate', 'formats'];
+const TEMPLATE_FIELDS = ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'queue', 'games', 'recurrence', 'crate', 'formats'];
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 const GOOGLE_MAPS_LIBRARIES = 'places';
 let googleMapsScriptPromise: Promise<void> | null = null;
@@ -90,6 +90,8 @@ interface EventData {
   has_queue: boolean;
   queue_types: string[];
   allowed_formats: string[];
+  has_games: boolean;
+  game_modes: string[];
   // Replaced legacy tags with Crate ID
   crate_id?: number | null;
   
@@ -195,6 +197,8 @@ function buildEventDataFromDbEvent(dbEvent: DbEvent): EventData {
     has_queue: !!dbEvent.has_queue,
     queue_types: Array.isArray(dbEvent.queue_types) ? dbEvent.queue_types : [],
     allowed_formats: normalizeStringArray(dbEvent.allowed_formats),
+    has_games: !!dbEvent.has_games,
+    game_modes: normalizeStringArray(dbEvent.game_modes),
     crate_id: dbEvent.crate_id ?? null,
     is_recurring: !!dbEvent.is_recurring,
     recurrence_pattern: dbEvent.recurrence_pattern || 'weekly',
@@ -221,6 +225,8 @@ const OVERRIDE_FIELDS: Array<{
   { key: 'has_queue', label: 'Queue Enabled' },
   { key: 'queue_types', label: 'Queue Types' },
   { key: 'allowed_formats', label: 'Allowed Formats' },
+  { key: 'has_games', label: 'Games Enabled' },
+  { key: 'game_modes', label: 'Game Modes' },
   { key: 'crate_id', label: 'Crate' },
   { key: 'is_featured_grid', label: 'Featured Grid' },
   { key: 'is_featured_upnext', label: 'Featured Up Next' },
@@ -292,6 +298,8 @@ export default function EditEventForm() {
     has_queue: false,
     queue_types: [],
     allowed_formats: [] as string[],
+    has_games: false,
+    game_modes: [],
     crate_id: null,
     is_recurring: false,
     recurrence_pattern: 'weekly',
@@ -715,6 +723,8 @@ export default function EditEventForm() {
         return normalizeArrayValue(event.queue_types ?? []);
       case 'allowed_formats':
         return normalizeArrayValue(event.allowed_formats ?? []);
+      case 'game_modes':
+        return normalizeArrayValue(event.game_modes ?? []);
       case 'crate_id':
         return event.crate_id ?? null;
       default:
@@ -727,6 +737,7 @@ export default function EditEventForm() {
     setEventData((prev) => ({
       ...prev,
       [name]: checked,
+      ...(name === 'has_games' && !checked ? { game_modes: [] } : {}),
       ...(name === 'is_recurring' && !checked ? { recurrence_end_date: '' } : {})
     }));
   };
@@ -744,6 +755,14 @@ export default function EditEventForm() {
       const types = [...prev.queue_types];
       if (checked) return { ...prev, queue_types: [...types, queueType] };
       return { ...prev, queue_types: types.filter((t) => t !== queueType) };
+    });
+  };
+
+  const handleGameModeChange = (mode: string, checked: boolean) => {
+    setEventData((prev) => {
+      const modes = [...prev.game_modes];
+      if (checked) return { ...prev, game_modes: [...modes, mode] };
+      return { ...prev, game_modes: modes.filter((t) => t !== mode) };
     });
   };
 
@@ -768,6 +787,10 @@ export default function EditEventForm() {
         ? { has_queue: defaults.has_queue }
         : {}),
       ...(enabledFields.includes('queue') && defaults.queue_types ? { queue_types: defaults.queue_types } : {}),
+      ...(enabledFields.includes('games') && typeof defaults.has_games === 'boolean'
+        ? { has_games: defaults.has_games }
+        : {}),
+      ...(enabledFields.includes('games') && defaults.game_modes ? { game_modes: defaults.game_modes } : {}),
       ...(enabledFields.includes('recurrence') && typeof defaults.is_recurring === 'boolean'
         ? { is_recurring: defaults.is_recurring }
         : {}),
@@ -838,6 +861,9 @@ export default function EditEventForm() {
       const normalizedQueueTypes = eventData.queue_types
         .map((type) => type.trim())
         .filter(Boolean);
+      const normalizedGameModes = eventData.game_modes
+        .map((mode) => mode.trim())
+        .filter(Boolean);
       const normalizedImageUrl = eventData.image_url.trim();
       
       const payload: EventInsert = {
@@ -854,6 +880,10 @@ export default function EditEventForm() {
           ? normalizedQueueTypes
           : null,
         allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
+        has_games: eventData.has_games,
+        game_modes: eventData.has_games && normalizedGameModes.length > 0
+          ? normalizedGameModes
+          : null,
         crate_id: eventData.crate_id || null,
         
         is_recurring: isTBA ? false : eventData.is_recurring,
@@ -1526,6 +1556,51 @@ export default function EditEventForm() {
           )}
           </section>
         )}
+
+        <section className="p-5 bg-indigo-50 border border-indigo-200 rounded-2xl">
+          <label className="flex items-center gap-2 mb-4 font-bold text-indigo-800">
+            <input
+              type="checkbox"
+              name="has_games"
+              checked={eventData.has_games}
+              onChange={handleCheckboxChange}
+              className="h-4 w-4"
+            />
+            Enable Vinyl Games
+          </label>
+
+          {eventData.has_games && (
+            <div className="grid gap-3 md:grid-cols-3">
+              <label className="flex items-center gap-2 text-sm text-indigo-900">
+                <input
+                  type="checkbox"
+                  checked={eventData.game_modes.includes('bracketology')}
+                  onChange={(e) => handleGameModeChange('bracketology', e.target.checked)}
+                  className="h-4 w-4"
+                />
+                🏆 Bracketology
+              </label>
+              <label className="flex items-center gap-2 text-sm text-indigo-900">
+                <input
+                  type="checkbox"
+                  checked={eventData.game_modes.includes('bingo')}
+                  onChange={(e) => handleGameModeChange('bingo', e.target.checked)}
+                  className="h-4 w-4"
+                />
+                🎯 Vinyl Bingo
+              </label>
+              <label className="flex items-center gap-2 text-sm text-indigo-900">
+                <input
+                  type="checkbox"
+                  checked={eventData.game_modes.includes('trivia')}
+                  onChange={(e) => handleGameModeChange('trivia', e.target.checked)}
+                  className="h-4 w-4"
+                />
+                🎤 Needle Drop Trivia
+              </label>
+            </div>
+          )}
+        </section>
 
         <button
           type="submit"
