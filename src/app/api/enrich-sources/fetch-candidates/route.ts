@@ -7,6 +7,7 @@ import {
   fetchDiscogsData, 
   fetchLastFmData, 
   fetchAppleMusicData, 
+  fetchAllMusicData,
   fetchCoverArtData, 
   fetchWikipediaData, 
   fetchGeniusData,
@@ -76,6 +77,7 @@ export async function POST(req: Request) {
             musicbrainz_release_group_id,
             genres,
             styles,
+            notes,
             original_release_year,
             artist:artists (name),
             master_tag_links:master_tag_links (
@@ -153,6 +155,7 @@ export async function POST(req: Request) {
           cover_image_url?: string | null;
           discogs_master_id?: string | null;
           musicbrainz_release_group_id?: string | null;
+          notes?: string | null;
           original_release_year?: number | null;
           genres?: string[] | null;
           styles?: string[] | null;
@@ -201,6 +204,16 @@ export async function POST(req: Request) {
       const firstRecording = releaseTracks[0]?.recording
         ? (Array.isArray(releaseTracks[0].recording) ? releaseTracks[0].recording[0] : releaseTracks[0].recording)
         : null;
+      const trackCredits = releaseTracks
+        .map((track) => {
+          const recording = track.recording
+            ? (Array.isArray(track.recording) ? track.recording[0] : track.recording)
+            : null;
+          return asRecord(recording?.credits);
+        })
+        .filter((credit) => Object.keys(credit).length > 0);
+      const hasLyricsUrl = trackCredits.some((credit) => typeof credit.lyrics_url === 'string' && credit.lyrics_url.trim().length > 0);
+      const hasLyrics = trackCredits.some((credit) => typeof credit.lyrics === 'string' && credit.lyrics.trim().length > 0);
       const creditsInfo = getAlbumCredits(firstRecording?.credits);
       const { albumPeople, classical, artwork, albumDetails, links } = creditsInfo;
       const formatParts = [release?.media_type, ...(release?.format_details ?? [])].filter(Boolean);
@@ -244,13 +257,27 @@ export async function POST(req: Request) {
         genius_url: asString(links.genius_url),
         apple_music_url: asString(links.apple_music_url),
         lastfm_url: asString(links.lastfm_url),
+        allmusic_url: asString(links.allmusic_url),
         year: release?.release_year ?? master?.original_release_year ?? null,
         label: release?.label ?? null,
         cat_no: release?.catalog_number ?? null,
         genres: master?.genres ?? null,
         styles: master?.styles ?? null,
+        master_notes: master?.notes ?? null,
+        cultural_significance: albumDetails.cultural_significance ?? null,
+        recording_location: albumDetails.recording_location ?? null,
+        critical_reception: albumDetails.critical_reception ?? null,
+        allmusic_rating: albumDetails.allmusic_rating ?? null,
+        allmusic_review: albumDetails.allmusic_review ?? null,
+        apple_music_editorial_notes: albumDetails.apple_music_editorial_notes ?? null,
+        pitchfork_score: albumDetails.pitchfork_score ?? null,
+        chart_positions: albumDetails.chart_positions ?? null,
+        awards: albumDetails.awards ?? null,
+        certifications: albumDetails.certifications ?? null,
         tracks: releaseTracks.length > 0 ? ['has_tracks'] : [],
         tracklists: releaseTracks.length > 0 ? ['has_tracks'] : [],
+        tracks_lyrics_url: hasLyricsUrl ? ['has_lyrics_url'] : [],
+        tracks_lyrics: hasLyrics ? ['has_lyrics'] : [],
         disc_metadata: albumDetails.disc_metadata ?? null,
         matrix_numbers: albumDetails.matrix_numbers ?? null,
         location: album.location ?? null,
@@ -283,6 +310,14 @@ export async function POST(req: Request) {
     const hasMissingSelectedField = (album: ReturnType<typeof mapInventoryToCandidate>) => {
       if (!missingDataOnly || !fields.length) return true;
       return fields.some((field: string) => {
+        if (field === 'tracks.lyrics_url') {
+          return isEmptyValue((album as Record<string, unknown>).tracks_lyrics_url);
+        }
+        if (field === 'tracks.lyrics') {
+          const hasLyrics = !isEmptyValue((album as Record<string, unknown>).tracks_lyrics);
+          const hasLyricsUrl = !isEmptyValue((album as Record<string, unknown>).tracks_lyrics_url);
+          return !(hasLyrics || hasLyricsUrl);
+        }
         const [rootField] = field.split('.');
         return isEmptyValue((album as Record<string, unknown>)[rootField]);
       });
@@ -304,6 +339,7 @@ export async function POST(req: Request) {
           if (services.discogs) promises.push(fetchDiscogsData(typedAlbum));
           if (services.spotify) promises.push(fetchSpotifyData(typedAlbum));
           if (services.appleMusicEnhanced) promises.push(fetchAppleMusicData(typedAlbum));
+          if (services.allmusic) promises.push(fetchAllMusicData(typedAlbum));
           if (services.lastfm) promises.push(fetchLastFmData(typedAlbum));
           if (services.wikipedia) promises.push(fetchWikipediaData(typedAlbum));
           if (services.genius) promises.push(fetchGeniusData(typedAlbum));
