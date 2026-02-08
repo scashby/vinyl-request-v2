@@ -49,6 +49,12 @@ const gameModeLabels: Record<string, string> = {
   trivia: 'Needle Drop Trivia',
 };
 
+const gameModeLabels: Record<string, string> = {
+  bracketology: 'Bracketology',
+  bingo: 'Vinyl Bingo',
+  trivia: 'Needle Drop Trivia',
+};
+
 const normalizeStringArray = (value: unknown): string[] => {
   if (Array.isArray(value)) return value;
   if (typeof value === 'string') {
