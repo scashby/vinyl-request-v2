@@ -25,9 +25,7 @@ type GameState = {
 type PatchPayload =
   | { action: 'setActiveMatch'; matchId: string }
   | { action: 'recordWinner'; matchId: string; winner: 'red' | 'blue' }
-  | { action: 'initializeBracket' }
-  | { action: 'setTriviaIndex'; index: number }
-  | { action: 'setTriviaReveal'; reveal: boolean };
+  | { action: 'initializeBracket' };
 
 const createEmptyEntry = (): BracketEntry => ({
   id: null,
@@ -254,52 +252,6 @@ export async function PATCH(
         game_state: {
           ...currentState,
           matches,
-        },
-      })
-      .eq('id', sessionId)
-      .select('*')
-      .single();
-
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ data: updated });
-  }
-
-  if (payload.action === 'setTriviaIndex') {
-    const { data: updated, error: updateError } = await supabaseAdmin
-      .from('game_sessions')
-      .update({
-        game_state: {
-          ...currentState,
-          trivia: {
-            ...(currentState.trivia ?? {}),
-            currentIndex: payload.index,
-          },
-        },
-      })
-      .eq('id', sessionId)
-      .select('*')
-      .single();
-
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ data: updated });
-  }
-
-  if (payload.action === 'setTriviaReveal') {
-    const { data: updated, error: updateError } = await supabaseAdmin
-      .from('game_sessions')
-      .update({
-        game_state: {
-          ...currentState,
-          trivia: {
-            ...(currentState.trivia ?? {}),
-            reveal: payload.reveal,
-          },
         },
       })
       .eq('id', sessionId)

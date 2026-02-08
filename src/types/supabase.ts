@@ -643,30 +643,6 @@ export type Database = {
           }
         ];
       };
-      game_templates: {
-        Row: {
-          id: number;
-          name: string;
-          game_type: string;
-          template_state: Json;
-          created_at: string;
-        };
-        Insert: {
-          id?: number;
-          name: string;
-          game_type: string;
-          template_state?: Json;
-          created_at?: string;
-        };
-        Update: {
-          id?: number;
-          name?: string;
-          game_type?: string;
-          template_state?: Json;
-          created_at?: string;
-        };
-        Relationships: [];
-      };
       import_conflict_resolutions: {
         Row: {
           id: number;
