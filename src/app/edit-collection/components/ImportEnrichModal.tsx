@@ -28,7 +28,7 @@ const ALLOWED_COLUMNS = new Set([
   'image_url', 'back_image_url', 'sell_price', 'media_condition', 'location', // FIXED: Was 'folder'
   'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
   'apple_music_id', 'apple_music_url', 'lastfm_id', 'lastfm_url', 
-  'musicbrainz_id', 'musicbrainz_url', 'wikipedia_url', 'genius_url', 
+  'musicbrainz_id', 'musicbrainz_url', 'wikipedia_url', 'genius_url', 'allmusic_url',
   'tags', 'lastfm_tags', 'notes', 'release_notes', 'master_notes', 'enriched_metadata', 'enrichment_summary', 'companies', 'genres', 'styles', 'original_release_date',
   'inner_sleeve_images', 'musicians', 'credits', 'producers', 'engineers', 
   'songwriters', 'composer', 'conductor', 'orchestra',
@@ -41,7 +41,8 @@ const ALLOWED_COLUMNS = new Set([
   'is_cover', 'original_artist', 'original_year',
   'tracks.lyrics', 'tracks.lyrics_url',
   'cultural_significance', 'recording_location', 'critical_reception', 'awards', 'certifications',
-  'allmusic_rating', 'pitchfork_score'
+  'chart_positions',
+  'allmusic_rating', 'allmusic_review', 'apple_music_editorial_notes', 'pitchfork_score'
 ]);
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
@@ -205,6 +206,46 @@ const extractSide = (position: unknown): string | null => {
   if (typeof position !== 'string') return null;
   const match = position.trim().match(/^([A-Za-z])/);
   return match ? match[1].toUpperCase() : null;
+};
+
+const extractDiscNumber = (position: string): number => {
+  const trimmed = position.trim().toUpperCase();
+  const sideMatch = trimmed.match(/^([A-Z])/);
+  if (sideMatch?.[1]) {
+    const idx = sideMatch[1].charCodeAt(0) - 65;
+    if (idx >= 0) return Math.floor(idx / 2) + 1;
+  }
+  const discMatch = trimmed.match(/^(\d+)[-./]/);
+  if (discMatch?.[1]) {
+    const num = Number(discMatch[1]);
+    if (!Number.isNaN(num) && num > 0) return num;
+  }
+  return 1;
+};
+
+const deriveDiscDataFromTracks = (tracks: Record<string, unknown>[]) => {
+  const discMap = new Map<number, Set<string>>();
+  tracks.forEach((track) => {
+    const pos = String(track.position ?? '').trim();
+    if (!pos) return;
+    const discNumber = extractDiscNumber(pos);
+    const side = extractSide(pos);
+    if (!discMap.has(discNumber)) discMap.set(discNumber, new Set());
+    if (side) discMap.get(discNumber)?.add(side);
+  });
+  if (discMap.size === 0) return null;
+  const discNumbers = Array.from(discMap.keys()).sort((a, b) => a - b);
+  const disc_metadata = discNumbers.map((num) => ({
+    disc_number: num,
+    title: `Disc #${num}`,
+    storage_device: null,
+    slot: null
+  }));
+  const matrix_numbers: Record<string, { side_a: string; side_b: string }> = {};
+  discNumbers.forEach((num) => {
+    matrix_numbers[String(num)] = { side_a: '', side_b: '' };
+  });
+  return { disc_metadata, matrix_numbers };
 };
 
 // Helper to validate Postgres dates
@@ -411,6 +452,16 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'mood_party':
       case 'master_release_date':
       case 'recording_date':
+      case 'recording_location':
+      case 'critical_reception':
+      case 'cultural_significance':
+      case 'chart_positions':
+      case 'awards':
+      case 'certifications':
+      case 'allmusic_rating':
+      case 'allmusic_review':
+      case 'apple_music_editorial_notes':
+      case 'pitchfork_score':
       case 'companies':
       case 'enrichment_sources':
       case 'purchase_store':
@@ -507,11 +558,25 @@ const applyAlbumCreditsToRecordings = async (
     .map((track) => {
       const recording = toSingle(track.recording);
       if (!recording?.id) return null;
+      
       const mergedCredits = mergeRecordingCredits(recording.credits, albumCredits);
+      
+      // EXTRACT VALUES FROM THE JSON TO SAVE TO COLUMNS
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const details = (mergedCredits as any).album_details || {};
+
       return Promise.resolve(
         supabase
           .from('recordings')
-          .update({ credits: mergedCredits as unknown as import('types/supabase').Json })
+          .update({ 
+            credits: mergedCredits as unknown as import('types/supabase').Json,
+            // FORCE DATA INTO THE COLUMNS
+            bpm: details.tempo_bpm ? Math.round(Number(details.tempo_bpm)) : null,
+            energy: details.energy ? Number(details.energy) : null,
+            danceability: details.danceability ? Number(details.danceability) : null,
+            valence: details.mood_happy ? Number(details.mood_happy) : null,
+            musical_key: details.musical_key || null
+          })
           .eq('id', recording.id)
       );
     })
@@ -646,6 +711,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       discogs: activeServices.has('discogs'),
       lastfm: activeServices.has('lastfm'),
       appleMusicEnhanced: activeServices.has('appleMusic'),
+      allmusic: activeServices.has('allmusic'),
       wikipedia: activeServices.has('wikipedia'),
       genius: activeServices.has('genius'),
       coverArt: activeServices.has('coverArtArchive'),
@@ -749,7 +815,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     let collectedSummary: {album: string, field: string, action: string}[] = [];
 
     while ((collectedConflicts.length < targetConflicts || specificAlbumIds) && hasMoreRef.current) {
-      setStatus(`Scanning (Cursor: ${cursorRef.current})... Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
+      setStatus(`Scanning... Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
 
       try {
         const payload = {
@@ -783,6 +849,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         }
 
         const candidates = result.results || [];
+        const lastCheckedAlbum = candidates.length > 0 ? candidates[candidates.length - 1].album : null;
+        const lastCheckedLabel = lastCheckedAlbum
+          ? `${lastCheckedAlbum.artist} - ${lastCheckedAlbum.title}`
+          : (result.processedCount ? `No matches in last batch (${result.processedCount} checked)` : 'No matches in last batch');
+        setStatus(`Scanning... Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
 
         if (result.processedCount > candidates.length) {
           // This is fine, logs empty results if any
@@ -797,6 +868,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         collectedConflicts = [...collectedConflicts, ...batchConflicts];
         if (batchSummaryItems && batchSummaryItems.length > 0) {
             collectedSummary = [...collectedSummary, ...batchSummaryItems];
+        }
+        if (batchConflicts.length > 0) {
+          setStatus(`Scanning... Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
         }
 
         if (specificAlbumIds) break;
@@ -882,6 +956,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   };
 
   async function processBatchAndSave(results: CandidateResult[]) {
+    const activeServices = getServicesForSelection();
+    const wantsLyrics = !!fieldConfig['tracks.lyrics'] || !!fieldConfig['tracks.lyrics_url'];
+    const runGeniusLyrics = wantsLyrics && activeServices.genius;
+
     const albumIds = results.map(r => r.album.id);
     const { data: resolutions, error: resError } = await supabase
       .from('import_conflict_resolutions')
@@ -896,6 +974,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const processedIds: number[] = [];
     const historyUpdates: { album_id: number; field_name: string; source: string; resolution: string; kept_value: import('types/supabase').Json | null; resolved_at: string }[] = [];
     const trackSavePromises: Promise<unknown>[] = [];
+    const lyricJobs: { albumId: number; artist: string; title: string; appleMusicId?: string | null }[] = [];
     
     const GLOBAL_PRIORITY = [
       'discogs', 'musicbrainz', 'spotify', 'appleMusic', 'deezer', 
@@ -939,9 +1018,19 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
       if (Object.keys(candidates).length === 0) return;
 
+      if (runGeniusLyrics && Array.isArray(album.tracks) && album.tracks.length > 0) {
+        lyricJobs.push({
+          albumId: album.id,
+          artist: album.artist,
+          title: album.title,
+          appleMusicId: (album as Record<string, unknown>).apple_music_id as string | null
+        });
+      }
+
       const updatesForAlbum: Record<string, unknown> = {};
       const autoFilledFields: string[] = [];
       const fieldCandidates: Record<string, Record<string, unknown>> = {};
+      let derivedDiscData: { disc_metadata: unknown; matrix_numbers: unknown } | null = null;
 
       for (const source of GLOBAL_PRIORITY) {
          const sourceData = (candidates as Record<string, Record<string, unknown>>)[source];
@@ -1009,6 +1098,17 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                  kept_value: toJsonValue('tracks_updated'),
                  resolved_at: new Date().toISOString()
                });
+            }
+
+            if (!derivedDiscData) {
+              derivedDiscData = deriveDiscDataFromTracks(tracks as Record<string, unknown>[]);
+            }
+
+            if (derivedDiscData?.disc_metadata && !fieldCandidates.disc_metadata) {
+              fieldCandidates.disc_metadata = { [source]: derivedDiscData.disc_metadata };
+            }
+            if (derivedDiscData?.matrix_numbers && !fieldCandidates.matrix_numbers) {
+              fieldCandidates.matrix_numbers = { [source]: derivedDiscData.matrix_numbers };
             }
          }
       }
@@ -1214,6 +1314,27 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       await Promise.all(autoUpdates.map(u => applyAlbumUpdates(u.album, u.fields)));
     }
 
+    if (runGeniusLyrics && lyricJobs.length > 0) {
+      const lyricResults = await Promise.all(lyricJobs.map(async (job) => {
+        try {
+          const res = await fetch('/api/enrich-sources/genius', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ albumId: job.albumId })
+          });
+          const data = await res.json();
+          if (data?.success) {
+            addLog(`${job.artist} - ${job.title}`, 'info', `Lyrics URLs: ${data.data?.enrichedCount ?? 0}/${data.data?.totalTracks ?? 0}`);
+          } else {
+            addLog(`${job.artist} - ${job.title}`, 'skipped', `Lyrics enrichment failed: ${data?.error ?? 'Unknown error'}`);
+          }
+        } catch (error) {
+          addLog(`${job.artist} - ${job.title}`, 'skipped', `Lyrics enrichment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }));
+      void lyricResults;
+    }
+
     return { conflicts: newConflicts, summary: localBatchSummary };
   }
   
@@ -1253,6 +1374,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       if (track.tempo_bpm) credits.tempo_bpm = track.tempo_bpm;
       if (track.musical_key) credits.musical_key = track.musical_key;
       if (track.lyrics) credits.lyrics = track.lyrics;
+      if (track.lyrics_url) credits.lyrics_url = track.lyrics_url;
+      if (track.lyrics_source) credits.lyrics_source = track.lyrics_source;
+      if (track.artist) credits.track_artist = track.artist;
+      if (track.note) credits.track_note = track.note;
       if (track.is_cover !== undefined) credits.is_cover = track.is_cover;
       if (track.original_artist) credits.original_artist = track.original_artist;
       if (track.original_year) credits.original_year = track.original_year;

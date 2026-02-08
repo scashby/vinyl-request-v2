@@ -306,7 +306,8 @@ const ConflictRow = React.memo(({
     const TEXT_LIST_FIELDS = [
         'genres', 'styles', 'musicians', 'credits', 'producers', 'engineers', 
         'tags', 'label', 'labels', 'writers', 'mixers', 'composer', 'lyricist', 
-        'arranger', 'samples', 'sampled_by', 'awards', 'certifications', 'songwriters'
+        'arranger', 'samples', 'sampled_by', 'awards', 'certifications', 'songwriters',
+        'chart_positions'
     ];
     
     const isTextListField = TEXT_LIST_FIELDS.includes(conflict.field_name);
@@ -532,6 +533,37 @@ export default function EnrichmentReviewModal({
 
   const handleResolve = useCallback((conflict: ExtendedFieldConflict, value: unknown, source: string) => {
     const key = `${conflict.album_id}-${conflict.field_name}`;
+    const isImageArrayField =
+      isImageArray(conflict.current_value) ||
+      isImageArray(conflict.new_value) ||
+      (conflict.candidates
+        ? Object.values(conflict.candidates).some((val) => isImageArray(val))
+        : false);
+
+    if (isImageArrayField) {
+      setResolutions(prev => {
+        const currentRes = prev[key];
+        const base = Array.isArray(currentRes?.value)
+          ? (currentRes?.value as string[])
+          : (Array.isArray(conflict.current_value) ? (conflict.current_value as string[]) : []);
+        const selected = new Set(base.map(String));
+        const url = String(value);
+        if (selected.has(url)) {
+          selected.delete(url);
+        } else {
+          selected.add(url);
+        }
+        return {
+          ...prev,
+          [key]: {
+            value: Array.from(selected),
+            source: 'custom_merge',
+            selectedSources: currentRes?.selectedSources ?? []
+          }
+        };
+      });
+      return;
+    }
     
     // Explicitly listing fields that support multi-source merging
     const MERGEABLE_FIELDS = [

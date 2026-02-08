@@ -49,6 +49,12 @@ const GAME_MODE_LABELS: Record<string, string> = {
   trivia: 'Needle Drop Trivia',
 };
 
+const gameModeLabels: Record<string, string> = {
+  bracketology: 'Bracketology',
+  bingo: 'Vinyl Bingo',
+  trivia: 'Needle Drop Trivia',
+};
+
 const normalizeStringArray = (value: unknown): string[] => {
   if (Array.isArray(value)) return value;
   if (typeof value === 'string') {
@@ -248,9 +254,9 @@ export default function Page() {
                         Vinyl Games
                       </span>
                     )}
-                      {event.has_games && gameModes.length > 0 && (
+                    {event.has_games && gameModes.length > 0 && (
                       <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-700 bg-indigo-50 px-2 py-1 rounded-full">
-                        {gameModes.map((mode) => GAME_MODE_LABELS[mode] || mode).join(' · ')}
+                        {gameModes.map((mode) => gameModeLabels[mode] || mode).join(' · ')}
                       </span>
                     )}
                   </div>
