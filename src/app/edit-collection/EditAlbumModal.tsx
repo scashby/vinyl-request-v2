@@ -769,6 +769,10 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               disc_number: track.disc_number ?? null,
             });
 
+            // HELPER TO EXTRACT VALUES FROM THE JSON STRUCTURE
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const details = (recordingCredits as any).album_details || {};
+
             const recordingPayload = {
               title: trackTitle,
               duration_seconds: parseDurationToSeconds(track.duration),
@@ -776,6 +780,12 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               credits: Object.keys(recordingCredits).length > 0
                 ? (recordingCredits as unknown as Database['public']['Tables']['recordings']['Insert']['credits'])
                 : undefined,
+              // ADD THESE LINES TO SAVE TO COLUMNS:
+              bpm: details.tempo_bpm ? Math.round(Number(details.tempo_bpm)) : null,
+              energy: details.energy ? Number(details.energy) : null,
+              danceability: details.danceability ? Number(details.danceability) : null,
+              valence: details.mood_happy ? Number(details.mood_happy) : null,
+              musical_key: details.musical_key || null
             };
 
             const { data: recording, error: recordingError } = await supabase

@@ -558,11 +558,25 @@ const applyAlbumCreditsToRecordings = async (
     .map((track) => {
       const recording = toSingle(track.recording);
       if (!recording?.id) return null;
+      
       const mergedCredits = mergeRecordingCredits(recording.credits, albumCredits);
+      
+      // EXTRACT VALUES FROM THE JSON TO SAVE TO COLUMNS
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const details = (mergedCredits as any).album_details || {};
+
       return Promise.resolve(
         supabase
           .from('recordings')
-          .update({ credits: mergedCredits as unknown as import('types/supabase').Json })
+          .update({ 
+            credits: mergedCredits as unknown as import('types/supabase').Json,
+            // FORCE DATA INTO THE COLUMNS
+            bpm: details.tempo_bpm ? Math.round(Number(details.tempo_bpm)) : null,
+            energy: details.energy ? Number(details.energy) : null,
+            danceability: details.danceability ? Number(details.danceability) : null,
+            valence: details.mood_happy ? Number(details.mood_happy) : null,
+            musical_key: details.musical_key || null
+          })
           .eq('id', recording.id)
       );
     })
