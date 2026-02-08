@@ -41,8 +41,9 @@ const ALLOWED_COLUMNS = new Set([
   'is_cover', 'original_artist', 'original_year',
   'tracks.lyrics', 'tracks.lyrics_url',
   'cultural_significance', 'recording_location', 'critical_reception', 'awards', 'certifications',
-  'chart_positions',
-  'allmusic_rating', 'allmusic_review', 'apple_music_editorial_notes', 'pitchfork_score'
+  'chart_positions', 'sort_title', 'subtitle', 'master_release_date', 'recording_date', 'recording_year',
+  'allmusic_rating', 'allmusic_review', 'pitchfork_score', 'pitchfork_review',
+  'apple_music_editorial_notes'
 ]);
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
@@ -302,11 +303,8 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
   const masterUpdates: Record<string, unknown> = {};
   const albumCredits: Record<string, unknown> = {};
   const tagNames: string[] = [];
-  const albumPeople: Record<string, unknown> = {};
-  const classical: Record<string, unknown> = {};
   const artwork: Record<string, unknown> = {};
   const albumDetails: Record<string, unknown> = {};
-  const albumLinks: Record<string, unknown> = {};
 
   Object.entries(updates).forEach(([key, value]) => {
     switch (key) {
@@ -335,13 +333,12 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
           releaseUpdates.media_type = parsed.media_type ?? releaseUpdates.media_type;
           releaseUpdates.format_details = parsed.format_details ?? releaseUpdates.format_details;
           releaseUpdates.qty = parsed.qty ?? releaseUpdates.qty;
-          albumDetails.rpm = parsed.rpm ?? albumDetails.rpm ?? null;
-          albumDetails.vinyl_weight = parsed.weight ?? albumDetails.vinyl_weight ?? null;
-          albumDetails.vinyl_color = parsed.color ? [parsed.color] : albumDetails.vinyl_color ?? null;
-          albumDetails.packaging = parsed.packaging ?? albumDetails.packaging ?? null;
-          albumDetails.is_box_set = parsed.is_box_set ?? albumDetails.is_box_set ?? false;
-          albumDetails.box_set = parsed.box_set ?? albumDetails.box_set ?? null;
-          albumDetails.extra = parsed.extraText || albumDetails.extra || null;
+          releaseUpdates.rpm = parsed.rpm ?? releaseUpdates.rpm ?? null;
+          releaseUpdates.vinyl_weight = parsed.weight ?? releaseUpdates.vinyl_weight ?? null;
+          releaseUpdates.vinyl_color = parsed.color ? [parsed.color] : releaseUpdates.vinyl_color ?? null;
+          releaseUpdates.packaging = parsed.packaging ?? releaseUpdates.packaging ?? null;
+          releaseUpdates.box_set = parsed.box_set ?? releaseUpdates.box_set ?? null;
+          releaseUpdates.qty = parsed.qty ?? releaseUpdates.qty ?? null;
         }
         break;
       }
@@ -409,14 +406,12 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'producers':
       case 'engineers':
       case 'songwriters':
-        appendAlbumCredits(albumPeople, key, value);
-        break;
       case 'composer':
       case 'conductor':
       case 'chorus':
       case 'composition':
       case 'orchestra':
-        appendAlbumCredits(classical, key, value);
+        masterUpdates[key] = normalizeCreditsValue(value) ?? null;
         break;
       case 'back_image_url':
       case 'spine_image_url':
@@ -424,34 +419,11 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'vinyl_label_images':
         appendAlbumCredits(artwork, key, value);
         break;
-      case 'packaging':
-      case 'vinyl_color':
-      case 'vinyl_weight':
-      case 'rpm':
-      case 'is_box_set':
-      case 'spars_code':
-      case 'box_set':
-      case 'sound':
-      case 'studio':
-      case 'disc_metadata':
-      case 'matrix_numbers':
-      case 'tracklist':
-      case 'tracklists':
-      case 'tempo_bpm':
-      case 'musical_key':
-      case 'energy':
-      case 'danceability':
-      case 'lyrics':
-      case 'lyrics_url':
-      case 'mood_acoustic':
-      case 'mood_electronic':
-      case 'mood_happy':
-      case 'mood_sad':
-      case 'mood_aggressive':
-      case 'mood_relaxed':
-      case 'mood_party':
+      case 'sort_title':
+      case 'subtitle':
       case 'master_release_date':
       case 'recording_date':
+      case 'recording_year':
       case 'recording_location':
       case 'critical_reception':
       case 'cultural_significance':
@@ -460,8 +432,36 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'certifications':
       case 'allmusic_rating':
       case 'allmusic_review':
-      case 'apple_music_editorial_notes':
       case 'pitchfork_score':
+      case 'pitchfork_review':
+        masterUpdates[key] = normalizeCreditsValue(value) ?? null;
+        break;
+      case 'packaging':
+      case 'vinyl_color':
+      case 'vinyl_weight':
+      case 'rpm':
+      case 'spars_code':
+      case 'box_set':
+      case 'sound':
+      case 'studio':
+      case 'disc_metadata':
+      case 'matrix_numbers':
+        releaseUpdates[key] = normalizeCreditsValue(value) ?? null;
+        break;
+      case 'tracklist':
+      case 'tracklists':
+      case 'tempo_bpm':
+      case 'musical_key':
+      case 'energy':
+      case 'danceability':
+      case 'mood_acoustic':
+      case 'mood_electronic':
+      case 'mood_happy':
+      case 'mood_sad':
+      case 'mood_aggressive':
+      case 'mood_relaxed':
+      case 'mood_party':
+      case 'apple_music_editorial_notes':
       case 'companies':
       case 'enrichment_sources':
       case 'purchase_store':
@@ -483,22 +483,16 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'allmusic_url':
       case 'wikipedia_url':
       case 'genius_url':
-        appendAlbumCredits(albumLinks, key, value);
+        masterUpdates[key] = normalizeCreditsValue(value) ?? null;
+        break;
+      case 'custom_links':
+        masterUpdates.custom_links = value ?? null;
         break;
       default:
         break;
     }
   });
 
-  if (Object.keys(albumLinks).length > 0) {
-    albumDetails.links = albumLinks;
-  }
-  if (Object.keys(albumPeople).length > 0) {
-    albumCredits.album_people = albumPeople;
-  }
-  if (Object.keys(classical).length > 0) {
-    albumCredits.classical = classical;
-  }
   if (Object.keys(artwork).length > 0) {
     albumCredits.artwork = artwork;
   }
@@ -1391,6 +1385,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         .map((track) => ({
           title: String(track.title ?? '').trim(),
           duration_seconds: parseDurationToSeconds(track.duration),
+          track_artist: track.artist ? String(track.artist) : null,
+          lyrics: track.lyrics ? String(track.lyrics) : null,
+          lyrics_url: track.lyrics_url ? String(track.lyrics_url) : null,
+          is_cover: typeof track.is_cover === 'boolean' ? track.is_cover : null,
+          original_artist: track.original_artist ? String(track.original_artist) : null,
           credits: (() => {
             const credits = buildTrackCredits(track);
             return Object.keys(credits).length > 0
@@ -1447,12 +1446,20 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         : {};
 
       const nextCredits: Record<string, unknown> = { ...currentCredits, ...buildTrackCredits(match) };
+      const updatePayload: Record<string, unknown> = {
+        credits: nextCredits as unknown as import('types/supabase').Json,
+      };
+      if (match.artist) updatePayload.track_artist = String(match.artist);
+      if (match.lyrics) updatePayload.lyrics = String(match.lyrics);
+      if (match.lyrics_url) updatePayload.lyrics_url = String(match.lyrics_url);
+      if (typeof match.is_cover === 'boolean') updatePayload.is_cover = match.is_cover;
+      if (match.original_artist) updatePayload.original_artist = String(match.original_artist);
 
       updates.push(
         Promise.resolve(
           supabase
             .from('recordings')
-            .update({ credits: nextCredits as unknown as import('types/supabase').Json })
+            .update(updatePayload)
             .eq('id', recording.id)
         )
       );

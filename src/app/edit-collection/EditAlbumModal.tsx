@@ -609,8 +609,9 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           box_set: asString(release?.box_set ?? albumDetails.box_set),
           sound: asString(release?.sound ?? albumDetails.sound),
           studio: asString(release?.studio ?? albumDetails.studio),
-          master_release_date: asString(albumDetails.master_release_date),
-          recording_date: asString(albumDetails.recording_date),
+          master_release_date: asString(master?.master_release_date ?? albumDetails.master_release_date),
+          recording_date: asString(master?.recording_date ?? albumDetails.recording_date),
+          recording_year: master?.recording_year ?? albumDetails.recording_year ?? null,
           chart_positions: master?.chart_positions ?? asStringArray(albumDetails.chart_positions),
           awards: master?.awards ?? asStringArray(albumDetails.awards),
           certifications: master?.certifications ?? asStringArray(albumDetails.certifications),
@@ -831,6 +832,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               title: trackTitle,
               duration_seconds: parseDurationToSeconds(track.duration),
               notes: track.note ?? null,
+              track_artist: track.artist ?? null,
               credits: Object.keys(recordingCredits).length > 0
                 ? (recordingCredits as unknown as Database['public']['Tables']['recordings']['Insert']['credits'])
                 : undefined,
@@ -887,6 +889,16 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               null,
             notes: editedAlbum.release_notes ?? null,
             track_count: typeof trackCount === 'number' ? trackCount : editedAlbum.release?.track_count ?? null,
+            packaging: editedAlbum.packaging ?? null,
+            vinyl_color: editedAlbum.vinyl_color ?? null,
+            vinyl_weight: editedAlbum.vinyl_weight ?? null,
+            rpm: editedAlbum.rpm ?? null,
+            spars_code: editedAlbum.spars_code ?? null,
+            box_set: editedAlbum.box_set ?? null,
+            sound: editedAlbum.sound ?? null,
+            studio: editedAlbum.studio ?? null,
+            disc_metadata: editedAlbum.disc_metadata ?? null,
+            matrix_numbers: editedAlbum.matrix_numbers ?? null,
           };
 
           const parsedFormat = editedAlbum.format
@@ -956,6 +968,8 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
 
           const masterUpdate: Database['public']['Tables']['masters']['Update'] = {
             title: editedAlbum.title ?? null,
+            sort_title: editedAlbum.sort_title ?? null,
+            subtitle: editedAlbum.subtitle ?? null,
             original_release_year: editedAlbum.original_release_year
               ? Number(editedAlbum.original_release_year)
               : (editedAlbum.year ? Number(editedAlbum.year) : null),
@@ -968,6 +982,39 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                 : null,
             cover_image_url: editedAlbum.image_url ?? null,
             notes: editedAlbum.master_notes ?? null,
+            musicians: editedAlbum.musicians ?? null,
+            producers: editedAlbum.producers ?? null,
+            engineers: editedAlbum.engineers ?? null,
+            songwriters: editedAlbum.songwriters ?? null,
+            composer: editedAlbum.composer ?? null,
+            conductor: editedAlbum.conductor ?? null,
+            chorus: editedAlbum.chorus ?? null,
+            composition: editedAlbum.composition ?? null,
+            orchestra: editedAlbum.orchestra ?? null,
+            chart_positions: editedAlbum.chart_positions ?? null,
+            awards: editedAlbum.awards ?? null,
+            certifications: editedAlbum.certifications ?? null,
+            cultural_significance: editedAlbum.cultural_significance ?? null,
+            critical_reception: editedAlbum.critical_reception ?? null,
+            allmusic_rating: typeof editedAlbum.allmusic_rating === 'number'
+              ? editedAlbum.allmusic_rating
+              : (editedAlbum.allmusic_rating ? Number(editedAlbum.allmusic_rating) : null),
+            allmusic_review: editedAlbum.allmusic_review ?? null,
+            pitchfork_score: typeof editedAlbum.pitchfork_score === 'number'
+              ? editedAlbum.pitchfork_score
+              : (editedAlbum.pitchfork_score ? Number(editedAlbum.pitchfork_score) : null),
+            pitchfork_review: editedAlbum.pitchfork_review ?? null,
+            recording_location: editedAlbum.recording_location ?? null,
+            master_release_date: editedAlbum.master_release_date ?? null,
+            recording_date: editedAlbum.recording_date ?? null,
+            recording_year: editedAlbum.recording_year ?? null,
+            wikipedia_url: editedAlbum.wikipedia_url ?? null,
+            allmusic_url: editedAlbum.allmusic_url ?? null,
+            apple_music_url: editedAlbum.apple_music_url ?? null,
+            lastfm_url: editedAlbum.lastfm_url ?? null,
+            spotify_url: editedAlbum.spotify_url ?? null,
+            genius_url: editedAlbum.genius_url ?? null,
+            custom_links: (editedAlbum.custom_links ?? []) as unknown as Database['public']['Tables']['masters']['Update']['custom_links'],
             main_artist_id: mainArtistId,
           };
 

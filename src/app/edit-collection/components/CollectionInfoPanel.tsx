@@ -105,10 +105,21 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
     return `https://www.ebay.com/sch/i.html?_nkw=${query}&LH_Sold=1&LH_Complete=1`;
   };
 
-  const formatBarcode = (value?: string | null) => {
-    if (!value) return '—';
+  const normalizeBarcodeDigits = (value?: string | null) => {
+    if (!value) return null;
     const cleaned = value.replace(/[^0-9Xx]/g, '');
-    return cleaned || value;
+    if (!cleaned) return null;
+    if (cleaned.length === 12) return `0${cleaned}`;
+    return cleaned;
+  };
+
+  const formatBarcodeDisplay = (value?: string | null) => {
+    const digits = normalizeBarcodeDigits(value);
+    if (!digits) return '—';
+    if (digits.length === 13) {
+      return `${digits[0]} ${digits.slice(1, 6)} ${digits.slice(6, 11)} ${digits.slice(11)}`;
+    }
+    return digits;
   };
 
   const getDiscNumber = (track: ReleaseTrack, fallbackIndex: number): number => {
@@ -235,9 +246,17 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
         </div>
       )}
 
-      <div className="text-xs text-[#333] mb-2 font-normal flex items-center gap-2">
-        <span className="barcode-font">{formatBarcode(album.release?.barcode)}</span>
-        <span className="font-mono">{formatBarcode(album.release?.barcode)}</span>
+      <div className="mb-2">
+        {normalizeBarcodeDigits(album.release?.barcode) ? (
+          <div className="flex flex-col items-start">
+            <span className="barcode-font">{normalizeBarcodeDigits(album.release?.barcode)}</span>
+            <span className="font-mono text-xs tracking-widest text-[#333]">
+              {formatBarcodeDisplay(album.release?.barcode)}
+            </span>
+          </div>
+        ) : (
+          <span className="text-xs text-[#999]">—</span>
+        )}
       </div>
       <div className="text-[13px] text-[#333] mb-2 font-normal">{album.release?.country || '—'}</div>
       <div className="text-[13px] text-[#333] mb-3 font-normal">

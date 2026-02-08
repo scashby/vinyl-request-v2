@@ -876,6 +876,9 @@ export type Database = {
           pitchfork_score: number | null;
           pitchfork_review: string | null;
           recording_location: string | null;
+          master_release_date: string | null;
+          recording_date: string | null;
+          recording_year: number | null;
           wikipedia_url: string | null;
           allmusic_url: string | null;
           apple_music_url: string | null;
@@ -917,6 +920,9 @@ export type Database = {
           pitchfork_score?: number | null;
           pitchfork_review?: string | null;
           recording_location?: string | null;
+          master_release_date?: string | null;
+          recording_date?: string | null;
+          recording_year?: number | null;
           wikipedia_url?: string | null;
           allmusic_url?: string | null;
           apple_music_url?: string | null;
@@ -958,6 +964,9 @@ export type Database = {
           pitchfork_score?: number | null;
           pitchfork_review?: string | null;
           recording_location?: string | null;
+          master_release_date?: string | null;
+          recording_date?: string | null;
+          recording_year?: number | null;
           wikipedia_url?: string | null;
           allmusic_url?: string | null;
           apple_music_url?: string | null;
