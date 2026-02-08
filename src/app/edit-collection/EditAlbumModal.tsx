@@ -129,6 +129,15 @@ const asString = (value: unknown): string | null => {
   return null;
 };
 
+const asNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && !Number.isNaN(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+};
+
 const asStringArray = (value: unknown): string[] => {
   if (!value) return [];
   if (Array.isArray(value)) {
@@ -614,7 +623,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           studio: asString(release?.studio ?? albumDetails.studio),
           master_release_date: asString(master?.master_release_date ?? albumDetails.master_release_date),
           recording_date: asString(master?.recording_date ?? albumDetails.recording_date),
-          recording_year: master?.recording_year ?? albumDetails.recording_year ?? null,
+          recording_year: master?.recording_year ?? asNumber(albumDetails.recording_year),
           chart_positions: master?.chart_positions ?? asStringArray(albumDetails.chart_positions),
           awards: master?.awards ?? asStringArray(albumDetails.awards),
           certifications: master?.certifications ?? asStringArray(albumDetails.certifications),
