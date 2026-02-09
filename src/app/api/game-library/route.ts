@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from 'src/lib/supabaseAdmin';
+import type { Database } from 'types/supabase';
 
 type LibraryPayload = {
   gameType?: string;
@@ -12,6 +13,8 @@ type LibraryPayload = {
   inventoryId?: number | null;
   metadata?: unknown;
 };
+
+type GameLibraryInsert = Database['public']['Tables']['game_library_items']['Insert'];
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -72,7 +75,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'itemType is required.' }, { status: 400 });
   }
 
-  const insertPayload = {
+  const insertPayload: GameLibraryInsert = {
     game_type: gameType,
     item_type: itemType,
     title: payload.title?.trim() || null,
@@ -89,8 +92,8 @@ export async function POST(request: NextRequest) {
   };
 
   const { data, error } = await supabaseAdmin
-    .from('game_library_items' as never)
-    .insert(insertPayload as never)
+    .from('game_library_items')
+    .insert(insertPayload)
     .select(
       'id, game_type, item_type, title, artist, prompt, answer, cover_image, inventory_id, metadata, created_at, updated_at'
     )

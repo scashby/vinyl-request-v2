@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from 'src/lib/supabaseAdmin';
+import type { Database } from 'types/supabase';
 
 type UpdatePayload = {
   gameType?: string;
@@ -12,6 +13,8 @@ type UpdatePayload = {
   inventoryId?: number | null;
   metadata?: unknown;
 };
+
+type GameLibraryUpdate = Database['public']['Tables']['game_library_items']['Update'];
 
 export async function PATCH(
   request: NextRequest,
@@ -33,7 +36,7 @@ export async function PATCH(
     );
   }
 
-  const updatePayload: Record<string, unknown> = {
+  const updatePayload: GameLibraryUpdate = {
     updated_at: new Date().toISOString(),
   };
 
@@ -67,8 +70,8 @@ export async function PATCH(
   }
 
   const { data, error } = await supabaseAdmin
-    .from('game_library_items' as never)
-    .update(updatePayload as never)
+    .from('game_library_items')
+    .update(updatePayload)
     .eq('id', itemId)
     .select(
       'id, game_type, item_type, title, artist, prompt, answer, cover_image, inventory_id, metadata, created_at, updated_at'

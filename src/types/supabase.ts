@@ -600,6 +600,58 @@ export type Database = {
         };
         Relationships: [];
       };
+      game_library_items: {
+        Row: {
+          id: number;
+          game_type: string;
+          item_type: string;
+          title: string | null;
+          artist: string | null;
+          prompt: string | null;
+          answer: string | null;
+          cover_image: string | null;
+          inventory_id: number | null;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          game_type: string;
+          item_type: string;
+          title?: string | null;
+          artist?: string | null;
+          prompt?: string | null;
+          answer?: string | null;
+          cover_image?: string | null;
+          inventory_id?: number | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          game_type?: string;
+          item_type?: string;
+          title?: string | null;
+          artist?: string | null;
+          prompt?: string | null;
+          answer?: string | null;
+          cover_image?: string | null;
+          inventory_id?: number | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'game_library_items_inventory_id_fkey';
+            columns: ['inventory_id'];
+            referencedRelation: 'inventory';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
       game_sessions: {
         Row: {
           id: number;
