@@ -29,7 +29,7 @@ const readLocalTemplates = (): TemplateRow[] => {
   try {
     const parsed = JSON.parse(raw) as TemplateRow[];
     return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
+  } catch {
     return [];
   }
 };
@@ -95,7 +95,7 @@ export default function AdminGamesPage() {
       const result = await response.json();
       setTemplates(result.data as TemplateRow[]);
       setUsingLocalTemplates(false);
-    } catch (loadError) {
+    } catch {
       setTemplates(readLocalTemplates());
       setUsingLocalTemplates(true);
     }
@@ -115,7 +115,7 @@ export default function AdminGamesPage() {
     if (gameType === 'trivia' && triviaJson.trim()) {
       try {
         triviaQuestions = JSON.parse(triviaJson.trim());
-      } catch (parseError) {
+      } catch {
         setError('Trivia JSON is invalid.');
         return;
       }

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { supabase } from 'src/lib/supabaseClient';
@@ -74,7 +74,7 @@ export default function TournamentNominationPage() {
     };
   }, [eventId, hasValidEvent]);
 
-  const loadLeaderboard = async () => {
+  const loadLeaderboard = useCallback(async () => {
     if (!hasValidEvent) return;
     const { data } = await supabase
       .from('tournament_candidates')
@@ -84,11 +84,11 @@ export default function TournamentNominationPage() {
       .limit(16);
 
     setLeaderboard(data || []);
-  };
+  }, [eventId, hasValidEvent]);
 
   useEffect(() => {
     loadLeaderboard();
-  }, [eventId, hasValidEvent]);
+  }, [loadLeaderboard]);
 
   useEffect(() => {
     if (!searchTerm.trim()) {

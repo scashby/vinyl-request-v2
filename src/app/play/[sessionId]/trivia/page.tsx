@@ -33,7 +33,10 @@ export default function TriviaScreenPage() {
   const [error, setError] = useState('');
 
   const triviaState = session?.game_state?.trivia;
-  const questions = triviaState?.questions ?? [];
+  const questions = useMemo(
+    () => triviaState?.questions ?? [],
+    [triviaState?.questions]
+  );
   const currentIndex = triviaState?.currentIndex ?? 0;
   const reveal = triviaState?.reveal ?? false;
 

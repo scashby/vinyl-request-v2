@@ -375,10 +375,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         setLoading(true);
         setError(null);
 
-        const { data, error: fetchError } = await supabase
-          .from('inventory')
-          .select(
-            `id,
+        const fullSelect = `id,
              release_id,
              status,
              personal_notes,
@@ -482,15 +479,95 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                    master_tags (name)
                  )
                )
-             )`
-          )
+             )`;
+
+        const fallbackSelect = `id,
+             release_id,
+             status,
+             personal_notes,
+             media_condition,
+             sleeve_condition,
+             location,
+             date_added,
+             purchase_price,
+             current_value,
+             purchase_date,
+             owner,
+             play_count,
+             last_played_at,
+             release:releases (
+               id,
+               master_id,
+               media_type,
+               label,
+               catalog_number,
+               barcode,
+               country,
+               release_date,
+               release_year,
+               discogs_release_id,
+               spotify_album_id,
+               track_count,
+               notes,
+               qty,
+               format_details,
+               release_tracks:release_tracks (
+                 id,
+                 position,
+                 side,
+                 title_override,
+                 recording:recordings (
+                   id,
+                   title,
+                   duration_seconds,
+                   credits,
+                   notes
+                 )
+               ),
+               master:masters (
+                 id,
+                 title,
+                 original_release_year,
+                 discogs_master_id,
+                 musicbrainz_release_group_id,
+                 cover_image_url,
+                 genres,
+                 styles,
+                 notes,
+                 artist:artists (id, name),
+                 master_tag_links:master_tag_links (
+                   master_tags (name)
+                 )
+               )
+             )`;
+
+        const initial = await supabase
+          .from('inventory')
+          .select(fullSelect)
           .eq('id', albumId)
           .single();
+        let data: any = initial.data;
+        let fetchError = initial.error;
 
         if (fetchError) {
-          console.error('Error fetching album:', fetchError);
-          setError('Failed to load album data');
-          return;
+          const message =
+            typeof fetchError.message === 'string' ? fetchError.message : '';
+          const missingColumn = message.includes('does not exist');
+          if (missingColumn) {
+            console.warn('Album fetch failed due to missing columns. Retrying with fallback select.');
+            const retry = await supabase
+              .from('inventory')
+              .select(fallbackSelect)
+              .eq('id', albumId)
+              .single();
+            data = retry.data as unknown;
+            fetchError = retry.error;
+          }
+          if (fetchError) {
+            console.error('Error fetching album:', fetchError);
+            setError('Failed to load album data');
+            return;
+          }
         }
 
         if (!data) {
