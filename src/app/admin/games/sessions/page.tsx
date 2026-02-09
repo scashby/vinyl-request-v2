@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Container } from 'components/ui/Container';
 import { supabase } from 'src/lib/supabaseClient';
 
@@ -54,6 +55,8 @@ const gameTypeLabels: Record<string, string> = {
 };
 
 export default function AdminGamesPage() {
+  const searchParams = useSearchParams();
+  const eventIdParam = searchParams.get('eventId');
   const [events, setEvents] = useState<EventRow[]>([]);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
@@ -64,6 +67,7 @@ export default function AdminGamesPage() {
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [usingLocalTemplates, setUsingLocalTemplates] = useState(false);
+  const [showAllSessions, setShowAllSessions] = useState(!eventIdParam);
 
   const activeEvent = useMemo(
     () => events.find((event) => event.id === Number(eventId)) ?? null,
@@ -107,9 +111,21 @@ export default function AdminGamesPage() {
     loadTemplates();
   }, []);
 
+  useEffect(() => {
+    if (eventIdParam) {
+      setEventId(eventIdParam);
+      setShowAllSessions(false);
+    }
+  }, [eventIdParam]);
+
   const handleCreateSession = async () => {
     setStatus('');
     setError('');
+
+    if (!eventId) {
+      setError('Select an event.');
+      return;
+    }
 
     let triviaQuestions = undefined;
     if (gameType === 'trivia' && triviaJson.trim()) {
@@ -121,13 +137,20 @@ export default function AdminGamesPage() {
       }
     }
 
+    const selectedTemplate = templateId
+      ? templates.find((item) => item.id === Number(templateId))
+      : undefined;
+    const localTemplateState =
+      usingLocalTemplates && selectedTemplate ? selectedTemplate.template_state : undefined;
+
     const response = await fetch('/api/game-sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         eventId: eventId ? Number(eventId) : undefined,
         gameType,
-        templateId: templateId ? Number(templateId) : undefined,
+        templateId: !usingLocalTemplates && templateId ? Number(templateId) : undefined,
+        templateState: usingLocalTemplates ? localTemplateState : undefined,
         triviaQuestions,
       }),
     });
@@ -142,7 +165,7 @@ export default function AdminGamesPage() {
     setEventId('');
     setTemplateId('');
     setTriviaJson('');
-    await loadSessions();
+      await loadSessions();
   };
 
   const getSessionLink = (session: SessionRow) => {
@@ -154,6 +177,11 @@ export default function AdminGamesPage() {
     }
     return `/admin/games/${session.id}`;
   };
+
+  const filteredSessions = useMemo(() => {
+    if (!eventIdParam || showAllSessions) return sessions;
+    return sessions.filter((session) => session.event_id === Number(eventIdParam));
+  }, [eventIdParam, showAllSessions, sessions]);
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -168,6 +196,11 @@ export default function AdminGamesPage() {
           <p className="text-white/60 mt-2">
             Create game sessions tied to events and jump into live controls.
           </p>
+          {eventIdParam && (
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70">
+              Managing sessions for event ID <span className="text-white">{eventIdParam}</span>.
+            </div>
+          )}
 
           <div className="mt-8 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6 space-y-4">
@@ -243,6 +276,11 @@ export default function AdminGamesPage() {
                     Using locally stored templates (API unavailable).
                   </p>
                 )}
+                {templateId && gameType === 'trivia' && !triviaJson.trim() && (
+                  <p className="mt-2 text-xs text-white/60">
+                    Trivia questions will load from the selected template.
+                  </p>
+                )}
               </div>
 
               {gameType === 'trivia' && (
@@ -273,14 +311,25 @@ export default function AdminGamesPage() {
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-[#0c0f1a] p-6">
-              <h2 className="text-lg font-semibold mb-4">Active sessions</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Active sessions</h2>
+                {eventIdParam && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllSessions((prev) => !prev)}
+                    className="rounded-md border border-white/20 px-3 py-1 text-xs font-semibold hover:border-white/40"
+                  >
+                    {showAllSessions ? 'Filter to event' : 'Show all'}
+                  </button>
+                )}
+              </div>
               <div className="space-y-3 max-h-[420px] overflow-y-auto">
-                {sessions.length === 0 && (
+                {filteredSessions.length === 0 && (
                   <p className="text-sm text-white/60">
                     No sessions yet. Create one to get started.
                   </p>
                 )}
-                {sessions.map((session) => (
+                {filteredSessions.map((session) => (
                   <div
                     key={session.id}
                     className="rounded-xl border border-white/10 bg-black/40 p-4"

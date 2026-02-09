@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Container } from 'components/ui/Container';
 
 type TemplateRow = {
@@ -85,6 +86,20 @@ export default function GameTemplatesPage() {
           <p className="text-white/60 mt-2">
             Build reusable game setups you can apply to events later.
           </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/admin/games"
+              className="rounded-lg bg-white/10 px-4 py-2 text-xs font-semibold hover:bg-white/20"
+            >
+              Open Game Library
+            </Link>
+            <Link
+              href="/admin/games/sessions"
+              className="rounded-lg border border-white/20 px-4 py-2 text-xs font-semibold hover:border-white/40"
+            >
+              Manage Sessions
+            </Link>
+          </div>
 
           <div className="mt-8 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6 space-y-4">

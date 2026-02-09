@@ -256,6 +256,15 @@ export default function Page() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {event.has_games && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => router.push(`/admin/games/sessions?eventId=${event.id}`)}
+                    >
+                      Games
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="secondary"

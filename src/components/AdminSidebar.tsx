@@ -235,7 +235,17 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
                     : "bg-indigo-600 text-white hover:bg-indigo-700"
                 }`}
               >
-                🧭 Games Admin
+                📚 Game Library
+              </Link>
+              <Link
+                href="/admin/games/templates"
+                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+                  pathname === "/admin/games/templates"
+                    ? "bg-indigo-700 text-white"
+                    : "bg-indigo-600 text-white hover:bg-indigo-700"
+                }`}
+              >
+                🧩 Game Templates
               </Link>
               <Link
                 href="/admin/games/sessions"
@@ -256,16 +266,6 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
                 }`}
               >
                 🎯 Bingo Cards
-              </Link>
-              <Link
-                href="/admin/games/templates"
-                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-                  pathname === "/admin/games/templates"
-                    ? "bg-indigo-700 text-white"
-                    : "bg-indigo-600 text-white hover:bg-indigo-700"
-                }`}
-              >
-                🧩 Game Templates
               </Link>
             </div>
           </div>

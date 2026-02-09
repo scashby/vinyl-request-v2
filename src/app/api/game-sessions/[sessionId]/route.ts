@@ -20,12 +20,25 @@ type BracketMatch = {
 type GameState = {
   activeMatchId?: string | null;
   matches?: BracketMatch[];
+  trivia?: {
+    currentIndex?: number;
+    reveal?: boolean;
+    questions?: Array<{
+      prompt?: string;
+      answer?: string;
+      artist?: string;
+      title?: string;
+      coverImage?: string;
+    }>;
+  };
 };
 
 type PatchPayload =
   | { action: 'setActiveMatch'; matchId: string }
   | { action: 'recordWinner'; matchId: string; winner: 'red' | 'blue' }
-  | { action: 'initializeBracket' };
+  | { action: 'initializeBracket' }
+  | { action: 'setTriviaIndex'; index: number }
+  | { action: 'setTriviaReveal'; reveal: boolean };
 
 const createEmptyEntry = (): BracketEntry => ({
   id: null,
@@ -252,6 +265,63 @@ export async function PATCH(
         game_state: {
           ...currentState,
           matches,
+        },
+      })
+      .eq('id', sessionId)
+      .select('*')
+      .single();
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ data: updated });
+  }
+
+  if (payload.action === 'setTriviaIndex') {
+    const trivia = currentState.trivia ?? {
+      currentIndex: 0,
+      reveal: false,
+      questions: [],
+    };
+    const nextIndex = Number.isNaN(payload.index) ? 0 : payload.index;
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from('game_sessions')
+      .update({
+        game_state: {
+          ...currentState,
+          trivia: {
+            ...trivia,
+            currentIndex: nextIndex,
+          },
+        },
+      })
+      .eq('id', sessionId)
+      .select('*')
+      .single();
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ data: updated });
+  }
+
+  if (payload.action === 'setTriviaReveal') {
+    const trivia = currentState.trivia ?? {
+      currentIndex: 0,
+      reveal: false,
+      questions: [],
+    };
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from('game_sessions')
+      .update({
+        game_state: {
+          ...currentState,
+          trivia: {
+            ...trivia,
+            reveal: payload.reveal,
+          },
         },
       })
       .eq('id', sessionId)

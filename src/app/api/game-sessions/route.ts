@@ -5,6 +5,8 @@ type CreatePayload = {
   eventId?: number;
   crateId?: number | null;
   gameType?: string;
+  templateId?: number | null;
+  templateState?: unknown;
   triviaQuestions?: Array<{
     prompt?: string;
     answer?: string;
@@ -60,18 +62,66 @@ export async function POST(request: NextRequest) {
       ? null
       : Number(payload.crateId);
 
+  const templateId =
+    payload.templateId === null || payload.templateId === undefined
+      ? null
+      : Number(payload.templateId);
+
+  let templateState: Record<string, unknown> = {};
+  if (templateId) {
+    const { data: template, error: templateError } = await supabaseAdmin
+      .from('game_templates')
+      .select('id, game_type, template_state')
+      .eq('id', templateId)
+      .single();
+
+    if (templateError) {
+      return NextResponse.json({ error: templateError.message }, { status: 500 });
+    }
+
+    if (template?.game_type && template.game_type !== gameType) {
+      return NextResponse.json(
+        { error: 'Template game type does not match the selected game type.' },
+        { status: 400 }
+      );
+    }
+
+    if (template?.template_state && typeof template.template_state === 'object') {
+      templateState = template.template_state as Record<string, unknown>;
+    }
+  } else if (payload.templateState && typeof payload.templateState === 'object') {
+    templateState = payload.templateState as Record<string, unknown>;
+  }
+
   const triviaQuestions = payload.triviaQuestions ?? [];
 
   const gameState =
     gameType === 'trivia'
       ? {
+          ...templateState,
           trivia: {
-            currentIndex: 0,
-            reveal: false,
-            questions: triviaQuestions,
+            currentIndex:
+              typeof (templateState as { trivia?: { currentIndex?: number } })
+                ?.trivia?.currentIndex === 'number'
+                ? (templateState as { trivia?: { currentIndex?: number } })
+                    ?.trivia?.currentIndex
+                : 0,
+            reveal:
+              typeof (templateState as { trivia?: { reveal?: boolean } })
+                ?.trivia?.reveal === 'boolean'
+                ? (templateState as { trivia?: { reveal?: boolean } })
+                    ?.trivia?.reveal
+                : false,
+            questions:
+              triviaQuestions.length > 0
+                ? triviaQuestions
+                : (templateState as { trivia?: { questions?: unknown[] } })
+                    ?.trivia?.questions ?? [],
           },
         }
-      : {};
+      : {
+          ...templateState,
+        };
 
   const { data, error } = await supabaseAdmin
     .from('game_sessions')
