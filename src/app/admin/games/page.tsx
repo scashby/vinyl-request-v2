@@ -189,9 +189,11 @@ export default function GameLibraryPage() {
     setArtist(item.artist);
     setTitle(item.title);
     setSelectedTrackId(null);
-    if (!coverImage) {
-      setCoverImage(item.coverImage ?? '');
-    }
+    setCoverImage(item.coverImage ?? '');
+    setPrompt('');
+    setAnswer('');
+    setDifficulty('');
+    setNotes('');
   };
 
   const handleSelectTrack = (trackId: number) => {

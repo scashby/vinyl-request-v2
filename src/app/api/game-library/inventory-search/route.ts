@@ -9,17 +9,45 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data: [] });
   }
 
-  const { data: masters, error: mastersError } = await supabaseAdmin
-    .from('masters')
-    .select('id, title, cover_image_url, main_artist_id, artists ( name )')
-    .or(`title.ilike.%${query}%,artists.name.ilike.%${query}%`)
+  const { data: artistRows, error: artistError } = await supabaseAdmin
+    .from('artists')
+    .select('id')
+    .ilike('name', `%${query}%`)
     .limit(25);
 
-  if (mastersError) {
-    return NextResponse.json({ error: mastersError.message }, { status: 500 });
+  if (artistError) {
+    return NextResponse.json({ error: artistError.message }, { status: 500 });
   }
 
-  const masterRows = masters ?? [];
+  const artistIds = (artistRows ?? []).map((row) => row.id);
+
+  const { data: mastersByTitle, error: mastersTitleError } = await supabaseAdmin
+    .from('masters')
+    .select('id, title, cover_image_url, main_artist_id, artists ( name )')
+    .ilike('title', `%${query}%`)
+    .limit(25);
+
+  if (mastersTitleError) {
+    return NextResponse.json({ error: mastersTitleError.message }, { status: 500 });
+  }
+
+  let mastersByArtist: typeof mastersByTitle = [];
+  if (artistIds.length > 0) {
+    const { data, error } = await supabaseAdmin
+      .from('masters')
+      .select('id, title, cover_image_url, main_artist_id, artists ( name )')
+      .in('main_artist_id', artistIds)
+      .limit(25);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    mastersByArtist = data ?? [];
+  }
+
+  const masterRows = [...(mastersByTitle ?? []), ...(mastersByArtist ?? [])]
+    .filter((row, index, all) => all.findIndex((item) => item.id === row.id) === index);
   const masterIds = masterRows.map((row) => row.id);
 
   if (masterIds.length === 0) {
