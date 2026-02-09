@@ -21,6 +21,7 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
 
   const navItems: NavItem[] = [
     { label: "Dashboard", path: "/admin/admin-dashboard" },
+    { label: "Games Admin", path: "/admin/games" },
     { label: "Logout", path: "/" },
   ];
 
