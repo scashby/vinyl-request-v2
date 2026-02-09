@@ -20,6 +20,20 @@ type CreatePayload = {
 };
 
 type GameSessionInsert = Database['public']['Tables']['game_sessions']['Insert'];
+type TemplateItemRow = {
+  position: number | null;
+  game_library_items: {
+    id: number;
+    title: string | null;
+    artist: string | null;
+    prompt: string | null;
+    answer: string | null;
+    cover_image: string | null;
+    metadata: Json | null;
+    item_type: string;
+    game_type: string;
+  } | null;
+};
 
 const normalizeTemplateState = (raw: Json | undefined): Record<string, Json> => {
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
@@ -80,6 +94,7 @@ export async function POST(request: NextRequest) {
       : Number(payload.templateId);
 
   let templateState: Record<string, Json> = {};
+  let templateItems: TemplateItemRow[] = [];
   if (templateId) {
     const { data: template, error: templateError } = await supabaseAdmin
       .from('game_templates')
@@ -99,11 +114,35 @@ export async function POST(request: NextRequest) {
     }
 
     templateState = normalizeTemplateState(template?.template_state as Json | undefined);
+
+    const { data: itemRows, error: itemsError } = await supabaseAdmin
+      .from('game_template_items')
+      .select('position, game_library_items ( id, title, artist, prompt, answer, cover_image, metadata, item_type, game_type )')
+      .eq('template_id', templateId)
+      .order('position', { ascending: true });
+
+    if (itemsError) {
+      return NextResponse.json({ error: itemsError.message }, { status: 500 });
+    }
+
+    templateItems = (itemRows as TemplateItemRow[]) ?? [];
   } else if (payload.templateState) {
     templateState = normalizeTemplateState(payload.templateState);
   }
 
   const triviaQuestions = payload.triviaQuestions ?? [];
+  const templateQuestions = templateItems
+    .map((item) => item.game_library_items)
+    .filter(Boolean)
+    .map((item) => ({
+      prompt: item?.prompt ?? null,
+      answer: item?.answer ?? null,
+      artist: item?.artist ?? null,
+      title: item?.title ?? null,
+      coverImage: item?.cover_image ?? null,
+      metadata: item?.metadata ?? null,
+    })) as Json[];
+
   const normalizedQuestions = triviaQuestions.map((question) => ({
     prompt: question.prompt ?? null,
     answer: question.answer ?? null,
@@ -132,12 +171,27 @@ export async function POST(request: NextRequest) {
             questions:
               normalizedQuestions.length > 0
                 ? normalizedQuestions
+                : templateQuestions.length > 0
+                ? templateQuestions
                 : (templateState as { trivia?: { questions?: Json[] } })
                     ?.trivia?.questions ?? [],
           },
         }
       : {
           ...templateState,
+          ...(templateItems.length > 0
+            ? {
+                templateItems: templateItems
+                  .map((item) => item.game_library_items)
+                  .filter(Boolean)
+                  .map((item) => ({
+                    title: item?.title ?? null,
+                    artist: item?.artist ?? null,
+                    coverImage: item?.cover_image ?? null,
+                    metadata: item?.metadata ?? null,
+                  })),
+              }
+            : {}),
         };
 
   const insertPayload: GameSessionInsert = {

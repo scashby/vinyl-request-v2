@@ -11,6 +11,9 @@ type LibraryPayload = {
   answer?: string | null;
   coverImage?: string | null;
   inventoryId?: number | null;
+  tags?: string[];
+  genres?: string[];
+  decades?: string[];
   metadata?: Json;
 };
 
@@ -27,11 +30,14 @@ export async function GET(request: NextRequest) {
   const gameType = searchParams.get('gameType');
   const itemType = searchParams.get('itemType');
   const query = searchParams.get('q');
+  const tagsParam = searchParams.get('tags');
+  const genresParam = searchParams.get('genres');
+  const decadesParam = searchParams.get('decades');
 
   let builder = supabaseAdmin
     .from('game_library_items')
     .select(
-      'id, game_type, item_type, title, artist, prompt, answer, cover_image, inventory_id, metadata, created_at, updated_at'
+      'id, game_type, item_type, title, artist, prompt, answer, cover_image, inventory_id, tags, genres, decades, metadata, created_at, updated_at'
     )
     .order('created_at', { ascending: false });
 
@@ -47,6 +53,23 @@ export async function GET(request: NextRequest) {
     builder = builder.or(
       `title.ilike.%${query}%,artist.ilike.%${query}%,prompt.ilike.%${query}%,answer.ilike.%${query}%`
     );
+  }
+
+  const parseCsv = (value: string | null) =>
+    value ? value.split(',').map((item) => item.trim()).filter(Boolean) : [];
+
+  const tags = parseCsv(tagsParam);
+  const genres = parseCsv(genresParam);
+  const decades = parseCsv(decadesParam);
+
+  if (tags.length > 0) {
+    builder = builder.contains('tags', tags);
+  }
+  if (genres.length > 0) {
+    builder = builder.contains('genres', genres);
+  }
+  if (decades.length > 0) {
+    builder = builder.contains('decades', decades);
   }
 
   const { data, error } = await builder;
@@ -103,6 +126,9 @@ export async function POST(request: NextRequest) {
       payload.inventoryId === null || payload.inventoryId === undefined
         ? null
         : Number(payload.inventoryId),
+    tags: payload.tags ?? [],
+    genres: payload.genres ?? [],
+    decades: payload.decades ?? [],
     metadata: payload.metadata ?? {},
     updated_at: new Date().toISOString(),
   };

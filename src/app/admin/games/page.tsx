@@ -32,6 +32,9 @@ type LibraryItem = {
   prompt: string | null;
   answer: string | null;
   cover_image: string | null;
+  tags: string[] | null;
+  genres: string[] | null;
+  decades: string[] | null;
   metadata: Json | null;
   created_at: string;
 };
@@ -44,7 +47,23 @@ type InventoryResult = {
   coverImage: string | null;
   releaseYear: number | null;
   location: string | null;
+  mediaType?: string | null;
+  label?: string | null;
+  catalogNumber?: string | null;
+  genres?: string[] | null;
+  styles?: string[] | null;
+  musicians?: string[] | null;
+  producers?: string[] | null;
+  engineers?: string[] | null;
+  songwriters?: string[] | null;
+  composer?: string | null;
+  conductor?: string | null;
+  chorus?: string | null;
+  orchestra?: string | null;
+  recordingYear?: number | null;
+  recordingLocation?: string | null;
   trackTitle?: string | null;
+  trackArtist?: string | null;
   trackPosition?: string | null;
   trackSide?: string | null;
   recordingId?: number | null;
@@ -97,11 +116,16 @@ export default function GameLibraryPage() {
   const [trackResults, setTrackResults] = useState<TrackResult[]>([]);
   const [trackLoading, setTrackLoading] = useState(false);
   const [selectedTrackId, setSelectedTrackId] = useState<number | null>(null);
+  const [selectedContributor, setSelectedContributor] = useState('');
+  const [derivedTags, setDerivedTags] = useState<string[]>([]);
+  const [derivedGenres, setDerivedGenres] = useState<string[]>([]);
+  const [derivedDecades, setDerivedDecades] = useState<string[]>([]);
 
   const availableItemTypes = ITEM_TYPE_OPTIONS.filter((option) =>
     option.gameTypes.includes(gameType)
   );
   const shouldShowTriviaFields = itemType === 'trivia-question';
+  const shouldShowDifficulty = itemType === 'trivia-question';
 
   const fetchItems = async (overrides?: {
     gameType?: string;
@@ -207,9 +231,32 @@ export default function GameLibraryPage() {
     setAnswer('');
     setDifficulty('');
     setNotes('');
+    setSelectedContributor('');
     if (item.trackTitle) {
       setTitle(item.trackTitle);
     }
+    if (item.trackArtist) {
+      setArtist(item.trackArtist);
+    }
+
+    const combinedGenres = [
+      ...(item.genres ?? []),
+      ...(item.styles ?? []),
+    ].filter(Boolean);
+    setDerivedGenres(combinedGenres);
+
+    const decadeSource = item.releaseYear ?? item.recordingYear ?? null;
+    const decadeLabel =
+      typeof decadeSource === 'number'
+        ? `${Math.floor(decadeSource / 10) * 10}s`
+        : null;
+    setDerivedDecades(decadeLabel ? [decadeLabel] : []);
+
+    const baseTags = [
+      item.mediaType ? `format:${item.mediaType}` : null,
+      item.label ? `label:${item.label}` : null,
+    ].filter(Boolean) as string[];
+    setDerivedTags(baseTags);
   };
 
   const handleSelectTrack = (trackId: number) => {
@@ -235,7 +282,7 @@ export default function GameLibraryPage() {
     }
 
     const metadata = buildMetadata({
-      difficulty: difficulty || undefined,
+      difficulty: shouldShowDifficulty ? difficulty || undefined : undefined,
       notes: notes || undefined,
       source: selectedInventory ? 'collection' : 'manual',
       inventory_id: selectedInventory?.inventoryId,
@@ -244,6 +291,9 @@ export default function GameLibraryPage() {
       track_side: selectedTrack?.side ?? selectedInventory?.trackSide ?? undefined,
       recording_id: selectedTrack?.recordingId ?? selectedInventory?.recordingId ?? undefined,
       track_title: selectedTrack?.title ?? selectedInventory?.trackTitle ?? undefined,
+      genre: selectedInventory?.genres?.[0] ?? undefined,
+      style: selectedInventory?.styles?.[0] ?? undefined,
+      contributor: selectedContributor || undefined,
     });
 
     const response = await fetch('/api/game-library', {
@@ -258,6 +308,9 @@ export default function GameLibraryPage() {
         answer: answer.trim() || null,
         coverImage: coverImage.trim() || null,
         inventoryId: selectedInventory?.inventoryId ?? null,
+        tags: derivedTags,
+        genres: derivedGenres,
+        decades: derivedDecades,
         metadata,
       }),
     });
@@ -276,6 +329,10 @@ export default function GameLibraryPage() {
     setCoverImage('');
     setDifficulty('');
     setNotes('');
+    setSelectedContributor('');
+    setDerivedTags([]);
+    setDerivedGenres([]);
+    setDerivedDecades([]);
     setSelectedInventory(null);
     setInventoryResults([]);
     setSelectedTrackId(null);
@@ -468,10 +525,30 @@ export default function GameLibraryPage() {
                     {selectedInventory.trackTitle && (
                       <div className="text-xs text-blue-700">
                         Track: {selectedInventory.trackSide ? `${selectedInventory.trackSide} ` : ''}{selectedInventory.trackPosition ?? ''} {selectedInventory.trackTitle}
+                        {selectedInventory.trackArtist ? ` · ${selectedInventory.trackArtist}` : ''}
                       </div>
                     )}
                     {selectedInventory.location && (
                       <div className="text-xs text-blue-700">Location: {selectedInventory.location}</div>
+                    )}
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-blue-700">
+                      {selectedInventory.releaseYear && <span>Year: {selectedInventory.releaseYear}</span>}
+                      {selectedInventory.mediaType && <span>Format: {selectedInventory.mediaType}</span>}
+                      {selectedInventory.label && <span>Label: {selectedInventory.label}</span>}
+                      {selectedInventory.catalogNumber && <span>Cat #: {selectedInventory.catalogNumber}</span>}
+                    </div>
+                    {(derivedGenres.length > 0 || derivedDecades.length > 0 || derivedTags.length > 0) && (
+                      <div className="mt-2 text-xs text-blue-700">
+                        {derivedGenres.length > 0 && (
+                          <div>Genres: {derivedGenres.join(', ')}</div>
+                        )}
+                        {derivedDecades.length > 0 && (
+                          <div>Decades: {derivedDecades.join(', ')}</div>
+                        )}
+                        {derivedTags.length > 0 && (
+                          <div>Tags: {derivedTags.join(', ')}</div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
@@ -494,6 +571,122 @@ export default function GameLibraryPage() {
                     {trackLoading && (
                       <p className="mt-2 text-xs text-slate-500">Loading track list...</p>
                     )}
+                  </div>
+                )}
+
+                {selectedInventory && (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="text-xs uppercase tracking-widest text-slate-500">Trivia Builder</div>
+                    <div className="mt-3 grid gap-3">
+                      {selectedInventory.coverImage && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setPrompt('Which album cover is this?');
+                            setAnswer(`${selectedInventory.artist} — ${selectedInventory.title}`);
+                          }}
+                        >
+                          Use Cover Art Question
+                        </Button>
+                      )}
+                      {selectedInventory.releaseYear && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setPrompt(`What year was \\"${selectedInventory.title}\\" released?`);
+                            setAnswer(String(selectedInventory.releaseYear));
+                          }}
+                        >
+                          Use Release Year Question
+                        </Button>
+                      )}
+                      {selectedInventory.genres?.length ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setPrompt(`Which genre best fits \\"${selectedInventory.title}\\" by ${selectedInventory.artist}?`);
+                            setAnswer(selectedInventory.genres?.[0] ?? '');
+                          }}
+                        >
+                          Use Genre Question
+                        </Button>
+                      ) : null}
+                      {selectedTrack && selectedTrack.position && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            const sideLabel = selectedTrack.side ? `${selectedTrack.side} ` : '';
+                            setPrompt(`Which track is on ${sideLabel}${selectedTrack.position}?`);
+                            setAnswer(selectedTrack.title);
+                          }}
+                        >
+                          Use Track Position Question
+                        </Button>
+                      )}
+                      {selectedTrack && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setPrompt(`Name the track from \\"${selectedInventory.title}\\" by ${selectedInventory.artist}.`);
+                            setAnswer(selectedTrack.title);
+                          }}
+                        >
+                          Use Track Title Question
+                        </Button>
+                      )}
+                    </div>
+
+                    {(() => {
+                      const contributorOptions = [
+                        ...(selectedInventory.musicians ?? []).map((name) => `${name} (Musician)`),
+                        ...(selectedInventory.producers ?? []).map((name) => `${name} (Producer)`),
+                        ...(selectedInventory.engineers ?? []).map((name) => `${name} (Engineer)`),
+                        ...(selectedInventory.songwriters ?? []).map((name) => `${name} (Songwriter)`),
+                        ...(selectedInventory.composer ? [`${selectedInventory.composer} (Composer)`] : []),
+                        ...(selectedInventory.conductor ? [`${selectedInventory.conductor} (Conductor)`] : []),
+                        ...(selectedInventory.chorus ? [`${selectedInventory.chorus} (Chorus)`] : []),
+                        ...(selectedInventory.orchestra ? [`${selectedInventory.orchestra} (Orchestra)`] : []),
+                      ];
+
+                      if (contributorOptions.length === 0) return null;
+
+                      return (
+                        <div className="mt-4">
+                          <label className="text-sm font-medium text-slate-700">Contributor</label>
+                          <select
+                            value={selectedContributor}
+                            onChange={(event) => setSelectedContributor(event.target.value)}
+                            className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
+                          >
+                            <option value="">Select a contributor</option>
+                            {contributorOptions.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="mt-3"
+                            onClick={() => {
+                              if (!selectedContributor) return;
+                              const [name, rolePart] = selectedContributor.split(' (');
+                              const role = rolePart ? rolePart.replace(')', '') : 'musician';
+                              setPrompt(`Which ${role.toLowerCase()} appears on \\"${selectedInventory.title}\\" by ${selectedInventory.artist}?`);
+                              setAnswer(name);
+                            }}
+                          >
+                            Use Contributor Question
+                          </Button>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
@@ -552,22 +745,24 @@ export default function GameLibraryPage() {
                 </div>
               )}
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className={`grid gap-4 ${shouldShowDifficulty ? 'md:grid-cols-2' : ''}`}>
+                {shouldShowDifficulty && (
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">Difficulty</label>
+                    <select
+                      value={difficulty}
+                      onChange={(event) => setDifficulty(event.target.value)}
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
+                    >
+                      <option value="">Select</option>
+                      {DIFFICULTY_OPTIONS.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div>
-                  <label className="text-sm font-medium text-slate-700">Difficulty</label>
-                  <select
-                    value={difficulty}
-                    onChange={(event) => setDifficulty(event.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
-                  >
-                    <option value="">Select</option>
-                    {DIFFICULTY_OPTIONS.map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-700">Notes</label>
+                  <label className="text-sm font-medium text-slate-700">Notes (optional)</label>
                   <input
                     value={notes}
                     onChange={(event) => setNotes(event.target.value)}

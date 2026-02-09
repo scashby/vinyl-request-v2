@@ -23,7 +23,9 @@ export async function GET(request: NextRequest) {
 
   const { data: mastersByTitle, error: mastersTitleError } = await supabaseAdmin
     .from('masters')
-    .select('id, title, cover_image_url, main_artist_id, artists ( name )')
+    .select(
+      'id, title, subtitle, cover_image_url, main_artist_id, genres, styles, musicians, producers, engineers, songwriters, composer, conductor, chorus, orchestra, recording_year, recording_location, artists ( name )'
+    )
     .ilike('title', `%${query}%`)
     .limit(25);
 
@@ -35,7 +37,9 @@ export async function GET(request: NextRequest) {
   if (artistIds.length > 0) {
     const { data, error } = await supabaseAdmin
       .from('masters')
-      .select('id, title, cover_image_url, main_artist_id, artists ( name )')
+      .select(
+        'id, title, subtitle, cover_image_url, main_artist_id, genres, styles, musicians, producers, engineers, songwriters, composer, conductor, chorus, orchestra, recording_year, recording_location, artists ( name )'
+      )
       .in('main_artist_id', artistIds)
       .limit(25);
 
@@ -90,7 +94,7 @@ export async function GET(request: NextRequest) {
 
   const { data: releases, error: releasesError } = await supabaseAdmin
     .from('releases')
-    .select('id, master_id, release_year')
+    .select('id, master_id, release_year, media_type, label, catalog_number')
     .in('master_id', masterIds.length > 0 ? masterIds : [0])
     .limit(50);
 
@@ -105,7 +109,7 @@ export async function GET(request: NextRequest) {
   if (trackReleaseIds.length > 0) {
     const { data: trackReleases, error: trackReleaseError } = await supabaseAdmin
       .from('releases')
-      .select('id, master_id, release_year')
+      .select('id, master_id, release_year, media_type, label, catalog_number')
       .in('id', trackReleaseIds)
       .limit(50);
 
@@ -157,6 +161,7 @@ export async function GET(request: NextRequest) {
       ? trackMatch?.recordings[0]
       : trackMatch?.recordings;
     const trackTitle = trackMatch?.title_override || recording?.title || null;
+    const trackArtist = recording?.track_artist || null;
 
     return {
       inventoryId: row.id,
@@ -165,8 +170,24 @@ export async function GET(request: NextRequest) {
       artist: artistName ?? 'Unknown artist',
       coverImage: master?.cover_image_url ?? null,
       releaseYear: release?.release_year ?? null,
+      mediaType: release?.media_type ?? null,
+      label: release?.label ?? null,
+      catalogNumber: release?.catalog_number ?? null,
       location: row.location ?? null,
+      genres: master?.genres ?? null,
+      styles: master?.styles ?? null,
+      musicians: master?.musicians ?? null,
+      producers: master?.producers ?? null,
+      engineers: master?.engineers ?? null,
+      songwriters: master?.songwriters ?? null,
+      composer: master?.composer ?? null,
+      conductor: master?.conductor ?? null,
+      chorus: master?.chorus ?? null,
+      orchestra: master?.orchestra ?? null,
+      recordingYear: master?.recording_year ?? null,
+      recordingLocation: master?.recording_location ?? null,
       trackTitle,
+      trackArtist,
       trackPosition: trackMatch?.position ?? null,
       trackSide: trackMatch?.side ?? null,
       recordingId: trackMatch?.recording_id ?? null,

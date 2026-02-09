@@ -611,6 +611,9 @@ export type Database = {
           answer: string | null;
           cover_image: string | null;
           inventory_id: number | null;
+          tags: string[];
+          genres: string[];
+          decades: string[];
           metadata: Json;
           created_at: string;
           updated_at: string;
@@ -625,6 +628,9 @@ export type Database = {
           answer?: string | null;
           cover_image?: string | null;
           inventory_id?: number | null;
+          tags?: string[];
+          genres?: string[];
+          decades?: string[];
           metadata?: Json;
           created_at?: string;
           updated_at?: string;
@@ -639,6 +645,9 @@ export type Database = {
           answer?: string | null;
           cover_image?: string | null;
           inventory_id?: number | null;
+          tags?: string[];
+          genres?: string[];
+          decades?: string[];
           metadata?: Json;
           created_at?: string;
           updated_at?: string;
@@ -718,6 +727,46 @@ export type Database = {
           created_at?: string;
         };
         Relationships: [];
+      };
+      game_template_items: {
+        Row: {
+          id: number;
+          template_id: number;
+          library_item_id: number;
+          position: number;
+          metadata: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          template_id: number;
+          library_item_id: number;
+          position?: number;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          template_id?: number;
+          library_item_id?: number;
+          position?: number;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'game_template_items_template_id_fkey';
+            columns: ['template_id'];
+            referencedRelation: 'game_templates';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'game_template_items_library_item_id_fkey';
+            columns: ['library_item_id'];
+            referencedRelation: 'game_library_items';
+            referencedColumns: ['id'];
+          }
+        ];
       };
       import_conflict_resolutions: {
         Row: {
