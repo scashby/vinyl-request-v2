@@ -21,6 +21,7 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
 
   const navItems: NavItem[] = [
     { label: "Dashboard", path: "/admin/admin-dashboard" },
+    { label: "Games Admin", path: "/admin/games" },
     { label: "Logout", path: "/" },
   ];
 
@@ -218,6 +219,53 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
                 }`}
               >
                 🎵 Queues
+              </Link>
+            </div>
+          </div>
+
+          {/* Vinyl Games */}
+          <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+            <h4 className="text-sm font-semibold text-indigo-800 mb-2">🎮 Vinyl Games</h4>
+            <div className="space-y-2">
+              <Link
+                href="/admin/games"
+                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+                  pathname === "/admin/games"
+                    ? "bg-indigo-700 text-white"
+                    : "bg-indigo-600 text-white hover:bg-indigo-700"
+                }`}
+              >
+                🧭 Games Admin
+              </Link>
+              <Link
+                href="/admin/games/sessions"
+                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+                  pathname === "/admin/games/sessions"
+                    ? "bg-indigo-700 text-white"
+                    : "bg-indigo-600 text-white hover:bg-indigo-700"
+                }`}
+              >
+                🎛️ Game Sessions
+              </Link>
+              <Link
+                href="/admin/games/bingo"
+                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+                  pathname === "/admin/games/bingo"
+                    ? "bg-indigo-700 text-white"
+                    : "bg-indigo-600 text-white hover:bg-indigo-700"
+                }`}
+              >
+                🎯 Bingo Cards
+              </Link>
+              <Link
+                href="/admin/games/templates"
+                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+                  pathname === "/admin/games/templates"
+                    ? "bg-indigo-700 text-white"
+                    : "bg-indigo-600 text-white hover:bg-indigo-700"
+                }`}
+              >
+                🧩 Game Templates
               </Link>
             </div>
           </div>
