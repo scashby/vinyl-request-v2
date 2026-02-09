@@ -632,9 +632,9 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           cultural_significance: asString(master?.cultural_significance ?? albumDetails.cultural_significance),
           critical_reception: asString(master?.critical_reception ?? albumDetails.critical_reception),
           recording_location: asString(master?.recording_location ?? albumDetails.recording_location),
-          allmusic_rating: master?.allmusic_rating ?? albumDetails.allmusic_rating ?? null,
+          allmusic_rating: master?.allmusic_rating ?? asNumber(albumDetails.allmusic_rating),
           allmusic_review: asString(master?.allmusic_review ?? albumDetails.allmusic_review),
-          pitchfork_score: master?.pitchfork_score ?? albumDetails.pitchfork_score ?? null,
+          pitchfork_score: master?.pitchfork_score ?? asNumber(albumDetails.pitchfork_score),
           pitchfork_review: asString(master?.pitchfork_review ?? albumDetails.pitchfork_review),
           tempo_bpm: typeof albumDetails.tempo_bpm === 'number' ? albumDetails.tempo_bpm : null,
           musical_key: asString(albumDetails.musical_key),
@@ -909,8 +909,12 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             box_set: editedAlbum.box_set ?? null,
             sound: editedAlbum.sound ?? null,
             studio: editedAlbum.studio ?? null,
-            disc_metadata: editedAlbum.disc_metadata ?? null,
-            matrix_numbers: editedAlbum.matrix_numbers ?? null,
+            disc_metadata: editedAlbum.disc_metadata
+              ? (editedAlbum.disc_metadata as Database['public']['Tables']['releases']['Update']['disc_metadata'])
+              : null,
+            matrix_numbers: editedAlbum.matrix_numbers
+              ? (editedAlbum.matrix_numbers as Database['public']['Tables']['releases']['Update']['matrix_numbers'])
+              : null,
           };
 
           const parsedFormat = editedAlbum.format

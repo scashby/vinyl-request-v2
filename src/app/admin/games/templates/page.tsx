@@ -44,7 +44,7 @@ export default function GameTemplatesPage() {
     if (templateJson.trim()) {
       try {
         templateState = JSON.parse(templateJson.trim());
-      } catch (parseError) {
+      } catch {
         setError('Template JSON is invalid.');
         return;
       }

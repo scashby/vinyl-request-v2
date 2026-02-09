@@ -185,7 +185,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
 
     if (fallbackTracks.length > 0) {
       const groups = new Map<number, { tracks: typeof fallbackTracks; totalSeconds: number }>();
-      fallbackTracks.forEach((track, idx) => {
+      fallbackTracks.forEach((track) => {
         const discMatch = (track.position ?? '').match(/^(\d+)[-.:]/);
         const disc = discMatch?.[1] ? Number(discMatch[1]) : 1;
         const existing = groups.get(disc) ?? { tracks: [], totalSeconds: 0 };

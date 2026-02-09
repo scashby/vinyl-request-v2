@@ -329,6 +329,7 @@ interface SpotifyTrack {
   id: string;
   name: string;
   duration_ms: number;
+  artists?: SpotifyArtist[];
 }
 
 interface SpotifyAlbum {
@@ -672,7 +673,7 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
                         return {
                             position: String(i + 1),
                             title: t.name,
-                            artist: (t as any)?.artists?.[0]?.name ?? undefined,
+                            artist: t.artists?.[0]?.name ?? undefined,
                             duration: t.duration_ms ? `${Math.floor(t.duration_ms / 1000)}s` : undefined,
                             tempo_bpm: feat ? Math.round(feat.tempo) : undefined,
                             musical_key: keyStr

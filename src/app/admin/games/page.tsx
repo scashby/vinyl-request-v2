@@ -80,7 +80,7 @@ export default function AdminGamesPage() {
     if (gameType === 'trivia' && triviaJson.trim()) {
       try {
         triviaQuestions = JSON.parse(triviaJson.trim());
-      } catch (parseError) {
+      } catch {
         setError('Trivia JSON is invalid.');
         return;
       }
