@@ -21,9 +21,9 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
 
   const navItems: NavItem[] = [
     { label: "Dashboard", path: "/admin/admin-dashboard" },
-    { label: "Games Admin", path: "/admin/games" },
     { label: "Logout", path: "/" },
   ];
+
 
   return (
     <>
@@ -235,6 +235,16 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
                     : "bg-indigo-600 text-white hover:bg-indigo-700"
                 }`}
               >
+                🧭 Games Admin
+              </Link>
+              <Link
+                href="/admin/games/sessions"
+                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+                  pathname === "/admin/games/sessions"
+                    ? "bg-indigo-700 text-white"
+                    : "bg-indigo-600 text-white hover:bg-indigo-700"
+                }`}
+              >
                 🎛️ Game Sessions
               </Link>
               <Link
@@ -247,8 +257,19 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
               >
                 🎯 Bingo Cards
               </Link>
+              <Link
+                href="/admin/games/templates"
+                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+                  pathname === "/admin/games/templates"
+                    ? "bg-indigo-700 text-white"
+                    : "bg-indigo-600 text-white hover:bg-indigo-700"
+                }`}
+              >
+                🧩 Game Templates
+              </Link>
             </div>
           </div>
+
 
           {/* Content */}
           <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
