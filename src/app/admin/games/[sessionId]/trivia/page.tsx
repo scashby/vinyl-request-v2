@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Container } from 'components/ui/Container';
 import { supabase } from 'src/lib/supabaseClient';
@@ -35,7 +35,10 @@ export default function TriviaAdminPage() {
   const [error, setError] = useState('');
 
   const triviaState = session?.game_state?.trivia;
-  const questions = triviaState?.questions ?? [];
+  const questions = useMemo(
+    () => triviaState?.questions ?? [],
+    [triviaState?.questions]
+  );
   const currentIndex = triviaState?.currentIndex ?? 0;
   const reveal = triviaState?.reveal ?? false;
 
@@ -44,7 +47,7 @@ export default function TriviaAdminPage() {
     [questions, currentIndex]
   );
 
-  const loadSession = async () => {
+  const loadSession = useCallback(async () => {
     if (!sessionId || Number.isNaN(sessionId)) return;
     setLoading(true);
     const { data, error: fetchError } = await supabase
@@ -57,11 +60,11 @@ export default function TriviaAdminPage() {
       setSession(data as GameSession);
     }
     setLoading(false);
-  };
+  }, [sessionId]);
 
   useEffect(() => {
     loadSession();
-  }, [sessionId]);
+  }, [loadSession]);
 
   const sendPatch = async (payload: unknown) => {
     setMessage('');

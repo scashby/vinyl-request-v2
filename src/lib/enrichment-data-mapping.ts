@@ -60,7 +60,7 @@ export const DATA_TO_SERVICES: Record<DataCategory, EnrichmentService[]> = {
   release_metadata: ['musicbrainz', 'discogs', 'spotify', 'appleMusic', 'wikipedia', 'wikidata', 'popsike'],
   lyrics: ['genius', 'musixmatch'],
   similar_albums: ['lastfm', 'allmusic', 'rateyourmusic', 'deezer'],
-  cultural_context: ['wikipedia', 'wikidata'],
+  cultural_context: ['wikipedia', 'wikidata', 'allmusic', 'appleMusic'],
 };
 
 /**
@@ -142,6 +142,7 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
   tracklists: [
     'tracks',
     'tracklists',
+    'tracklist',
     'disc_metadata'
   ],
   sonic_domain: [
@@ -248,6 +249,7 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   // --- TRACKLISTS ---
   'tracks': ['discogs', 'spotify', 'appleMusic', 'lastfm'],
   'tracklists': ['discogs', 'spotify', 'appleMusic'],
+  'tracklist': ['discogs', 'spotify', 'appleMusic', 'lastfm'],
   'disc_metadata': ['discogs'],
 
   // --- SONIC DOMAIN ---
@@ -292,8 +294,12 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'release_notes': ['discogs'],
   'master_notes': ['wikipedia', 'allmusic', 'appleMusic'],
   'wikipedia_url': ['wikipedia'],
-  'cultural_significance': ['wikipedia'],
-  'critical_reception': ['wikipedia'],
+  'cultural_significance': ['wikipedia', 'allmusic'],
+  'recording_location': ['wikipedia', 'wikidata'],
+  'critical_reception': ['wikipedia', 'allmusic'],
+  'allmusic_rating': ['allmusic'],
+  'allmusic_review': ['allmusic'],
+  'apple_music_editorial_notes': ['appleMusic'],
   
   // --- LINKS ---
   'spotify_id': ['spotify'],
@@ -312,6 +318,8 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'pitchfork_score': ['pitchfork'],
   'awards': ['wikipedia', 'wikidata', 'allmusic'],
   'certifications': ['wikipedia', 'wikidata']
+  ,
+  'chart_positions': ['wikipedia', 'wikidata']
 };
 
 /**
@@ -382,6 +390,7 @@ export function dataCategoriesToServices(
     appleMusicEnhanced: false,
     allmusic: false,
     wikipedia: false,
+    wikidata: false,
     coverArtArchive: false,
     acousticbrainz: false,
     discogsMetadata: false,
@@ -404,6 +413,7 @@ export function dataCategoriesToServices(
         case 'appleMusic': services.appleMusicEnhanced = true; break;
         case 'allmusic': services.allmusic = true; break;
         case 'wikipedia': services.wikipedia = true; break;
+        case 'wikidata': services.wikidata = true; break;
         case 'discogs': 
           services.discogsMetadata = true;
           services.discogsTracklist = true;
