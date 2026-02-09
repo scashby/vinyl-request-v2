@@ -1,19 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from 'src/lib/supabaseAdmin';
+import type { Database, Json } from 'types/supabase';
+
+type TriviaQuestion = {
+  prompt?: string;
+  answer?: string;
+  artist?: string;
+  title?: string;
+  coverImage?: string;
+};
 
 type CreatePayload = {
   eventId?: number;
   crateId?: number | null;
   gameType?: string;
   templateId?: number | null;
-  templateState?: unknown;
-  triviaQuestions?: Array<{
-    prompt?: string;
-    answer?: string;
-    artist?: string;
-    title?: string;
-    coverImage?: string;
-  }>;
+  templateState?: Json;
+  triviaQuestions?: TriviaQuestion[];
+};
+
+type GameSessionInsert = Database['public']['Tables']['game_sessions']['Insert'];
+
+const normalizeTemplateState = (raw: Json | undefined): Record<string, Json> => {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw as Record<string, Json>;
+  }
+  return {};
 };
 
 export async function GET() {
@@ -67,7 +79,7 @@ export async function POST(request: NextRequest) {
       ? null
       : Number(payload.templateId);
 
-  let templateState: Record<string, unknown> = {};
+  let templateState: Record<string, Json> = {};
   if (templateId) {
     const { data: template, error: templateError } = await supabaseAdmin
       .from('game_templates')
@@ -86,16 +98,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (template?.template_state && typeof template.template_state === 'object') {
-      templateState = template.template_state as Record<string, unknown>;
-    }
-  } else if (payload.templateState && typeof payload.templateState === 'object') {
-    templateState = payload.templateState as Record<string, unknown>;
+    templateState = normalizeTemplateState(template?.template_state as Json | undefined);
+  } else if (payload.templateState) {
+    templateState = normalizeTemplateState(payload.templateState);
   }
 
   const triviaQuestions = payload.triviaQuestions ?? [];
+  const normalizedQuestions = triviaQuestions.map((question) => ({
+    prompt: question.prompt ?? null,
+    answer: question.answer ?? null,
+    artist: question.artist ?? null,
+    title: question.title ?? null,
+    coverImage: question.coverImage ?? null,
+  })) as Json[];
 
-  const gameState =
+  const gameState: Json =
     gameType === 'trivia'
       ? {
           ...templateState,
@@ -113,9 +130,9 @@ export async function POST(request: NextRequest) {
                     ?.trivia?.reveal
                 : false,
             questions:
-              triviaQuestions.length > 0
-                ? triviaQuestions
-                : (templateState as { trivia?: { questions?: unknown[] } })
+              normalizedQuestions.length > 0
+                ? normalizedQuestions
+                : (templateState as { trivia?: { questions?: Json[] } })
                     ?.trivia?.questions ?? [],
           },
         }
@@ -123,14 +140,16 @@ export async function POST(request: NextRequest) {
           ...templateState,
         };
 
-  const { data, error } = await supabaseAdmin
-    .from('game_sessions')
-    .insert({
+  const insertPayload: GameSessionInsert = {
       event_id: eventId,
       crate_id: crateId,
       game_type: gameType,
       game_state: gameState,
-    })
+    };
+
+  const { data, error } = await supabaseAdmin
+    .from('game_sessions')
+    .insert(insertPayload)
     .select('id, event_id, crate_id, game_type, game_state, created_at')
     .single();
 

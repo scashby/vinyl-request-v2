@@ -75,7 +75,17 @@ export default function GameLibraryPage() {
   };
 
   useEffect(() => {
-    fetchItems();
+    const loadInitialItems = async () => {
+      setLoading(true);
+      const response = await fetch('/api/game-library');
+      const result = await response.json();
+      if (response.ok) {
+        setItems(result.data as LibraryItem[]);
+      }
+      setLoading(false);
+    };
+
+    loadInitialItems();
   }, []);
 
   const handleCreate = async () => {

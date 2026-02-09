@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from 'src/lib/supabaseAdmin';
-import type { Database } from 'types/supabase';
+import type { Database, Json } from 'types/supabase';
 
 type LibraryPayload = {
   gameType?: string;
@@ -11,7 +11,7 @@ type LibraryPayload = {
   answer?: string | null;
   coverImage?: string | null;
   inventoryId?: number | null;
-  metadata?: unknown;
+  metadata?: Json;
 };
 
 type GameLibraryInsert = Database['public']['Tables']['game_library_items']['Insert'];
