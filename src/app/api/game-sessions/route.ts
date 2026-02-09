@@ -5,7 +5,6 @@ type CreatePayload = {
   eventId?: number;
   crateId?: number | null;
   gameType?: string;
-  templateId?: number;
   triviaQuestions?: Array<{
     prompt?: string;
     answer?: string;
@@ -33,9 +32,17 @@ export async function POST(request: NextRequest) {
 
   try {
     payload = await request.json();
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Invalid JSON payload.' },
+      { status: 400 }
+    );
+  }
+
+  const eventId = Number(payload.eventId);
+  if (!eventId || Number.isNaN(eventId)) {
+    return NextResponse.json(
+      { error: 'eventId is required.' },
       { status: 400 }
     );
   }
@@ -48,60 +55,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const templateId = payload.templateId ? Number(payload.templateId) : null;
-  const eventId = payload.eventId ? Number(payload.eventId) : null;
-
-  if (gameType === 'bracketology' && (!eventId || Number.isNaN(eventId))) {
-    return NextResponse.json(
-      { error: 'eventId is required for bracketology.' },
-      { status: 400 }
-    );
-  }
-
   const crateId =
     payload.crateId === null || payload.crateId === undefined
       ? null
       : Number(payload.crateId);
 
-  let templateState: unknown = {};
-  if (templateId) {
-    const { data: template, error: templateError } = await supabaseAdmin
-      .from('game_templates')
-      .select('id, template_state')
-      .eq('id', templateId)
-      .single();
-
-    if (templateError) {
-      return NextResponse.json(
-        { error: templateError.message },
-        { status: 500 }
-      );
-    }
-    templateState = template?.template_state ?? {};
-  }
-
   const triviaQuestions = payload.triviaQuestions ?? [];
-
-  const templateTriviaQuestions = Array.isArray(
-    (templateState as { trivia?: { questions?: unknown } })?.trivia?.questions
-  )
-    ? ((templateState as { trivia?: { questions?: unknown[] } })?.trivia
-        ?.questions as unknown[])
-    : [];
 
   const gameState =
     gameType === 'trivia'
       ? {
-          ...(templateState as Record<string, unknown>),
           trivia: {
             currentIndex: 0,
             reveal: false,
-            questions: triviaQuestions.length
-              ? triviaQuestions
-              : templateTriviaQuestions,
+            questions: triviaQuestions,
           },
         }
-      : templateState ?? {};
+      : {};
 
   const { data, error } = await supabaseAdmin
     .from('game_sessions')

@@ -13,27 +13,6 @@ type EventRow = {
   game_modes: string[] | string | null;
 };
 
-type TemplateRow = {
-  id: number;
-  name: string;
-  game_type: string;
-  template_state: unknown;
-};
-
-const LOCAL_TEMPLATES_KEY = 'vinylGamesTemplates';
-
-const readLocalTemplates = (): TemplateRow[] => {
-  if (typeof window === 'undefined') return [];
-  const raw = window.localStorage.getItem(LOCAL_TEMPLATES_KEY);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw) as TemplateRow[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    return [];
-  }
-};
-
 type SessionRow = {
   id: number;
   event_id: number | null;
@@ -56,14 +35,11 @@ const gameTypeLabels: Record<string, string> = {
 export default function AdminGamesPage() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
-  const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [eventId, setEventId] = useState('');
   const [gameType, setGameType] = useState('bracketology');
-  const [templateId, setTemplateId] = useState('');
   const [triviaJson, setTriviaJson] = useState('');
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
-  const [usingLocalTemplates, setUsingLocalTemplates] = useState(false);
 
   const activeEvent = useMemo(
     () => events.find((event) => event.id === Number(eventId)) ?? null,
@@ -86,36 +62,25 @@ export default function AdminGamesPage() {
     }
   };
 
-  const loadTemplates = async () => {
-    try {
-      const response = await fetch('/api/game-templates');
-      if (!response.ok) {
-        throw new Error('Failed to load templates.');
-      }
-      const result = await response.json();
-      setTemplates(result.data as TemplateRow[]);
-      setUsingLocalTemplates(false);
-    } catch (loadError) {
-      setTemplates(readLocalTemplates());
-      setUsingLocalTemplates(true);
-    }
-  };
-
   useEffect(() => {
     loadEvents();
     loadSessions();
-    loadTemplates();
   }, []);
 
   const handleCreateSession = async () => {
     setStatus('');
     setError('');
 
+    if (!eventId) {
+      setError('Select an event.');
+      return;
+    }
+
     let triviaQuestions = undefined;
     if (gameType === 'trivia' && triviaJson.trim()) {
       try {
         triviaQuestions = JSON.parse(triviaJson.trim());
-      } catch (parseError) {
+      } catch {
         setError('Trivia JSON is invalid.');
         return;
       }
@@ -125,9 +90,8 @@ export default function AdminGamesPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        eventId: eventId ? Number(eventId) : undefined,
+        eventId: Number(eventId),
         gameType,
-        templateId: templateId ? Number(templateId) : undefined,
         triviaQuestions,
       }),
     });
@@ -140,7 +104,6 @@ export default function AdminGamesPage() {
 
     setStatus('Session created.');
     setEventId('');
-    setTemplateId('');
     setTriviaJson('');
     await loadSessions();
   };
@@ -193,11 +156,6 @@ export default function AdminGamesPage() {
                     This event is not marked as having Vinyl Games yet.
                   </p>
                 )}
-                {gameType === 'bracketology' && !eventId && (
-                  <p className="text-xs text-yellow-300 mt-2">
-                    Bracketology sessions require an event.
-                  </p>
-                )}
               </div>
 
               <div>
@@ -213,36 +171,6 @@ export default function AdminGamesPage() {
                   <option value="bingo">Vinyl Bingo</option>
                   <option value="trivia">Needle Drop Trivia</option>
                 </select>
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold mb-2 block">
-                  Template (optional)
-                </label>
-                <select
-                  value={templateId}
-                  onChange={(event) => {
-                    const nextId = event.target.value;
-                    setTemplateId(nextId);
-                    const template = templates.find((item) => item.id === Number(nextId));
-                    if (template) {
-                      setGameType(template.game_type);
-                    }
-                  }}
-                  className="w-full rounded-lg bg-black/60 border border-white/10 px-4 py-3 text-white"
-                >
-                  <option value="">Select a template</option>
-                  {templates.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.name} · {template.game_type}
-                    </option>
-                  ))}
-                </select>
-                {usingLocalTemplates && (
-                  <p className="mt-2 text-xs text-yellow-300">
-                    Using locally stored templates (API unavailable).
-                  </p>
-                )}
               </div>
 
               {gameType === 'trivia' && (

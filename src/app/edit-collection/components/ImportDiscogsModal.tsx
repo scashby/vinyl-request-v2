@@ -133,43 +133,6 @@ const asRecord = (value: unknown): Record<string, unknown> => {
   return value as Record<string, unknown>;
 };
 
-const applyAlbumDetailsToReleaseRecordings = async (
-  releaseId: number,
-  albumDetails: Record<string, unknown>
-) => {
-  if (!releaseId || Object.keys(albumDetails).length === 0) return;
-
-  const { data: tracks, error } = await supabase
-    .from('release_tracks')
-    .select('recording:recordings ( id, credits )')
-    .eq('release_id', releaseId);
-
-  if (error || !tracks) return;
-
-  const updates = tracks
-    .map((track) => {
-      const recording = Array.isArray(track.recording) ? track.recording[0] : track.recording;
-      if (!recording?.id) return null;
-      const credits = asRecord(recording.credits);
-      const merged = {
-        ...credits,
-        album_details: {
-          ...(asRecord(credits.album_details ?? credits.albumDetails ?? credits.album_metadata)),
-          ...albumDetails,
-        },
-      };
-      return supabase
-        .from('recordings')
-        .update({ credits: merged as Database['public']['Tables']['recordings']['Update']['credits'] })
-        .eq('id', recording.id);
-    })
-    .filter(Boolean);
-
-  if (updates.length > 0) {
-    await Promise.all(updates);
-  }
-};
-
 const applyArtworkToReleaseRecordings = async (
   releaseId: number,
   artwork: Record<string, unknown>
@@ -262,6 +225,17 @@ const getOrCreateRelease = async (
     country: string | null;
     release_year: number | null;
     discogs_release_id: string | null;
+    release_date?: string | null;
+    packaging?: string | null;
+    vinyl_color?: string[] | null;
+    vinyl_weight?: string | null;
+    rpm?: string | null;
+    spars_code?: string | null;
+    box_set?: string | null;
+    sound?: string | null;
+    studio?: string | null;
+    disc_metadata?: unknown | null;
+    matrix_numbers?: unknown | null;
   }
 ) => {
   let existing = null;
@@ -298,6 +272,17 @@ const getOrCreateRelease = async (
       barcode: payload.barcode,
       country: payload.country,
       release_year: payload.release_year,
+      release_date: payload.release_date ?? null,
+      packaging: payload.packaging ?? null,
+      vinyl_color: payload.vinyl_color ?? null,
+      vinyl_weight: payload.vinyl_weight ?? null,
+      rpm: payload.rpm ?? null,
+      spars_code: payload.spars_code ?? null,
+      box_set: payload.box_set ?? null,
+      sound: payload.sound ?? null,
+      studio: payload.studio ?? null,
+      disc_metadata: (payload.disc_metadata ?? null) as Database['public']['Tables']['releases']['Insert']['disc_metadata'],
+      matrix_numbers: (payload.matrix_numbers ?? null) as Database['public']['Tables']['releases']['Insert']['matrix_numbers'],
       discogs_release_id: payload.discogs_release_id,
     })
     .select('id')
@@ -365,11 +350,54 @@ const splitDiscogsUpdates = (payload: Record<string, unknown>) => {
       case 'styles':
       case 'discogs_master_id':
       case 'original_release_year':
+      case 'musicians':
+      case 'producers':
+      case 'engineers':
+      case 'songwriters':
+      case 'composer':
+      case 'conductor':
+      case 'chorus':
+      case 'composition':
+      case 'orchestra':
+      case 'chart_positions':
+      case 'awards':
+      case 'certifications':
+      case 'cultural_significance':
+      case 'critical_reception':
+      case 'allmusic_rating':
+      case 'allmusic_review':
+      case 'pitchfork_score':
+      case 'pitchfork_review':
+      case 'recording_location':
+      case 'sort_title':
+      case 'subtitle':
+      case 'master_release_date':
+      case 'recording_date':
+      case 'recording_year':
+      case 'wikipedia_url':
+      case 'allmusic_url':
+      case 'apple_music_url':
+      case 'lastfm_url':
+      case 'spotify_url':
+      case 'genius_url':
+      case 'custom_links':
         masterUpdates[key] = value ?? null;
         break;
       case 'notes':
       case 'release_notes':
         releaseUpdates.notes = value ?? null;
+        break;
+      case 'packaging':
+      case 'vinyl_color':
+      case 'vinyl_weight':
+      case 'rpm':
+      case 'spars_code':
+      case 'box_set':
+      case 'sound':
+      case 'studio':
+      case 'disc_metadata':
+      case 'matrix_numbers':
+        releaseUpdates[key] = value ?? null;
         break;
       default:
         break;
@@ -918,6 +946,42 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     country: data.country || null,
   };
 
+  if (Array.isArray(data.extraartists) && data.extraartists.length > 0) {
+    const producers = data.extraartists
+      .filter((a) => a.role.toLowerCase().includes('producer'))
+      .map((a) => a.name);
+    const engineers = data.extraartists
+      .filter((a) => a.role.toLowerCase().includes('engineer') || a.role.toLowerCase().includes('mixed'))
+      .map((a) => a.name);
+    const songwriters = data.extraartists
+      .filter((a) => a.role.toLowerCase().includes('written') || a.role.toLowerCase().includes('lyrics'))
+      .map((a) => a.name);
+    const composers = data.extraartists
+      .filter((a) => a.role.toLowerCase().includes('composer'))
+      .map((a) => a.name);
+    const conductors = data.extraartists
+      .filter((a) => a.role.toLowerCase().includes('conductor'))
+      .map((a) => a.name);
+    const choruses = data.extraartists
+      .filter((a) => a.role.toLowerCase().includes('chorus'))
+      .map((a) => a.name);
+    const orchestras = data.extraartists
+      .filter((a) => a.role.toLowerCase().includes('orchestra'))
+      .map((a) => a.name);
+    const musicians = data.extraartists
+      .filter((a) => !a.role.toLowerCase().includes('producer') && !a.role.toLowerCase().includes('engineer'))
+      .map((a) => `${a.name} (${a.role})`);
+
+    if (producers.length > 0) enriched.producers = producers;
+    if (engineers.length > 0) enriched.engineers = engineers;
+    if (songwriters.length > 0) enriched.songwriters = songwriters;
+    if (composers.length > 0) enriched.composer = composers[0];
+    if (conductors.length > 0) enriched.conductor = conductors[0];
+    if (choruses.length > 0) enriched.chorus = choruses[0];
+    if (orchestras.length > 0) enriched.orchestra = orchestras[0];
+    if (musicians.length > 0) enriched.musicians = musicians;
+  }
+
   if (data.released) {
       let dateStr = data.released.trim();
       dateStr = dateStr.replace(/-00/g, ''); 
@@ -1394,15 +1458,11 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               releaseUpdates.format_details = formatData.format_details ?? null;
               releaseUpdates.qty = formatData.qty ?? 1;
 
-              const albumDetailsUpdate = {
-                rpm: formatData.rpm ?? null,
-                vinyl_weight: formatData.weight ?? null,
-                vinyl_color: formatData.color ? [formatData.color] : null,
-                extra: formatData.extraText || null,
-                packaging: formatData.packaging ?? null,
-                is_box_set: formatData.is_box_set ?? false,
-                box_set: formatData.box_set ?? null,
-              };
+              releaseUpdates.rpm = formatData.rpm ?? null;
+              releaseUpdates.vinyl_weight = formatData.weight ?? null;
+              releaseUpdates.vinyl_color = formatData.color ? [formatData.color] : null;
+              releaseUpdates.packaging = formatData.packaging ?? null;
+              releaseUpdates.box_set = formatData.box_set ?? null;
 
               // Enrichment Logic (Only if NEW or Full Sync/Partial Sync needs it)
               let enrichedData: Record<string, unknown> | null = null;
@@ -1441,7 +1501,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 typeof value === 'number' && !Number.isNaN(value) ? value : null;
               const getStringArray = (value: unknown): string[] =>
                 Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
-              const releaseRow = album.existingReleaseId
+                  const releaseRow = album.existingReleaseId
                 ? { id: album.existingReleaseId }
                 : await getOrCreateRelease(masterRow.id, {
                     media_type: getString(releaseUpdates.media_type) ?? 'Vinyl',
@@ -1452,6 +1512,17 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     barcode: getString(releaseUpdates.barcode),
                     country: getString(releaseUpdates.country),
                     release_year: getNumber(releaseUpdates.release_year),
+                    release_date: getString(releaseUpdates.release_date),
+                    packaging: getString(releaseUpdates.packaging),
+                    vinyl_color: getStringArray(releaseUpdates.vinyl_color),
+                    vinyl_weight: getString(releaseUpdates.vinyl_weight),
+                    rpm: getString(releaseUpdates.rpm),
+                    spars_code: getString(releaseUpdates.spars_code),
+                    box_set: getString(releaseUpdates.box_set),
+                    sound: getString(releaseUpdates.sound),
+                    studio: getString(releaseUpdates.studio),
+                    disc_metadata: releaseUpdates.disc_metadata ?? null,
+                    matrix_numbers: releaseUpdates.matrix_numbers ?? null,
                     discogs_release_id: getString(releaseUpdates.discogs_release_id) ?? album.discogs_release_id,
                   });
               const inventoryRow = album.existingId
@@ -1468,7 +1539,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 await supabase.from('masters').update(masterUpdates as Record<string, unknown>).eq('id', masterRow.id);
               }
 
-              await applyAlbumDetailsToReleaseRecordings(releaseRow.id, albumDetailsUpdate);
               if (enrichedData) {
                 const artworkUpdate = {
                   back_image_url: enrichedData.back_image_url ?? null,
