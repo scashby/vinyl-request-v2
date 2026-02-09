@@ -44,6 +44,10 @@ type InventoryResult = {
   coverImage: string | null;
   releaseYear: number | null;
   location: string | null;
+  trackTitle?: string | null;
+  trackPosition?: string | null;
+  trackSide?: string | null;
+  recordingId?: number | null;
 };
 
 type TrackResult = {
@@ -194,6 +198,9 @@ export default function GameLibraryPage() {
     setAnswer('');
     setDifficulty('');
     setNotes('');
+    if (item.trackTitle) {
+      setTitle(item.trackTitle);
+    }
   };
 
   const handleSelectTrack = (trackId: number) => {
@@ -213,6 +220,10 @@ export default function GameLibraryPage() {
   const handleCreate = async () => {
     setStatus('');
     setError('');
+    if (!selectedInventory) {
+      setError('Select an item from your collection first.');
+      return;
+    }
 
     const metadata = buildMetadata({
       difficulty: difficulty || undefined,
@@ -220,9 +231,10 @@ export default function GameLibraryPage() {
       source: selectedInventory ? 'collection' : 'manual',
       inventory_id: selectedInventory?.inventoryId,
       release_id: selectedInventory?.releaseId ?? undefined,
-      track_position: selectedTrack?.position ?? undefined,
-      track_side: selectedTrack?.side ?? undefined,
-      recording_id: selectedTrack?.recordingId ?? undefined,
+      track_position: selectedTrack?.position ?? selectedInventory?.trackPosition ?? undefined,
+      track_side: selectedTrack?.side ?? selectedInventory?.trackSide ?? undefined,
+      recording_id: selectedTrack?.recordingId ?? selectedInventory?.recordingId ?? undefined,
+      track_title: selectedTrack?.title ?? selectedInventory?.trackTitle ?? undefined,
     });
 
     const response = await fetch('/api/game-library', {
@@ -359,7 +371,7 @@ export default function GameLibraryPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-800">Pull from collection</h3>
-                    <p className="text-xs text-slate-500">Search by artist or album to auto-fill details.</p>
+                  <p className="text-xs text-slate-500">Search by artist, album, or track to auto-fill details.</p>
                   </div>
                   {selectedInventory && (
                     <Button
@@ -380,7 +392,7 @@ export default function GameLibraryPage() {
                   <input
                     value={inventoryQuery}
                     onChange={(event) => setInventoryQuery(event.target.value)}
-                    placeholder="Search artist or album"
+                    placeholder="Search artist, album, or track"
                     className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
                   />
                   <Button onClick={handleSearchInventory} size="sm">
@@ -424,6 +436,11 @@ export default function GameLibraryPage() {
                             {item.releaseYear ? ` · ${item.releaseYear}` : ''}
                             {item.location ? ` · ${item.location}` : ''}
                           </div>
+                          {item.trackTitle && (
+                            <div className="text-xs text-blue-600">
+                              Track: {item.trackSide ? `${item.trackSide} ` : ''}{item.trackPosition ?? ''} {item.trackTitle}
+                            </div>
+                          )}
                         </div>
                       </button>
                     ))}
@@ -436,6 +453,11 @@ export default function GameLibraryPage() {
                     <div>
                       {selectedInventory.artist} — {selectedInventory.title}
                     </div>
+                    {selectedInventory.trackTitle && (
+                      <div className="text-xs text-blue-700">
+                        Track: {selectedInventory.trackSide ? `${selectedInventory.trackSide} ` : ''}{selectedInventory.trackPosition ?? ''} {selectedInventory.trackTitle}
+                      </div>
+                    )}
                     {selectedInventory.location && (
                       <div className="text-xs text-blue-700">Location: {selectedInventory.location}</div>
                     )}
@@ -489,36 +511,34 @@ export default function GameLibraryPage() {
                 </div>
               )}
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="text-sm font-medium text-slate-700">Artist</label>
-                  <input
-                    value={artist}
-                    onChange={(event) => setArtist(event.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
-                    placeholder="Artist name"
-                  />
+              {selectedInventory && (
+                <div className="grid gap-4 md:grid-cols-[120px_1fr] items-center rounded-xl border border-gray-200 bg-white p-3">
+                  <div className="relative h-24 w-24 overflow-hidden rounded-lg bg-slate-100">
+                    {coverImage ? (
+                      <Image
+                        src={coverImage}
+                        alt={title || 'Cover image'}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="h-full w-full bg-slate-200" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase tracking-widest text-slate-500">Selected details</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">
+                      {artist} — {title}
+                    </div>
+                    {selectedInventory.trackTitle && (
+                      <div className="text-xs text-slate-500">
+                        Track: {selectedInventory.trackSide ? `${selectedInventory.trackSide} ` : ''}{selectedInventory.trackPosition ?? ''} {selectedInventory.trackTitle}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-700">Title</label>
-                  <input
-                    value={title}
-                    onChange={(event) => setTitle(event.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
-                    placeholder="Track or album title"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-slate-700">Cover image URL</label>
-                <input
-                  value={coverImage}
-                  onChange={(event) => setCoverImage(event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
-                  placeholder="https://..."
-                />
-              </div>
+              )}
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
