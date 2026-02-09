@@ -11,34 +11,6 @@ type TemplateRow = {
   created_at: string;
 };
 
-const TEMPLATE_SNIPPETS: Record<string, string> = {
-  trivia:
-    '{"trivia":{"questions":[{"prompt":"Name the sample","artist":"Artist","title":"Track","coverImage":""}]}}',
-  bingo:
-    '{"bingo":{"notes":"Optional template metadata for bingo sessions."}}',
-  bracketology:
-    '{"bracket":{"theme":"Best 80s B-Side","notes":"Pre-seed metadata for bracket setup."}}',
-};
-
-const LOCAL_TEMPLATES_KEY = 'vinylGamesTemplates';
-
-const readLocalTemplates = (): TemplateRow[] => {
-  if (typeof window === 'undefined') return [];
-  const raw = window.localStorage.getItem(LOCAL_TEMPLATES_KEY);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw) as TemplateRow[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    return [];
-  }
-};
-
-const writeLocalTemplates = (templates: TemplateRow[]) => {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(LOCAL_TEMPLATES_KEY, JSON.stringify(templates));
-};
-
 export default function GameTemplatesPage() {
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [name, setName] = useState('');
@@ -46,21 +18,12 @@ export default function GameTemplatesPage() {
   const [templateJson, setTemplateJson] = useState('');
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
-  const [usingLocal, setUsingLocal] = useState(false);
 
   const loadTemplates = async () => {
-    try {
-      const response = await fetch('/api/game-templates');
-      if (!response.ok) {
-        throw new Error('Failed to load from API.');
-      }
-      const result = await response.json();
+    const response = await fetch('/api/game-templates');
+    const result = await response.json();
+    if (response.ok) {
       setTemplates(result.data as TemplateRow[]);
-      setUsingLocal(false);
-    } catch (loadError) {
-      const local = readLocalTemplates();
-      setTemplates(local);
-      setUsingLocal(true);
     }
   };
 
@@ -81,7 +44,7 @@ export default function GameTemplatesPage() {
     if (templateJson.trim()) {
       try {
         templateState = JSON.parse(templateJson.trim());
-      } catch (parseError) {
+      } catch {
         setError('Template JSON is invalid.');
         return;
       }
@@ -97,30 +60,16 @@ export default function GameTemplatesPage() {
       }),
     });
 
-    if (response.ok) {
-      setStatus('Template created.');
-      setName('');
-      setTemplateJson('');
-      await loadTemplates();
+    const result = await response.json();
+    if (!response.ok) {
+      setError(result.error || 'Failed to create template.');
       return;
     }
 
-    const result = await response.json().catch(() => ({}));
-    const localTemplates = readLocalTemplates();
-    const nextTemplate: TemplateRow = {
-      id: Date.now() * -1,
-      name: name.trim(),
-      game_type: gameType,
-      template_state: templateState,
-      created_at: new Date().toISOString(),
-    };
-    const nextTemplates = [nextTemplate, ...localTemplates];
-    writeLocalTemplates(nextTemplates);
-    setTemplates(nextTemplates);
-    setUsingLocal(true);
-    setStatus(result.error ? `${result.error} Saved locally.` : 'Saved locally.');
+    setStatus('Template created.');
     setName('');
     setTemplateJson('');
+    await loadTemplates();
   };
 
   return (
@@ -164,13 +113,6 @@ export default function GameTemplatesPage() {
                   <option value="bingo">Vinyl Bingo</option>
                   <option value="bracketology">Bracketology</option>
                 </select>
-                <button
-                  type="button"
-                  onClick={() => setTemplateJson(TEMPLATE_SNIPPETS[gameType] ?? '')}
-                  className="mt-2 text-xs text-[#7bdcff] hover:text-white"
-                >
-                  Insert starter template
-                </button>
               </div>
               <div>
                 <label className="text-sm font-semibold mb-2 block">
@@ -197,11 +139,6 @@ export default function GameTemplatesPage() {
 
             <div className="rounded-2xl border border-white/10 bg-[#0c0f1a] p-6">
               <h2 className="text-lg font-semibold mb-4">Saved templates</h2>
-              {usingLocal && (
-                <p className="mb-3 text-xs text-yellow-300">
-                  Using local storage fallback (API unavailable).
-                </p>
-              )}
               <div className="space-y-3 max-h-[420px] overflow-y-auto">
                 {templates.length === 0 && (
                   <p className="text-sm text-white/60">

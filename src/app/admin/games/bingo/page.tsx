@@ -42,7 +42,6 @@ const buildCard = (items: BingoItem[]) => {
 
 const addCardToPdf = (doc: jsPDF, grid: (BingoItem | null)[], title: string) => {
   const pageWidth = 210;
-  const pageHeight = 297;
   const margin = 15;
   const cellSize = (pageWidth - margin * 2) / 5;
   const startX = margin;

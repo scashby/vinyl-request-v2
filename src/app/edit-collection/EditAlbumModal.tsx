@@ -129,6 +129,15 @@ const asString = (value: unknown): string | null => {
   return null;
 };
 
+const asNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && !Number.isNaN(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+};
+
 const asStringArray = (value: unknown): string[] => {
   if (!value) return [];
   if (Array.isArray(value)) {
@@ -241,6 +250,9 @@ const buildAlbumCredits = (album: Album): Record<string, unknown> => {
     my_rating: album.my_rating ?? undefined,
     last_cleaned_date: normalizeEmpty(album.last_cleaned_date),
     played_history: album.played_history ?? undefined,
+    chart_positions: album.chart_positions ?? undefined,
+    awards: album.awards ?? undefined,
+    certifications: album.certifications ?? undefined,
     apple_music_id: normalizeEmpty(album.apple_music_id),
     lastfm_id: normalizeEmpty(album.lastfm_id),
     musicbrainz_url: normalizeEmpty(album.musicbrainz_url),
@@ -392,6 +404,16 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                release_year,
                discogs_release_id,
                spotify_album_id,
+               packaging,
+               vinyl_color,
+               vinyl_weight,
+               rpm,
+               spars_code,
+               box_set,
+               sound,
+               studio,
+               disc_metadata,
+               matrix_numbers,
                track_count,
                notes,
                qty,
@@ -406,7 +428,12 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                    title,
                    duration_seconds,
                    credits,
-                   notes
+                   notes,
+                   lyrics,
+                   lyrics_url,
+                   is_cover,
+                   original_artist,
+                   track_artist
                  )
                ),
                master:masters (
@@ -419,6 +446,37 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                  genres,
                  styles,
                  notes,
+                 sort_title,
+                 subtitle,
+                 musicians,
+                 producers,
+                 engineers,
+                 songwriters,
+                 composer,
+                 conductor,
+                 chorus,
+                 composition,
+                 orchestra,
+                 chart_positions,
+                 awards,
+                 certifications,
+                 cultural_significance,
+                 critical_reception,
+                 allmusic_rating,
+                 allmusic_review,
+                 pitchfork_score,
+                 pitchfork_review,
+                 recording_location,
+                 master_release_date,
+                 recording_date,
+                 recording_year,
+                 wikipedia_url,
+                 allmusic_url,
+                 apple_music_url,
+                 lastfm_url,
+                 spotify_url,
+                 genius_url,
+                 custom_links,
                  artist:artists (id, name),
                  master_tag_links:master_tag_links (
                    master_tags (name)
@@ -457,7 +515,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         const trackList = (releaseTracks ?? []).map((track, index) => {
           const recording = toSingle(track.recording);
           const recordingCredits = asRecord(recording?.credits);
-          const trackArtist = asString(recordingCredits.track_artist);
+          const trackArtist = asString(recording?.track_artist ?? recordingCredits.track_artist);
           const discNumberRaw = recordingCredits.disc_number;
           const discNumber =
             typeof discNumberRaw === 'number'
@@ -509,15 +567,17 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           musicbrainz_id: master?.musicbrainz_release_group_id ?? null,
           spotify_id: release?.spotify_album_id ?? null,
           spotify_url: release?.spotify_album_id ? `https://open.spotify.com/album/${release.spotify_album_id}` : null,
-          apple_music_url: asString(links.apple_music_url ?? albumDetails.apple_music_url),
-          lastfm_url: asString(links.lastfm_url ?? albumDetails.lastfm_url),
-          allmusic_url: asString(links.allmusic_url ?? albumDetails.allmusic_url),
-          wikipedia_url: asString(links.wikipedia_url ?? albumDetails.wikipedia_url),
-          genius_url: asString(links.genius_url ?? albumDetails.genius_url),
+          apple_music_url: asString(master?.apple_music_url ?? links.apple_music_url ?? albumDetails.apple_music_url),
+          lastfm_url: asString(master?.lastfm_url ?? links.lastfm_url ?? albumDetails.lastfm_url),
+          allmusic_url: asString(master?.allmusic_url ?? links.allmusic_url ?? albumDetails.allmusic_url),
+          wikipedia_url: asString(master?.wikipedia_url ?? links.wikipedia_url ?? albumDetails.wikipedia_url),
+          genius_url: asString(master?.genius_url ?? links.genius_url ?? albumDetails.genius_url),
           apple_music_id: asString(albumDetails.apple_music_id),
           lastfm_id: asString(albumDetails.lastfm_id),
           musicbrainz_url: asString(albumDetails.musicbrainz_url),
-          custom_links: customLinks,
+          custom_links: Array.isArray(master?.custom_links)
+            ? (master?.custom_links as Array<{ url: string; description?: string | null }>)
+            : customLinks,
           personal_notes: data.personal_notes ?? null,
           release_notes: release?.notes ?? null,
           master_notes: master?.notes ?? null,
@@ -536,33 +596,46 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           collection_status: collectionStatus,
           for_sale: status === 'for_sale',
           tracks: trackList,
-          disc_metadata: (albumDetails.disc_metadata as Album['disc_metadata']) ?? null,
-          matrix_numbers: (albumDetails.matrix_numbers as Album['matrix_numbers']) ?? null,
+          disc_metadata: (release?.disc_metadata ?? albumDetails.disc_metadata) as Album['disc_metadata'],
+          matrix_numbers: (release?.matrix_numbers ?? albumDetails.matrix_numbers) as Album['matrix_numbers'],
           discs: maxDiscNumber || release?.qty || null,
           sides: uniqueSides.size || null,
           back_image_url: asString(artwork.back_image_url),
           spine_image_url: asString(artwork.spine_image_url),
           inner_sleeve_images: asStringArray(artwork.inner_sleeve_images),
           vinyl_label_images: asStringArray(artwork.vinyl_label_images),
-          musicians: asStringArray(albumPeople.musicians),
-          producers: asStringArray(albumPeople.producers),
-          engineers: asStringArray(albumPeople.engineers),
-          songwriters: asStringArray(albumPeople.songwriters),
-          composer: asString(classical.composer),
-          conductor: asString(classical.conductor),
-          chorus: asString(classical.chorus),
-          composition: asString(classical.composition),
-          orchestra: asString(classical.orchestra),
-          packaging: asString(albumDetails.packaging),
-          vinyl_color: asStringArray(albumDetails.vinyl_color),
-          vinyl_weight: asString(albumDetails.vinyl_weight),
-          rpm: asString(albumDetails.rpm),
-          spars_code: asString(albumDetails.spars_code),
-          box_set: asString(albumDetails.box_set),
-          sound: asString(albumDetails.sound),
-          studio: asString(albumDetails.studio),
-          master_release_date: asString(albumDetails.master_release_date),
-          recording_date: asString(albumDetails.recording_date),
+          musicians: master?.musicians ?? asStringArray(albumPeople.musicians),
+          producers: master?.producers ?? asStringArray(albumPeople.producers),
+          engineers: master?.engineers ?? asStringArray(albumPeople.engineers),
+          songwriters: master?.songwriters ?? asStringArray(albumPeople.songwriters),
+          composer: master?.composer ?? asString(classical.composer),
+          conductor: master?.conductor ?? asString(classical.conductor),
+          chorus: master?.chorus ?? asString(classical.chorus),
+          composition: master?.composition ?? asString(classical.composition),
+          orchestra: master?.orchestra ?? asString(classical.orchestra),
+          packaging: asString(release?.packaging ?? albumDetails.packaging),
+          vinyl_color: release?.vinyl_color ?? asStringArray(albumDetails.vinyl_color),
+          vinyl_weight: asString(release?.vinyl_weight ?? albumDetails.vinyl_weight),
+          rpm: asString(release?.rpm ?? albumDetails.rpm),
+          spars_code: asString(release?.spars_code ?? albumDetails.spars_code),
+          box_set: asString(release?.box_set ?? albumDetails.box_set),
+          sound: asString(release?.sound ?? albumDetails.sound),
+          studio: asString(release?.studio ?? albumDetails.studio),
+          master_release_date: asString(master?.master_release_date ?? albumDetails.master_release_date),
+          recording_date: asString(master?.recording_date ?? albumDetails.recording_date),
+          recording_year: master?.recording_year ?? asNumber(albumDetails.recording_year),
+          chart_positions: master?.chart_positions ?? asStringArray(albumDetails.chart_positions),
+          awards: master?.awards ?? asStringArray(albumDetails.awards),
+          certifications: master?.certifications ?? asStringArray(albumDetails.certifications),
+          sort_title: master?.sort_title ?? asString(albumDetails.sort_title),
+          subtitle: master?.subtitle ?? asString(albumDetails.subtitle),
+          cultural_significance: asString(master?.cultural_significance ?? albumDetails.cultural_significance),
+          critical_reception: asString(master?.critical_reception ?? albumDetails.critical_reception),
+          recording_location: asString(master?.recording_location ?? albumDetails.recording_location),
+          allmusic_rating: master?.allmusic_rating ?? asNumber(albumDetails.allmusic_rating),
+          allmusic_review: asString(master?.allmusic_review ?? albumDetails.allmusic_review),
+          pitchfork_score: master?.pitchfork_score ?? asNumber(albumDetails.pitchfork_score),
+          pitchfork_review: asString(master?.pitchfork_review ?? albumDetails.pitchfork_review),
           tempo_bpm: typeof albumDetails.tempo_bpm === 'number' ? albumDetails.tempo_bpm : null,
           musical_key: asString(albumDetails.musical_key),
           energy: typeof albumDetails.energy === 'number' ? albumDetails.energy : null,
@@ -763,13 +836,24 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               disc_number: track.disc_number ?? null,
             });
 
+            // HELPER TO EXTRACT VALUES FROM THE JSON STRUCTURE
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const details = (recordingCredits as any).album_details || {};
+
             const recordingPayload = {
               title: trackTitle,
               duration_seconds: parseDurationToSeconds(track.duration),
               notes: track.note ?? null,
+              track_artist: track.artist ?? null,
               credits: Object.keys(recordingCredits).length > 0
                 ? (recordingCredits as unknown as Database['public']['Tables']['recordings']['Insert']['credits'])
                 : undefined,
+              // ADD THESE LINES TO SAVE TO COLUMNS:
+              bpm: details.tempo_bpm ? Math.round(Number(details.tempo_bpm)) : null,
+              energy: details.energy ? Number(details.energy) : null,
+              danceability: details.danceability ? Number(details.danceability) : null,
+              valence: details.mood_happy ? Number(details.mood_happy) : null,
+              musical_key: details.musical_key || null
             };
 
             const { data: recording, error: recordingError } = await supabase
@@ -817,6 +901,20 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               null,
             notes: editedAlbum.release_notes ?? null,
             track_count: typeof trackCount === 'number' ? trackCount : editedAlbum.release?.track_count ?? null,
+            packaging: editedAlbum.packaging ?? null,
+            vinyl_color: editedAlbum.vinyl_color ?? null,
+            vinyl_weight: editedAlbum.vinyl_weight ?? null,
+            rpm: editedAlbum.rpm ?? null,
+            spars_code: editedAlbum.spars_code ?? null,
+            box_set: editedAlbum.box_set ?? null,
+            sound: editedAlbum.sound ?? null,
+            studio: editedAlbum.studio ?? null,
+            disc_metadata: editedAlbum.disc_metadata
+              ? (editedAlbum.disc_metadata as Database['public']['Tables']['releases']['Update']['disc_metadata'])
+              : null,
+            matrix_numbers: editedAlbum.matrix_numbers
+              ? (editedAlbum.matrix_numbers as Database['public']['Tables']['releases']['Update']['matrix_numbers'])
+              : null,
           };
 
           const parsedFormat = editedAlbum.format
@@ -886,6 +984,8 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
 
           const masterUpdate: Database['public']['Tables']['masters']['Update'] = {
             title: editedAlbum.title ?? null,
+            sort_title: editedAlbum.sort_title ?? null,
+            subtitle: editedAlbum.subtitle ?? null,
             original_release_year: editedAlbum.original_release_year
               ? Number(editedAlbum.original_release_year)
               : (editedAlbum.year ? Number(editedAlbum.year) : null),
@@ -898,6 +998,39 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                 : null,
             cover_image_url: editedAlbum.image_url ?? null,
             notes: editedAlbum.master_notes ?? null,
+            musicians: editedAlbum.musicians ?? null,
+            producers: editedAlbum.producers ?? null,
+            engineers: editedAlbum.engineers ?? null,
+            songwriters: editedAlbum.songwriters ?? null,
+            composer: editedAlbum.composer ?? null,
+            conductor: editedAlbum.conductor ?? null,
+            chorus: editedAlbum.chorus ?? null,
+            composition: editedAlbum.composition ?? null,
+            orchestra: editedAlbum.orchestra ?? null,
+            chart_positions: editedAlbum.chart_positions ?? null,
+            awards: editedAlbum.awards ?? null,
+            certifications: editedAlbum.certifications ?? null,
+            cultural_significance: editedAlbum.cultural_significance ?? null,
+            critical_reception: editedAlbum.critical_reception ?? null,
+            allmusic_rating: typeof editedAlbum.allmusic_rating === 'number'
+              ? editedAlbum.allmusic_rating
+              : (editedAlbum.allmusic_rating ? Number(editedAlbum.allmusic_rating) : null),
+            allmusic_review: editedAlbum.allmusic_review ?? null,
+            pitchfork_score: typeof editedAlbum.pitchfork_score === 'number'
+              ? editedAlbum.pitchfork_score
+              : (editedAlbum.pitchfork_score ? Number(editedAlbum.pitchfork_score) : null),
+            pitchfork_review: editedAlbum.pitchfork_review ?? null,
+            recording_location: editedAlbum.recording_location ?? null,
+            master_release_date: editedAlbum.master_release_date ?? null,
+            recording_date: editedAlbum.recording_date ?? null,
+            recording_year: editedAlbum.recording_year ?? null,
+            wikipedia_url: editedAlbum.wikipedia_url ?? null,
+            allmusic_url: editedAlbum.allmusic_url ?? null,
+            apple_music_url: editedAlbum.apple_music_url ?? null,
+            lastfm_url: editedAlbum.lastfm_url ?? null,
+            spotify_url: editedAlbum.spotify_url ?? null,
+            genius_url: editedAlbum.genius_url ?? null,
+            custom_links: (editedAlbum.custom_links ?? []) as unknown as Database['public']['Tables']['masters']['Update']['custom_links'],
             main_artist_id: mainArtistId,
           };
 

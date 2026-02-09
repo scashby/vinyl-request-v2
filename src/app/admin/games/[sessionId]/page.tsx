@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { Container } from 'components/ui/Container';
@@ -62,7 +62,7 @@ export default function GameSessionAdminPage() {
 
   const activeMatchId = session?.game_state?.activeMatchId ?? null;
 
-  const loadSession = async () => {
+  const loadSession = useCallback(async () => {
     if (!sessionId || Number.isNaN(sessionId)) return;
     setLoading(true);
     const { data, error } = await supabase
@@ -75,11 +75,11 @@ export default function GameSessionAdminPage() {
       setSession(data as GameSession);
     }
     setLoading(false);
-  };
+  }, [sessionId]);
 
   useEffect(() => {
     loadSession();
-  }, [sessionId]);
+  }, [loadSession]);
 
   const sendPatch = async (payload: unknown) => {
     setActionMessage('');
