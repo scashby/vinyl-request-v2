@@ -67,8 +67,8 @@ export async function PATCH(
   }
 
   const { data, error } = await supabaseAdmin
-    .from('game_library_items')
-    .update(updatePayload)
+    .from('game_library_items' as never)
+    .update(updatePayload as never)
     .eq('id', itemId)
     .select(
       'id, game_type, item_type, title, artist, prompt, answer, cover_image, inventory_id, metadata, created_at, updated_at'
