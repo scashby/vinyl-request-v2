@@ -16,6 +16,8 @@ interface Event {
   is_featured_grid?: boolean;
   featured_priority?: number | string | null;
   allowed_tags?: string[] | string | null;
+  has_games?: boolean;
+  game_modes?: string[] | string | null;
 }
 
 interface DJSet {
@@ -280,6 +282,11 @@ export default function Page() {
                                   __html: formatEventText(displayTitle),
                                 }}
                               />
+                              {ev.has_games && (
+                                <div className="mt-3 inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-[#7bdcff]">
+                                  Vinyl Games
+                                </div>
+                              )}
                             </div>
                           </div>
                         </Link>
@@ -380,6 +387,11 @@ export default function Page() {
                               {e.location && (
                                 <div className="text-[#9aa3ad] text-sm mt-1">
                                   📍 {e.location}
+                                </div>
+                              )}
+                              {e.has_games && (
+                                <div className="mt-2 inline-flex items-center rounded-full bg-[#0b1b2a] px-2.5 py-1 text-xs font-bold uppercase tracking-widest text-[#00c4ff]">
+                                  Vinyl Games
                                 </div>
                               )}
                             </div>

@@ -24,10 +24,17 @@ interface EventData {
   info?: string;
   info_url?: string;
   has_queue?: boolean;
+  has_games?: boolean;
+  game_modes?: string[] | string | null;
   allowed_tags?: string[] | string | null;
 }
 
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
+const GAME_MODE_LABELS: Record<string, string> = {
+  bracketology: 'Bracketology',
+  bingo: 'Vinyl Bingo',
+  trivia: 'Needle Drop Trivia',
+};
 
 const normalizeStringArray = (value: unknown): string[] => {
   if (Array.isArray(value)) return value;
@@ -115,6 +122,8 @@ export default function Page() {
     info,
     info_url,
     has_queue,
+    has_games,
+    game_modes,
     allowed_tags
   } = event;
 
@@ -141,6 +150,7 @@ export default function Page() {
   const imageSrc = image_url?.includes('dropbox.com')
     ? image_url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace(/\?.*$/, '')
     : image_url || '/images/event-header-still.jpg';
+  const normalizedGameModes = normalizeStringArray(game_modes);
 
   const goToBrowse = () => {
     router.push(`/browse/browse-albums?eventId=${event.id}`);
@@ -253,6 +263,37 @@ export default function Page() {
                   >
                     View the event page
                   </a>
+                )}
+              </div>
+            )}
+
+            {has_games && (
+              <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-6">
+                <h3 className="text-2xl font-bold text-indigo-900 mb-3">
+                  Vinyl Games
+                </h3>
+                <p className="text-indigo-900/80 mb-4">
+                  This event features live audience games.
+                </p>
+                {normalizedGameModes.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {normalizedGameModes.map((mode) => (
+                      <span
+                        key={mode}
+                        className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-indigo-700"
+                      >
+                        {GAME_MODE_LABELS[mode] || mode}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {normalizedGameModes.includes('bracketology') && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => router.push(`/events/${event.id}/nominate`)}
+                  >
+                    Nominate a Track
+                  </Button>
                 )}
               </div>
             )}
