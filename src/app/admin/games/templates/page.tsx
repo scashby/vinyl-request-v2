@@ -50,6 +50,7 @@ export default function GameTemplatesPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [name, setName] = useState('');
   const [gameType, setGameType] = useState('trivia');
+  const [itemType, setItemType] = useState('');
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
 
@@ -78,7 +79,9 @@ export default function GameTemplatesPage() {
   const loadItems = async () => {
     const params = new URLSearchParams();
     params.set('gameType', gameType);
-    if (availableItemTypes.length === 1) {
+    if (itemType) {
+      params.set('itemType', itemType);
+    } else if (availableItemTypes.length === 1) {
       params.set('itemType', availableItemTypes[0].value);
     }
     if (query.trim()) params.set('q', query.trim());
@@ -99,8 +102,15 @@ export default function GameTemplatesPage() {
 
   useEffect(() => {
     setSelectedIds([]);
+    setItemType(availableItemTypes[0]?.value ?? '');
     loadItems();
   }, [gameType]);
+
+  useEffect(() => {
+    if (!itemType) return;
+    setSelectedIds([]);
+    loadItems();
+  }, [itemType]);
 
   const toggleSelection = (id: number) => {
     setSelectedIds((prev) =>
@@ -210,6 +220,21 @@ export default function GameTemplatesPage() {
                   className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
                 >
                   {GAME_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700">Item type</label>
+                <select
+                  value={itemType || availableItemTypes[0]?.value || ''}
+                  onChange={(event) => setItemType(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
+                >
+                  {availableItemTypes.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>

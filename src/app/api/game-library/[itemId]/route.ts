@@ -11,6 +11,9 @@ type UpdatePayload = {
   answer?: string | null;
   coverImage?: string | null;
   inventoryId?: number | null;
+  tags?: string[];
+  genres?: string[];
+  decades?: string[];
   metadata?: Json;
 };
 
@@ -65,6 +68,15 @@ export async function PATCH(
     updatePayload.inventory_id =
       payload.inventoryId === null ? null : Number(payload.inventoryId);
   }
+  if (payload.tags !== undefined) {
+    updatePayload.tags = payload.tags ?? [];
+  }
+  if (payload.genres !== undefined) {
+    updatePayload.genres = payload.genres ?? [];
+  }
+  if (payload.decades !== undefined) {
+    updatePayload.decades = payload.decades ?? [];
+  }
   if (payload.metadata !== undefined) {
     updatePayload.metadata = payload.metadata ?? {};
   }
@@ -74,7 +86,7 @@ export async function PATCH(
     .update(updatePayload)
     .eq('id', itemId)
     .select(
-      'id, game_type, item_type, title, artist, prompt, answer, cover_image, inventory_id, metadata, created_at, updated_at'
+      'id, game_type, item_type, title, artist, prompt, answer, cover_image, inventory_id, tags, genres, decades, metadata, created_at, updated_at'
     )
     .single();
 
