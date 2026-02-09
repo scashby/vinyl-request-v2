@@ -15,10 +15,10 @@ const GAME_TYPE_OPTIONS = [
 ];
 
 const ITEM_TYPE_OPTIONS = [
-  { value: 'trivia-question', label: 'Trivia Question' },
-  { value: 'track', label: 'Track' },
-  { value: 'album', label: 'Album' },
-  { value: 'bingo-item', label: 'Bingo Item' },
+  { value: 'trivia-question', label: 'Trivia Question', gameTypes: ['trivia'] },
+  { value: 'track', label: 'Track', gameTypes: ['bracketology'] },
+  { value: 'album', label: 'Album', gameTypes: ['bracketology'] },
+  { value: 'bingo-item', label: 'Bingo Item', gameTypes: ['bingo'] },
 ];
 
 const DIFFICULTY_OPTIONS = ['Easy', 'Medium', 'Hard'];
@@ -98,6 +98,9 @@ export default function GameLibraryPage() {
   const [trackLoading, setTrackLoading] = useState(false);
   const [selectedTrackId, setSelectedTrackId] = useState<number | null>(null);
 
+  const availableItemTypes = ITEM_TYPE_OPTIONS.filter((option) =>
+    option.gameTypes.includes(gameType)
+  );
   const shouldShowTriviaFields = itemType === 'trivia-question';
 
   const fetchItems = async (overrides?: {
@@ -136,6 +139,12 @@ export default function GameLibraryPage() {
 
     loadInitialItems();
   }, []);
+
+  useEffect(() => {
+    if (!availableItemTypes.find((option) => option.value === itemType)) {
+      setItemType(availableItemTypes[0]?.value ?? 'trivia-question');
+    }
+  }, [availableItemTypes, itemType]);
 
   const handleSearchInventory = async () => {
     setInventoryError('');
@@ -358,13 +367,16 @@ export default function GameLibraryPage() {
                     onChange={(event) => setItemType(event.target.value)}
                     className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
                   >
-                    {ITEM_TYPE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  {availableItemTypes.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-xs text-slate-500">
+                  Item types are filtered by the selected game type.
+                </p>
+              </div>
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">

@@ -16,6 +16,12 @@ type LibraryPayload = {
 
 type GameLibraryInsert = Database['public']['Tables']['game_library_items']['Insert'];
 
+const VALID_ITEM_TYPES: Record<string, string[]> = {
+  trivia: ['trivia-question'],
+  bingo: ['bingo-item'],
+  bracketology: ['track', 'album'],
+};
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const gameType = searchParams.get('gameType');
@@ -73,6 +79,16 @@ export async function POST(request: NextRequest) {
 
   if (!itemType) {
     return NextResponse.json({ error: 'itemType is required.' }, { status: 400 });
+  }
+
+  const allowedItemTypes = VALID_ITEM_TYPES[gameType] ?? [];
+  if (!allowedItemTypes.includes(itemType)) {
+    return NextResponse.json(
+      {
+        error: `Invalid itemType for ${gameType}. Allowed: ${allowedItemTypes.join(', ') || 'none'}.`,
+      },
+      { status: 400 }
+    );
   }
 
   const insertPayload: GameLibraryInsert = {
