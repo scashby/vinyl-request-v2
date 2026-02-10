@@ -173,7 +173,7 @@ export default function AdminGamesPage() {
       return `/admin/games/${session.id}/trivia`;
     }
     if (session.game_type === 'bingo') {
-      return '/admin/games/bingo';
+      return `/admin/games/bingo?sessionId=${session.id}`;
     }
     return `/admin/games/${session.id}`;
   };

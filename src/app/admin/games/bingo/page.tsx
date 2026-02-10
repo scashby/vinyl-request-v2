@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { jsPDF } from 'jspdf';
 import { supabase } from 'src/lib/supabaseClient';
 import { Container } from 'components/ui/Container';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 
 type Crate = {
   id: number;
@@ -14,6 +16,24 @@ type BingoItem = {
   id: number;
   title: string;
   artist: string;
+};
+
+type TemplateRow = {
+  id: number;
+  name: string;
+  game_type: string;
+};
+
+type SessionRow = {
+  id: number;
+  event_id: number | null;
+  game_type: string;
+  created_at: string;
+  events?: {
+    id: number;
+    title: string;
+    date: string;
+  } | null;
 };
 
 const shuffle = <T,>(items: T[]) => {
@@ -81,8 +101,16 @@ const addCardToPdf = (doc: jsPDF, grid: (BingoItem | null)[], title: string) => 
 };
 
 export default function BingoCardPage() {
+  const searchParams = useSearchParams();
+  const sessionIdParam = searchParams.get('sessionId');
   const [crates, setCrates] = useState<Crate[]>([]);
   const [crateId, setCrateId] = useState('');
+  const [templates, setTemplates] = useState<TemplateRow[]>([]);
+  const [templateId, setTemplateId] = useState('');
+  const [useTemplate, setUseTemplate] = useState(false);
+  const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [sessionId, setSessionId] = useState('');
+  const [useSession, setUseSession] = useState(false);
   const [cardCount, setCardCount] = useState(10);
   const [items, setItems] = useState<BingoItem[]>([]);
   const [status, setStatus] = useState('');
@@ -98,18 +126,62 @@ export default function BingoCardPage() {
       const { data } = await supabase.from('crates').select('id, name').order('name');
       setCrates((data as Crate[]) ?? []);
     };
+    const loadTemplates = async () => {
+      const response = await fetch('/api/game-templates');
+      const result = await response.json();
+      if (response.ok) {
+        const all = (result.data as TemplateRow[]) ?? [];
+        setTemplates(all.filter((template) => template.game_type === 'bingo'));
+      }
+    };
+    const loadSessions = async () => {
+      const response = await fetch('/api/game-sessions');
+      const result = await response.json();
+      if (response.ok) {
+        const all = (result.data as SessionRow[]) ?? [];
+        setSessions(all.filter((session) => session.game_type === 'bingo'));
+      }
+    };
     loadCrates();
+    loadTemplates();
+    loadSessions();
   }, []);
+
+  useEffect(() => {
+    if (sessionIdParam) {
+      setUseSession(true);
+      setSessionId(sessionIdParam);
+    }
+  }, [sessionIdParam]);
 
   const handleLoadItems = async () => {
     setStatus('');
     setError('');
     setItems([]);
 
+    if (useSession && !sessionId) {
+      setError('Select a bingo session.');
+      return;
+    }
+    if (useTemplate && !templateId) {
+      setError('Select a bingo template.');
+      return;
+    }
+    if (!useTemplate && !crateId) {
+      setError('Select a crate.');
+      return;
+    }
+
     const response = await fetch('/api/bingo/cards', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ crateId: Number(crateId) }),
+      body: JSON.stringify(
+        useSession
+          ? { sessionId: Number(sessionId) }
+          : useTemplate
+          ? { templateId: Number(templateId) }
+          : { crateId: Number(crateId) }
+      ),
     });
 
     const result = await response.json();
@@ -157,27 +229,112 @@ export default function BingoCardPage() {
             Bingo Card Generator
           </h1>
           <p className="text-white/60 mt-2">
-            Pick a crate and generate randomized PDF bingo cards.
+            Pick a crate, template, or session and generate randomized PDF bingo cards.
           </p>
+          <div className="mt-3">
+            <Link
+              href="/admin/games/templates"
+              className="text-xs font-semibold text-[#7bdcff] hover:underline"
+            >
+              Manage Bingo Templates
+            </Link>
+          </div>
 
           <div className="mt-8 grid gap-6 md:grid-cols-[1.4fr_0.6fr]">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6 space-y-5">
               <div>
                 <label className="text-sm font-semibold mb-2 block">
-                  Choose a crate
+                  Source
                 </label>
-                <select
-                  value={crateId}
-                  onChange={(event) => setCrateId(event.target.value)}
-                  className="w-full rounded-lg bg-black/60 border border-white/10 px-4 py-3 text-white"
-                >
-                  <option value="">Select a crate</option>
-                  {crates.map((crate) => (
-                    <option key={crate.id} value={crate.id}>
-                      {crate.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUseTemplate(false);
+                      setUseSession(false);
+                    }}
+                    className={`rounded-md px-3 py-2 text-xs font-semibold ${
+                      !useTemplate && !useSession
+                        ? 'bg-[#7bdcff] text-black'
+                        : 'border border-white/20 text-white'
+                    }`}
+                  >
+                    Crate
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUseTemplate(true);
+                      setUseSession(false);
+                    }}
+                    className={`rounded-md px-3 py-2 text-xs font-semibold ${
+                      useTemplate
+                        ? 'bg-[#7bdcff] text-black'
+                        : 'border border-white/20 text-white'
+                    }`}
+                  >
+                    Template
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUseSession(true);
+                      setUseTemplate(false);
+                    }}
+                    className={`rounded-md px-3 py-2 text-xs font-semibold ${
+                      useSession
+                        ? 'bg-[#7bdcff] text-black'
+                        : 'border border-white/20 text-white'
+                    }`}
+                  >
+                    Session
+                  </button>
+                </div>
+
+                {!useTemplate && !useSession && (
+                  <select
+                    value={crateId}
+                    onChange={(event) => setCrateId(event.target.value)}
+                    className="w-full rounded-lg bg-black/60 border border-white/10 px-4 py-3 text-white"
+                  >
+                    <option value="">Select a crate</option>
+                    {crates.map((crate) => (
+                      <option key={crate.id} value={crate.id}>
+                        {crate.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {useTemplate && (
+                  <select
+                    value={templateId}
+                    onChange={(event) => setTemplateId(event.target.value)}
+                    className="w-full rounded-lg bg-black/60 border border-white/10 px-4 py-3 text-white"
+                  >
+                    <option value="">Select a bingo template</option>
+                    {templates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {useSession && (
+                  <select
+                    value={sessionId}
+                    onChange={(event) => setSessionId(event.target.value)}
+                    className="w-full rounded-lg bg-black/60 border border-white/10 px-4 py-3 text-white"
+                  >
+                    <option value="">Select a bingo session</option>
+                    {sessions.map((session) => (
+                      <option key={session.id} value={session.id}>
+                        {session.events?.title ?? `Session ${session.id}`} · {session.events?.date ?? 'TBA'}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div>
@@ -198,10 +355,10 @@ export default function BingoCardPage() {
                 <button
                   type="button"
                   onClick={handleLoadItems}
-                  disabled={!crateId}
+                  disabled={useSession ? !sessionId : useTemplate ? !templateId : !crateId}
                   className="rounded-lg border border-[#7bdcff] px-4 py-2 font-semibold text-[#7bdcff] hover:bg-[#7bdcff] hover:text-black disabled:opacity-40"
                 >
-                  Load Crate Items
+                  Load Bingo Items
                 </button>
                 <button
                   type="button"

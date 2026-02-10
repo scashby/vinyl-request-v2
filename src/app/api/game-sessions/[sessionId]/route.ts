@@ -31,6 +31,12 @@ type GameState = {
       coverImage?: string;
     }>;
   };
+  templateItems?: Array<{
+    title?: string | null;
+    artist?: string | null;
+    coverImage?: string | null;
+    metadata?: unknown;
+  }>;
 };
 
 type PatchPayload =
@@ -199,6 +205,37 @@ export async function PATCH(
         { error: 'Session is missing event_id.' },
         { status: 400 }
       );
+    }
+
+    const templateSeeds = (currentState.templateItems ?? [])
+      .filter((item) => item?.title)
+      .map((item) => ({
+        id: null,
+        artist: item?.artist ?? 'Unknown',
+        title: item?.title ?? 'Unknown',
+        cover_image: item?.coverImage ?? null,
+      }));
+
+    if (templateSeeds.length >= 2) {
+      const matches = buildBracketMatches(templateSeeds.slice(0, 16));
+      const { data: updated, error: updateError } = await supabaseAdmin
+        .from('game_sessions')
+        .update({
+          game_state: {
+            ...currentState,
+            matches,
+            activeMatchId: matches[0]?.id ?? null,
+          },
+        })
+        .eq('id', sessionId)
+        .select('*')
+        .single();
+
+      if (updateError) {
+        return NextResponse.json({ error: updateError.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ data: updated });
     }
 
     const { data: candidates, error: candidatesError } = await supabaseAdmin
