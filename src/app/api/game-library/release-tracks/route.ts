@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabaseAdmin
     .from('release_tracks')
-    .select('id, position, side, title_override, recording_id, recordings ( title, track_artist )')
+    .select('id, position, side, title_override, recording_id, recordings ( title, track_artist, credits, lyrics, lyrics_url )')
     .eq('release_id', releaseId)
     .order('position', { ascending: true });
 
@@ -31,6 +31,9 @@ export async function GET(request: NextRequest) {
       side: row.side,
       title: row.title_override || recording?.title || 'Unknown title',
       trackArtist: recording?.track_artist || null,
+      credits: recording?.credits ?? null,
+      lyrics: recording?.lyrics ?? null,
+      lyricsUrl: recording?.lyrics_url ?? null,
     };
   });
 

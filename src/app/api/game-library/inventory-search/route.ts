@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const { data: mastersByTitle, error: mastersTitleError } = await supabaseAdmin
     .from('masters')
     .select(
-      'id, title, subtitle, cover_image_url, main_artist_id, genres, styles, musicians, producers, engineers, songwriters, composer, conductor, chorus, orchestra, recording_year, recording_location, artists ( name )'
+      'id, title, subtitle, cover_image_url, main_artist_id, genres, styles, musicians, producers, engineers, songwriters, composer, conductor, chorus, orchestra, recording_year, recording_location, awards, certifications, chart_positions, allmusic_rating, pitchfork_score, artists ( name )'
     )
     .ilike('title', `%${query}%`)
     .limit(25);
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from('masters')
       .select(
-        'id, title, subtitle, cover_image_url, main_artist_id, genres, styles, musicians, producers, engineers, songwriters, composer, conductor, chorus, orchestra, recording_year, recording_location, artists ( name )'
+        'id, title, subtitle, cover_image_url, main_artist_id, genres, styles, musicians, producers, engineers, songwriters, composer, conductor, chorus, orchestra, recording_year, recording_location, awards, certifications, chart_positions, allmusic_rating, pitchfork_score, artists ( name )'
       )
       .in('main_artist_id', artistIds)
       .limit(25);
@@ -186,6 +186,11 @@ export async function GET(request: NextRequest) {
       orchestra: master?.orchestra ?? null,
       recordingYear: master?.recording_year ?? null,
       recordingLocation: master?.recording_location ?? null,
+      awards: master?.awards ?? null,
+      certifications: master?.certifications ?? null,
+      chartPositions: master?.chart_positions ?? null,
+      allmusicRating: master?.allmusic_rating ?? null,
+      pitchforkScore: master?.pitchfork_score ?? null,
       trackTitle,
       trackArtist,
       trackPosition: trackMatch?.position ?? null,

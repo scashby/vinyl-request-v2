@@ -62,6 +62,11 @@ type InventoryResult = {
   orchestra?: string | null;
   recordingYear?: number | null;
   recordingLocation?: string | null;
+  awards?: string[] | null;
+  certifications?: string[] | null;
+  chartPositions?: string[] | null;
+  allmusicRating?: number | null;
+  pitchforkScore?: number | null;
   trackTitle?: string | null;
   trackArtist?: string | null;
   trackPosition?: string | null;
@@ -76,6 +81,9 @@ type TrackResult = {
   side: string | null;
   title: string;
   trackArtist: string | null;
+  credits?: Json | null;
+  lyrics?: string | null;
+  lyricsUrl?: string | null;
 };
 
 const buildMetadata = (values: Record<string, Json | undefined>) => {
@@ -117,6 +125,7 @@ export default function GameLibraryPage() {
   const [trackLoading, setTrackLoading] = useState(false);
   const [selectedTrackId, setSelectedTrackId] = useState<number | null>(null);
   const [selectedContributor, setSelectedContributor] = useState('');
+  const [selectedTrackCredit, setSelectedTrackCredit] = useState('');
   const [derivedTags, setDerivedTags] = useState<string[]>([]);
   const [derivedGenres, setDerivedGenres] = useState<string[]>([]);
   const [derivedDecades, setDerivedDecades] = useState<string[]>([]);
@@ -232,6 +241,7 @@ export default function GameLibraryPage() {
     setDifficulty('');
     setNotes('');
     setSelectedContributor('');
+    setSelectedTrackCredit('');
     if (item.trackTitle) {
       setTitle(item.trackTitle);
     }
@@ -262,6 +272,7 @@ export default function GameLibraryPage() {
   const handleSelectTrack = (trackId: number) => {
     if (!trackId || Number.isNaN(trackId)) {
       setSelectedTrackId(null);
+      setSelectedTrackCredit('');
       return;
     }
     setSelectedTrackId(trackId);
@@ -271,7 +282,24 @@ export default function GameLibraryPage() {
     if (track.trackArtist) {
       setArtist(track.trackArtist);
     }
+    setSelectedTrackCredit('');
   };
+
+  const trackCreditOptions = useMemo(() => {
+    const track = trackResults.find((item) => item.id === selectedTrackId);
+    const credits = track?.credits;
+    if (!credits || !Array.isArray(credits)) return [];
+    return credits
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return null;
+        const record = entry as Record<string, Json | undefined>;
+        const name = String(record.name ?? record.artist ?? record.person ?? '').trim();
+        const role = String(record.role ?? record.instrument ?? record.job ?? '').trim();
+        if (!name) return null;
+        return role ? `${name} (${role})` : name;
+      })
+      .filter(Boolean) as string[];
+  }, [selectedTrackId, trackResults]);
 
   const handleCreate = async () => {
     setStatus('');
@@ -294,6 +322,7 @@ export default function GameLibraryPage() {
       genre: selectedInventory?.genres?.[0] ?? undefined,
       style: selectedInventory?.styles?.[0] ?? undefined,
       contributor: selectedContributor || undefined,
+      track_credit: selectedTrackCredit || undefined,
     });
 
     const response = await fetch('/api/game-library', {
@@ -330,6 +359,7 @@ export default function GameLibraryPage() {
     setDifficulty('');
     setNotes('');
     setSelectedContributor('');
+    setSelectedTrackCredit('');
     setDerivedTags([]);
     setDerivedGenres([]);
     setDerivedDecades([]);
@@ -548,6 +578,24 @@ export default function GameLibraryPage() {
                         {derivedTags.length > 0 && (
                           <div>Tags: {derivedTags.join(', ')}</div>
                         )}
+                        {selectedInventory.recordingLocation && (
+                          <div>Recording location: {selectedInventory.recordingLocation}</div>
+                        )}
+                        {selectedInventory.awards?.length ? (
+                          <div>Awards: {selectedInventory.awards.join(', ')}</div>
+                        ) : null}
+                        {selectedInventory.certifications?.length ? (
+                          <div>Certifications: {selectedInventory.certifications.join(', ')}</div>
+                        ) : null}
+                        {selectedInventory.chartPositions?.length ? (
+                          <div>Chart positions: {selectedInventory.chartPositions.join(', ')}</div>
+                        ) : null}
+                        {selectedInventory.allmusicRating !== null && selectedInventory.allmusicRating !== undefined ? (
+                          <div>AllMusic rating: {selectedInventory.allmusicRating}</div>
+                        ) : null}
+                        {selectedInventory.pitchforkScore !== null && selectedInventory.pitchforkScore !== undefined ? (
+                          <div>Pitchfork score: {selectedInventory.pitchforkScore}</div>
+                        ) : null}
                       </div>
                     )}
                   </div>
@@ -614,6 +662,90 @@ export default function GameLibraryPage() {
                           Use Genre Question
                         </Button>
                       ) : null}
+                      {selectedInventory.styles?.length ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setPrompt(`Which style best fits \\"${selectedInventory.title}\\" by ${selectedInventory.artist}?`);
+                            setAnswer(selectedInventory.styles?.[0] ?? '');
+                          }}
+                        >
+                          Use Style Question
+                        </Button>
+                      ) : null}
+                      {selectedInventory.recordingLocation ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setPrompt(`Where was \\"${selectedInventory.title}\\" recorded?`);
+                            setAnswer(selectedInventory.recordingLocation ?? '');
+                          }}
+                        >
+                          Use Recording Location Question
+                        </Button>
+                      ) : null}
+                      {selectedInventory.allmusicRating !== null && selectedInventory.allmusicRating !== undefined ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setPrompt(`What is the AllMusic rating for \\"${selectedInventory.title}\\"?`);
+                            setAnswer(String(selectedInventory.allmusicRating));
+                          }}
+                        >
+                          Use AllMusic Rating Question
+                        </Button>
+                      ) : null}
+                      {selectedInventory.pitchforkScore !== null && selectedInventory.pitchforkScore !== undefined ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setPrompt(`What is the Pitchfork score for \\"${selectedInventory.title}\\"?`);
+                            setAnswer(String(selectedInventory.pitchforkScore));
+                          }}
+                        >
+                          Use Pitchfork Score Question
+                        </Button>
+                      ) : null}
+                      {selectedInventory.awards?.length ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setPrompt(`Name an award won by \\"${selectedInventory.title}\\".`);
+                            setAnswer(selectedInventory.awards?.[0] ?? '');
+                          }}
+                        >
+                          Use Awards Question
+                        </Button>
+                      ) : null}
+                      {selectedInventory.certifications?.length ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setPrompt(`What certification did \\"${selectedInventory.title}\\" receive?`);
+                            setAnswer(selectedInventory.certifications?.[0] ?? '');
+                          }}
+                        >
+                          Use Certification Question
+                        </Button>
+                      ) : null}
+                      {selectedInventory.chartPositions?.length ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setPrompt(`What chart position is associated with \\"${selectedInventory.title}\\"?`);
+                            setAnswer(selectedInventory.chartPositions?.[0] ?? '');
+                          }}
+                        >
+                          Use Chart Position Question
+                        </Button>
+                      ) : null}
                       {selectedTrack && selectedTrack.position && (
                         <Button
                           variant="secondary"
@@ -639,6 +771,19 @@ export default function GameLibraryPage() {
                           Use Track Title Question
                         </Button>
                       )}
+                      {selectedTrack?.lyrics ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            const snippet = selectedTrack.lyrics?.split('\\n').filter(Boolean).slice(0, 2).join(' ');
+                            setPrompt(`Name the track from these lyrics: \"${snippet}\"`);
+                            setAnswer(selectedTrack.title);
+                          }}
+                        >
+                          Use Lyrics Line Question
+                        </Button>
+                      ) : null}
                     </div>
 
                     {(() => {
@@ -687,6 +832,38 @@ export default function GameLibraryPage() {
                         </div>
                       );
                     })()}
+
+                    {trackCreditOptions.length > 0 && (
+                      <div className="mt-4">
+                        <label className="text-sm font-medium text-slate-700">Track credits</label>
+                        <select
+                          value={selectedTrackCredit}
+                          onChange={(event) => setSelectedTrackCredit(event.target.value)}
+                          className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
+                        >
+                          <option value="">Select a credit</option>
+                          {trackCreditOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="mt-3"
+                          onClick={() => {
+                            if (!selectedTrackCredit || !selectedTrack) return;
+                            const [name, rolePart] = selectedTrackCredit.split(' (');
+                            const role = rolePart ? rolePart.replace(')', '') : 'credit';
+                            setPrompt(`Which ${role.toLowerCase()} appears on the track \\"${selectedTrack.title}\\"?`);
+                            setAnswer(name);
+                          }}
+                        >
+                          Use Track Credit Question
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
