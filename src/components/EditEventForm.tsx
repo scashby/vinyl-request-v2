@@ -90,8 +90,6 @@ interface EventData {
   has_queue: boolean;
   queue_types: string[];
   allowed_formats: string[];
-  has_games: boolean;
-  game_modes: string[];
   // Replaced legacy tags with Crate ID
   crate_id?: number | null;
   
@@ -197,8 +195,6 @@ function buildEventDataFromDbEvent(dbEvent: DbEvent): EventData {
     has_queue: !!dbEvent.has_queue,
     queue_types: Array.isArray(dbEvent.queue_types) ? dbEvent.queue_types : [],
     allowed_formats: normalizeStringArray(dbEvent.allowed_formats),
-    has_games: !!dbEvent.has_games,
-    game_modes: normalizeStringArray(dbEvent.game_modes),
     crate_id: dbEvent.crate_id ?? null,
     is_recurring: !!dbEvent.is_recurring,
     recurrence_pattern: dbEvent.recurrence_pattern || 'weekly',
@@ -225,8 +221,6 @@ const OVERRIDE_FIELDS: Array<{
   { key: 'has_queue', label: 'Queue Enabled' },
   { key: 'queue_types', label: 'Queue Types' },
   { key: 'allowed_formats', label: 'Allowed Formats' },
-  { key: 'has_games', label: 'Games Enabled' },
-  { key: 'game_modes', label: 'Game Modes' },
   { key: 'crate_id', label: 'Crate' },
   { key: 'is_featured_grid', label: 'Featured Grid' },
   { key: 'is_featured_upnext', label: 'Featured Up Next' },
@@ -298,8 +292,6 @@ export default function EditEventForm() {
     has_queue: false,
     queue_types: [],
     allowed_formats: [] as string[],
-    has_games: false,
-    game_modes: [],
     crate_id: null,
     is_recurring: false,
     recurrence_pattern: 'weekly',
@@ -723,8 +715,6 @@ export default function EditEventForm() {
         return normalizeArrayValue(event.queue_types ?? []);
       case 'allowed_formats':
         return normalizeArrayValue(event.allowed_formats ?? []);
-      case 'game_modes':
-        return normalizeArrayValue(event.game_modes ?? []);
       case 'crate_id':
         return event.crate_id ?? null;
       default:
