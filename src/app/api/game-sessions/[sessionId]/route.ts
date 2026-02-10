@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from 'src/lib/supabaseAdmin';
+import type { Json } from 'types/supabase';
 
 type BracketEntry = {
   id: number | null;
@@ -35,8 +36,35 @@ type GameState = {
     title?: string | null;
     artist?: string | null;
     coverImage?: string | null;
-    metadata?: unknown;
+    metadata?: Json | null;
   }>;
+};
+
+const toJsonValue = (value: unknown): Json => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => toJsonValue(item));
+  }
+  if (typeof value === 'object') {
+    const output: Record<string, Json> = {};
+    Object.entries(value as Record<string, unknown>).forEach(([key, item]) => {
+      output[key] = toJsonValue(item);
+    });
+    return output;
+  }
+  return null;
+};
+
+const serializeGameState = (state: GameState): Json => {
+  return toJsonValue({
+    activeMatchId: state.activeMatchId ?? null,
+    matches: state.matches ?? [],
+    trivia: state.trivia ?? null,
+    templateItems: state.templateItems ?? [],
+  });
 };
 
 type PatchPayload =
@@ -257,11 +285,11 @@ export async function PATCH(
     const { data: updated, error: updateError } = await supabaseAdmin
       .from('game_sessions')
       .update({
-        game_state: {
+        game_state: serializeGameState({
           ...currentState,
           matches,
           activeMatchId: matches[0]?.id ?? null,
-        },
+        }),
       })
       .eq('id', sessionId)
       .select('*')
@@ -278,10 +306,10 @@ export async function PATCH(
     const { data: updated, error: updateError } = await supabaseAdmin
       .from('game_sessions')
       .update({
-        game_state: {
+        game_state: serializeGameState({
           ...currentState,
           activeMatchId: payload.matchId,
-        },
+        }),
       })
       .eq('id', sessionId)
       .select('*')
@@ -299,10 +327,10 @@ export async function PATCH(
     const { data: updated, error: updateError } = await supabaseAdmin
       .from('game_sessions')
       .update({
-        game_state: {
+        game_state: serializeGameState({
           ...currentState,
           matches,
-        },
+        }),
       })
       .eq('id', sessionId)
       .select('*')
@@ -325,13 +353,13 @@ export async function PATCH(
     const { data: updated, error: updateError } = await supabaseAdmin
       .from('game_sessions')
       .update({
-        game_state: {
+        game_state: serializeGameState({
           ...currentState,
           trivia: {
             ...trivia,
             currentIndex: nextIndex,
           },
-        },
+        }),
       })
       .eq('id', sessionId)
       .select('*')
@@ -353,13 +381,13 @@ export async function PATCH(
     const { data: updated, error: updateError } = await supabaseAdmin
       .from('game_sessions')
       .update({
-        game_state: {
+        game_state: serializeGameState({
           ...currentState,
           trivia: {
             ...trivia,
             reveal: payload.reveal,
           },
-        },
+        }),
       })
       .eq('id', sessionId)
       .select('*')
