@@ -114,6 +114,11 @@ export default function GameLibraryPage() {
   const [coverImage, setCoverImage] = useState('');
   const [difficulty, setDifficulty] = useState('');
   const [notes, setNotes] = useState('');
+  const [answerSource, setAnswerSource] = useState('');
+  const [suggestedPrompt, setSuggestedPrompt] = useState('');
+  const [answerMeta, setAnswerMeta] = useState<Record<string, Json>>({});
+  const [bingoSlot, setBingoSlot] = useState('');
+  const [bracketSeed, setBracketSeed] = useState('');
 
   const [inventoryQuery, setInventoryQuery] = useState('');
   const [inventoryResults, setInventoryResults] = useState<InventoryResult[]>([]);
@@ -124,8 +129,6 @@ export default function GameLibraryPage() {
   const [trackResults, setTrackResults] = useState<TrackResult[]>([]);
   const [trackLoading, setTrackLoading] = useState(false);
   const [selectedTrackId, setSelectedTrackId] = useState<number | null>(null);
-  const [selectedContributor, setSelectedContributor] = useState('');
-  const [selectedTrackCredit, setSelectedTrackCredit] = useState('');
   const [derivedTags, setDerivedTags] = useState<string[]>([]);
   const [derivedGenres, setDerivedGenres] = useState<string[]>([]);
   const [derivedDecades, setDerivedDecades] = useState<string[]>([]);
@@ -135,6 +138,8 @@ export default function GameLibraryPage() {
   );
   const shouldShowTriviaFields = itemType === 'trivia-question';
   const shouldShowDifficulty = itemType === 'trivia-question';
+  const shouldShowBingoFields = itemType === 'bingo-item';
+  const shouldShowBracketFields = itemType === 'track' || itemType === 'album';
 
   const fetchItems = async (overrides?: {
     gameType?: string;
@@ -238,10 +243,13 @@ export default function GameLibraryPage() {
     setCoverImage(item.coverImage ?? '');
     setPrompt('');
     setAnswer('');
+    setAnswerSource('');
+    setSuggestedPrompt('');
+    setAnswerMeta({});
     setDifficulty('');
     setNotes('');
-    setSelectedContributor('');
-    setSelectedTrackCredit('');
+    setBingoSlot('');
+    setBracketSeed('');
     if (item.trackTitle) {
       setTitle(item.trackTitle);
     }
@@ -272,7 +280,6 @@ export default function GameLibraryPage() {
   const handleSelectTrack = (trackId: number) => {
     if (!trackId || Number.isNaN(trackId)) {
       setSelectedTrackId(null);
-      setSelectedTrackCredit('');
       return;
     }
     setSelectedTrackId(trackId);
@@ -282,7 +289,6 @@ export default function GameLibraryPage() {
     if (track.trackArtist) {
       setArtist(track.trackArtist);
     }
-    setSelectedTrackCredit('');
   };
 
   const trackCreditOptions = useMemo(() => {
@@ -300,6 +306,202 @@ export default function GameLibraryPage() {
       })
       .filter(Boolean) as string[];
   }, [selectedTrackId, trackResults]);
+
+  const contributorOptions = useMemo(() => {
+    if (!selectedInventory) return [];
+    return [
+      ...(selectedInventory.musicians ?? []).map((name) => `${name} (Musician)`),
+      ...(selectedInventory.producers ?? []).map((name) => `${name} (Producer)`),
+      ...(selectedInventory.engineers ?? []).map((name) => `${name} (Engineer)`),
+      ...(selectedInventory.songwriters ?? []).map((name) => `${name} (Songwriter)`),
+      ...(selectedInventory.composer ? [`${selectedInventory.composer} (Composer)`] : []),
+      ...(selectedInventory.conductor ? [`${selectedInventory.conductor} (Conductor)`] : []),
+      ...(selectedInventory.chorus ? [`${selectedInventory.chorus} (Chorus)`] : []),
+      ...(selectedInventory.orchestra ? [`${selectedInventory.orchestra} (Orchestra)`] : []),
+    ];
+  }, [selectedInventory]);
+
+  const answerSources = useMemo(() => {
+    if (!selectedInventory) return [];
+    const options: Array<{
+      value: string;
+      label: string;
+      answer: string;
+      prompt: string;
+      meta: Record<string, Json>;
+    }> = [];
+
+    const albumLabel = `${selectedInventory.artist} — ${selectedInventory.title}`;
+    options.push({
+      value: 'album',
+      label: 'Album title',
+      answer: selectedInventory.title,
+      prompt: `What is the album title for "${selectedInventory.artist}"?`,
+      meta: { answer_source: 'album' },
+    });
+    options.push({
+      value: 'artist',
+      label: 'Artist name',
+      answer: selectedInventory.artist,
+      prompt: `Who is the artist behind "${selectedInventory.title}"?`,
+      meta: { answer_source: 'artist' },
+    });
+    if (selectedInventory.coverImage) {
+      options.push({
+        value: 'cover_art',
+        label: 'Cover art (album)',
+        answer: albumLabel,
+        prompt: 'Which album cover is this?',
+        meta: { answer_source: 'cover_art' },
+      });
+    }
+    if (selectedInventory.releaseYear) {
+      options.push({
+        value: 'release_year',
+        label: 'Release year',
+        answer: String(selectedInventory.releaseYear),
+        prompt: `What year was "${selectedInventory.title}" released?`,
+        meta: { answer_source: 'release_year', release_year: selectedInventory.releaseYear },
+      });
+    }
+    if (selectedInventory.label) {
+      options.push({
+        value: 'label',
+        label: 'Label',
+        answer: selectedInventory.label,
+        prompt: `Which label released "${selectedInventory.title}"?`,
+        meta: { answer_source: 'label', label: selectedInventory.label },
+      });
+    }
+    if (selectedInventory.catalogNumber) {
+      options.push({
+        value: 'catalog_number',
+        label: 'Catalog number',
+        answer: selectedInventory.catalogNumber,
+        prompt: `What catalog number is associated with "${selectedInventory.title}"?`,
+        meta: { answer_source: 'catalog_number', catalog_number: selectedInventory.catalogNumber },
+      });
+    }
+    if (selectedInventory.genres?.length) {
+      options.push({
+        value: 'genre',
+        label: 'Genre',
+        answer: selectedInventory.genres[0],
+        prompt: `Which genre best fits "${selectedInventory.title}"?`,
+        meta: { answer_source: 'genre', genre: selectedInventory.genres[0] },
+      });
+    }
+    if (selectedInventory.styles?.length) {
+      options.push({
+        value: 'style',
+        label: 'Style',
+        answer: selectedInventory.styles[0],
+        prompt: `Which style best fits "${selectedInventory.title}"?`,
+        meta: { answer_source: 'style', style: selectedInventory.styles[0] },
+      });
+    }
+    if (selectedInventory.recordingLocation) {
+      options.push({
+        value: 'recording_location',
+        label: 'Recording location',
+        answer: selectedInventory.recordingLocation,
+        prompt: `Where was "${selectedInventory.title}" recorded?`,
+        meta: { answer_source: 'recording_location', recording_location: selectedInventory.recordingLocation },
+      });
+    }
+    if (selectedInventory.awards?.length) {
+      options.push({
+        value: 'award',
+        label: 'Award',
+        answer: selectedInventory.awards[0],
+        prompt: `Name an award won by "${selectedInventory.title}".`,
+        meta: { answer_source: 'award', award: selectedInventory.awards[0] },
+      });
+    }
+    if (selectedInventory.certifications?.length) {
+      options.push({
+        value: 'certification',
+        label: 'Certification',
+        answer: selectedInventory.certifications[0],
+        prompt: `What certification did "${selectedInventory.title}" receive?`,
+        meta: { answer_source: 'certification', certification: selectedInventory.certifications[0] },
+      });
+    }
+    if (selectedInventory.chartPositions?.length) {
+      options.push({
+        value: 'chart_position',
+        label: 'Chart position',
+        answer: selectedInventory.chartPositions[0],
+        prompt: `What chart position is associated with "${selectedInventory.title}"?`,
+        meta: { answer_source: 'chart_position', chart_position: selectedInventory.chartPositions[0] },
+      });
+    }
+    if (selectedInventory.allmusicRating !== null && selectedInventory.allmusicRating !== undefined) {
+      options.push({
+        value: 'allmusic_rating',
+        label: 'AllMusic rating',
+        answer: String(selectedInventory.allmusicRating),
+        prompt: `What is the AllMusic rating for "${selectedInventory.title}"?`,
+        meta: { answer_source: 'allmusic_rating', allmusic_rating: selectedInventory.allmusicRating },
+      });
+    }
+    if (selectedInventory.pitchforkScore !== null && selectedInventory.pitchforkScore !== undefined) {
+      options.push({
+        value: 'pitchfork_score',
+        label: 'Pitchfork score',
+        answer: String(selectedInventory.pitchforkScore),
+        prompt: `What is the Pitchfork score for "${selectedInventory.title}"?`,
+        meta: { answer_source: 'pitchfork_score', pitchfork_score: selectedInventory.pitchforkScore },
+      });
+    }
+    if (selectedTrack) {
+      options.push({
+        value: 'track_title',
+        label: 'Track title',
+        answer: selectedTrack.title,
+        prompt: `Name the track from "${selectedInventory.title}".`,
+        meta: { answer_source: 'track_title', track_title: selectedTrack.title },
+      });
+      if (selectedTrack.position) {
+        const sideLabel = selectedTrack.side ? `${selectedTrack.side} ` : '';
+        options.push({
+          value: 'track_position',
+          label: 'Track position',
+          answer: selectedTrack.title,
+          prompt: `Which track is on ${sideLabel}${selectedTrack.position}?`,
+          meta: { answer_source: 'track_position', track_position: selectedTrack.position },
+        });
+      }
+    }
+    if (contributorOptions.length) {
+      contributorOptions.forEach((option) => {
+        const [name, rolePart] = option.split(' (');
+        const role = rolePart ? rolePart.replace(')', '') : 'Contributor';
+        options.push({
+          value: `contributor:${option}`,
+          label: `Contributor · ${option}`,
+          answer: name,
+          prompt: `Which ${role.toLowerCase()} appears on "${selectedInventory.title}" by ${selectedInventory.artist}?`,
+          meta: { answer_source: 'contributor', contributor: option },
+        });
+      });
+    }
+    if (trackCreditOptions.length) {
+      trackCreditOptions.forEach((option) => {
+        const [name, rolePart] = option.split(' (');
+        const role = rolePart ? rolePart.replace(')', '') : 'credit';
+        options.push({
+          value: `track_credit:${option}`,
+          label: `Track credit · ${option}`,
+          answer: name,
+          prompt: `Which ${role.toLowerCase()} appears on the track "${selectedTrack?.title ?? ''}"?`,
+          meta: { answer_source: 'track_credit', track_credit: option },
+        });
+      });
+    }
+
+    return options.filter((option) => option.answer?.trim());
+  }, [selectedInventory, selectedTrack, contributorOptions, trackCreditOptions]);
 
   const handleCreate = async () => {
     setStatus('');
@@ -321,8 +523,9 @@ export default function GameLibraryPage() {
       track_title: selectedTrack?.title ?? selectedInventory?.trackTitle ?? undefined,
       genre: selectedInventory?.genres?.[0] ?? undefined,
       style: selectedInventory?.styles?.[0] ?? undefined,
-      contributor: selectedContributor || undefined,
-      track_credit: selectedTrackCredit || undefined,
+      bingo_slot: shouldShowBingoFields && bingoSlot ? Number(bingoSlot) : undefined,
+      seed: shouldShowBracketFields && bracketSeed ? Number(bracketSeed) : undefined,
+      ...answerMeta,
     });
 
     const response = await fetch('/api/game-library', {
@@ -358,8 +561,11 @@ export default function GameLibraryPage() {
     setCoverImage('');
     setDifficulty('');
     setNotes('');
-    setSelectedContributor('');
-    setSelectedTrackCredit('');
+    setAnswerSource('');
+    setSuggestedPrompt('');
+    setAnswerMeta({});
+    setBingoSlot('');
+    setBracketSeed('');
     setDerivedTags([]);
     setDerivedGenres([]);
     setDerivedDecades([]);
@@ -463,14 +669,41 @@ export default function GameLibraryPage() {
                 <p className="mt-2 text-xs text-slate-500">
                   Item types are filtered by the selected game type.
                 </p>
+                </div>
               </div>
-              </div>
+
+              {shouldShowTriviaFields && (
+                <div>
+                  <label className="text-sm font-medium text-slate-700">Step 1 · Write the trivia question</label>
+                  <textarea
+                    value={prompt}
+                    onChange={(event) => setPrompt(event.target.value)}
+                    rows={3}
+                    className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
+                    placeholder="Name the sample, identify the artist, etc."
+                  />
+                </div>
+              )}
+
+              {shouldShowTriviaFields && (
+                <div>
+                  <label className="text-sm font-medium text-slate-700">Answer</label>
+                  <input
+                    value={answer}
+                    onChange={(event) => setAnswer(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
+                    placeholder="Correct answer or response"
+                  />
+                </div>
+              )}
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-800">Pull from collection</h3>
-                  <p className="text-xs text-slate-500">Search by artist, album, or track to auto-fill details.</p>
+                    <h3 className="text-sm font-semibold text-slate-800">
+                      {shouldShowTriviaFields ? 'Step 2 · Choose from your collection' : 'Choose from your collection'}
+                    </h3>
+                    <p className="text-xs text-slate-500">Search by artist, album, or track and select the correct record.</p>
                   </div>
                   {selectedInventory && (
                     <Button
@@ -622,245 +855,45 @@ export default function GameLibraryPage() {
                   </div>
                 )}
 
-                {selectedInventory && (
+                {selectedInventory && shouldShowTriviaFields && (
                   <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-                    <div className="text-xs uppercase tracking-widest text-slate-500">Trivia Builder</div>
-                    <div className="mt-3 grid gap-3">
-                      {selectedInventory.coverImage && (
+                    <div className="text-xs uppercase tracking-widest text-slate-500">Step 3 · Choose the answer data</div>
+                    <label className="mt-3 text-sm font-medium text-slate-700 block">Answer source</label>
+                    <select
+                      value={answerSource}
+                      onChange={(event) => {
+                        const next = event.target.value;
+                        setAnswerSource(next);
+                        const option = answerSources.find((entry) => entry.value === next);
+                        if (option) {
+                          setAnswer(option.answer);
+                          setSuggestedPrompt(option.prompt);
+                          setAnswerMeta(option.meta);
+                        } else {
+                          setSuggestedPrompt('');
+                          setAnswerMeta({});
+                        }
+                      }}
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
+                    >
+                      <option value="">Select what the answer should be</option>
+                      {answerSources.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    {suggestedPrompt && (
+                      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                        <div className="font-semibold text-slate-700">Suggested prompt</div>
+                        <div className="mt-1">{suggestedPrompt}</div>
                         <Button
-                          variant="secondary"
                           size="sm"
-                          onClick={() => {
-                            setPrompt('Which album cover is this?');
-                            setAnswer(`${selectedInventory.artist} — ${selectedInventory.title}`);
-                          }}
-                        >
-                          Use Cover Art Question
-                        </Button>
-                      )}
-                      {selectedInventory.releaseYear && (
-                        <Button
                           variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            setPrompt(`What year was \\"${selectedInventory.title}\\" released?`);
-                            setAnswer(String(selectedInventory.releaseYear));
-                          }}
+                          className="mt-2"
+                          onClick={() => setPrompt(suggestedPrompt)}
                         >
-                          Use Release Year Question
-                        </Button>
-                      )}
-                      {selectedInventory.genres?.length ? (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            setPrompt(`Which genre best fits \\"${selectedInventory.title}\\" by ${selectedInventory.artist}?`);
-                            setAnswer(selectedInventory.genres?.[0] ?? '');
-                          }}
-                        >
-                          Use Genre Question
-                        </Button>
-                      ) : null}
-                      {selectedInventory.styles?.length ? (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            setPrompt(`Which style best fits \\"${selectedInventory.title}\\" by ${selectedInventory.artist}?`);
-                            setAnswer(selectedInventory.styles?.[0] ?? '');
-                          }}
-                        >
-                          Use Style Question
-                        </Button>
-                      ) : null}
-                      {selectedInventory.recordingLocation ? (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            setPrompt(`Where was \\"${selectedInventory.title}\\" recorded?`);
-                            setAnswer(selectedInventory.recordingLocation ?? '');
-                          }}
-                        >
-                          Use Recording Location Question
-                        </Button>
-                      ) : null}
-                      {selectedInventory.allmusicRating !== null && selectedInventory.allmusicRating !== undefined ? (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            setPrompt(`What is the AllMusic rating for \\"${selectedInventory.title}\\"?`);
-                            setAnswer(String(selectedInventory.allmusicRating));
-                          }}
-                        >
-                          Use AllMusic Rating Question
-                        </Button>
-                      ) : null}
-                      {selectedInventory.pitchforkScore !== null && selectedInventory.pitchforkScore !== undefined ? (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            setPrompt(`What is the Pitchfork score for \\"${selectedInventory.title}\\"?`);
-                            setAnswer(String(selectedInventory.pitchforkScore));
-                          }}
-                        >
-                          Use Pitchfork Score Question
-                        </Button>
-                      ) : null}
-                      {selectedInventory.awards?.length ? (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            setPrompt(`Name an award won by \\"${selectedInventory.title}\\".`);
-                            setAnswer(selectedInventory.awards?.[0] ?? '');
-                          }}
-                        >
-                          Use Awards Question
-                        </Button>
-                      ) : null}
-                      {selectedInventory.certifications?.length ? (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            setPrompt(`What certification did \\"${selectedInventory.title}\\" receive?`);
-                            setAnswer(selectedInventory.certifications?.[0] ?? '');
-                          }}
-                        >
-                          Use Certification Question
-                        </Button>
-                      ) : null}
-                      {selectedInventory.chartPositions?.length ? (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            setPrompt(`What chart position is associated with \\"${selectedInventory.title}\\"?`);
-                            setAnswer(selectedInventory.chartPositions?.[0] ?? '');
-                          }}
-                        >
-                          Use Chart Position Question
-                        </Button>
-                      ) : null}
-                      {selectedTrack && selectedTrack.position && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            const sideLabel = selectedTrack.side ? `${selectedTrack.side} ` : '';
-                            setPrompt(`Which track is on ${sideLabel}${selectedTrack.position}?`);
-                            setAnswer(selectedTrack.title);
-                          }}
-                        >
-                          Use Track Position Question
-                        </Button>
-                      )}
-                      {selectedTrack && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            setPrompt(`Name the track from \\"${selectedInventory.title}\\" by ${selectedInventory.artist}.`);
-                            setAnswer(selectedTrack.title);
-                          }}
-                        >
-                          Use Track Title Question
-                        </Button>
-                      )}
-                      {selectedTrack?.lyrics ? (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            const snippet = selectedTrack.lyrics?.split('\\n').filter(Boolean).slice(0, 2).join(' ');
-                            setPrompt(`Name the track from these lyrics: \"${snippet}\"`);
-                            setAnswer(selectedTrack.title);
-                          }}
-                        >
-                          Use Lyrics Line Question
-                        </Button>
-                      ) : null}
-                    </div>
-
-                    {(() => {
-                      const contributorOptions = [
-                        ...(selectedInventory.musicians ?? []).map((name) => `${name} (Musician)`),
-                        ...(selectedInventory.producers ?? []).map((name) => `${name} (Producer)`),
-                        ...(selectedInventory.engineers ?? []).map((name) => `${name} (Engineer)`),
-                        ...(selectedInventory.songwriters ?? []).map((name) => `${name} (Songwriter)`),
-                        ...(selectedInventory.composer ? [`${selectedInventory.composer} (Composer)`] : []),
-                        ...(selectedInventory.conductor ? [`${selectedInventory.conductor} (Conductor)`] : []),
-                        ...(selectedInventory.chorus ? [`${selectedInventory.chorus} (Chorus)`] : []),
-                        ...(selectedInventory.orchestra ? [`${selectedInventory.orchestra} (Orchestra)`] : []),
-                      ];
-
-                      if (contributorOptions.length === 0) return null;
-
-                      return (
-                        <div className="mt-4">
-                          <label className="text-sm font-medium text-slate-700">Contributor</label>
-                          <select
-                            value={selectedContributor}
-                            onChange={(event) => setSelectedContributor(event.target.value)}
-                            className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
-                          >
-                            <option value="">Select a contributor</option>
-                            {contributorOptions.map((option) => (
-                              <option key={option} value={option}>
-                                {option}
-                              </option>
-                            ))}
-                          </select>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="mt-3"
-                            onClick={() => {
-                              if (!selectedContributor) return;
-                              const [name, rolePart] = selectedContributor.split(' (');
-                              const role = rolePart ? rolePart.replace(')', '') : 'musician';
-                              setPrompt(`Which ${role.toLowerCase()} appears on \\"${selectedInventory.title}\\" by ${selectedInventory.artist}?`);
-                              setAnswer(name);
-                            }}
-                          >
-                            Use Contributor Question
-                          </Button>
-                        </div>
-                      );
-                    })()}
-
-                    {trackCreditOptions.length > 0 && (
-                      <div className="mt-4">
-                        <label className="text-sm font-medium text-slate-700">Track credits</label>
-                        <select
-                          value={selectedTrackCredit}
-                          onChange={(event) => setSelectedTrackCredit(event.target.value)}
-                          className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
-                        >
-                          <option value="">Select a credit</option>
-                          {trackCreditOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="mt-3"
-                          onClick={() => {
-                            if (!selectedTrackCredit || !selectedTrack) return;
-                            const [name, rolePart] = selectedTrackCredit.split(' (');
-                            const role = rolePart ? rolePart.replace(')', '') : 'credit';
-                            setPrompt(`Which ${role.toLowerCase()} appears on the track \\"${selectedTrack.title}\\"?`);
-                            setAnswer(name);
-                          }}
-                        >
-                          Use Track Credit Question
+                          Use suggested prompt
                         </Button>
                       </div>
                     )}
@@ -868,27 +901,37 @@ export default function GameLibraryPage() {
                 )}
               </div>
 
-              {shouldShowTriviaFields && (
+              {shouldShowBingoFields && (
                 <div>
-                  <label className="text-sm font-medium text-slate-700">Prompt</label>
-                  <textarea
-                    value={prompt}
-                    onChange={(event) => setPrompt(event.target.value)}
-                    rows={3}
+                  <label className="text-sm font-medium text-slate-700">Bingo slot (optional)</label>
+                  <select
+                    value={bingoSlot}
+                    onChange={(event) => setBingoSlot(event.target.value)}
                     className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
-                    placeholder="Name the sample, identify the artist, etc."
-                  />
+                  >
+                    <option value="">No fixed slot</option>
+                    {Array.from({ length: 25 }, (_, index) => index + 1).map((slot) => (
+                      <option key={slot} value={slot} disabled={slot === 13}>
+                        {slot === 13 ? '13 · Free space' : `Slot ${slot}`}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Slot 13 is the free space. This is used when building a fixed bingo template.
+                  </p>
                 </div>
               )}
 
-              {shouldShowTriviaFields && (
+              {shouldShowBracketFields && (
                 <div>
-                  <label className="text-sm font-medium text-slate-700">Answer</label>
+                  <label className="text-sm font-medium text-slate-700">Seed (optional)</label>
                   <input
-                    value={answer}
-                    onChange={(event) => setAnswer(event.target.value)}
+                    value={bracketSeed}
+                    onChange={(event) => setBracketSeed(event.target.value)}
+                    type="number"
+                    min={1}
                     className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
-                    placeholder="Correct answer or response"
+                    placeholder="1 = highest seed"
                   />
                 </div>
               )}
