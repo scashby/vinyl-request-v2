@@ -18,6 +18,16 @@ type TemplateItem = {
   artist: string;
   side: string | null;
   position: string | null;
+  sort_order?: number | null;
+};
+
+type SearchResult = {
+  inventory_id: number;
+  recording_id: number | null;
+  title: string;
+  artist: string;
+  side: string | null;
+  position: string | null;
 };
 
 export default function Page() {
@@ -28,6 +38,9 @@ export default function Page() {
   const [name, setName] = useState("");
   const [setlistMode, setSetlistMode] = useState(false);
   const [isWorking, setIsWorking] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const templateId = Number(params.id);
 
@@ -84,12 +97,73 @@ export default function Page() {
     }
   };
 
+  const handleMoveItem = async (itemId: number, direction: "up" | "down") => {
+    const index = items.findIndex((item) => item.id === itemId);
+    if (index === -1) return;
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= items.length) return;
+
+    const currentItem = items[index];
+    const targetItem = items[targetIndex];
+
+    setIsWorking(true);
+    try {
+      await fetch(`/api/game-template-items/${currentItem.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sortOrder: targetItem.sort_order ?? targetIndex + 1 }),
+      });
+      await fetch(`/api/game-template-items/${targetItem.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sortOrder: currentItem.sort_order ?? index + 1 }),
+      });
+      await loadTemplate();
+    } finally {
+      setIsWorking(false);
+    }
+  };
+
   const handleDeleteTemplate = async () => {
     if (!confirm("Delete this playlist?")) return;
     setIsWorking(true);
     try {
       await fetch(`/api/game-templates/${templateId}`, { method: "DELETE" });
       router.push("/admin/games/bingo/templates");
+    } finally {
+      setIsWorking(false);
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) return;
+    setIsSearching(true);
+    try {
+      const response = await fetch(`/api/vinyl-search?q=${encodeURIComponent(searchTerm)}`);
+      const payload = await response.json();
+      setSearchResults(payload.data ?? []);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleAddTrack = async (result: SearchResult) => {
+    setIsWorking(true);
+    try {
+      await fetch("/api/game-template-items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          templateId,
+          inventoryId: result.inventory_id,
+          recordingId: result.recording_id,
+          title: result.title,
+          artist: result.artist,
+          side: result.side,
+          position: result.position,
+        }),
+      });
+      await loadTemplate();
     } finally {
       setIsWorking(false);
     }
@@ -165,7 +239,7 @@ export default function Page() {
           {items.length === 0 ? (
             <p className="text-sm text-gray-500">No tracks in this playlist.</p>
           ) : (
-            items.map((item) => (
+            items.map((item, index) => (
               <div
                 key={item.id}
                 className="flex flex-wrap items-center justify-between gap-3 border border-gray-200 rounded-xl px-4 py-3"
@@ -178,6 +252,24 @@ export default function Page() {
                   <div className="text-xs text-gray-500">
                     {item.side ? `Side ${item.side}` : ""} {item.position ?? ""}
                   </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleMoveItem(item.id, "up")}
+                      disabled={isWorking || index === 0}
+                    >
+                      Up
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleMoveItem(item.id, "down")}
+                      disabled={isWorking || index === items.length - 1}
+                    >
+                      Down
+                    </Button>
+                  </div>
                   <Button
                     variant="secondary"
                     size="sm"
@@ -187,6 +279,45 @@ export default function Page() {
                     Remove
                   </Button>
                 </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      <section className="border border-gray-200 rounded-2xl p-5 bg-white shadow-sm mt-6">
+        <h2 className="text-lg font-semibold text-gray-900">Add Tracks</h2>
+        <p className="text-sm text-gray-500 mt-2">Search your vinyl collection and add tracks.</p>
+        <div className="flex flex-wrap gap-3 mt-4">
+          <input
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Search by song or artist..."
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-[200px]"
+          />
+          <Button size="sm" onClick={handleSearch} disabled={isSearching || !searchTerm.trim()}>
+            Search
+          </Button>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          {isSearching ? (
+            <p className="text-sm text-gray-500">Searching...</p>
+          ) : searchResults.length === 0 ? (
+            <p className="text-sm text-gray-500">No results yet.</p>
+          ) : (
+            searchResults.map((result, index) => (
+              <div
+                key={`${result.recording_id ?? "track"}-${index}`}
+                className="flex flex-wrap items-center justify-between gap-3 border border-gray-200 rounded-xl px-4 py-3"
+              >
+                <div>
+                  <div className="text-sm font-semibold text-gray-900">{result.title}</div>
+                  <div className="text-xs text-gray-500">{result.artist}</div>
+                </div>
+                <Button size="sm" onClick={() => handleAddTrack(result)} disabled={isWorking}>
+                  Add
+                </Button>
               </div>
             ))
           )}

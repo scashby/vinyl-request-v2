@@ -184,6 +184,34 @@ export default function Page() {
     doc.save("music-bingo-pick-list.pdf");
   };
 
+  const handleDownloadSessionCards = async () => {
+    if (!session) return;
+    const response = await fetch(`/api/game-cards?sessionId=${session.id}`);
+    const payload = await response.json();
+    const cards = (payload.data ?? []).map((card: any) => ({
+      index: card.card_number,
+      cells: card.grid,
+    }));
+    const { generateBingoCardsPdf } = await import("src/lib/bingoPdf");
+    const doc = generateBingoCardsPdf(cards, `Music Bingo Session ${session.id}`);
+    doc.save(`music-bingo-session-${session.id}-cards.pdf`);
+  };
+
+  const handleDownloadSessionPickListPdf = async () => {
+    if (!session) return;
+    const response = await fetch(`/api/game-sessions/${session.id}`);
+    const payload = await response.json();
+    const picks = payload.data?.picks ?? [];
+    const items = picks.map((pick: any) => ({
+      id: String(pick.id),
+      title: pick.game_template_items?.title ?? "",
+      artist: pick.game_template_items?.artist ?? "",
+    }));
+    const { generatePickListPdf } = await import("src/lib/pickListPdf");
+    const doc = generatePickListPdf(items, `Music Bingo Session ${session.id} Pick List`);
+    doc.save(`music-bingo-session-${session.id}-pick-list.pdf`);
+  };
+
   return (
     <Container size="md" className="py-8 min-h-screen">
       <div className="flex items-start justify-between gap-6 mb-8">
@@ -350,6 +378,26 @@ export default function Page() {
             >
               Create Session
             </Button>
+            {session && (
+              <div className="mt-3 flex flex-col gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  fullWidth
+                  onClick={handleDownloadSessionCards}
+                >
+                  Download Session Cards
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  fullWidth
+                  onClick={handleDownloadSessionPickListPdf}
+                >
+                  Session Pick List PDF
+                </Button>
+              </div>
+            )}
           </section>
         </aside>
       </div>

@@ -9,6 +9,7 @@ import {
   type EventSubtypeConfig,
   type EventTypeConfig,
   type EventTypeConfigState,
+  mergeEventTypeConfig,
 } from "src/lib/eventTypeConfig";
 
 const SETTINGS_KEY = "event_type_config";
@@ -20,6 +21,7 @@ const ALL_TEMPLATE_FIELDS = [
   "info",
   "info_url",
   "queue",
+  "games",
   "recurrence",
   "crate",
   "formats",
@@ -32,6 +34,7 @@ const FIELD_OPTIONS = [
   { id: "info", label: "Description" },
   { id: "info_url", label: "Link" },
   { id: "queue", label: "Queue" },
+  { id: "games", label: "Games" },
   { id: "recurrence", label: "Recurrence" },
   { id: "crate", label: "Crate restriction" },
   { id: "formats", label: "Allowed formats" },
@@ -266,8 +269,9 @@ export default function Page() {
           return;
         }
 
-        const nextConfig = data?.value ? JSON.parse(data.value) : defaultEventTypeConfig;
-        const normalizedConfig = normalizeConfigState(nextConfig);
+        const incomingConfig = data?.value ? JSON.parse(data.value) : defaultEventTypeConfig;
+        const mergedConfig = mergeEventTypeConfig(defaultEventTypeConfig, incomingConfig);
+        const normalizedConfig = normalizeConfigState(mergedConfig);
         setConfig(normalizedConfig);
         setInitialConfig(normalizedConfig);
       } catch (err) {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Container } from "components/ui/Container";
 import { Button } from "components/ui/Button";
+import { useSearchParams } from "next/navigation";
 
 type GameSession = {
   id: number;
@@ -12,16 +13,20 @@ type GameSession = {
 
 export default function Page() {
   const [session, setSession] = useState<GameSession | null>(null);
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     const load = async () => {
-      const response = await fetch("/api/game-sessions");
+      const eventId = searchParams.get("eventId");
+      const response = await fetch(
+        eventId ? `/api/game-sessions?eventId=${eventId}` : "/api/game-sessions"
+      );
       const payload = await response.json();
       const latest = payload.data?.[0] ?? null;
       setSession(latest);
     };
     void load();
-  }, []);
+  }, [searchParams]);
 
   const joinUrl = session?.game_code ? `/join/${session.game_code}` : null;
 

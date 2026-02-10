@@ -78,9 +78,30 @@ export const defaultEventTypeConfig: EventTypeConfigState = {
       description: 'Off-site DJ events with public details.',
     },
     {
+      id: 'music-bingo',
+      label: 'Music Bingo',
+      description: 'Vinyl-only Music Bingo nights.',
+      template_fields: [
+        'date',
+        'time',
+        'location',
+        'image_url',
+        'info',
+        'info_url',
+        'games',
+        'recurrence',
+        'crate',
+        'formats'
+      ],
+      defaults: {
+        allowed_formats: ['Vinyl'],
+        has_queue: false,
+      },
+    },
+    {
       id: 'private-dj',
       label: 'Private DJ Event',
-      description: 'Displays publicly as “Private Event.”',
+      description: 'Displays publicly as "Private Event."',
     },
     {
       id: 'other',
@@ -88,5 +109,19 @@ export const defaultEventTypeConfig: EventTypeConfigState = {
       description: 'General appearances or non-DJ events.',
     },
   ],
+};
+
+export const mergeEventTypeConfig = (
+  base: EventTypeConfigState,
+  incoming: EventTypeConfigState
+): EventTypeConfigState => {
+  const incomingMap = new Map(incoming.types.map((type) => [type.id, type]));
+  const mergedTypes = base.types.map((type) => incomingMap.get(type.id) ?? type);
+  for (const type of incoming.types) {
+    if (!mergedTypes.find((existing) => existing.id === type.id)) {
+      mergedTypes.push(type);
+    }
+  }
+  return { types: mergedTypes };
 };
 // AUDIT: inspected, no changes.

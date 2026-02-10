@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
-import { buildPickList, BingoItem } from "src/lib/bingo";
+import { buildPickList, buildBingoCards, BingoItem } from "src/lib/bingo";
 import { generateGameCode } from "src/lib/gameCode";
 
 type CreateSessionPayload = {
@@ -30,11 +30,20 @@ const insertSession = async (payload: CreateSessionPayload, gameCode: string) =>
     .single();
 };
 
-export async function GET() {
-  const { data, error } = await supabaseAdmin
-    .from("game_sessions")
-    .select("*")
-    .order("created_at", { ascending: false });
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const eventId = searchParams.get("eventId");
+
+  let query = supabaseAdmin.from("game_sessions").select("*");
+  if (eventId) {
+    const id = Number(eventId);
+    if (!id || Number.isNaN(id)) {
+      return NextResponse.json({ error: "Invalid eventId." }, { status: 400 });
+    }
+    query = query.eq("event_id", id);
+  }
+
+  const { data, error } = await query.order("created_at", { ascending: false });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -110,11 +119,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: picksError.message }, { status: 500 });
   }
 
+  const cards = buildBingoCards(items, payload.cardCount ?? 40, payload.variant === "standard" ? "standard" : payload.variant === "death" ? "death" : "blackout");
+  const cardsPayload = cards.map((card) => ({
+    session_id: sessionInsert.data.id,
+    card_number: card.index,
+    has_free_space: payload.variant === "standard",
+    grid: card.cells,
+  }));
+
+  const { error: cardsError } = await supabaseAdmin
+    .from("game_cards")
+    .insert(cardsPayload);
+
+  if (cardsError) {
+    return NextResponse.json({ error: cardsError.message }, { status: 500 });
+  }
+
   return NextResponse.json(
     {
       data: {
         session: sessionInsert.data,
         pickCount: pickList.length,
+        cardCount: cards.length,
       },
     },
     { status: 201 }

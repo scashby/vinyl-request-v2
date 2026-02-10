@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Container } from "components/ui/Container";
 import { Button } from "components/ui/Button";
+import { useSearchParams } from "next/navigation";
 
 type PickItem = {
   id: number;
@@ -26,9 +27,13 @@ export default function Page() {
   const [picks, setPicks] = useState<PickItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isWorking, setIsWorking] = useState(false);
+  const searchParams = useSearchParams();
 
   const loadLatestSession = async () => {
-    const response = await fetch("/api/game-sessions");
+    const eventId = searchParams.get("eventId");
+    const response = await fetch(
+      eventId ? `/api/game-sessions?eventId=${eventId}` : "/api/game-sessions"
+    );
     const payload = await response.json();
     const latest = payload.data?.[0] ?? null;
     setSession(latest);
@@ -41,7 +46,7 @@ export default function Page() {
 
   useEffect(() => {
     void loadLatestSession();
-  }, []);
+  }, [searchParams]);
 
   const currentPick = picks[currentIndex];
   const currentItem = currentPick?.game_template_items;
