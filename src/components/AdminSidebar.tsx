@@ -223,6 +223,23 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
             </div>
           </div>
 
+          {/* Games */}
+          <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+            <h4 className="text-sm font-semibold text-slate-800 mb-2">🎲 Games</h4>
+            <div className="space-y-2">
+              <Link
+                href="/admin/games"
+                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+                  pathname === "/admin/games"
+                    ? "bg-slate-700 text-white"
+                    : "bg-slate-600 text-white hover:bg-slate-700"
+                }`}
+              >
+                🎵 Music Games
+              </Link>
+            </div>
+          </div>
+
           {/* Content */}
           <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
             <h4 className="text-sm font-semibold text-green-800 mb-2">📝 Content</h4>
