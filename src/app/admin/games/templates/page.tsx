@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Button } from 'components/ui/Button';
 import { Card } from 'components/ui/Card';
@@ -59,8 +59,9 @@ export default function GameTemplatesPage() {
   const [genreFilter, setGenreFilter] = useState('');
   const [decadeFilter, setDecadeFilter] = useState('');
 
-  const availableItemTypes = ITEM_TYPE_OPTIONS.filter((option) =>
-    option.gameTypes.includes(gameType)
+  const availableItemTypes = useMemo(
+    () => ITEM_TYPE_OPTIONS.filter((option) => option.gameTypes.includes(gameType)),
+    [gameType]
   );
 
   const selectedItems = useMemo(
@@ -76,14 +77,11 @@ export default function GameTemplatesPage() {
     }
   };
 
-  const loadItems = async () => {
+  const fetchItems = useCallback(async () => {
+    if (!itemType) return;
     const params = new URLSearchParams();
     params.set('gameType', gameType);
-    if (itemType) {
-      params.set('itemType', itemType);
-    } else if (availableItemTypes.length === 1) {
-      params.set('itemType', availableItemTypes[0].value);
-    }
+    params.set('itemType', itemType);
     if (query.trim()) params.set('q', query.trim());
     if (tagFilter.trim()) params.set('tags', tagFilter.trim());
     if (genreFilter.trim()) params.set('genres', genreFilter.trim());
@@ -94,48 +92,24 @@ export default function GameTemplatesPage() {
     if (response.ok) {
       setItems(result.data as LibraryItem[]);
     }
-  };
+  }, [decadeFilter, gameType, genreFilter, itemType, query, tagFilter]);
 
   useEffect(() => {
     loadTemplates();
   }, []);
 
   useEffect(() => {
-    setSelectedIds([]);
     const nextItemType = availableItemTypes[0]?.value ?? '';
-    setItemType((prev) => (prev && availableItemTypes.some((opt) => opt.value === prev) ? prev : nextItemType));
+    setItemType((prev) => {
+      if (prev && availableItemTypes.some((opt) => opt.value === prev)) return prev;
+      return nextItemType;
+    });
+    setSelectedIds([]);
+  }, [gameType, availableItemTypes]);
 
-    const fetchForFilters = async () => {
-      const params = new URLSearchParams();
-      params.set('gameType', gameType);
-      const activeItemType =
-        itemType && availableItemTypes.some((opt) => opt.value === itemType)
-          ? itemType
-          : nextItemType;
-      if (activeItemType) {
-        params.set('itemType', activeItemType);
-      }
-      if (query.trim()) params.set('q', query.trim());
-      if (tagFilter.trim()) params.set('tags', tagFilter.trim());
-      if (genreFilter.trim()) params.set('genres', genreFilter.trim());
-      if (decadeFilter.trim()) params.set('decades', decadeFilter.trim());
-      const response = await fetch(`/api/game-library?${params.toString()}`);
-      const result = await response.json();
-      if (response.ok) {
-        setItems(result.data as LibraryItem[]);
-      }
-    };
-
-    fetchForFilters();
-  }, [
-    gameType,
-    itemType,
-    query,
-    tagFilter,
-    genreFilter,
-    decadeFilter,
-    availableItemTypes,
-  ]);
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
 
   const toggleSelection = (id: number) => {
     setSelectedIds((prev) =>
@@ -296,7 +270,7 @@ export default function GameTemplatesPage() {
                   />
                 </div>
                 <div className="mt-3 flex gap-2">
-                  <Button size="sm" onClick={loadItems}>Apply Filters</Button>
+                  <Button size="sm" onClick={fetchItems}>Apply Filters</Button>
                   <Button
                     variant="secondary"
                     size="sm"
@@ -305,7 +279,7 @@ export default function GameTemplatesPage() {
                       setTagFilter('');
                       setGenreFilter('');
                       setDecadeFilter('');
-                      loadItems();
+                      fetchItems();
                     }}
                   >
                     Clear
