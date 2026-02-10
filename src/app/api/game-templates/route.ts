@@ -75,9 +75,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  if (itemIds.length > 0 && data) {
+  const createdTemplate = data as TemplateInsert & { id: number } | null;
+
+  if (itemIds.length > 0 && createdTemplate) {
     const templateItems: TemplateItemInsert[] = itemIds.map((itemId, index) => ({
-      template_id: data.id,
+      template_id: createdTemplate.id,
       library_item_id: itemId,
       position: itemPositions[String(itemId)] ?? index + 1,
       metadata: {},
