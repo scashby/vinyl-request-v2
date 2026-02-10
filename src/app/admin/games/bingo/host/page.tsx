@@ -1,25 +1,88 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Container } from "components/ui/Container";
 import { Button } from "components/ui/Button";
 
-const playlist = [
-  { id: "1", title: "I Want Candy", artist: "Bow Wow Wow" },
-  { id: "2", title: "Jessie's Girl", artist: "Rick Springfield" },
-  { id: "3", title: "Rock Me Amadeus", artist: "Falco" },
-  { id: "4", title: "It's the End of the World", artist: "R.E.M." },
-  { id: "5", title: "Working for the Weekend", artist: "Loverboy" },
-];
+type PickItem = {
+  id: number;
+  pick_index: number;
+  called_at: string | null;
+  game_template_items: {
+    id: number;
+    title: string;
+    artist: string;
+  } | null;
+};
+
+type Session = {
+  id: number;
+  game_code: string | null;
+  status: string;
+};
 
 export default function Page() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [picks, setPicks] = useState<PickItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const current = playlist[currentIndex];
+  const [isWorking, setIsWorking] = useState(false);
+
+  const loadLatestSession = async () => {
+    const response = await fetch("/api/game-sessions");
+    const payload = await response.json();
+    const latest = payload.data?.[0] ?? null;
+    setSession(latest);
+    if (latest?.id) {
+      const detailsResponse = await fetch(`/api/game-sessions/${latest.id}`);
+      const detailsPayload = await detailsResponse.json();
+      setPicks(detailsPayload.data?.picks ?? []);
+    }
+  };
+
+  useEffect(() => {
+    void loadLatestSession();
+  }, []);
+
+  const currentPick = picks[currentIndex];
+  const currentItem = currentPick?.game_template_items;
 
   const hasPrev = currentIndex > 0;
-  const hasNext = currentIndex < playlist.length - 1;
+  const hasNext = currentIndex < picks.length - 1;
 
-  const history = useMemo(() => playlist.slice(0, currentIndex), [currentIndex]);
+  const history = useMemo(() => picks.slice(0, currentIndex), [picks, currentIndex]);
+
+  const markCalled = async (pickId: number) => {
+    await fetch(`/api/game-session-picks/${pickId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ calledAt: new Date().toISOString() }),
+    });
+  };
+
+  const handleNext = async () => {
+    if (!currentPick) return;
+    setIsWorking(true);
+    try {
+      await markCalled(currentPick.id);
+      setCurrentIndex((prev) => Math.min(picks.length - 1, prev + 1));
+    } finally {
+      setIsWorking(false);
+    }
+  };
+
+  const handlePrev = () => {
+    setCurrentIndex((prev) => Math.max(0, prev - 1));
+  };
+
+  const updateSessionStatus = async (status: string) => {
+    if (!session?.id) return;
+    await fetch(`/api/game-sessions/${session.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    await loadLatestSession();
+  };
 
   return (
     <Container size="md" className="py-8 min-h-screen">
@@ -29,10 +92,26 @@ export default function Page() {
           <p className="text-sm text-gray-500 mt-2">
             Manual vinyl playback. Advance the pick list as you play each track.
           </p>
+          {session?.game_code && (
+            <p className="text-xs text-gray-500 mt-2">Game code: {session.game_code}</p>
+          )}
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" size="sm">Finish Game</Button>
-          <Button size="sm">Start Game</Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!session}
+            onClick={() => updateSessionStatus("finished")}
+          >
+            Finish Game
+          </Button>
+          <Button
+            size="sm"
+            disabled={!session}
+            onClick={() => updateSessionStatus("active")}
+          >
+            Start Game
+          </Button>
         </div>
       </div>
 
@@ -40,8 +119,10 @@ export default function Page() {
         <section className="lg:col-span-2 border border-gray-200 rounded-2xl p-6 bg-white shadow-sm">
           <div className="text-xs uppercase tracking-wide text-gray-400">Now Playing</div>
           <div className="mt-3 p-4 border border-gray-200 rounded-xl bg-gray-50">
-            <div className="text-lg font-semibold text-gray-900">{current.title}</div>
-            <div className="text-sm text-gray-600">{current.artist}</div>
+            <div className="text-lg font-semibold text-gray-900">
+              {currentItem?.title ?? "No pick loaded"}
+            </div>
+            <div className="text-sm text-gray-600">{currentItem?.artist ?? "-"}</div>
           </div>
 
           <div className="flex gap-3 mt-5">
@@ -49,14 +130,14 @@ export default function Page() {
               variant="secondary"
               size="sm"
               disabled={!hasPrev}
-              onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
+              onClick={handlePrev}
             >
               Previous Song
             </Button>
             <Button
               size="sm"
-              disabled={!hasNext}
-              onClick={() => setCurrentIndex((prev) => Math.min(playlist.length - 1, prev + 1))}
+              disabled={!hasNext || isWorking}
+              onClick={handleNext}
             >
               Next Song
             </Button>
@@ -69,9 +150,9 @@ export default function Page() {
             {history.length === 0 ? (
               <p className="text-sm text-gray-500">No songs called yet.</p>
             ) : (
-              history.map((song, index) => (
-                <div key={song.id} className="text-sm text-gray-700">
-                  {index + 1}. {song.title} — {song.artist}
+              history.map((pick, index) => (
+                <div key={pick.id} className="text-sm text-gray-700">
+                  {index + 1}. {pick.game_template_items?.title ?? "-"} - {pick.game_template_items?.artist ?? "-"}
                 </div>
               ))
             )}

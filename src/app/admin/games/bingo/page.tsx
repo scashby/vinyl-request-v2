@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Container } from "components/ui/Container";
 import { Button } from "components/ui/Button";
 import { buildBingoCards, buildPickList, BingoItem, BingoVariant } from "src/lib/bingo";
+import { useSearchParams } from "next/navigation";
 
 const bingoTargets = [
   { value: "one_line", label: "One Line" },
@@ -53,6 +54,7 @@ export default function Page() {
   const [templateItems, setTemplateItems] = useState<TemplateItem[]>([]);
   const [session, setSession] = useState<GameSession | null>(null);
   const [isWorking, setIsWorking] = useState(false);
+  const searchParams = useSearchParams();
 
   const hasFreeSpace = form.variant === "standard";
 
@@ -78,8 +80,17 @@ export default function Page() {
     void refreshTemplates();
   }, []);
 
+  useEffect(() => {
+    const param = searchParams.get("templateId");
+    if (!param) return;
+    const id = Number(param);
+    if (!id || Number.isNaN(id)) return;
+    setSelectedTemplateId(id);
+    void loadTemplateItems(id);
+  }, [searchParams]);
+
   const loadTemplateItems = async (templateId: number) => {
-    const response = await fetch(`/api/game-templates?templateId=${templateId}`);
+    const response = await fetch(`/api/game-templates/${templateId}`);
     const payload = await response.json();
     setTemplateItems(payload.data?.items ?? []);
   };
@@ -130,6 +141,9 @@ export default function Page() {
       const { generateBingoCardsPdf } = await import("src/lib/bingoPdf");
       const doc = generateBingoCardsPdf(cards, "Music Bingo Cards");
       doc.save("music-bingo-cards.pdf");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to generate cards.";
+      alert(message);
     } finally {
       setIsWorking(false);
     }

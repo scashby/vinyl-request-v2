@@ -70,8 +70,10 @@ export default function Page() {
               </p>
             </div>
             <div className="flex gap-2">
-              <Button variant="secondary" size="sm">Edit</Button>
-              <Link href="/admin/games/bingo">
+              <Link href={`/admin/games/bingo/templates/${template.id}`}>
+                <Button variant="secondary" size="sm">Edit</Button>
+              </Link>
+              <Link href={`/admin/games/bingo?templateId=${template.id}`}>
                 <Button size="sm">Use in Game</Button>
               </Link>
             </div>
