@@ -16,8 +16,6 @@ interface Event {
   is_featured_grid?: boolean;
   featured_priority?: number | string | null;
   allowed_tags?: string[] | string | null;
-  has_games?: boolean;
-  game_modes?: string[] | string | null;
 }
 
 interface DJSet {

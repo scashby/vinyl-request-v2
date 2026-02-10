@@ -838,9 +838,6 @@ export default function EditEventForm() {
       const normalizedQueueTypes = eventData.queue_types
         .map((type) => type.trim())
         .filter(Boolean);
-      const normalizedGameModes = eventData.game_modes
-        .map((mode) => mode.trim())
-        .filter(Boolean);
       const normalizedImageUrl = eventData.image_url.trim();
       
       const payload: EventInsert = {
@@ -857,10 +854,6 @@ export default function EditEventForm() {
           ? normalizedQueueTypes
           : null,
         allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
-        has_games: eventData.has_games,
-        game_modes: eventData.has_games && normalizedGameModes.length > 0
-          ? normalizedGameModes
-          : null,
         crate_id: eventData.crate_id || null,
         
         is_recurring: isTBA ? false : eventData.is_recurring,
@@ -1533,51 +1526,6 @@ export default function EditEventForm() {
           )}
           </section>
         )}
-
-        <section className="p-5 bg-indigo-50 border border-indigo-200 rounded-2xl">
-          <label className="flex items-center gap-2 mb-4 font-bold text-indigo-800">
-            <input
-              type="checkbox"
-              name="has_games"
-              checked={eventData.has_games}
-              onChange={handleCheckboxChange}
-              className="h-4 w-4"
-            />
-            Enable Vinyl Games
-          </label>
-
-          {eventData.has_games && (
-            <div className="grid gap-3 md:grid-cols-3">
-              <label className="flex items-center gap-2 text-sm text-indigo-900">
-                <input
-                  type="checkbox"
-                  checked={eventData.game_modes.includes('bracketology')}
-                  onChange={(e) => handleGameModeChange('bracketology', e.target.checked)}
-                  className="h-4 w-4"
-                />
-                🏆 Bracketology
-              </label>
-              <label className="flex items-center gap-2 text-sm text-indigo-900">
-                <input
-                  type="checkbox"
-                  checked={eventData.game_modes.includes('bingo')}
-                  onChange={(e) => handleGameModeChange('bingo', e.target.checked)}
-                  className="h-4 w-4"
-                />
-                🎯 Vinyl Bingo
-              </label>
-              <label className="flex items-center gap-2 text-sm text-indigo-900">
-                <input
-                  type="checkbox"
-                  checked={eventData.game_modes.includes('trivia')}
-                  onChange={(e) => handleGameModeChange('trivia', e.target.checked)}
-                  className="h-4 w-4"
-                />
-                🎤 Needle Drop Trivia
-              </label>
-            </div>
-          )}
-        </section>
 
         <button
           type="submit"
