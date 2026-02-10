@@ -219,29 +219,29 @@ export default function BingoCardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-slate-50 text-gray-900">
       <Container size="lg">
         <div className="py-12">
-          <p className="text-sm uppercase tracking-[0.35em] text-[#7bdcff]">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
             Admin · Vinyl Bingo
           </p>
-          <h1 className="text-3xl md:text-4xl font-black mt-2">
-            Bingo Card Generator
+          <h1 className="text-3xl md:text-4xl font-bold mt-2">
+            Bingo Cards
           </h1>
-          <p className="text-white/60 mt-2">
-            Pick a crate, template, or session and generate randomized PDF bingo cards.
+          <p className="text-slate-600 mt-2">
+            Step 1: Choose a source. Step 2: Load items. Step 3: Generate the PDF.
           </p>
           <div className="mt-3">
             <Link
               href="/admin/games/templates"
-              className="text-xs font-semibold text-[#7bdcff] hover:underline"
+              className="text-xs font-semibold text-blue-600 hover:underline"
             >
               Manage Bingo Templates
             </Link>
           </div>
 
           <div className="mt-8 grid gap-6 md:grid-cols-[1.4fr_0.6fr]">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 space-y-5">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
               <div>
                 <label className="text-sm font-semibold mb-2 block">
                   Source
@@ -255,8 +255,8 @@ export default function BingoCardPage() {
                     }}
                     className={`rounded-md px-3 py-2 text-xs font-semibold ${
                       !useTemplate && !useSession
-                        ? 'bg-[#7bdcff] text-black'
-                        : 'border border-white/20 text-white'
+                        ? 'bg-blue-600 text-white'
+                        : 'border border-slate-200 text-slate-600'
                     }`}
                   >
                     Crate
@@ -269,8 +269,8 @@ export default function BingoCardPage() {
                     }}
                     className={`rounded-md px-3 py-2 text-xs font-semibold ${
                       useTemplate
-                        ? 'bg-[#7bdcff] text-black'
-                        : 'border border-white/20 text-white'
+                        ? 'bg-blue-600 text-white'
+                        : 'border border-slate-200 text-slate-600'
                     }`}
                   >
                     Template
@@ -283,8 +283,8 @@ export default function BingoCardPage() {
                     }}
                     className={`rounded-md px-3 py-2 text-xs font-semibold ${
                       useSession
-                        ? 'bg-[#7bdcff] text-black'
-                        : 'border border-white/20 text-white'
+                        ? 'bg-blue-600 text-white'
+                        : 'border border-slate-200 text-slate-600'
                     }`}
                   >
                     Session
@@ -295,7 +295,7 @@ export default function BingoCardPage() {
                   <select
                     value={crateId}
                     onChange={(event) => setCrateId(event.target.value)}
-                    className="w-full rounded-lg bg-black/60 border border-white/10 px-4 py-3 text-white"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm"
                   >
                     <option value="">Select a crate</option>
                     {crates.map((crate) => (
@@ -310,7 +310,7 @@ export default function BingoCardPage() {
                   <select
                     value={templateId}
                     onChange={(event) => setTemplateId(event.target.value)}
-                    className="w-full rounded-lg bg-black/60 border border-white/10 px-4 py-3 text-white"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm"
                   >
                     <option value="">Select a bingo template</option>
                     {templates.map((template) => (
@@ -325,7 +325,7 @@ export default function BingoCardPage() {
                   <select
                     value={sessionId}
                     onChange={(event) => setSessionId(event.target.value)}
-                    className="w-full rounded-lg bg-black/60 border border-white/10 px-4 py-3 text-white"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm"
                   >
                     <option value="">Select a bingo session</option>
                     {sessions.map((session) => (
@@ -347,7 +347,7 @@ export default function BingoCardPage() {
                   max={50}
                   value={cardCount}
                   onChange={(event) => setCardCount(Number(event.target.value))}
-                  className="w-full rounded-lg bg-black/60 border border-white/10 px-4 py-3 text-white"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm"
                 />
               </div>
 
@@ -356,7 +356,7 @@ export default function BingoCardPage() {
                   type="button"
                   onClick={handleLoadItems}
                   disabled={useSession ? !sessionId : useTemplate ? !templateId : !crateId}
-                  className="rounded-lg border border-[#7bdcff] px-4 py-2 font-semibold text-[#7bdcff] hover:bg-[#7bdcff] hover:text-black disabled:opacity-40"
+                  className="rounded-lg border border-blue-600 px-4 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-600 hover:text-white disabled:opacity-40"
                 >
                   Load Bingo Items
                 </button>
@@ -364,19 +364,19 @@ export default function BingoCardPage() {
                   type="button"
                   onClick={handleGenerate}
                   disabled={!canGenerate}
-                  className="rounded-lg bg-[#7bdcff] px-4 py-2 font-semibold text-black disabled:opacity-40"
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
                 >
                   Generate PDF
                 </button>
               </div>
 
-              {status && <p className="text-sm text-green-400">{status}</p>}
-              {error && <p className="text-sm text-red-400">{error}</p>}
+              {status && <p className="text-sm text-emerald-600">{status}</p>}
+              {error && <p className="text-sm text-red-600">{error}</p>}
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-[#0c0f1a] p-6">
-              <h2 className="text-lg font-semibold mb-2">Crate Summary</h2>
-              <p className="text-white/60 text-sm">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold mb-2">Preview</h2>
+              <p className="text-slate-600 text-sm">
                 {items.length
                   ? `${items.length} eligible records loaded.`
                   : 'Load a crate to preview eligible records.'}
@@ -385,14 +385,14 @@ export default function BingoCardPage() {
                 {items.slice(0, 12).map((item) => (
                   <div
                     key={item.id}
-                    className="text-sm border-b border-white/10 pb-2"
+                    className="text-sm border-b border-slate-200 pb-2"
                   >
                     <div className="font-semibold">{item.title}</div>
-                    <div className="text-white/60">{item.artist}</div>
+                    <div className="text-slate-500">{item.artist}</div>
                   </div>
                 ))}
                 {items.length > 12 && (
-                  <p className="text-xs text-white/40">
+                  <p className="text-xs text-slate-500">
                     + {items.length - 12} more entries
                   </p>
                 )}
