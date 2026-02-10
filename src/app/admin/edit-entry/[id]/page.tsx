@@ -969,7 +969,7 @@ export default function EditEntryPage() {
     
     setStatus('✅ Saved!');
     setSaving(false);
-    setTimeout(() => router.push('/admin/edit-collection'), 1000);
+    setTimeout(() => router.push('/edit-collection'), 1000);
   }
 
   const sides = Array.from(new Set(tracks.map(t => getSideFromPosition(t.position)).filter(s => s !== 'Unknown')));
@@ -2351,7 +2351,7 @@ export default function EditEntryPage() {
             {saving ? '💾 Saving...' : '💾 Save Changes'}
           </button>
           <button 
-            onClick={() => router.push('/admin/edit-collection')} 
+            onClick={() => router.push('/edit-collection')} 
             style={{ 
               ...buttonStyle, 
               padding: '12px 24px', 

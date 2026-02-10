@@ -208,7 +208,7 @@ export default function AdminDashboardPage() {
               {authStatus === 'authenticated' ? (
                 <>
                   <Link href="/admin/manage-events" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #10b981, #047857)' }}>📅 Manage Events</Link>
-                  <Link href="/admin/edit-collection" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>📚 Collection Command Center</Link>
+                  <Link href="/edit-collection" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>📚 Collection Command Center</Link>
                   <Link href="/admin/games" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #6366f1, #4338ca)' }}>📚 Game Library</Link>
                   <Link href="/admin/games/templates" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #4f46e5, #312e81)' }}>🧩 Game Templates</Link>
                   <Link href="/admin/games/sessions" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #312e81, #1e1b4b)' }}>🎛️ Game Sessions</Link>
