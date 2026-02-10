@@ -102,36 +102,18 @@ export default function GameTemplatesPage() {
 
   useEffect(() => {
     setSelectedIds([]);
-    setItemType(availableItemTypes[0]?.value ?? '');
-    const fetchForGameType = async () => {
-      const params = new URLSearchParams();
-      params.set('gameType', gameType);
-      if (availableItemTypes.length === 1) {
-        params.set('itemType', availableItemTypes[0].value);
-      }
-      if (query.trim()) params.set('q', query.trim());
-      if (tagFilter.trim()) params.set('tags', tagFilter.trim());
-      if (genreFilter.trim()) params.set('genres', genreFilter.trim());
-      if (decadeFilter.trim()) params.set('decades', decadeFilter.trim());
-      const response = await fetch(`/api/game-library?${params.toString()}`);
-      const result = await response.json();
-      if (response.ok) {
-        setItems(result.data as LibraryItem[]);
-      }
-    };
-    fetchForGameType();
-  }, [gameType]);
+    const nextItemType = availableItemTypes[0]?.value ?? '';
+    setItemType((prev) => (prev && availableItemTypes.some((opt) => opt.value === prev) ? prev : nextItemType));
 
-  useEffect(() => {
-    if (!itemType) return;
-    setSelectedIds([]);
-    const fetchForItemType = async () => {
+    const fetchForFilters = async () => {
       const params = new URLSearchParams();
       params.set('gameType', gameType);
-      if (itemType) {
-        params.set('itemType', itemType);
-      } else if (availableItemTypes.length === 1) {
-        params.set('itemType', availableItemTypes[0].value);
+      const activeItemType =
+        itemType && availableItemTypes.some((opt) => opt.value === itemType)
+          ? itemType
+          : nextItemType;
+      if (activeItemType) {
+        params.set('itemType', activeItemType);
       }
       if (query.trim()) params.set('q', query.trim());
       if (tagFilter.trim()) params.set('tags', tagFilter.trim());
@@ -143,8 +125,17 @@ export default function GameTemplatesPage() {
         setItems(result.data as LibraryItem[]);
       }
     };
-    fetchForItemType();
-  }, [itemType]);
+
+    fetchForFilters();
+  }, [
+    gameType,
+    itemType,
+    query,
+    tagFilter,
+    genreFilter,
+    decadeFilter,
+    availableItemTypes,
+  ]);
 
   const toggleSelection = (id: number) => {
     setSelectedIds((prev) =>
