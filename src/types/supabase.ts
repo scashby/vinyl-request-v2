@@ -500,8 +500,6 @@ export type Database = {
           allowed_formats: string[] | null;
           allowed_tags: string[] | null;
           crate_id: number | null;
-          has_games: boolean | null;
-          game_modes: string[] | null;
           is_featured_grid: boolean | null;
           is_featured_upnext: boolean | null;
           featured_priority: number | null;
@@ -523,8 +521,6 @@ export type Database = {
           allowed_formats?: string[] | null;
           allowed_tags?: string[] | null;
           crate_id?: number | null;
-          has_games?: boolean | null;
-          game_modes?: string[] | null;
           is_featured_grid?: boolean | null;
           is_featured_upnext?: boolean | null;
           featured_priority?: number | null;
@@ -546,8 +542,6 @@ export type Database = {
           allowed_formats?: string[] | null;
           allowed_tags?: string[] | null;
           crate_id?: number | null;
-          has_games?: boolean | null;
-          game_modes?: string[] | null;
           is_featured_grid?: boolean | null;
           is_featured_upnext?: boolean | null;
           featured_priority?: number | null;
@@ -599,174 +593,6 @@ export type Database = {
           created_at?: string | null;
         };
         Relationships: [];
-      };
-      game_library_items: {
-        Row: {
-          id: number;
-          game_type: string;
-          item_type: string;
-          title: string | null;
-          artist: string | null;
-          prompt: string | null;
-          answer: string | null;
-          cover_image: string | null;
-          inventory_id: number | null;
-          tags: string[];
-          genres: string[];
-          decades: string[];
-          metadata: Json;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: number;
-          game_type: string;
-          item_type: string;
-          title?: string | null;
-          artist?: string | null;
-          prompt?: string | null;
-          answer?: string | null;
-          cover_image?: string | null;
-          inventory_id?: number | null;
-          tags?: string[];
-          genres?: string[];
-          decades?: string[];
-          metadata?: Json;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: number;
-          game_type?: string;
-          item_type?: string;
-          title?: string | null;
-          artist?: string | null;
-          prompt?: string | null;
-          answer?: string | null;
-          cover_image?: string | null;
-          inventory_id?: number | null;
-          tags?: string[];
-          genres?: string[];
-          decades?: string[];
-          metadata?: Json;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'game_library_items_inventory_id_fkey';
-            columns: ['inventory_id'];
-            referencedRelation: 'inventory';
-            referencedColumns: ['id'];
-          }
-        ];
-      };
-      game_sessions: {
-        Row: {
-          id: number;
-          event_id: number | null;
-          crate_id: number | null;
-          game_type: string;
-          game_state: Json;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: number;
-          event_id?: number | null;
-          crate_id?: number | null;
-          game_type: string;
-          game_state?: Json;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: number;
-          event_id?: number | null;
-          crate_id?: number | null;
-          game_type?: string;
-          game_state?: Json;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'game_sessions_crate_id_fkey';
-            columns: ['crate_id'];
-            referencedRelation: 'crates';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'game_sessions_event_id_fkey';
-            columns: ['event_id'];
-            referencedRelation: 'events';
-            referencedColumns: ['id'];
-          }
-        ];
-      };
-      game_templates: {
-        Row: {
-          id: number;
-          name: string;
-          game_type: string;
-          template_state: Json;
-          created_at: string;
-        };
-        Insert: {
-          id?: number;
-          name: string;
-          game_type: string;
-          template_state?: Json;
-          created_at?: string;
-        };
-        Update: {
-          id?: number;
-          name?: string;
-          game_type?: string;
-          template_state?: Json;
-          created_at?: string;
-        };
-        Relationships: [];
-      };
-      game_template_items: {
-        Row: {
-          id: number;
-          template_id: number;
-          library_item_id: number;
-          position: number;
-          metadata: Json;
-          created_at: string;
-        };
-        Insert: {
-          id?: number;
-          template_id: number;
-          library_item_id: number;
-          position?: number;
-          metadata?: Json;
-          created_at?: string;
-        };
-        Update: {
-          id?: number;
-          template_id?: number;
-          library_item_id?: number;
-          position?: number;
-          metadata?: Json;
-          created_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'game_template_items_template_id_fkey';
-            columns: ['template_id'];
-            referencedRelation: 'game_templates';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'game_template_items_library_item_id_fkey';
-            columns: ['library_item_id'];
-            referencedRelation: 'game_library_items';
-            referencedColumns: ['id'];
-          }
-        ];
       };
       import_conflict_resolutions: {
         Row: {

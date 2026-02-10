@@ -9,8 +9,6 @@ export type EventSubtypeDefaults = {
   image_url?: string;
   has_queue?: boolean;
   queue_types?: string[];
-  has_games?: boolean;
-  game_modes?: string[];
   is_recurring?: boolean;
   recurrence_pattern?: string;
   recurrence_interval?: number;
@@ -52,7 +50,6 @@ export const defaultEventTypeConfig: EventTypeConfigState = {
         'info',
         'info_url',
         'queue',
-        'games',
         'recurrence',
         'crate',
         'formats'
@@ -71,33 +68,6 @@ export const defaultEventTypeConfig: EventTypeConfigState = {
             is_recurring: true,
             recurrence_pattern: 'weekly',
             recurrence_interval: 1,
-          },
-        },
-        {
-          id: 'vinyl-trivia',
-          label: 'Vinyl Trivia',
-          defaults: {
-            prefill_fields: ['queue', 'recurrence'],
-            has_games: true,
-            game_modes: ['trivia'],
-          },
-        },
-        {
-          id: 'vinyl-bingo',
-          label: 'Vinyl Music Bingo',
-          defaults: {
-            prefill_fields: ['queue', 'recurrence'],
-            has_games: true,
-            game_modes: ['bingo'],
-          },
-        },
-        {
-          id: 'vinyl-bracketology',
-          label: 'Vinyl Bracketology',
-          defaults: {
-            prefill_fields: ['queue', 'recurrence'],
-            has_games: true,
-            game_modes: ['bracketology'],
           },
         },
       ],

@@ -17,8 +17,6 @@ interface Event {
   parent_event_id?: number | null;
   crate_id?: number | null;
   has_queue?: boolean;
-  has_games?: boolean;
-  game_modes?: string[] | string | null;
   is_featured_grid?: boolean;
   featured_priority?: number | null;
   allowed_tags?: string[] | string | null;
@@ -38,15 +36,6 @@ const eventTypeLabels: Record<string, string> = {
 const eventSubtypeLabels: Record<string, string> = {
   'live-jukebox': 'Live Jukebox',
   'vinyl-sundays': 'Vinyl Sundays',
-  'vinyl-trivia': 'Vinyl Trivia',
-  'vinyl-bingo': 'Vinyl Music Bingo',
-  'vinyl-bracketology': 'Vinyl Bracketology',
-};
-
-const gameModeLabels: Record<string, string> = {
-  bracketology: 'Bracketology',
-  bingo: 'Vinyl Bingo',
-  trivia: 'Needle Drop Trivia',
 };
 
 const normalizeStringArray = (value: unknown): string[] => {
@@ -206,7 +195,6 @@ export default function Page() {
       <div className="space-y-4">
         {filteredEvents.map(event => {
           const tags = normalizeStringArray(event.allowed_tags);
-          const gameModes = normalizeStringArray(event.game_modes);
           const eventType = getTagValue(tags, EVENT_TYPE_TAG_PREFIX);
           const eventSubtype = getTagValue(tags, EVENT_SUBTYPE_TAG_PREFIX);
 
@@ -243,28 +231,9 @@ export default function Page() {
                         Queue Active
                       </span>
                     )}
-                    {event.has_games && (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-700 bg-indigo-100 px-2 py-1 rounded-full">
-                        Vinyl Games
-                      </span>
-                    )}
-                    {event.has_games && gameModes.length > 0 && (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-700 bg-indigo-50 px-2 py-1 rounded-full">
-                        {gameModes.map((mode) => gameModeLabels[mode] || mode).join(' · ')}
-                      </span>
-                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {event.has_games && (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => router.push(`/admin/games/sessions?eventId=${event.id}`)}
-                    >
-                      Games
-                    </Button>
-                  )}
                   <Button
                     size="sm"
                     variant="secondary"
