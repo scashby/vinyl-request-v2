@@ -103,13 +103,47 @@ export default function GameTemplatesPage() {
   useEffect(() => {
     setSelectedIds([]);
     setItemType(availableItemTypes[0]?.value ?? '');
-    loadItems();
+    const fetchForGameType = async () => {
+      const params = new URLSearchParams();
+      params.set('gameType', gameType);
+      if (availableItemTypes.length === 1) {
+        params.set('itemType', availableItemTypes[0].value);
+      }
+      if (query.trim()) params.set('q', query.trim());
+      if (tagFilter.trim()) params.set('tags', tagFilter.trim());
+      if (genreFilter.trim()) params.set('genres', genreFilter.trim());
+      if (decadeFilter.trim()) params.set('decades', decadeFilter.trim());
+      const response = await fetch(`/api/game-library?${params.toString()}`);
+      const result = await response.json();
+      if (response.ok) {
+        setItems(result.data as LibraryItem[]);
+      }
+    };
+    fetchForGameType();
   }, [gameType]);
 
   useEffect(() => {
     if (!itemType) return;
     setSelectedIds([]);
-    loadItems();
+    const fetchForItemType = async () => {
+      const params = new URLSearchParams();
+      params.set('gameType', gameType);
+      if (itemType) {
+        params.set('itemType', itemType);
+      } else if (availableItemTypes.length === 1) {
+        params.set('itemType', availableItemTypes[0].value);
+      }
+      if (query.trim()) params.set('q', query.trim());
+      if (tagFilter.trim()) params.set('tags', tagFilter.trim());
+      if (genreFilter.trim()) params.set('genres', genreFilter.trim());
+      if (decadeFilter.trim()) params.set('decades', decadeFilter.trim());
+      const response = await fetch(`/api/game-library?${params.toString()}`);
+      const result = await response.json();
+      if (response.ok) {
+        setItems(result.data as LibraryItem[]);
+      }
+    };
+    fetchForItemType();
   }, [itemType]);
 
   const toggleSelection = (id: number) => {
