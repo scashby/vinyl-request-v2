@@ -171,6 +171,19 @@ export default function Page() {
     URL.revokeObjectURL(url);
   };
 
+  const handleDownloadPickListPdf = async () => {
+    if (templateItems.length === 0) return;
+    const items: BingoItem[] = templateItems.map((item) => ({
+      id: String(item.id),
+      title: item.title,
+      artist: item.artist,
+    }));
+    const pickList = buildPickList(items, form.setlistMode ? "setlist" : "shuffle");
+    const { generatePickListPdf } = await import("src/lib/pickListPdf");
+    const doc = generatePickListPdf(pickList, "Music Bingo Pick List");
+    doc.save("music-bingo-pick-list.pdf");
+  };
+
   return (
     <Container size="md" className="py-8 min-h-screen">
       <div className="flex items-start justify-between gap-6 mb-8">
@@ -272,6 +285,9 @@ export default function Page() {
               </Button>
               <Button variant="secondary" size="sm" onClick={handleDownloadPickList} disabled={isWorking || templateItems.length === 0}>
                 Download Pick List
+              </Button>
+              <Button variant="secondary" size="sm" onClick={handleDownloadPickListPdf} disabled={isWorking || templateItems.length === 0}>
+                Pick List PDF
               </Button>
             </div>
           </section>
