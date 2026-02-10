@@ -727,7 +727,6 @@ export default function EditEventForm() {
     setEventData((prev) => ({
       ...prev,
       [name]: checked,
-      ...(name === 'has_games' && !checked ? { game_modes: [] } : {}),
       ...(name === 'is_recurring' && !checked ? { recurrence_end_date: '' } : {})
     }));
   };
@@ -745,14 +744,6 @@ export default function EditEventForm() {
       const types = [...prev.queue_types];
       if (checked) return { ...prev, queue_types: [...types, queueType] };
       return { ...prev, queue_types: types.filter((t) => t !== queueType) };
-    });
-  };
-
-  const handleGameModeChange = (mode: string, checked: boolean) => {
-    setEventData((prev) => {
-      const modes = [...prev.game_modes];
-      if (checked) return { ...prev, game_modes: [...modes, mode] };
-      return { ...prev, game_modes: modes.filter((t) => t !== mode) };
     });
   };
 
@@ -777,10 +768,6 @@ export default function EditEventForm() {
         ? { has_queue: defaults.has_queue }
         : {}),
       ...(enabledFields.includes('queue') && defaults.queue_types ? { queue_types: defaults.queue_types } : {}),
-      ...(enabledFields.includes('games') && typeof defaults.has_games === 'boolean'
-        ? { has_games: defaults.has_games }
-        : {}),
-      ...(enabledFields.includes('games') && defaults.game_modes ? { game_modes: defaults.game_modes } : {}),
       ...(enabledFields.includes('recurrence') && typeof defaults.is_recurring === 'boolean'
         ? { is_recurring: defaults.is_recurring }
         : {}),
