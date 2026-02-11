@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 
 const formatDate = (value: string | null) => {
   if (!value) return "Unknown";
@@ -49,7 +50,9 @@ export default function Page() {
     <div className="min-h-screen bg-slate-50">
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-6 py-4">
-          <Link href="/admin/games/bingo" className="text-slate-500 hover:text-slate-900">←</Link>
+          <Link href="/admin/games/bingo" className="text-slate-500 hover:text-slate-900">
+            <ChevronLeft className="h-5 w-5" />
+          </Link>
           <div className="text-center">
             <div className="text-sm font-semibold text-slate-900">Game History</div>
           </div>
@@ -74,11 +77,17 @@ export default function Page() {
               <div className="mt-3 space-y-3">
                 {entries.map((session) => (
                   <div key={session.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="text-xs text-slate-500">Session {session.id}</div>
-                    <div className="mt-2 text-sm text-slate-700">
-                      Code: {session.game_code ?? "-"} · {session.variant} · {session.bingo_target}
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="text-xs text-slate-500">Session {session.id}</div>
+                        <div className="mt-2 text-sm text-slate-700">
+                          Code: {session.game_code ?? "-"} · {session.variant} · {session.bingo_target}
+                        </div>
+                      </div>
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
+                        {session.status}
+                      </span>
                     </div>
-                    <div className="mt-1 text-xs text-slate-500">Status: {session.status}</div>
                   </div>
                 ))}
               </div>

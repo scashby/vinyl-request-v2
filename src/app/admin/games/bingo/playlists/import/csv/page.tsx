@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import BingoHeader from "../../../_components/BingoHeader";
+import Link from "next/link";
+import Image from "next/image";
+import { ChevronLeft } from "lucide-react";
 
 type TemplateItem = {
   id: number;
@@ -53,9 +55,23 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <BingoHeader backHref="/admin/games/bingo/playlists/new" title="Import CSV" />
+      <div className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-6 py-4">
+          <Link href="/admin/games/bingo/playlists/new" className="text-slate-500 hover:text-slate-900">
+            <ChevronLeft className="h-5 w-5" />
+          </Link>
+          <div className="flex items-center gap-2">
+            <Image src="/images/Skulllogo.png" alt="Dead Wax Dialogues" width={28} height={28} />
+            <div className="text-center">
+              <div className="text-xs uppercase tracking-[0.3em] text-slate-400">Dead Wax</div>
+              <div className="text-sm font-semibold text-slate-900">Bingo</div>
+            </div>
+          </div>
+          <div className="w-6" />
+        </div>
+      </div>
 
-      <main className="mx-auto w-full max-w-3xl px-6 py-10">
+      <main className="mx-auto w-full max-w-3xl px-6 py-12">
         <div className="text-center">
           <h1 className="text-xl font-semibold text-slate-900">Import a Spreadsheet</h1>
         </div>
@@ -64,7 +80,7 @@ export default function Page() {
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Required Format</div>
           <div className="mt-2 text-sm font-semibold text-slate-900">CSV (comma-separated values)</div>
           <div className="mt-1 text-xs text-slate-500">UTF-8 format.</div>
-          <div className="mt-4 flex gap-6 text-xs text-slate-600">
+          <div className="mt-4 grid grid-cols-2 gap-4 text-xs text-slate-600">
             <div>
               <div className="text-[11px] uppercase tracking-wide text-slate-400">Minimum Songs</div>
               <div className="mt-1 inline-flex items-center rounded-full border border-slate-200 px-2 py-0.5 font-semibold">75</div>
@@ -75,7 +91,7 @@ export default function Page() {
             </div>
           </div>
           <p className="mt-4 text-xs text-slate-500">
-            The CSV file must include a heading for "Title" and a heading for "Artist". The headings are not case sensitive.
+            The CSV file must include a heading for "Title" (the song name) and a heading for "Artist". The headings are not case sensitive.
           </p>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -95,7 +111,11 @@ export default function Page() {
             </button>
           </div>
 
-          {error ? <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-600">{error}</div> : null}
+          {error ? (
+            <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-600">
+              {error}
+            </div>
+          ) : null}
         </div>
 
         {result ? (

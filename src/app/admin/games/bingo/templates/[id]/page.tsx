@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import BingoHeader from "../../_components/BingoHeader";
-import { Download, Pencil, Trash2, X } from "lucide-react";
+import { Download, Pencil, X } from "lucide-react";
 
 const COLOR_SWATCHES = [
   "#3b82f6",
@@ -30,16 +29,6 @@ type TemplateItem = {
   artist: string;
   side: string | null;
   position: string | null;
-  sort_order?: number | null;
-};
-
-type SearchResult = {
-  inventory_id: number;
-  recording_id: number | null;
-  title: string;
-  artist: string;
-  side: string | null;
-  position: string | null;
 };
 
 export default function Page() {
@@ -50,13 +39,8 @@ export default function Page() {
   const [name, setName] = useState("");
   const [setlistMode, setSetlistMode] = useState(false);
   const [accent, setAccent] = useState(COLOR_SWATCHES[5]);
-  const [defaultVideo, setDefaultVideo] = useState("");
-  const [preGameVideo, setPreGameVideo] = useState("");
   const [isWorking, setIsWorking] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
 
   const loadTemplate = async () => {
     const response = await fetch(`/api/game-templates/${templateId}`);
@@ -71,8 +55,6 @@ export default function Page() {
     if (!templateId || Number.isNaN(templateId)) return;
     void loadTemplate();
   }, [templateId]);
-
-  const trackCount = items.length;
 
   const handleSave = async () => {
     setIsWorking(true);
@@ -115,59 +97,21 @@ export default function Page() {
     URL.revokeObjectURL(url);
   };
 
-  const handleSearch = async () => {
-    if (!searchTerm.trim()) return;
-    setIsSearching(true);
-    try {
-      const response = await fetch(`/api/vinyl-search?q=${encodeURIComponent(searchTerm)}`);
-      const payload = await response.json();
-      setSearchResults(payload.data ?? []);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleAddTrack = async (result: SearchResult) => {
-    setIsWorking(true);
-    try {
-      await fetch("/api/game-template-items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          templateId,
-          inventoryId: result.inventory_id,
-          recordingId: result.recording_id,
-          title: result.title,
-          artist: result.artist,
-          side: result.side,
-          position: result.position,
-        }),
-      });
-      await loadTemplate();
-    } finally {
-      setIsWorking(false);
-    }
-  };
-
   if (!template) {
     return (
-      <div className="min-h-screen bg-slate-50">
-        <BingoHeader backHref="/admin/games/bingo/templates" title="Edit Playlist" />
-        <div className="mx-auto w-full max-w-4xl px-6 py-10 text-sm text-slate-500">Loading playlist...</div>
+      <div className="min-h-screen bg-slate-950 text-slate-100">
+        <div className="mx-auto w-full max-w-5xl px-6 py-10 text-sm text-slate-400">Loading playlist...</div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="border-b border-slate-800 bg-slate-950/90">
+      <div className="border-b border-slate-900 bg-slate-950/90">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4">
-          <Link href="/admin/games/bingo/templates" className="text-slate-400 hover:text-white">
-            ←
-          </Link>
+          <Link href="/admin/games/bingo" className="text-slate-400 hover:text-white">←</Link>
           <div className="text-center">
-            <div className="text-xs uppercase tracking-[0.3em] text-slate-500">Playlist Editor</div>
-            <div className="text-sm font-semibold">Edit Playlist</div>
+            <div className="text-xs uppercase tracking-[0.3em] text-slate-500">Edit Playlist</div>
           </div>
           <button
             type="button"
@@ -191,7 +135,7 @@ export default function Page() {
         <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="text-lg font-semibold">{name}</div>
-            <div className="text-xs text-slate-400">{trackCount} songs</div>
+            <div className="text-xs text-slate-400">{items.length} songs</div>
             <button
               type="button"
               onClick={() => setShowDetails(true)}
@@ -204,7 +148,7 @@ export default function Page() {
           <button
             type="button"
             onClick={() => navigator.clipboard.writeText(window.location.href)}
-            className="rounded-lg border border-slate-700 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-200 hover:border-slate-500"
+            className="rounded-lg border border-slate-700 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-200"
           >
             Copy Link
           </button>
@@ -224,62 +168,13 @@ export default function Page() {
                 <button
                   type="button"
                   onClick={() => handleDeleteItem(item.id)}
-                  className="rounded-lg border border-slate-700 p-2 text-slate-400 hover:text-white"
-                  aria-label="Remove track"
+                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  Remove
                 </button>
               </div>
             ))
           )}
-        </div>
-
-        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-          <div className="text-sm font-semibold">Add Tracks</div>
-          <p className="mt-1 text-xs text-slate-400">Search your vinyl collection and add tracks.</p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <input
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search by song or artist..."
-              className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
-            />
-            <button
-              type="button"
-              onClick={handleSearch}
-              disabled={isSearching || !searchTerm.trim()}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-            >
-              Search
-            </button>
-          </div>
-          <div className="mt-4 space-y-3">
-            {isSearching ? (
-              <p className="text-sm text-slate-400">Searching...</p>
-            ) : searchResults.length === 0 ? (
-              <p className="text-sm text-slate-400">No results yet.</p>
-            ) : (
-              searchResults.map((result, index) => (
-                <div
-                  key={`${result.recording_id ?? "track"}-${index}`}
-                  className="flex items-center justify-between rounded-xl border border-slate-800 px-4 py-3"
-                >
-                  <div>
-                    <div className="text-sm font-semibold text-slate-100">{result.title}</div>
-                    <div className="text-xs text-slate-400">{result.artist}</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleAddTrack(result)}
-                    disabled={isWorking}
-                    className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:border-slate-500"
-                  >
-                    Add
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
         </div>
 
         <button
@@ -350,25 +245,6 @@ export default function Page() {
                   }`}
                 />
               </button>
-            </div>
-
-            <div className="mt-5">
-              <div className="text-sm font-semibold">Jumbotron Videos</div>
-              <p className="text-xs text-slate-400">Provide video URLs for the large screen display.</p>
-              <div className="mt-3 space-y-3">
-                <input
-                  value={defaultVideo}
-                  onChange={(event) => setDefaultVideo(event.target.value)}
-                  placeholder="Default video URL"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
-                />
-                <input
-                  value={preGameVideo}
-                  onChange={(event) => setPreGameVideo(event.target.value)}
-                  placeholder="Pre-game video URL"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
-                />
-              </div>
             </div>
 
             <button

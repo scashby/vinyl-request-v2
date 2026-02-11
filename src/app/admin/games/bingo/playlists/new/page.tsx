@@ -1,51 +1,46 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import BingoHeader from "../../_components/BingoHeader";
-import { ChevronRight } from "lucide-react";
+import Image from "next/image";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function Page() {
-  const [isBuilding, setIsBuilding] = useState(false);
-
-  const handleBuildFromCollection = async () => {
-    setIsBuilding(true);
-    try {
-      const response = await fetch("/api/game-templates", { method: "POST" });
-      const payload = await response.json();
-      const templateId = payload.data?.id;
-      if (templateId) {
-        window.location.href = `/admin/games/bingo?templateId=${templateId}`;
-      }
-    } finally {
-      setIsBuilding(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-slate-50">
-      <BingoHeader backHref="/admin/games/bingo" title="Create Playlist" />
+      <div className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-6 py-4">
+          <Link href="/admin/games/bingo" className="text-slate-500 hover:text-slate-900">
+            <ChevronLeft className="h-5 w-5" />
+          </Link>
+          <div className="flex items-center gap-2">
+            <Image src="/images/Skulllogo.png" alt="Dead Wax Dialogues" width={28} height={28} />
+            <div className="text-center">
+              <div className="text-xs uppercase tracking-[0.3em] text-slate-400">Dead Wax</div>
+              <div className="text-sm font-semibold text-slate-900">Bingo</div>
+            </div>
+          </div>
+          <div className="w-6" />
+        </div>
+      </div>
 
-      <main className="mx-auto w-full max-w-3xl px-6 py-10">
+      <main className="mx-auto w-full max-w-3xl px-6 py-12">
         <div className="text-center">
           <h1 className="text-xl font-semibold text-slate-900">Create a Custom Playlist</h1>
         </div>
 
         <div className="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <button
-            type="button"
-            onClick={handleBuildFromCollection}
-            disabled={isBuilding}
-            className="flex w-full items-center justify-between border-b border-slate-200 px-6 py-5 text-left hover:bg-slate-50"
+          <Link
+            href="/admin/games/bingo/playlists/import/vinyl"
+            className="flex items-center justify-between border-b border-slate-200 px-6 py-5 text-left hover:bg-slate-50"
           >
             <div>
-              <div className="text-sm font-semibold text-slate-900">Build from Vinyl Collection</div>
+              <div className="text-sm font-semibold text-slate-900">Import from Vinyl Collection</div>
               <div className="text-xs text-slate-500">
-                Pull songs directly from your collection and generate a fresh playlist.
+                Build a playlist from your collection, then customize the titles and playback notes.
               </div>
             </div>
             <ChevronRight className="h-4 w-4 text-slate-400" />
-          </button>
+          </Link>
 
           <Link
             href="/admin/games/bingo/playlists/import/csv"

@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { ChevronLeft } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
-import BingoHeader from "../_components/BingoHeader";
 
 export default function Page() {
-  const [selection, setSelection] = useState<"yes" | "no">("no");
+  const [selection, setSelection] = useState<"yes" | "no">("yes");
   const searchParams = useSearchParams();
   const router = useRouter();
   const sessionId = searchParams.get("sessionId");
@@ -17,7 +19,21 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <BingoHeader backHref="/admin/games/bingo/setup" title="Playback" />
+      <div className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-6 py-4">
+          <Link href="/admin/games/bingo/setup" className="text-slate-500 hover:text-slate-900">
+            <ChevronLeft className="h-5 w-5" />
+          </Link>
+          <div className="flex items-center gap-2">
+            <Image src="/images/Skulllogo.png" alt="Dead Wax Dialogues" width={28} height={28} />
+            <div className="text-center">
+              <div className="text-xs uppercase tracking-[0.3em] text-slate-400">Dead Wax</div>
+              <div className="text-sm font-semibold text-slate-900">Bingo</div>
+            </div>
+          </div>
+          <div className="w-6" />
+        </div>
+      </div>
 
       <main className="mx-auto w-full max-w-3xl px-6 py-12">
         <div className="text-center">

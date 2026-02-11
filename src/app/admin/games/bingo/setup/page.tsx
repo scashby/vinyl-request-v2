@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import BingoHeader from "../_components/BingoHeader";
-import { buildBingoCards, buildPickList, BingoItem, BingoVariant } from "src/lib/bingo";
 import Link from "next/link";
+import Image from "next/image";
+import { ChevronLeft } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { buildBingoCards, buildPickList, BingoItem, BingoVariant } from "src/lib/bingo";
 
 const bingoTargets = [
   { value: "one_line", label: "One Line", description: "At least one line in any direction" },
@@ -12,8 +13,8 @@ const bingoTargets = [
   { value: "three_lines", label: "Three Lines", description: "At least three lines in any direction" },
   { value: "four_lines", label: "Four Lines", description: "At least four lines in any direction" },
   { value: "four_corners", label: "Four Corners", description: "Each corner square on the card" },
-  { value: "edges", label: "Edges", description: "Four lines around the outer border" },
-  { value: "x_shape", label: "X Shape", description: "Both diagonal lines" },
+  { value: "edges", label: "Edges", description: "Four lines around the outer border of the card" },
+  { value: "x_shape", label: "X Shape", description: "Both diagonal lines on the card" },
   { value: "full_card", label: "Full Card", description: "Every square on the card" },
 ];
 
@@ -28,11 +29,6 @@ const patternMap: Record<string, number[]> = {
   full_card: Array.from({ length: 25 }).map((_, index) => index),
 };
 
-const GAME_TYPES: { value: BingoVariant; label: string; description: string }[] = [
-  { value: "standard", label: "Standard Bingo", description: "Free space in the center." },
-  { value: "death", label: "Death Bingo", description: "Avoid bingos. Last card standing wins." },
-  { value: "blackout", label: "Blackout Bingo", description: "Fill the entire card to win." },
-];
 
 const Toggle = ({
   checked,
@@ -121,7 +117,7 @@ export default function Page() {
   const [items, setItems] = useState<TemplateItem[]>([]);
   const [target, setTarget] = useState("one_line");
   const [showMore, setShowMore] = useState(false);
-  const [variant, setVariant] = useState<BingoVariant>(initialVariant);
+  const [variant] = useState<BingoVariant>(initialVariant);
   const [cardCount, setCardCount] = useState(40);
   const [setlistMode, setSetlistMode] = useState(false);
   const [isWorking, setIsWorking] = useState(false);
@@ -215,7 +211,21 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <BingoHeader backHref="/admin/games/bingo" title="Game Setup" />
+      <div className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-6 py-4">
+          <Link href="/admin/games/bingo" className="text-slate-500 hover:text-slate-900">
+            <ChevronLeft className="h-5 w-5" />
+          </Link>
+          <div className="flex items-center gap-2">
+            <Image src="/images/Skulllogo.png" alt="Dead Wax Dialogues" width={28} height={28} />
+            <div className="text-center">
+              <div className="text-xs uppercase tracking-[0.3em] text-slate-400">Dead Wax</div>
+              <div className="text-sm font-semibold text-slate-900">Bingo</div>
+            </div>
+          </div>
+          <div className="w-6" />
+        </div>
+      </div>
 
       <main className="mx-auto w-full max-w-4xl px-6 py-10">
         <div className="text-center mb-8">
@@ -238,7 +248,6 @@ export default function Page() {
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="border-b border-slate-200 px-6 py-4">
               <div className="text-sm font-semibold text-slate-900">Bingo Target</div>
-              <div className="text-xs text-slate-500 mt-1">Choose a win condition for this session.</div>
             </div>
             <div className="px-6 py-4">
               <select
@@ -306,7 +315,7 @@ export default function Page() {
               checked={highlightCurrentColumn}
               onChange={setHighlightCurrentColumn}
               label="Highlight Current Column"
-              description="Show guests which column the current song is under."
+              description="Show guests which column the current song is under. If you’re experiencing delay, you may want to switch this off."
             />
             <Toggle
               checked={hideArtist}
@@ -337,8 +346,8 @@ export default function Page() {
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <LinkRow
               title="Jumbotron"
-              description="Customize a page intended as a large display."
-              href="/admin/games/bingo/settings"
+              description="Customize a page intended as a large video screen display."
+              href="/admin/games/bingo/settings/jumbotron"
             />
             <LinkRow
               title="Branding"
@@ -354,29 +363,7 @@ export default function Page() {
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="text-sm font-semibold text-slate-900">Game Type</div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              {GAME_TYPES.map((type) => (
-                <button
-                  key={type.value}
-                  type="button"
-                  onClick={() => setVariant(type.value)}
-                  className={`rounded-xl border px-4 py-3 text-left transition ${
-                    variant === type.value
-                      ? "border-indigo-500 bg-indigo-50"
-                      : "border-slate-200 hover:border-slate-300"
-                  }`}
-                >
-                  <div className="text-sm font-semibold text-slate-900">{type.label}</div>
-                  <div className="text-xs text-slate-500">{type.description}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="text-sm font-semibold text-slate-900">Game Tools</div>
-            <div className="mt-3 grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2">
               <label className="flex flex-col gap-2 text-sm text-slate-700">
                 Cards per game
                 <input

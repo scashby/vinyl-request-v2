@@ -1,8 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
+
+const LobbySection = ({
+  label,
+  count,
+  emptyText,
+  color,
+}: {
+  label: string;
+  count: number;
+  emptyText: string;
+  color: string;
+}) => (
+  <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+    <div className="flex items-center gap-3">
+      <span className={`rounded-md px-2 py-1 text-xs font-semibold ${color}`}>{count}</span>
+      <div>
+        <div className="text-sm font-semibold">{label}</div>
+        <div className="text-xs text-slate-400">{emptyText}</div>
+      </div>
+    </div>
+  </div>
+);
 
 type GameSession = {
   id: number;
@@ -48,13 +70,9 @@ export default function Page() {
           </Link>
           <div className="text-center">
             <div className="text-xs uppercase tracking-[0.3em] text-slate-500">Lobby</div>
-            <div className="text-sm font-semibold">Game Lobby</div>
+            <div className="text-sm font-semibold">Lobby</div>
           </div>
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="text-slate-400 hover:text-white"
-          >
+          <button type="button" onClick={() => router.back()} className="text-slate-400 hover:text-white">
             ×
           </button>
         </div>
@@ -81,25 +99,24 @@ export default function Page() {
         </div>
 
         <div className="mt-8 grid gap-4">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-            <div className="flex items-center gap-3">
-              <span className="rounded-md bg-blue-500/30 px-2 py-1 text-xs font-semibold text-blue-200">5</span>
-              <div>
-                <div className="text-sm font-semibold">Seats Available</div>
-                <div className="text-xs text-slate-400">Upgrade your account to host larger games.</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-            <div className="flex items-center gap-3">
-              <span className="rounded-md bg-amber-500/30 px-2 py-1 text-xs font-semibold text-amber-200">0</span>
-              <div>
-                <div className="text-sm font-semibold">Lobby</div>
-                <div className="text-xs text-slate-400">No guests waiting to join the game.</div>
-              </div>
-            </div>
-          </div>
+          <LobbySection
+            label="Playing"
+            count={0}
+            emptyText="No guests are in the game."
+            color="bg-emerald-500/20 text-emerald-200"
+          />
+          <LobbySection
+            label="Left game"
+            count={0}
+            emptyText="No guests have left the game."
+            color="bg-fuchsia-500/20 text-fuchsia-200"
+          />
+          <LobbySection
+            label="Removed"
+            count={0}
+            emptyText="No guests have been removed."
+            color="bg-rose-500/20 text-rose-200"
+          />
         </div>
 
         <button
