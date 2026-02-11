@@ -12,9 +12,13 @@ import EditAlbumModal from './EditAlbumModal';
 import NewCrateModal from './crates/NewCrateModal';
 import NewSmartCrateModal from './crates/NewSmartCrateModal';
 import { AddToCrateModal } from './crates/AddToCrateModal';
+import NewPlaylistModal from './playlists/NewPlaylistModal';
+import AddToPlaylistModal from './playlists/AddToPlaylistModal';
+import ManagePlaylistsModal from './playlists/ManagePlaylistsModal';
 import Header from './Header';
 import { ManageColumnFavoritesModal, type ColumnFavorite } from './ManageColumnFavoritesModal';
 import type { Crate } from '../../types/crate';
+import type { CollectionPlaylist } from '../../types/collectionPlaylist';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import CollectionInfoPanel from './components/CollectionInfoPanel';
 import { BoxIcon } from '../../components/BoxIcon';
@@ -87,14 +91,7 @@ type SidebarMode = 'format' | 'crates' | 'playlists';
 type TrackListSource = 'crates' | 'playlists';
 type CrateGameKey = 'bingo' | 'trivia' | 'brackets';
 
-interface Playlist {
-  id: string;
-  name: string;
-  icon: string;
-  color: string;
-  trackKeys: string[];
-  createdAt: string;
-}
+type Playlist = CollectionPlaylist;
 
 interface CollectionTrackRow {
   key: string;
@@ -130,8 +127,6 @@ const CRATE_GAME_LABELS: { key: CrateGameKey; icon: string; label: string }[] = 
   { key: 'trivia', icon: '❓', label: 'Trivia' },
   { key: 'brackets', icon: '🏆', label: 'Brackets' },
 ];
-
-const PLAYLIST_PRESET_ICONS = ['🎵', '🎧', '🔥', '⭐', '💿', '🎤'];
 
 const formatTrackDuration = (seconds: number | null | undefined): string => {
   if (!seconds || seconds <= 0) return '—';
@@ -241,11 +236,12 @@ function CollectionBrowserPage() {
   const [crateItemsByCrate, setCrateItemsByCrate] = useState<Record<number, Set<number>>>({});
   const [crateGameFlags, setCrateGameFlags] = useState<CrateGameFlags>({});
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState<number | null>(null);
   const [showNewPlaylistModal, setShowNewPlaylistModal] = useState(false);
   const [showAddToPlaylistModal, setShowAddToPlaylistModal] = useState(false);
   const [showManagePlaylistsModal, setShowManagePlaylistsModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
   
   const [collectionFilter, setCollectionFilter] = useState<string>('All');
   const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
@@ -318,15 +314,6 @@ function CollectionBrowserPage() {
       }
     }
 
-    const storedPlaylists = localStorage.getItem('collection-track-playlists');
-    if (storedPlaylists) {
-      try {
-        setPlaylists(JSON.parse(storedPlaylists) as Playlist[]);
-      } catch {
-        // Invalid JSON, ignore
-      }
-    }
-
     const storedViewMode = localStorage.getItem('collection-view-mode');
     if (storedViewMode === 'collection' || storedViewMode === 'album-track') {
       setViewMode(storedViewMode);
@@ -368,10 +355,6 @@ function CollectionBrowserPage() {
   useEffect(() => {
     localStorage.setItem('collection-crate-game-flags', JSON.stringify(crateGameFlags));
   }, [crateGameFlags]);
-
-  useEffect(() => {
-    localStorage.setItem('collection-track-playlists', JSON.stringify(playlists));
-  }, [playlists]);
 
   useEffect(() => {
     localStorage.setItem('collection-view-mode', viewMode);
@@ -562,10 +545,109 @@ function CollectionBrowserPage() {
     setCrateItemsByCrate(itemMap);
   }, []);
 
+  const loadPlaylists = useCallback(async () => {
+    const { data: playlistRows, error: playlistError } = await (supabase as any)
+      .from('collection_playlists')
+      .select('id, name, icon, color, sort_order, created_at')
+      .order('sort_order', { ascending: true });
+
+    if (playlistError) {
+      console.error('Error loading playlists:', playlistError);
+      return;
+    }
+
+    const { data: playlistItems, error: itemsError } = await (supabase as any)
+      .from('collection_playlist_items')
+      .select('playlist_id, track_key, sort_order')
+      .order('sort_order', { ascending: true });
+
+    if (itemsError) {
+      console.error('Error loading playlist items:', itemsError);
+      return;
+    }
+
+    if ((playlistRows ?? []).length === 0) {
+      const legacy = localStorage.getItem('collection-track-playlists');
+      if (legacy) {
+        try {
+          const parsed = JSON.parse(legacy) as Array<{
+            name: string;
+            icon?: string;
+            color?: string;
+            trackKeys?: string[];
+            createdAt?: string;
+          }>;
+
+          if (parsed.length > 0) {
+            for (let i = 0; i < parsed.length; i += 1) {
+              const legacyPlaylist = parsed[i];
+              const { data: inserted, error: insertError } = await (supabase as any)
+                .from('collection_playlists')
+                .insert({
+                  name: legacyPlaylist.name,
+                  icon: legacyPlaylist.icon || '🎵',
+                  color: legacyPlaylist.color || '#3578b3',
+                  sort_order: i,
+                  created_at: legacyPlaylist.createdAt || new Date().toISOString(),
+                })
+                .select('id')
+                .single();
+
+              if (insertError || !inserted) {
+                throw insertError || new Error('Failed to import legacy playlist');
+              }
+
+              const trackKeys = legacyPlaylist.trackKeys || [];
+              if (trackKeys.length > 0) {
+                const records = trackKeys.map((trackKey, idx) => ({
+                  playlist_id: inserted.id,
+                  track_key: trackKey,
+                  sort_order: idx,
+                }));
+                const { error: itemsInsertError } = await (supabase as any)
+                  .from('collection_playlist_items')
+                  .insert(records);
+                if (itemsInsertError) throw itemsInsertError;
+              }
+            }
+
+            localStorage.removeItem('collection-track-playlists');
+            await loadPlaylists();
+            return;
+          }
+        } catch (legacyError) {
+          console.error('Failed importing legacy local playlists:', legacyError);
+        }
+      }
+    }
+
+    const tracksByPlaylist = (playlistItems ?? []).reduce((acc, item) => {
+      if (!item.playlist_id || !item.track_key) return acc;
+      if (!acc[item.playlist_id]) {
+        acc[item.playlist_id] = [];
+      }
+      acc[item.playlist_id].push(item.track_key);
+      return acc;
+    }, {} as Record<number, string[]>);
+
+    const mapped: Playlist[] = (playlistRows ?? []).map((row) => ({
+      id: row.id,
+      name: row.name,
+      icon: row.icon || '🎵',
+      color: row.color || '#3578b3',
+      trackKeys: tracksByPlaylist[row.id] ?? [],
+      createdAt: row.created_at || new Date().toISOString(),
+      sortOrder: row.sort_order ?? 0,
+    }));
+
+    setPlaylists(mapped);
+  }, []);
+
   useEffect(() => {
     loadAlbums();
     loadCrates();
-  }, [loadAlbums, loadCrates]);
+    loadPlaylists();
+  }, [loadAlbums, loadCrates, loadPlaylists]);
 
   const filteredAndSortedAlbums = useMemo(() => {
     let filtered = albums.filter(album => {
@@ -1147,35 +1229,138 @@ function CollectionBrowserPage() {
     });
   }, []);
 
-  const handleCreatePlaylist = useCallback((playlist: Omit<Playlist, 'id' | 'createdAt' | 'trackKeys'>) => {
-    const newPlaylist: Playlist = {
-      id: `playlist-${Date.now()}`,
-      name: playlist.name,
-      icon: playlist.icon,
-      color: playlist.color,
-      trackKeys: [],
-      createdAt: new Date().toISOString(),
-    };
-    setPlaylists((prev) => [...prev, newPlaylist]);
-    setSelectedPlaylistId(newPlaylist.id);
-    setShowNewPlaylistModal(false);
-    setTrackSource('playlists');
-    setViewMode('album-track');
-  }, []);
+  const handleCreatePlaylist = useCallback(async (playlist: { name: string; icon: string; color: string }) => {
+    try {
+      const maxSort = playlists.reduce((max, item) => Math.max(max, item.sortOrder ?? 0), -1);
+      const nextSortOrder = maxSort + 1;
 
-  const handleAddToPlaylists = useCallback((playlistIds: string[]) => {
+      const { data, error } = await (supabase as any)
+        .from('collection_playlists')
+        .insert({
+          name: playlist.name.trim(),
+          icon: playlist.icon,
+          color: playlist.color,
+          sort_order: nextSortOrder,
+        })
+        .select('id')
+        .single();
+
+      if (error || !data) {
+        throw error || new Error('Failed to create playlist');
+      }
+
+      await loadPlaylists();
+      setSelectedPlaylistId(data.id);
+      setShowNewPlaylistModal(false);
+      setTrackSource('playlists');
+      setViewMode('album-track');
+    } catch (err) {
+      console.error('Failed to create playlist:', err);
+      alert('Failed to create playlist. Please try again.');
+    }
+  }, [loadPlaylists, playlists]);
+
+  const handleUpdatePlaylist = useCallback(async (playlist: Playlist) => {
+    try {
+      const { error } = await (supabase as any)
+        .from('collection_playlists')
+        .update({
+          name: playlist.name,
+          icon: playlist.icon,
+          color: playlist.color,
+        })
+        .eq('id', playlist.id);
+
+      if (error) throw error;
+      await loadPlaylists();
+    } catch (err) {
+      console.error('Failed to update playlist:', err);
+      alert('Failed to update playlist. Please try again.');
+    }
+  }, [loadPlaylists]);
+
+  const handleDeletePlaylist = useCallback(async (playlistId: number, playlistName: string) => {
+    if (!confirm(`Delete playlist "${playlistName}"? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await (supabase as any)
+        .from('collection_playlists')
+        .delete()
+        .eq('id', playlistId);
+
+      if (error) throw error;
+
+      if (selectedPlaylistId === playlistId) {
+        setSelectedPlaylistId(null);
+      }
+      await loadPlaylists();
+    } catch (err) {
+      console.error('Failed to delete playlist:', err);
+      alert('Failed to delete playlist. Please try again.');
+    }
+  }, [loadPlaylists, selectedPlaylistId]);
+
+  const handleReorderPlaylists = useCallback(async (orderedPlaylists: Playlist[]) => {
+    try {
+      const updates = orderedPlaylists.map((playlist, index) => ({
+        id: playlist.id,
+        sort_order: index,
+      }));
+
+      for (const update of updates) {
+        const { error } = await (supabase as any)
+          .from('collection_playlists')
+          .update({ sort_order: update.sort_order })
+          .eq('id', update.id);
+        if (error) throw error;
+      }
+
+      await loadPlaylists();
+    } catch (err) {
+      console.error('Failed to reorder playlists:', err);
+      alert('Failed to reorder playlists. Please try again.');
+    }
+  }, [loadPlaylists]);
+
+  const handleAddToPlaylists = useCallback(async (playlistIds: number[]) => {
     if (selectedTrackKeys.size === 0 || playlistIds.length === 0) return;
-    const trackKeys = Array.from(selectedTrackKeys);
-    setPlaylists((prev) =>
-      prev.map((playlist) => {
-        if (!playlistIds.includes(playlist.id)) return playlist;
-        const merged = new Set([...playlist.trackKeys, ...trackKeys]);
-        return { ...playlist, trackKeys: Array.from(merged) };
-      })
-    );
-    setSelectedTrackKeys(new Set());
-    setShowAddToPlaylistModal(false);
-  }, [selectedTrackKeys]);
+
+    try {
+      const trackKeys = Array.from(selectedTrackKeys);
+      const records: Array<{ playlist_id: number; track_key: string; sort_order: number }> = [];
+
+      playlists.forEach((playlist) => {
+        if (!playlistIds.includes(playlist.id)) return;
+        const existingKeys = new Set(playlist.trackKeys);
+        let sortOrderBase = playlist.trackKeys.length;
+        trackKeys.forEach((trackKey) => {
+          if (existingKeys.has(trackKey)) return;
+          records.push({
+            playlist_id: playlist.id,
+            track_key: trackKey,
+            sort_order: sortOrderBase,
+          });
+          sortOrderBase += 1;
+        });
+      });
+
+      if (records.length > 0) {
+        const { error } = await (supabase as any)
+          .from('collection_playlist_items')
+          .insert(records);
+        if (error) throw error;
+      }
+
+      await loadPlaylists();
+      setSelectedTrackKeys(new Set());
+      setShowAddToPlaylistModal(false);
+    } catch (err) {
+      console.error('Failed to add tracks to playlists:', err);
+      alert('Failed to add tracks to playlists. Please try again.');
+    }
+  }, [loadPlaylists, playlists, selectedTrackKeys]);
 
   return (
     <>
@@ -1716,8 +1901,13 @@ function CollectionBrowserPage() {
       {showNewPlaylistModal && (
         <NewPlaylistModal
           isOpen={showNewPlaylistModal}
-          onClose={() => setShowNewPlaylistModal(false)}
+          editingPlaylist={editingPlaylist}
+          onClose={() => {
+            setShowNewPlaylistModal(false);
+            setEditingPlaylist(null);
+          }}
           onCreate={handleCreatePlaylist}
+          onUpdate={handleUpdatePlaylist}
         />
       )}
       {showAddToPlaylistModal && (
@@ -1729,6 +1919,7 @@ function CollectionBrowserPage() {
           onAdd={handleAddToPlaylists}
           onOpenNewPlaylist={() => {
             setShowAddToPlaylistModal(false);
+            setEditingPlaylist(null);
             setShowNewPlaylistModal(true);
           }}
         />
@@ -1738,9 +1929,16 @@ function CollectionBrowserPage() {
           isOpen={showManagePlaylistsModal}
           onClose={() => setShowManagePlaylistsModal(false)}
           playlists={playlists}
-          onSave={setPlaylists}
+          onReorder={handleReorderPlaylists}
+          onDelete={handleDeletePlaylist}
+          onEdit={(playlist) => {
+            setShowManagePlaylistsModal(false);
+            setEditingPlaylist(playlist);
+            setShowNewPlaylistModal(true);
+          }}
           onOpenNewPlaylist={() => {
             setShowManagePlaylistsModal(false);
+            setEditingPlaylist(null);
             setShowNewPlaylistModal(true);
           }}
         />
@@ -1762,262 +1960,6 @@ function CollectionBrowserPage() {
         />
       )}
     </>
-  );
-}
-
-function NewPlaylistModal({
-  isOpen,
-  onClose,
-  onCreate
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onCreate: (playlist: { name: string; icon: string; color: string }) => void;
-}) {
-  const [name, setName] = useState('');
-  const [icon, setIcon] = useState('🎵');
-  const [color, setColor] = useState('#2196F3');
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30002]" onClick={onClose}>
-      <div className="bg-white rounded-lg w-[420px] shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="m-0 text-lg font-semibold text-gray-900">New Playlist</h2>
-          <button onClick={onClose} className="bg-transparent border-none text-2xl cursor-pointer text-gray-500">×</button>
-        </div>
-        <div className="p-6">
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Playlist Name</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Ex: Bingo Round 1"
-            className="w-full px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none focus:border-blue-500 mb-4"
-          />
-          <div className="mb-4">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Icon</label>
-            <div className="flex gap-2 flex-wrap">
-              {PLAYLIST_PRESET_ICONS.map((preset) => (
-                <button key={preset} onClick={() => setIcon(preset)} className={`w-10 h-10 border rounded flex items-center justify-center text-xl ${icon === preset ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`}>
-                  {preset}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="mb-2">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Color</label>
-            <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-16 h-10 border border-gray-300 rounded cursor-pointer" />
-          </div>
-        </div>
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 bg-gray-100 text-gray-700 border-none rounded text-sm cursor-pointer">Cancel</button>
-          <button
-            onClick={() => {
-              if (!name.trim()) return;
-              onCreate({ name: name.trim(), icon, color });
-              setName('');
-              setIcon('🎵');
-              setColor('#2196F3');
-            }}
-            disabled={!name.trim()}
-            className={`px-4 py-2 text-white border-none rounded text-sm cursor-pointer ${name.trim() ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'}`}
-          >
-            Create Playlist
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AddToPlaylistModal({
-  isOpen,
-  onClose,
-  playlists,
-  selectedTrackCount,
-  onAdd,
-  onOpenNewPlaylist
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  playlists: Playlist[];
-  selectedTrackCount: number;
-  onAdd: (playlistIds: string[]) => void;
-  onOpenNewPlaylist: () => void;
-}) {
-  const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<Set<string>>(new Set());
-  const [query, setQuery] = useState('');
-
-  useEffect(() => {
-    if (!isOpen) {
-      setSelectedPlaylistIds(new Set());
-      setQuery('');
-    }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  const filteredPlaylists = playlists.filter((playlist) => playlist.name.toLowerCase().includes(query.toLowerCase()));
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30002]" onClick={onClose}>
-      <div className="bg-white rounded-md w-[500px] max-h-[600px] flex flex-col overflow-hidden shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="px-4 py-3 border-b border-gray-200 flex justify-between items-center">
-          <h3 className="m-0 text-base font-semibold text-gray-900">Add {selectedTrackCount} Track{selectedTrackCount !== 1 ? 's' : ''} to Playlist</h3>
-          <button onClick={onClose} className="bg-transparent border-none text-xl cursor-pointer text-gray-500">×</button>
-        </div>
-        <div className="px-4 py-3 border-b border-gray-200 flex gap-2">
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search playlists..." className="flex-1 px-2.5 py-1.5 border border-gray-300 rounded text-[13px] outline-none focus:border-blue-500" />
-          <button onClick={onOpenNewPlaylist} className="px-3 py-1.5 bg-blue-500 text-white border-none rounded text-[13px] cursor-pointer">New Playlist</button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2">
-          {filteredPlaylists.length === 0 ? (
-            <div className="p-10 text-center text-gray-400 text-[13px]">
-              {playlists.length === 0 ? 'No playlists available yet.' : 'No playlists match your search.'}
-            </div>
-          ) : (
-            filteredPlaylists.map((playlist) => {
-              const checked = selectedPlaylistIds.has(playlist.id);
-              return (
-                <label key={playlist.id} className="flex items-center justify-between px-2 py-2 rounded cursor-pointer hover:bg-gray-100">
-                  <span className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => {
-                        setSelectedPlaylistIds((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(playlist.id)) next.delete(playlist.id);
-                          else next.add(playlist.id);
-                          return next;
-                        });
-                      }}
-                    />
-                    <span>{playlist.icon}</span>
-                    <span className="text-[13px] text-gray-900">{playlist.name}</span>
-                  </span>
-                  <span className="text-[12px] text-gray-500">{playlist.trackKeys.length}</span>
-                </label>
-              );
-            })
-          )}
-        </div>
-        <div className="px-4 py-3 border-t border-gray-200 flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-1.5 bg-white border border-gray-300 text-gray-700 rounded text-[13px] cursor-pointer">Cancel</button>
-          <button
-            onClick={() => onAdd(Array.from(selectedPlaylistIds))}
-            disabled={selectedPlaylistIds.size === 0}
-            className={`px-4 py-1.5 border-none rounded text-[13px] text-white ${selectedPlaylistIds.size > 0 ? 'bg-blue-500 hover:bg-blue-600 cursor-pointer' : 'bg-gray-300 cursor-not-allowed'}`}
-          >
-            Add to Playlist
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ManagePlaylistsModal({
-  isOpen,
-  onClose,
-  playlists,
-  onSave,
-  onOpenNewPlaylist
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  playlists: Playlist[];
-  onSave: (playlists: Playlist[]) => void;
-  onOpenNewPlaylist: () => void;
-}) {
-  const [localPlaylists, setLocalPlaylists] = useState<Playlist[]>(playlists);
-
-  useEffect(() => {
-    if (isOpen) {
-      setLocalPlaylists(playlists);
-    }
-  }, [isOpen, playlists]);
-
-  if (!isOpen) return null;
-
-  const movePlaylist = (index: number, direction: 'up' | 'down') => {
-    const target = direction === 'up' ? index - 1 : index + 1;
-    if (target < 0 || target >= localPlaylists.length) return;
-    const next = [...localPlaylists];
-    const [item] = next.splice(index, 1);
-    next.splice(target, 0, item);
-    setLocalPlaylists(next);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30002]" onClick={onClose}>
-      <div className="bg-white rounded-lg w-[620px] max-h-[80vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="m-0 text-lg font-semibold text-gray-900">Manage Playlists</h2>
-          <div className="flex items-center gap-2">
-            <button onClick={onOpenNewPlaylist} className="px-3 py-1.5 bg-blue-500 text-white border-none rounded text-xs font-medium cursor-pointer hover:bg-blue-600">New Playlist</button>
-            <button onClick={onClose} className="bg-transparent border-none text-2xl cursor-pointer text-gray-500">×</button>
-          </div>
-        </div>
-
-        <div className="p-4 overflow-y-auto flex-1">
-          {localPlaylists.length === 0 ? (
-            <div className="p-10 text-center text-gray-500 text-sm">No playlists yet.</div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {localPlaylists.map((playlist, index) => (
-                <div key={playlist.id} className="flex items-center gap-3 p-3 border border-gray-200 bg-gray-50 rounded">
-                  <div className="flex flex-col gap-0.5">
-                    <button onClick={() => movePlaylist(index, 'up')} disabled={index === 0} className={`w-6 h-5 rounded border text-[10px] ${index === 0 ? 'border-gray-200 text-gray-300' : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-100'}`}>▲</button>
-                    <button onClick={() => movePlaylist(index, 'down')} disabled={index === localPlaylists.length - 1} className={`w-6 h-5 rounded border text-[10px] ${index === localPlaylists.length - 1 ? 'border-gray-200 text-gray-300' : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-100'}`}>▼</button>
-                  </div>
-                  <div className="text-2xl" style={{ color: playlist.color }}>{playlist.icon}</div>
-                  <div className="flex-1">
-                    <div className="text-sm font-semibold text-gray-900">{playlist.name}</div>
-                    <div className="text-xs text-gray-500">{playlist.trackKeys.length} tracks</div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        const nextName = prompt('Rename playlist', playlist.name)?.trim();
-                        if (!nextName) return;
-                        setLocalPlaylists((prev) => prev.map((item) => (item.id === playlist.id ? { ...item, name: nextName } : item)));
-                      }}
-                      className="px-3 py-1.5 bg-white border border-gray-300 rounded text-xs cursor-pointer hover:bg-gray-50"
-                    >
-                      Rename
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (!confirm(`Delete playlist "${playlist.name}"?`)) return;
-                        setLocalPlaylists((prev) => prev.filter((item) => item.id !== playlist.id));
-                      }}
-                      className="px-3 py-1.5 bg-red-500 text-white border-none rounded text-xs cursor-pointer hover:bg-red-600"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 bg-gray-100 text-gray-700 border-none rounded text-sm cursor-pointer hover:bg-gray-200">Cancel</button>
-          <button
-            onClick={() => {
-              onSave(localPlaylists);
-              onClose();
-            }}
-            className="px-4 py-2 bg-blue-500 text-white border-none rounded text-sm cursor-pointer hover:bg-blue-600"
-          >
-            Save
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -2045,7 +1987,7 @@ function ExportCsvTxtModal({
   currentTracks: CollectionTrackRow[];
   selectedTrackKeys: Set<string>;
   playlists: Playlist[];
-  selectedPlaylistId: string | null;
+  selectedPlaylistId: number | null;
   visibleColumns: ColumnId[];
 }) {
   type TrackExportColumnId =

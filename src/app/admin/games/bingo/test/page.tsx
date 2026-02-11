@@ -1,65 +1,77 @@
 // Path: src/app/admin/games/bingo/test/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Settings, Moon, Sun } from "lucide-react";
+import Image from "next/image";
+import { ChevronLeft, History, Settings, X, Plus } from "lucide-react";
 
 type GameTemplate = {
   id: number;
   name: string;
   description: string | null;
-  source: string | null;
+  image_url?: string | null;
   item_count?: number;
+  source?: string;
 };
 
-type SpotifyPlaylist = {
+type TemplateItem = {
   id: number;
-  name: string;
-  song_count?: number;
+  title: string;
+  artist: string;
 };
 
+// Placeholder images for demo - in production these come from the database
+const PLAYLIST_IMAGES: Record<string, string> = {
+  "Sing A Long Hits Vol. 1": "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=200&fit=crop",
+  "Sing A Long Hits Vol. 2": "https://images.unsplash.com/photo-1529518969858-8baa65152fc8?w=400&h=200&fit=crop",
+  "One Hit Wonders": "https://images.unsplash.com/photo-1619983081563-430f63602796?w=400&h=200&fit=crop",
+  "80's Hits": "https://images.unsplash.com/photo-1557683316-973673baf926?w=400&h=200&fit=crop",
+  "Party Jamz": "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=400&h=200&fit=crop",
+  "Christmas": "https://images.unsplash.com/photo-1512389142860-9c449e58a814?w=400&h=200&fit=crop",
+  "90's Hits": "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=200&fit=crop",
+  "70's Hits": "https://images.unsplash.com/photo-1506157786151-b8491531f063?w=400&h=200&fit=crop",
+  "2000's Hits": "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&h=200&fit=crop",
+  "Women of Pop": "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&h=200&fit=crop",
+  "Yacht Rock": "https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=400&h=200&fit=crop",
+  "Boybands vs Girlbands": "https://images.unsplash.com/photo-1524368535928-5b5e00ddc76b?w=400&h=200&fit=crop",
+};
+
+// Gradient fallbacks for playlists without images
 const GRADIENTS = [
-  "from-pink-500 to-rose-600",
-  "from-violet-500 to-purple-600",
-  "from-blue-500 to-indigo-600",
-  "from-emerald-500 to-teal-600",
-  "from-amber-500 to-orange-600",
+  "from-orange-500 to-red-600",
   "from-cyan-500 to-blue-600",
-  "from-fuchsia-500 to-pink-600",
-  "from-lime-500 to-green-600",
+  "from-pink-500 to-purple-600",
+  "from-violet-500 to-purple-700",
+  "from-yellow-400 to-orange-500",
+  "from-green-400 to-cyan-500",
+  "from-rose-400 to-pink-600",
+  "from-indigo-500 to-violet-600",
 ];
 
 export default function BingoPlaylistsPage() {
   const router = useRouter();
   const [templates, setTemplates] = useState<GameTemplate[]>([]);
-  const [spotifyPlaylists, setSpotifyPlaylists] = useState<SpotifyPlaylist[]>([]);
-  const [darkMode, setDarkMode] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [previewPlaylist, setPreviewPlaylist] = useState<GameTemplate | null>(null);
+  const [previewItems, setPreviewItems] = useState<TemplateItem[]>([]);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
-  const rockstarPlaylists = useMemo(
-    () => templates.filter((t) => t.source === "featured" || t.source === "system"),
-    [templates]
+  const systemPlaylists = templates.filter(
+    (t) => t.source === "featured" || t.source === "system"
   );
-
-  const customPlaylists = useMemo(
-    () => templates.filter((t) => !t.source || t.source === "custom"),
-    [templates]
+  const customPlaylists = templates.filter(
+    (t) => !t.source || t.source === "custom"
   );
 
   useEffect(() => {
     async function load() {
       try {
-        const [tRes, pRes] = await Promise.all([
-          fetch("/api/game-templates"),
-          fetch("/api/playlists?platform=spotify"),
-        ]);
-        if (tRes.ok) {
-          const d = await tRes.json();
+        const res = await fetch("/api/game-templates");
+        if (res.ok) {
+          const d = await res.json();
           setTemplates(d.data ?? d ?? []);
-        }
-        if (pRes.ok) {
-          setSpotifyPlaylists(await pRes.json());
         }
       } finally {
         setIsLoading(false);
@@ -68,158 +80,366 @@ export default function BingoPlaylistsPage() {
     load();
   }, []);
 
-  const selectPlaylist = (id: number) => {
-    router.push(`/admin/games/bingo/test/host?templateId=${id}`);
+  const openPreview = async (playlist: GameTemplate) => {
+    setPreviewPlaylist(playlist);
+    setLoadingPreview(true);
+    try {
+      const res = await fetch(`/api/game-templates/${playlist.id}/items`);
+      if (res.ok) {
+        const d = await res.json();
+        setPreviewItems(d.data ?? d ?? []);
+      }
+    } finally {
+      setLoadingPreview(false);
+    }
   };
 
-  const selectSpotify = (id: number) => {
-    router.push(`/admin/games/bingo/test/host?spotifyId=${id}`);
+  const startGame = () => {
+    if (previewPlaylist) {
+      router.push(`/admin/games/bingo/test/setup?templateId=${previewPlaylist.id}`);
+    }
   };
 
-  const bg = darkMode ? "bg-[#1a1625]" : "bg-gray-100";
-  const card = darkMode ? "bg-[#252236]" : "bg-white";
-  const text = darkMode ? "text-white" : "text-gray-900";
-  const muted = darkMode ? "text-gray-400" : "text-gray-500";
-  const border = darkMode ? "border-[#2d2a3e]" : "border-gray-200";
+  const getPlaylistImage = (name: string) => {
+    return PLAYLIST_IMAGES[name] || null;
+  };
 
   return (
-    <div className={`min-h-screen ${bg} ${text}`}>
+    <div className="min-h-screen bg-[#121212] text-white">
       {/* Header */}
-      <header className={`border-b ${border} px-6 py-4`}>
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-rose-600">
-              <span className="text-xl text-white">★</span>
-            </div>
-            <span className="text-lg font-bold">Rockstar Bingo</span>
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#121212]/95 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
+          <button
+            onClick={() => router.back()}
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+          <div className="flex items-center gap-1 text-lg font-medium tracking-wide">
+            <span>rockstar</span>
+            <span className="text-purple-400">★</span>
+            <span>bingo</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <button
-              onClick={() => setDarkMode(!darkMode)}
-              className={`rounded-lg p-2 transition ${darkMode ? "hover:bg-white/10" : "hover:bg-gray-200"}`}
+              onClick={() => router.push("/admin/games/bingo/test/history")}
+              className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10"
             >
-              {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              <History className="h-5 w-5" />
             </button>
-            <button className={`rounded-lg p-2 transition ${darkMode ? "hover:bg-white/10" : "hover:bg-gray-200"}`}>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10"
+            >
               <Settings className="h-5 w-5" />
             </button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-6 py-8">
+      <main className="mx-auto max-w-5xl px-4 py-8">
         {isLoading ? (
           <div className="flex justify-center py-20">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-pink-500 border-t-transparent" />
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
           </div>
         ) : (
           <div className="space-y-10">
-            {/* Rockstar Playlists */}
+            {/* Title Section */}
+            <div>
+              <h1 className="text-2xl font-bold">Music Bingo</h1>
+              <p className="mt-1 text-gray-400">
+                Choose a playlist below to start a game of music bingo.
+              </p>
+              <button className="mt-2 text-sm font-medium uppercase tracking-wide text-cyan-400 hover:text-cyan-300">
+                Change Game Type
+              </button>
+            </div>
+
+            {/* Our Playlists */}
             <section>
-              <h2 className="mb-4 text-lg font-bold">Rockstar Playlists</h2>
-              {rockstarPlaylists.length === 0 ? (
-                <p className={muted}>No featured playlists available</p>
+              <h2 className="mb-2 text-lg font-semibold">Our Playlists</h2>
+              <p className="mb-4 text-sm text-gray-400">
+                Try one of our suggested playlists.
+              </p>
+              {systemPlaylists.length === 0 ? (
+                <p className="text-gray-500">No featured playlists available</p>
               ) : (
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                  {rockstarPlaylists.map((p, i) => (
-                    <button
-                      key={p.id}
-                      onClick={() => selectPlaylist(p.id)}
-                      className={`group aspect-square overflow-hidden rounded-2xl bg-gradient-to-br ${GRADIENTS[i % GRADIENTS.length]} p-4 text-left shadow-lg transition hover:scale-[1.03] hover:shadow-xl`}
-                    >
-                      <div className="flex h-full flex-col justify-end">
-                        <div className="font-bold text-white drop-shadow">{p.name}</div>
-                        {p.item_count && (
-                          <div className="text-sm text-white/70">{p.item_count} songs</div>
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+                  {systemPlaylists.map((p, i) => {
+                    const img = getPlaylistImage(p.name);
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => openPreview(p)}
+                        className="group relative aspect-[2/1] overflow-hidden rounded-lg text-left transition-transform hover:scale-[1.02]"
+                      >
+                        {img ? (
+                          <Image
+                            src={img}
+                            alt={p.name}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div
+                            className={`absolute inset-0 bg-gradient-to-br ${GRADIENTS[i % GRADIENTS.length]}`}
+                          />
                         )}
-                      </div>
-                    </button>
-                  ))}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                        <div className="absolute bottom-0 left-0 p-3">
+                          <div className="font-semibold text-white drop-shadow-lg">
+                            {p.name}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </section>
 
-            {/* Custom Playlists */}
+            {/* Your Custom Playlists */}
             <section>
-              <h2 className="mb-4 text-lg font-bold">Custom Playlists</h2>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              <div className="mb-2 flex items-center gap-3">
+                <h2 className="text-lg font-semibold">Your Custom Playlists</h2>
+                <button className="text-sm font-medium uppercase tracking-wide text-cyan-400 hover:text-cyan-300">
+                  Edit
+                </button>
+              </div>
+              <p className="mb-4 text-sm text-gray-400">
+                Playlists you&apos;ve imported and fine-tuned to perfection.
+              </p>
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
                 {/* Create New */}
                 <button
-                  onClick={() => router.push("/admin/games/bingo/test/playlists/new")}
-                  className={`aspect-square rounded-2xl border-2 border-dashed ${border} transition hover:border-pink-500 hover:bg-pink-500/5`}
+                  onClick={() =>
+                    router.push("/admin/games/bingo/test/playlists/create")
+                  }
+                  className="group flex aspect-[2/1] flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-purple-500/50 bg-transparent transition-colors hover:border-purple-400 hover:bg-purple-500/5"
                 >
-                  <div className="flex h-full flex-col items-center justify-center gap-2">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-rose-600 text-2xl text-white">
-                      +
-                    </div>
-                    <span className="text-sm font-medium">Create Playlist</span>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-current text-purple-400 group-hover:text-purple-300">
+                    <Plus className="h-5 w-5" />
                   </div>
+                  <span className="text-sm font-medium text-gray-300 group-hover:text-white">
+                    Create a Custom Playlist
+                  </span>
                 </button>
 
                 {customPlaylists.map((p, i) => (
                   <button
                     key={p.id}
-                    onClick={() => selectPlaylist(p.id)}
-                    className={`aspect-square rounded-2xl ${card} border ${border} p-4 text-left shadow transition hover:shadow-lg`}
+                    onClick={() => openPreview(p)}
+                    className={`group relative aspect-[2/1] overflow-hidden rounded-lg text-left transition-transform hover:scale-[1.02] bg-gradient-to-br ${GRADIENTS[(i + 3) % GRADIENTS.length]}`}
                   >
-                    <div className="flex h-full flex-col">
-                      <div className={`mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br ${GRADIENTS[(i + 3) % GRADIENTS.length]} text-white`}>
-                        ♪
-                      </div>
-                      <div className="flex-1 font-medium">{p.name}</div>
-                      {p.item_count && (
-                        <div className={`text-xs ${muted}`}>{p.item_count} songs</div>
-                      )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                    <div className="absolute bottom-0 left-0 p-3">
+                      <div className="font-semibold text-white">{p.name}</div>
                     </div>
                   </button>
                 ))}
               </div>
             </section>
 
-            {/* Spotify Playlists */}
+            {/* Spotify Section */}
             <section>
-              <div className="mb-4 flex items-center gap-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1DB954]">
-                  <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+              <div className="rounded-xl bg-[#1a1a1a] p-6">
+                <h2 className="text-lg font-semibold">
+                  Use your playlists on Spotify
+                </h2>
+                <p className="mt-1 text-sm text-gray-400">
+                  Connect a Spotify Premium account to play a bingo game with
+                  your own playlists.
+                </p>
+                <button className="mt-4 flex items-center justify-center gap-2 rounded-full bg-[#2a2a2a] px-6 py-3 text-sm font-semibold transition hover:bg-[#333]">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
                   </svg>
-                </div>
-                <h2 className="text-lg font-bold">Your Spotify Playlists</h2>
+                  CONNECT TO SPOTIFY
+                </button>
               </div>
-              {spotifyPlaylists.length === 0 ? (
-                <div className={`rounded-2xl ${card} border ${border} p-6`}>
-                  <p className={muted}>No Spotify playlists connected.</p>
-                  <button className="mt-3 rounded-full bg-[#1DB954] px-5 py-2 text-sm font-semibold text-white hover:bg-[#1ed760]">
-                    Connect Spotify
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                  {spotifyPlaylists.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => selectSpotify(p.id)}
-                      className={`aspect-square rounded-2xl ${card} border ${border} p-4 text-left shadow transition hover:shadow-lg`}
-                    >
-                      <div className="flex h-full flex-col">
-                        <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-[#1DB954]">
-                          <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
-                          </svg>
-                        </div>
-                        <div className="flex-1 font-medium">{p.name}</div>
-                        {p.song_count && (
-                          <div className={`text-xs ${muted}`}>{p.song_count} songs</div>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
             </section>
+
+            {/* Terms */}
+            <p className="text-center text-xs text-gray-500">
+              By continuing, I acknowledge and confirm that I have read the{" "}
+              <a href="#" className="text-cyan-400 hover:underline">
+                terms of service
+              </a>{" "}
+              and I agree to be bound by such terms.
+            </p>
           </div>
         )}
       </main>
+
+      {/* Preview Modal */}
+      {previewPlaylist && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="relative w-full max-w-lg rounded-xl bg-[#1a1a1a] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 p-4">
+              <h2 className="text-lg font-semibold">
+                Preview: {previewPlaylist.name}
+              </h2>
+              <button
+                onClick={() => setPreviewPlaylist(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-4">
+              <div className="mb-4 flex items-center gap-2">
+                <span className="text-gray-400">Possible Songs:</span>
+                <span className="rounded bg-purple-600 px-2 py-0.5 text-sm font-semibold">
+                  {previewPlaylist.item_count || previewItems.length}
+                </span>
+              </div>
+              <div className="max-h-80 space-y-1 overflow-y-auto">
+                {loadingPreview ? (
+                  <div className="flex justify-center py-8">
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
+                  </div>
+                ) : previewItems.length === 0 ? (
+                  <p className="py-8 text-center text-gray-500">
+                    No songs in this playlist
+                  </p>
+                ) : (
+                  previewItems.map((item) => (
+                    <div key={item.id} className="py-2">
+                      <div className="font-medium">{item.title}</div>
+                      <div className="text-sm uppercase tracking-wide text-gray-400">
+                        {item.artist}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            <div className="p-4">
+              <button
+                onClick={startGame}
+                className="w-full rounded-lg bg-gradient-to-r from-purple-600 to-violet-600 py-3 font-semibold uppercase tracking-wide transition hover:from-purple-500 hover:to-violet-500"
+              >
+                Create Game
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="relative w-full max-w-lg rounded-xl bg-[#1a1a1a] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 p-4">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <h2 className="text-lg font-semibold">Settings</h2>
+              </div>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4 p-4">
+              {/* Account */}
+              <div className="rounded-lg bg-[#252525] p-4">
+                <h3 className="font-semibold">Account</h3>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-gray-400">steve@deadwaxdialogues.com</span>
+                  <span className="rounded bg-green-600 px-2 py-0.5 text-xs font-semibold uppercase">
+                    Free
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-gray-500">
+                  You can host up to <strong className="text-white">5 guests</strong> per game
+                </p>
+                <button className="mt-3 w-full rounded-lg bg-gradient-to-r from-purple-600 to-violet-600 py-2.5 font-semibold uppercase tracking-wide">
+                  Upgrade Account
+                </button>
+                <button className="mt-2 w-full rounded-lg border border-purple-500 py-2.5 font-semibold uppercase tracking-wide text-purple-400 hover:bg-purple-500/10">
+                  Logout
+                </button>
+              </div>
+
+              {/* Spotify */}
+              <div className="rounded-lg bg-[#252525] p-4">
+                <h3 className="font-semibold">Spotify Connection</h3>
+                <p className="mt-1 text-sm text-gray-400">
+                  Connect a Spotify Premium account to access your playlists and manage playback
+                </p>
+                <button className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#333] py-2.5 font-semibold transition hover:bg-[#404040]">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
+                  </svg>
+                  CONNECT TO SPOTIFY
+                </button>
+              </div>
+
+              {/* Color Mode */}
+              <div className="rounded-lg bg-[#252525] p-4">
+                <h3 className="font-semibold">Color Mode</h3>
+                <div className="mt-3 flex rounded-lg bg-[#1a1a1a] p-1">
+                  <button className="flex-1 rounded-md px-4 py-2 text-sm font-medium text-gray-400 transition hover:text-white">
+                    AUTO
+                  </button>
+                  <button className="flex-1 rounded-md px-4 py-2 text-sm font-medium text-gray-400 transition hover:text-white">
+                    LIGHT
+                  </button>
+                  <button className="flex-1 rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white">
+                    ✓ DARK
+                  </button>
+                </div>
+              </div>
+
+              {/* Links */}
+              <button className="flex w-full items-center justify-between rounded-lg bg-[#252525] p-4 text-left hover:bg-[#2a2a2a]">
+                <div>
+                  <h3 className="font-semibold">Branding Settings</h3>
+                  <p className="text-sm text-gray-400">
+                    Customize how your brand appears throughout the application.
+                  </p>
+                </div>
+                <ChevronLeft className="h-5 w-5 rotate-180 text-gray-400" />
+              </button>
+
+              <button className="flex w-full items-center justify-between rounded-lg bg-[#252525] p-4 text-left hover:bg-[#2a2a2a]">
+                <div>
+                  <h3 className="font-semibold">Join Screen URL</h3>
+                  <p className="text-sm text-gray-400">
+                    Customize the web address guests join games from.
+                  </p>
+                </div>
+                <ChevronLeft className="h-5 w-5 rotate-180 text-gray-400" />
+              </button>
+
+              <button className="flex w-full items-center justify-between rounded-lg bg-[#252525] p-4 text-left hover:bg-[#2a2a2a]">
+                <div>
+                  <h3 className="font-semibold">Venues</h3>
+                  <p className="text-sm text-gray-400">
+                    Manage the locations you host games at.
+                  </p>
+                </div>
+                <ChevronLeft className="h-5 w-5 rotate-180 text-gray-400" />
+              </button>
+            </div>
+            <div className="p-4">
+              <button
+                onClick={() => setShowSettings(false)}
+                className="w-full rounded-lg bg-gradient-to-r from-purple-600 to-violet-600 py-3 font-semibold uppercase tracking-wide"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

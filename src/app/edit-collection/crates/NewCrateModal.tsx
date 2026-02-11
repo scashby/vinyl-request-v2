@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from 'lib/supabaseClient';
 import type { Crate } from 'types/crate';
+import { SHARED_COLOR_PRESETS, SHARED_ICON_PRESETS } from '../iconPresets';
 
 interface NewCrateModalProps {
   isOpen: boolean;
@@ -12,40 +13,27 @@ interface NewCrateModalProps {
   editingCrate?: Crate | null; // Optional crate to edit
 }
 
-const PRESET_ICONS = [
-  '📦',
-  '🎱', // Bingo
-  '❓', // Trivia
-  '🏆', // Brackets
-  '🎮', // Other games
-  '🎵',
-  '🎧',
-  '🔥',
-  '⭐',
-  '💎',
-  '🎸',
-  '🎤',
-  '🎺',
-  '🥁',
-];
-const PRESET_COLORS = [
-  '#3578b3', // Default blue
-  '#ef4444', // Red
-  '#f59e0b', // Orange
-  '#10b981', // Green
-  '#8b5cf6', // Purple
-  '#ec4899', // Pink
-  '#06b6d4', // Cyan
-];
-
 export function NewCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }: NewCrateModalProps) {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('📦');
   const [color, setColor] = useState('#3578b3');
+  const [iconSearch, setIconSearch] = useState('');
+  const [customIcon, setCustomIcon] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isEditing = !!editingCrate;
+  const firstIconFromInput = (value: string): string => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    return Array.from(trimmed)[0] ?? '';
+  };
+
+  const filteredIcons = SHARED_ICON_PRESETS.filter((preset) => {
+    const q = iconSearch.trim().toLowerCase();
+    if (!q) return true;
+    return preset.icon.includes(q) || preset.keywords.some((keyword) => keyword.includes(q));
+  });
 
   // Populate form when editing
   useEffect(() => {
@@ -53,6 +41,7 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }:
       setName(editingCrate.name);
       setIcon(editingCrate.icon);
       setColor(editingCrate.color);
+      setCustomIcon(editingCrate.icon);
     }
   }, [editingCrate]);
 
@@ -137,6 +126,8 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }:
       setName('');
       setIcon('📦');
       setColor('#3578b3');
+      setIconSearch('');
+      setCustomIcon('');
     }
     setError(null);
     setSaving(false);
@@ -198,18 +189,43 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }:
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Icon
             </label>
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                value={customIcon}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setCustomIcon(value);
+                  const parsed = firstIconFromInput(value);
+                  if (parsed) setIcon(parsed);
+                }}
+                placeholder="Paste any emoji"
+                className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
+              />
+              <input
+                type="text"
+                value={iconSearch}
+                onChange={(e) => setIconSearch(e.target.value)}
+                placeholder="Filter"
+                className="w-[110px] px-2 py-1.5 border border-gray-300 rounded text-sm"
+              />
+            </div>
             <div className="flex gap-2 flex-wrap">
-              {PRESET_ICONS.map((presetIcon) => (
+              {filteredIcons.map((preset) => (
                 <button
-                  key={presetIcon}
-                  onClick={() => setIcon(presetIcon)}
+                  key={preset.icon}
+                  onClick={() => {
+                    setIcon(preset.icon);
+                    setCustomIcon(preset.icon);
+                  }}
                   className={`w-12 h-12 border rounded-md cursor-pointer text-2xl flex items-center justify-center ${
-                    icon === presetIcon 
+                    icon === preset.icon
                       ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100' 
                       : 'border-gray-300 bg-white hover:bg-gray-50'
                   }`}
+                  title={preset.keywords.join(', ')}
                 >
-                  {presetIcon}
+                  {preset.icon}
                 </button>
               ))}
             </div>
@@ -221,7 +237,7 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }:
               Color
             </label>
             <div className="flex gap-2 flex-wrap">
-              {PRESET_COLORS.map((presetColor) => (
+              {SHARED_COLOR_PRESETS.map((presetColor) => (
                 <button
                   key={presetColor}
                   onClick={() => setColor(presetColor)}
@@ -232,6 +248,7 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }:
                 />
               ))}
             </div>
+            <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="mt-2 w-14 h-8 border border-gray-300 rounded cursor-pointer" />
           </div>
 
           {/* Preview */}
