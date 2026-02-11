@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   const { data: inventoryRows, error } = await supabaseAdmin
     .from("inventory")
     .select(
-      "id, releases ( id, media_type, format_details, release_tracks ( id, position, side, title_override, recordings ( id, title, track_artist ) ) )"
+      "id, releases ( id, media_type, format_details, release_year, release_tracks ( id, position, side, title_override, recordings ( id, title, track_artist ) ) )"
     )
     .eq("releases.media_type", "Vinyl")
     .overlaps("releases.format_details", VINYL_SIZES)
@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
     recording_id: number | null;
     title: string;
     artist: string;
+    year: number | null;
     side: string | null;
     position: string | null;
   }[] = [];
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
         recording_id: recording?.id ?? null,
         title,
         artist,
+        year: release.release_year ?? null,
         side: track.side ?? null,
         position: track.position ?? null,
       });

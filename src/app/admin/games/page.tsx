@@ -8,7 +8,7 @@ const gameCards = [
   {
     title: "Music Bingo",
     description:
-      "Vinyl-only music bingo with printable cards, pick lists, and host controls.",
+      "Build and export CSV playlists for Rockstar Bingo import.",
     href: "/admin/games/bingo",
     cta: "Open",
     status: "ready",
