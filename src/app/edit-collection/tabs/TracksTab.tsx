@@ -46,6 +46,39 @@ interface Track {
   is_header?: boolean;
 }
 
+const inferSideFromPosition = (position: string | null | undefined): string | undefined => {
+  if (!position) return undefined;
+  const match = position.trim().toUpperCase().match(/^([A-Z])/);
+  return match?.[1];
+};
+
+const parseTrackPositionNumber = (
+  rawPosition: string | number | null | undefined,
+  fallback: number
+): number => {
+  if (typeof rawPosition === 'number' && Number.isFinite(rawPosition) && rawPosition > 0) {
+    return rawPosition;
+  }
+
+  const text = String(rawPosition ?? '').trim();
+  if (!text) return fallback;
+
+  const numericLike = Number(text);
+  if (Number.isFinite(numericLike) && numericLike > 0) {
+    return numericLike;
+  }
+
+  const matches = text.match(/\d+/g);
+  if (matches && matches.length > 0) {
+    const parsed = Number(matches[matches.length - 1]);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return fallback;
+};
+
 interface Disc {
   disc_number: number;
   title: string;
@@ -149,6 +182,8 @@ function SortableTrackRow({
   }
 
   // Regular track row
+  const positionLabel = track.side ? `${track.side}${track.position}` : String(track.position);
+
   return (
     <div
       ref={setNodeRef}
@@ -167,7 +202,7 @@ function SortableTrackRow({
         <span className="text-base">≡</span>
       </div>
       <div className="text-center text-gray-500 text-sm">
-        {track.side ? `${track.side}${track.position}` : track.position}
+        {positionLabel}
       </div>
       <div className="px-1">
         <input
@@ -298,15 +333,16 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const loadedTracks: Track[] = album.tracks.map((dbTrack: any, index: number) => {
         if (!dbTrack) return null; // Skip null entries
+        const inferredSide = inferSideFromPosition(dbTrack.position);
         return {
           id: `track-${index}`,
-          position: parseInt(dbTrack.position || '0'),
+          position: parseTrackPositionNumber(dbTrack.position, index + 1),
           title: dbTrack.title || '',
           artist: dbTrack.artist || '',
           duration: dbTrack.duration || '',
           note: dbTrack.note || '',
           disc_number: dbTrack.disc_number || 1,
-          side: dbTrack.side || 'A',
+          side: dbTrack.side || inferredSide,
           is_header: dbTrack.type === 'header',
         };
       }).filter((t) => t !== null) as Track[];

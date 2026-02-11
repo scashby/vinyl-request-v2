@@ -61,17 +61,77 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
   { value: 'tags-count-asc', label: 'Fewest Tags', category: 'Metadata' }
 ];
 
+type AppViewMode = 'collection' | 'album-track';
+type SidebarMode = 'format' | 'crates' | 'playlists';
+type TrackListSource = 'crates' | 'playlists';
+type CrateGameKey = 'bingo' | 'trivia' | 'brackets';
+
+interface Playlist {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  trackKeys: string[];
+  createdAt: string;
+}
+
+interface CollectionTrackRow {
+  key: string;
+  inventoryId: number;
+  releaseTrackId: number | null;
+  recordingId: number | null;
+  albumArtist: string;
+  albumTitle: string;
+  trackArtist: string;
+  trackTitle: string;
+  position: string;
+  side: string | null;
+  durationSeconds: number | null;
+  durationLabel: string;
+}
+
+type CrateGameFlags = Record<number, Record<CrateGameKey, boolean>>;
+
+const CRATE_GAME_LABELS: { key: CrateGameKey; icon: string; label: string }[] = [
+  { key: 'bingo', icon: '🎱', label: 'Bingo' },
+  { key: 'trivia', icon: '❓', label: 'Trivia' },
+  { key: 'brackets', icon: '🏆', label: 'Brackets' },
+];
+
+const PLAYLIST_PRESET_ICONS = ['🎵', '🎧', '🔥', '⭐', '💿', '🎤'];
+
+const formatTrackDuration = (seconds: number | null | undefined): string => {
+  if (!seconds || seconds <= 0) return '—';
+  const minutes = Math.floor(seconds / 60);
+  const remain = seconds % 60;
+  return `${minutes}:${remain.toString().padStart(2, '0')}`;
+};
+
+const normalizeTrackPosition = (position: string | null | undefined, fallback: number): string => {
+  const raw = (position ?? '').trim();
+  if (raw) return raw;
+  return String(fallback);
+};
+
 function CollectionBrowserPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchTypeDropdown, setShowSearchTypeDropdown] = useState(false);
   const [selectedLetter, setSelectedLetter] = useState<string>('All');
-  const [folderMode, setFolderMode] = useState<string>('format');
+  const [viewMode, setViewMode] = useState<AppViewMode>('collection');
+  const [trackSource, setTrackSource] = useState<TrackListSource>('crates');
+  const [folderMode, setFolderMode] = useState<SidebarMode>('format');
   const [selectedFolderValue, setSelectedFolderValue] = useState<string | null>(null);
   const [selectedCrateId, setSelectedCrateId] = useState<number | null>(null);
   const [crates, setCrates] = useState<Crate[]>([]);
   const [crateItemCounts, setCrateItemCounts] = useState<Record<number, number>>({});
+  const [crateItemsByCrate, setCrateItemsByCrate] = useState<Record<number, Set<number>>>({});
+  const [crateGameFlags, setCrateGameFlags] = useState<CrateGameFlags>({});
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
+  const [showNewPlaylistModal, setShowNewPlaylistModal] = useState(false);
+  const [showAddToPlaylistModal, setShowAddToPlaylistModal] = useState(false);
   
   const [collectionFilter, setCollectionFilter] = useState<string>('All');
   const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
@@ -80,6 +140,7 @@ function CollectionBrowserPage() {
   
   const [folderSortByCount, setFolderSortByCount] = useState(false);
   const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<number>>(new Set());
+  const [selectedTrackKeys, setSelectedTrackKeys] = useState<Set<string>>(new Set());
   const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null);
   const [editingAlbumId, setEditingAlbumId] = useState<number | null>(null);
   const [showFolderModeDropdown, setShowFolderModeDropdown] = useState(false);
@@ -93,6 +154,7 @@ function CollectionBrowserPage() {
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
   
   const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [showViewModeDropdown, setShowViewModeDropdown] = useState(false);
 
   const [tableSortState, setTableSortState] = useState<SortState>({
     column: null,
@@ -127,6 +189,31 @@ function CollectionBrowserPage() {
     }
   }, []);
 
+  useEffect(() => {
+    const storedFlags = localStorage.getItem('collection-crate-game-flags');
+    if (storedFlags) {
+      try {
+        setCrateGameFlags(JSON.parse(storedFlags) as CrateGameFlags);
+      } catch {
+        // Invalid JSON, ignore
+      }
+    }
+
+    const storedPlaylists = localStorage.getItem('collection-track-playlists');
+    if (storedPlaylists) {
+      try {
+        setPlaylists(JSON.parse(storedPlaylists) as Playlist[]);
+      } catch {
+        // Invalid JSON, ignore
+      }
+    }
+
+    const storedViewMode = localStorage.getItem('collection-view-mode');
+    if (storedViewMode === 'collection' || storedViewMode === 'album-track') {
+      setViewMode(storedViewMode);
+    }
+  }, []);
+
   const handleColumnsChange = useCallback((columns: ColumnId[]) => {
     setVisibleColumns(columns);
     localStorage.setItem('collection-visible-columns', JSON.stringify(columns));
@@ -138,6 +225,18 @@ function CollectionBrowserPage() {
       setSortBy(stored as SortOption);
     }
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('collection-crate-game-flags', JSON.stringify(crateGameFlags));
+  }, [crateGameFlags]);
+
+  useEffect(() => {
+    localStorage.setItem('collection-track-playlists', JSON.stringify(playlists));
+  }, [playlists]);
+
+  useEffect(() => {
+    localStorage.setItem('collection-view-mode', viewMode);
+  }, [viewMode]);
 
   const handleSortChange = useCallback((newSort: SortOption) => {
     setSortBy(newSort);
@@ -280,7 +379,7 @@ function CollectionBrowserPage() {
 
     const { data: crateItems, error: crateItemsError } = await supabase
       .from('crate_items')
-      .select('crate_id');
+      .select('crate_id, inventory_id');
 
     if (crateItemsError) {
       console.error('Error loading crate items:', crateItemsError);
@@ -288,13 +387,23 @@ function CollectionBrowserPage() {
     }
 
     const counts = (crateItems ?? []).reduce((acc, item) => {
-      if (item.crate_id) {
+      if (item.crate_id && item.inventory_id) {
         acc[item.crate_id] = (acc[item.crate_id] || 0) + 1;
       }
       return acc;
     }, {} as Record<number, number>);
 
+    const itemMap = (crateItems ?? []).reduce((acc, item) => {
+      if (!item.crate_id || !item.inventory_id) return acc;
+      if (!acc[item.crate_id]) {
+        acc[item.crate_id] = new Set<number>();
+      }
+      acc[item.crate_id].add(item.inventory_id);
+      return acc;
+    }, {} as Record<number, Set<number>>);
+
     setCrateItemCounts(counts);
+    setCrateItemsByCrate(itemMap);
   }, []);
 
   useEffect(() => {
@@ -315,7 +424,7 @@ function CollectionBrowserPage() {
         }
       }
 
-      if (folderMode === 'crates' && selectedCrateId !== null) {
+      if (viewMode === 'collection' && folderMode === 'crates' && selectedCrateId !== null) {
         const selectedCrate = crates.find(c => c.id === selectedCrateId);
         if (selectedCrate) {
           if (selectedCrate.is_smart) {
@@ -323,12 +432,15 @@ function CollectionBrowserPage() {
               return false;
             }
           } else {
-            // Manual crate - will be implemented in Phase 2
+            const crateInventoryIds = crateItemsByCrate[selectedCrate.id];
+            if (!crateInventoryIds?.has(album.id)) {
+              return false;
+            }
           }
         }
       }
 
-      if (folderMode === 'format' && selectedFolderValue) {
+      if (viewMode === 'collection' && folderMode === 'format' && selectedFolderValue) {
         if ((album.release?.media_type || 'Unknown') !== selectedFolderValue) return false;
       }
 
@@ -392,13 +504,7 @@ function CollectionBrowserPage() {
     }
 
     return filtered;
-  }, [albums, collectionFilter, selectedLetter, selectedFolderValue, selectedCrateId, folderMode, crates, searchQuery, sortBy, tableSortState]);
-
-  useEffect(() => {
-    if (filteredAndSortedAlbums.length > 0 && !selectedAlbumId) {
-      setSelectedAlbumId(filteredAndSortedAlbums[0].id);
-    }
-  }, [filteredAndSortedAlbums, selectedAlbumId]);
+  }, [albums, collectionFilter, selectedLetter, selectedFolderValue, selectedCrateId, folderMode, crates, searchQuery, sortBy, tableSortState, crateItemsByCrate, viewMode]);
 
   const folderCounts = useMemo(() => {
     return albums.reduce((acc, album) => {
@@ -420,6 +526,139 @@ function CollectionBrowserPage() {
     });
   }, [crates, albums, crateItemCounts]);
 
+  const playlistCounts = useMemo(() => {
+    return playlists.reduce((acc, playlist) => {
+      acc[playlist.id] = playlist.trackKeys.length;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [playlists]);
+
+  const allTrackRows = useMemo<CollectionTrackRow[]>(() => {
+    const rows: CollectionTrackRow[] = [];
+
+    albums.forEach((album) => {
+      if (collectionFilter === 'For Sale' && album.status !== 'for_sale') {
+        return;
+      }
+      const albumArtist = getAlbumArtist(album);
+      const albumTitle = getAlbumTitle(album);
+      const releaseTracks = album.release?.release_tracks ?? [];
+
+      if (releaseTracks.length > 0) {
+        releaseTracks.forEach((track, index) => {
+          const position = normalizeTrackPosition(track.position, index + 1);
+          const side = track.side ? track.side.toUpperCase() : null;
+          const key = `${album.id}:${track.id ?? `p:${position}`}:${track.recording?.id ?? index}`;
+          rows.push({
+            key,
+            inventoryId: album.id,
+            releaseTrackId: track.id ?? null,
+            recordingId: track.recording?.id ?? null,
+            albumArtist,
+            albumTitle,
+            trackArtist: track.recording?.track_artist || albumArtist,
+            trackTitle: track.title_override ?? track.recording?.title ?? 'Untitled',
+            position,
+            side,
+            durationSeconds: track.recording?.duration_seconds ?? null,
+            durationLabel: formatTrackDuration(track.recording?.duration_seconds ?? null),
+          });
+        });
+        return;
+      }
+
+      const fallbackTracks = album.tracks ?? [];
+      fallbackTracks.forEach((track, index) => {
+        if (track.type === 'header') return;
+        const position = normalizeTrackPosition(track.position, index + 1);
+        const side = track.side ? track.side.toUpperCase() : null;
+        const key = `${album.id}:fallback:${index}:${position}`;
+        rows.push({
+          key,
+          inventoryId: album.id,
+          releaseTrackId: null,
+          recordingId: null,
+          albumArtist,
+          albumTitle,
+          trackArtist: track.artist ?? albumArtist,
+          trackTitle: track.title,
+          position,
+          side,
+          durationSeconds: null,
+          durationLabel: track.duration ?? '—',
+        });
+      });
+    });
+
+    return rows;
+  }, [albums, collectionFilter]);
+
+  const filteredTrackRows = useMemo(() => {
+    let rows = allTrackRows;
+
+    const selectedCrate = selectedCrateId !== null ? crates.find((crate) => crate.id === selectedCrateId) : null;
+
+    if (trackSource === 'crates' && selectedCrate) {
+      if (selectedCrate.is_smart) {
+        const allowedAlbumIds = new Set(
+          albums.filter((album) => albumMatchesSmartCrate(album, selectedCrate)).map((album) => album.id)
+        );
+        rows = rows.filter((row) => allowedAlbumIds.has(row.inventoryId));
+      } else {
+        const allowedInventoryIds = crateItemsByCrate[selectedCrate.id];
+        rows = rows.filter((row) => allowedInventoryIds?.has(row.inventoryId));
+      }
+    }
+
+    if (trackSource === 'playlists' && selectedPlaylistId) {
+      const playlist = playlists.find((item) => item.id === selectedPlaylistId);
+      if (playlist) {
+        const allowedKeys = new Set(playlist.trackKeys);
+        rows = rows.filter((row) => allowedKeys.has(row.key));
+      }
+    }
+
+    if (selectedLetter !== 'All') {
+      rows = rows.filter((row) => {
+        const firstChar = row.trackArtist.charAt(0).toUpperCase();
+        if (selectedLetter === '0-9') return /[0-9]/.test(firstChar);
+        return firstChar === selectedLetter;
+      });
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      rows = rows.filter((row) => {
+        const searchable = `${row.trackTitle} ${row.trackArtist} ${row.albumTitle} ${row.albumArtist} ${row.position} ${row.side ?? ''}`.toLowerCase();
+        return searchable.includes(q);
+      });
+    }
+
+    return rows;
+  }, [
+    allTrackRows,
+    trackSource,
+    selectedCrateId,
+    crates,
+    albums,
+    crateItemsByCrate,
+    selectedPlaylistId,
+    playlists,
+    selectedLetter,
+    searchQuery,
+  ]);
+
+  useEffect(() => {
+    if (selectedAlbumId) return;
+    if (viewMode === 'collection' && filteredAndSortedAlbums.length > 0) {
+      setSelectedAlbumId(filteredAndSortedAlbums[0].id);
+      return;
+    }
+    if (viewMode === 'album-track' && filteredTrackRows.length > 0) {
+      setSelectedAlbumId(filteredTrackRows[0].inventoryId);
+    }
+  }, [filteredAndSortedAlbums, selectedAlbumId, viewMode, filteredTrackRows]);
+
   const sortedFolderItems = useMemo(() => {
     return Object.entries(folderCounts)
       .sort((a, b) => {
@@ -433,6 +672,17 @@ function CollectionBrowserPage() {
         !folderSearch || item.toLowerCase().includes(folderSearch.toLowerCase())
       );
   }, [folderCounts, folderSortByCount, folderSearch]);
+
+  const sortedPlaylists = useMemo(() => {
+    const list = [...playlists].filter((playlist) => !folderSearch || playlist.name.toLowerCase().includes(folderSearch.toLowerCase()));
+    list.sort((a, b) => {
+      if (folderSortByCount) {
+        return (playlistCounts[b.id] || 0) - (playlistCounts[a.id] || 0);
+      }
+      return a.name.localeCompare(b.name);
+    });
+    return list;
+  }, [playlists, folderSearch, folderSortByCount, playlistCounts]);
 
   const selectedAlbum = useMemo(() => {
     return albums.find(a => a.id === selectedAlbumId) || null;
@@ -462,11 +712,34 @@ function CollectionBrowserPage() {
     return new Set(Array.from(selectedAlbumIds).map(id => String(id)));
   }, [selectedAlbumIds]);
 
-  const handleFolderModeChange = useCallback((mode: string) => {
+  useEffect(() => {
+    if (viewMode === 'album-track') {
+      setFolderMode(trackSource);
+      setSelectedFolderValue(null);
+    } else if (folderMode === 'playlists') {
+      setFolderMode('format');
+    }
+    setSelectedAlbumIds(new Set());
+    setSelectedTrackKeys(new Set());
+  }, [viewMode, trackSource, folderMode]);
+
+  const handleFolderModeChange = useCallback((mode: SidebarMode) => {
     setFolderMode(mode);
     setShowFolderModeDropdown(false);
     setSelectedFolderValue(null);
     setSelectedCrateId(null);
+    setSelectedPlaylistId(null);
+    if (mode === 'playlists') {
+      setTrackSource('playlists');
+      setViewMode('album-track');
+    } else if (mode === 'crates') {
+      setTrackSource('crates');
+    }
+  }, []);
+
+  const handleViewModeChange = useCallback((mode: AppViewMode) => {
+    setViewMode(mode);
+    setShowFolderModeDropdown(false);
   }, []);
 
   const handleAddToCrates = useCallback(async (crateIds: number[]) => {
@@ -509,6 +782,61 @@ function CollectionBrowserPage() {
       throw err;
     }
   }, [selectedAlbumIds, crates, loadCrates]);
+
+  const toggleCrateGameFlag = useCallback((crateId: number, flag: CrateGameKey) => {
+    setCrateGameFlags((prev) => {
+      const existing = prev[crateId] ?? { bingo: false, trivia: false, brackets: false };
+      return {
+        ...prev,
+        [crateId]: {
+          ...existing,
+          [flag]: !existing[flag],
+        },
+      };
+    });
+  }, []);
+
+  const toggleTrackSelection = useCallback((trackKey: string) => {
+    setSelectedTrackKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(trackKey)) {
+        next.delete(trackKey);
+      } else {
+        next.add(trackKey);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleCreatePlaylist = useCallback((playlist: Omit<Playlist, 'id' | 'createdAt' | 'trackKeys'>) => {
+    const newPlaylist: Playlist = {
+      id: `playlist-${Date.now()}`,
+      name: playlist.name,
+      icon: playlist.icon,
+      color: playlist.color,
+      trackKeys: [],
+      createdAt: new Date().toISOString(),
+    };
+    setPlaylists((prev) => [...prev, newPlaylist]);
+    setSelectedPlaylistId(newPlaylist.id);
+    setShowNewPlaylistModal(false);
+    setTrackSource('playlists');
+    setViewMode('album-track');
+  }, []);
+
+  const handleAddToPlaylists = useCallback((playlistIds: string[]) => {
+    if (selectedTrackKeys.size === 0 || playlistIds.length === 0) return;
+    const trackKeys = Array.from(selectedTrackKeys);
+    setPlaylists((prev) =>
+      prev.map((playlist) => {
+        if (!playlistIds.includes(playlist.id)) return playlist;
+        const merged = new Set([...playlist.trackKeys, ...trackKeys]);
+        return { ...playlist, trackKeys: Array.from(merged) };
+      })
+    );
+    setSelectedTrackKeys(new Set());
+    setShowAddToPlaylistModal(false);
+  }, [selectedTrackKeys]);
 
   return (
     <>
@@ -589,11 +917,11 @@ function CollectionBrowserPage() {
                 <span className="text-[10px]">▼</span>
               </button>
             </div>
-            <input type="text" placeholder="Search albums..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} title="Search your collection" className="bg-[#2a2a2a] text-white border border-[#555] border-l-0 px-3 py-1.5 rounded-r text-[13px] w-[220px] h-8 outline-none" />
+            <input type="text" placeholder={viewMode === 'collection' ? 'Search albums...' : 'Search tracks, artist, album...'} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} title="Search your collection" className="bg-[#2a2a2a] text-white border border-[#555] border-l-0 px-3 py-1.5 rounded-r text-[13px] w-[220px] h-8 outline-none" />
           </div>
         </div>
 
-        {selectedAlbumIds.size > 0 && (
+        {viewMode === 'collection' && selectedAlbumIds.size > 0 && (
           <div className="bg-[#5BA3D0] text-white px-4 py-2 flex items-center gap-2 h-10 shrink-0">
             <button onClick={() => setSelectedAlbumIds(new Set())} title="Clear selection" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">✕ Cancel</button>
             <button title="Select all albums" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">☑ All</button>
@@ -607,13 +935,23 @@ function CollectionBrowserPage() {
           </div>
         )}
 
+        {viewMode === 'album-track' && selectedTrackKeys.size > 0 && (
+          <div className="bg-[#5BA3D0] text-white px-4 py-2 flex items-center gap-2 h-10 shrink-0">
+            <button onClick={() => setSelectedTrackKeys(new Set())} title="Clear selection" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">✕ Cancel</button>
+            <button onClick={() => setSelectedTrackKeys(new Set(filteredTrackRows.map((row) => row.key)))} title="Select all tracks" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">☑ All</button>
+            <button onClick={() => setShowAddToPlaylistModal(true)} title="Add selected tracks to playlist(s)" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">🎵 Add to Playlist</button>
+            <div className="flex-1" />
+            <span className="text-xs font-medium">{selectedTrackKeys.size} of {filteredTrackRows.length} selected</span>
+          </div>
+        )}
+
         <div className="flex flex-1 overflow-hidden min-h-0">
           <div className="hidden md:flex w-[220px] bg-[#2C2C2C] text-white flex-col overflow-hidden border-r border-[#1a1a1a] shrink-0">
             <div className="p-2.5 border-b border-[#1a1a1a] flex justify-between items-center shrink-0">
               <div className="relative">
                 <button onClick={() => setShowFolderModeDropdown(!showFolderModeDropdown)} title="Change view mode" className="bg-[#3a3a3a] text-white border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-xs flex items-center gap-1.5">
-                  <span>{folderMode === 'crates' ? '📦' : '📁'}</span>
-                  <span>{folderMode === 'crates' ? 'Crates' : 'Format'}</span>
+                  <span>{folderMode === 'crates' ? '📦' : folderMode === 'playlists' ? '🎵' : '📁'}</span>
+                  <span>{folderMode === 'crates' ? 'Crates' : folderMode === 'playlists' ? 'Playlists' : 'Format'}</span>
                   <span className="text-[10px]">▼</span>
                 </button>
 
@@ -621,17 +959,29 @@ function CollectionBrowserPage() {
                   <>
                     <div onClick={() => setShowFolderModeDropdown(false)} className="fixed inset-0 z-[99]" />
                     <div className="absolute top-full left-0 mt-1 bg-[#2a2a2a] border border-[#555] rounded z-[100] min-w-[180px] shadow-lg">
-                      <div className="px-3 py-2 text-[10px] font-semibold text-[#999] uppercase tracking-wider">Favorites</div>
-                      <button onClick={() => handleFolderModeChange('format')} className={`w-full px-4 py-2 bg-transparent border-none text-left cursor-pointer text-[13px] text-white flex items-center gap-2 hover:bg-[#3a3a3a] ${folderMode === 'format' ? 'bg-[#5A9BD5]' : ''}`}>
-                        <span>📁</span>
-                        <span>Format</span>
-                      </button>
+                      {viewMode === 'collection' && (
+                        <>
+                          <div className="px-3 py-2 text-[10px] font-semibold text-[#999] uppercase tracking-wider">Collection</div>
+                          <button onClick={() => handleFolderModeChange('format')} className={`w-full px-4 py-2 bg-transparent border-none text-left cursor-pointer text-[13px] text-white flex items-center gap-2 hover:bg-[#3a3a3a] ${folderMode === 'format' ? 'bg-[#5A9BD5]' : ''}`}>
+                            <span>📁</span>
+                            <span>Format</span>
+                          </button>
+                        </>
+                      )}
 
-                      <div className="px-3 py-2 text-[10px] font-semibold text-[#999] uppercase tracking-wider mt-1 border-t border-[#444]">Crates</div>
+                      <div className="px-3 py-2 text-[10px] font-semibold text-[#999] uppercase tracking-wider mt-1 border-t border-[#444]">
+                        {viewMode === 'collection' ? 'Crates' : 'Track Sources'}
+                      </div>
                       <button onClick={() => handleFolderModeChange('crates')} className={`w-full px-4 py-2 bg-transparent border-none text-left cursor-pointer text-[13px] text-white flex items-center gap-2 hover:bg-[#3a3a3a] ${folderMode === 'crates' ? 'bg-[#5A9BD5]' : ''}`}>
                         <span>📦</span>
                         <span>Crates</span>
                       </button>
+                      {viewMode === 'album-track' && (
+                        <button onClick={() => handleFolderModeChange('playlists')} className={`w-full px-4 py-2 bg-transparent border-none text-left cursor-pointer text-[13px] text-white flex items-center gap-2 hover:bg-[#3a3a3a] ${folderMode === 'playlists' ? 'bg-[#5A9BD5]' : ''}`}>
+                          <span>🎵</span>
+                          <span>Playlists</span>
+                        </button>
+                      )}
                     </div>
                   </>
                 )}
@@ -641,8 +991,18 @@ function CollectionBrowserPage() {
 
             <div className="p-2.5 border-b border-[#1a1a1a] shrink-0">
               <div className="flex gap-1.5 items-center flex-nowrap">
-                <input type="text" placeholder={folderMode === 'crates' ? 'Search crates...' : 'Search format...'} value={folderSearch} onChange={(e) => setFolderSearch(e.target.value)} title={folderMode === 'crates' ? 'Filter crates' : 'Filter formats'} className="flex-1 px-2 py-1.5 bg-[#3a3a3a] text-white border border-[#555] rounded text-xs outline-none" />
+                <input
+                  type="text"
+                  placeholder={folderMode === 'crates' ? 'Search crates...' : folderMode === 'playlists' ? 'Search playlists...' : 'Search format...'}
+                  value={folderSearch}
+                  onChange={(e) => setFolderSearch(e.target.value)}
+                  title={folderMode === 'crates' ? 'Filter crates' : folderMode === 'playlists' ? 'Filter playlists' : 'Filter formats'}
+                  className="flex-1 px-2 py-1.5 bg-[#3a3a3a] text-white border border-[#555] rounded text-xs outline-none"
+                />
                 <button onClick={() => setFolderSortByCount(!folderSortByCount)} title={folderSortByCount ? "Sort alphabetically" : "Sort by count"} className="bg-[#3a3a3a] text-white border border-[#555] px-2 py-1 rounded cursor-pointer text-xs shrink-0">{folderSortByCount ? '🔢' : '🔤'}</button>
+                {viewMode === 'album-track' && folderMode === 'playlists' && (
+                  <button onClick={() => setShowNewPlaylistModal(true)} title="Create playlist" className="bg-[#3a3a3a] text-white border border-[#555] px-2 py-1 rounded cursor-pointer text-xs shrink-0">＋</button>
+                )}
               </div>
             </div>
 
@@ -661,7 +1021,7 @@ function CollectionBrowserPage() {
                     </button>
                   ))}
                 </>
-              ) : (
+              ) : folderMode === 'crates' ? (
                 <>
                   <button onClick={() => setSelectedCrateId(null)} title="Show all albums" className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${selectedCrateId === null ? 'bg-[#5A9BD5]' : ''}`}>
                     <span>📚 [All Albums]</span>
@@ -672,17 +1032,54 @@ function CollectionBrowserPage() {
                     .filter(crate => !folderSearch || crate.name.toLowerCase().includes(folderSearch.toLowerCase()))
                     .map(crate => (
                     <button key={crate.id} onClick={() => setSelectedCrateId(crate.id)} title={`Filter by ${crate.name}`} className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${selectedCrateId === crate.id ? 'bg-[#5A9BD5]' : ''}`}>
-                      <span className="flex items-center gap-1.5">
+                      <span className="flex items-center gap-1.5 min-w-0">
                         {crate.is_smart ? (
                           <BoxIcon color={crate.icon} size={16} />
                         ) : (
                           <span>{crate.icon}</span>
                         )}
-                        <span>{crate.name}</span>
+                        <span className="truncate">{crate.name}</span>
+                        {viewMode === 'album-track' && (
+                          <span className="flex items-center gap-0.5">
+                            {CRATE_GAME_LABELS.map((badge) => {
+                              const enabled = crateGameFlags[crate.id]?.[badge.key] ?? false;
+                              return (
+                                <span
+                                  key={`${crate.id}-${badge.key}`}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    toggleCrateGameFlag(crate.id, badge.key);
+                                  }}
+                                  title={`${badge.label} ${enabled ? 'enabled' : 'disabled'}`}
+                                  className={`text-[10px] leading-none px-1 py-0.5 rounded ${enabled ? 'bg-white/25' : 'opacity-40 hover:opacity-80'}`}
+                                >
+                                  {badge.icon}
+                                </span>
+                              );
+                            })}
+                          </span>
+                        )}
                       </span>
                       <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${selectedCrateId === crate.id ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{crate.album_count || 0}</span>
                     </button>
                   ))}
+                </>
+              ) : (
+                <>
+                  <button onClick={() => setSelectedPlaylistId(null)} title="Show all tracks" className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${selectedPlaylistId === null ? 'bg-[#5A9BD5]' : ''}`}>
+                    <span>🎵 [All Tracks]</span>
+                    <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${selectedPlaylistId === null ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{allTrackRows.length}</span>
+                  </button>
+                  {sortedPlaylists.map((playlist) => (
+                      <button key={playlist.id} onClick={() => setSelectedPlaylistId(playlist.id)} title={`Filter by ${playlist.name}`} className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${selectedPlaylistId === playlist.id ? 'bg-[#5A9BD5]' : ''}`}>
+                        <span className="flex items-center gap-1.5 min-w-0">
+                          <span style={{ color: playlist.color }}>{playlist.icon}</span>
+                          <span className="truncate">{playlist.name}</span>
+                        </span>
+                        <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${selectedPlaylistId === playlist.id ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{playlistCounts[playlist.id] || 0}</span>
+                      </button>
+                    ))}
                 </>
               )}
             </div>
@@ -691,10 +1088,27 @@ function CollectionBrowserPage() {
           <div className="flex-1 flex flex-col overflow-hidden bg-white min-w-0">
             <div className="px-3 py-1.5 border-b border-[#555] flex items-center justify-between bg-[#4a4a4a] h-10 shrink-0">
               <div className="flex gap-1.5 items-center">
-                <button title="Change view mode" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
-                  <span>☰</span>
-                  <span style={{ fontSize: '9px' }}>▼</span>
-                </button>
+                <div className="relative">
+                  <button onClick={() => setShowViewModeDropdown(!showViewModeDropdown)} title="Change view mode" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
+                    <span>{viewMode === 'collection' ? '☰' : '🎵'}</span>
+                    <span style={{ fontSize: '9px' }}>▼</span>
+                  </button>
+                  {showViewModeDropdown && (
+                    <>
+                      <div onClick={() => setShowViewModeDropdown(false)} className="fixed inset-0 z-[99]" />
+                      <div className="absolute top-full left-0 mt-1 bg-white border border-[#ddd] rounded shadow-lg z-[100] min-w-[220px]">
+                        <button onClick={() => { handleViewModeChange('collection'); setShowViewModeDropdown(false); }} className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${viewMode === 'collection' ? 'bg-[#e3f2fd]' : ''}`}>
+                          <span>Collection Table</span>
+                          {viewMode === 'collection' && <span className="text-[#2196F3]">✓</span>}
+                        </button>
+                        <button onClick={() => { handleViewModeChange('album-track'); setShowViewModeDropdown(false); }} className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${viewMode === 'album-track' ? 'bg-[#e3f2fd]' : ''}`}>
+                          <span>Album / Track Builder</span>
+                          {viewMode === 'album-track' && <span className="text-[#2196F3]">✓</span>}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
                 
                 <div className="relative">
                   <button onClick={() => setShowSortDropdown(!showSortDropdown)} title="Change sort order" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
@@ -727,14 +1141,76 @@ function CollectionBrowserPage() {
                   <span className="text-[9px]">▼</span>
                 </button>
               </div>
-              <div className="text-xs text-[#ddd] font-semibold">{loading ? 'Loading...' : `${filteredAndSortedAlbums.length} albums`}</div>
+              <div className="text-xs text-[#ddd] font-semibold">
+                {loading ? 'Loading...' : viewMode === 'collection' ? `${filteredAndSortedAlbums.length} albums` : `${filteredTrackRows.length} tracks`}
+              </div>
             </div>
 
             <div className="flex-1 overflow-hidden bg-white min-h-0">
               {loading ? (
                 <div className="p-10 text-center text-[#666]">Loading albums...</div>
               ) : (
-                <CollectionTable albums={filteredAndSortedAlbums} visibleColumns={visibleColumns} lockedColumns={lockedColumns} onAlbumClick={handleAlbumClick} selectedAlbums={selectedAlbumsAsStrings} onSelectionChange={handleSelectionChange} sortState={tableSortState} onSortChange={handleTableSortChange} onEditAlbum={handleEditAlbum} />
+                viewMode === 'collection' ? (
+                  <CollectionTable albums={filteredAndSortedAlbums} visibleColumns={visibleColumns} lockedColumns={lockedColumns} onAlbumClick={handleAlbumClick} selectedAlbums={selectedAlbumsAsStrings} onSelectionChange={handleSelectionChange} sortState={tableSortState} onSortChange={handleTableSortChange} onEditAlbum={handleEditAlbum} />
+                ) : (
+                  <div className="h-full overflow-auto">
+                    <table className="w-full border-collapse text-sm">
+                      <thead className="sticky top-0 z-10 bg-[#f5f5f5] border-b border-[#ddd]">
+                        <tr>
+                          <th className="w-[42px] px-2 py-2 text-left font-semibold text-[#666]">
+                            <input
+                              type="checkbox"
+                              checked={filteredTrackRows.length > 0 && selectedTrackKeys.size === filteredTrackRows.length}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedTrackKeys(new Set(filteredTrackRows.map((row) => row.key)));
+                                } else {
+                                  setSelectedTrackKeys(new Set());
+                                }
+                              }}
+                            />
+                          </th>
+                          <th className="px-2 py-2 text-left font-semibold text-[#666]">Track</th>
+                          <th className="px-2 py-2 text-left font-semibold text-[#666]">Artist</th>
+                          <th className="px-2 py-2 text-left font-semibold text-[#666]">Album</th>
+                          <th className="px-2 py-2 text-left font-semibold text-[#666]">Pos</th>
+                          <th className="px-2 py-2 text-right font-semibold text-[#666]">Length</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredTrackRows.map((row) => {
+                          const isChecked = selectedTrackKeys.has(row.key);
+                          const isSelectedAlbum = selectedAlbumId === row.inventoryId;
+                          const positionLabel = row.side ? `${row.side}${row.position.replace(/^[A-Za-z]/, '')}` : row.position;
+                          return (
+                            <tr
+                              key={row.key}
+                              onClick={() => setSelectedAlbumId(row.inventoryId)}
+                              className={`border-b border-[#eee] cursor-pointer ${isSelectedAlbum ? 'bg-[#f3f9ff]' : 'hover:bg-[#fafafa]'}`}
+                            >
+                              <td className="px-2 py-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => toggleTrackSelection(row.key)}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </td>
+                              <td className="px-2 py-2 text-[#1f2937]">{row.trackTitle}</td>
+                              <td className="px-2 py-2 text-[#374151]">{row.trackArtist}</td>
+                              <td className="px-2 py-2 text-[#4b5563]">{row.albumTitle}</td>
+                              <td className="px-2 py-2 text-[#4b5563]">{positionLabel}</td>
+                              <td className="px-2 py-2 text-right text-[#4b5563]">{row.durationLabel}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    {filteredTrackRows.length === 0 && (
+                      <div className="p-10 text-center text-[#666] text-sm">No tracks match the current filters.</div>
+                    )}
+                  </div>
+                )
               )}
             </div>
           </div>
@@ -768,7 +1244,180 @@ function CollectionBrowserPage() {
       {showNewCrateModal && <NewCrateModal isOpen={showNewCrateModal} onClose={() => { setShowNewCrateModal(false); setEditingCrate(null); if (returnToAddToCrate) { setReturnToAddToCrate(false); setNewlyCreatedCrateId(null); }}} onCrateCreated={async (newCrateId) => { await loadCrates(); setEditingCrate(null); if (returnToAddToCrate) { setNewlyCreatedCrateId(newCrateId); setShowNewCrateModal(false); setShowAddToCrateModal(true); } else { setShowNewCrateModal(false); }}} editingCrate={editingCrate} />}
       {showNewSmartCrateModal && <NewSmartCrateModal isOpen={showNewSmartCrateModal} onClose={() => { setShowNewSmartCrateModal(false); setEditingCrate(null); }} onCrateCreated={() => { loadCrates(); setShowNewSmartCrateModal(false); setEditingCrate(null); }} editingCrate={editingCrate} />}
       {showAddToCrateModal && <AddToCrateModal isOpen={showAddToCrateModal} onClose={() => { setShowAddToCrateModal(false); setReturnToAddToCrate(false); setNewlyCreatedCrateId(null); }} crates={cratesWithCounts} onAddToCrates={handleAddToCrates} selectedCount={selectedAlbumIds.size} onOpenNewCrate={() => { setReturnToAddToCrate(true); setShowAddToCrateModal(false); setEditingCrate(null); setShowNewCrateModal(true); }} autoSelectCrateId={newlyCreatedCrateId} />}
+      {showNewPlaylistModal && (
+        <NewPlaylistModal
+          isOpen={showNewPlaylistModal}
+          onClose={() => setShowNewPlaylistModal(false)}
+          onCreate={handleCreatePlaylist}
+        />
+      )}
+      {showAddToPlaylistModal && (
+        <AddToPlaylistModal
+          isOpen={showAddToPlaylistModal}
+          onClose={() => setShowAddToPlaylistModal(false)}
+          playlists={playlists}
+          selectedTrackCount={selectedTrackKeys.size}
+          onAdd={handleAddToPlaylists}
+          onOpenNewPlaylist={() => {
+            setShowAddToPlaylistModal(false);
+            setShowNewPlaylistModal(true);
+          }}
+        />
+      )}
     </>
+  );
+}
+
+function NewPlaylistModal({
+  isOpen,
+  onClose,
+  onCreate
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onCreate: (playlist: { name: string; icon: string; color: string }) => void;
+}) {
+  const [name, setName] = useState('');
+  const [icon, setIcon] = useState('🎵');
+  const [color, setColor] = useState('#2196F3');
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30002]" onClick={onClose}>
+      <div className="bg-white rounded-lg w-[420px] shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+          <h2 className="m-0 text-lg font-semibold text-gray-900">New Playlist</h2>
+          <button onClick={onClose} className="bg-transparent border-none text-2xl cursor-pointer text-gray-500">×</button>
+        </div>
+        <div className="p-6">
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Playlist Name</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ex: Bingo Round 1"
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none focus:border-blue-500 mb-4"
+          />
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Icon</label>
+            <div className="flex gap-2 flex-wrap">
+              {PLAYLIST_PRESET_ICONS.map((preset) => (
+                <button key={preset} onClick={() => setIcon(preset)} className={`w-10 h-10 border rounded flex items-center justify-center text-xl ${icon === preset ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`}>
+                  {preset}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mb-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Color</label>
+            <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-16 h-10 border border-gray-300 rounded cursor-pointer" />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 bg-gray-100 text-gray-700 border-none rounded text-sm cursor-pointer">Cancel</button>
+          <button
+            onClick={() => {
+              if (!name.trim()) return;
+              onCreate({ name: name.trim(), icon, color });
+              setName('');
+              setIcon('🎵');
+              setColor('#2196F3');
+            }}
+            disabled={!name.trim()}
+            className={`px-4 py-2 text-white border-none rounded text-sm cursor-pointer ${name.trim() ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'}`}
+          >
+            Create Playlist
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddToPlaylistModal({
+  isOpen,
+  onClose,
+  playlists,
+  selectedTrackCount,
+  onAdd,
+  onOpenNewPlaylist
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  playlists: Playlist[];
+  selectedTrackCount: number;
+  onAdd: (playlistIds: string[]) => void;
+  onOpenNewPlaylist: () => void;
+}) {
+  const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedPlaylistIds(new Set());
+      setQuery('');
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const filteredPlaylists = playlists.filter((playlist) => playlist.name.toLowerCase().includes(query.toLowerCase()));
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30002]" onClick={onClose}>
+      <div className="bg-white rounded-md w-[500px] max-h-[600px] flex flex-col overflow-hidden shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+          <h3 className="m-0 text-base font-semibold text-gray-900">Add {selectedTrackCount} Track{selectedTrackCount !== 1 ? 's' : ''} to Playlist</h3>
+          <button onClick={onClose} className="bg-transparent border-none text-xl cursor-pointer text-gray-500">×</button>
+        </div>
+        <div className="px-4 py-3 border-b border-gray-200 flex gap-2">
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search playlists..." className="flex-1 px-2.5 py-1.5 border border-gray-300 rounded text-[13px] outline-none focus:border-blue-500" />
+          <button onClick={onOpenNewPlaylist} className="px-3 py-1.5 bg-blue-500 text-white border-none rounded text-[13px] cursor-pointer">New Playlist</button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-2">
+          {filteredPlaylists.length === 0 ? (
+            <div className="p-10 text-center text-gray-400 text-[13px]">
+              {playlists.length === 0 ? 'No playlists available yet.' : 'No playlists match your search.'}
+            </div>
+          ) : (
+            filteredPlaylists.map((playlist) => {
+              const checked = selectedPlaylistIds.has(playlist.id);
+              return (
+                <label key={playlist.id} className="flex items-center justify-between px-2 py-2 rounded cursor-pointer hover:bg-gray-100">
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => {
+                        setSelectedPlaylistIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(playlist.id)) next.delete(playlist.id);
+                          else next.add(playlist.id);
+                          return next;
+                        });
+                      }}
+                    />
+                    <span>{playlist.icon}</span>
+                    <span className="text-[13px] text-gray-900">{playlist.name}</span>
+                  </span>
+                  <span className="text-[12px] text-gray-500">{playlist.trackKeys.length}</span>
+                </label>
+              );
+            })
+          )}
+        </div>
+        <div className="px-4 py-3 border-t border-gray-200 flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-1.5 bg-white border border-gray-300 text-gray-700 rounded text-[13px] cursor-pointer">Cancel</button>
+          <button
+            onClick={() => onAdd(Array.from(selectedPlaylistIds))}
+            disabled={selectedPlaylistIds.size === 0}
+            className={`px-4 py-1.5 border-none rounded text-[13px] text-white ${selectedPlaylistIds.size > 0 ? 'bg-blue-500 hover:bg-blue-600 cursor-pointer' : 'bg-gray-300 cursor-not-allowed'}`}
+          >
+            Add to Playlist
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

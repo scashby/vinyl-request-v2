@@ -109,8 +109,8 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
     if (!value) return null;
     const cleaned = value.replace(/[^0-9Xx]/g, '');
     if (!cleaned) return null;
-    if (cleaned.length === 12) return `0${cleaned}`;
-    return cleaned;
+    if (cleaned.length >= 13) return cleaned.slice(0, 13);
+    return cleaned.padStart(13, '0');
   };
 
   const formatBarcodeDisplay = (value?: string | null) => {
@@ -291,18 +291,30 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
                   if ('recording' in track) {
                     const title = track.title_override ?? track.recording?.title ?? 'Untitled';
                     const duration = formatDuration(track.recording?.duration_seconds ?? null);
+                    const rawPosition = (track.position ?? '').trim();
+                    const side = (track.side ?? '').trim().toUpperCase();
+                    const numericPositionMatch = rawPosition.match(/\d+$/);
+                    const positionLabel =
+                      side && numericPositionMatch?.[0]
+                        ? `${side}${numericPositionMatch[0]}`
+                        : rawPosition || (side ? `${side}${idx + 1}` : String(idx + 1));
                     return (
                       <div key={track.id ?? `${track.position}-${idx}`} className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                        <div className="min-w-[28px] text-gray-500 text-[13px]">{idx + 1}</div>
+                        <div className="min-w-[42px] text-gray-500 text-[13px]">{positionLabel}</div>
                         <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{title}</div>
                         {duration !== '—' && <div className="text-gray-500 text-[13px] min-w-[40px] text-right">{duration}</div>}
                       </div>
                     );
                   }
                   const fallback = track as NonNullable<Album['tracks']>[number];
+                  const fallbackSide = (fallback.side ?? '').trim().toUpperCase();
+                  const fallbackPosition = (fallback.position ?? '').trim();
+                  const fallbackLabel = fallbackSide && fallbackPosition
+                    ? `${fallbackSide}${fallbackPosition.replace(/^[A-Za-z]/, '')}`
+                    : fallbackPosition || (fallbackSide ? `${fallbackSide}${idx + 1}` : String(idx + 1));
                   return (
                     <div key={`${fallback.position}-${idx}`} className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                      <div className="min-w-[28px] text-gray-500 text-[13px]">{idx + 1}</div>
+                      <div className="min-w-[42px] text-gray-500 text-[13px]">{fallbackLabel}</div>
                       <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{fallback.title}</div>
                       {fallback.duration && <div className="text-gray-500 text-[13px] min-w-[40px] text-right">{fallback.duration}</div>}
                     </div>
