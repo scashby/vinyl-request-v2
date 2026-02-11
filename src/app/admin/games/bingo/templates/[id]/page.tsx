@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useParams } from "next/navigation";
-import { Download, Pencil, X } from "lucide-react";
+import { Download, Pencil, X, Trash2 } from "lucide-react";
 
 const COLOR_SWATCHES = [
   "#3b82f6",
@@ -59,13 +60,11 @@ export default function Page() {
   const handleSave = async () => {
     setIsWorking(true);
     try {
-      await fetch(`/api/game-templates/${templateId}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, setlistMode }),
-        }
-      );
+      await fetch(`/api/game-templates/${templateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, setlistMode }),
+      });
       await loadTemplate();
       setShowDetails(false);
     } finally {
@@ -99,24 +98,28 @@ export default function Page() {
 
   if (!template) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100">
-        <div className="mx-auto w-full max-w-5xl px-6 py-10 text-sm text-slate-400">Loading playlist...</div>
+      <div className="min-h-screen bg-slate-50">
+        <div className="mx-auto w-full max-w-5xl px-6 py-10 text-sm text-slate-500">Loading playlist...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="border-b border-slate-900 bg-slate-950/90">
+    <div className="min-h-screen bg-slate-50">
+      <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4">
-          <Link href="/admin/games/bingo" className="text-slate-400 hover:text-white">←</Link>
-          <div className="text-center">
-            <div className="text-xs uppercase tracking-[0.3em] text-slate-500">Edit Playlist</div>
+          <Link href="/admin/games/bingo" className="text-slate-500 hover:text-slate-900">←</Link>
+          <div className="flex items-center gap-2">
+            <Image src="/images/Skulllogo.png" alt="Dead Wax Dialogues" width={28} height={28} />
+            <div className="text-center leading-tight">
+              <div className="text-xs uppercase tracking-[0.3em] text-slate-400">Dead Wax</div>
+              <div className="text-sm font-semibold text-slate-900">Edit Playlist</div>
+            </div>
           </div>
           <button
             type="button"
             onClick={handleExport}
-            className="rounded-full border border-slate-700 p-2 text-slate-300 hover:text-white"
+            className="rounded-full border border-slate-300 p-2 text-slate-600 hover:text-slate-900"
             aria-label="Export playlist"
           >
             <Download className="h-4 w-4" />
@@ -125,21 +128,21 @@ export default function Page() {
       </div>
 
       <main className="mx-auto w-full max-w-5xl px-6 py-10">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 text-xs text-slate-300">
-          <span className="mr-2 rounded-full border border-rose-500 px-2 py-0.5 text-[10px] uppercase tracking-wide text-rose-300">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-700">
+          <span className="mr-2 rounded-full border border-amber-300 px-2 py-0.5 text-[10px] uppercase tracking-wide">
             Warning
           </span>
-          This playlist is not compatible with automatic playback. It will need to be managed manually.
+          This playlist may not be compatible with automatic playback and might need to be managed manually.
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <div className="text-lg font-semibold">{name}</div>
-            <div className="text-xs text-slate-400">{items.length} songs</div>
+            <div className="text-2xl font-semibold text-slate-900">{name}</div>
+            <div className="text-xs text-slate-500">{items.length} songs</div>
             <button
               type="button"
               onClick={() => setShowDetails(true)}
-              className="mt-2 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-indigo-300"
+              className="mt-2 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-indigo-600"
             >
               <Pencil className="h-3 w-3" />
               Edit Details
@@ -148,29 +151,30 @@ export default function Page() {
           <button
             type="button"
             onClick={() => navigator.clipboard.writeText(window.location.href)}
-            className="rounded-lg border border-slate-700 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-200"
+            className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700"
           >
             Copy Link
           </button>
         </div>
 
-        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/70">
-          <div className="border-b border-slate-800 px-5 py-4 text-sm font-semibold">Songs</div>
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-white">
+          <div className="border-b border-slate-200 px-5 py-4 text-sm font-semibold text-slate-900">Songs</div>
           {items.length === 0 ? (
-            <div className="px-5 py-6 text-sm text-slate-400">No tracks in this playlist.</div>
+            <div className="px-5 py-6 text-sm text-slate-500">No tracks in this playlist.</div>
           ) : (
             items.map((item) => (
-              <div key={item.id} className="flex items-center justify-between border-b border-slate-800 px-5 py-3 last:border-b-0">
+              <div key={item.id} className="flex items-center justify-between border-b border-slate-100 px-5 py-3 last:border-b-0">
                 <div>
-                  <div className="text-sm font-semibold text-slate-100">{item.title}</div>
-                  <div className="text-xs text-slate-400">{item.artist}</div>
+                  <div className="text-sm font-semibold text-slate-900">{item.title}</div>
+                  <div className="text-xs text-slate-500">{item.artist}</div>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleDeleteItem(item.id)}
-                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200"
+                  className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:text-rose-600"
+                  aria-label="Remove song"
                 >
-                  Remove
+                  <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             ))
@@ -188,14 +192,14 @@ export default function Page() {
       </main>
 
       {showDetails ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-6">
-          <div className="w-full max-w-2xl rounded-2xl bg-slate-900 p-6 text-slate-100 shadow-xl">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-6">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-start justify-between">
-              <div className="text-lg font-semibold">Edit Details</div>
+              <div className="text-lg font-semibold text-slate-900">Edit Details</div>
               <button
                 type="button"
                 onClick={() => setShowDetails(false)}
-                className="rounded-full border border-slate-700 p-2 text-slate-300 hover:text-white"
+                className="rounded-full border border-slate-200 p-2 text-slate-500 hover:text-slate-900"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -206,7 +210,7 @@ export default function Page() {
               <input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
+                className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
               />
             </div>
 
@@ -218,32 +222,24 @@ export default function Page() {
                     key={color}
                     type="button"
                     onClick={() => setAccent(color)}
-                    className={`h-8 w-8 rounded-md border ${
-                      accent === color ? "border-white" : "border-transparent"
-                    }`}
+                    className={`h-8 w-8 rounded-md border ${accent === color ? "border-slate-900" : "border-transparent"}`}
                     style={{ backgroundColor: color }}
                   />
                 ))}
               </div>
             </div>
 
-            <div className="mt-5 flex items-center justify-between rounded-xl border border-slate-800 px-4 py-3">
+            <div className="mt-5 flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3">
               <div>
-                <div className="text-sm font-semibold">Setlist Mode</div>
-                <div className="text-xs text-slate-400">Keep the songs in order when creating a game.</div>
+                <div className="text-sm font-semibold text-slate-900">Setlist Mode</div>
+                <div className="text-xs text-slate-500">Keep song order when creating a game.</div>
               </div>
               <button
                 type="button"
                 onClick={() => setSetlistMode((prev) => !prev)}
-                className={`h-6 w-11 rounded-full p-1 transition ${
-                  setlistMode ? "bg-indigo-500" : "bg-slate-700"
-                }`}
+                className={`h-6 w-11 rounded-full p-1 transition ${setlistMode ? "bg-indigo-500" : "bg-slate-200"}`}
               >
-                <span
-                  className={`block h-4 w-4 rounded-full bg-white transition ${
-                    setlistMode ? "translate-x-5" : "translate-x-0"
-                  }`}
-                />
+                <span className={`block h-4 w-4 rounded-full bg-white transition ${setlistMode ? "translate-x-5" : "translate-x-0"}`} />
               </button>
             </div>
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Users, Settings } from "lucide-react";
 
 type PickItem = {
@@ -103,33 +104,24 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="border-b border-slate-900 bg-slate-950/95">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4">
-          <Link href="/admin/games/bingo" className="text-slate-400 hover:text-white">
+          <Link href="/admin/games/bingo" className="text-slate-500 hover:text-slate-900">
             ←
           </Link>
-          <div className="flex items-center gap-6 text-xs">
-            <div className="text-center">
-              <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Game Code</div>
-              <div className="mt-1 rounded-md border border-indigo-500 px-3 py-1 text-sm font-semibold text-indigo-200">
-                {session?.game_code ?? "----"}
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Playing</div>
-              <div className="mt-1 rounded-md bg-emerald-500/20 px-3 py-1 text-sm font-semibold text-emerald-200">0</div>
-            </div>
-            <div className="text-center">
-              <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Lobby</div>
-              <div className="mt-1 rounded-md bg-amber-500/20 px-3 py-1 text-sm font-semibold text-amber-200">0</div>
+          <div className="flex items-center gap-2">
+            <Image src="/images/Skulllogo.png" alt="Dead Wax Dialogues" width={28} height={28} />
+            <div className="text-center leading-tight">
+              <div className="text-xs uppercase tracking-[0.3em] text-slate-400">Dead Wax</div>
+              <div className="text-sm font-semibold text-slate-900">Bingo</div>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => router.push(`/admin/games/bingo/lobby?sessionId=${session?.id ?? ""}`)}
-              className="rounded-full border border-slate-800 p-2 text-slate-300 hover:text-white"
+              className="rounded-full border border-slate-200 p-2 text-slate-500 hover:text-slate-900"
               aria-label="Lobby"
             >
               <Users className="h-4 w-4" />
@@ -137,7 +129,7 @@ export default function Page() {
             <button
               type="button"
               onClick={() => router.push(`/admin/games/bingo/settings?sessionId=${session?.id ?? ""}`)}
-              className="rounded-full border border-slate-800 p-2 text-slate-300 hover:text-white"
+              className="rounded-full border border-slate-200 p-2 text-slate-500 hover:text-slate-900"
               aria-label="Settings"
             >
               <Settings className="h-4 w-4" />
@@ -148,6 +140,9 @@ export default function Page() {
 
       <main className="mx-auto w-full max-w-5xl px-6 py-8">
         <div className="mb-6 flex flex-wrap items-center gap-3">
+          <div className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+            Game Code: {session?.game_code ?? "----"}
+          </div>
           {session?.status !== "active" ? (
             <button
               type="button"
@@ -160,7 +155,7 @@ export default function Page() {
           <button
             type="button"
             onClick={() => setShowFinishConfirm(true)}
-            className="flex-1 rounded-lg border border-indigo-500/70 px-4 py-2 text-sm font-semibold uppercase tracking-wide text-indigo-200 hover:bg-indigo-600"
+            className="flex-1 rounded-lg border border-indigo-500/70 px-4 py-2 text-sm font-semibold uppercase tracking-wide text-indigo-700 hover:bg-indigo-50"
           >
             Finish Game
           </button>
@@ -174,24 +169,20 @@ export default function Page() {
               <div
                 key={pick.id}
                 className={`flex items-center justify-between rounded-xl border px-4 py-3 ${
-                  isCurrent
-                    ? "border-amber-400 bg-amber-500/10"
-                    : "border-slate-800 bg-slate-900/50"
+                  isCurrent ? "border-amber-400 bg-amber-100/70" : "border-slate-200 bg-white"
                 }`}
               >
                 <div className="flex items-center gap-4">
                   <div
                     className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold ${
-                      isCurrent ? "bg-amber-400 text-slate-900" : "bg-slate-800 text-slate-300"
+                      isCurrent ? "bg-amber-400 text-slate-900" : "bg-slate-200 text-slate-600"
                     }`}
                   >
                     {columnLabel}
                   </div>
                   <div>
-                    <div className="text-sm font-semibold text-slate-100">
-                      {pick.game_template_items?.title ?? "-"}
-                    </div>
-                    <div className="text-xs text-slate-400">{pick.game_template_items?.artist ?? ""}</div>
+                    <div className="text-sm font-semibold text-slate-900">{pick.game_template_items?.title ?? "-"}</div>
+                    <div className="text-xs text-slate-500">{pick.game_template_items?.artist ?? ""}</div>
                   </div>
                 </div>
                 <div className="text-xs text-slate-500">{pick.pick_index}</div>
@@ -205,7 +196,7 @@ export default function Page() {
             type="button"
             onClick={handlePrev}
             disabled={currentIndex === 0}
-            className="flex-1 rounded-lg border border-slate-800 px-4 py-3 text-sm font-semibold uppercase tracking-wide text-slate-200 hover:border-slate-600 disabled:opacity-40"
+            className="flex-1 rounded-lg border border-slate-300 px-4 py-3 text-sm font-semibold uppercase tracking-wide text-slate-700 disabled:opacity-40"
           >
             Previous Song
           </button>
@@ -221,10 +212,10 @@ export default function Page() {
       </main>
 
       {showFinishConfirm ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-6">
-          <div className="w-full max-w-sm rounded-2xl bg-slate-900 p-6 text-center">
-            <div className="text-lg font-semibold">Finish the game?</div>
-            <p className="mt-2 text-xs text-slate-400">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-6">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl">
+            <div className="text-lg font-semibold text-slate-900">Finish the game?</div>
+            <p className="mt-2 text-xs text-slate-500">
               This will end the current game for all players and display a game summary.
             </p>
             <div className="mt-6 space-y-3">
@@ -241,7 +232,7 @@ export default function Page() {
               <button
                 type="button"
                 onClick={() => setShowFinishConfirm(false)}
-                className="w-full rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200"
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
               >
                 No
               </button>
