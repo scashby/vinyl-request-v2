@@ -109,6 +109,7 @@ interface CollectionTrackRow {
   durationSeconds: number | null;
   durationLabel: string;
   albumMediaType: string;
+  trackFormatFacets: string[];
 }
 
 interface TrackAlbumGroup {
@@ -160,6 +161,67 @@ const getTrackPositionSortValue = (position: string, side: string | null): numbe
   const match = position.match(/\d+/g);
   const number = match?.length ? Number(match[match.length - 1]) : 999;
   return sideWeight * 1000 + (Number.isNaN(number) ? 999 : number);
+};
+
+const canonicalizeFormatFacet = (value: string): string | null => {
+  const token = value.trim().toLowerCase();
+  if (!token) return null;
+
+  const mapped: Array<[RegExp, string]> = [
+    [/^vinyl$/, 'Vinyl'],
+    [/^cd$|^compact disc$/, 'CD'],
+    [/^cassette$|^cass$/, 'Cassette'],
+    [/^8[- ]?track cartridge$|^8[- ]?track$/, '8-Track'],
+    [/^dvd$/, 'DVD'],
+    [/^all media$/, 'All Media'],
+    [/^box set$/, 'Box Set'],
+    [/^lp$/, 'LP'],
+    [/^ep$/, 'EP'],
+    [/^single$/, 'Single'],
+    [/^album$/, 'Album'],
+    [/^mini-album$/, 'Mini-Album'],
+    [/^maxi-single$/, 'Maxi-Single'],
+    [/^7"$/, '7"'],
+    [/^10"$/, '10"'],
+    [/^12"$/, '12"'],
+    [/^45 rpm$|^45$/, '45 RPM'],
+    [/^33 ?1\/3 rpm$|^33⅓ rpm$|^33 rpm$/, '33 RPM'],
+    [/^78 rpm$|^78$/, '78 RPM'],
+    [/^reissue$/, 'Reissue'],
+    [/^stereo$/, 'Stereo'],
+    [/^mono$/, 'Mono'],
+  ];
+
+  for (const [regex, label] of mapped) {
+    if (regex.test(token)) return label;
+  }
+
+  return null;
+};
+
+const buildTrackFormatFacets = (album: Album): string[] => {
+  const rawTokens: string[] = [];
+  const mediaType = album.release?.media_type;
+  if (mediaType) rawTokens.push(mediaType);
+
+  const details = album.release?.format_details ?? [];
+  details.forEach((entry) => {
+    if (!entry) return;
+    rawTokens.push(entry);
+    entry
+      .split(/[,/]/)
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .forEach((part) => rawTokens.push(part));
+  });
+
+  const facets = new Set<string>();
+  rawTokens.forEach((token) => {
+    const normalized = canonicalizeFormatFacet(token);
+    if (normalized) facets.add(normalized);
+  });
+
+  return Array.from(facets);
 };
 
 function CollectionBrowserPage() {
@@ -634,6 +696,7 @@ function CollectionBrowserPage() {
       const albumArtist = getAlbumArtist(album);
       const albumTitle = getAlbumTitle(album);
       const albumMediaType = album.release?.media_type || 'Unknown';
+      const trackFormatFacets = buildTrackFormatFacets(album);
       const releaseTracks = album.release?.release_tracks ?? [];
 
       if (releaseTracks.length > 0) {
@@ -655,6 +718,7 @@ function CollectionBrowserPage() {
             durationSeconds: track.recording?.duration_seconds ?? null,
             durationLabel: formatTrackDuration(track.recording?.duration_seconds ?? null),
             albumMediaType,
+            trackFormatFacets,
           });
         });
         return;
@@ -680,6 +744,7 @@ function CollectionBrowserPage() {
           durationSeconds: parseDurationLabelToSeconds(track.duration),
           durationLabel: track.duration ?? '—',
           albumMediaType,
+          trackFormatFacets,
         });
       });
     });
@@ -689,7 +754,10 @@ function CollectionBrowserPage() {
 
   const trackFormatCounts = useMemo(() => {
     return allTrackRows.reduce((acc, row) => {
-      acc[row.albumMediaType] = (acc[row.albumMediaType] || 0) + 1;
+      const facets = row.trackFormatFacets.length > 0 ? row.trackFormatFacets : [row.albumMediaType];
+      facets.forEach((facet) => {
+        acc[facet] = (acc[facet] || 0) + 1;
+      });
       return acc;
     }, {} as Record<string, number>);
   }, [allTrackRows]);
@@ -730,16 +798,22 @@ function CollectionBrowserPage() {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       rows = rows.filter((row) => {
-        const searchable = `${row.trackTitle} ${row.trackArtist} ${row.albumTitle} ${row.albumArtist} ${row.position} ${row.side ?? ''} ${row.albumMediaType}`.toLowerCase();
+        const searchable = `${row.trackTitle} ${row.trackArtist} ${row.albumTitle} ${row.albumArtist} ${row.position} ${row.side ?? ''} ${row.albumMediaType} ${row.trackFormatFacets.join(' ')}`.toLowerCase();
         return searchable.includes(q);
       });
     }
 
     if (trackFormatFilters.size > 0) {
       if (trackFormatFilterMode === 'include') {
-        rows = rows.filter((row) => trackFormatFilters.has(row.albumMediaType));
+        rows = rows.filter((row) => {
+          const facets = row.trackFormatFacets.length > 0 ? row.trackFormatFacets : [row.albumMediaType];
+          return Array.from(trackFormatFilters).every((required) => facets.includes(required));
+        });
       } else {
-        rows = rows.filter((row) => !trackFormatFilters.has(row.albumMediaType));
+        rows = rows.filter((row) => {
+          const facets = row.trackFormatFacets.length > 0 ? row.trackFormatFacets : [row.albumMediaType];
+          return !facets.some((facet) => trackFormatFilters.has(facet));
+        });
       }
     }
 
