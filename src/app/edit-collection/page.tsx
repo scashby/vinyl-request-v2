@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState, useMemo, Suspense, Fragment } from 'r
 import { supabase } from '../../lib/supabaseClient';
 import CollectionTable from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
-import { ColumnId, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
+import { ColumnId, COLUMN_DEFINITIONS, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
 import type { Album } from '../../types/album';
 import { toSafeStringArray, toSafeSearchString } from '../../types/album';
 import EditAlbumModal from './EditAlbumModal';
@@ -13,6 +13,7 @@ import NewCrateModal from './crates/NewCrateModal';
 import NewSmartCrateModal from './crates/NewSmartCrateModal';
 import { AddToCrateModal } from './crates/AddToCrateModal';
 import Header from './Header';
+import { ManageColumnFavoritesModal, type ColumnFavorite } from './ManageColumnFavoritesModal';
 import type { Crate } from '../../types/crate';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import CollectionInfoPanel from './components/CollectionInfoPanel';
@@ -243,6 +244,8 @@ function CollectionBrowserPage() {
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const [showNewPlaylistModal, setShowNewPlaylistModal] = useState(false);
   const [showAddToPlaylistModal, setShowAddToPlaylistModal] = useState(false);
+  const [showManagePlaylistsModal, setShowManagePlaylistsModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   
   const [collectionFilter, setCollectionFilter] = useState<string>('All');
   const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
@@ -1203,6 +1206,8 @@ function CollectionBrowserPage() {
           loadCrates={loadCrates}
           filteredAndSortedAlbums={filteredAndSortedAlbums}
           selectedAlbumIds={selectedAlbumIds}
+          onOpenManagePlaylists={() => setShowManagePlaylistsModal(true)}
+          onOpenExportCsvTxt={() => setShowExportModal(true)}
         />
 
         <div className="bg-[#3A3A3A] text-white px-4 py-2 flex items-center justify-between gap-5 h-[48px] shrink-0">
@@ -1728,6 +1733,34 @@ function CollectionBrowserPage() {
           }}
         />
       )}
+      {showManagePlaylistsModal && (
+        <ManagePlaylistsModal
+          isOpen={showManagePlaylistsModal}
+          onClose={() => setShowManagePlaylistsModal(false)}
+          playlists={playlists}
+          onSave={setPlaylists}
+          onOpenNewPlaylist={() => {
+            setShowManagePlaylistsModal(false);
+            setShowNewPlaylistModal(true);
+          }}
+        />
+      )}
+      {showExportModal && (
+        <ExportCsvTxtModal
+          isOpen={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          viewMode={viewMode}
+          allAlbums={albums}
+          currentAlbums={filteredAndSortedAlbums}
+          selectedAlbumIds={selectedAlbumIds}
+          allTracks={allTrackRows}
+          currentTracks={filteredTrackRows}
+          selectedTrackKeys={selectedTrackKeys}
+          playlists={playlists}
+          selectedPlaylistId={selectedPlaylistId}
+          visibleColumns={visibleColumns}
+        />
+      )}
     </>
   );
 }
@@ -1882,6 +1915,626 @@ function AddToPlaylistModal({
         </div>
       </div>
     </div>
+  );
+}
+
+function ManagePlaylistsModal({
+  isOpen,
+  onClose,
+  playlists,
+  onSave,
+  onOpenNewPlaylist
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  playlists: Playlist[];
+  onSave: (playlists: Playlist[]) => void;
+  onOpenNewPlaylist: () => void;
+}) {
+  const [localPlaylists, setLocalPlaylists] = useState<Playlist[]>(playlists);
+
+  useEffect(() => {
+    if (isOpen) {
+      setLocalPlaylists(playlists);
+    }
+  }, [isOpen, playlists]);
+
+  if (!isOpen) return null;
+
+  const movePlaylist = (index: number, direction: 'up' | 'down') => {
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (target < 0 || target >= localPlaylists.length) return;
+    const next = [...localPlaylists];
+    const [item] = next.splice(index, 1);
+    next.splice(target, 0, item);
+    setLocalPlaylists(next);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30002]" onClick={onClose}>
+      <div className="bg-white rounded-lg w-[620px] max-h-[80vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+          <h2 className="m-0 text-lg font-semibold text-gray-900">Manage Playlists</h2>
+          <div className="flex items-center gap-2">
+            <button onClick={onOpenNewPlaylist} className="px-3 py-1.5 bg-blue-500 text-white border-none rounded text-xs font-medium cursor-pointer hover:bg-blue-600">New Playlist</button>
+            <button onClick={onClose} className="bg-transparent border-none text-2xl cursor-pointer text-gray-500">×</button>
+          </div>
+        </div>
+
+        <div className="p-4 overflow-y-auto flex-1">
+          {localPlaylists.length === 0 ? (
+            <div className="p-10 text-center text-gray-500 text-sm">No playlists yet.</div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {localPlaylists.map((playlist, index) => (
+                <div key={playlist.id} className="flex items-center gap-3 p-3 border border-gray-200 bg-gray-50 rounded">
+                  <div className="flex flex-col gap-0.5">
+                    <button onClick={() => movePlaylist(index, 'up')} disabled={index === 0} className={`w-6 h-5 rounded border text-[10px] ${index === 0 ? 'border-gray-200 text-gray-300' : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-100'}`}>▲</button>
+                    <button onClick={() => movePlaylist(index, 'down')} disabled={index === localPlaylists.length - 1} className={`w-6 h-5 rounded border text-[10px] ${index === localPlaylists.length - 1 ? 'border-gray-200 text-gray-300' : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-100'}`}>▼</button>
+                  </div>
+                  <div className="text-2xl" style={{ color: playlist.color }}>{playlist.icon}</div>
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold text-gray-900">{playlist.name}</div>
+                    <div className="text-xs text-gray-500">{playlist.trackKeys.length} tracks</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        const nextName = prompt('Rename playlist', playlist.name)?.trim();
+                        if (!nextName) return;
+                        setLocalPlaylists((prev) => prev.map((item) => (item.id === playlist.id ? { ...item, name: nextName } : item)));
+                      }}
+                      className="px-3 py-1.5 bg-white border border-gray-300 rounded text-xs cursor-pointer hover:bg-gray-50"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!confirm(`Delete playlist "${playlist.name}"?`)) return;
+                        setLocalPlaylists((prev) => prev.filter((item) => item.id !== playlist.id));
+                      }}
+                      className="px-3 py-1.5 bg-red-500 text-white border-none rounded text-xs cursor-pointer hover:bg-red-600"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 bg-gray-100 text-gray-700 border-none rounded text-sm cursor-pointer hover:bg-gray-200">Cancel</button>
+          <button
+            onClick={() => {
+              onSave(localPlaylists);
+              onClose();
+            }}
+            className="px-4 py-2 bg-blue-500 text-white border-none rounded text-sm cursor-pointer hover:bg-blue-600"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExportCsvTxtModal({
+  isOpen,
+  onClose,
+  viewMode,
+  allAlbums,
+  currentAlbums,
+  selectedAlbumIds,
+  allTracks,
+  currentTracks,
+  selectedTrackKeys,
+  playlists,
+  selectedPlaylistId,
+  visibleColumns
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  viewMode: AppViewMode;
+  allAlbums: Album[];
+  currentAlbums: Album[];
+  selectedAlbumIds: Set<number>;
+  allTracks: CollectionTrackRow[];
+  currentTracks: CollectionTrackRow[];
+  selectedTrackKeys: Set<string>;
+  playlists: Playlist[];
+  selectedPlaylistId: string | null;
+  visibleColumns: ColumnId[];
+}) {
+  type TrackExportColumnId =
+    | 'album_artist'
+    | 'album_title'
+    | 'track_artist'
+    | 'track_title'
+    | 'position'
+    | 'side'
+    | 'length'
+    | 'format'
+    | 'playlist';
+
+  const trackColumnLabels: Record<TrackExportColumnId, string> = {
+    album_artist: 'Album Artist',
+    album_title: 'Album',
+    track_artist: 'Track Artist',
+    track_title: 'Track',
+    position: 'Position',
+    side: 'Side',
+    length: 'Length',
+    format: 'Format',
+    playlist: 'Playlist',
+  };
+
+  const defaultColumnFavorites: ColumnFavorite[] = [
+    {
+      id: 'favorite-my-export',
+      name: 'My Print / Export columns',
+      columns: ['Artist', 'Title', 'Format', 'Discs', 'Tracks', 'Length', 'Barcode', 'Cat No', 'Genre', 'Label', 'Added'],
+    },
+    {
+      id: 'favorite-bingo',
+      name: 'Bingo Export',
+      columns: ['Artist', 'Title', 'Format', 'Length', 'Cat No'],
+    },
+    {
+      id: 'favorite-trivia',
+      name: 'Trivia Export',
+      columns: ['Artist', 'Title', 'Year', 'Genre', 'Label'],
+    },
+  ];
+
+  const [formatType, setFormatType] = useState<'csv' | 'txt'>('csv');
+  const [scope, setScope] = useState<'all' | 'current' | 'selected'>('current');
+  const [delimiter, setDelimiter] = useState<string>(',');
+  const [enclosure, setEnclosure] = useState<'double' | 'single' | 'none'>('double');
+  const [includeHeaders, setIncludeHeaders] = useState(true);
+  const [filename, setFilename] = useState('collection_export');
+  const [columnFavorites, setColumnFavorites] = useState<ColumnFavorite[]>(defaultColumnFavorites);
+  const [selectedColumnFavoriteId, setSelectedColumnFavoriteId] = useState<string>(defaultColumnFavorites[0].id);
+  const [showManageColumnFavorites, setShowManageColumnFavorites] = useState(false);
+  const [selectedAlbumColumns, setSelectedAlbumColumns] = useState<ColumnId[]>(
+    visibleColumns.filter((id) => !['checkbox', 'owned', 'for_sale_indicator', 'menu'].includes(id))
+  );
+  const [selectedTrackColumns, setSelectedTrackColumns] = useState<TrackExportColumnId[]>([
+    'album_artist',
+    'album_title',
+    'track_artist',
+    'track_title',
+    'position',
+    'side',
+    'length',
+    'format',
+  ]);
+
+  useEffect(() => {
+    if (formatType === 'txt') {
+      setDelimiter('\t');
+      setEnclosure('none');
+    } else if (delimiter === '\t') {
+      setDelimiter(',');
+      setEnclosure('double');
+    }
+  }, [formatType, delimiter]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const storedFavorites = localStorage.getItem('collection-export-column-favorites');
+    if (storedFavorites) {
+      try {
+        const parsed = JSON.parse(storedFavorites) as ColumnFavorite[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setColumnFavorites(parsed);
+          setSelectedColumnFavoriteId(parsed[0].id);
+        }
+      } catch {
+        // ignore invalid local storage
+      }
+    }
+
+    const storedSelectedColumns = localStorage.getItem('collection-export-selected-album-columns');
+    if (storedSelectedColumns) {
+      try {
+        const parsed = JSON.parse(storedSelectedColumns) as ColumnId[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSelectedAlbumColumns(parsed);
+        }
+      } catch {
+        // ignore invalid local storage
+      }
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    localStorage.setItem('collection-export-column-favorites', JSON.stringify(columnFavorites));
+  }, [columnFavorites]);
+
+  useEffect(() => {
+    localStorage.setItem('collection-export-selected-album-columns', JSON.stringify(selectedAlbumColumns));
+  }, [selectedAlbumColumns]);
+
+  if (!isOpen) return null;
+
+  const exportableAlbumColumns = Object.values(COLUMN_DEFINITIONS)
+    .map((definition) => definition.id)
+    .filter((id): id is ColumnId => !['checkbox', 'owned', 'for_sale_indicator', 'menu'].includes(id));
+
+  const selectedFavorite = columnFavorites.find((favorite) => favorite.id === selectedColumnFavoriteId) ?? null;
+
+  const favoriteToColumnIds = (favorite: ColumnFavorite | null): ColumnId[] => {
+    if (!favorite) return [];
+
+    const byLabel = Object.values(COLUMN_DEFINITIONS).reduce((acc, definition) => {
+      acc[definition.label.toLowerCase()] = definition.id;
+      return acc;
+    }, {} as Record<string, ColumnId>);
+
+    const aliases: Record<string, ColumnId> = {
+      genre: 'genres',
+      style: 'styles',
+      tag: 'custom_tags',
+      tags: 'custom_tags',
+      'cat no': 'cat_no',
+      'cat no.': 'cat_no',
+      location: 'location',
+      owner: 'owner',
+      format: 'format',
+      artist: 'artist',
+      title: 'title',
+      year: 'year',
+      barcode: 'barcode',
+      discs: 'discs',
+      tracks: 'tracks',
+      length: 'length',
+      label: 'labels',
+      labels: 'labels',
+      added: 'added_date',
+      'added date': 'added_date',
+      status: 'collection_status',
+      'media condition': 'media_condition',
+      'sleeve condition': 'package_sleeve_condition',
+      notes: 'personal_notes',
+      'purchase price': 'purchase_price',
+      value: 'current_value',
+    };
+
+    const resolved = favorite.columns
+      .map((column) => {
+        const key = column.toLowerCase().trim();
+        return byLabel[key] ?? aliases[key] ?? null;
+      })
+      .filter((columnId): columnId is ColumnId => Boolean(columnId))
+      .filter((columnId, index, arr) => arr.indexOf(columnId) === index);
+
+    return resolved.filter((columnId) => exportableAlbumColumns.includes(columnId));
+  };
+
+  const exportAlbumColumns = selectedAlbumColumns.filter((columnId) => exportableAlbumColumns.includes(columnId));
+
+  const selectedAlbums = allAlbums.filter((album) => selectedAlbumIds.has(album.id));
+  const selectedTracks = allTracks.filter((track) => selectedTrackKeys.has(track.key));
+  const selectedPlaylist = selectedPlaylistId ? playlists.find((playlist) => playlist.id === selectedPlaylistId) : null;
+  const datasetCount = viewMode === 'collection'
+    ? { all: allAlbums.length, current: currentAlbums.length, selected: selectedAlbums.length }
+    : { all: allTracks.length, current: currentTracks.length, selected: selectedTracks.length };
+
+  const albumRows = scope === 'all' ? allAlbums : scope === 'selected' ? selectedAlbums : currentAlbums;
+  const trackRows = scope === 'all' ? allTracks : scope === 'selected' ? selectedTracks : currentTracks;
+
+  const resolveAlbumValue = (album: Album, column: ColumnId): string => {
+    switch (column) {
+      case 'artist': return getAlbumArtist(album);
+      case 'title': return getAlbumTitle(album);
+      case 'year': return String(getAlbumYearValue(album) ?? '');
+      case 'format': return getDisplayFormat(getAlbumFormat(album));
+      case 'barcode': return album.barcode || album.release?.barcode || '';
+      case 'cat_no': return album.cat_no || album.catalog_number || album.release?.catalog_number || '';
+      case 'discs': return String(album.discs ?? album.release?.qty ?? '');
+      case 'tracks': return String(album.release?.release_tracks?.length ?? album.tracks?.length ?? '');
+      case 'length': {
+        const seconds = (album.release?.release_tracks ?? []).reduce((sum, track) => sum + (track.recording?.duration_seconds ?? 0), 0);
+        return seconds ? formatTrackDuration(seconds) : '';
+      }
+      case 'genres': return (album.genres ?? album.release?.master?.genres ?? []).join(' | ');
+      case 'styles': return (album.styles ?? album.release?.master?.styles ?? []).join(' | ');
+      case 'labels': return (album.labels ?? (album.label ? [album.label] : [])).join(' | ');
+      case 'location': return album.location || '';
+      case 'collection_status': return album.collection_status || album.status || '';
+      case 'media_condition': return album.media_condition || '';
+      case 'package_sleeve_condition': return album.package_sleeve_condition || album.sleeve_condition || '';
+      case 'purchase_price': return album.purchase_price != null ? String(album.purchase_price) : '';
+      case 'current_value': return album.current_value != null ? String(album.current_value) : '';
+      case 'added_date': return album.date_added || '';
+      case 'personal_notes': return album.personal_notes || '';
+      case 'custom_tags': return (album.custom_tags ?? []).join(' | ');
+      case 'owner': return album.owner || '';
+      default: return '';
+    }
+  };
+
+  const headers = viewMode === 'collection'
+    ? exportAlbumColumns.map((id) => COLUMN_DEFINITIONS[id]?.label || id)
+    : selectedTrackColumns.map((id) => trackColumnLabels[id]);
+
+  const rows = viewMode === 'collection'
+    ? albumRows.map((album) => exportAlbumColumns.map((col) => resolveAlbumValue(album, col)))
+    : trackRows.map((track) =>
+        selectedTrackColumns.map((columnId) => {
+          if (columnId === 'album_artist') return track.albumArtist;
+          if (columnId === 'album_title') return track.albumTitle;
+          if (columnId === 'track_artist') return track.trackArtist;
+          if (columnId === 'track_title') return track.trackTitle;
+          if (columnId === 'position') return track.position;
+          if (columnId === 'side') return track.side ?? '';
+          if (columnId === 'length') return track.durationLabel;
+          if (columnId === 'format') return track.trackFormatFacets.join(' | ') || track.albumMediaType;
+          if (columnId === 'playlist') return selectedPlaylist?.name ?? '';
+          return '';
+        })
+      );
+
+  const quoteChar = enclosure === 'double' ? '"' : enclosure === 'single' ? '\'' : '';
+  const escaped = (value: string): string => {
+    if (!quoteChar) return value.replace(/\r?\n/g, ' ');
+    const escapedQuotes = value.replace(new RegExp(quoteChar, 'g'), `${quoteChar}${quoteChar}`);
+    return `${quoteChar}${escapedQuotes}${quoteChar}`;
+  };
+
+  const renderedLines = [
+    ...(includeHeaders ? [headers.map((value) => escaped(value)).join(delimiter)] : []),
+    ...rows.map((row) => row.map((value) => escaped(String(value ?? ''))).join(delimiter)),
+  ];
+
+  const previewText = renderedLines.slice(0, 40).join('\n');
+
+  const download = () => {
+    const text = renderedLines.join('\n');
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename || 'export'}.${formatType}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const applyPlaylistPreset = (preset: 'bingo_csv' | 'trivia_txt' | 'brackets_csv') => {
+    setScope('current');
+
+    if (preset === 'bingo_csv') {
+      setFormatType('csv');
+      setDelimiter(',');
+      setEnclosure('double');
+      setIncludeHeaders(true);
+      setFilename('bingo_playlist_export');
+      setSelectedTrackColumns(['track_title', 'track_artist', 'album_title', 'position', 'side', 'length', 'format', 'playlist']);
+      return;
+    }
+
+    if (preset === 'trivia_txt') {
+      setFormatType('txt');
+      setDelimiter('\t');
+      setEnclosure('none');
+      setIncludeHeaders(true);
+      setFilename('trivia_playlist_export');
+      setSelectedTrackColumns(['track_title', 'track_artist', 'album_title', 'playlist']);
+      return;
+    }
+
+    setFormatType('csv');
+    setDelimiter(',');
+    setEnclosure('double');
+    setIncludeHeaders(true);
+    setFilename('brackets_playlist_export');
+    setSelectedTrackColumns(['track_title', 'track_artist', 'album_title', 'length', 'playlist']);
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30003]" onClick={onClose}>
+        <div className="bg-white rounded-lg w-[1000px] max-w-[95vw] max-h-[90vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <h2 className="m-0 text-lg font-semibold text-gray-900">Export to CSV / TXT</h2>
+          <button onClick={onClose} className="bg-transparent border-none text-2xl cursor-pointer text-gray-500">×</button>
+        </div>
+
+        <div className="p-6 overflow-y-auto flex-1">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+            <div className="border border-gray-200 rounded p-3">
+              <div className="text-sm font-semibold text-gray-900 mb-2">Scope</div>
+              <label className="flex items-center gap-2 text-sm mb-1">
+                <input type="radio" checked={scope === 'all'} onChange={() => setScope('all')} />
+                <span>{viewMode === 'collection' ? 'All Albums' : 'All Tracks'} ({datasetCount.all})</span>
+              </label>
+              <label className="flex items-center gap-2 text-sm mb-1">
+                <input type="radio" checked={scope === 'current'} onChange={() => setScope('current')} />
+                <span>Current List ({datasetCount.current})</span>
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="radio" checked={scope === 'selected'} onChange={() => setScope('selected')} />
+                <span>Selected ({datasetCount.selected})</span>
+              </label>
+            </div>
+
+            <div className="border border-gray-200 rounded p-3">
+              <div className="text-sm font-semibold text-gray-900 mb-2 flex items-center justify-between">
+                <span>Columns</span>
+                {viewMode === 'collection' && (
+                  <button onClick={() => setShowManageColumnFavorites(true)} className="px-2 py-1 text-xs rounded border border-gray-300 bg-white hover:bg-gray-50 cursor-pointer">
+                    Manage
+                  </button>
+                )}
+              </div>
+              {viewMode === 'collection' ? (
+                <>
+                  <div className="flex items-center gap-2 mb-2">
+                    <select
+                      value={selectedColumnFavoriteId}
+                      onChange={(e) => {
+                        const nextId = e.target.value;
+                        setSelectedColumnFavoriteId(nextId);
+                        const favorite = columnFavorites.find((item) => item.id === nextId) ?? null;
+                        const mapped = favoriteToColumnIds(favorite);
+                        if (mapped.length > 0) {
+                          setSelectedAlbumColumns(mapped);
+                        }
+                      }}
+                      className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs"
+                    >
+                      {columnFavorites.map((favorite) => (
+                        <option key={favorite.id} value={favorite.id}>{favorite.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => {
+                        const mapped = favoriteToColumnIds(selectedFavorite);
+                        if (mapped.length > 0) setSelectedAlbumColumns(mapped);
+                      }}
+                      className="px-2 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-gray-50 cursor-pointer"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                  <div className="max-h-[120px] overflow-auto border border-gray-200 rounded p-2 text-xs">
+                    {exportableAlbumColumns.map((columnId) => {
+                      const checked = selectedAlbumColumns.includes(columnId);
+                      return (
+                        <label key={columnId} className="flex items-center gap-2 mb-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              setSelectedAlbumColumns((prev) => {
+                                if (prev.includes(columnId)) {
+                                  return prev.filter((item) => item !== columnId);
+                                }
+                                return [...prev, columnId];
+                              });
+                            }}
+                          />
+                          <span>{COLUMN_DEFINITIONS[columnId].label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="max-h-[120px] overflow-auto border border-gray-200 rounded p-2 text-xs">
+                  {Object.entries(trackColumnLabels).map(([columnId, label]) => {
+                    const id = columnId as TrackExportColumnId;
+                    const checked = selectedTrackColumns.includes(id);
+                    return (
+                      <label key={columnId} className="flex items-center gap-2 mb-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            setSelectedTrackColumns((prev) => {
+                              if (prev.includes(id)) {
+                                return prev.filter((item) => item !== id);
+                              }
+                              return [...prev, id];
+                            });
+                          }}
+                        />
+                        <span>{label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {viewMode === 'album-track' && (
+            <div className="mb-4 border border-gray-200 rounded p-3">
+              <div className="text-sm font-semibold text-gray-900 mb-2">Playlist Presets</div>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => applyPlaylistPreset('bingo_csv')} className="px-3 py-1.5 text-xs rounded bg-blue-500 text-white hover:bg-blue-600 cursor-pointer">Bingo CSV Preset</button>
+                <button onClick={() => applyPlaylistPreset('trivia_txt')} className="px-3 py-1.5 text-xs rounded bg-indigo-500 text-white hover:bg-indigo-600 cursor-pointer">Trivia TXT Preset</button>
+                <button onClick={() => applyPlaylistPreset('brackets_csv')} className="px-3 py-1.5 text-xs rounded bg-emerald-500 text-white hover:bg-emerald-600 cursor-pointer">Brackets CSV Preset</button>
+              </div>
+            </div>
+          )}
+
+          <div className="mb-3 flex items-center gap-2">
+            <button onClick={() => setFormatType('csv')} className={`px-4 py-2 rounded text-sm font-semibold ${formatType === 'csv' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}>CSV</button>
+            <button onClick={() => setFormatType('txt')} className={`px-4 py-2 rounded text-sm font-semibold ${formatType === 'txt' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}>TXT</button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+            <div className="border border-gray-200 rounded p-3">
+              <div className="text-sm font-semibold mb-2">Field Delimiter</div>
+              {[
+                { label: 'Semicolon', value: ';' },
+                { label: 'Comma', value: ',' },
+                { label: 'Tab', value: '\t' },
+                { label: 'Space', value: ' ' },
+              ].map((item) => (
+                <label key={item.label} className="flex items-center gap-2 text-sm mb-1">
+                  <input type="radio" checked={delimiter === item.value} onChange={() => setDelimiter(item.value)} />
+                  <span>{item.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="border border-gray-200 rounded p-3">
+              <div className="text-sm font-semibold mb-2">Field Enclosure</div>
+              {[
+                { label: 'Double Quote', value: 'double' as const },
+                { label: 'Single Quote', value: 'single' as const },
+                { label: 'None', value: 'none' as const },
+              ].map((item) => (
+                <label key={item.label} className="flex items-center gap-2 text-sm mb-1">
+                  <input type="radio" checked={enclosure === item.value} onChange={() => setEnclosure(item.value)} />
+                  <span>{item.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="border border-gray-200 rounded p-3">
+              <div className="text-sm font-semibold mb-2">Options</div>
+              <label className="flex items-center gap-2 text-sm mb-3">
+                <input type="checkbox" checked={includeHeaders} onChange={(e) => setIncludeHeaders(e.target.checked)} />
+                <span>Include Field Names as First Row</span>
+              </label>
+              <div className="text-sm font-semibold mb-1">Filename</div>
+              <input value={filename} onChange={(e) => setFilename(e.target.value)} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
+            </div>
+          </div>
+
+          <div className="border border-gray-200 rounded p-3">
+            <div className="text-sm font-semibold mb-2">Preview</div>
+            <pre className="text-[12px] leading-5 bg-gray-50 border border-gray-200 rounded p-3 max-h-[260px] overflow-auto whitespace-pre-wrap">{previewText}</pre>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 bg-gray-100 text-gray-700 border-none rounded text-sm cursor-pointer hover:bg-gray-200">Cancel</button>
+          <button onClick={download} className="px-4 py-2 bg-blue-500 text-white border-none rounded text-sm cursor-pointer hover:bg-blue-600">Generate File</button>
+        </div>
+        </div>
+      </div>
+
+      <ManageColumnFavoritesModal
+        isOpen={showManageColumnFavorites}
+        onClose={() => setShowManageColumnFavorites(false)}
+        favorites={columnFavorites}
+        onSave={(favorites) => {
+          setColumnFavorites(favorites);
+          setShowManageColumnFavorites(false);
+        }}
+        selectedId={selectedColumnFavoriteId}
+        onSelect={setSelectedColumnFavoriteId}
+      />
+    </>
   );
 }
 

@@ -24,6 +24,8 @@ interface HeaderProps {
   loadCrates?: () => Promise<void>;
   filteredAndSortedAlbums?: Album[];
   selectedAlbumIds?: Set<number>;
+  onOpenManagePlaylists?: () => void;
+  onOpenExportCsvTxt?: () => void;
 }
 
 export default function Header({ 
@@ -31,7 +33,9 @@ export default function Header({
   loadAlbums = async () => {}, 
   loadCrates = async () => {},
   filteredAndSortedAlbums = [],
-  selectedAlbumIds = new Set()
+  selectedAlbumIds = new Set(),
+  onOpenManagePlaylists = () => {},
+  onOpenExportCsvTxt = () => {}
 }: HeaderProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -68,6 +72,9 @@ export default function Header({
               <button onClick={() => { setSidebarOpen(false); setShowManageCratesModal(true); }} title="Manage crates (DJ workflow organization)" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded transition-colors">
                 <span className="mr-2.5">📦</span> Manage Crates
               </button>
+              <button onClick={() => { setSidebarOpen(false); onOpenManagePlaylists(); }} title="Manage playlists (track-based organization)" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded transition-colors">
+                <span className="mr-2.5">🎵</span> Manage Playlists
+              </button>
             </div>
 
             <hr className="border-[#444] my-5" />
@@ -76,6 +83,9 @@ export default function Header({
               <div className="text-[11px] font-semibold text-[#999] mb-2.5 uppercase tracking-wider">Tools</div>
               <button onClick={() => { setSidebarOpen(false); setShowPrintToPDF(true); }} title="Export collection to PDF" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded transition-colors">
                 <span className="mr-2.5">🖨️</span> Print to PDF
+              </button>
+              <button onClick={() => { setSidebarOpen(false); onOpenExportCsvTxt(); }} title="Export collection/tracks to CSV or TXT" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded transition-colors">
+                <span className="mr-2.5">📄</span> Export CSV / TXT
               </button>
               <button onClick={() => { setSidebarOpen(false); setShowStatistics(true); }} title="View collection statistics" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded transition-colors">
                 <span className="mr-2.5">📊</span> Statistics
