@@ -1,10 +1,22 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { Container } from "components/ui/Container";
-import { Button } from "components/ui/Button";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import BingoHeader from "../../_components/BingoHeader";
+import { Download, Pencil, Trash2, X } from "lucide-react";
+
+const COLOR_SWATCHES = [
+  "#3b82f6",
+  "#22c55e",
+  "#2563eb",
+  "#f59e0b",
+  "#d946ef",
+  "#7c3aed",
+  "#f43f5e",
+  "#14b8a6",
+  "#eab308",
+];
 
 type Template = {
   id: number;
@@ -32,17 +44,19 @@ type SearchResult = {
 
 export default function Page() {
   const params = useParams();
-  const router = useRouter();
+  const templateId = Number(params.id);
   const [template, setTemplate] = useState<Template | null>(null);
   const [items, setItems] = useState<TemplateItem[]>([]);
   const [name, setName] = useState("");
   const [setlistMode, setSetlistMode] = useState(false);
+  const [accent, setAccent] = useState(COLOR_SWATCHES[5]);
+  const [defaultVideo, setDefaultVideo] = useState("");
+  const [preGameVideo, setPreGameVideo] = useState("");
   const [isWorking, setIsWorking] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-
-  const templateId = Number(params.id);
 
   const loadTemplate = async () => {
     const response = await fetch(`/api/game-templates/${templateId}`);
@@ -58,30 +72,20 @@ export default function Page() {
     void loadTemplate();
   }, [templateId]);
 
+  const trackCount = items.length;
+
   const handleSave = async () => {
     setIsWorking(true);
     try {
-      await fetch(`/api/game-templates/${templateId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, setlistMode }),
-      });
+      await fetch(`/api/game-templates/${templateId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, setlistMode }),
+        }
+      );
       await loadTemplate();
-    } finally {
-      setIsWorking(false);
-    }
-  };
-
-  const handleRebuild = async () => {
-    if (!confirm("Rebuild this playlist from your vinyl collection?")) return;
-    setIsWorking(true);
-    try {
-      await fetch(`/api/game-templates/${templateId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rebuild: true }),
-      });
-      await loadTemplate();
+      setShowDetails(false);
     } finally {
       setIsWorking(false);
     }
@@ -97,42 +101,18 @@ export default function Page() {
     }
   };
 
-  const handleMoveItem = async (itemId: number, direction: "up" | "down") => {
-    const index = items.findIndex((item) => item.id === itemId);
-    if (index === -1) return;
-    const targetIndex = direction === "up" ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= items.length) return;
-
-    const currentItem = items[index];
-    const targetItem = items[targetIndex];
-
-    setIsWorking(true);
-    try {
-      await fetch(`/api/game-template-items/${currentItem.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sortOrder: targetItem.sort_order ?? targetIndex + 1 }),
-      });
-      await fetch(`/api/game-template-items/${targetItem.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sortOrder: currentItem.sort_order ?? index + 1 }),
-      });
-      await loadTemplate();
-    } finally {
-      setIsWorking(false);
-    }
-  };
-
-  const handleDeleteTemplate = async () => {
-    if (!confirm("Delete this playlist?")) return;
-    setIsWorking(true);
-    try {
-      await fetch(`/api/game-templates/${templateId}`, { method: "DELETE" });
-      router.push("/admin/games/bingo/templates");
-    } finally {
-      setIsWorking(false);
-    }
+  const handleExport = () => {
+    const payload = {
+      name,
+      tracks: items.map((item) => ({ title: item.title, artist: item.artist })),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${name || "playlist"}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleSearch = async () => {
@@ -171,158 +151,237 @@ export default function Page() {
 
   if (!template) {
     return (
-      <Container size="md" className="py-8 min-h-screen">
-        <p className="text-sm text-gray-500">Loading playlist...</p>
-      </Container>
+      <div className="min-h-screen bg-slate-50">
+        <BingoHeader backHref="/admin/games/bingo/templates" title="Edit Playlist" />
+        <div className="mx-auto w-full max-w-4xl px-6 py-10 text-sm text-slate-500">Loading playlist...</div>
+      </div>
     );
   }
 
   return (
-    <Container size="md" className="py-8 min-h-screen">
-      <div className="flex items-start justify-between gap-6 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Edit Playlist</h1>
-          <p className="text-sm text-gray-500 mt-2">Vinyl-only songs. Edit metadata and remove tracks.</p>
-        </div>
-        <div className="flex gap-2">
-          <Link href="/admin/games/bingo">
-            <Button variant="secondary" size="sm">Back to Bingo</Button>
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="border-b border-slate-800 bg-slate-950/90">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4">
+          <Link href="/admin/games/bingo/templates" className="text-slate-400 hover:text-white">
+            ←
           </Link>
-          <Button variant="secondary" size="sm" onClick={handleDeleteTemplate} disabled={isWorking}>
-            Delete Playlist
-          </Button>
+          <div className="text-center">
+            <div className="text-xs uppercase tracking-[0.3em] text-slate-500">Playlist Editor</div>
+            <div className="text-sm font-semibold">Edit Playlist</div>
+          </div>
+          <button
+            type="button"
+            onClick={handleExport}
+            className="rounded-full border border-slate-700 p-2 text-slate-300 hover:text-white"
+            aria-label="Export playlist"
+          >
+            <Download className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <section className="lg:col-span-2 border border-gray-200 rounded-2xl p-5 bg-white shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Playlist Details</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <label className="flex flex-col gap-2 text-sm text-gray-700">
-              Name
+      <main className="mx-auto w-full max-w-5xl px-6 py-10">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 text-xs text-slate-300">
+          <span className="mr-2 rounded-full border border-rose-500 px-2 py-0.5 text-[10px] uppercase tracking-wide text-rose-300">
+            Warning
+          </span>
+          This playlist is not compatible with automatic playback. It will need to be managed manually.
+        </div>
+
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="text-lg font-semibold">{name}</div>
+            <div className="text-xs text-slate-400">{trackCount} songs</div>
+            <button
+              type="button"
+              onClick={() => setShowDetails(true)}
+              className="mt-2 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-indigo-300"
+            >
+              <Pencil className="h-3 w-3" />
+              Edit Details
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigator.clipboard.writeText(window.location.href)}
+            className="rounded-lg border border-slate-700 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-200 hover:border-slate-500"
+          >
+            Copy Link
+          </button>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/70">
+          <div className="border-b border-slate-800 px-5 py-4 text-sm font-semibold">Songs</div>
+          {items.length === 0 ? (
+            <div className="px-5 py-6 text-sm text-slate-400">No tracks in this playlist.</div>
+          ) : (
+            items.map((item) => (
+              <div key={item.id} className="flex items-center justify-between border-b border-slate-800 px-5 py-3 last:border-b-0">
+                <div>
+                  <div className="text-sm font-semibold text-slate-100">{item.title}</div>
+                  <div className="text-xs text-slate-400">{item.artist}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteItem(item.id)}
+                  className="rounded-lg border border-slate-700 p-2 text-slate-400 hover:text-white"
+                  aria-label="Remove track"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+          <div className="text-sm font-semibold">Add Tracks</div>
+          <p className="mt-1 text-xs text-slate-400">Search your vinyl collection and add tracks.</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search by song or artist..."
+              className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+            />
+            <button
+              type="button"
+              onClick={handleSearch}
+              disabled={isSearching || !searchTerm.trim()}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+            >
+              Search
+            </button>
+          </div>
+          <div className="mt-4 space-y-3">
+            {isSearching ? (
+              <p className="text-sm text-slate-400">Searching...</p>
+            ) : searchResults.length === 0 ? (
+              <p className="text-sm text-slate-400">No results yet.</p>
+            ) : (
+              searchResults.map((result, index) => (
+                <div
+                  key={`${result.recording_id ?? "track"}-${index}`}
+                  className="flex items-center justify-between rounded-xl border border-slate-800 px-4 py-3"
+                >
+                  <div>
+                    <div className="text-sm font-semibold text-slate-100">{result.title}</div>
+                    <div className="text-xs text-slate-400">{result.artist}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAddTrack(result)}
+                    disabled={isWorking}
+                    className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:border-slate-500"
+                  >
+                    Add
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={isWorking}
+          className="mt-6 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-700"
+        >
+          Save Changes
+        </button>
+      </main>
+
+      {showDetails ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-6">
+          <div className="w-full max-w-2xl rounded-2xl bg-slate-900 p-6 text-slate-100 shadow-xl">
+            <div className="flex items-start justify-between">
+              <div className="text-lg font-semibold">Edit Details</div>
+              <button
+                type="button"
+                onClick={() => setShowDetails(false)}
+                className="rounded-full border border-slate-700 p-2 text-slate-300 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-5">
+              <label className="text-xs uppercase tracking-wide text-slate-400">Title</label>
               <input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
               />
-            </label>
-            <label className="flex items-center gap-3 text-sm text-gray-700 mt-6">
-              <input
-                type="checkbox"
-                checked={setlistMode}
-                onChange={(event) => setSetlistMode(event.target.checked)}
-                className="accent-blue-600"
-              />
-              Setlist Mode (ordered)
-            </label>
-          </div>
-          <div className="flex flex-wrap gap-3 mt-5">
-            <Button size="sm" onClick={handleSave} disabled={isWorking}>
-              Save Changes
-            </Button>
-            <Button variant="secondary" size="sm" onClick={handleRebuild} disabled={isWorking}>
-              Rebuild from Vinyl Collection
-            </Button>
-          </div>
-        </section>
+            </div>
 
-        <aside className="border border-gray-200 rounded-2xl p-5 bg-white shadow-sm">
-          <h3 className="text-sm font-semibold text-gray-900">Playlist Stats</h3>
-          <p className="text-sm text-gray-600 mt-3">Tracks: {items.length}</p>
-          <p className="text-sm text-gray-600">Mode: {setlistMode ? "Setlist" : "Shuffle"}</p>
-        </aside>
-      </div>
-
-      <section className="border border-gray-200 rounded-2xl p-5 bg-white shadow-sm mt-6">
-        <h2 className="text-lg font-semibold text-gray-900">Tracks</h2>
-        <div className="mt-4 space-y-3">
-          {items.length === 0 ? (
-            <p className="text-sm text-gray-500">No tracks in this playlist.</p>
-          ) : (
-            items.map((item, index) => (
-              <div
-                key={item.id}
-                className="flex flex-wrap items-center justify-between gap-3 border border-gray-200 rounded-xl px-4 py-3"
-              >
-                <div>
-                  <div className="text-sm font-semibold text-gray-900">{item.title}</div>
-                  <div className="text-xs text-gray-500">{item.artist}</div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-xs text-gray-500">
-                    {item.side ? `Side ${item.side}` : ""} {item.position ?? ""}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => handleMoveItem(item.id, "up")}
-                      disabled={isWorking || index === 0}
-                    >
-                      Up
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => handleMoveItem(item.id, "down")}
-                      disabled={isWorking || index === items.length - 1}
-                    >
-                      Down
-                    </Button>
-                  </div>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => handleDeleteItem(item.id)}
-                    disabled={isWorking}
-                  >
-                    Remove
-                  </Button>
-                </div>
+            <div className="mt-5">
+              <label className="text-xs uppercase tracking-wide text-slate-400">Color</label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {COLOR_SWATCHES.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setAccent(color)}
+                    className={`h-8 w-8 rounded-md border ${
+                      accent === color ? "border-white" : "border-transparent"
+                    }`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
               </div>
-            ))
-          )}
-        </div>
-      </section>
+            </div>
 
-      <section className="border border-gray-200 rounded-2xl p-5 bg-white shadow-sm mt-6">
-        <h2 className="text-lg font-semibold text-gray-900">Add Tracks</h2>
-        <p className="text-sm text-gray-500 mt-2">Search your vinyl collection and add tracks.</p>
-        <div className="flex flex-wrap gap-3 mt-4">
-          <input
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Search by song or artist..."
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-[200px]"
-          />
-          <Button size="sm" onClick={handleSearch} disabled={isSearching || !searchTerm.trim()}>
-            Search
-          </Button>
-        </div>
-
-        <div className="mt-4 space-y-3">
-          {isSearching ? (
-            <p className="text-sm text-gray-500">Searching...</p>
-          ) : searchResults.length === 0 ? (
-            <p className="text-sm text-gray-500">No results yet.</p>
-          ) : (
-            searchResults.map((result, index) => (
-              <div
-                key={`${result.recording_id ?? "track"}-${index}`}
-                className="flex flex-wrap items-center justify-between gap-3 border border-gray-200 rounded-xl px-4 py-3"
-              >
-                <div>
-                  <div className="text-sm font-semibold text-gray-900">{result.title}</div>
-                  <div className="text-xs text-gray-500">{result.artist}</div>
-                </div>
-                <Button size="sm" onClick={() => handleAddTrack(result)} disabled={isWorking}>
-                  Add
-                </Button>
+            <div className="mt-5 flex items-center justify-between rounded-xl border border-slate-800 px-4 py-3">
+              <div>
+                <div className="text-sm font-semibold">Setlist Mode</div>
+                <div className="text-xs text-slate-400">Keep the songs in order when creating a game.</div>
               </div>
-            ))
-          )}
+              <button
+                type="button"
+                onClick={() => setSetlistMode((prev) => !prev)}
+                className={`h-6 w-11 rounded-full p-1 transition ${
+                  setlistMode ? "bg-indigo-500" : "bg-slate-700"
+                }`}
+              >
+                <span
+                  className={`block h-4 w-4 rounded-full bg-white transition ${
+                    setlistMode ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="mt-5">
+              <div className="text-sm font-semibold">Jumbotron Videos</div>
+              <p className="text-xs text-slate-400">Provide video URLs for the large screen display.</p>
+              <div className="mt-3 space-y-3">
+                <input
+                  value={defaultVideo}
+                  onChange={(event) => setDefaultVideo(event.target.value)}
+                  placeholder="Default video URL"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
+                />
+                <input
+                  value={preGameVideo}
+                  onChange={(event) => setPreGameVideo(event.target.value)}
+                  placeholder="Pre-game video URL"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isWorking}
+              className="mt-6 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              Save
+            </button>
+          </div>
         </div>
-      </section>
-    </Container>
+      ) : null}
+    </div>
   );
 }

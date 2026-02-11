@@ -2,18 +2,18 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Container } from "components/ui/Container";
-import { Button } from "components/ui/Button";
+import BingoHeader from "../_components/BingoHeader";
+import { Plus, ChevronRight } from "lucide-react";
 
 type TemplateSummary = {
   id: number;
   name: string;
+  source: string | null;
   setlist_mode: boolean;
 };
 
 export default function Page() {
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
-  const [isWorking, setIsWorking] = useState(false);
 
   const refreshTemplates = async () => {
     const response = await fetch("/api/game-templates");
@@ -25,62 +25,56 @@ export default function Page() {
     void refreshTemplates();
   }, []);
 
-  const handleBuildVinylPlaylist = async () => {
-    setIsWorking(true);
-    try {
-      await fetch("/api/game-templates", { method: "POST" });
-      await refreshTemplates();
-    } finally {
-      setIsWorking(false);
-    }
-  };
-
   return (
-    <Container size="md" className="py-8 min-h-screen">
-      <div className="flex items-start justify-between gap-6 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Music Bingo Playlists</h1>
-          <p className="text-sm text-gray-500 mt-2">
-            Vinyl-only playlists built from your collection (7"-12").
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" size="sm" onClick={handleBuildVinylPlaylist} disabled={isWorking}>
-            Build Vinyl Playlist
-          </Button>
-          <Button size="sm">Create Playlist</Button>
-        </div>
-      </div>
+    <div className="min-h-screen bg-slate-50">
+      <BingoHeader backHref="/admin/games/bingo" title="Playlists" />
 
-      <div className="space-y-4">
-        {templates.length === 0 ? (
-          <div className="border border-dashed border-gray-300 rounded-2xl p-6 text-sm text-gray-500">
-            No playlists yet. Use "Build Vinyl Playlist" to generate one from your collection.
+      <main className="mx-auto w-full max-w-5xl px-6 py-10">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900">Your Custom Playlists</h1>
+            <p className="text-sm text-slate-500">
+              Vinyl-only playlists built from your collection and imports.
+            </p>
           </div>
-        ) : (
-          templates.map((template) => (
-          <div
-            key={template.id}
-            className="border border-gray-200 rounded-2xl p-5 bg-white shadow-sm flex flex-wrap items-center justify-between gap-4"
+          <Link
+            href="/admin/games/bingo/playlists/new"
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
           >
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">{template.name}</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                {template.setlist_mode ? "Setlist" : "Shuffled"}
-              </p>
+            <Plus className="h-4 w-4" />
+            New Playlist
+          </Link>
+        </div>
+
+        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
+          {templates.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
+              No playlists yet. Build one from your vinyl collection or import a spreadsheet.
             </div>
-            <div className="flex gap-2">
-              <Link href={`/admin/games/bingo/templates/${template.id}`}>
-                <Button variant="secondary" size="sm">Edit</Button>
-              </Link>
-              <Link href={`/admin/games/bingo?templateId=${template.id}`}>
-                <Button size="sm">Use in Game</Button>
-              </Link>
-            </div>
-          </div>
-        ))
-        )}
-      </div>
-    </Container>
+          ) : (
+            templates.map((template) => (
+              <div
+                key={template.id}
+                className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              >
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">{template.name}</div>
+                  <div className="text-xs text-slate-500">
+                    {template.source ?? "custom"} · {template.setlist_mode ? "Setlist" : "Shuffle"}
+                  </div>
+                </div>
+                <Link
+                  href={`/admin/games/bingo/templates/${template.id}`}
+                  className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-indigo-600"
+                >
+                  Edit
+                  <ChevronRight className="h-3 w-3" />
+                </Link>
+              </div>
+            ))
+          )}
+        </div>
+      </main>
+    </div>
   );
 }
