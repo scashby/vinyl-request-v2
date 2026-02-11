@@ -19,10 +19,16 @@ export async function POST(request: Request) {
   }
 
   const csvText = await file.text();
-  const parsed = Papa.parse<Record<string, string>>(csvText, {
+  type CsvParseResult = {
+    data: Record<string, string>[];
+    errors: Array<{ message: string }>;
+    meta: { fields?: string[] };
+  };
+
+  const parsed = Papa.parse(csvText, {
     header: true,
     skipEmptyLines: true,
-  });
+  }) as CsvParseResult;
 
   if (parsed.errors.length > 0) {
     return NextResponse.json({ error: parsed.errors[0].message }, { status: 400 });
