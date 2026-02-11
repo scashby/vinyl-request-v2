@@ -1,7 +1,7 @@
 // src/app/edit-collection/page.tsx
 'use client';
 
-import { useCallback, useEffect, useState, useMemo, Suspense } from 'react';
+import { useCallback, useEffect, useState, useMemo, Suspense, Fragment } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import CollectionTable from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
@@ -90,6 +90,16 @@ interface CollectionTrackRow {
   durationLabel: string;
 }
 
+interface TrackAlbumGroup {
+  inventoryId: number;
+  albumArtist: string;
+  albumTitle: string;
+  trackCount: number;
+  totalSeconds: number;
+  tracks: CollectionTrackRow[];
+  sideTotals: Array<{ side: string; totalSeconds: number; trackCount: number }>;
+}
+
 type CrateGameFlags = Record<number, Record<CrateGameKey, boolean>>;
 
 const CRATE_GAME_LABELS: { key: CrateGameKey; icon: string; label: string }[] = [
@@ -105,6 +115,16 @@ const formatTrackDuration = (seconds: number | null | undefined): string => {
   const minutes = Math.floor(seconds / 60);
   const remain = seconds % 60;
   return `${minutes}:${remain.toString().padStart(2, '0')}`;
+};
+
+const parseDurationLabelToSeconds = (value: string | null | undefined): number | null => {
+  if (!value) return null;
+  const parts = value.split(':').map((item) => Number(item));
+  if (parts.some((part) => Number.isNaN(part))) return null;
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
 };
 
 const normalizeTrackPosition = (position: string | null | undefined, fallback: number): string => {
@@ -141,6 +161,7 @@ function CollectionBrowserPage() {
   const [folderSortByCount, setFolderSortByCount] = useState(false);
   const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<number>>(new Set());
   const [selectedTrackKeys, setSelectedTrackKeys] = useState<Set<string>>(new Set());
+  const [expandedAlbumIds, setExpandedAlbumIds] = useState<Set<number>>(new Set());
   const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null);
   const [editingAlbumId, setEditingAlbumId] = useState<number | null>(null);
   const [showFolderModeDropdown, setShowFolderModeDropdown] = useState(false);
@@ -584,7 +605,7 @@ function CollectionBrowserPage() {
           trackTitle: track.title,
           position,
           side,
-          durationSeconds: null,
+          durationSeconds: parseDurationLabelToSeconds(track.duration),
           durationLabel: track.duration ?? '—',
         });
       });
@@ -648,6 +669,64 @@ function CollectionBrowserPage() {
     searchQuery,
   ]);
 
+  const groupedTrackRows = useMemo<TrackAlbumGroup[]>(() => {
+    const grouped = new Map<number, TrackAlbumGroup>();
+
+    filteredTrackRows.forEach((row) => {
+      const existing = grouped.get(row.inventoryId) ?? {
+        inventoryId: row.inventoryId,
+        albumArtist: row.albumArtist,
+        albumTitle: row.albumTitle,
+        trackCount: 0,
+        totalSeconds: 0,
+        tracks: [],
+        sideTotals: [],
+      };
+
+      existing.tracks.push(row);
+      existing.trackCount += 1;
+      existing.totalSeconds += row.durationSeconds ?? 0;
+      grouped.set(row.inventoryId, existing);
+    });
+
+    const results = Array.from(grouped.values());
+    results.forEach((group) => {
+      group.tracks.sort((a, b) => {
+        const sideA = a.side ?? '';
+        const sideB = b.side ?? '';
+        if (sideA && sideB && sideA !== sideB) return sideA.localeCompare(sideB);
+        if (sideA && !sideB) return -1;
+        if (!sideA && sideB) return 1;
+        const numA = Number((a.position.match(/\d+/g) ?? ['9999']).slice(-1)[0]);
+        const numB = Number((b.position.match(/\d+/g) ?? ['9999']).slice(-1)[0]);
+        if (numA !== numB) return numA - numB;
+        return a.position.localeCompare(b.position);
+      });
+
+      const sideMap = new Map<string, { totalSeconds: number; trackCount: number }>();
+      group.tracks.forEach((track) => {
+        const side = track.side ?? '';
+        if (!side) return;
+        const item = sideMap.get(side) ?? { totalSeconds: 0, trackCount: 0 };
+        item.totalSeconds += track.durationSeconds ?? 0;
+        item.trackCount += 1;
+        sideMap.set(side, item);
+      });
+      group.sideTotals = Array.from(sideMap.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([side, totals]) => ({
+          side,
+          totalSeconds: totals.totalSeconds,
+          trackCount: totals.trackCount,
+        }));
+    });
+
+    return results.sort((a, b) => {
+      if (a.albumArtist !== b.albumArtist) return a.albumArtist.localeCompare(b.albumArtist);
+      return a.albumTitle.localeCompare(b.albumTitle);
+    });
+  }, [filteredTrackRows]);
+
   useEffect(() => {
     if (selectedAlbumId) return;
     if (viewMode === 'collection' && filteredAndSortedAlbums.length > 0) {
@@ -658,6 +737,15 @@ function CollectionBrowserPage() {
       setSelectedAlbumId(filteredTrackRows[0].inventoryId);
     }
   }, [filteredAndSortedAlbums, selectedAlbumId, viewMode, filteredTrackRows]);
+
+  useEffect(() => {
+    if (viewMode !== 'album-track') return;
+    if (groupedTrackRows.length === 0) return;
+    setExpandedAlbumIds((prev) => {
+      if (prev.size > 0) return prev;
+      return new Set([groupedTrackRows[0].inventoryId]);
+    });
+  }, [viewMode, groupedTrackRows]);
 
   const sortedFolderItems = useMemo(() => {
     return Object.entries(folderCounts)
@@ -721,6 +809,9 @@ function CollectionBrowserPage() {
     }
     setSelectedAlbumIds(new Set());
     setSelectedTrackKeys(new Set());
+    if (viewMode === 'collection') {
+      setExpandedAlbumIds(new Set());
+    }
   }, [viewMode, trackSource, folderMode]);
 
   const handleFolderModeChange = useCallback((mode: SidebarMode) => {
@@ -803,6 +894,18 @@ function CollectionBrowserPage() {
         next.delete(trackKey);
       } else {
         next.add(trackKey);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleAlbumExpanded = useCallback((albumId: number) => {
+    setExpandedAlbumIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(albumId)) {
+        next.delete(albumId);
+      } else {
+        next.add(albumId);
       }
       return next;
     });
@@ -1178,35 +1281,90 @@ function CollectionBrowserPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredTrackRows.map((row) => {
-                          const isChecked = selectedTrackKeys.has(row.key);
-                          const isSelectedAlbum = selectedAlbumId === row.inventoryId;
-                          const positionLabel = row.side ? `${row.side}${row.position.replace(/^[A-Za-z]/, '')}` : row.position;
+                        {groupedTrackRows.map((group) => {
+                          const isExpanded = expandedAlbumIds.has(group.inventoryId);
+                          const allTracksSelected = group.tracks.length > 0 && group.tracks.every((track) => selectedTrackKeys.has(track.key));
                           return (
-                            <tr
-                              key={row.key}
-                              onClick={() => setSelectedAlbumId(row.inventoryId)}
-                              className={`border-b border-[#eee] cursor-pointer ${isSelectedAlbum ? 'bg-[#f3f9ff]' : 'hover:bg-[#fafafa]'}`}
-                            >
-                              <td className="px-2 py-2">
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={() => toggleTrackSelection(row.key)}
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              </td>
-                              <td className="px-2 py-2 text-[#1f2937]">{row.trackTitle}</td>
-                              <td className="px-2 py-2 text-[#374151]">{row.trackArtist}</td>
-                              <td className="px-2 py-2 text-[#4b5563]">{row.albumTitle}</td>
-                              <td className="px-2 py-2 text-[#4b5563]">{positionLabel}</td>
-                              <td className="px-2 py-2 text-right text-[#4b5563]">{row.durationLabel}</td>
-                            </tr>
+                            <Fragment key={`group-${group.inventoryId}`}>
+                              <tr
+                                key={`album-${group.inventoryId}`}
+                                onClick={() => {
+                                  setSelectedAlbumId(group.inventoryId);
+                                  toggleAlbumExpanded(group.inventoryId);
+                                }}
+                                className={`border-b border-[#ddd] cursor-pointer ${selectedAlbumId === group.inventoryId ? 'bg-[#eef6ff]' : 'bg-[#f8fafc] hover:bg-[#f1f5f9]'}`}
+                              >
+                                <td className="px-2 py-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={allTracksSelected}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      const keys = group.tracks.map((track) => track.key);
+                                      setSelectedTrackKeys((prev) => {
+                                        const next = new Set(prev);
+                                        if (allTracksSelected) {
+                                          keys.forEach((key) => next.delete(key));
+                                        } else {
+                                          keys.forEach((key) => next.add(key));
+                                        }
+                                        return next;
+                                      });
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                </td>
+                                <td className="px-2 py-2 text-[#111827] font-semibold">
+                                  <span className="mr-2 text-[#4b5563]">{isExpanded ? '▾' : '▸'}</span>
+                                  {group.albumTitle}
+                                </td>
+                                <td className="px-2 py-2 text-[#1f2937]">{group.albumArtist}</td>
+                                <td className="px-2 py-2 text-[#4b5563]">
+                                  {group.trackCount} tracks
+                                  {group.sideTotals.length > 0 && (
+                                    <span className="ml-2 text-[#6b7280] text-xs">
+                                      {group.sideTotals.map((side) => `Side ${side.side}: ${formatTrackDuration(side.totalSeconds)}`).join(' | ')}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-2 py-2 text-[#4b5563]">—</td>
+                                <td className="px-2 py-2 text-right text-[#4b5563]">
+                                  {group.totalSeconds > 0 ? formatTrackDuration(group.totalSeconds) : '—'}
+                                </td>
+                              </tr>
+                              {isExpanded &&
+                                group.tracks.map((row) => {
+                                  const isChecked = selectedTrackKeys.has(row.key);
+                                  const positionNumber = (row.position.match(/\d+/g) ?? [row.position]).slice(-1)[0];
+                                  const positionLabel = row.side ? `${row.side}${positionNumber}` : row.position;
+                                  return (
+                                    <tr
+                                      key={row.key}
+                                      onClick={() => setSelectedAlbumId(row.inventoryId)}
+                                      className={`border-b border-[#eee] cursor-pointer ${selectedAlbumId === row.inventoryId ? 'bg-[#f8fbff]' : 'hover:bg-[#fafafa]'}`}
+                                    >
+                                      <td className="px-2 py-2">
+                                        <input
+                                          type="checkbox"
+                                          checked={isChecked}
+                                          onChange={() => toggleTrackSelection(row.key)}
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                      </td>
+                                      <td className="px-2 py-2 text-[#1f2937] pl-7">{row.trackTitle}</td>
+                                      <td className="px-2 py-2 text-[#374151]">{row.trackArtist}</td>
+                                      <td className="px-2 py-2 text-[#6b7280]">{row.albumTitle}</td>
+                                      <td className="px-2 py-2 text-[#4b5563]">{positionLabel}</td>
+                                      <td className="px-2 py-2 text-right text-[#4b5563]">{row.durationLabel}</td>
+                                    </tr>
+                                  );
+                                })}
+                            </Fragment>
                           );
                         })}
                       </tbody>
                     </table>
-                    {filteredTrackRows.length === 0 && (
+                    {groupedTrackRows.length === 0 && (
                       <div className="p-10 text-center text-[#666] text-sm">No tracks match the current filters.</div>
                     )}
                   </div>

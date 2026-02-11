@@ -3,7 +3,24 @@ import './globals.css';
 // FIXED: Named import
 import { AuthProvider } from '../components/AuthProvider'; 
 import NavigationMenu from '../components/NavigationMenu';
+import { Inter, Libre_Barcode_EAN13_Text, Playfair_Display } from 'next/font/google';
 // FIXED: Named import
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+});
+
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  variable: '--font-playfair',
+});
+
+const libreBarcode = Libre_Barcode_EAN13_Text({
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-libre-barcode',
+});
 
 export const metadata = {
   title: 'Dead Wax Dialogues',
@@ -20,7 +37,7 @@ export default function RootLayout({
       {/* FIXED: Removed 'bg-black text-white' to stop forced dark mode.
           The app will now use the defaults from globals.css.
       */}
-      <body className="font-sans min-h-screen pb-24 md:pb-0">
+      <body className={`${inter.variable} ${playfair.variable} ${libreBarcode.variable} font-sans min-h-screen pb-24 md:pb-0`}>
         <AuthProvider>
           {/* REMOVED: AlbumContextManager wrapper (Audio Recognition) */}
           <NavigationMenu />
