@@ -12,7 +12,22 @@ interface NewCrateModalProps {
   editingCrate?: Crate | null; // Optional crate to edit
 }
 
-const PRESET_ICONS = ['📦', '🎵', '🔥', '⭐', '💎', '🎧', '🎸', '🎹', '🎤', '🎺', '🎷', '🥁'];
+const PRESET_ICONS = [
+  '📦',
+  '🎱', // Bingo
+  '❓', // Trivia
+  '🏆', // Brackets
+  '🎮', // Other games
+  '🎵',
+  '🎧',
+  '🔥',
+  '⭐',
+  '💎',
+  '🎸',
+  '🎤',
+  '🎺',
+  '🥁',
+];
 const PRESET_COLORS = [
   '#3578b3', // Default blue
   '#ef4444', // Red
