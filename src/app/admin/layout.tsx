@@ -33,7 +33,6 @@ function RequireAuth({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   const isLoginPage = pathname === "/admin/login";
-  const isBingoRoute = pathname?.startsWith("/admin/games/bingo");
 
   if (isLoading) {
     return (
@@ -47,42 +46,38 @@ function RequireAuth({ children }: { children: ReactNode }) {
 
   return (
     <div className="relative min-h-screen bg-white text-gray-900">
-      {!isBingoRoute ? (
-        <>
-          {/* Mobile Menu Button - only visible on mobile */}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-gray-800 text-white rounded-md shadow-lg"
-            aria-label="Toggle menu"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {sidebarOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              )}
-            </svg>
-          </button>
-
-          {/* Overlay for mobile - only shows when sidebar is open */}
-          {sidebarOpen && (
-            <div
-              className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
-              onClick={() => setSidebarOpen(false)}
-            />
+      {/* Mobile Menu Button - only visible on mobile */}
+      <button
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-gray-800 text-white rounded-md shadow-lg"
+        aria-label="Toggle menu"
+      >
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {sidebarOpen ? (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          ) : (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           )}
+        </svg>
+      </button>
 
-          {/* Sidebar */}
-          <AdminSidebar
-            isOpen={sidebarOpen}
-            onClose={() => setSidebarOpen(false)}
-          />
-        </>
-      ) : null}
+      {/* Overlay for mobile - only shows when sidebar is open */}
+      {sidebarOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <AdminSidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
       {/* Main Content */}
-      <div className={`${isBingoRoute ? "" : "lg:ml-48"} min-h-screen`}>
-        <div className={isBingoRoute ? "" : "p-4"}>
+      <div className="lg:ml-48 min-h-screen">
+        <div className="p-4">
           {children}
         </div>
       </div>
