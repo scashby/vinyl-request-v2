@@ -40,6 +40,13 @@ type SortOption =
   | 'location-asc' | 'location-desc'
   | 'decade-desc' | 'decade-asc';
 
+type TrackSortOption =
+  | 'album-asc' | 'album-desc'
+  | 'track-asc' | 'track-desc'
+  | 'artist-asc' | 'artist-desc'
+  | 'position-asc' | 'position-desc'
+  | 'duration-asc' | 'duration-desc';
+
 const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
   { value: 'artist-asc', label: 'Artist (A→Z)', category: 'Basic' },
   { value: 'artist-desc', label: 'Artist (Z→A)', category: 'Basic' },
@@ -59,6 +66,19 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
   { value: 'condition-desc', label: 'Condition (Z→A)', category: 'Physical' },
   { value: 'tags-count-desc', label: 'Most Tags', category: 'Metadata' },
   { value: 'tags-count-asc', label: 'Fewest Tags', category: 'Metadata' }
+];
+
+const TRACK_SORT_OPTIONS: { value: TrackSortOption; label: string; category: string }[] = [
+  { value: 'album-asc', label: 'Album (A→Z)', category: 'Album' },
+  { value: 'album-desc', label: 'Album (Z→A)', category: 'Album' },
+  { value: 'artist-asc', label: 'Track Artist (A→Z)', category: 'Track' },
+  { value: 'artist-desc', label: 'Track Artist (Z→A)', category: 'Track' },
+  { value: 'track-asc', label: 'Track Title (A→Z)', category: 'Track' },
+  { value: 'track-desc', label: 'Track Title (Z→A)', category: 'Track' },
+  { value: 'position-asc', label: 'Position (A1→B1...)', category: 'Order' },
+  { value: 'position-desc', label: 'Position (Reverse)', category: 'Order' },
+  { value: 'duration-asc', label: 'Duration (Shortest)', category: 'Duration' },
+  { value: 'duration-desc', label: 'Duration (Longest)', category: 'Duration' },
 ];
 
 type AppViewMode = 'collection' | 'album-track';
@@ -88,6 +108,7 @@ interface CollectionTrackRow {
   side: string | null;
   durationSeconds: number | null;
   durationLabel: string;
+  albumMediaType: string;
 }
 
 interface TrackAlbumGroup {
@@ -133,6 +154,14 @@ const normalizeTrackPosition = (position: string | null | undefined, fallback: n
   return String(fallback);
 };
 
+const getTrackPositionSortValue = (position: string, side: string | null): number => {
+  const parsedSide = (side ?? position.trim().charAt(0)).toUpperCase();
+  const sideWeight = parsedSide >= 'A' && parsedSide <= 'Z' ? parsedSide.charCodeAt(0) - 65 : 100;
+  const match = position.match(/\d+/g);
+  const number = match?.length ? Number(match[match.length - 1]) : 999;
+  return sideWeight * 1000 + (Number.isNaN(number) ? 999 : number);
+};
+
 function CollectionBrowserPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
@@ -173,9 +202,13 @@ function CollectionBrowserPage() {
   const [newlyCreatedCrateId, setNewlyCreatedCrateId] = useState<number | null>(null);
   
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
+  const [trackSortBy, setTrackSortBy] = useState<TrackSortOption>('album-asc');
+  const [trackFormatFilterMode, setTrackFormatFilterMode] = useState<'include' | 'exclude'>('include');
+  const [trackFormatFilters, setTrackFormatFilters] = useState<Set<string>>(new Set());
   
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [showViewModeDropdown, setShowViewModeDropdown] = useState(false);
+  const [showTrackFormatDropdown, setShowTrackFormatDropdown] = useState(false);
 
   const [tableSortState, setTableSortState] = useState<SortState>({
     column: null,
@@ -245,6 +278,26 @@ function CollectionBrowserPage() {
     if (stored && SORT_OPTIONS.some(opt => opt.value === stored)) {
       setSortBy(stored as SortOption);
     }
+
+    const storedTrackSort = localStorage.getItem('collection-track-sort-preference');
+    if (storedTrackSort && TRACK_SORT_OPTIONS.some(opt => opt.value === storedTrackSort)) {
+      setTrackSortBy(storedTrackSort as TrackSortOption);
+    }
+
+    const storedTrackFilterMode = localStorage.getItem('collection-track-format-filter-mode');
+    if (storedTrackFilterMode === 'include' || storedTrackFilterMode === 'exclude') {
+      setTrackFormatFilterMode(storedTrackFilterMode);
+    }
+
+    const storedTrackFilters = localStorage.getItem('collection-track-format-filters');
+    if (storedTrackFilters) {
+      try {
+        const parsed = JSON.parse(storedTrackFilters) as string[];
+        setTrackFormatFilters(new Set(parsed));
+      } catch {
+        // ignore invalid local storage
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -259,11 +312,28 @@ function CollectionBrowserPage() {
     localStorage.setItem('collection-view-mode', viewMode);
   }, [viewMode]);
 
+  useEffect(() => {
+    localStorage.setItem('collection-track-sort-preference', trackSortBy);
+  }, [trackSortBy]);
+
+  useEffect(() => {
+    localStorage.setItem('collection-track-format-filter-mode', trackFormatFilterMode);
+  }, [trackFormatFilterMode]);
+
+  useEffect(() => {
+    localStorage.setItem('collection-track-format-filters', JSON.stringify(Array.from(trackFormatFilters)));
+  }, [trackFormatFilters]);
+
   const handleSortChange = useCallback((newSort: SortOption) => {
     setSortBy(newSort);
     localStorage.setItem('collection-sort-preference', newSort);
     setShowSortDropdown(false);
     setTableSortState({ column: null, direction: null });
+  }, []);
+
+  const handleTrackSortChange = useCallback((newSort: TrackSortOption) => {
+    setTrackSortBy(newSort);
+    setShowSortDropdown(false);
   }, []);
 
   const handleTableSortChange = useCallback((column: ColumnId) => {
@@ -563,6 +633,7 @@ function CollectionBrowserPage() {
       }
       const albumArtist = getAlbumArtist(album);
       const albumTitle = getAlbumTitle(album);
+      const albumMediaType = album.release?.media_type || 'Unknown';
       const releaseTracks = album.release?.release_tracks ?? [];
 
       if (releaseTracks.length > 0) {
@@ -583,6 +654,7 @@ function CollectionBrowserPage() {
             side,
             durationSeconds: track.recording?.duration_seconds ?? null,
             durationLabel: formatTrackDuration(track.recording?.duration_seconds ?? null),
+            albumMediaType,
           });
         });
         return;
@@ -607,12 +679,20 @@ function CollectionBrowserPage() {
           side,
           durationSeconds: parseDurationLabelToSeconds(track.duration),
           durationLabel: track.duration ?? '—',
+          albumMediaType,
         });
       });
     });
 
     return rows;
   }, [albums, collectionFilter]);
+
+  const trackFormatCounts = useMemo(() => {
+    return allTrackRows.reduce((acc, row) => {
+      acc[row.albumMediaType] = (acc[row.albumMediaType] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [allTrackRows]);
 
   const filteredTrackRows = useMemo(() => {
     let rows = allTrackRows;
@@ -650,10 +730,44 @@ function CollectionBrowserPage() {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       rows = rows.filter((row) => {
-        const searchable = `${row.trackTitle} ${row.trackArtist} ${row.albumTitle} ${row.albumArtist} ${row.position} ${row.side ?? ''}`.toLowerCase();
+        const searchable = `${row.trackTitle} ${row.trackArtist} ${row.albumTitle} ${row.albumArtist} ${row.position} ${row.side ?? ''} ${row.albumMediaType}`.toLowerCase();
         return searchable.includes(q);
       });
     }
+
+    if (trackFormatFilters.size > 0) {
+      if (trackFormatFilterMode === 'include') {
+        rows = rows.filter((row) => trackFormatFilters.has(row.albumMediaType));
+      } else {
+        rows = rows.filter((row) => !trackFormatFilters.has(row.albumMediaType));
+      }
+    }
+
+    rows = [...rows].sort((a, b) => {
+      switch (trackSortBy) {
+        case 'album-asc':
+          return `${a.albumArtist} ${a.albumTitle}`.localeCompare(`${b.albumArtist} ${b.albumTitle}`);
+        case 'album-desc':
+          return `${b.albumArtist} ${b.albumTitle}`.localeCompare(`${a.albumArtist} ${a.albumTitle}`);
+        case 'track-asc':
+          return a.trackTitle.localeCompare(b.trackTitle);
+        case 'track-desc':
+          return b.trackTitle.localeCompare(a.trackTitle);
+        case 'artist-asc':
+          return a.trackArtist.localeCompare(b.trackArtist);
+        case 'artist-desc':
+          return b.trackArtist.localeCompare(a.trackArtist);
+        case 'duration-asc':
+          return (a.durationSeconds ?? 0) - (b.durationSeconds ?? 0);
+        case 'duration-desc':
+          return (b.durationSeconds ?? 0) - (a.durationSeconds ?? 0);
+        case 'position-desc':
+          return getTrackPositionSortValue(b.position, b.side) - getTrackPositionSortValue(a.position, a.side);
+        case 'position-asc':
+        default:
+          return getTrackPositionSortValue(a.position, a.side) - getTrackPositionSortValue(b.position, b.side);
+      }
+    });
 
     return rows;
   }, [
@@ -667,6 +781,9 @@ function CollectionBrowserPage() {
     playlists,
     selectedLetter,
     searchQuery,
+    trackFormatFilters,
+    trackFormatFilterMode,
+    trackSortBy,
   ]);
 
   const groupedTrackRows = useMemo<TrackAlbumGroup[]>(() => {
@@ -692,15 +809,16 @@ function CollectionBrowserPage() {
     const results = Array.from(grouped.values());
     results.forEach((group) => {
       group.tracks.sort((a, b) => {
-        const sideA = a.side ?? '';
-        const sideB = b.side ?? '';
-        if (sideA && sideB && sideA !== sideB) return sideA.localeCompare(sideB);
-        if (sideA && !sideB) return -1;
-        if (!sideA && sideB) return 1;
-        const numA = Number((a.position.match(/\d+/g) ?? ['9999']).slice(-1)[0]);
-        const numB = Number((b.position.match(/\d+/g) ?? ['9999']).slice(-1)[0]);
-        if (numA !== numB) return numA - numB;
-        return a.position.localeCompare(b.position);
+        if (trackSortBy === 'track-asc') return a.trackTitle.localeCompare(b.trackTitle);
+        if (trackSortBy === 'track-desc') return b.trackTitle.localeCompare(a.trackTitle);
+        if (trackSortBy === 'artist-asc') return a.trackArtist.localeCompare(b.trackArtist);
+        if (trackSortBy === 'artist-desc') return b.trackArtist.localeCompare(a.trackArtist);
+        if (trackSortBy === 'duration-asc') return (a.durationSeconds ?? 0) - (b.durationSeconds ?? 0);
+        if (trackSortBy === 'duration-desc') return (b.durationSeconds ?? 0) - (a.durationSeconds ?? 0);
+        if (trackSortBy === 'position-desc') {
+          return getTrackPositionSortValue(b.position, b.side) - getTrackPositionSortValue(a.position, a.side);
+        }
+        return getTrackPositionSortValue(a.position, a.side) - getTrackPositionSortValue(b.position, b.side);
       });
 
       const sideMap = new Map<string, { totalSeconds: number; trackCount: number }>();
@@ -722,10 +840,29 @@ function CollectionBrowserPage() {
     });
 
     return results.sort((a, b) => {
-      if (a.albumArtist !== b.albumArtist) return a.albumArtist.localeCompare(b.albumArtist);
+      if (trackSortBy === 'album-desc') {
+        const artistCmp = b.albumArtist.localeCompare(a.albumArtist);
+        if (artistCmp !== 0) return artistCmp;
+        return b.albumTitle.localeCompare(a.albumTitle);
+      }
+
+      if (trackSortBy === 'duration-desc' || trackSortBy === 'duration-asc') {
+        const mult = trackSortBy === 'duration-desc' ? -1 : 1;
+        const cmp = (a.totalSeconds - b.totalSeconds) * mult;
+        if (cmp !== 0) return cmp;
+      }
+
+      if (trackSortBy === 'artist-desc' || trackSortBy === 'artist-asc') {
+        const mult = trackSortBy === 'artist-desc' ? -1 : 1;
+        const cmp = a.albumArtist.localeCompare(b.albumArtist) * mult;
+        if (cmp !== 0) return cmp;
+      }
+
+      const artistCmp = a.albumArtist.localeCompare(b.albumArtist);
+      if (artistCmp !== 0) return artistCmp;
       return a.albumTitle.localeCompare(b.albumTitle);
     });
-  }, [filteredTrackRows]);
+  }, [filteredTrackRows, trackSortBy]);
 
   useEffect(() => {
     if (selectedAlbumId) return;
@@ -772,6 +909,19 @@ function CollectionBrowserPage() {
     return list;
   }, [playlists, folderSearch, folderSortByCount, playlistCounts]);
 
+  const sortedTrackFormats = useMemo(() => {
+    return Object.entries(trackFormatCounts).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [trackFormatCounts]);
+
+  const trackFormatSummary = useMemo(() => {
+    if (trackFormatFilters.size === 0) return 'All Formats';
+    const values = Array.from(trackFormatFilters);
+    if (values.length === 1) {
+      return `${trackFormatFilterMode === 'include' ? 'Only' : 'Exclude'} ${values[0]}`;
+    }
+    return `${trackFormatFilterMode === 'include' ? 'Only' : 'Exclude'} ${values.length} formats`;
+  }, [trackFormatFilters, trackFormatFilterMode]);
+
   const selectedAlbum = useMemo(() => {
     return albums.find(a => a.id === selectedAlbumId) || null;
   }, [albums, selectedAlbumId]);
@@ -782,6 +932,14 @@ function CollectionBrowserPage() {
       acc[opt.category].push(opt);
       return acc;
     }, {} as Record<string, typeof SORT_OPTIONS>);
+  }, []);
+
+  const trackSortOptionsByCategory = useMemo(() => {
+    return TRACK_SORT_OPTIONS.reduce((acc, opt) => {
+      if (!acc[opt.category]) acc[opt.category] = [];
+      acc[opt.category].push(opt);
+      return acc;
+    }, {} as Record<string, typeof TRACK_SORT_OPTIONS>);
   }, []);
 
   const handleAlbumClick = useCallback((album: Album) => {
@@ -811,6 +969,7 @@ function CollectionBrowserPage() {
     setSelectedTrackKeys(new Set());
     if (viewMode === 'collection') {
       setExpandedAlbumIds(new Set());
+      setShowTrackFormatDropdown(false);
     }
   }, [viewMode, trackSource, folderMode]);
 
@@ -1014,6 +1173,67 @@ function CollectionBrowserPage() {
           </div>
 
           <div className="flex items-center shrink-0">
+            {viewMode === 'album-track' && (
+              <div className="relative mr-1.5">
+                <button
+                  onClick={() => setShowTrackFormatDropdown(!showTrackFormatDropdown)}
+                  title="Track format filters"
+                  className="bg-[#2a2a2a] text-white border border-[#555] px-2.5 py-1.5 cursor-pointer text-[12px] rounded h-8 hover:bg-[#333] transition-colors"
+                >
+                  🎚 {trackFormatSummary}
+                </button>
+                {showTrackFormatDropdown && (
+                  <>
+                    <div onClick={() => setShowTrackFormatDropdown(false)} className="fixed inset-0 z-[99]" />
+                    <div className="absolute right-0 top-full mt-1 w-[280px] max-h-[320px] overflow-auto bg-[#2a2a2a] border border-[#555] rounded z-[100] shadow-lg p-2">
+                      <div className="flex gap-1 mb-2">
+                        <button
+                          onClick={() => setTrackFormatFilterMode('include')}
+                          className={`flex-1 px-2 py-1 text-[11px] rounded border ${trackFormatFilterMode === 'include' ? 'bg-[#5A9BD5] border-[#5A9BD5] text-white' : 'bg-[#3a3a3a] border-[#555] text-white'}`}
+                        >
+                          Include
+                        </button>
+                        <button
+                          onClick={() => setTrackFormatFilterMode('exclude')}
+                          className={`flex-1 px-2 py-1 text-[11px] rounded border ${trackFormatFilterMode === 'exclude' ? 'bg-[#5A9BD5] border-[#5A9BD5] text-white' : 'bg-[#3a3a3a] border-[#555] text-white'}`}
+                        >
+                          Exclude
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => setTrackFormatFilters(new Set())}
+                        className="w-full mb-2 px-2 py-1 text-[11px] rounded border border-[#555] bg-[#3a3a3a] text-white hover:bg-[#444]"
+                      >
+                        Clear Format Filters
+                      </button>
+                      {sortedTrackFormats.map(([format, count]) => {
+                        const checked = trackFormatFilters.has(format);
+                        return (
+                          <label key={format} className="flex items-center justify-between px-2 py-1.5 rounded text-[12px] text-white hover:bg-[#3a3a3a] cursor-pointer">
+                            <span className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => {
+                                  setTrackFormatFilters((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(format)) next.delete(format);
+                                    else next.add(format);
+                                    return next;
+                                  });
+                                }}
+                              />
+                              <span>{format}</span>
+                            </span>
+                            <span className="text-[#bbb]">{count}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             <div className="relative">
               <button onClick={() => setShowSearchTypeDropdown(!showSearchTypeDropdown)} title="Search type" className="bg-[#2a2a2a] text-white border border-[#555] border-r-0 px-2.5 py-1.5 cursor-pointer text-[13px] rounded-l flex items-center gap-1 h-8 hover:bg-[#333] transition-colors">
                 <span>🔍</span>
@@ -1223,17 +1443,29 @@ function CollectionBrowserPage() {
                     <>
                       <div onClick={() => setShowSortDropdown(false)} className="fixed inset-0 z-[99]" />
                       <div className="absolute top-full left-0 mt-1 bg-white border border-[#ddd] rounded shadow-lg z-[100] min-w-[240px] max-h-[400px] overflow-y-auto">
-                        {Object.entries(sortOptionsByCategory).map(([category, options]) => (
-                          <div key={category}>
-                            <div className="px-3 py-2 text-[11px] font-semibold text-[#999] uppercase tracking-wider bg-[#f8f8f8] border-b border-[#e8e8e8]">{category}</div>
-                            {options.map(opt => (
-                              <button key={opt.value} onClick={() => handleSortChange(opt.value)} className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${sortBy === opt.value ? 'bg-[#e3f2fd]' : ''}`}>
-                                <span>{opt.label}</span>
-                                {sortBy === opt.value && <span className="text-[#2196F3]">✓</span>}
-                              </button>
+                        {viewMode === 'collection'
+                          ? Object.entries(sortOptionsByCategory).map(([category, options]) => (
+                              <div key={category}>
+                                <div className="px-3 py-2 text-[11px] font-semibold text-[#999] uppercase tracking-wider bg-[#f8f8f8] border-b border-[#e8e8e8]">{category}</div>
+                                {options.map(opt => (
+                                  <button key={opt.value} onClick={() => handleSortChange(opt.value)} className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${sortBy === opt.value ? 'bg-[#e3f2fd]' : ''}`}>
+                                    <span>{opt.label}</span>
+                                    {sortBy === opt.value && <span className="text-[#2196F3]">✓</span>}
+                                  </button>
+                                ))}
+                              </div>
+                            ))
+                          : Object.entries(trackSortOptionsByCategory).map(([category, options]) => (
+                              <div key={category}>
+                                <div className="px-3 py-2 text-[11px] font-semibold text-[#999] uppercase tracking-wider bg-[#f8f8f8] border-b border-[#e8e8e8]">{category}</div>
+                                {options.map(opt => (
+                                  <button key={opt.value} onClick={() => handleTrackSortChange(opt.value)} className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${trackSortBy === opt.value ? 'bg-[#e3f2fd]' : ''}`}>
+                                    <span>{opt.label}</span>
+                                    {trackSortBy === opt.value && <span className="text-[#2196F3]">✓</span>}
+                                  </button>
+                                ))}
+                              </div>
                             ))}
-                          </div>
-                        ))}
                       </div>
                     </>
                   )}
