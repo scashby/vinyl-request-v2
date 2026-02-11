@@ -18,7 +18,6 @@ export async function GET(request: NextRequest) {
       "id, releases ( id, media_type, format_details, release_year, release_tracks ( id, position, side, title_override, recordings ( id, title, track_artist ) ) )"
     )
     .eq("releases.media_type", "Vinyl")
-    .overlaps("releases.format_details", VINYL_SIZES)
     .limit(DEFAULT_LIMIT);
 
   if (error) {
@@ -38,6 +37,9 @@ export async function GET(request: NextRequest) {
   for (const row of inventoryRows ?? []) {
     const release = row.releases;
     if (!release || !release.release_tracks) continue;
+    const sizes = release.format_details ?? [];
+    const isSupportedSize = sizes.some((size: string) => VINYL_SIZES.includes(size));
+    if (!isSupportedSize) continue;
 
     for (const track of release.release_tracks) {
       const recording = track.recordings;
