@@ -133,7 +133,7 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-lg w-[600px] max-h-[80vh] flex flex-col shadow-xl"
+        className="bg-white rounded-lg w-[860px] max-h-[86vh] flex flex-col shadow-xl"
       >
         {/* Header */}
         <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center">

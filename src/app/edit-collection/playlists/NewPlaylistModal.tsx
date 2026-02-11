@@ -61,12 +61,12 @@ export function NewPlaylistModal({ isOpen, editingPlaylist, onClose, onCreate, o
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30002]" onClick={handleClose}>
-      <div className="bg-white rounded-lg w-[480px] shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-lg w-[760px] max-h-[86vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center">
           <h2 className="m-0 text-lg font-semibold text-gray-900">{isEditing ? 'Edit Playlist' : 'New Playlist'}</h2>
           <button onClick={handleClose} className="bg-transparent border-none text-2xl cursor-pointer text-gray-500 p-0 leading-none hover:text-gray-700">×</button>
         </div>
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto">
           <label className="block text-sm font-semibold text-gray-700 mb-2">Playlist Name</label>
           <input
             value={name}
@@ -97,7 +97,7 @@ export function NewPlaylistModal({ isOpen, editingPlaylist, onClose, onCreate, o
                 className="w-[110px] px-2 py-1.5 border border-gray-300 rounded text-sm"
               />
             </div>
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap max-h-[280px] overflow-y-auto pr-1">
               {filteredIcons.map((preset) => (
                 <button
                   key={preset.icon}

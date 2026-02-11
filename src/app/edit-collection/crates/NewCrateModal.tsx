@@ -141,7 +141,7 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }:
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-lg w-[480px] shadow-xl"
+        className="bg-white rounded-lg w-[760px] max-h-[86vh] flex flex-col shadow-xl"
       >
         {/* Header */}
         <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center">
@@ -157,7 +157,7 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }:
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto">
           {error && (
             <div className="mb-4 p-3 bg-red-100 border border-red-500 rounded-md text-red-800 text-sm">
               {error}
@@ -210,7 +210,7 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }:
                 className="w-[110px] px-2 py-1.5 border border-gray-300 rounded text-sm"
               />
             </div>
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap max-h-[280px] overflow-y-auto pr-1">
               {filteredIcons.map((preset) => (
                 <button
                   key={preset.icon}
