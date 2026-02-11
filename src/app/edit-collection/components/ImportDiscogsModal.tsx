@@ -113,10 +113,24 @@ const coerceYear = (value?: string | null): number | null => {
 const normalizeReleaseDate = (released?: string | null): string | null => {
   if (!released) return null;
   const value = released.trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  if (/^\d{4}-\d{2}$/.test(value)) return `${value}-01`;
-  if (/^\d{4}$/.test(value)) return `${value}-01-01`;
-  return null;
+  const match = value.match(/^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?$/);
+  if (!match) return null;
+
+  const year = Number.parseInt(match[1] ?? '', 10);
+  let month = Number.parseInt(match[2] ?? '01', 10);
+  let day = Number.parseInt(match[3] ?? '01', 10);
+
+  // Discogs often uses 00 for unknown month/day. Normalize to first valid value.
+  if (month === 0) month = 1;
+  if (day === 0) day = 1;
+
+  if (month < 1 || month > 12) return null;
+  const maxDay = new Date(year, month, 0).getDate();
+  if (day < 1 || day > maxDay) return null;
+
+  const mm = String(month).padStart(2, '0');
+  const dd = String(day).padStart(2, '0');
+  return `${year}-${mm}-${dd}`;
 };
 
 const buildFormatLabel = (release?: { media_type?: string | null; format_details?: string[] | null; qty?: number | null } | null) => {
