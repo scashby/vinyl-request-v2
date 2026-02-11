@@ -4,15 +4,22 @@
 export type GameSession = {
   id: number;
   game_code: string | null;
-  status: "pending" | "active" | "paused" | "finished";
+  status: "pending" | "active" | "paused" | "completed";
   variant: "standard" | "death" | "blackout";
   bingo_target: string;
+  current_pick_index: number;
   created_at: string | null;
+  game_templates: {
+    id: number;
+    name: string;
+    description?: string | null;
+  };
 };
 
 export type PickItem = {
   id: number;
   pick_index: number;
+  status: "pending" | "played" | "skipped";
   called_at: string | null;
   game_template_items: {
     id: number;
@@ -24,13 +31,13 @@ export type PickItem = {
     duration_ms?: number;
     spotify_uri?: string;
     lyrics_url?: string;
-  } | null;
+  };
 };
 
 export type Player = {
   id: number;
   display_name: string;
-  status: "lobby" | "playing" | "left" | "removed";
+  status: "waiting" | "admitted" | "playing" | "left" | "removed";
   joined_at: string;
   correct_count: number;
   missed_count: number;
@@ -56,6 +63,14 @@ export type JumbotronSettings = {
 
 export const COLUMN_LABELS = ["B", "I", "N", "G", "O"] as const;
 
+export const COLUMN_COLORS = [
+  { letter: "B", bg: "bg-blue-500", text: "text-blue-500" },
+  { letter: "I", bg: "bg-green-500", text: "text-green-500" },
+  { letter: "N", bg: "bg-yellow-500", text: "text-yellow-500" },
+  { letter: "G", bg: "bg-orange-500", text: "text-orange-500" },
+  { letter: "O", bg: "bg-red-500", text: "text-red-500" },
+] as const;
+
 export const BINGO_TARGETS = [
   { value: "one_line", label: "One Line", description: "Any single line" },
   { value: "two_lines", label: "Two Lines", description: "Any two lines" },
@@ -65,7 +80,7 @@ export const BINGO_TARGETS = [
 ] as const;
 
 export function getColumnLabel(pickIndex: number): string {
-  return COLUMN_LABELS[(pickIndex - 1) % COLUMN_LABELS.length];
+  return COLUMN_LABELS[pickIndex % COLUMN_LABELS.length];
 }
 
 export function formatDuration(ms: number): string {
