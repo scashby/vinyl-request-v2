@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import type { CollectionPlaylist, SmartPlaylistFieldType, SmartPlaylistOperatorType, SmartPlaylistRule } from '../../../types/collectionPlaylist';
-import { BoxIcon } from '../../../components/BoxIcon';
 
 interface NewSmartPlaylistModalProps {
   isOpen: boolean;
@@ -35,7 +34,7 @@ const SMART_PLAYLIST_COLORS = [
   '#8b4513',
 ];
 
-const FIELD_OPTIONS: { value: SmartPlaylistFieldType; label: string; type: 'text' | 'number' }[] = [
+const FIELD_OPTIONS: { value: SmartPlaylistFieldType; label: string; type: 'text' | 'number' | 'date' | 'boolean' | 'array' }[] = [
   { value: 'track_title', label: 'Track Title', type: 'text' },
   { value: 'track_artist', label: 'Track Artist', type: 'text' },
   { value: 'album_title', label: 'Album Title', type: 'text' },
@@ -44,25 +43,95 @@ const FIELD_OPTIONS: { value: SmartPlaylistFieldType; label: string; type: 'text
   { value: 'side', label: 'Side', type: 'text' },
   { value: 'album_format', label: 'Album Format', type: 'text' },
   { value: 'duration_seconds', label: 'Duration Seconds', type: 'number' },
+  { value: 'format', label: 'Format', type: 'text' },
+  { value: 'country', label: 'Country', type: 'text' },
+  { value: 'location', label: 'Location', type: 'text' },
+  { value: 'status', label: 'Status', type: 'text' },
+  { value: 'barcode', label: 'Barcode', type: 'text' },
+  { value: 'catalog_number', label: 'Catalog Number', type: 'text' },
+  { value: 'label', label: 'Label', type: 'text' },
+  { value: 'media_condition', label: 'Media Condition', type: 'text' },
+  { value: 'sleeve_condition', label: 'Sleeve Condition', type: 'text' },
+  { value: 'package_sleeve_condition', label: 'Package/Sleeve Condition', type: 'text' },
+  { value: 'packaging', label: 'Packaging', type: 'text' },
+  { value: 'studio', label: 'Studio', type: 'text' },
+  { value: 'sound', label: 'Sound', type: 'text' },
+  { value: 'vinyl_weight', label: 'Vinyl Weight', type: 'text' },
+  { value: 'rpm', label: 'RPM', type: 'text' },
+  { value: 'spars_code', label: 'SPARS Code', type: 'text' },
+  { value: 'box_set', label: 'Box Set', type: 'text' },
+  { value: 'owner', label: 'Owner', type: 'text' },
+  { value: 'purchase_store', label: 'Purchase Store', type: 'text' },
+  { value: 'notes', label: 'Notes', type: 'text' },
+  { value: 'personal_notes', label: 'Personal Notes', type: 'text' },
+  { value: 'release_notes', label: 'Release Notes', type: 'text' },
+  { value: 'master_notes', label: 'Master Notes', type: 'text' },
+  { value: 'composer', label: 'Composer', type: 'text' },
+  { value: 'conductor', label: 'Conductor', type: 'text' },
+  { value: 'chorus', label: 'Chorus', type: 'text' },
+  { value: 'composition', label: 'Composition', type: 'text' },
+  { value: 'orchestra', label: 'Orchestra', type: 'text' },
+  { value: 'year_int', label: 'Year', type: 'number' },
+  { value: 'decade', label: 'Decade', type: 'number' },
+  { value: 'my_rating', label: 'My Rating', type: 'number' },
+  { value: 'play_count', label: 'Play Count', type: 'number' },
+  { value: 'discs', label: 'Disc Count', type: 'number' },
+  { value: 'sides', label: 'Side Count', type: 'number' },
+  { value: 'index_number', label: 'Index Number', type: 'number' },
+  { value: 'purchase_price', label: 'Purchase Price', type: 'number' },
+  { value: 'current_value', label: 'Current Value', type: 'number' },
+  { value: 'date_added', label: 'Date Added', type: 'date' },
+  { value: 'purchase_date', label: 'Purchase Date', type: 'date' },
+  { value: 'last_played_at', label: 'Last Played Date', type: 'date' },
+  { value: 'last_cleaned_date', label: 'Last Cleaned Date', type: 'date' },
+  { value: 'original_release_date', label: 'Original Release Date', type: 'date' },
+  { value: 'recording_date', label: 'Recording Date', type: 'date' },
+  { value: 'for_sale', label: 'For Sale', type: 'boolean' },
+  { value: 'is_live', label: 'Is Live', type: 'boolean' },
+  { value: 'is_1001', label: '1001 Albums', type: 'boolean' },
+  { value: 'custom_tags', label: 'Tags', type: 'array' },
+  { value: 'discogs_genres', label: 'Genres (Discogs)', type: 'array' },
+  { value: 'spotify_genres', label: 'Genres (Spotify)', type: 'array' },
+  { value: 'labels', label: 'Labels', type: 'array' },
+  { value: 'signed_by', label: 'Signed By', type: 'array' },
+  { value: 'songwriters', label: 'Songwriters', type: 'array' },
+  { value: 'producers', label: 'Producers', type: 'array' },
+  { value: 'engineers', label: 'Engineers', type: 'array' },
+  { value: 'musicians', label: 'Musicians', type: 'array' },
 ];
 
 function getOperatorsForFieldType(fieldType: string): { value: SmartPlaylistOperatorType; label: string }[] {
-  if (fieldType === 'number') {
-    return [
-      { value: 'is', label: 'Is' },
-      { value: 'is_not', label: 'Is Not' },
-      { value: 'greater_than', label: 'Greater Than' },
-      { value: 'less_than', label: 'Less Than' },
-      { value: 'greater_than_or_equal_to', label: 'Greater Than or Equal To' },
-      { value: 'less_than_or_equal_to', label: 'Less Than or Equal To' },
-    ];
+  switch (fieldType) {
+    case 'number':
+      return [
+        { value: 'is', label: 'Is' },
+        { value: 'is_not', label: 'Is Not' },
+        { value: 'greater_than', label: 'Greater Than' },
+        { value: 'less_than', label: 'Less Than' },
+        { value: 'greater_than_or_equal_to', label: 'Greater Than or Equal To' },
+        { value: 'less_than_or_equal_to', label: 'Less Than or Equal To' },
+      ];
+    case 'date':
+      return [
+        { value: 'is', label: 'Is' },
+        { value: 'before', label: 'Before' },
+        { value: 'after', label: 'After' },
+      ];
+    case 'boolean':
+      return [{ value: 'is', label: 'Is' }];
+    case 'array':
+      return [
+        { value: 'includes', label: 'Includes' },
+        { value: 'excludes', label: 'Excludes' },
+      ];
+    default:
+      return [
+        { value: 'contains', label: 'Contains' },
+        { value: 'is', label: 'Is' },
+        { value: 'is_not', label: 'Is Not' },
+        { value: 'does_not_contain', label: 'Does Not Contain' },
+      ];
   }
-  return [
-    { value: 'contains', label: 'Contains' },
-    { value: 'is', label: 'Is' },
-    { value: 'is_not', label: 'Is Not' },
-    { value: 'does_not_contain', label: 'Does Not Contain' },
-  ];
 }
 
 export function NewSmartPlaylistModal({ isOpen, onClose, onCreate, onUpdate, editingPlaylist }: NewSmartPlaylistModalProps) {
@@ -142,7 +211,7 @@ export function NewSmartPlaylistModal({ isOpen, onClose, onCreate, onUpdate, edi
         await onUpdate({
           ...editingPlaylist,
           name: name.trim(),
-          icon: color,
+          icon: '⚡',
           color,
           isSmart: true,
           smartRules: { rules },
@@ -182,11 +251,11 @@ export function NewSmartPlaylistModal({ isOpen, onClose, onCreate, onUpdate, edi
               <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter playlist name..." autoFocus className="w-full px-3 py-2.5 border border-gray-300 rounded-md text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Box Color</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Playlist Accent</label>
               <div className="flex gap-2 flex-wrap max-w-[400px]">
                 {SMART_PLAYLIST_COLORS.map((swatch) => (
                   <button key={swatch} onClick={() => setColor(swatch)} className={`w-12 h-12 border rounded-md cursor-pointer flex items-center justify-center p-1 ${color === swatch ? 'border-gray-900 ring-2 ring-gray-200' : 'border-gray-300 bg-white hover:bg-gray-50'}`}>
-                    <BoxIcon color={swatch} size={32} />
+                    <span style={{ color: swatch }} className="text-2xl leading-none">🎵</span>
                   </button>
                 ))}
               </div>
@@ -220,7 +289,14 @@ export function NewSmartPlaylistModal({ isOpen, onClose, onCreate, onUpdate, edi
                       <select value={rule.operator} onChange={(e) => handleRuleChange(index, 'operator', e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none cursor-pointer bg-white">
                         {operators.map((op) => <option key={op.value} value={op.value}>{op.label}</option>)}
                       </select>
-                      {fieldDef?.type === 'number' ? (
+                      {fieldDef?.type === 'boolean' ? (
+                        <select value={String(rule.value)} onChange={(e) => handleRuleChange(index, 'value', e.target.value === 'true')} className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none cursor-pointer bg-white">
+                          <option value="true">True</option>
+                          <option value="false">False</option>
+                        </select>
+                      ) : fieldDef?.type === 'date' ? (
+                        <input type="date" value={String(rule.value)} onChange={(e) => handleRuleChange(index, 'value', e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none bg-white" />
+                      ) : fieldDef?.type === 'number' ? (
                         <input type="number" value={String(rule.value)} onChange={(e) => handleRuleChange(index, 'value', Number(e.target.value))} placeholder="Value..." className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none bg-white" />
                       ) : (
                         <input type="text" value={String(rule.value)} onChange={(e) => handleRuleChange(index, 'value', e.target.value)} placeholder="Value..." className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none bg-white" />

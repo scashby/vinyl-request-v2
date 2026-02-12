@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BoxIcon } from '../../../components/BoxIcon';
 import type { CollectionPlaylist } from '../../../types/collectionPlaylist';
 
 interface ManagePlaylistsModalProps {
@@ -108,7 +107,7 @@ export function ManagePlaylistsModal({
                   </div>
                   <div className="flex-1 flex items-center gap-3">
                     <div className="text-3xl leading-none flex items-center justify-center">
-                      {playlist.isSmart ? <BoxIcon color={playlist.color} size={28} /> : <span style={{ color: playlist.color }}>{playlist.icon}</span>}
+                      {playlist.isSmart ? <span style={{ color: playlist.color }}>⚡</span> : <span style={{ color: playlist.color }}>{playlist.icon}</span>}
                     </div>
                     <div className="flex-1">
                       <div className="text-sm font-semibold text-gray-900 mb-0.5">{playlist.name}</div>

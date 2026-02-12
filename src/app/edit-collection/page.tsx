@@ -207,6 +207,73 @@ const buildTrackFormatFacets = (album: Album): string[] => {
   return Array.from(facets);
 };
 
+const buildTrackRuleMetadata = (album: Album) => {
+  const release = album.release;
+  const master = release?.master;
+  const masterTagLinks = master?.master_tag_links ?? [];
+  const normalizedTags = masterTagLinks
+    .map((link) => link.master_tags?.name)
+    .filter((name): name is string => Boolean(name));
+
+  return {
+    format: getAlbumFormat(album),
+    country: release?.country ?? album.country ?? null,
+    location: album.location ?? null,
+    status: album.status ?? null,
+    barcode: release?.barcode ?? album.barcode ?? null,
+    catalogNumber: release?.catalog_number ?? album.catalog_number ?? album.cat_no ?? null,
+    label: release?.label ?? album.label ?? null,
+    owner: album.owner ?? null,
+    personalNotes: album.personal_notes ?? null,
+    releaseNotes: album.release_notes ?? release?.notes ?? null,
+    masterNotes: album.master_notes ?? master?.notes ?? null,
+    mediaCondition: album.media_condition ?? null,
+    sleeveCondition: album.sleeve_condition ?? null,
+    packageSleeveCondition: album.package_sleeve_condition ?? null,
+    packaging: release?.packaging ?? album.packaging ?? null,
+    studio: release?.studio ?? album.studio ?? null,
+    sound: release?.sound ?? album.sound ?? null,
+    vinylWeight: release?.vinyl_weight ?? album.vinyl_weight ?? null,
+    rpm: release?.rpm ?? album.rpm ?? null,
+    sparsCode: release?.spars_code ?? album.spars_code ?? null,
+    boxSet: release?.box_set ?? album.box_set ?? null,
+    purchaseStore: album.purchase_store ?? null,
+    notes: album.notes ?? null,
+    composer: album.composer ?? null,
+    conductor: album.conductor ?? null,
+    chorus: album.chorus ?? null,
+    composition: album.composition ?? null,
+    orchestra: album.orchestra ?? null,
+    yearInt: getAlbumYearInt(album) ?? null,
+    decade: getAlbumDecade(album),
+    myRating: album.my_rating ?? null,
+    playCount: album.play_count ?? null,
+    discs: release?.qty ?? album.discs ?? null,
+    sides: album.sides ?? null,
+    indexNumber: album.index_number ?? null,
+    purchasePrice: album.purchase_price ?? null,
+    currentValue: album.current_value ?? null,
+    dateAdded: album.date_added ?? null,
+    purchaseDate: album.purchase_date ?? null,
+    lastPlayedAt: album.last_played_at ?? null,
+    lastCleanedDate: album.last_cleaned_date ?? null,
+    originalReleaseDate: album.master_release_date ?? null,
+    recordingDate: album.recording_date ?? null,
+    forSale: album.status === 'for_sale' || album.for_sale === true,
+    isLive: album.is_live === true,
+    is1001: (album as unknown as { is_1001?: boolean | null }).is_1001 === true,
+    customTags: toSafeStringArray(album.custom_tags ?? album.tags ?? normalizedTags),
+    discogsGenres: toSafeStringArray(master?.genres ?? album.genres),
+    spotifyGenres: toSafeStringArray((album as unknown as { spotify_genres?: unknown }).spotify_genres),
+    labels: toSafeStringArray(album.labels ?? release?.label),
+    signedBy: toSafeStringArray(album.signed_by),
+    songwriters: toSafeStringArray(album.songwriters),
+    producers: toSafeStringArray(album.producers),
+    engineers: toSafeStringArray(album.engineers),
+    musicians: toSafeStringArray(album.musicians),
+  };
+};
+
 function CollectionBrowserPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
@@ -771,6 +838,7 @@ function CollectionBrowserPage() {
       const albumTitle = getAlbumTitle(album);
       const albumMediaType = album.release?.media_type || 'Unknown';
       const trackFormatFacets = buildTrackFormatFacets(album);
+      const trackRuleMetadata = buildTrackRuleMetadata(album);
       const releaseTracks = album.release?.release_tracks ?? [];
 
       if (releaseTracks.length > 0) {
@@ -793,6 +861,7 @@ function CollectionBrowserPage() {
             durationLabel: formatTrackDuration(track.recording?.duration_seconds ?? null),
             albumMediaType,
             trackFormatFacets,
+            ...trackRuleMetadata,
           });
         });
         return;
@@ -819,6 +888,7 @@ function CollectionBrowserPage() {
           durationLabel: track.duration ?? '—',
           albumMediaType,
           trackFormatFacets,
+          ...trackRuleMetadata,
         });
       });
     });
@@ -1303,7 +1373,7 @@ function CollectionBrowserPage() {
         .from('collection_playlists')
         .insert({
           name: payload.name.trim(),
-          icon: payload.color,
+          icon: '⚡',
           color: payload.color,
           sort_order: nextSortOrder,
           is_smart: true,
@@ -1709,7 +1779,7 @@ function CollectionBrowserPage() {
                       <button key={playlist.id} onClick={() => setSelectedPlaylistId(playlist.id)} title={`Filter by ${playlist.name}`} className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${selectedPlaylistId === playlist.id ? 'bg-[#5A9BD5]' : ''}`}>
                         <span className="flex items-center gap-1.5 min-w-0">
                           {playlist.isSmart ? (
-                            <BoxIcon color={playlist.color} size={16} />
+                            <span style={{ color: playlist.color }}>⚡</span>
                           ) : (
                             <span style={{ color: playlist.color }}>{playlist.icon}</span>
                           )}
