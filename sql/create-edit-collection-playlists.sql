@@ -6,6 +6,10 @@ create table if not exists public.collection_playlists (
   name text not null,
   icon text not null default '🎵',
   color text not null default '#3578b3',
+  is_smart boolean not null default false,
+  smart_rules jsonb,
+  match_rules text not null default 'all',
+  live_update boolean not null default true,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -25,3 +29,8 @@ create index if not exists idx_collection_playlists_sort_order
 
 create index if not exists idx_collection_playlist_items_playlist_sort
   on public.collection_playlist_items(playlist_id, sort_order);
+
+alter table public.collection_playlists add column if not exists is_smart boolean not null default false;
+alter table public.collection_playlists add column if not exists smart_rules jsonb;
+alter table public.collection_playlists add column if not exists match_rules text not null default 'all';
+alter table public.collection_playlists add column if not exists live_update boolean not null default true;

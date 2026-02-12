@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { BoxIcon } from '../../../components/BoxIcon';
 import type { CollectionPlaylist } from '../../../types/collectionPlaylist';
 
 interface ManagePlaylistsModalProps {
@@ -10,7 +11,9 @@ interface ManagePlaylistsModalProps {
   onReorder: (playlists: CollectionPlaylist[]) => Promise<void>;
   onDelete: (playlistId: number, playlistName: string) => Promise<void>;
   onEdit: (playlist: CollectionPlaylist) => void;
+  onEditSmart: (playlist: CollectionPlaylist) => void;
   onOpenNewPlaylist: () => void;
+  onOpenNewSmartPlaylist: () => void;
 }
 
 export function ManagePlaylistsModal({
@@ -20,7 +23,9 @@ export function ManagePlaylistsModal({
   onReorder,
   onDelete,
   onEdit,
-  onOpenNewPlaylist
+  onEditSmart,
+  onOpenNewPlaylist,
+  onOpenNewSmartPlaylist
 }: ManagePlaylistsModalProps) {
   const [localPlaylists, setLocalPlaylists] = useState<CollectionPlaylist[]>(playlists);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -65,6 +70,10 @@ export function ManagePlaylistsModal({
               <span>🎵</span>
               <span>New Playlist</span>
             </button>
+            <button onClick={onOpenNewSmartPlaylist} className="px-3 py-1.5 bg-violet-500 text-white border-none rounded text-xs font-medium cursor-pointer flex items-center gap-1 hover:bg-violet-600">
+              <span>⚡</span>
+              <span>New Smart</span>
+            </button>
             <button onClick={onClose} className="bg-transparent border-none text-2xl cursor-pointer text-gray-500 p-0 leading-none hover:text-gray-700">×</button>
           </div>
         </div>
@@ -98,18 +107,20 @@ export function ManagePlaylistsModal({
                     </button>
                   </div>
                   <div className="flex-1 flex items-center gap-3">
-                    <div className="text-3xl leading-none flex items-center justify-center" style={{ color: playlist.color }}>
-                      {playlist.icon}
+                    <div className="text-3xl leading-none flex items-center justify-center">
+                      {playlist.isSmart ? <BoxIcon color={playlist.color} size={28} /> : <span style={{ color: playlist.color }}>{playlist.icon}</span>}
                     </div>
                     <div className="flex-1">
                       <div className="text-sm font-semibold text-gray-900 mb-0.5">{playlist.name}</div>
                       <div className="text-xs text-gray-500">
-                        Track Playlist • {playlist.trackKeys.length} track{playlist.trackKeys.length !== 1 ? 's' : ''}
+                        {playlist.isSmart
+                          ? `Smart Playlist • ${playlist.smartRules?.rules?.length || 0} rule(s) • ${playlist.matchRules === 'all' ? 'Match All' : 'Match Any'}${playlist.liveUpdate ? ' • Live Update' : ''}`
+                          : `Manual Playlist • ${playlist.trackKeys.length} track${playlist.trackKeys.length !== 1 ? 's' : ''}`}
                       </div>
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => onEdit(playlist)} className="px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded text-xs cursor-pointer font-medium hover:bg-gray-50">
+                    <button onClick={() => (playlist.isSmart ? onEditSmart(playlist) : onEdit(playlist))} className="px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded text-xs cursor-pointer font-medium hover:bg-gray-50">
                       Edit
                     </button>
                     <button

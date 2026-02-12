@@ -15,11 +15,15 @@ import { AddToCrateModal } from './crates/AddToCrateModal';
 import NewPlaylistModal from './playlists/NewPlaylistModal';
 import AddToPlaylistModal from './playlists/AddToPlaylistModal';
 import ManagePlaylistsModal from './playlists/ManagePlaylistsModal';
+import NewSmartPlaylistModal from './playlists/NewSmartPlaylistModal';
 import Header from './Header';
 import { ManageColumnFavoritesModal, type ColumnFavorite } from './ManageColumnFavoritesModal';
 import type { Crate } from '../../types/crate';
 import type { CollectionPlaylist } from '../../types/collectionPlaylist';
+import type { SmartPlaylistRule } from '../../types/collectionPlaylist';
+import type { CollectionTrackRow } from '../../types/collectionTrackRow';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
+import { trackMatchesSmartPlaylist } from '../../lib/playlistUtils';
 import CollectionInfoPanel from './components/CollectionInfoPanel';
 import { BoxIcon } from '../../components/BoxIcon';
 import { getDisplayFormat } from '../../utils/formatDisplay';
@@ -92,23 +96,6 @@ type TrackListSource = 'crates' | 'playlists';
 type CrateGameKey = 'bingo' | 'trivia' | 'brackets';
 
 type Playlist = CollectionPlaylist;
-
-interface CollectionTrackRow {
-  key: string;
-  inventoryId: number;
-  releaseTrackId: number | null;
-  recordingId: number | null;
-  albumArtist: string;
-  albumTitle: string;
-  trackArtist: string;
-  trackTitle: string;
-  position: string;
-  side: string | null;
-  durationSeconds: number | null;
-  durationLabel: string;
-  albumMediaType: string;
-  trackFormatFacets: string[];
-}
 
 interface TrackAlbumGroup {
   inventoryId: number;
@@ -242,6 +229,7 @@ function CollectionBrowserPage() {
   const [showManagePlaylistsModal, setShowManagePlaylistsModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
+  const [showNewSmartPlaylistModal, setShowNewSmartPlaylistModal] = useState(false);
   
   const [collectionFilter, setCollectionFilter] = useState<string>('All');
   const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
@@ -548,7 +536,7 @@ function CollectionBrowserPage() {
   const loadPlaylists = useCallback(async () => {
     const { data: playlistRows, error: playlistError } = await (supabase as any)
       .from('collection_playlists')
-      .select('id, name, icon, color, sort_order, created_at')
+      .select('id, name, icon, color, sort_order, created_at, is_smart, smart_rules, match_rules, live_update')
       .order('sort_order', { ascending: true });
 
     if (playlistError) {
@@ -589,6 +577,10 @@ function CollectionBrowserPage() {
                   color: legacyPlaylist.color || '#3578b3',
                   sort_order: i,
                   created_at: legacyPlaylist.createdAt || new Date().toISOString(),
+                  is_smart: false,
+                  smart_rules: null,
+                  match_rules: 'all',
+                  live_update: true,
                 })
                 .select('id')
                 .single();
@@ -638,6 +630,10 @@ function CollectionBrowserPage() {
       trackKeys: tracksByPlaylist[row.id] ?? [],
       createdAt: row.created_at || new Date().toISOString(),
       sortOrder: row.sort_order ?? 0,
+      isSmart: !!row.is_smart,
+      smartRules: row.smart_rules ?? null,
+      matchRules: row.match_rules === 'any' ? 'any' : 'all',
+      liveUpdate: row.live_update !== false,
     }));
 
     setPlaylists(mapped);
@@ -764,13 +760,6 @@ function CollectionBrowserPage() {
     });
   }, [crates, albums, crateItemCounts]);
 
-  const playlistCounts = useMemo(() => {
-    return playlists.reduce((acc, playlist) => {
-      acc[playlist.id] = playlist.trackKeys.length;
-      return acc;
-    }, {} as Record<string, number>);
-  }, [playlists]);
-
   const allTrackRows = useMemo<CollectionTrackRow[]>(() => {
     const rows: CollectionTrackRow[] = [];
 
@@ -847,6 +836,15 @@ function CollectionBrowserPage() {
     }, {} as Record<string, number>);
   }, [allTrackRows]);
 
+  const playlistCounts = useMemo(() => {
+    return playlists.reduce((acc, playlist) => {
+      acc[playlist.id] = playlist.isSmart
+        ? allTrackRows.filter((row) => trackMatchesSmartPlaylist(row, playlist)).length
+        : playlist.trackKeys.length;
+      return acc;
+    }, {} as Record<number, number>);
+  }, [allTrackRows, playlists]);
+
   const filteredTrackRows = useMemo(() => {
     let rows = allTrackRows;
 
@@ -867,8 +865,12 @@ function CollectionBrowserPage() {
     if (trackSource === 'playlists' && selectedPlaylistId) {
       const playlist = playlists.find((item) => item.id === selectedPlaylistId);
       if (playlist) {
-        const allowedKeys = new Set(playlist.trackKeys);
-        rows = rows.filter((row) => allowedKeys.has(row.key));
+        if (playlist.isSmart) {
+          rows = rows.filter((row) => trackMatchesSmartPlaylist(row, playlist));
+        } else {
+          const allowedKeys = new Set(playlist.trackKeys);
+          rows = rows.filter((row) => allowedKeys.has(row.key));
+        }
       }
     }
 
@@ -1241,6 +1243,10 @@ function CollectionBrowserPage() {
           icon: playlist.icon,
           color: playlist.color,
           sort_order: nextSortOrder,
+          is_smart: false,
+          smart_rules: null,
+          match_rules: 'all',
+          live_update: true,
         })
         .select('id')
         .single();
@@ -1268,6 +1274,10 @@ function CollectionBrowserPage() {
           name: playlist.name,
           icon: playlist.icon,
           color: playlist.color,
+          is_smart: playlist.isSmart,
+          smart_rules: playlist.smartRules,
+          match_rules: playlist.matchRules,
+          live_update: playlist.liveUpdate,
         })
         .eq('id', playlist.id);
 
@@ -1278,6 +1288,43 @@ function CollectionBrowserPage() {
       alert('Failed to update playlist. Please try again.');
     }
   }, [loadPlaylists]);
+
+  const handleCreateSmartPlaylist = useCallback(async (payload: {
+    name: string;
+    color: string;
+    matchRules: 'all' | 'any';
+    liveUpdate: boolean;
+    smartRules: { rules: SmartPlaylistRule[] };
+  }) => {
+    try {
+      const maxSort = playlists.reduce((max, item) => Math.max(max, item.sortOrder ?? 0), -1);
+      const nextSortOrder = maxSort + 1;
+      const { data, error } = await (supabase as any)
+        .from('collection_playlists')
+        .insert({
+          name: payload.name.trim(),
+          icon: payload.color,
+          color: payload.color,
+          sort_order: nextSortOrder,
+          is_smart: true,
+          smart_rules: payload.smartRules,
+          match_rules: payload.matchRules,
+          live_update: payload.liveUpdate,
+        })
+        .select('id')
+        .single();
+
+      if (error || !data) throw error || new Error('Failed to create smart playlist');
+      await loadPlaylists();
+      setSelectedPlaylistId(data.id);
+      setShowNewSmartPlaylistModal(false);
+      setTrackSource('playlists');
+      setViewMode('album-track');
+    } catch (err) {
+      console.error('Failed to create smart playlist:', err);
+      alert('Failed to create smart playlist. Please try again.');
+    }
+  }, [loadPlaylists, playlists]);
 
   const handleDeletePlaylist = useCallback(async (playlistId: number, playlistName: string) => {
     if (!confirm(`Delete playlist "${playlistName}"? This cannot be undone.`)) {
@@ -1661,7 +1708,11 @@ function CollectionBrowserPage() {
                   {sortedPlaylists.map((playlist) => (
                       <button key={playlist.id} onClick={() => setSelectedPlaylistId(playlist.id)} title={`Filter by ${playlist.name}`} className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${selectedPlaylistId === playlist.id ? 'bg-[#5A9BD5]' : ''}`}>
                         <span className="flex items-center gap-1.5 min-w-0">
-                          <span style={{ color: playlist.color }}>{playlist.icon}</span>
+                          {playlist.isSmart ? (
+                            <BoxIcon color={playlist.color} size={16} />
+                          ) : (
+                            <span style={{ color: playlist.color }}>{playlist.icon}</span>
+                          )}
                           <span className="truncate">{playlist.name}</span>
                         </span>
                         <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${selectedPlaylistId === playlist.id ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{playlistCounts[playlist.id] || 0}</span>
@@ -1901,12 +1952,24 @@ function CollectionBrowserPage() {
       {showNewPlaylistModal && (
         <NewPlaylistModal
           isOpen={showNewPlaylistModal}
-          editingPlaylist={editingPlaylist}
+          editingPlaylist={editingPlaylist && !editingPlaylist.isSmart ? editingPlaylist : null}
           onClose={() => {
             setShowNewPlaylistModal(false);
             setEditingPlaylist(null);
           }}
           onCreate={handleCreatePlaylist}
+          onUpdate={handleUpdatePlaylist}
+        />
+      )}
+      {showNewSmartPlaylistModal && (
+        <NewSmartPlaylistModal
+          isOpen={showNewSmartPlaylistModal}
+          editingPlaylist={editingPlaylist?.isSmart ? editingPlaylist : null}
+          onClose={() => {
+            setShowNewSmartPlaylistModal(false);
+            setEditingPlaylist(null);
+          }}
+          onCreate={handleCreateSmartPlaylist}
           onUpdate={handleUpdatePlaylist}
         />
       )}
@@ -1936,10 +1999,20 @@ function CollectionBrowserPage() {
             setEditingPlaylist(playlist);
             setShowNewPlaylistModal(true);
           }}
+          onEditSmart={(playlist) => {
+            setShowManagePlaylistsModal(false);
+            setEditingPlaylist(playlist);
+            setShowNewSmartPlaylistModal(true);
+          }}
           onOpenNewPlaylist={() => {
             setShowManagePlaylistsModal(false);
             setEditingPlaylist(null);
             setShowNewPlaylistModal(true);
+          }}
+          onOpenNewSmartPlaylist={() => {
+            setShowManagePlaylistsModal(false);
+            setEditingPlaylist(null);
+            setShowNewSmartPlaylistModal(true);
           }}
         />
       )}
