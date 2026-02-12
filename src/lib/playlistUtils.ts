@@ -30,6 +30,21 @@ function trackMatchesRule(track: CollectionTrackRow, rule: SmartPlaylistRule): b
       return Number(trackValue) >= Number(rule.value);
     case 'less_than_or_equal_to':
       return Number(trackValue) <= Number(rule.value);
+    case 'between': {
+      if (!isBetweenValue(rule.value)) return false;
+      const raw = String(trackValue);
+      const valueDate = Date.parse(raw);
+      const minDate = Date.parse(String(rule.value.min));
+      const maxDate = Date.parse(String(rule.value.max));
+      if (!Number.isNaN(valueDate) && !Number.isNaN(minDate) && !Number.isNaN(maxDate)) {
+        return valueDate >= minDate && valueDate <= maxDate;
+      }
+      const valueNum = Number(trackValue);
+      const minNum = Number(rule.value.min);
+      const maxNum = Number(rule.value.max);
+      if (Number.isNaN(valueNum) || Number.isNaN(minNum) || Number.isNaN(maxNum)) return false;
+      return valueNum >= minNum && valueNum <= maxNum;
+    }
     case 'before':
       return new Date(String(trackValue)) < new Date(String(rule.value));
     case 'after':
@@ -47,6 +62,10 @@ function trackMatchesRule(track: CollectionTrackRow, rule: SmartPlaylistRule): b
     default:
       return false;
   }
+}
+
+function isBetweenValue(value: SmartPlaylistRule['value']): value is { min: string | number; max: string | number } {
+  return typeof value === 'object' && value !== null && 'min' in value && 'max' in value;
 }
 
 function getTrackFieldValue(track: CollectionTrackRow, field: SmartPlaylistRule['field']): unknown {

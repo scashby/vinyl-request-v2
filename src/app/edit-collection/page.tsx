@@ -216,7 +216,7 @@ const buildTrackRuleMetadata = (album: Album) => {
     .filter((name): name is string => Boolean(name));
 
   return {
-    format: getAlbumFormat(album),
+    format: release?.media_type ?? getAlbumFormat(album),
     country: release?.country ?? album.country ?? null,
     location: album.location ?? null,
     status: album.status ?? null,

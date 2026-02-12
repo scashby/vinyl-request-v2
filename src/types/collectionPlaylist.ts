@@ -19,8 +19,17 @@ export interface SmartPlaylistRules {
 export interface SmartPlaylistRule {
   field: SmartPlaylistFieldType;
   operator: SmartPlaylistOperatorType;
-  value: string | number | boolean;
+  value: SmartPlaylistRuleValue;
 }
+
+export type SmartPlaylistRuleValue =
+  | string
+  | number
+  | boolean
+  | {
+      min: string | number;
+      max: string | number;
+    };
 
 export type SmartPlaylistFieldType =
   | 'track_title'
@@ -101,6 +110,7 @@ export type SmartPlaylistOperatorType =
   | 'less_than'
   | 'greater_than_or_equal_to'
   | 'less_than_or_equal_to'
+  | 'between'
   | 'before'
   | 'after'
   | 'includes'

@@ -1,7 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { CollectionPlaylist, SmartPlaylistFieldType, SmartPlaylistOperatorType, SmartPlaylistRule } from '../../../types/collectionPlaylist';
+import type {
+  CollectionPlaylist,
+  SmartPlaylistFieldType,
+  SmartPlaylistOperatorType,
+  SmartPlaylistRule,
+  SmartPlaylistRuleValue
+} from '../../../types/collectionPlaylist';
 
 interface NewSmartPlaylistModalProps {
   isOpen: boolean;
@@ -100,6 +106,26 @@ const FIELD_OPTIONS: { value: SmartPlaylistFieldType; label: string; type: 'text
   { value: 'musicians', label: 'Musicians', type: 'array' },
 ];
 
+const FORMAT_OPTIONS = [
+  'Vinyl',
+  'CD',
+  'Cassette',
+  '8-Track Cartridge',
+  'SACD',
+  'DVD',
+  'All Media',
+  'Box Set',
+  'Flexi-disc',
+  'LP',
+  'EP',
+  'Single',
+  '7"',
+  '10"',
+  '12"',
+];
+
+const STATUS_OPTIONS = ['active', 'sold', 'wishlist', 'incoming', 'for_sale'];
+
 function getOperatorsForFieldType(fieldType: string): { value: SmartPlaylistOperatorType; label: string }[] {
   switch (fieldType) {
     case 'number':
@@ -110,12 +136,14 @@ function getOperatorsForFieldType(fieldType: string): { value: SmartPlaylistOper
         { value: 'less_than', label: 'Less Than' },
         { value: 'greater_than_or_equal_to', label: 'Greater Than or Equal To' },
         { value: 'less_than_or_equal_to', label: 'Less Than or Equal To' },
+        { value: 'between', label: 'Between' },
       ];
     case 'date':
       return [
         { value: 'is', label: 'Is' },
         { value: 'before', label: 'Before' },
         { value: 'after', label: 'After' },
+        { value: 'between', label: 'Between' },
       ];
     case 'boolean':
       return [{ value: 'is', label: 'Is' }];
@@ -177,10 +205,36 @@ export function NewSmartPlaylistModal({ isOpen, onClose, onCreate, onUpdate, edi
       const fieldDef = FIELD_OPTIONS.find((f) => f.value === value);
       const operators = getOperatorsForFieldType(fieldDef?.type || 'text');
       next[index] = { field: value as SmartPlaylistFieldType, operator: operators[0].value, value: '' };
+    } else if (field === 'operator') {
+      next[index] = {
+        ...next[index],
+        operator: value as SmartPlaylistOperatorType,
+        value: value === 'between' ? { min: '', max: '' } : '',
+      };
     } else {
       next[index] = { ...next[index], [field]: value };
     }
     setRules(next);
+  };
+
+  const isBetweenValue = (value: SmartPlaylistRuleValue): value is { min: string | number; max: string | number } => {
+    return typeof value === 'object' && value !== null && 'min' in value && 'max' in value;
+  };
+
+  const handleBetweenChange = (index: number, bound: 'min' | 'max', nextValue: string) => {
+    setRules((prev) => {
+      const next = [...prev];
+      const existing = next[index]?.value;
+      const currentRange = isBetweenValue(existing) ? existing : { min: '', max: '' };
+      next[index] = {
+        ...next[index],
+        value: {
+          ...currentRange,
+          [bound]: nextValue,
+        },
+      };
+      return next;
+    });
   };
 
   const handleClose = () => {
@@ -198,7 +252,13 @@ export function NewSmartPlaylistModal({ isOpen, onClose, onCreate, onUpdate, edi
       setError('At least one rule is required');
       return;
     }
-    const invalidRule = rules.find((rule) => rule.value === '' || rule.value === null || rule.value === undefined);
+    const invalidRule = rules.find((rule) => {
+      if (rule.operator === 'between') {
+        if (!isBetweenValue(rule.value)) return true;
+        return String(rule.value.min).trim() === '' || String(rule.value.max).trim() === '';
+      }
+      return rule.value === '' || rule.value === null || rule.value === undefined;
+    });
     if (invalidRule) {
       setError('All rules must have a value');
       return;
@@ -255,7 +315,7 @@ export function NewSmartPlaylistModal({ isOpen, onClose, onCreate, onUpdate, edi
               <div className="flex gap-2 flex-wrap max-w-[400px]">
                 {SMART_PLAYLIST_COLORS.map((swatch) => (
                   <button key={swatch} onClick={() => setColor(swatch)} className={`w-12 h-12 border rounded-md cursor-pointer flex items-center justify-center p-1 ${color === swatch ? 'border-gray-900 ring-2 ring-gray-200' : 'border-gray-300 bg-white hover:bg-gray-50'}`}>
-                    <span style={{ color: swatch }} className="text-2xl leading-none">🎵</span>
+                    <span className="w-7 h-7 rounded-full border border-black/10" style={{ backgroundColor: swatch }} />
                   </button>
                 ))}
               </div>
@@ -281,6 +341,8 @@ export function NewSmartPlaylistModal({ isOpen, onClose, onCreate, onUpdate, edi
                 {rules.map((rule, index) => {
                   const fieldDef = FIELD_OPTIONS.find((field) => field.value === rule.field);
                   const operators = getOperatorsForFieldType(fieldDef?.type || 'text');
+                  const usesFormatDropdown = rule.field === 'format' || rule.field === 'album_format';
+                  const usesStatusDropdown = rule.field === 'status';
                   return (
                     <div key={`${rule.field}-${index}`} className="flex gap-2 p-3 bg-gray-50 rounded-md border border-gray-200 items-center">
                       <select value={rule.field} onChange={(e) => handleRuleChange(index, 'field', e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none cursor-pointer bg-white">
@@ -289,10 +351,41 @@ export function NewSmartPlaylistModal({ isOpen, onClose, onCreate, onUpdate, edi
                       <select value={rule.operator} onChange={(e) => handleRuleChange(index, 'operator', e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none cursor-pointer bg-white">
                         {operators.map((op) => <option key={op.value} value={op.value}>{op.label}</option>)}
                       </select>
-                      {fieldDef?.type === 'boolean' ? (
+                      {rule.operator === 'between' ? (
+                        <div className="flex-1 flex gap-2">
+                          <input
+                            type={fieldDef?.type === 'date' ? 'date' : 'number'}
+                            value={isBetweenValue(rule.value) ? String(rule.value.min) : ''}
+                            onChange={(e) => handleBetweenChange(index, 'min', e.target.value)}
+                            placeholder="Min"
+                            className="w-1/2 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none bg-white"
+                          />
+                          <input
+                            type={fieldDef?.type === 'date' ? 'date' : 'number'}
+                            value={isBetweenValue(rule.value) ? String(rule.value.max) : ''}
+                            onChange={(e) => handleBetweenChange(index, 'max', e.target.value)}
+                            placeholder="Max"
+                            className="w-1/2 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none bg-white"
+                          />
+                        </div>
+                      ) : fieldDef?.type === 'boolean' ? (
                         <select value={String(rule.value)} onChange={(e) => handleRuleChange(index, 'value', e.target.value === 'true')} className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none cursor-pointer bg-white">
                           <option value="true">True</option>
                           <option value="false">False</option>
+                        </select>
+                      ) : usesFormatDropdown ? (
+                        <select value={String(rule.value)} onChange={(e) => handleRuleChange(index, 'value', e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none cursor-pointer bg-white">
+                          <option value="">Select format...</option>
+                          {FORMAT_OPTIONS.map((opt) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      ) : usesStatusDropdown ? (
+                        <select value={String(rule.value)} onChange={(e) => handleRuleChange(index, 'value', e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none cursor-pointer bg-white">
+                          <option value="">Select status...</option>
+                          {STATUS_OPTIONS.map((opt) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
                         </select>
                       ) : fieldDef?.type === 'date' ? (
                         <input type="date" value={String(rule.value)} onChange={(e) => handleRuleChange(index, 'value', e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none bg-white" />
