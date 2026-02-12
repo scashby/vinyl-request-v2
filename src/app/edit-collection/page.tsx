@@ -261,10 +261,8 @@ const buildTrackRuleMetadata = (album: Album) => {
     recordingDate: album.recording_date ?? null,
     forSale: album.status === 'for_sale' || album.for_sale === true,
     isLive: album.is_live === true,
-    is1001: (album as unknown as { is_1001?: boolean | null }).is_1001 === true,
     customTags: toSafeStringArray(album.custom_tags ?? album.tags ?? normalizedTags),
-    discogsGenres: toSafeStringArray(master?.genres ?? album.genres),
-    spotifyGenres: toSafeStringArray((album as unknown as { spotify_genres?: unknown }).spotify_genres),
+    genres: toSafeStringArray(master?.genres ?? album.genres),
     labels: toSafeStringArray(album.labels ?? release?.label),
     signedBy: toSafeStringArray(album.signed_by),
     songwriters: toSafeStringArray(album.songwriters),
@@ -904,6 +902,36 @@ function CollectionBrowserPage() {
       });
       return acc;
     }, {} as Record<string, number>);
+  }, [allTrackRows]);
+
+  const smartPlaylistValueOptions = useMemo(() => {
+    const collect = (values: Array<string | null | undefined>) =>
+      Array.from(
+        new Set(
+          values
+            .map((value) => value?.trim())
+            .filter((value): value is string => Boolean(value))
+        )
+      ).sort((a, b) => a.localeCompare(b));
+
+    const collectArrayValues = (values: Array<string[] | null | undefined>) =>
+      collect(values.flatMap((items) => items ?? []));
+
+    return {
+      format: collect(allTrackRows.map((row) => row.format ?? row.albumMediaType)),
+      album_format: collect(allTrackRows.map((row) => row.albumMediaType)),
+      country: collect(allTrackRows.map((row) => row.country)),
+      status: collect(allTrackRows.map((row) => row.status)),
+      media_condition: collect(allTrackRows.map((row) => row.mediaCondition)),
+      sleeve_condition: collect(allTrackRows.map((row) => row.sleeveCondition)),
+      package_sleeve_condition: collect(allTrackRows.map((row) => row.packageSleeveCondition)),
+      rpm: collect(allTrackRows.map((row) => row.rpm)),
+      genre: collectArrayValues(allTrackRows.map((row) => row.genres)),
+      location: collect(allTrackRows.map((row) => row.location)),
+      owner: collect(allTrackRows.map((row) => row.owner)),
+      purchase_store: collect(allTrackRows.map((row) => row.purchaseStore)),
+      label: collect(allTrackRows.map((row) => row.label)),
+    };
   }, [allTrackRows]);
 
   const playlistCounts = useMemo(() => {
@@ -2035,6 +2063,7 @@ function CollectionBrowserPage() {
         <NewSmartPlaylistModal
           isOpen={showNewSmartPlaylistModal}
           editingPlaylist={editingPlaylist?.isSmart ? editingPlaylist : null}
+          valueOptions={smartPlaylistValueOptions}
           onClose={() => {
             setShowNewSmartPlaylistModal(false);
             setEditingPlaylist(null);

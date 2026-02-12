@@ -12,6 +12,7 @@ import type {
 interface NewSmartPlaylistModalProps {
   isOpen: boolean;
   onClose: () => void;
+  valueOptions?: Partial<Record<string, string[]>>;
   onCreate: (payload: {
     name: string;
     color: string;
@@ -94,10 +95,8 @@ const FIELD_OPTIONS: { value: SmartPlaylistFieldType; label: string; type: 'text
   { value: 'recording_date', label: 'Recording Date', type: 'date' },
   { value: 'for_sale', label: 'For Sale', type: 'boolean' },
   { value: 'is_live', label: 'Is Live', type: 'boolean' },
-  { value: 'is_1001', label: '1001 Albums', type: 'boolean' },
   { value: 'custom_tags', label: 'Tags', type: 'array' },
-  { value: 'discogs_genres', label: 'Genres (Discogs)', type: 'array' },
-  { value: 'spotify_genres', label: 'Genres (Spotify)', type: 'array' },
+  { value: 'genre', label: 'Genre', type: 'array' },
   { value: 'labels', label: 'Labels', type: 'array' },
   { value: 'signed_by', label: 'Signed By', type: 'array' },
   { value: 'songwriters', label: 'Songwriters', type: 'array' },
@@ -105,26 +104,6 @@ const FIELD_OPTIONS: { value: SmartPlaylistFieldType; label: string; type: 'text
   { value: 'engineers', label: 'Engineers', type: 'array' },
   { value: 'musicians', label: 'Musicians', type: 'array' },
 ];
-
-const FORMAT_OPTIONS = [
-  'Vinyl',
-  'CD',
-  'Cassette',
-  '8-Track Cartridge',
-  'SACD',
-  'DVD',
-  'All Media',
-  'Box Set',
-  'Flexi-disc',
-  'LP',
-  'EP',
-  'Single',
-  '7"',
-  '10"',
-  '12"',
-];
-
-const STATUS_OPTIONS = ['active', 'sold', 'wishlist', 'incoming', 'for_sale'];
 
 function getOperatorsForFieldType(fieldType: string): { value: SmartPlaylistOperatorType; label: string }[] {
   switch (fieldType) {
@@ -162,7 +141,31 @@ function getOperatorsForFieldType(fieldType: string): { value: SmartPlaylistOper
   }
 }
 
-export function NewSmartPlaylistModal({ isOpen, onClose, onCreate, onUpdate, editingPlaylist }: NewSmartPlaylistModalProps) {
+const LEGACY_RULE_FIELD_MAP: Partial<Record<string, SmartPlaylistFieldType>> = {
+  discogs_genres: 'genre',
+  spotify_genres: 'genre',
+};
+
+const DROPDOWN_FIELDS = new Set<SmartPlaylistFieldType>([
+  'format',
+  'album_format',
+  'country',
+  'status',
+  'media_condition',
+  'sleeve_condition',
+  'package_sleeve_condition',
+  'rpm',
+  'genre',
+  'location',
+  'owner',
+  'purchase_store',
+  'label',
+]);
+
+const normalizeRuleField = (field: string): SmartPlaylistFieldType =>
+  LEGACY_RULE_FIELD_MAP[field] ?? (field as SmartPlaylistFieldType);
+
+export function NewSmartPlaylistModal({ isOpen, onClose, valueOptions, onCreate, onUpdate, editingPlaylist }: NewSmartPlaylistModalProps) {
   const [name, setName] = useState('');
   const [color, setColor] = useState('#3b82f6');
   const [matchRules, setMatchRules] = useState<'all' | 'any'>('all');
@@ -179,7 +182,13 @@ export function NewSmartPlaylistModal({ isOpen, onClose, onCreate, onUpdate, edi
       setColor(editingPlaylist.color);
       setMatchRules(editingPlaylist.matchRules);
       setLiveUpdate(editingPlaylist.liveUpdate);
-      setRules(editingPlaylist.smartRules?.rules || []);
+      const normalizedRules = (editingPlaylist.smartRules?.rules || [])
+        .filter((rule) => rule.field !== ('is_1001' as SmartPlaylistFieldType))
+        .map((rule) => ({
+          ...rule,
+          field: normalizeRuleField(rule.field),
+        }));
+      setRules(normalizedRules);
       return;
     }
     setName('');
@@ -341,8 +350,10 @@ export function NewSmartPlaylistModal({ isOpen, onClose, onCreate, onUpdate, edi
                 {rules.map((rule, index) => {
                   const fieldDef = FIELD_OPTIONS.find((field) => field.value === rule.field);
                   const operators = getOperatorsForFieldType(fieldDef?.type || 'text');
-                  const usesFormatDropdown = rule.field === 'format' || rule.field === 'album_format';
-                  const usesStatusDropdown = rule.field === 'status';
+                  const dropdownOptions = DROPDOWN_FIELDS.has(rule.field)
+                    ? (valueOptions?.[rule.field] ?? [])
+                    : [];
+                  const usesDropdown = dropdownOptions.length > 0;
                   return (
                     <div key={`${rule.field}-${index}`} className="flex gap-2 p-3 bg-gray-50 rounded-md border border-gray-200 items-center">
                       <select value={rule.field} onChange={(e) => handleRuleChange(index, 'field', e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none cursor-pointer bg-white">
@@ -373,17 +384,10 @@ export function NewSmartPlaylistModal({ isOpen, onClose, onCreate, onUpdate, edi
                           <option value="true">True</option>
                           <option value="false">False</option>
                         </select>
-                      ) : usesFormatDropdown ? (
+                      ) : usesDropdown ? (
                         <select value={String(rule.value)} onChange={(e) => handleRuleChange(index, 'value', e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none cursor-pointer bg-white">
-                          <option value="">Select format...</option>
-                          {FORMAT_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
-                      ) : usesStatusDropdown ? (
-                        <select value={String(rule.value)} onChange={(e) => handleRuleChange(index, 'value', e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none cursor-pointer bg-white">
-                          <option value="">Select status...</option>
-                          {STATUS_OPTIONS.map((opt) => (
+                          <option value="">Select value...</option>
+                          {dropdownOptions.map((opt) => (
                             <option key={opt} value={opt}>{opt}</option>
                           ))}
                         </select>

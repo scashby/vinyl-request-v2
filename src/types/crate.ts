@@ -44,9 +44,9 @@ export type CrateFieldType =
   | 'date_added' | 'purchase_date' | 'last_played_at' | 'last_played_date' | 'last_cleaned_date'
   | 'original_release_date' | 'recording_date'
   // Boolean fields
-  | 'for_sale' | 'is_live' | 'is_1001'
+  | 'for_sale' | 'is_live'
   // Array fields (special handling)
-  | 'tags' | 'custom_tags' | 'discogs_genres' | 'spotify_genres' | 'signed_by'
+  | 'tags' | 'custom_tags' | 'genres' | 'signed_by'
   | 'songwriters' | 'producers' | 'engineers' | 'musicians'
   // Derived fields
   | 'decade';

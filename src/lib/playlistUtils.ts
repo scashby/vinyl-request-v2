@@ -176,14 +176,10 @@ function getTrackFieldValue(track: CollectionTrackRow, field: SmartPlaylistRule[
       return track.forSale === true;
     case 'is_live':
       return track.isLive === true;
-    case 'is_1001':
-      return track.is1001 === true;
     case 'custom_tags':
       return track.customTags ?? [];
-    case 'discogs_genres':
-      return track.discogsGenres ?? [];
-    case 'spotify_genres':
-      return track.spotifyGenres ?? [];
+    case 'genre':
+      return track.genres ?? [];
     case 'labels':
       return track.labels ?? [];
     case 'signed_by':

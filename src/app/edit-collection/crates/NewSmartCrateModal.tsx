@@ -91,12 +91,10 @@ const FIELD_OPTIONS: { value: CrateFieldType; label: string; type: 'text' | 'num
   // Boolean fields
   { value: 'for_sale', label: 'For Sale', type: 'boolean' },
   { value: 'is_live', label: 'Is Live', type: 'boolean' },
-  { value: 'is_1001', label: '1001 Albums', type: 'boolean' },
   
   // Array fields - Collections
   { value: 'custom_tags', label: 'Tags', type: 'array' },
-  { value: 'discogs_genres', label: 'Genres (Discogs)', type: 'array' },
-  { value: 'spotify_genres', label: 'Genres (Spotify)', type: 'array' },
+  { value: 'genres', label: 'Genre', type: 'array' },
   { value: 'labels', label: 'Labels', type: 'array' },
   { value: 'signed_by', label: 'Signed By', type: 'array' },
   

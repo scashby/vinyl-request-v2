@@ -89,11 +89,9 @@ export type SmartPlaylistFieldType =
   // Boolean fields
   | 'for_sale'
   | 'is_live'
-  | 'is_1001'
   // Array fields
   | 'custom_tags'
-  | 'discogs_genres'
-  | 'spotify_genres'
+  | 'genre'
   | 'labels'
   | 'signed_by'
   | 'songwriters'

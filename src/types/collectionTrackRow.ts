@@ -58,10 +58,8 @@ export interface CollectionTrackRow {
   recordingDate?: string | null;
   forSale?: boolean;
   isLive?: boolean;
-  is1001?: boolean;
   customTags?: string[];
-  discogsGenres?: string[];
-  spotifyGenres?: string[];
+  genres?: string[];
   labels?: string[];
   signedBy?: string[];
   songwriters?: string[];
