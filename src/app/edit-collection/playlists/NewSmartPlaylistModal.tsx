@@ -49,10 +49,10 @@ const FIELD_OPTIONS: { value: SmartPlaylistFieldType; label: string; type: 'text
   { value: 'album_artist', label: 'Album Artist', type: 'text' },
   { value: 'position', label: 'Position', type: 'text' },
   { value: 'side', label: 'Side', type: 'text' },
-  { value: 'album_format', label: 'Album Format', type: 'text' },
+  { value: 'album_format', label: 'Media Type', type: 'text' },
   { value: 'duration_seconds', label: 'Duration Seconds', type: 'number' },
   // Album-level context useful for playlist curation
-  { value: 'format', label: 'Format', type: 'text' },
+  { value: 'format', label: 'Format Detail', type: 'text' },
   { value: 'country', label: 'Country', type: 'text' },
   { value: 'year_int', label: 'Year', type: 'number' },
   { value: 'decade', label: 'Decade', type: 'number' },

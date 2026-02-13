@@ -109,6 +109,18 @@ interface TrackAlbumGroup {
 
 type CrateGameFlags = Record<number, Record<CrateGameKey, boolean>>;
 
+const MEDIA_TYPE_FACETS = new Set([
+  'Vinyl',
+  'CD',
+  'Cassette',
+  '8-Track',
+  'DVD',
+  'All Media',
+  'Box Set',
+  'SACD',
+  'Flexi-disc',
+]);
+
 const CRATE_GAME_LABELS: { key: CrateGameKey; icon: string; label: string }[] = [
   { key: 'bingo', icon: '🎱', label: 'Bingo' },
   { key: 'trivia', icon: '❓', label: 'Trivia' },
@@ -216,7 +228,7 @@ const buildTrackRuleMetadata = (album: Album) => {
     .filter((name): name is string => Boolean(name));
 
   return {
-    format: release?.media_type ?? getAlbumFormat(album),
+    format: getAlbumFormat(album),
     country: release?.country ?? album.country ?? null,
     location: album.location ?? null,
     status: album.status ?? null,
@@ -918,7 +930,9 @@ function CollectionBrowserPage() {
       collect(values.flatMap((items) => items ?? []));
 
     return {
-      format: collect(allTrackRows.map((row) => row.format ?? row.albumMediaType)),
+      format: collectArrayValues(
+        allTrackRows.map((row) => row.trackFormatFacets.filter((facet) => !MEDIA_TYPE_FACETS.has(facet)))
+      ),
       album_format: collect(allTrackRows.map((row) => row.albumMediaType)),
       country: collect(allTrackRows.map((row) => row.country)),
       year_int: collect(allTrackRows.map((row) => (row.yearInt != null ? String(row.yearInt) : null))),

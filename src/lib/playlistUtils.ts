@@ -1,6 +1,18 @@
 import type { CollectionTrackRow } from '../types/collectionTrackRow';
 import type { CollectionPlaylist, SmartPlaylistRule } from '../types/collectionPlaylist';
 
+const MEDIA_TYPE_FACETS = new Set([
+  'Vinyl',
+  'CD',
+  'Cassette',
+  '8-Track',
+  'DVD',
+  'All Media',
+  'Box Set',
+  'SACD',
+  'Flexi-disc',
+]);
+
 export function trackMatchesSmartPlaylist(track: CollectionTrackRow, playlist: CollectionPlaylist): boolean {
   if (!playlist.isSmart || !playlist.smartRules || playlist.smartRules.rules.length === 0) return false;
   if (playlist.matchRules === 'all') {
@@ -10,6 +22,42 @@ export function trackMatchesSmartPlaylist(track: CollectionTrackRow, playlist: C
 }
 
 function trackMatchesRule(track: CollectionTrackRow, rule: SmartPlaylistRule): boolean {
+  if (rule.field === 'format') {
+    const details = (track.trackFormatFacets ?? [])
+      .filter((facet) => !MEDIA_TYPE_FACETS.has(facet))
+      .map((facet) => facet.toLowerCase());
+    const target = String(rule.value).toLowerCase();
+    switch (rule.operator) {
+      case 'contains':
+        return details.some((facet) => facet.includes(target));
+      case 'is':
+        return details.some((facet) => facet === target);
+      case 'is_not':
+        return !details.some((facet) => facet === target);
+      case 'does_not_contain':
+        return !details.some((facet) => facet.includes(target));
+      default:
+        return false;
+    }
+  }
+
+  if (rule.field === 'album_format') {
+    const mediaType = String(track.albumMediaType ?? '').toLowerCase();
+    const target = String(rule.value).toLowerCase();
+    switch (rule.operator) {
+      case 'contains':
+        return mediaType.includes(target);
+      case 'is':
+        return mediaType === target;
+      case 'is_not':
+        return mediaType !== target;
+      case 'does_not_contain':
+        return !mediaType.includes(target);
+      default:
+        return false;
+    }
+  }
+
   const trackValue = getTrackFieldValue(track, rule.field);
   if (trackValue === null || trackValue === undefined) return false;
 
