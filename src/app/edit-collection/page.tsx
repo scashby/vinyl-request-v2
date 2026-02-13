@@ -921,15 +921,10 @@ function CollectionBrowserPage() {
       format: collect(allTrackRows.map((row) => row.format ?? row.albumMediaType)),
       album_format: collect(allTrackRows.map((row) => row.albumMediaType)),
       country: collect(allTrackRows.map((row) => row.country)),
-      status: collect(allTrackRows.map((row) => row.status)),
-      media_condition: collect(allTrackRows.map((row) => row.mediaCondition)),
-      sleeve_condition: collect(allTrackRows.map((row) => row.sleeveCondition)),
-      package_sleeve_condition: collect(allTrackRows.map((row) => row.packageSleeveCondition)),
-      rpm: collect(allTrackRows.map((row) => row.rpm)),
+      year_int: collect(allTrackRows.map((row) => (row.yearInt != null ? String(row.yearInt) : null))),
+      decade: collect(allTrackRows.map((row) => (row.decade != null ? String(row.decade) : null))),
+      side: collect(allTrackRows.map((row) => row.side)),
       genre: collectArrayValues(allTrackRows.map((row) => row.genres)),
-      location: collect(allTrackRows.map((row) => row.location)),
-      owner: collect(allTrackRows.map((row) => row.owner)),
-      purchase_store: collect(allTrackRows.map((row) => row.purchaseStore)),
       label: collect(allTrackRows.map((row) => row.label)),
     };
   }, [allTrackRows]);

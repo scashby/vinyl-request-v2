@@ -21,7 +21,14 @@ export interface SmartRules {
 export interface SmartRule {
   field: CrateFieldType;
   operator: CrateOperatorType;
-  value: string | number | boolean;
+  value:
+    | string
+    | number
+    | boolean
+    | {
+        min: string | number;
+        max: string | number;
+      };
 }
 
 // All database fields that can be used in smart crate rules
@@ -55,7 +62,7 @@ export type CrateOperatorType =
   // Text operators
   | 'contains' | 'is' | 'is_not' | 'does_not_contain'
   // Number operators
-  | 'greater_than' | 'less_than' | 'greater_than_or_equal_to' | 'less_than_or_equal_to'
+  | 'greater_than' | 'less_than' | 'greater_than_or_equal_to' | 'less_than_or_equal_to' | 'between'
   // Date operators
   | 'before' | 'after'
   // Array operators

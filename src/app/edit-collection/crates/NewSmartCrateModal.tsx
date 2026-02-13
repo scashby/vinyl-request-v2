@@ -31,79 +31,51 @@ const SMART_CRATE_COLORS = [
   '#8b4513', // Brown
 ];
 
-// Field definitions with their types
+// Curated smart-crate fields (album curation, not maintenance internals)
 const FIELD_OPTIONS: { value: CrateFieldType; label: string; type: 'text' | 'number' | 'date' | 'boolean' | 'array' }[] = [
-  // Basic Info
   { value: 'artist', label: 'Artist', type: 'text' },
   { value: 'title', label: 'Album Title', type: 'text' },
   { value: 'format', label: 'Format', type: 'text' },
-  { value: 'barcode', label: 'Barcode', type: 'text' },
-  { value: 'cat_no', label: 'Catalog Number', type: 'text' },
-  
-  // Packaging & Condition
-  { value: 'packaging', label: 'Packaging', type: 'text' },
-  { value: 'package_sleeve_condition', label: 'Package/Sleeve Condition', type: 'text' },
-  { value: 'media_condition', label: 'Media Condition', type: 'text' },
-  
-  // Vinyl Details
-  { value: 'vinyl_weight', label: 'Vinyl Weight', type: 'text' },
-  { value: 'rpm', label: 'RPM', type: 'text' },
-  { value: 'sound', label: 'Sound', type: 'text' },
-  { value: 'spars_code', label: 'SPARS Code', type: 'text' },
-  
-  // Location & Studio
   { value: 'country', label: 'Country', type: 'text' },
+  { value: 'label', label: 'Label', type: 'text' },
   { value: 'location', label: 'Location', type: 'text' },
-  { value: 'studio', label: 'Studio', type: 'text' },
-  
-  // Personal
-  { value: 'owner', label: 'Owner', type: 'text' },
-  { value: 'purchase_store', label: 'Purchase Store', type: 'text' },
-  { value: 'notes', label: 'Notes', type: 'text' },
-  { value: 'box_set', label: 'Box Set', type: 'text' },
-  
-  // Classical
-  { value: 'composer', label: 'Composer', type: 'text' },
-  { value: 'conductor', label: 'Conductor', type: 'text' },
-  { value: 'chorus', label: 'Chorus', type: 'text' },
-  { value: 'composition', label: 'Composition', type: 'text' },
-  { value: 'orchestra', label: 'Orchestra', type: 'text' },
-  
-  // Number fields
+  { value: 'status', label: 'Status', type: 'text' },
+  { value: 'media_condition', label: 'Media Condition', type: 'text' },
+  { value: 'sleeve_condition', label: 'Sleeve Condition', type: 'text' },
   { value: 'year_int', label: 'Year', type: 'number' },
   { value: 'decade', label: 'Decade', type: 'number' },
   { value: 'my_rating', label: 'My Rating', type: 'number' },
   { value: 'play_count', label: 'Play Count', type: 'number' },
-  { value: 'discs', label: 'Disc Count', type: 'number' },
-  { value: 'sides', label: 'Sides', type: 'number' },
-  { value: 'index_number', label: 'Index Number', type: 'number' },
-  { value: 'purchase_price', label: 'Purchase Price', type: 'number' },
-  { value: 'current_value', label: 'Current Value', type: 'number' },
-  
-  // Date fields
   { value: 'date_added', label: 'Date Added', type: 'date' },
-  { value: 'purchase_date', label: 'Purchase Date', type: 'date' },
-  { value: 'last_played_date', label: 'Last Played Date', type: 'date' },
-  { value: 'last_cleaned_date', label: 'Last Cleaned Date', type: 'date' },
-  { value: 'original_release_date', label: 'Original Release Date', type: 'date' },
-  { value: 'recording_date', label: 'Recording Date', type: 'date' },
-  
-  // Boolean fields
+  { value: 'last_played_at', label: 'Last Played Date', type: 'date' },
   { value: 'for_sale', label: 'For Sale', type: 'boolean' },
   { value: 'is_live', label: 'Is Live', type: 'boolean' },
-  
-  // Array fields - Collections
   { value: 'custom_tags', label: 'Tags', type: 'array' },
   { value: 'genres', label: 'Genre', type: 'array' },
-  { value: 'labels', label: 'Labels', type: 'array' },
   { value: 'signed_by', label: 'Signed By', type: 'array' },
-  
-  // Array fields - Credits
-  { value: 'songwriters', label: 'Songwriters', type: 'array' },
-  { value: 'producers', label: 'Producers', type: 'array' },
-  { value: 'engineers', label: 'Engineers', type: 'array' },
-  { value: 'musicians', label: 'Musicians', type: 'array' },
 ];
+
+const COUNTRY_OPTIONS = ['US', 'UK', 'Canada', 'Germany', 'France', 'Italy', 'Spain', 'Netherlands', 'Belgium', 'Sweden', 'Norway', 'Denmark', 'Finland', 'Austria', 'Switzerland', 'Japan', 'Australia', 'New Zealand', 'Brazil', 'Mexico', 'Argentina', 'Russia', 'Poland', 'Czech Republic', 'Hungary', 'Portugal', 'Greece', 'Ireland', 'Israel', 'South Korea', 'China', 'India', 'Europe', 'UK & Europe', 'USA & Canada'];
+const FORMAT_OPTIONS = ['Vinyl', 'CD', 'Cassette', '8-Track Cartridge', 'SACD', 'DVD', 'All Media', 'Box Set', 'Flexi-disc', 'LP', 'EP', 'Single', '7"', '10"', '12"'];
+const STATUS_OPTIONS = ['active', 'for_sale', 'sold', 'wishlist', 'incoming'];
+const CONDITION_OPTIONS = ['Sealed', 'Mint (M)', 'Near Mint (NM or M-)', 'Very Good Plus (VG+)', 'Very Good (VG)', 'Good Plus (G+)', 'Good (G)', 'Fair (F)', 'Poor (P)', 'Generic', 'No Cover'];
+
+const DROPDOWN_OPTIONS: Partial<Record<CrateFieldType, string[]>> = {
+  country: COUNTRY_OPTIONS,
+  format: FORMAT_OPTIONS,
+  status: STATUS_OPTIONS,
+  media_condition: CONDITION_OPTIONS,
+  sleeve_condition: CONDITION_OPTIONS,
+};
+
+const DROPDOWN_FIELDS = new Set<CrateFieldType>(['country', 'format', 'status', 'media_condition', 'sleeve_condition', 'genres', 'custom_tags', 'signed_by']);
+const SUPPORTED_FIELDS = new Set<CrateFieldType>(FIELD_OPTIONS.map((field) => field.value));
+const LEGACY_RULE_FIELD_MAP: Partial<Record<string, CrateFieldType>> = {
+  discogs_genres: 'genres',
+  spotify_genres: 'genres',
+  labels: 'label',
+  catalog_number: 'cat_no',
+};
 
 // Get operators for a field type
 function getOperatorsForFieldType(fieldType: string): { value: CrateOperatorType; label: string }[] {
@@ -123,12 +95,14 @@ function getOperatorsForFieldType(fieldType: string): { value: CrateOperatorType
         { value: 'less_than', label: 'Less Than' },
         { value: 'greater_than_or_equal_to', label: 'Greater Than or Equal To' },
         { value: 'less_than_or_equal_to', label: 'Less Than or Equal To' },
+        { value: 'between', label: 'Between' },
       ];
     case 'date':
       return [
         { value: 'is', label: 'Is' },
         { value: 'before', label: 'Before' },
         { value: 'after', label: 'After' },
+        { value: 'between', label: 'Between' },
       ];
     case 'boolean':
       return [
@@ -162,7 +136,13 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCra
       setIcon(editingCrate.icon);
       setMatchRules(editingCrate.match_rules);
       setLiveUpdate(editingCrate.live_update);
-      setRules(editingCrate.smart_rules?.rules || []);
+      const normalizedRules = (editingCrate.smart_rules?.rules || [])
+        .map((rule) => ({
+          ...rule,
+          field: LEGACY_RULE_FIELD_MAP[rule.field] ?? rule.field,
+        }))
+        .filter((rule) => SUPPORTED_FIELDS.has(rule.field));
+      setRules(normalizedRules);
     }
   }, [editingCrate]);
 
@@ -195,6 +175,12 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCra
         operator: operators[0]?.value || 'contains',
         value: '',
       };
+    } else if (field === 'operator') {
+      newRules[index] = {
+        ...newRules[index],
+        operator: value as CrateOperatorType,
+        value: value === 'between' ? { min: '', max: '' } : '',
+      };
     } else {
       newRules[index] = {
         ...newRules[index],
@@ -203,6 +189,25 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCra
     }
     
     setRules(newRules);
+  };
+
+  const isBetweenValue = (value: SmartRule['value']): value is { min: string | number; max: string | number } =>
+    typeof value === 'object' && value !== null && 'min' in value && 'max' in value;
+
+  const handleBetweenChange = (index: number, bound: 'min' | 'max', nextValue: string) => {
+    setRules((prev) => {
+      const next = [...prev];
+      const existing = next[index]?.value;
+      const currentRange = isBetweenValue(existing) ? existing : { min: '', max: '' };
+      next[index] = {
+        ...next[index],
+        value: {
+          ...currentRange,
+          [bound]: nextValue,
+        },
+      };
+      return next;
+    });
   };
 
   const handleSave = async () => {
@@ -217,7 +222,13 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCra
     }
 
     // Validate all rules have values
-    const invalidRule = rules.find((r) => r.value === '' || r.value === null || r.value === undefined);
+    const invalidRule = rules.find((r) => {
+      if (r.operator === 'between') {
+        if (!isBetweenValue(r.value)) return true;
+        return String(r.value.min).trim() === '' || String(r.value.max).trim() === '';
+      }
+      return r.value === '' || r.value === null || r.value === undefined;
+    });
     if (invalidRule) {
       setError('All rules must have a value');
       return;
@@ -396,6 +407,8 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCra
                 {rules.map((rule, index) => {
                   const fieldDef = FIELD_OPTIONS.find((f) => f.value === rule.field);
                   const operators = getOperatorsForFieldType(fieldDef?.type || 'text');
+                  const dropdownOptions = rule.field in DROPDOWN_OPTIONS ? (DROPDOWN_OPTIONS[rule.field] ?? []) : [];
+                  const usesDropdown = DROPDOWN_FIELDS.has(rule.field) && dropdownOptions.length > 0;
 
                   return (
                     <div
@@ -429,7 +442,24 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCra
                       </select>
 
                       {/* Value Input */}
-                      {fieldDef?.type === 'boolean' ? (
+                      {rule.operator === 'between' ? (
+                        <div className="flex-1 flex gap-2">
+                          <input
+                            type={fieldDef?.type === 'date' ? 'date' : 'number'}
+                            value={isBetweenValue(rule.value) ? String(rule.value.min) : ''}
+                            onChange={(e) => handleBetweenChange(index, 'min', e.target.value)}
+                            placeholder="Min"
+                            className="w-1/2 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none bg-white"
+                          />
+                          <input
+                            type={fieldDef?.type === 'date' ? 'date' : 'number'}
+                            value={isBetweenValue(rule.value) ? String(rule.value.max) : ''}
+                            onChange={(e) => handleBetweenChange(index, 'max', e.target.value)}
+                            placeholder="Max"
+                            className="w-1/2 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none bg-white"
+                          />
+                        </div>
+                      ) : fieldDef?.type === 'boolean' ? (
                         <select
                           value={String(rule.value)}
                           onChange={(e) => handleRuleChange(index, 'value', e.target.value === 'true')}
@@ -437,6 +467,19 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCra
                         >
                           <option value="true">True</option>
                           <option value="false">False</option>
+                        </select>
+                      ) : usesDropdown ? (
+                        <select
+                          value={String(rule.value)}
+                          onChange={(e) => handleRuleChange(index, 'value', e.target.value)}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none cursor-pointer bg-white"
+                        >
+                          <option value="">Select value...</option>
+                          {dropdownOptions.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
                         </select>
                       ) : fieldDef?.type === 'date' ? (
                         <input

@@ -50,6 +50,21 @@ function albumMatchesRule(album: Album, rule: SmartRule): boolean {
       return Number(albumValue) >= Number(value);
     case 'less_than_or_equal_to':
       return Number(albumValue) <= Number(value);
+    case 'between': {
+      if (!isBetweenValue(value)) return false;
+      const raw = String(albumValue);
+      const valueDate = Date.parse(raw);
+      const minDate = Date.parse(String(value.min));
+      const maxDate = Date.parse(String(value.max));
+      if (!Number.isNaN(valueDate) && !Number.isNaN(minDate) && !Number.isNaN(maxDate)) {
+        return valueDate >= minDate && valueDate <= maxDate;
+      }
+      const valueNum = Number(albumValue);
+      const minNum = Number(value.min);
+      const maxNum = Number(value.max);
+      if (Number.isNaN(valueNum) || Number.isNaN(minNum) || Number.isNaN(maxNum)) return false;
+      return valueNum >= minNum && valueNum <= maxNum;
+    }
 
     // Date operators
     case 'before':
@@ -76,6 +91,10 @@ function albumMatchesRule(album: Album, rule: SmartRule): boolean {
     default:
       return false;
   }
+}
+
+function isBetweenValue(value: SmartRule['value']): value is { min: string | number; max: string | number } {
+  return typeof value === 'object' && value !== null && 'min' in value && 'max' in value;
 }
 
 /**
