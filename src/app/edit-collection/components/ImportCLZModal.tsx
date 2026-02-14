@@ -679,36 +679,60 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
         return;
       }
 
-      const { data: existing, error: dbError } = await supabase
-        .from('inventory')
-        .select(`
-          id,
-          location,
-          media_condition,
-          sleeve_condition,
-          personal_notes,
-          release:releases (
-            id,
-            label,
-            catalog_number,
-            barcode,
-            country,
-            release_year,
-            master:masters (
-              id,
-              title,
-              original_release_year,
-              artist:artists ( name )
-            )
-          )
-        `);
+      type ExistingRow = {
+        id: number;
+        location?: string | null;
+        media_condition?: string | null;
+        sleeve_condition?: string | null;
+        personal_notes?: string | null;
+        release?: unknown;
+      };
 
-      if (dbError) {
-        setError(`Database error: ${dbError.message}`);
-        return;
+      const existingRows: ExistingRow[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      let keepGoing = true;
+
+      while (keepGoing) {
+        const { data: batch, error: dbError } = await supabase
+          .from('inventory')
+          .select(`
+            id,
+            location,
+            media_condition,
+            sleeve_condition,
+            personal_notes,
+            release:releases (
+              id,
+              label,
+              catalog_number,
+              barcode,
+              country,
+              release_year,
+              master:masters (
+                id,
+                title,
+                original_release_year,
+                artist:artists ( name )
+              )
+            )
+          `)
+          .order('id', { ascending: true })
+          .range(from, from + batchSize - 1);
+
+        if (dbError) {
+          setError(`Database error: ${dbError.message}`);
+          setStage('upload');
+          return;
+        }
+
+        const currentBatch = (batch ?? []) as ExistingRow[];
+        existingRows.push(...currentBatch);
+        keepGoing = currentBatch.length === batchSize;
+        from += batchSize;
       }
 
-      const mappedExisting = (existing ?? []).map((row) => {
+      const mappedExisting = existingRows.map((row) => {
         const releaseRaw = firstRecord(row.release as unknown);
         const release = releaseRaw as {
           id?: number | null;
@@ -734,6 +758,11 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
         const artistRaw = firstRecord(master?.artist as unknown) as { name?: string | null } | null;
         const artistName = artistRaw?.name?.trim() || 'Unknown Artist';
         const title = master?.title?.trim() || 'Untitled';
+        const toNullableString = (value: unknown): string | null => {
+          if (value === null || value === undefined) return null;
+          if (typeof value === 'string') return value;
+          return String(value);
+        };
         return {
           id: row.id as number,
           release_id: release?.id ?? null,
@@ -745,10 +774,10 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
           catalog_number: release?.catalog_number ?? null,
           barcode: release?.barcode ?? null,
           country: release?.country ?? null,
-          location: row.location ?? null,
-          media_condition: row.media_condition ?? null,
-          sleeve_condition: row.sleeve_condition ?? null,
-          personal_notes: row.personal_notes ?? null,
+          location: toNullableString(row.location),
+          media_condition: toNullableString(row.media_condition),
+          sleeve_condition: toNullableString(row.sleeve_condition),
+          personal_notes: toNullableString(row.personal_notes),
         } satisfies ExistingAlbum;
       });
 
