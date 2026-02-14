@@ -211,6 +211,15 @@ interface ResolutionHistory {
   source: string;
 }
 
+type ConflictResolutionWriteRow = {
+  album_id: number;
+  field_name: string;
+  source: string;
+  resolution: string;
+  kept_value: import('types/supabase').Json | null;
+  resolved_at: string;
+};
+
 // Extended type for Multi-Source Conflicts
 export type ExtendedFieldConflict = FieldConflict & {
   source: string;
@@ -743,6 +752,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [currentRunId, setCurrentRunId] = useState<string | null>(null);
   const [historyWriteEnabled, setHistoryWriteEnabled] = useState(true);
   const [auditLogWriteEnabled, setAuditLogWriteEnabled] = useState(true);
+  const historyWriteModeRef = useRef<'upsert' | 'insert' | 'disabled'>('upsert');
+  const historyDisabledRef = useRef(false);
+  const auditDisabledRef = useRef(false);
 
   // Loop Control Refs
   const hasMoreRef = useRef(true);
@@ -758,6 +770,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       setCurrentRunId(null);
       setHistoryWriteEnabled(true);
       setAuditLogWriteEnabled(true);
+      historyWriteModeRef.current = 'upsert';
+      historyDisabledRef.current = false;
+      auditDisabledRef.current = false;
     }
   }, [isOpen]);
 
@@ -786,7 +801,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
 
   function disableHistoryWrites(context: string, error: unknown) {
-    if (!historyWriteEnabled) return;
+    if (historyDisabledRef.current) return;
+    historyDisabledRef.current = true;
+    historyWriteModeRef.current = 'disabled';
     setHistoryWriteEnabled(false);
     const message = error && typeof error === 'object' && 'message' in error
       ? String((error as { message?: unknown }).message)
@@ -794,10 +811,39 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     addLog('System', 'skipped', `Disabled conflict history writes (${context}): ${message}`);
   }
 
+  async function persistConflictResolutionHistory(rows: ConflictResolutionWriteRow[], context: string) {
+    if (rows.length === 0 || historyWriteModeRef.current === 'disabled' || historyDisabledRef.current) return;
+
+    if (historyWriteModeRef.current === 'upsert') {
+      const { error } = await supabase
+        .from('import_conflict_resolutions')
+        .upsert(rows, { onConflict: 'album_id,field_name,source' });
+
+      if (!error) return;
+
+      const message = error.message || '';
+      if (message.toLowerCase().includes('no unique or exclusion constraint')) {
+        historyWriteModeRef.current = 'insert';
+        addLog('System', 'info', `Conflict history fallback: switching to insert mode (${context}).`);
+      } else {
+        disableHistoryWrites(context, error);
+        return;
+      }
+    }
+
+    if (historyWriteModeRef.current === 'insert') {
+      const { error } = await supabase.from('import_conflict_resolutions').insert(rows);
+      if (error) {
+        disableHistoryWrites(`${context} (insert fallback)`, error);
+      }
+    }
+  }
+
   async function persistEnrichmentRunLogs(rows: EnrichmentRunLogInsert[]) {
-    if (!auditLogWriteEnabled || rows.length === 0) return;
+    if (!auditLogWriteEnabled || auditDisabledRef.current || rows.length === 0) return;
     const { error } = await supabase.from('enrichment_run_logs').insert(rows);
     if (error) {
+      auditDisabledRef.current = true;
       setAuditLogWriteEnabled(false);
       addLog('System', 'skipped', `Disabled enrichment run logging: ${error.message}`);
     }
@@ -1055,7 +1101,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const autoUpdates: { album: Album; fields: Record<string, unknown> }[] = [];
     const newConflicts: ExtendedFieldConflict[] = [];
     const processedIds: number[] = [];
-    const historyUpdates: { album_id: number; field_name: string; source: string; resolution: string; kept_value: import('types/supabase').Json | null; resolved_at: string }[] = [];
+    const historyUpdates: ConflictResolutionWriteRow[] = [];
     const trackSavePromises: Promise<unknown>[] = [];
     const lyricJobs: { albumId: number; artist: string; title: string; appleMusicId?: string | null }[] = [];
     const pendingAuditRows: EnrichmentRunLogInsert[] = [];
@@ -1428,12 +1474,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     });
 
     if (historyUpdates.length > 0 && historyWriteEnabled) {
-      const { error } = await supabase
-        .from('import_conflict_resolutions')
-        .upsert(historyUpdates, { onConflict: 'album_id,field_name,source' });
-      if (error) {
-        disableHistoryWrites('scan auto-fill', error);
-      }
+      await persistConflictResolutionHistory(historyUpdates, 'scan auto-fill');
     }
 
     if (trackSavePromises.length > 0) {
@@ -1495,9 +1536,20 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           });
           const data = await res.json();
           if (data?.success) {
-            addLog(`${job.artist} - ${job.title}`, 'info', `Lyrics URLs: ${data.data?.enrichedCount ?? 0}/${data.data?.totalTracks ?? 0}`);
+            const failedCount = Number(data.data?.failedCount ?? 0);
+            const failedSample = Array.isArray(data.data?.failedTracks) && data.data.failedTracks.length > 0
+              ? String(data.data.failedTracks[0]?.error ?? '')
+              : '';
+            const detail = failedCount > 0 && failedSample
+              ? `Lyrics URLs: ${data.data?.enrichedCount ?? 0}/${data.data?.totalTracks ?? 0} (failed: ${failedCount}; sample: ${failedSample})`
+              : `Lyrics URLs: ${data.data?.enrichedCount ?? 0}/${data.data?.totalTracks ?? 0}`;
+            addLog(`${job.artist} - ${job.title}`, 'info', detail);
           } else {
-            addLog(`${job.artist} - ${job.title}`, 'skipped', `Lyrics enrichment failed: ${data?.error ?? 'Unknown error'}`);
+            const failedSample = Array.isArray(data?.data?.failedTracks) && data.data.failedTracks.length > 0
+              ? String(data.data.failedTracks[0]?.error ?? '')
+              : '';
+            const reason = data?.error || failedSample || `HTTP ${res.status}`;
+            addLog(`${job.artist} - ${job.title}`, 'skipped', `Lyrics enrichment failed: ${reason}`);
           }
         } catch (error) {
           addLog(`${job.artist} - ${job.title}`, 'skipped', `Lyrics enrichment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1758,12 +1810,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
 
     if (resolutionRecords.length > 0 && historyWriteEnabled) {
-      const { error } = await supabase.from('import_conflict_resolutions').upsert(resolutionRecords, {
-        onConflict: 'album_id,field_name,source'
-      });
-      if (error) {
-        disableHistoryWrites('manual review', error);
-      }
+      await persistConflictResolutionHistory(resolutionRecords, 'manual review');
     }
 
     const runId = currentRunId ?? createEnrichmentRunId();
