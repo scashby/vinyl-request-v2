@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
-import { normalizeArtist, normalizeTitle } from '../../../lib/importUtils';
+import { cleanArtistName, normalizeArtist, normalizeTitle } from '../../../lib/importUtils';
 import {
   buildIdentifyingFieldUpdates,
   detectConflicts,
@@ -89,10 +89,25 @@ function normalizeForScore(value: string): string {
     .trim();
 }
 
+function normalizeArtistForScore(value: string): string {
+  return normalizeForScore(cleanArtistName(value))
+    .replace(/\b(feat|ft|featuring|with)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function splitArtistParts(value: string): string[] {
+  return normalizeArtistForScore(value)
+    .split(/\s*(?:,|&|\/|;|\+|\band\b)\s*/g)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
 function stripEditionText(value: string): string {
   return normalizeForScore(value)
     .replace(/\(([^)]*)\)/g, ' ')
     .replace(/\b(remaster(ed)?|reissue|deluxe|expanded|mono|stereo|anniversary|edition|version)\b/g, ' ')
+    .replace(/\b\d{4}\b/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -151,10 +166,35 @@ function textSimilarity(left: string, right: string): number {
 }
 
 function classifyMatchLevel(score: number): MatchLevel {
-  if (score >= 86) return 'high';
-  if (score >= 72) return 'medium';
-  if (score >= 58) return 'low';
+  if (score >= 82) return 'high';
+  if (score >= 68) return 'medium';
+  if (score >= 52) return 'low';
   return 'none';
+}
+
+function artistSimilarity(left: string, right: string): number {
+  const fullScore = textSimilarity(normalizeArtistForScore(left), normalizeArtistForScore(right));
+  const leftParts = splitArtistParts(left);
+  const rightParts = splitArtistParts(right);
+  if (leftParts.length === 0 || rightParts.length === 0) return fullScore;
+
+  let bestPartScore = 0;
+  let exactPartMatch = false;
+  for (const leftPart of leftParts) {
+    for (const rightPart of rightParts) {
+      const score = textSimilarity(leftPart, rightPart);
+      if (score > bestPartScore) bestPartScore = score;
+      if (normalizeForScore(leftPart) === normalizeForScore(rightPart)) {
+        exactPartMatch = true;
+      }
+    }
+  }
+
+  if (exactPartMatch && bestPartScore >= 0.95) {
+    return Math.max(fullScore, 0.96);
+  }
+
+  return Math.max(fullScore, bestPartScore);
 }
 
 function cleanPosition(pos: string): number {
@@ -183,7 +223,12 @@ function parseCLZXML(xmlText: string): ParsedCLZAlbum[] {
     const artistNode = music.querySelector('artists artist displayname');
     const artist = artistNode?.textContent || 'Unknown Artist';
     const title = music.querySelector('title')?.textContent || 'Unknown Title';
-    const year = music.querySelector('releaseyear')?.textContent || '';
+    const year = (
+      music.querySelector('releaseyear')?.textContent
+      || music.querySelector('releasedate year displayname')?.textContent
+      || music.querySelector('releasedate date')?.textContent
+      || ''
+    ).trim();
 
     const labels: string[] = [];
     music.querySelectorAll('labels label displayname').forEach((node) => {
@@ -242,7 +287,11 @@ function parseCLZXML(xmlText: string): ParsedCLZAlbum[] {
       title,
       year,
       tracks,
-      barcode: music.querySelector('barcode')?.textContent || '',
+      barcode: (
+        music.querySelector('barcode')?.textContent
+        || music.querySelector('upc')?.textContent
+        || ''
+      ).trim(),
       catalog_number: music.querySelector('labelnumber')?.textContent || '',
       label,
       artist_norm: normalizeArtist(artist),
@@ -258,7 +307,7 @@ function parseCLZXML(xmlText: string): ParsedCLZAlbum[] {
 function compareCLZAlbums(parsed: ParsedCLZAlbum[], existing: ExistingAlbum[]): ComparedCLZAlbum[] {
   const normalizedExisting = existing.map((album) => ({
     album,
-    artistNorm: normalizeForScore(album.artist),
+    artistRaw: album.artist,
     titleNorm: normalizeForScore(album.title),
     titleBaseNorm: stripEditionText(album.title),
     yearNum: album.year ? parseInt(album.year, 10) : null,
@@ -267,7 +316,6 @@ function compareCLZAlbums(parsed: ParsedCLZAlbum[], existing: ExistingAlbum[]): 
   }));
 
   return parsed.map((clzAlbum) => {
-    const clzArtistNorm = normalizeForScore(clzAlbum.artist);
     const clzTitleNorm = normalizeForScore(clzAlbum.title);
     const clzTitleBaseNorm = stripEditionText(clzAlbum.title);
     const clzYearNum = clzAlbum.year ? parseInt(clzAlbum.year, 10) : null;
@@ -275,9 +323,9 @@ function compareCLZAlbums(parsed: ParsedCLZAlbum[], existing: ExistingAlbum[]): 
     const clzCatNorm = normalizeForScore(clzAlbum.catalog_number);
 
     const candidates = normalizedExisting
-      .map(({ album, artistNorm, titleNorm, titleBaseNorm, yearNum, barcodeNorm, catNorm }) => {
+      .map(({ album, artistRaw, titleNorm, titleBaseNorm, yearNum, barcodeNorm, catNorm }) => {
         const barcodeExact = !!clzBarcodeNorm && !!barcodeNorm && clzBarcodeNorm === barcodeNorm;
-        const artistScore = textSimilarity(clzArtistNorm, artistNorm);
+        const artistScore = artistSimilarity(clzAlbum.artist, artistRaw);
         const titleScore = Math.max(
           textSimilarity(clzTitleNorm, titleNorm),
           textSimilarity(clzTitleBaseNorm, titleBaseNorm),
@@ -316,7 +364,9 @@ function compareCLZAlbums(parsed: ParsedCLZAlbum[], existing: ExistingAlbum[]): 
       .sort((a, b) => b.score - a.score)
       .slice(0, 5);
 
-    const suggestedMatches = candidates.filter((candidate) => candidate.score >= 58).slice(0, 3);
+    const suggestedMatches = candidates
+      .filter((candidate) => candidate.score >= 52)
+      .slice(0, 3);
     const best = candidates[0];
 
     const autoMatch = best && best.level === 'high';
