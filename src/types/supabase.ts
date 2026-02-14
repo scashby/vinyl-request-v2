@@ -814,6 +814,66 @@ export type Database = {
         };
         Relationships: [];
       };
+      enrichment_run_logs: {
+        Row: {
+          id: number;
+          run_id: string;
+          album_id: number;
+          album_artist: string | null;
+          album_title: string | null;
+          phase: string;
+          selected_fields: string[];
+          checked_sources: string[];
+          returned_sources: string[];
+          returned_fields: string[];
+          source_payload: Json | null;
+          proposed_updates: Json | null;
+          applied_updates: Json | null;
+          conflict_fields: string[];
+          update_status: string;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          run_id: string;
+          album_id: number;
+          album_artist?: string | null;
+          album_title?: string | null;
+          phase?: string;
+          selected_fields?: string[];
+          checked_sources?: string[];
+          returned_sources?: string[];
+          returned_fields?: string[];
+          source_payload?: Json | null;
+          proposed_updates?: Json | null;
+          applied_updates?: Json | null;
+          conflict_fields?: string[];
+          update_status?: string;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          run_id?: string;
+          album_id?: number;
+          album_artist?: string | null;
+          album_title?: string | null;
+          phase?: string;
+          selected_fields?: string[];
+          checked_sources?: string[];
+          returned_sources?: string[];
+          returned_fields?: string[];
+          source_payload?: Json | null;
+          proposed_updates?: Json | null;
+          applied_updates?: Json | null;
+          conflict_fields?: string[];
+          update_status?: string;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       import_conflict_resolutions: {
         Row: {
           id: number;

@@ -126,6 +126,84 @@ type LogEntry = {
   timestamp: Date;
 };
 
+type EnrichmentRunLogInsert = import('types/supabase').Database['public']['Tables']['enrichment_run_logs']['Insert'];
+
+type ActiveServiceMap = ReturnType<typeof getServicesForSelectionFromConfig>;
+
+const SERVICE_FLAG_TO_ID: Record<string, string> = {
+  musicbrainz: 'musicbrainz',
+  spotify: 'spotify',
+  discogs: 'discogs',
+  lastfm: 'lastfm',
+  appleMusicEnhanced: 'appleMusic',
+  allmusic: 'allmusic',
+  wikipedia: 'wikipedia',
+  genius: 'genius',
+  coverArt: 'coverArtArchive',
+  whosampled: 'whosampled',
+  secondhandsongs: 'secondhandsongs',
+  theaudiodb: 'theaudiodb',
+  wikidata: 'wikidata',
+  setlistfm: 'setlistfm',
+  rateyourmusic: 'rateyourmusic',
+  fanarttv: 'fanarttv',
+  deezer: 'deezer',
+  musixmatch: 'musixmatch',
+  popsike: 'popsike',
+  pitchfork: 'pitchfork',
+};
+
+const normalizeSourceForLog = (source: string): string => {
+  if (source === 'coverArt') return 'coverArtArchive';
+  if (source === 'appleMusicEnhanced') return 'appleMusic';
+  return source;
+};
+
+const createEnrichmentRunId = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `run_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+};
+
+function getServicesForSelectionFromConfig(config: FieldConfigMap) {
+  const activeServices = new Set<string>();
+
+  Object.values(config).forEach(allowedSources => {
+    allowedSources.forEach(s => activeServices.add(s));
+  });
+
+  return {
+    musicbrainz: activeServices.has('musicbrainz'),
+    spotify: activeServices.has('spotify'),
+    discogs: activeServices.has('discogs'),
+    lastfm: activeServices.has('lastfm'),
+    appleMusicEnhanced: activeServices.has('appleMusic'),
+    allmusic: activeServices.has('allmusic'),
+    wikipedia: activeServices.has('wikipedia'),
+    genius: activeServices.has('genius'),
+    coverArt: activeServices.has('coverArtArchive'),
+    whosampled: activeServices.has('whosampled'),
+    secondhandsongs: activeServices.has('secondhandsongs'),
+    theaudiodb: activeServices.has('theaudiodb'),
+    wikidata: activeServices.has('wikidata'),
+    setlistfm: activeServices.has('setlistfm'),
+    rateyourmusic: activeServices.has('rateyourmusic'),
+    fanarttv: activeServices.has('fanarttv'),
+    deezer: activeServices.has('deezer'),
+    musixmatch: activeServices.has('musixmatch'),
+    popsike: activeServices.has('popsike'),
+    pitchfork: activeServices.has('pitchfork'),
+  };
+}
+
+const checkedSourcesFromActiveServices = (activeServices: ActiveServiceMap): string[] => {
+  return Object.entries(activeServices)
+    .filter(([, enabled]) => !!enabled)
+    .map(([flag]) => SERVICE_FLAG_TO_ID[flag] ?? flag)
+    .sort();
+};
+
 // Local interface for resolution history
 interface ResolutionHistory {
   album_id: number;
@@ -662,6 +740,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [sessionLog, setSessionLog] = useState<LogEntry[]>([]);
   const logEndRef = useRef<HTMLDivElement>(null);
   const [batchSummary, setBatchSummary] = useState<{album: string, field: string, action: string}[] | null>(null);
+  const [currentRunId, setCurrentRunId] = useState<string | null>(null);
+  const [historyWriteEnabled, setHistoryWriteEnabled] = useState(true);
+  const [auditLogWriteEnabled, setAuditLogWriteEnabled] = useState(true);
 
   // Loop Control Refs
   const hasMoreRef = useRef(true);
@@ -670,6 +751,14 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
   useEffect(() => {
     if (isOpen) loadStats();
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentRunId(null);
+      setHistoryWriteEnabled(true);
+      setAuditLogWriteEnabled(true);
+    }
   }, [isOpen]);
 
   useEffect(() => {
@@ -693,34 +782,25 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
 
   function getServicesForSelection() {
-    const activeServices = new Set<string>();
-    
-    Object.values(fieldConfig).forEach(allowedSources => {
-      allowedSources.forEach(s => activeServices.add(s));
-    });
+    return getServicesForSelectionFromConfig(fieldConfig);
+  }
 
-    return {
-      musicbrainz: activeServices.has('musicbrainz'),
-      spotify: activeServices.has('spotify'),
-      discogs: activeServices.has('discogs'),
-      lastfm: activeServices.has('lastfm'),
-      appleMusicEnhanced: activeServices.has('appleMusic'),
-      allmusic: activeServices.has('allmusic'),
-      wikipedia: activeServices.has('wikipedia'),
-      genius: activeServices.has('genius'),
-      coverArt: activeServices.has('coverArtArchive'),
-      whosampled: activeServices.has('whosampled'),
-      secondhandsongs: activeServices.has('secondhandsongs'),
-      theaudiodb: activeServices.has('theaudiodb'),
-      wikidata: activeServices.has('wikidata'),
-      setlistfm: activeServices.has('setlistfm'),
-      rateyourmusic: activeServices.has('rateyourmusic'),
-      fanarttv: activeServices.has('fanarttv'),
-      deezer: activeServices.has('deezer'),
-      musixmatch: activeServices.has('musixmatch'),
-      popsike: activeServices.has('popsike'),
-      pitchfork: activeServices.has('pitchfork'),
-    };
+  function disableHistoryWrites(context: string, error: unknown) {
+    if (!historyWriteEnabled) return;
+    setHistoryWriteEnabled(false);
+    const message = error && typeof error === 'object' && 'message' in error
+      ? String((error as { message?: unknown }).message)
+      : 'Unknown error';
+    addLog('System', 'skipped', `Disabled conflict history writes (${context}): ${message}`);
+  }
+
+  async function persistEnrichmentRunLogs(rows: EnrichmentRunLogInsert[]) {
+    if (!auditLogWriteEnabled || rows.length === 0) return;
+    const { error } = await supabase.from('enrichment_run_logs').insert(rows);
+    if (error) {
+      setAuditLogWriteEnabled(false);
+      addLog('System', 'skipped', `Disabled enrichment run logging: ${error.message}`);
+    }
   }
 
   const toggleField = (field: string) => {
@@ -787,6 +867,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     isLoopingRef.current = true;
     cursorRef.current = 0; 
     setConflicts([]);
+    if (!currentRunId) {
+      setCurrentRunId(createEnrichmentRunId());
+    }
     
     if (specificAlbumIds && specificAlbumIds.length > 0) {
       isLoopingRef.current = false;
@@ -951,6 +1034,12 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
   async function processBatchAndSave(results: CandidateResult[]) {
     const activeServices = getServicesForSelection();
+    const checkedSources = checkedSourcesFromActiveServices(activeServices);
+    const selectedFields = Object.keys(fieldConfig);
+    const runId = currentRunId ?? createEnrichmentRunId();
+    if (!currentRunId) {
+      setCurrentRunId(runId);
+    }
     const wantsLyrics = !!fieldConfig['tracks.lyrics'] || !!fieldConfig['tracks.lyrics_url'];
     const runGeniusLyrics = wantsLyrics && activeServices.genius;
 
@@ -969,6 +1058,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const historyUpdates: { album_id: number; field_name: string; source: string; resolution: string; kept_value: import('types/supabase').Json | null; resolved_at: string }[] = [];
     const trackSavePromises: Promise<unknown>[] = [];
     const lyricJobs: { albumId: number; artist: string; title: string; appleMusicId?: string | null }[] = [];
+    const pendingAuditRows: EnrichmentRunLogInsert[] = [];
     
     const GLOBAL_PRIORITY = [
       'discogs', 'musicbrainz', 'spotify', 'appleMusic', 'deezer', 
@@ -1010,7 +1100,26 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
          }
       }
 
-      if (Object.keys(candidates).length === 0) return;
+      if (Object.keys(candidates).length === 0) {
+        pendingAuditRows.push({
+          run_id: runId,
+          album_id: album.id,
+          album_artist: album.artist,
+          album_title: album.title,
+          phase: 'scan',
+          selected_fields: selectedFields,
+          checked_sources: checkedSources,
+          returned_sources: [],
+          returned_fields: [],
+          source_payload: toJsonValue({}),
+          proposed_updates: null,
+          applied_updates: null,
+          conflict_fields: [],
+          update_status: 'no_data_returned',
+          notes: null,
+        });
+        return;
+      }
 
       if (runGeniusLyrics && Array.isArray(album.tracks) && album.tracks.length > 0) {
         lyricJobs.push({
@@ -1275,6 +1384,28 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         updatesForAlbum.last_reviewed_at = new Date().toISOString();
       }
 
+      const conflictFieldsForAlbum = newConflicts
+        .filter(c => c.album_id === album.id)
+        .map(c => c.field_name);
+
+      pendingAuditRows.push({
+        run_id: runId,
+        album_id: album.id,
+        album_artist: album.artist,
+        album_title: album.title,
+        phase: 'scan',
+        selected_fields: selectedFields,
+        checked_sources: checkedSources,
+        returned_sources: Object.keys(candidates).map(normalizeSourceForLog),
+        returned_fields: allowedSummaryKeys,
+        source_payload: toJsonValue(candidates),
+        proposed_updates: toJsonValue(updatesForAlbum),
+        applied_updates: null,
+        conflict_fields: conflictFieldsForAlbum,
+        update_status: Object.keys(updatesForAlbum).length > 0 ? 'pending_apply' : (conflictFieldsForAlbum.length > 0 ? 'conflict' : 'no_change'),
+        notes: null,
+      });
+
       if (Object.keys(updatesForAlbum).length > 0) {
         autoUpdates.push({ album, fields: updatesForAlbum });
         
@@ -1296,16 +1427,62 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       }
     });
 
-    if (historyUpdates.length > 0) {
-       await supabase.from('import_conflict_resolutions').upsert(historyUpdates, { onConflict: 'album_id,field_name,source' });
+    if (historyUpdates.length > 0 && historyWriteEnabled) {
+      const { error } = await supabase
+        .from('import_conflict_resolutions')
+        .upsert(historyUpdates, { onConflict: 'album_id,field_name,source' });
+      if (error) {
+        disableHistoryWrites('scan auto-fill', error);
+      }
     }
 
     if (trackSavePromises.length > 0) {
       await Promise.all(trackSavePromises);
     }
 
+    const failedAutoApplyAlbumIds = new Set<number>();
+    const appliedUpdatesByAlbumId = new Set<number>();
     if (autoUpdates.length > 0) {
-      await Promise.all(autoUpdates.map(u => applyAlbumUpdates(u.album, u.fields)));
+      const applyResults = await Promise.allSettled(autoUpdates.map(u => applyAlbumUpdates(u.album, u.fields)));
+      applyResults.forEach((res, index) => {
+        const albumId = autoUpdates[index].album.id;
+        if (res.status === 'fulfilled') {
+          appliedUpdatesByAlbumId.add(albumId);
+        } else {
+          failedAutoApplyAlbumIds.add(albumId);
+          addLog(`${autoUpdates[index].album.artist} - ${autoUpdates[index].album.title}`, 'skipped', `Auto-save failed: ${res.reason instanceof Error ? res.reason.message : 'Unknown error'}`);
+        }
+      });
+    }
+
+    if (pendingAuditRows.length > 0) {
+      const finalizedRows = pendingAuditRows.map((row) => {
+        const hasProposed = !!row.proposed_updates && row.proposed_updates !== null && row.proposed_updates !== '{}';
+        let updateStatus = row.update_status ?? 'no_change';
+        if (failedAutoApplyAlbumIds.has(row.album_id)) {
+          updateStatus = 'apply_failed';
+        } else if (appliedUpdatesByAlbumId.has(row.album_id)) {
+          updateStatus = row.conflict_fields && row.conflict_fields.length > 0 ? 'applied_with_conflicts' : 'applied';
+        } else if (row.conflict_fields && row.conflict_fields.length > 0) {
+          updateStatus = 'conflict';
+        } else if (hasProposed) {
+          updateStatus = 'pending_apply';
+        } else {
+          updateStatus = 'no_change';
+        }
+
+        const appliedUpdates = appliedUpdatesByAlbumId.has(row.album_id)
+          ? row.proposed_updates
+          : null;
+
+        return {
+          ...row,
+          applied_updates: appliedUpdates,
+          update_status: updateStatus,
+        };
+      });
+
+      await persistEnrichmentRunLogs(finalizedRows);
     }
 
     if (runGeniusLyrics && lyricJobs.length > 0) {
@@ -1580,11 +1757,47 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         }
     }
 
-    if (resolutionRecords.length > 0) {
-        await supabase.from('import_conflict_resolutions').upsert(resolutionRecords, { 
-            onConflict: 'album_id,field_name,source' 
-        });
+    if (resolutionRecords.length > 0 && historyWriteEnabled) {
+      const { error } = await supabase.from('import_conflict_resolutions').upsert(resolutionRecords, {
+        onConflict: 'album_id,field_name,source'
+      });
+      if (error) {
+        disableHistoryWrites('manual review', error);
+      }
     }
+
+    const runId = currentRunId ?? createEnrichmentRunId();
+    if (!currentRunId) {
+      setCurrentRunId(runId);
+    }
+    const albumConflicts = conflicts.filter(c => c.album_id === albumId);
+    const sourcePayload = albumConflicts.reduce<Record<string, unknown>>((acc, conflict) => {
+      if (conflict.candidates) {
+        acc[conflict.field_name] = conflict.candidates;
+      }
+      return acc;
+    }, {});
+    const checkedSources = Array.from(new Set(
+      albumConflicts.flatMap(c => Object.keys(c.candidates ?? {}).map(normalizeSourceForLog))
+    ));
+
+    await persistEnrichmentRunLogs([{
+      run_id: runId,
+      album_id: albumId,
+      album_artist: albumStub.artist,
+      album_title: albumStub.title,
+      phase: 'review',
+      selected_fields: Object.keys(updates),
+      checked_sources: checkedSources,
+      returned_sources: checkedSources,
+      returned_fields: Object.keys(updates),
+      source_payload: toJsonValue(sourcePayload),
+      proposed_updates: toJsonValue(updates),
+      applied_updates: toJsonValue(updates),
+      conflict_fields: albumConflicts.map(c => c.field_name),
+      update_status: 'manual_applied',
+      notes: null,
+    }]);
 
     // 4. Remove from Queue
     setConflicts(prev => {
