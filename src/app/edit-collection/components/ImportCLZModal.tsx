@@ -12,7 +12,7 @@ import {
 } from '../../../lib/conflictDetection';
 import ConflictResolutionModal from './ConflictResolutionModal';
 
-type ImportStage = 'upload' | 'preview' | 'importing' | 'conflicts' | 'complete';
+type ImportStage = 'upload' | 'matching' | 'preview' | 'importing' | 'conflicts' | 'complete';
 type AlbumStatus = 'MATCHED' | 'NO_MATCH';
 type MatchLevel = 'high' | 'medium' | 'low' | 'none';
 
@@ -304,25 +304,179 @@ function parseCLZXML(xmlText: string): ParsedCLZAlbum[] {
   return albums;
 }
 
-function compareCLZAlbums(parsed: ParsedCLZAlbum[], existing: ExistingAlbum[]): ComparedCLZAlbum[] {
+function addToIndex(index: Map<string, number[]>, key: string, id: number) {
+  if (!key) return;
+  const arr = index.get(key);
+  if (arr) {
+    arr.push(id);
+  } else {
+    index.set(key, [id]);
+  }
+}
+
+function pickSearchPrefixes(value: string): string[] {
+  const clean = normalizeForScore(value);
+  if (!clean) return [];
+  const compact = clean.replace(/\s/g, '');
+  const firstToken = clean.split(' ')[0] || '';
+  return [compact.slice(0, 2), compact.slice(0, 4), firstToken.slice(0, 4)].filter(Boolean);
+}
+
+async function compareCLZAlbums(
+  parsed: ParsedCLZAlbum[],
+  existing: ExistingAlbum[],
+  onProgress?: (current: number, total: number) => void,
+): Promise<ComparedCLZAlbum[]> {
   const normalizedExisting = existing.map((album) => ({
     album,
+    id: album.id,
     artistRaw: album.artist,
+    artistNorm: normalizeArtistForScore(album.artist),
+    artistParts: splitArtistParts(album.artist),
     titleNorm: normalizeForScore(album.title),
     titleBaseNorm: stripEditionText(album.title),
+    titlePrefixes: pickSearchPrefixes(stripEditionText(album.title)),
     yearNum: album.year ? parseInt(album.year, 10) : null,
     barcodeNorm: normalizeForScore(album.barcode ?? ''),
     catNorm: normalizeForScore(album.catalog_number ?? ''),
   }));
 
-  return parsed.map((clzAlbum) => {
+  const byId = new Map<number, (typeof normalizedExisting)[number]>();
+  const artistPrefixIndex = new Map<string, number[]>();
+  const titlePrefixIndex = new Map<string, number[]>();
+  const yearIndex = new Map<string, number[]>();
+  const barcodeIndex = new Map<string, number[]>();
+  const catIndex = new Map<string, number[]>();
+  const exactIndex = new Map<string, number[]>();
+
+  normalizedExisting.forEach((existingAlbum) => {
+    byId.set(existingAlbum.id, existingAlbum);
+    existingAlbum.artistParts.forEach((part) => {
+      pickSearchPrefixes(part).forEach((prefix) => addToIndex(artistPrefixIndex, prefix, existingAlbum.id));
+    });
+    pickSearchPrefixes(existingAlbum.artistNorm).forEach((prefix) => addToIndex(artistPrefixIndex, prefix, existingAlbum.id));
+    existingAlbum.titlePrefixes.forEach((prefix) => addToIndex(titlePrefixIndex, prefix, existingAlbum.id));
+    if (existingAlbum.yearNum) addToIndex(yearIndex, String(existingAlbum.yearNum), existingAlbum.id);
+    if (existingAlbum.barcodeNorm) addToIndex(barcodeIndex, existingAlbum.barcodeNorm, existingAlbum.id);
+    if (existingAlbum.catNorm) addToIndex(catIndex, existingAlbum.catNorm, existingAlbum.id);
+    addToIndex(exactIndex, `${existingAlbum.artistNorm}||${existingAlbum.titleNorm}`, existingAlbum.id);
+    addToIndex(exactIndex, `${existingAlbum.artistNorm}||${existingAlbum.titleBaseNorm}`, existingAlbum.id);
+  });
+
+  const compared: ComparedCLZAlbum[] = [];
+
+  for (let idx = 0; idx < parsed.length; idx += 1) {
+    const clzAlbum = parsed[idx];
     const clzTitleNorm = normalizeForScore(clzAlbum.title);
     const clzTitleBaseNorm = stripEditionText(clzAlbum.title);
+    const clzArtistNorm = normalizeArtistForScore(clzAlbum.artist);
+    const clzArtistParts = splitArtistParts(clzAlbum.artist);
     const clzYearNum = clzAlbum.year ? parseInt(clzAlbum.year, 10) : null;
     const clzBarcodeNorm = normalizeForScore(clzAlbum.barcode);
     const clzCatNorm = normalizeForScore(clzAlbum.catalog_number);
+    const exactKey = `${clzArtistNorm}||${clzTitleNorm}`;
+    const exactBaseKey = `${clzArtistNorm}||${clzTitleBaseNorm}`;
+    const exactIds = [
+      ...(exactIndex.get(exactKey) ?? []),
+      ...(exactIndex.get(exactBaseKey) ?? []),
+    ];
 
-    const candidates = normalizedExisting
+    if (exactIds.length > 0) {
+      const uniqueExact = Array.from(new Set(exactIds));
+      const rankedExact = uniqueExact
+        .map((id) => byId.get(id))
+        .filter(Boolean) as (typeof normalizedExisting);
+      rankedExact.sort((a, b) => {
+        const aBarcode = a.barcodeNorm && clzBarcodeNorm && a.barcodeNorm === clzBarcodeNorm ? 1 : 0;
+        const bBarcode = b.barcodeNorm && clzBarcodeNorm && b.barcodeNorm === clzBarcodeNorm ? 1 : 0;
+        if (aBarcode !== bBarcode) return bBarcode - aBarcode;
+        const aCat = a.catNorm && clzCatNorm && a.catNorm === clzCatNorm ? 1 : 0;
+        const bCat = b.catNorm && clzCatNorm && b.catNorm === clzCatNorm ? 1 : 0;
+        if (aCat !== bCat) return bCat - aCat;
+        if (clzYearNum && a.yearNum && b.yearNum) {
+          const aDiff = Math.abs(a.yearNum - clzYearNum);
+          const bDiff = Math.abs(b.yearNum - clzYearNum);
+          if (aDiff !== bDiff) return aDiff - bDiff;
+        }
+        return 0;
+      });
+
+      const bestExact = rankedExact[0];
+      if (bestExact) {
+        compared.push({
+          ...clzAlbum,
+          status: 'MATCHED',
+          existingId: bestExact.id,
+          manualLink: false,
+          matchScore: 100,
+          matchLevel: 'high',
+          suggestedMatches: [
+            {
+              id: bestExact.id,
+              artist: bestExact.album.artist,
+              title: bestExact.album.title,
+              score: 100,
+              level: 'high',
+            },
+          ],
+        });
+        if (onProgress && (idx % 25 === 0 || idx === parsed.length - 1)) {
+          onProgress(idx + 1, parsed.length);
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+        continue;
+      }
+    }
+
+    const candidateIds = new Set<number>();
+    if (clzBarcodeNorm) {
+      (barcodeIndex.get(clzBarcodeNorm) ?? []).forEach((id) => candidateIds.add(id));
+    }
+    if (clzCatNorm) {
+      (catIndex.get(clzCatNorm) ?? []).forEach((id) => candidateIds.add(id));
+    }
+
+    pickSearchPrefixes(clzTitleBaseNorm).forEach((prefix) => {
+      (titlePrefixIndex.get(prefix) ?? []).forEach((id) => candidateIds.add(id));
+    });
+    pickSearchPrefixes(clzArtistNorm).forEach((prefix) => {
+      (artistPrefixIndex.get(prefix) ?? []).forEach((id) => candidateIds.add(id));
+    });
+    clzArtistParts.forEach((part) => {
+      pickSearchPrefixes(part).forEach((prefix) => {
+        (artistPrefixIndex.get(prefix) ?? []).forEach((id) => candidateIds.add(id));
+      });
+    });
+    if (clzYearNum) {
+      [-1, 0, 1].forEach((offset) => {
+        (yearIndex.get(String(clzYearNum + offset)) ?? []).forEach((id) => candidateIds.add(id));
+      });
+    }
+
+    const fallbackPool = normalizedExisting.filter((candidate) => {
+      const titleA = candidate.titleBaseNorm[0];
+      const titleB = clzTitleBaseNorm[0];
+      const artistA = candidate.artistNorm[0];
+      const artistB = clzArtistNorm[0];
+      return titleA === titleB || artistA === artistB;
+    });
+
+    let candidatesToScore = Array.from(candidateIds)
+      .map((id) => byId.get(id))
+      .filter(Boolean) as (typeof normalizedExisting);
+
+    if (candidatesToScore.length < 60) {
+      candidatesToScore = [
+        ...candidatesToScore,
+        ...fallbackPool.filter((candidate) => !candidateIds.has(candidate.id)).slice(0, 220),
+      ];
+    }
+
+    if (candidatesToScore.length === 0) {
+      candidatesToScore = normalizedExisting.slice(0, 220);
+    }
+
+    const candidates = candidatesToScore
       .map(({ album, artistRaw, titleNorm, titleBaseNorm, yearNum, barcodeNorm, catNorm }) => {
         const barcodeExact = !!clzBarcodeNorm && !!barcodeNorm && clzBarcodeNorm === barcodeNorm;
         const artistScore = artistSimilarity(clzAlbum.artist, artistRaw);
@@ -371,7 +525,7 @@ function compareCLZAlbums(parsed: ParsedCLZAlbum[], existing: ExistingAlbum[]): 
 
     const autoMatch = best && best.level === 'high';
 
-    return {
+    compared.push({
       ...clzAlbum,
       status: autoMatch ? 'MATCHED' : 'NO_MATCH',
       existingId: autoMatch ? best.id : undefined,
@@ -379,8 +533,15 @@ function compareCLZAlbums(parsed: ParsedCLZAlbum[], existing: ExistingAlbum[]): 
       matchScore: best?.score ?? 0,
       matchLevel: best?.level ?? 'none',
       suggestedMatches,
-    } satisfies ComparedCLZAlbum;
-  });
+    });
+
+    if (onProgress && (idx % 25 === 0 || idx === parsed.length - 1)) {
+      onProgress(idx + 1, parsed.length);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  }
+
+  return compared;
 }
 
 export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: ImportCLZModalProps) {
@@ -415,6 +576,12 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
       return Number.isNaN(parsed) ? null : parsed;
     }
     return null;
+  };
+
+  const firstRecord = <T,>(value: T | T[] | null | undefined): T | null => {
+    if (!value) return null;
+    if (Array.isArray(value)) return value[0] ?? null;
+    return value;
   };
 
   const splitV3Updates = (updates: Record<string, unknown>) => {
@@ -503,6 +670,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
 
     try {
       setError(null);
+      setStage('matching');
       const text = await file.text();
       const parsed = parseCLZXML(text);
 
@@ -541,7 +709,8 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
       }
 
       const mappedExisting = (existing ?? []).map((row) => {
-        const release = row.release as {
+        const releaseRaw = firstRecord(row.release as unknown);
+        const release = releaseRaw as {
           id?: number | null;
           label?: string | null;
           catalog_number?: string | null;
@@ -555,13 +724,22 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
             artist?: { name?: string | null } | null;
           } | null;
         } | null;
-        const master = release?.master;
+        const masterRaw = firstRecord(release?.master as unknown);
+        const master = masterRaw as {
+          id?: number | null;
+          title?: string | null;
+          original_release_year?: number | null;
+          artist?: { name?: string | null } | Array<{ name?: string | null }> | null;
+        } | null;
+        const artistRaw = firstRecord(master?.artist as unknown) as { name?: string | null } | null;
+        const artistName = artistRaw?.name?.trim() || 'Unknown Artist';
+        const title = master?.title?.trim() || 'Untitled';
         return {
           id: row.id as number,
           release_id: release?.id ?? null,
           master_id: master?.id ?? null,
-          artist: master?.artist?.name ?? 'Unknown Artist',
-          title: master?.title ?? 'Untitled',
+          artist: artistName,
+          title,
           year: (release?.release_year ?? master?.original_release_year)?.toString() ?? null,
           label: release?.label ?? null,
           catalog_number: release?.catalog_number ?? null,
@@ -574,7 +752,13 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
         } satisfies ExistingAlbum;
       });
 
-      const compared = compareCLZAlbums(parsed, mappedExisting);
+      const compared = await compareCLZAlbums(parsed, mappedExisting, (current, total) => {
+        setProgress({
+          current,
+          total,
+          status: `Matching album ${current} of ${total}`,
+        });
+      });
       setComparedAlbums(compared);
       setExistingAlbums(mappedExisting);
       setLinkQueries({});
@@ -582,6 +766,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
       setStage('preview');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to parse XML');
+      setStage('upload');
     }
   };
 
@@ -854,6 +1039,21 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
             </div>
           )}
 
+          {stage === 'matching' && (
+            <div className="max-w-3xl mx-auto text-center py-10 px-5">
+              <div className="w-full h-2 bg-gray-200 rounded overflow-hidden mb-3">
+                <div
+                  className="h-full bg-orange-500 transition-all duration-300"
+                  style={{ width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%` }}
+                />
+              </div>
+              <div className="text-sm text-gray-500 mb-2">{progress.current} / {progress.total}</div>
+              <div className="text-[13px] text-gray-400">
+                {progress.status || 'Computing fuzzy matches...'}
+              </div>
+            </div>
+          )}
+
           {stage === 'preview' && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
@@ -1034,6 +1234,14 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                 Continue
               </button>
             </>
+          )}
+          {stage === 'matching' && (
+            <button
+              onClick={handleClose}
+              className="px-4 py-2 bg-gray-100 border border-gray-300 rounded text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-200"
+            >
+              Cancel
+            </button>
           )}
 
           {stage === 'preview' && (
