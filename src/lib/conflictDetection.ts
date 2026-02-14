@@ -188,8 +188,17 @@ function canonicalizeString(value: string): string {
   return value
     .replace(/\u00A0/g, ' ')
     .replace(/\r\n?/g, '\n')
+    .replace(/\s*([,;:.!?])\s*/g, '$1 ')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n[ \t]+/g, '\n')
+    .trim();
+}
+
+function normalizeNotesForComparison(value: string): string {
+  return canonicalizeString(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -207,6 +216,11 @@ function areLooselyEqual(a: unknown, b: unknown): boolean {
   }
 
   return false;
+}
+
+function arePersonalNotesEquivalent(a: unknown, b: unknown): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') return areLooselyEqual(a, b);
+  return normalizeNotesForComparison(a) === normalizeNotesForComparison(b);
 }
 
 /**
@@ -331,6 +345,7 @@ export function detectConflicts(existingAlbum: Record<string, unknown>, imported
     if (field === 'tracks') valuesAreDifferent = !areTracksEqual(existingValue, newValue);
     else if (field === 'disc_metadata') valuesAreDifferent = !areDiscMetadataEqual(existingValue, newValue);
     else if (TAG_LIKE_FIELDS.includes(field)) valuesAreDifferent = !areStringArraysEqual(existingValue, newValue);
+    else if (field === 'personal_notes') valuesAreDifferent = !arePersonalNotesEquivalent(existingValue, newValue);
     else valuesAreDifferent = !areLooselyEqual(existingValue, newValue);
       
     if (valuesAreDifferent) {

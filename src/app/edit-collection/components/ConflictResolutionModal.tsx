@@ -186,24 +186,46 @@ export default function ConflictResolutionModal({
       if (!resolutionTableMissing) {
         const keptValue = finalValue as import('types/supabase').Json;
         const rejected = rejectedValue as import('types/supabase').Json;
-        const { error: resolutionError } = await supabase
-          .from('import_conflict_resolutions')
-          .upsert({
-            album_id: conflict.album_id,
-            field_name: conflict.field_name,
-            kept_value: keptValue,
-            rejected_value: rejected,
-            resolution: strategyResolution,
-            source: source,
-          }, {
-            onConflict: 'album_id,field_name,source',
-          });
+        const payload: import('types/supabase').Database['public']['Tables']['import_conflict_resolutions']['Insert'] = {
+          album_id: conflict.album_id,
+          field_name: conflict.field_name,
+          kept_value: keptValue,
+          rejected_value: rejected,
+          resolution: strategyResolution,
+          source: source,
+        };
 
-        if (resolutionError) {
-          if (isMissingResolutionTable(resolutionError)) {
+        const { data: existingResolution, error: existingLookupError } = await supabase
+          .from('import_conflict_resolutions')
+          .select('id')
+          .eq('album_id', conflict.album_id)
+          .eq('field_name', conflict.field_name)
+          .eq('source', source)
+          .limit(1)
+          .maybeSingle();
+
+        if (existingLookupError) {
+          if (isMissingResolutionTable(existingLookupError)) {
             setResolutionTableMissing(true);
           } else {
-            throw resolutionError;
+            console.warn('Skipping resolution history write (lookup failed):', existingLookupError);
+          }
+        } else {
+          const { error: resolutionWriteError } = existingResolution?.id
+            ? await supabase
+                .from('import_conflict_resolutions')
+                .update(payload)
+                .eq('id', existingResolution.id)
+            : await supabase
+                .from('import_conflict_resolutions')
+                .insert(payload);
+
+          if (resolutionWriteError) {
+            if (isMissingResolutionTable(resolutionWriteError)) {
+              setResolutionTableMissing(true);
+            } else {
+              console.warn('Skipping resolution history write (write failed):', resolutionWriteError);
+            }
           }
         }
       }
