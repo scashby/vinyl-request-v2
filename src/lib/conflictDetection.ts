@@ -184,6 +184,31 @@ function isEqual(a: unknown, b: unknown): boolean {
   return false;
 }
 
+function canonicalizeString(value: string): string {
+  return value
+    .replace(/\u00A0/g, ' ')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n[ \t]+/g, '\n')
+    .trim();
+}
+
+function areLooselyEqual(a: unknown, b: unknown): boolean {
+  if (isEqual(a, b)) return true;
+
+  if (typeof a === 'string' && typeof b === 'string') {
+    return canonicalizeString(a) === canonicalizeString(b);
+  }
+
+  const aIsNumberLike = (typeof a === 'number') || (typeof a === 'string' && a.trim() !== '' && !Number.isNaN(Number(a)));
+  const bIsNumberLike = (typeof b === 'number') || (typeof b === 'string' && b.trim() !== '' && !Number.isNaN(Number(b)));
+  if (aIsNumberLike && bIsNumberLike) {
+    return Number(a) === Number(b);
+  }
+
+  return false;
+}
+
 /**
  * Normalizes string arrays for case-insensitive comparison
  */
@@ -191,8 +216,8 @@ function areStringArraysEqual(a: unknown, b: unknown): boolean {
   if (!Array.isArray(a) || !Array.isArray(b)) return false;
   if (a.length !== b.length) return false;
   
-  const normA = a.map(s => String(s).toLowerCase()).sort();
-  const normB = b.map(s => String(s).toLowerCase()).sort();
+  const normA = a.map(s => canonicalizeString(String(s).toLowerCase())).sort();
+  const normB = b.map(s => canonicalizeString(String(s).toLowerCase())).sort();
   
   return normA.every((val, idx) => val === normB[idx]);
 }
@@ -216,8 +241,8 @@ function normalizeTrack(track: unknown): Record<string, unknown> {
   }
   
   return {
-    title: String(t.title || '').trim(),
-    artist: t.artist ? String(t.artist).trim() : undefined,
+    title: canonicalizeString(String(t.title || '')),
+    artist: t.artist ? canonicalizeString(String(t.artist)) : undefined,
     duration: normalizedDuration
   };
 }
@@ -306,7 +331,7 @@ export function detectConflicts(existingAlbum: Record<string, unknown>, imported
     if (field === 'tracks') valuesAreDifferent = !areTracksEqual(existingValue, newValue);
     else if (field === 'disc_metadata') valuesAreDifferent = !areDiscMetadataEqual(existingValue, newValue);
     else if (TAG_LIKE_FIELDS.includes(field)) valuesAreDifferent = !areStringArraysEqual(existingValue, newValue);
-    else valuesAreDifferent = !isEqual(existingValue, newValue);
+    else valuesAreDifferent = !areLooselyEqual(existingValue, newValue);
       
     if (valuesAreDifferent) {
       const previousResolution = resolutionMap.get(field);
