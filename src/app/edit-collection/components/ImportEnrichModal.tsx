@@ -890,14 +890,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
   }
 
-  useEffect(() => {
-    if (!isOpen || !enriching) return;
-    const timer = setInterval(() => {
-      void loadStats(true);
-    }, 10000);
-    return () => clearInterval(timer);
-  }, [isOpen, enriching]);
-
   function getServicesForSelection() {
     return getServicesForSelectionFromConfig(fieldConfig);
   }
