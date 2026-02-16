@@ -278,7 +278,7 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'recording_date': ['musicbrainz'],
   'master_release_date': ['discogs'],
   'studio': ['musicbrainz'],
-  'companies': ['discogs'],
+  'companies': ['discogs', 'spotify'],
   
   // --- CONTEXT ---
   'notes': ['wikipedia', 'discogs', 'allmusic', 'appleMusic'],

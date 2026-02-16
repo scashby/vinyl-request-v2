@@ -1,5 +1,6 @@
 // src/app/api/enrich-sources/fetch-candidates/route.ts
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 import { 
   fetchSpotifyData, 
@@ -40,7 +41,13 @@ export async function POST(req: Request) {
   const supabase = supabaseServer(getAuthHeader(req));
   try {
     const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-    const discogsOAuth = getDiscogsOAuthFromCookieHeader(req.headers.get('cookie'));
+    const cookieStore = await cookies();
+    const discogsToken = cookieStore.get('discogs_access_token')?.value;
+    const discogsSecret = cookieStore.get('discogs_access_secret')?.value;
+    const fallbackCookieHeader = req.headers.get('cookie');
+    const discogsOAuth = (discogsToken && discogsSecret)
+      ? getDiscogsOAuthFromCookieHeader(`discogs_access_token=${encodeURIComponent(discogsToken)}; discogs_access_secret=${encodeURIComponent(discogsSecret)}`)
+      : getDiscogsOAuthFromCookieHeader(fallbackCookieHeader);
     let discogsQueue: Promise<void> = Promise.resolve();
     const runDiscogsQueued = async (
       album: { artist: string; title: string; discogs_release_id?: string }

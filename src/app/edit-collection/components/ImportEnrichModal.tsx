@@ -849,7 +849,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       defaultCats.forEach(cat => {
         const fields = DATA_CATEGORY_CHECK_FIELDS[cat] || [];
         fields.forEach(field => {
-          if (ALLOWED_COLUMNS.has(field)) {
+          if (ALLOWED_COLUMNS.has(field) && !NON_ENRICHABLE_FIELDS.has(field)) {
             const services = FIELD_TO_SERVICES[field] || [];
             if (services.length > 0) {
               initialConfig[field] = new Set(services);
@@ -976,6 +976,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
 
   const toggleField = (field: string) => {
+    if (NON_ENRICHABLE_FIELDS.has(field)) return;
     setFieldConfig(prev => {
       const next = { ...prev };
       if (next[field]) {
@@ -1000,7 +1001,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
   const toggleCategory = (category: DataCategory) => {
     const fields = DATA_CATEGORY_CHECK_FIELDS[category] || [];
-    const validFields = fields.filter(f => ALLOWED_COLUMNS.has(f));
+    const validFields = fields.filter(f => ALLOWED_COLUMNS.has(f) && !NON_ENRICHABLE_FIELDS.has(f));
     const allEnabled = validFields.every(f => !!fieldConfig[f]);
 
     setFieldConfig(prev => {
@@ -1075,7 +1076,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           // Assuming the API expects 'folder' to filter by location:
           location: folderFilter || undefined, 
           services: getServicesForSelection(),
-          fields: Object.keys(fieldConfig),
+          fields: Object.keys(fieldConfig).filter((field) => !NON_ENRICHABLE_FIELDS.has(field)),
           autoSnooze: autoSnooze, // PASSED TO SERVER
           missingDataOnly: missingDataOnly
         };
@@ -1267,7 +1268,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   async function processBatchAndSave(results: CandidateResult[]) {
     const activeServices = getServicesForSelection();
     const checkedSources = checkedSourcesFromActiveServices(activeServices);
-    const selectedFields = Object.keys(fieldConfig);
+    const selectedFields = Object.keys(fieldConfig).filter((field) => !NON_ENRICHABLE_FIELDS.has(field));
     const runId = currentRunId ?? createEnrichmentRunId();
     if (!currentRunId) {
       setCurrentRunId(runId);
@@ -1408,7 +1409,12 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             if (['bpm', 'key'].includes(key)) return;
 
             const finalized = (album as Record<string, unknown>).finalized_fields as string[] | undefined;
-            if (Array.isArray(finalized) && finalized.includes(key)) return;
+            if (Array.isArray(finalized) && finalized.includes(key)) {
+              const currentFieldValue = (album as Record<string, unknown>)[key];
+              const isCurrentlyMissing = isEmptyValue(currentFieldValue);
+              // Do not let finalized flags block true missing-data recovery.
+              if (!isCurrentlyMissing) return;
+            }
 
             // CLIENT SIDE CHECK (Still useful for specific fields)
             if (autoSnooze) {
@@ -1830,18 +1836,22 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           });
           const data = await res.json();
           if (data?.success) {
+            const totalTracks = Number(data.data?.totalTracks ?? 0);
+            const enrichedCount = Number(data.data?.enrichedCount ?? 0);
             const failedCount = Number(data.data?.failedCount ?? 0);
             const syncedCount = Number(data.data?.syncedCount ?? 0);
             const attemptedCount = Number(data.data?.attemptedCount ?? 0);
             const skippedExistingCount = Number(data.data?.skippedExistingCount ?? 0);
+            const skippedNoTitleCount = Number(data.data?.skippedNoTitleCount ?? 0);
             const failedSample = Array.isArray(data.data?.failedTracks) && data.data.failedTracks.length > 0
               ? String(data.data.failedTracks[0]?.error ?? '')
               : '';
-            const baseCountLabel = syncedCount > 0
-              ? `Lyrics URLs: ${data.data?.enrichedCount ?? 0}/${data.data?.totalTracks ?? 0} (synced existing: ${syncedCount})`
-              : `Lyrics URLs: ${data.data?.enrichedCount ?? 0}/${data.data?.totalTracks ?? 0}`;
-            const attemptedLabel = attemptedCount > 0 ? `attempted: ${attemptedCount}` : null;
-            const skippedLabel = skippedExistingCount > 0 ? `already had URL: ${skippedExistingCount}` : null;
+            const failedTitles = Array.isArray(data.data?.failedTracks)
+              ? data.data.failedTracks
+                  .map((track: { title?: unknown }) => String(track?.title ?? '').trim())
+                  .filter((title: string) => title.length > 0)
+                  .slice(0, 3)
+              : [];
             const failedLabel = failedCount > 0 && failedSample
               ? `failed: ${failedCount}; sample: ${failedSample}`
               : (failedCount > 0 ? `failed: ${failedCount}` : null);
@@ -1853,11 +1863,34 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             const failureSummaryLabel = failureSummary.length > 0
               ? `reasons: ${failureSummary.join(' | ')}`
               : null;
-            const extras = [attemptedLabel, skippedLabel, failedLabel, failureSummaryLabel].filter((value): value is string => !!value);
-            const detail = extras.length > 0
-              ? `${baseCountLabel} (${extras.join('; ')})`
-              : baseCountLabel;
-            addLog(`${job.artist} - ${job.title}`, 'info', detail);
+
+            const updatesApplied = enrichedCount + syncedCount;
+            if (updatesApplied > 0) {
+              const detailExtras = [
+                attemptedCount > 0 ? `attempted: ${attemptedCount}` : null,
+                failedLabel,
+                failureSummaryLabel
+              ].filter((value): value is string => !!value);
+              const detail = detailExtras.length > 0
+                ? `Updated lyrics for ${updatesApplied}/${totalTracks} track(s) (${detailExtras.join('; ')})`
+                : `Updated lyrics for ${updatesApplied}/${totalTracks} track(s)`;
+              addLog(`${job.artist} - ${job.title}`, 'info', detail);
+            } else if (failedCount > 0) {
+              const titleSuffix = failedTitles.length > 0
+                ? `: ${failedTitles.join(', ')}${failedCount > failedTitles.length ? ', ...' : ''}`
+                : '';
+              const detailExtras = [failedLabel, failureSummaryLabel].filter((value): value is string => !!value);
+              const detail = detailExtras.length > 0
+                ? `Failed to update lyrics for ${failedCount} track(s)${titleSuffix} (${detailExtras.join('; ')})`
+                : `Failed to update lyrics for ${failedCount} track(s)${titleSuffix}`;
+              addLog(`${job.artist} - ${job.title}`, 'skipped', detail);
+            } else if (skippedNoTitleCount > 0 && skippedExistingCount === 0) {
+              addLog(`${job.artist} - ${job.title}`, 'info', `No lyrics updates attempted (${skippedNoTitleCount} track(s) missing usable titles).`);
+            } else if (skippedExistingCount === totalTracks && totalTracks > 0) {
+              addLog(`${job.artist} - ${job.title}`, 'info', 'No lyrics updates needed (all tracks already had lyrics URLs).');
+            } else {
+              addLog(`${job.artist} - ${job.title}`, 'info', 'No lyrics updates applied.');
+            }
           } else {
             const failedSample = Array.isArray(data?.data?.failedTracks) && data.data.failedTracks.length > 0
               ? String(data.data.failedTracks[0]?.error ?? '')
@@ -2585,12 +2618,13 @@ function DataCategoryCard({
   disabled: boolean; 
 }) {
   const fields = DATA_CATEGORY_CHECK_FIELDS[category] || [];
-  const validFields = fields.filter(f => ALLOWED_COLUMNS.has(f));
+  const validFields = fields.filter(f => ALLOWED_COLUMNS.has(f) && !NON_ENRICHABLE_FIELDS.has(f));
+  const selectableFields = validFields.filter((field) => !NON_ENRICHABLE_FIELDS.has(field));
   
   if (validFields.length === 0) return null;
 
-  const activeCount = validFields.filter(f => !!fieldConfig[f]).length;
-  const isAllSelected = activeCount === validFields.length;
+  const activeCount = selectableFields.filter(f => !!fieldConfig[f]).length;
+  const isAllSelected = selectableFields.length > 0 && activeCount === selectableFields.length;
   const isIndeterminate = activeCount > 0 && !isAllSelected;
 
   const formatLabel = (f: string) => f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -2700,33 +2734,38 @@ function DataCategoryCard({
       {/* FIELD ROWS (Dashboard Style) */}
       <div className="flex flex-col gap-2">
          {validFields.map(field => {
+            const isUnsupported = NON_ENRICHABLE_FIELDS.has(field);
             const isEnabled = !!fieldConfig[field];
             const activeSources = fieldConfig[field] || new Set();
             const services = FIELD_TO_SERVICES[field] || [];
             const missing = getMissing(field);
+            const badgeText = isUnsupported ? 'N/A' : String(missing);
+            const badgeClass = isUnsupported
+              ? 'bg-gray-100 text-gray-500'
+              : (
+                isFieldTracked(field)
+                  ? (missing > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700')
+                  : (missing > 0 ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700')
+              );
 
             return (
                <div key={field} className={isEnabled ? "p-2 bg-blue-50 border border-blue-200 rounded" : "p-2 border border-transparent"}>
                   {/* Row Top: Checkbox + Name + Stats */}
                   <div className="flex items-center justify-between">
-                     <label className="flex items-center gap-1.5 text-xs font-medium cursor-pointer">
+                     <label className={`flex items-center gap-1.5 text-xs font-medium ${isUnsupported ? 'cursor-not-allowed text-gray-500' : 'cursor-pointer'}`}>
                         <input 
                            type="checkbox" 
                            checked={isEnabled} 
                            onChange={() => onToggleField(field)}
-                           disabled={disabled}
+                           disabled={disabled || isUnsupported}
                         />
                         {formatLabel(field)}
                      </label>
                      <span
-                       className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
-                         isFieldTracked(field)
-                           ? (missing > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700')
-                           : (missing > 0 ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700')
-                       }`}
-                       title={isFieldTracked(field) ? 'Tracked field count' : 'Untracked field count'}
+                       className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${badgeClass}`}
+                       title={isUnsupported ? 'Not currently supported by implemented sources' : (isFieldTracked(field) ? 'Tracked field count' : 'Untracked field count')}
                      >
-                       {missing}
+                       {badgeText}
                      </span>
                   </div>
 

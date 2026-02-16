@@ -133,6 +133,8 @@ export type CandidateData = {
     note?: string;
     is_cover?: boolean;
     original_artist?: string;
+    original_year?: number;
+    mb_work_id?: string;
   }>;
 };
 
@@ -594,6 +596,30 @@ export async function fetchMusicBrainzData(album: { artist: string, title: strin
              }
           });
        });
+    }
+
+    // Promote track-level cover evidence to album-level fields when possible.
+    if (Array.isArray(candidate.tracks) && candidate.tracks.length > 0) {
+      const coverTracks = candidate.tracks.filter((track) => track.is_cover);
+      if (coverTracks.length > 0) {
+        candidate.is_cover = true;
+        const originalArtists = Array.from(
+          new Set(
+            coverTracks
+              .map((track) => track.original_artist)
+              .filter((artist): artist is string => typeof artist === 'string' && artist.trim().length > 0)
+          )
+        );
+        if (originalArtists.length > 0) {
+          candidate.original_artist = originalArtists.join(', ');
+        }
+        const years = coverTracks
+          .map((track) => track.original_year)
+          .filter((year): year is number => typeof year === 'number' && Number.isFinite(year));
+        if (years.length > 0) {
+          candidate.original_year = Math.min(...years);
+        }
+      }
     }
 
     if (release['label-info']?.[0]) {
