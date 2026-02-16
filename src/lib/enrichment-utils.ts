@@ -1,7 +1,7 @@
 // src/lib/enrichment-utils.ts
 import * as GeniusModule from 'genius-lyrics';
 import { parseDiscogsFormat } from './formatParser';
-import { fetchDiscogsJson, hasDiscogsCredentials } from './discogsAuth';
+import { fetchDiscogsJson, hasDiscogsCredentials, type DiscogsOAuthCredentials } from './discogsAuth';
 
 const getEnv = (...keys: string[]): string | undefined => {
   for (const key of keys) {
@@ -848,7 +848,10 @@ const buildDiscogsFormatString = (formats?: Array<{ name?: string; qty?: string 
   return `${base}, ${details.join(', ')}`.trim();
 };
 
-export async function fetchDiscogsData(album: { artist: string, title: string, discogs_release_id?: string }): Promise<EnrichmentResult> {
+export async function fetchDiscogsData(
+  album: { artist: string, title: string, discogs_release_id?: string },
+  opts?: { oauth?: DiscogsOAuthCredentials | null }
+): Promise<EnrichmentResult> {
   try {
     if (!hasDiscogsCredentials()) {
       return {
@@ -863,7 +866,8 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
       const q = `${album.artist} - ${album.title}`;
       const searchData = await fetchDiscogsJson<{ results?: Array<{ id?: string | number }> }>(
         `https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release`,
-        USER_AGENT
+        USER_AGENT,
+        { oauth: opts?.oauth }
       );
       const foundId = searchData.results?.[0]?.id;
       if (foundId !== null && foundId !== undefined) {
@@ -876,7 +880,8 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
     // 1. Fetch Specific Release
     const data = await fetchDiscogsJson<DiscogsRelease>(
       `https://api.discogs.com/releases/${releaseId}`,
-      USER_AGENT
+      USER_AGENT,
+      { oauth: opts?.oauth }
     );
 
     const formatString = buildDiscogsFormatString(data.formats as Array<{ name?: string; qty?: string | number; descriptions?: string[] }> | undefined);
@@ -887,7 +892,8 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
     if (data.master_id) {
         masterData = await fetchDiscogsJson<{ year?: number }>(
           `https://api.discogs.com/masters/${data.master_id}`,
-          USER_AGENT
+          USER_AGENT,
+          { oauth: opts?.oauth }
         );
     }
 

@@ -25,6 +25,7 @@ import {
   type CandidateData, 
   type EnrichmentResult
 } from "lib/enrichment-utils";
+import { getDiscogsOAuthFromCookieHeader } from "lib/discogsAuth";
 
 // Helper to chunk arrays for concurrency control
 const chunkArray = <T>(array: T[], size: number): T[][] => {
@@ -38,6 +39,22 @@ const chunkArray = <T>(array: T[], size: number): T[][] => {
 export async function POST(req: Request) {
   const supabase = supabaseServer(getAuthHeader(req));
   try {
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    const discogsOAuth = getDiscogsOAuthFromCookieHeader(req.headers.get('cookie'));
+    let discogsQueue: Promise<void> = Promise.resolve();
+    const runDiscogsQueued = async (
+      album: { artist: string; title: string; discogs_release_id?: string }
+    ): Promise<EnrichmentResult> => {
+      const pending = discogsQueue
+        .catch(() => undefined)
+        .then(() => fetchDiscogsData(album, { oauth: discogsOAuth }))
+        .finally(async () => {
+          await sleep(250);
+        });
+      discogsQueue = pending.then(() => undefined, () => undefined);
+      return pending;
+    };
+
     const body = await req.json();
     const { 
       albumIds,
@@ -386,7 +403,7 @@ export async function POST(req: Request) {
 
           // Always fetch requested services
           if (services.musicbrainz) tasks.push({ source: 'musicbrainz', promise: fetchMusicBrainzData(typedAlbum) });
-          if (services.discogs) tasks.push({ source: 'discogs', promise: fetchDiscogsData(typedAlbum) });
+          if (services.discogs) tasks.push({ source: 'discogs', promise: runDiscogsQueued(typedAlbum) });
           if (services.spotify) tasks.push({ source: 'spotify', promise: fetchSpotifyData(typedAlbum) });
           if (services.appleMusicEnhanced) tasks.push({ source: 'appleMusic', promise: fetchAppleMusicData(typedAlbum) });
           if (services.allmusic) tasks.push({ source: 'allmusic', promise: fetchAllMusicData(typedAlbum) });

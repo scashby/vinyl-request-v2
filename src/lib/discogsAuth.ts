@@ -10,8 +10,42 @@ const DISCOGS_CONSUMER_SECRET =
 const HAS_CONSUMER_AUTH = Boolean(DISCOGS_CONSUMER_KEY && DISCOGS_CONSUMER_SECRET);
 const HAS_TOKEN_AUTH = Boolean(DISCOGS_TOKEN);
 
+export type DiscogsOAuthCredentials = {
+  token: string;
+  secret: string;
+  consumerKey: string;
+  consumerSecret: string;
+};
+
 export const hasDiscogsCredentials = (): boolean =>
   HAS_CONSUMER_AUTH || HAS_TOKEN_AUTH;
+
+const parseCookieHeader = (cookieHeader: string | null): Record<string, string> => {
+  if (!cookieHeader) return {};
+  return cookieHeader.split(';').reduce<Record<string, string>>((acc, pair) => {
+    const [rawKey, ...rest] = pair.split('=');
+    const key = rawKey?.trim();
+    if (!key) return acc;
+    acc[key] = decodeURIComponent(rest.join('=').trim());
+    return acc;
+  }, {});
+};
+
+export const getDiscogsOAuthFromCookieHeader = (
+  cookieHeader: string | null
+): DiscogsOAuthCredentials | null => {
+  if (!HAS_CONSUMER_AUTH) return null;
+  const cookies = parseCookieHeader(cookieHeader);
+  const token = cookies.discogs_access_token?.trim();
+  const secret = cookies.discogs_access_secret?.trim();
+  if (!token || !secret) return null;
+  return {
+    token,
+    secret,
+    consumerKey: DISCOGS_CONSUMER_KEY as string,
+    consumerSecret: DISCOGS_CONSUMER_SECRET as string,
+  };
+};
 
 export const discogsHeaders = (userAgent?: string): HeadersInit => {
   const headers: HeadersInit = {
@@ -53,13 +87,40 @@ type DiscogsAttempt = {
   headers: HeadersInit;
 };
 
-const buildDiscogsAttempts = (url: string, userAgent?: string): DiscogsAttempt[] => {
+const buildOAuthHeader = (oauth: DiscogsOAuthCredentials): string => {
+  const nonce = Math.floor(Math.random() * 1_000_000_000).toString();
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const signature = `${oauth.consumerSecret}&${oauth.secret}`;
+  return `OAuth oauth_consumer_key="${oauth.consumerKey}", ` +
+    `oauth_nonce="${nonce}", ` +
+    `oauth_signature="${signature}", ` +
+    `oauth_signature_method="PLAINTEXT", ` +
+    `oauth_timestamp="${timestamp}", ` +
+    `oauth_token="${oauth.token}"`;
+};
+
+const buildDiscogsAttempts = (
+  url: string,
+  userAgent?: string,
+  oauth?: DiscogsOAuthCredentials | null
+): DiscogsAttempt[] => {
   const ua = userAgent || process.env.APP_USER_AGENT || DEFAULT_USER_AGENT;
   const baseHeaders: HeadersInit = {
     'User-Agent': ua,
     Accept: 'application/vnd.discogs.v2.discogs+json, application/json',
   };
   const attempts: DiscogsAttempt[] = [];
+
+  if (oauth) {
+    attempts.push({
+      name: 'oauth cookie',
+      url,
+      headers: {
+        ...baseHeaders,
+        Authorization: buildOAuthHeader(oauth),
+      },
+    });
+  }
 
   if (HAS_TOKEN_AUTH) {
     attempts.push({
@@ -94,8 +155,12 @@ const buildDiscogsAttempts = (url: string, userAgent?: string): DiscogsAttempt[]
   return attempts;
 };
 
-export async function fetchDiscogsJson<T>(url: string, userAgent?: string): Promise<T> {
-  const attempts = buildDiscogsAttempts(url, userAgent);
+export async function fetchDiscogsJson<T>(
+  url: string,
+  userAgent?: string,
+  opts?: { oauth?: DiscogsOAuthCredentials | null }
+): Promise<T> {
+  const attempts = buildDiscogsAttempts(url, userAgent, opts?.oauth);
   if (attempts.length === 0) {
     throw new Error('Discogs credentials not configured');
   }
