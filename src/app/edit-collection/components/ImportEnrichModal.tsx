@@ -206,6 +206,7 @@ const checkedSourcesFromActiveServices = (activeServices: ActiveServiceMap): str
 };
 
 const DEFERRED_CATEGORY_REASONS: Partial<Record<DataCategory, string>> = {};
+const CLASSICAL_ONLY_FIELDS = new Set(['composer', 'conductor', 'orchestra', 'chorus', 'composition']);
 
 // Local interface for resolution history
 interface ResolutionHistory {
@@ -1128,6 +1129,14 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     results.forEach((item) => {
       processedIds.push(item.album.id);
       const { album, candidates } = item;
+      const genrePool = [
+        ...(Array.isArray(album.genres) ? album.genres : []),
+        ...(Array.isArray(album.styles) ? album.styles : []),
+        ...(Array.isArray(album.tags) ? album.tags : []),
+      ]
+        .map((value) => String(value ?? '').toLowerCase())
+        .filter((value) => value.length > 0);
+      const isClassicalAlbum = genrePool.some((value) => value.includes('classical'));
       
       const foundKeys = new Set<string>();
       Object.values(candidates).forEach((c) => {
@@ -1192,6 +1201,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
          Object.entries(sourceData).forEach(([key, value]) => {
             if (!ALLOWED_COLUMNS.has(key)) return;
+            if (CLASSICAL_ONLY_FIELDS.has(key) && !isClassicalAlbum) return;
             
             const allowedSources = fieldConfig[key];
             if (!allowedSources) return; 

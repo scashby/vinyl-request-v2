@@ -135,11 +135,7 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
     'musicians',
     'producers',
     'engineers',
-    'songwriters',
-    'composer',
-    'conductor',
-    'orchestra',
-    'chorus'
+    'songwriters'
   ],
   tracklists: [
     'tracks',

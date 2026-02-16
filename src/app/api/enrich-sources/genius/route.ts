@@ -11,6 +11,7 @@ type Track = {
   title?: string;
   recording_id?: number | null;
   lyrics_url?: string | null;
+  track_artist?: string | null;
   credits?: Record<string, unknown> | null;
 };
 
@@ -35,6 +36,31 @@ function simplifyTrackTitle(title: string): string {
     .replace(/\[(remaster(ed)?|mono|stereo|live|edit|version).*?\]/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function buildTitleVariants(title: string): string[] {
+  const base = simplifyTrackTitle(title);
+  const variants = new Set<string>([title.trim(), base]);
+  variants.add(base.replace(/['"`]/g, ''));
+  variants.add(base.replace(/\b(pt|part)\.?\s*\d+\b/gi, '').trim());
+  variants.add(base.replace(/\b(vol|volume)\.?\s*\d+\b/gi, '').trim());
+  return Array.from(variants).map((v) => v.trim()).filter((v) => v.length > 0);
+}
+
+function buildArtistVariants(albumArtist: string, trackArtist?: string | null): string[] {
+  const variants = new Set<string>();
+  const add = (value: string | null | undefined) => {
+    if (!value) return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    variants.add(trimmed);
+    variants.add(trimmed.split(',')[0].trim());
+    variants.add(trimmed.split('&')[0].trim());
+    variants.add(trimmed.replace(/\b(feat|featuring|ft)\.?.*$/i, '').trim());
+  };
+  add(albumArtist);
+  add(trackArtist);
+  return Array.from(variants).filter((v) => v.length > 0);
 }
 
 function isGoodMatch(searchArtist: string, searchTrack: string, resultArtist: string, resultTrack: string): boolean {
@@ -192,6 +218,7 @@ export async function POST(req: Request) {
             recording:recordings (
               id,
               title,
+              track_artist,
               credits,
               lyrics_url
             )
@@ -223,6 +250,7 @@ export async function POST(req: Request) {
         title: track.title_override || recording?.title || '',
         recording_id: track.recording_id ?? recording?.id ?? null,
         lyrics_url: recording?.lyrics_url ?? null,
+        track_artist: recording?.track_artist ?? null,
         credits: normalizeCredits(recording?.credits ?? null)
       };
     });
@@ -268,26 +296,33 @@ export async function POST(req: Request) {
       }
 
       try {
-        const cleanTitle = simplifyTrackTitle(track.title);
         let lyricsUrl: string | null = null;
         let lyricsSource = 'genius';
         const providerErrors: string[] = [];
+        const titleVariants = buildTitleVariants(track.title);
+        const artistVariants = buildArtistVariants(artistName, track.track_artist);
 
-        try {
-          lyricsUrl = await searchLyrics(artistName, cleanTitle || track.title);
-        } catch (geniusError) {
-          providerErrors.push(geniusError instanceof Error ? `Genius: ${geniusError.message}` : 'Genius: Unknown error');
-        }
-
-        if (!lyricsUrl) {
-          try {
-            const lrcLibUrl = await searchLrcLibLyrics(artistName, cleanTitle || track.title);
-            if (lrcLibUrl) {
-              lyricsUrl = lrcLibUrl;
-              lyricsSource = 'lrclib';
+        for (const artistVariant of artistVariants) {
+          if (lyricsUrl) break;
+          for (const titleVariant of titleVariants) {
+            if (lyricsUrl) break;
+            try {
+              lyricsUrl = await searchLyrics(artistVariant, titleVariant);
+            } catch (geniusError) {
+              providerErrors.push(geniusError instanceof Error ? `Genius: ${geniusError.message}` : 'Genius: Unknown error');
             }
-          } catch (lrcError) {
-            providerErrors.push(lrcError instanceof Error ? `LRCLIB: ${lrcError.message}` : 'LRCLIB: Unknown error');
+
+            if (!lyricsUrl) {
+              try {
+                const lrcLibUrl = await searchLrcLibLyrics(artistVariant, titleVariant);
+                if (lrcLibUrl) {
+                  lyricsUrl = lrcLibUrl;
+                  lyricsSource = 'lrclib';
+                }
+              } catch (lrcError) {
+                providerErrors.push(lrcError instanceof Error ? `LRCLIB: ${lrcError.message}` : 'LRCLIB: Unknown error');
+              }
+            }
           }
         }
 
@@ -310,14 +345,26 @@ export async function POST(req: Request) {
           });
         } else {
           console.log(`    ❌ No validated match found`);
+          const failureReason = providerErrors.length > 0
+            ? providerErrors.join(' | ')
+            : 'No validated match found (Genius + LRCLIB)';
           enrichedTracks.push(track);
+          const nextCredits = {
+            ...(track.credits || {}),
+            lyrics_last_attempt_at: new Date().toISOString(),
+            lyrics_last_attempt_reason: failureReason,
+            lyrics_last_attempt_track: track.title,
+            lyrics_search_attempts: Number((track.credits || {}).lyrics_search_attempts ?? 0) + 1
+          };
+          enrichedTracks[enrichedTracks.length - 1] = {
+            ...track,
+            credits: nextCredits
+          };
           failedCount++;
           failedTracksList.push({
             position: track.position || '',
             title: track.title,
-            error: providerErrors.length > 0
-              ? providerErrors.join(' | ')
-              : 'No validated match found (Genius + LRCLIB)'
+            error: failureReason
           });
         }
 
@@ -339,20 +386,23 @@ export async function POST(req: Request) {
     console.log(`\n📊 SUMMARY: ${enrichedCount} enriched, ${skippedCount} skipped, ${failedCount} failed`);
 
     const tracksWithLyricsUrl = enrichedTracks.filter(
-      (track) => track.recording_id && track.credits?.lyrics_url
+      (track) => track.recording_id && (track.credits?.lyrics_url || track.credits?.lyrics_last_attempt_at)
     );
 
     if (tracksWithLyricsUrl.length > 0) {
       console.log(`💾 Updating database...`);
       for (const track of tracksWithLyricsUrl) {
-        const nextLyricsUrl = String(track.credits?.lyrics_url);
+        const nextLyricsUrl = track.credits?.lyrics_url ? String(track.credits.lyrics_url) : null;
         const wasMissingColumn = !track.lyrics_url || String(track.lyrics_url).trim().length === 0;
+        const updatePayload: Record<string, unknown> = {
+          credits: track.credits as unknown as import('types/supabase').Json
+        };
+        if (nextLyricsUrl) {
+          updatePayload.lyrics_url = nextLyricsUrl;
+        }
         const { error: updateError } = await supabase
           .from('recordings')
-          .update({
-            credits: track.credits as unknown as import('types/supabase').Json,
-            lyrics_url: nextLyricsUrl
-          })
+          .update(updatePayload)
           .eq('id', track.recording_id as number);
 
         if (updateError) {
