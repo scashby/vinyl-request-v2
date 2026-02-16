@@ -26,6 +26,16 @@ function normalizeForMatch(str: string): string {
     .trim();
 }
 
+function simplifyTrackTitle(title: string): string {
+  return title
+    .replace(/\((feat|featuring|ft)\.?.*?\)/gi, '')
+    .replace(/\[(feat|featuring|ft)\.?.*?\]/gi, '')
+    .replace(/\((remaster(ed)?|mono|stereo|live|edit|version).*?\)/gi, '')
+    .replace(/\[(remaster(ed)?|mono|stereo|live|edit|version).*?\]/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function isGoodMatch(searchArtist: string, searchTrack: string, resultArtist: string, resultTrack: string): boolean {
   const normSearchArtist = normalizeForMatch(searchArtist);
   const normSearchTrack = normalizeForMatch(searchTrack);
@@ -104,6 +114,48 @@ async function searchLyrics(albumArtist: string, trackTitle: string): Promise<st
 
   console.log(`    ❌ No validated matches found among ${hits.length} results`);
   return null;
+}
+
+async function searchLrcLibLyrics(albumArtist: string, trackTitle: string): Promise<string | null> {
+  const cleanTitle = simplifyTrackTitle(trackTitle);
+  const params = new URLSearchParams({
+    track_name: cleanTitle || trackTitle,
+    artist_name: albumArtist
+  });
+  const apiUrl = `https://lrclib.net/api/search?${params.toString()}`;
+  console.log(`    → Searching LRCLIB: "${albumArtist}" - "${cleanTitle || trackTitle}"`);
+
+  const res = await fetch(apiUrl, {
+    headers: { 'User-Agent': 'DeadWaxDialogues/1.0 (+lyrics enrichment)' }
+  });
+
+  if (!res.ok) {
+    throw new Error(`LRCLIB returned ${res.status}`);
+  }
+
+  const data = await res.json();
+  const entries = Array.isArray(data) ? data : [];
+  if (entries.length === 0) {
+    return null;
+  }
+
+  const normArtist = normalizeForMatch(albumArtist);
+  const normTrack = normalizeForMatch(cleanTitle || trackTitle);
+
+  const best = entries.find((entry: Record<string, unknown>) => {
+    const entryArtist = normalizeForMatch(String(entry.artistName ?? ''));
+    const entryTrack = normalizeForMatch(String(entry.trackName ?? ''));
+    const artistMatch = entryArtist === normArtist || entryArtist.includes(normArtist) || normArtist.includes(entryArtist);
+    const trackMatch = entryTrack === normTrack || entryTrack.includes(normTrack) || normTrack.includes(entryTrack);
+    return artistMatch && trackMatch;
+  }) || entries[0];
+
+  const bestId = best && typeof best === 'object' ? (best as Record<string, unknown>).id : null;
+  if (typeof bestId === 'number' || typeof bestId === 'string') {
+    return `https://lrclib.net/api/get/${bestId}`;
+  }
+
+  return apiUrl;
 }
 
 export async function POST(req: Request) {
@@ -212,23 +264,45 @@ export async function POST(req: Request) {
       }
 
       try {
-        const lyricsUrl = await searchLyrics(artistName, track.title);
+        const cleanTitle = simplifyTrackTitle(track.title);
+        let lyricsUrl: string | null = null;
+        let lyricsSource = 'genius';
+        const providerErrors: string[] = [];
+
+        try {
+          lyricsUrl = await searchLyrics(artistName, cleanTitle || track.title);
+        } catch (geniusError) {
+          providerErrors.push(geniusError instanceof Error ? `Genius: ${geniusError.message}` : 'Genius: Unknown error');
+        }
+
+        if (!lyricsUrl) {
+          try {
+            const lrcLibUrl = await searchLrcLibLyrics(artistName, cleanTitle || track.title);
+            if (lrcLibUrl) {
+              lyricsUrl = lrcLibUrl;
+              lyricsSource = 'lrclib';
+            }
+          } catch (lrcError) {
+            providerErrors.push(lrcError instanceof Error ? `LRCLIB: ${lrcError.message}` : 'LRCLIB: Unknown error');
+          }
+        }
 
         if (lyricsUrl) {
-          console.log(`    ✅ Found validated lyrics URL`);
+          console.log(`    ✅ Found validated lyrics URL (${lyricsSource})`);
           enrichedTracks.push({
             ...track,
             credits: {
               ...track.credits,
               lyrics_url: lyricsUrl,
-              lyrics_source: 'genius'
+              lyrics_source: lyricsSource
             }
           });
           enrichedCount++;
           enrichedTracksList.push({
             position: track.position || '',
             title: track.title,
-            lyrics_url: lyricsUrl
+            lyrics_url: lyricsUrl,
+            source: lyricsSource
           });
         } else {
           console.log(`    ❌ No validated match found`);
@@ -237,7 +311,9 @@ export async function POST(req: Request) {
           failedTracksList.push({
             position: track.position || '',
             title: track.title,
-            error: 'No validated match found on Genius'
+            error: providerErrors.length > 0
+              ? providerErrors.join(' | ')
+              : 'No validated match found (Genius + LRCLIB)'
           });
         }
 

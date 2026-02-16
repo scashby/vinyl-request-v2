@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS public.import_conflict_resolutions (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  album_id bigint NOT NULL REFERENCES public.collection(id) ON DELETE CASCADE,
+  album_id bigint NOT NULL REFERENCES public.inventory(id) ON DELETE CASCADE,
   field_name text NOT NULL,
   source text NOT NULL,
   resolution text NOT NULL CHECK (resolution IN ('keep_current', 'use_new', 'merge')),
