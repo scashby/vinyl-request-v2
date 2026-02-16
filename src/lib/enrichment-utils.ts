@@ -1,5 +1,5 @@
 // src/lib/enrichment-utils.ts
-import Genius from 'genius-lyrics';
+import * as GeniusModule from 'genius-lyrics';
 import { parseDiscogsFormat } from './formatParser';
 
 const getEnv = (...keys: string[]): string | undefined => {
@@ -14,7 +14,18 @@ const getEnv = (...keys: string[]): string | undefined => {
 
 // Initialize Genius Client if token exists
 const GENIUS_TOKEN = getEnv('GENIUS_ACCESS_TOKEN', 'GENIUS_API_TOKEN');
-const geniusClient = GENIUS_TOKEN ? new Genius.Client(GENIUS_TOKEN) : null;
+type GeniusLikeClient = {
+  songs: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    search: (query: string) => Promise<any[]>;
+  };
+};
+
+const GeniusClientCtor = (
+  (GeniusModule as unknown as { Client?: new (token: string) => GeniusLikeClient }).Client
+);
+const geniusClient: GeniusLikeClient | null =
+  GENIUS_TOKEN && GeniusClientCtor ? new GeniusClientCtor(GENIUS_TOKEN) : null;
 
 // ============================================================================
 // TYPES
