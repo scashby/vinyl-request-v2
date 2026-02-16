@@ -443,16 +443,26 @@ export async function POST(req: Request) {
                 sourceDiagnostics[task.source] = { status: 'returned' };
               } else {
                 sourceFieldCoverage[task.source] = [];
+                const authHint = task.source === 'discogs'
+                  ? (discogsOAuth ? 'discogs auth: oauth cookie present' : 'discogs auth: oauth cookie missing')
+                  : null;
                 sourceDiagnostics[task.source] = {
                   status: 'no_data',
-                  reason: value?.error || 'No match'
+                  reason: authHint
+                    ? `${authHint} | ${value?.error || 'No match'}`
+                    : (value?.error || 'No match')
                 };
               }
             } else {
               sourceFieldCoverage[task.source] = [];
+              const authHint = task.source === 'discogs'
+                ? (discogsOAuth ? 'discogs auth: oauth cookie present' : 'discogs auth: oauth cookie missing')
+                : null;
               sourceDiagnostics[task.source] = {
                 status: 'error',
-                reason: res.reason instanceof Error ? res.reason.message : 'Unknown error'
+                reason: authHint
+                  ? `${authHint} | ${res.reason instanceof Error ? res.reason.message : 'Unknown error'}`
+                  : (res.reason instanceof Error ? res.reason.message : 'Unknown error')
               };
             }
           });

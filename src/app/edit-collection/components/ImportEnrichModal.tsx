@@ -1090,6 +1090,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             try {
               const res = await fetch('/api/enrich-sources/fetch-candidates', {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestPayload)
               });
@@ -1710,7 +1711,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             `Updated missing fields: ${updatedList.join(', ')}`
           );
         }
-        if (unresolvedMissingReasons.size > 0) {
+        const noMissingFieldsUpdatedThisPass = updatedMissingFields.size === 0;
+        if (unresolvedMissingReasons.size > 0 && noMissingFieldsUpdatedThisPass) {
           const unresolvedList = Array.from(unresolvedMissingReasons.entries()).map(
             ([field, reason]) => `${formatField(field)} (${reason})`
           );

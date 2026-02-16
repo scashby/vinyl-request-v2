@@ -853,11 +853,11 @@ export async function fetchDiscogsData(
   opts?: { oauth?: DiscogsOAuthCredentials | null }
 ): Promise<EnrichmentResult> {
   try {
-    if (!hasDiscogsCredentials()) {
+    if (!hasDiscogsCredentials() && !opts?.oauth) {
       return {
         success: false,
         source: 'discogs',
-        error: 'Missing Discogs credentials (DISCOGS_TOKEN/DISCOGS_ACCESS_TOKEN/NEXT_PUBLIC_DISCOGS_TOKEN or DISCOGS_CONSUMER_KEY + DISCOGS_CONSUMER_SECRET|DISCOGS_SECRET_KEY)',
+        error: 'Missing Discogs credentials (no OAuth cookie and no DISCOGS_TOKEN/DISCOGS_ACCESS_TOKEN/NEXT_PUBLIC_DISCOGS_TOKEN or DISCOGS_CONSUMER_KEY + DISCOGS_CONSUMER_SECRET|DISCOGS_SECRET_KEY)',
       };
     }
     let releaseId = album.discogs_release_id;
@@ -982,7 +982,8 @@ export async function fetchDiscogsData(
 
     return { success: true, source: 'discogs', data: candidate };
   } catch (e) {
-    return { success: false, source: 'discogs', error: (e as Error).message };
+    const oauthContext = opts?.oauth ? 'oauth_cookie:present' : 'oauth_cookie:missing';
+    return { success: false, source: 'discogs', error: `${oauthContext} | ${(e as Error).message}` };
   }
 }
 
