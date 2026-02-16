@@ -52,14 +52,16 @@ export const DATA_TO_SERVICES: Record<DataCategory, EnrichmentService[]> = {
   artwork: ['coverArtArchive', 'musicbrainz', 'discogs', 'spotify', 'appleMusic', 'lastfm', 'theaudiodb', 'fanarttv', 'deezer'],
   credits: ['musicbrainz', 'allmusic', 'appleMusic', 'discogs', 'genius', 'wikidata'],
   tracklists: ['discogs', 'spotify', 'appleMusic', 'lastfm', 'setlistfm', 'deezer'],
-  sonic_domain: ['acousticbrainz', 'musicbrainz', 'spotify', 'whosampled', 'secondhandsongs'],
+  // NOTE: acousticbrainz is not implemented in the current fetch pipeline.
+  sonic_domain: ['musicbrainz', 'spotify', 'whosampled', 'secondhandsongs'],
   genres: ['discogs', 'spotify', 'appleMusic', 'allmusic', 'lastfm', 'musicbrainz', 'rateyourmusic', 'theaudiodb', 'deezer'],
   streaming_links: ['spotify', 'appleMusic', 'lastfm', 'musicbrainz', 'allmusic', 'wikipedia', 'whosampled', 'secondhandsongs', 'setlistfm', 'deezer', 'musixmatch'],
   reviews: ['allmusic', 'lastfm', 'spotify', 'appleMusic', 'wikipedia', 'rateyourmusic', 'pitchfork'],
-  chart_data: ['wikipedia', 'rateyourmusic', 'billboard' as EnrichmentService], // Placeholder cast if billboard not fully typed yet
+  // NOTE: billboard is not implemented in the current fetch pipeline.
+  chart_data: ['wikipedia', 'rateyourmusic', 'wikidata'],
   release_metadata: ['musicbrainz', 'discogs', 'spotify', 'appleMusic', 'wikipedia', 'wikidata', 'popsike'],
   lyrics: ['genius', 'musixmatch'],
-  similar_albums: ['lastfm', 'allmusic', 'rateyourmusic', 'deezer'],
+  similar_albums: ['lastfm'],
   cultural_context: ['wikipedia', 'wikidata', 'allmusic', 'appleMusic'],
 };
 
@@ -164,18 +166,14 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
   genres: [
     'genres',
     'styles',
-    'tags', // Generic Bucket
-    'discogs_genres',
-    'spotify_genres',
-    'apple_music_genres',
-    'allmusic_styles'
+    'tags'
   ],
   streaming_links: [
     'spotify_id',
     'apple_music_id',
     'lastfm_id',
     'musicbrainz_id',
-    'allmusic_id',
+    'allmusic_url',
     'wikipedia_url',
     'discogs_release_id',
     'discogs_master_id'
@@ -183,9 +181,6 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
   reviews: [
     'allmusic_rating',
     'allmusic_review',
-    'lastfm_playcount',
-    'lastfm_listeners',
-    'spotify_popularity',
     'critical_reception',
     'apple_music_editorial_notes',
     'pitchfork_score'
@@ -260,18 +255,18 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'sampled_by': ['whosampled'],
   
   // --- AUDIO ANALYSIS ---
-  'tempo_bpm': ['acousticbrainz', 'musicbrainz', 'spotify'],
-  'musical_key': ['acousticbrainz', 'musicbrainz', 'spotify'],
-  'time_signature': ['acousticbrainz', 'musicbrainz', 'spotify'],
-  'danceability': ['acousticbrainz', 'musicbrainz', 'spotify'],
-  'energy': ['acousticbrainz', 'musicbrainz', 'spotify'],
-  'mood_acoustic': ['acousticbrainz', 'musicbrainz', 'spotify'],
-  'mood_happy': ['acousticbrainz', 'musicbrainz', 'spotify'],
-  'mood_sad': ['acousticbrainz', 'musicbrainz', 'spotify'],
-  'mood_party': ['acousticbrainz', 'musicbrainz', 'spotify'],
-  'mood_relaxed': ['acousticbrainz', 'musicbrainz', 'spotify'],
-  'mood_aggressive': ['acousticbrainz', 'musicbrainz', 'spotify'],
-  'mood_electronic': ['acousticbrainz', 'musicbrainz', 'spotify'],
+  'tempo_bpm': ['musicbrainz', 'spotify'],
+  'musical_key': ['musicbrainz', 'spotify'],
+  'time_signature': ['musicbrainz', 'spotify'],
+  'danceability': ['musicbrainz', 'spotify'],
+  'energy': ['musicbrainz', 'spotify'],
+  'mood_acoustic': ['musicbrainz', 'spotify'],
+  'mood_happy': ['musicbrainz', 'spotify'],
+  'mood_sad': ['musicbrainz', 'spotify'],
+  'mood_party': ['musicbrainz', 'spotify'],
+  'mood_relaxed': ['musicbrainz', 'spotify'],
+  'mood_aggressive': ['musicbrainz', 'spotify'],
+  'mood_electronic': ['musicbrainz', 'spotify'],
   
   // --- GENRES & TAGS ---
   'genres': ['discogs', 'spotify', 'appleMusic', 'lastfm', 'allmusic'],
@@ -313,6 +308,10 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   // --- LYRICS ---
   'tracks.lyrics': ['genius'],
   'tracks.lyrics_url': ['genius'],
+
+  // --- SIMILAR ALBUMS ---
+  'lastfm_similar_albums': ['lastfm'],
+  'allmusic_similar_albums': ['lastfm'],
 
   // --- REVIEWS & CHARTS (Newly Added) ---
   'pitchfork_score': ['pitchfork'],

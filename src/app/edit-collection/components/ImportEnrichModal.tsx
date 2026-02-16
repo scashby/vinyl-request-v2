@@ -43,7 +43,8 @@ const ALLOWED_COLUMNS = new Set([
   'cultural_significance', 'recording_location', 'critical_reception', 'awards', 'certifications',
   'chart_positions', 'sort_title', 'subtitle', 'master_release_date', 'recording_date', 'recording_year',
   'allmusic_rating', 'allmusic_review', 'pitchfork_score', 'pitchfork_review',
-  'apple_music_editorial_notes'
+  'apple_music_editorial_notes',
+  'lastfm_similar_albums', 'allmusic_similar_albums'
 ]);
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
@@ -203,6 +204,8 @@ const checkedSourcesFromActiveServices = (activeServices: ActiveServiceMap): str
     .map(([flag]) => SERVICE_FLAG_TO_ID[flag] ?? flag)
     .sort();
 };
+
+const DEFERRED_CATEGORY_REASONS: Partial<Record<DataCategory, string>> = {};
 
 // Local interface for resolution history
 interface ResolutionHistory {
@@ -521,6 +524,8 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'allmusic_review':
       case 'pitchfork_score':
       case 'pitchfork_review':
+      case 'lastfm_similar_albums':
+      case 'allmusic_similar_albums':
         masterUpdates[key] = normalizeCreditsValue(value) ?? null;
         break;
       case 'packaging':
@@ -1953,8 +1958,14 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     );
   }
 
+  const hasRunnableCategory = (category: DataCategory) => {
+    const validFields = (DATA_CATEGORY_CHECK_FIELDS[category] || []).filter(f => ALLOWED_COLUMNS.has(f));
+    if (validFields.length === 0) return false;
+    return validFields.some((field) => (FIELD_TO_SERVICES[field] || []).length > 0);
+  };
+
   // --- UPDATED CONFIG WITH NEW CATEGORIES ---
-  const dataCategoriesConfig: { category: DataCategory; count: number; subcounts?: { label: string; count: number }[] }[] = stats ? [
+  const rawCategoryConfig: { category: DataCategory; count: number; subcounts?: { label: string; count: number }[] }[] = stats ? [
     { category: 'artwork', count: stats.missingArtwork, subcounts: [
         { label: 'Back covers', count: stats.missingBackCover },
         { label: 'Spine', count: stats.missingSpine || 0 },
@@ -1986,6 +1997,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     { category: 'cultural_context', count: stats.missingContext || 0, subcounts: [] },
     { category: 'similar_albums', count: stats.missingSimilar || 0, subcounts: [] },
   ] : [];
+  const dataCategoriesConfig = rawCategoryConfig.filter(({ category }) => hasRunnableCategory(category));
+  const deferredCategories = rawCategoryConfig
+    .map(({ category }) => category)
+    .filter((category) => !hasRunnableCategory(category));
 
   return (
     <div className="fixed inset-0 bg-white z-[10000] flex flex-col overflow-hidden">
@@ -2030,6 +2045,18 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               {/* 2. DATA CATEGORY SELECTION */}
               <div className="bg-white border-2 border-[#D8D8D8] rounded-md p-5 mb-6">
                 <h3 className="flex items-center gap-2 text-[15px] font-semibold text-green-700 mb-2">Select Data to Enrich</h3>
+                {deferredCategories.length > 0 && (
+                  <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    <span className="font-semibold">Temporarily unavailable:</span>{' '}
+                    {deferredCategories.map((category) => DATA_CATEGORY_LABELS[category]).join(', ')}.
+                    {deferredCategories
+                      .map((category) => DEFERRED_CATEGORY_REASONS[category])
+                      .filter((reason): reason is string => !!reason)
+                      .map((reason, index) => (
+                        <span key={`${reason}-${index}`}> {reason}</span>
+                      ))}
+                  </div>
+                )}
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-3">
                   {/* Note: dataCategoriesConfig is used for sorting/structure, but props are new */}
                   {dataCategoriesConfig.map(({ category }) => (

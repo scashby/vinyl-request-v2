@@ -73,6 +73,8 @@ export type CandidateData = {
   chart_positions?: string[];
   awards?: string[];
   certifications?: string[];
+  lastfm_similar_albums?: string[];
+  allmusic_similar_albums?: string[];
   enrichment_summary?: Record<string, string>; // Structured External Data (Setlist.fm, WhoSampled, etc)
   companies?: string[]; // Discogs Companies
   rpm?: string;
@@ -926,6 +928,23 @@ export async function fetchLastFmData(album: { artist: string, title: string }):
       tags: tags, // RENAMED: Match generic bucket in CandidateData
       image_url: toHttps(largeImg)
     };
+
+    try {
+      const similarUrl = `${LFM_BASE}?method=artist.getsimilar&artist=${encodeURIComponent(album.artist)}&limit=12&api_key=${LFM_KEY}&format=json`;
+      const similarRes = await fetch(similarUrl);
+      if (similarRes.ok) {
+        const similarData = await similarRes.json();
+        const similarArtists = (similarData?.similarartists?.artist ?? [])
+          .map((artist: { name?: string }) => String(artist?.name ?? '').trim())
+          .filter((name: string) => name.length > 0)
+          .slice(0, 12);
+        if (similarArtists.length > 0) {
+          candidate.lastfm_similar_albums = similarArtists;
+        }
+      }
+    } catch {
+      // Keep Last.fm base enrichment successful even if similar lookup fails.
+    }
 
     mapTagsToMoods(tags, candidate);
 

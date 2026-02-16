@@ -6,6 +6,8 @@ export const dynamic = 'force-dynamic';
 type RecordingRow = {
   duration_seconds: number | null;
   credits: unknown;
+  lyrics: string | null;
+  lyrics_url: string | null;
 };
 
 type ReleaseTrackRow = {
@@ -18,6 +20,26 @@ type MasterRow = {
   genres?: string[] | null;
   styles?: string[] | null;
   original_release_year?: number | null;
+  musicians?: string[] | null;
+  producers?: string[] | null;
+  engineers?: string[] | null;
+  songwriters?: string[] | null;
+  allmusic_rating?: number | string | null;
+  allmusic_review?: string | null;
+  critical_reception?: string | null;
+  pitchfork_score?: number | string | null;
+  chart_positions?: string[] | null;
+  certifications?: string[] | null;
+  awards?: string[] | null;
+  cultural_significance?: string | null;
+  recording_location?: string | null;
+  notes?: string | null;
+  wikipedia_url?: string | null;
+  allmusic_url?: string | null;
+  apple_music_url?: string | null;
+  lastfm_url?: string | null;
+  lastfm_similar_albums?: string[] | null;
+  allmusic_similar_albums?: string[] | null;
 };
 
 type ReleaseRow = {
@@ -63,12 +85,34 @@ export async function GET(request: Request) {
               cover_image_url,
               genres,
               styles,
-              original_release_year
+              original_release_year,
+              musicians,
+              producers,
+              engineers,
+              songwriters,
+              allmusic_rating,
+              allmusic_review,
+              critical_reception,
+              pitchfork_score,
+              chart_positions,
+              certifications,
+              awards,
+              cultural_significance,
+              recording_location,
+              notes,
+              wikipedia_url,
+              allmusic_url,
+              apple_music_url,
+              lastfm_url,
+              lastfm_similar_albums,
+              allmusic_similar_albums
             ),
             release_tracks:release_tracks (
               recording:recordings (
                 duration_seconds,
-                credits
+                credits,
+                lyrics,
+                lyrics_url
               )
             )
           )
@@ -137,6 +181,11 @@ export async function GET(request: Request) {
     let missingLabels = 0;
     let missingOriginalDate = 0;
     let missingCatalogNumber = 0;
+    let missingLyrics = 0;
+    let missingReviews = 0;
+    let missingChartData = 0;
+    let missingContext = 0;
+    let missingSimilar = 0;
 
     const folders = new Set<string>();
 
@@ -156,6 +205,15 @@ export async function GET(request: Request) {
       if (typeof value === 'string') return [value];
       return [];
     };
+
+    const hasString = (value: unknown): boolean =>
+      typeof value === 'string' && value.trim().length > 0;
+
+    const hasArray = (value: unknown): boolean =>
+      Array.isArray(value) && value.some((item) => {
+        if (typeof item === 'string') return item.trim().length > 0;
+        return item !== null && item !== undefined;
+      });
 
     const getAlbumCredits = (credits: unknown) => {
       const record = asRecord(credits);
@@ -202,10 +260,22 @@ export async function GET(request: Request) {
       if (!hasSpine) missingSpine++;
       if (!hasVinylLabel) missingVinylLabel++;
 
-      const musicians = asStringArray(creditInfo.albumPeople.musicians);
-      const producers = asStringArray(creditInfo.albumPeople.producers);
-      const engineers = asStringArray(creditInfo.albumPeople.engineers);
-      const songwriters = asStringArray(creditInfo.albumPeople.songwriters);
+      const musicians = [
+        ...asStringArray(master?.musicians),
+        ...asStringArray(creditInfo.albumPeople.musicians)
+      ];
+      const producers = [
+        ...asStringArray(master?.producers),
+        ...asStringArray(creditInfo.albumPeople.producers)
+      ];
+      const engineers = [
+        ...asStringArray(master?.engineers),
+        ...asStringArray(creditInfo.albumPeople.engineers)
+      ];
+      const songwriters = [
+        ...asStringArray(master?.songwriters),
+        ...asStringArray(creditInfo.albumPeople.songwriters)
+      ];
       const hasCredits = musicians.length > 0 || producers.length > 0 || engineers.length > 0 || songwriters.length > 0;
       if (!hasCredits) missingCredits++;
       if (musicians.length === 0) missingMusicians++;
@@ -235,7 +305,11 @@ export async function GET(request: Request) {
       if (!hasStyles) missingStyles++;
 
       const hasSpotify = !!release?.spotify_album_id;
-      const hasApple = !!(creditInfo.links.apple_music_url ?? creditInfo.albumDetails.apple_music_url);
+      const hasApple = !!(
+        master?.apple_music_url ??
+        creditInfo.links.apple_music_url ??
+        creditInfo.albumDetails.apple_music_url
+      );
       if (!hasSpotify || !hasApple) missingStreamingLinks++;
       if (!hasSpotify) missingSpotify++;
       if (!hasApple) missingAppleMusic++;
@@ -251,6 +325,56 @@ export async function GET(request: Request) {
       if (!hasBarcode) missingBarcode++;
       if (!hasLabel) missingLabels++;
       if (!hasCatalogNumber) missingCatalogNumber++;
+
+      const hasLyrics = releaseTracks.some((track) => {
+        const recording = toSingle(track.recording);
+        const credits = asRecord(recording?.credits);
+        return hasString(recording?.lyrics_url)
+          || hasString(credits.lyrics_url)
+          || hasString(recording?.lyrics)
+          || hasString(credits.lyrics);
+      });
+      if (!hasLyrics) missingLyrics++;
+
+      const hasReviews =
+        master?.allmusic_rating !== null && master?.allmusic_rating !== undefined
+        || hasString(master?.allmusic_review)
+        || hasString(master?.critical_reception)
+        || master?.pitchfork_score !== null && master?.pitchfork_score !== undefined
+        || hasString(creditInfo.albumDetails.allmusic_rating)
+        || hasString(creditInfo.albumDetails.allmusic_review)
+        || hasString(creditInfo.albumDetails.critical_reception)
+        || hasString(creditInfo.albumDetails.apple_music_editorial_notes)
+        || hasString(creditInfo.albumDetails.pitchfork_score);
+      if (!hasReviews) missingReviews++;
+
+      const hasChartData =
+        hasArray(master?.chart_positions)
+        || hasArray(master?.certifications)
+        || hasArray(master?.awards)
+        || hasArray(creditInfo.albumDetails.chart_positions)
+        || hasArray(creditInfo.albumDetails.certifications)
+        || hasArray(creditInfo.albumDetails.awards);
+      if (!hasChartData) missingChartData++;
+
+      const hasContext =
+        hasString(master?.cultural_significance)
+        || hasString(master?.recording_location)
+        || hasString(master?.critical_reception)
+        || hasString(master?.notes)
+        || hasString(master?.wikipedia_url)
+        || hasString(creditInfo.albumDetails.cultural_significance)
+        || hasString(creditInfo.albumDetails.recording_location)
+        || hasString(creditInfo.albumDetails.critical_reception)
+        || hasString(creditInfo.links.wikipedia_url);
+      if (!hasContext) missingContext++;
+
+      const hasSimilarAlbums =
+        hasArray(master?.lastfm_similar_albums)
+        || hasArray(master?.allmusic_similar_albums)
+        || hasArray(creditInfo.albumDetails.lastfm_similar_albums)
+        || hasArray(creditInfo.albumDetails.allmusic_similar_albums);
+      if (!hasSimilarAlbums) missingSimilar++;
 
       const isComplete =
         hasFront &&
@@ -302,7 +426,12 @@ export async function GET(request: Request) {
       missingBarcode,
       missingLabels,
       missingOriginalDate,
-      missingCatalogNumber
+      missingCatalogNumber,
+      missingLyrics,
+      missingReviews,
+      missingChartData,
+      missingContext,
+      missingSimilar
     };
 
     return NextResponse.json({ 

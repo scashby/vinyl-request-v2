@@ -264,7 +264,10 @@ export async function POST(req: Request) {
         if (!track.recording_id || !track.credits?.lyrics_url) continue;
           const { error: updateError } = await supabase
             .from('recordings')
-            .update({ credits: track.credits as unknown as import('types/supabase').Json })
+            .update({
+              credits: track.credits as unknown as import('types/supabase').Json,
+              lyrics_url: String(track.credits.lyrics_url)
+            })
             .eq('id', track.recording_id);
 
         if (updateError) {

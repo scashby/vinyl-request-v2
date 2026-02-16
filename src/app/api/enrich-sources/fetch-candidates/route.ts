@@ -77,6 +77,8 @@ export async function POST(req: Request) {
             musicbrainz_release_group_id,
             genres,
             styles,
+            lastfm_similar_albums,
+            allmusic_similar_albums,
             notes,
             original_release_year,
             artist:artists (name),
@@ -159,6 +161,8 @@ export async function POST(req: Request) {
           original_release_year?: number | null;
           genres?: string[] | null;
           styles?: string[] | null;
+          lastfm_similar_albums?: string[] | null;
+          allmusic_similar_albums?: string[] | null;
           artist?: { name?: string | null } | null;
           master_tag_links?: {
             tag?: { name?: string | null } | null;
@@ -263,6 +267,8 @@ export async function POST(req: Request) {
         cat_no: release?.catalog_number ?? null,
         genres: master?.genres ?? null,
         styles: master?.styles ?? null,
+        lastfm_similar_albums: master?.lastfm_similar_albums ?? null,
+        allmusic_similar_albums: master?.allmusic_similar_albums ?? null,
         master_notes: master?.notes ?? null,
         cultural_significance: albumDetails.cultural_significance ?? null,
         recording_location: albumDetails.recording_location ?? null,

@@ -1092,6 +1092,8 @@ export type Database = {
           lastfm_url: string | null;
           spotify_url: string | null;
           genius_url: string | null;
+          lastfm_similar_albums: string[] | null;
+          allmusic_similar_albums: string[] | null;
           custom_links: Json | null;
           created_at: string | null;
         };
@@ -1136,6 +1138,8 @@ export type Database = {
           lastfm_url?: string | null;
           spotify_url?: string | null;
           genius_url?: string | null;
+          lastfm_similar_albums?: string[] | null;
+          allmusic_similar_albums?: string[] | null;
           custom_links?: Json | null;
           created_at?: string | null;
         };
@@ -1180,6 +1184,8 @@ export type Database = {
           lastfm_url?: string | null;
           spotify_url?: string | null;
           genius_url?: string | null;
+          lastfm_similar_albums?: string[] | null;
+          allmusic_similar_albums?: string[] | null;
           custom_links?: Json | null;
           created_at?: string | null;
         };
