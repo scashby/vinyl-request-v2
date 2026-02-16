@@ -1428,10 +1428,13 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               derivedDiscData = deriveDiscDataFromTracks(tracks as Record<string, unknown>[]);
             }
 
-            if (derivedDiscData?.disc_metadata && !fieldCandidates.disc_metadata) {
+            const discMetadataAllowed = !!fieldConfig.disc_metadata && fieldConfig.disc_metadata.has(source);
+            const matrixNumbersAllowed = !!fieldConfig.matrix_numbers && fieldConfig.matrix_numbers.has(source);
+
+            if (discMetadataAllowed && derivedDiscData?.disc_metadata && !fieldCandidates.disc_metadata) {
               fieldCandidates.disc_metadata = { [source]: derivedDiscData.disc_metadata };
             }
-            if (derivedDiscData?.matrix_numbers && !fieldCandidates.matrix_numbers) {
+            if (matrixNumbersAllowed && derivedDiscData?.matrix_numbers && !fieldCandidates.matrix_numbers) {
               fieldCandidates.matrix_numbers = { [source]: derivedDiscData.matrix_numbers };
             }
          }

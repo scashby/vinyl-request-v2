@@ -63,6 +63,8 @@ export async function POST(req: Request) {
           discogs_release_id,
           spotify_album_id,
           release_year,
+          barcode,
+          country,
           label,
           catalog_number,
           notes,
@@ -81,6 +83,20 @@ export async function POST(req: Request) {
             allmusic_similar_albums,
             notes,
             original_release_year,
+            recording_date,
+            wikipedia_url,
+            allmusic_url,
+            apple_music_url,
+            lastfm_url,
+            cultural_significance,
+            recording_location,
+            critical_reception,
+            allmusic_rating,
+            allmusic_review,
+            pitchfork_score,
+            chart_positions,
+            awards,
+            certifications,
             artist:artists (name),
             master_tag_links:master_tag_links (
               tag:master_tags ( name )
@@ -144,6 +160,8 @@ export async function POST(req: Request) {
         discogs_release_id?: string | null;
         spotify_album_id?: string | null;
         release_year?: number | null;
+        barcode?: string | null;
+        country?: string | null;
         label?: string | null;
         catalog_number?: string | null;
         notes?: string | null;
@@ -159,6 +177,20 @@ export async function POST(req: Request) {
           musicbrainz_release_group_id?: string | null;
           notes?: string | null;
           original_release_year?: number | null;
+          recording_date?: string | null;
+          wikipedia_url?: string | null;
+          allmusic_url?: string | null;
+          apple_music_url?: string | null;
+          lastfm_url?: string | null;
+          cultural_significance?: string | null;
+          recording_location?: string | null;
+          critical_reception?: string | null;
+          allmusic_rating?: number | string | null;
+          allmusic_review?: string | null;
+          pitchfork_score?: number | string | null;
+          chart_positions?: string[] | null;
+          awards?: string[] | null;
+          certifications?: string[] | null;
           genres?: string[] | null;
           styles?: string[] | null;
           lastfm_similar_albums?: string[] | null;
@@ -257,11 +289,11 @@ export async function POST(req: Request) {
         apple_music_id: asString(albumDetails.apple_music_id),
         lastfm_id: asString(albumDetails.lastfm_id),
         musicbrainz_url: asString(albumDetails.musicbrainz_url),
-        wikipedia_url: asString(links.wikipedia_url),
         genius_url: asString(links.genius_url),
-        apple_music_url: asString(links.apple_music_url),
-        lastfm_url: asString(links.lastfm_url),
-        allmusic_url: asString(links.allmusic_url),
+        barcode: release?.barcode ?? null,
+        country: release?.country ?? null,
+        recording_date: master?.recording_date ?? null,
+        release_notes: release?.notes ?? null,
         year: release?.release_year ?? master?.original_release_year ?? null,
         label: release?.label ?? null,
         cat_no: release?.catalog_number ?? null,
@@ -270,16 +302,20 @@ export async function POST(req: Request) {
         lastfm_similar_albums: master?.lastfm_similar_albums ?? null,
         allmusic_similar_albums: master?.allmusic_similar_albums ?? null,
         master_notes: master?.notes ?? null,
-        cultural_significance: albumDetails.cultural_significance ?? null,
-        recording_location: albumDetails.recording_location ?? null,
-        critical_reception: albumDetails.critical_reception ?? null,
-        allmusic_rating: albumDetails.allmusic_rating ?? null,
-        allmusic_review: albumDetails.allmusic_review ?? null,
+        cultural_significance: master?.cultural_significance ?? albumDetails.cultural_significance ?? null,
+        recording_location: master?.recording_location ?? albumDetails.recording_location ?? null,
+        critical_reception: master?.critical_reception ?? albumDetails.critical_reception ?? null,
+        allmusic_rating: master?.allmusic_rating ?? albumDetails.allmusic_rating ?? null,
+        allmusic_review: master?.allmusic_review ?? albumDetails.allmusic_review ?? null,
         apple_music_editorial_notes: albumDetails.apple_music_editorial_notes ?? null,
-        pitchfork_score: albumDetails.pitchfork_score ?? null,
-        chart_positions: albumDetails.chart_positions ?? null,
-        awards: albumDetails.awards ?? null,
-        certifications: albumDetails.certifications ?? null,
+        pitchfork_score: master?.pitchfork_score ?? albumDetails.pitchfork_score ?? null,
+        chart_positions: master?.chart_positions ?? albumDetails.chart_positions ?? null,
+        awards: master?.awards ?? albumDetails.awards ?? null,
+        certifications: master?.certifications ?? albumDetails.certifications ?? null,
+        wikipedia_url: asString(master?.wikipedia_url) ?? asString(links.wikipedia_url),
+        allmusic_url: asString(master?.allmusic_url) ?? asString(links.allmusic_url),
+        apple_music_url: asString(master?.apple_music_url) ?? asString(links.apple_music_url),
+        lastfm_url: asString(master?.lastfm_url) ?? asString(links.lastfm_url),
         tracks: releaseTracks.length > 0 ? ['has_tracks'] : [],
         tracklists: releaseTracks.length > 0 ? ['has_tracks'] : [],
         tracks_lyrics_url: hasLyricsUrl ? ['has_lyrics_url'] : [],
