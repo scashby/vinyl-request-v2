@@ -1354,20 +1354,140 @@ export async function fetchAllMusicData(album: { artist: string, title: string, 
 // ============================================================================
 // 9. WHOSAMPLED (Samples & Covers)
 // ============================================================================
+const stripHtmlTags = (value: string) =>
+  decodeHtml(value)
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const normalizeWsPath = (href: string) => {
+  const trimmed = href.trim();
+  if (!trimmed) return null;
+  if (!trimmed.startsWith('/')) return null;
+  if (trimmed.startsWith('/search') || trimmed.startsWith('/login') || trimmed.startsWith('/forum')) return null;
+  return trimmed.split('#')[0].split('?')[0];
+};
+
+const parseWhoSampledAnchors = (html: string) => {
+  const anchors: Array<{ href: string; text: string; index: number }> = [];
+  const re = /<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(html)) !== null) {
+    const href = normalizeWsPath(match[1] || '');
+    const text = stripHtmlTags(match[2] || '');
+    if (!href || !text) continue;
+    anchors.push({ href, text, index: match.index });
+  }
+  return anchors;
+};
+
+const parseWhoSampledRelations = (
+  html: string,
+  anchors: Array<{ href: string; text: string; index: number }>
+) => {
+  const samples = new Set<string>();
+  const sampledBy = new Set<string>();
+
+  anchors.forEach((anchor) => {
+    const context = html.slice(Math.max(0, anchor.index - 900), Math.min(html.length, anchor.index + 900)).toLowerCase();
+    const isSampleContext =
+      context.includes('contains samples of') ||
+      context.includes('contains a sample of') ||
+      context.includes('contains interpolation') ||
+      context.includes('samples from');
+    const isSampledByContext =
+      context.includes('was sampled in') ||
+      context.includes('was remixed in') ||
+      context.includes('was covered in') ||
+      context.includes('sampled by');
+
+    if (!isSampleContext && !isSampledByContext) return;
+    if (anchor.text.length < 2 || anchor.text.length > 140) return;
+    if (/^(view|see|submit|buy|play|login)\b/i.test(anchor.text)) return;
+    if (!/^\/[^/]+\/[^/]+/.test(anchor.href)) return;
+
+    if (isSampleContext) samples.add(anchor.text);
+    if (isSampledByContext) sampledBy.add(anchor.text);
+  });
+
+  return {
+    samples: Array.from(samples).slice(0, 60),
+    sampled_by: Array.from(sampledBy).slice(0, 60),
+  };
+};
+
+const pickWhoSampledDetailPath = (html: string, album: { artist: string; title: string }) => {
+  const anchors = parseWhoSampledAnchors(html);
+  if (anchors.length === 0) return null;
+
+  const artistTokens = buildArtistVariants(album.artist)
+    .flatMap((v) => v.toLowerCase().split(/[^a-z0-9]+/g))
+    .filter((v) => v.length > 1);
+  const titleTokens = buildTitleVariants(album.title)
+    .flatMap((v) => v.toLowerCase().split(/[^a-z0-9]+/g))
+    .filter((v) => v.length > 1);
+
+  let best: { href: string; score: number } | null = null;
+  for (const anchor of anchors) {
+    const haystack = `${anchor.href} ${anchor.text}`.toLowerCase();
+    let score = 0;
+    artistTokens.forEach((token) => { if (haystack.includes(token)) score += 2; });
+    titleTokens.forEach((token) => { if (haystack.includes(token)) score += 3; });
+    if (!best || score > best.score) best = { href: anchor.href, score };
+  }
+
+  if (!best || best.score < 4) return null;
+  return best.href;
+};
+
 export async function fetchWhoSampledData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
-    // TODO: Spotify acquired WhoSampled (Nov 2025). 
-    // When "SongDNA" or equivalent endpoints become available in the Spotify Web API, 
-    // replace this link generator with a real API call to fetch sample/cover data directly.
-    const query = `${album.artist} ${album.title}`;
-    const searchUrl = `https://www.whosampled.com/search/?q=${encodeURIComponent(query)}`;
-    
-    return {
-        success: true,
-        source: 'whosampled',
-        data: {
-            enrichment_summary: { whosampled: `Search WhoSampled: ${searchUrl}` }
+    try {
+        const query = `${album.artist} ${album.title}`;
+        const baseUrl = 'https://www.whosampled.com';
+        const searchUrl = `${baseUrl}/search/?q=${encodeURIComponent(query)}`;
+        const headers = { 'User-Agent': USER_AGENT, 'Accept-Language': 'en-US,en;q=0.9' };
+
+        const searchRes = await fetch(searchUrl, { headers });
+        const searchHtml = await searchRes.text();
+        if (!searchRes.ok) {
+          return { success: false, source: 'whosampled', error: `Search ${searchRes.status}` };
         }
-    };
+        if (/just a moment|attention required|cf-chl|cloudflare/i.test(searchHtml)) {
+          return { success: false, source: 'whosampled', error: 'Blocked by anti-bot protection' };
+        }
+
+        const detailPath = pickWhoSampledDetailPath(searchHtml, album);
+        if (!detailPath) {
+          return { success: false, source: 'whosampled', error: 'No validated match found' };
+        }
+
+        const detailUrl = `${baseUrl}${detailPath}`;
+        const detailRes = await fetch(detailUrl, { headers });
+        const detailHtml = await detailRes.text();
+        if (!detailRes.ok) {
+          return { success: false, source: 'whosampled', error: `Detail ${detailRes.status}` };
+        }
+        if (/just a moment|attention required|cf-chl|cloudflare/i.test(detailHtml)) {
+          return { success: false, source: 'whosampled', error: 'Blocked by anti-bot protection' };
+        }
+
+        const anchors = parseWhoSampledAnchors(detailHtml);
+        const relations = parseWhoSampledRelations(detailHtml, anchors);
+        if (relations.samples.length === 0 && relations.sampled_by.length === 0) {
+          return { success: false, source: 'whosampled', error: 'No sample relationships found' };
+        }
+
+        return {
+          success: true,
+          source: 'whosampled',
+          data: {
+            ...relations,
+            enrichment_summary: { whosampled: detailUrl }
+          }
+        };
+    } catch (e) {
+        return { success: false, source: 'whosampled', error: (e as Error).message };
+    }
 }
 
 // ============================================================================

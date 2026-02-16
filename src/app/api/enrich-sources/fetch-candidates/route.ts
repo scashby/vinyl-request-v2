@@ -12,7 +12,6 @@ import {
   fetchCoverArtData, 
   fetchWikipediaData, 
   fetchGeniusData,
-  fetchWhoSampledData,
   fetchSecondHandSongsData,
   fetchTheAudioDBData,
   fetchWikidataData,
@@ -356,6 +355,8 @@ export async function POST(req: Request) {
         enriched_metadata: albumDetails.enriched_metadata ?? null,
         enrichment_summary: albumDetails.enrichment_summary ?? null,
         enrichment_sources: albumDetails.enrichment_sources ?? null,
+        samples: asStringArray(albumDetails.samples),
+        sampled_by: asStringArray(albumDetails.sampled_by),
         finalized_fields: albumDetails.finalized_fields ?? null,
         last_reviewed_at: albumDetails.last_reviewed_at ?? null
       };
@@ -418,7 +419,6 @@ export async function POST(req: Request) {
           if (services.wikipedia) tasks.push({ source: 'wikipedia', promise: fetchWikipediaData(typedAlbum) });
           if (services.genius) tasks.push({ source: 'genius', promise: fetchGeniusData(typedAlbum) });
           if (services.coverArt) tasks.push({ source: 'coverArt', promise: fetchCoverArtData(typedAlbum) });
-          if (services.whosampled) tasks.push({ source: 'whosampled', promise: fetchWhoSampledData(typedAlbum) });
           if (services.secondhandsongs) tasks.push({ source: 'secondhandsongs', promise: fetchSecondHandSongsData(typedAlbum) });
           if (services.theaudiodb) tasks.push({ source: 'theaudiodb', promise: fetchTheAudioDBData(typedAlbum) });
           if (services.wikidata) tasks.push({ source: 'wikidata', promise: fetchWikidataData(typedAlbum) });

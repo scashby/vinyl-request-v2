@@ -33,7 +33,6 @@ export type EnrichmentService =
   | 'wikipedia'
   | 'discogs'
   | 'genius'
-  | 'whosampled'
   | 'secondhandsongs'
   | 'theaudiodb'
   | 'rateyourmusic'
@@ -53,9 +52,9 @@ export const DATA_TO_SERVICES: Record<DataCategory, EnrichmentService[]> = {
   credits: ['musicbrainz', 'allmusic', 'appleMusic', 'discogs', 'genius', 'wikidata'],
   tracklists: ['discogs', 'spotify', 'appleMusic', 'lastfm', 'setlistfm', 'deezer'],
   // NOTE: acousticbrainz is not implemented in the current fetch pipeline.
-  sonic_domain: ['musicbrainz', 'spotify', 'whosampled', 'secondhandsongs'],
+  sonic_domain: ['musicbrainz', 'spotify', 'secondhandsongs'],
   genres: ['discogs', 'spotify', 'appleMusic', 'allmusic', 'lastfm', 'musicbrainz', 'rateyourmusic', 'theaudiodb', 'deezer'],
-  streaming_links: ['spotify', 'appleMusic', 'lastfm', 'musicbrainz', 'allmusic', 'wikipedia', 'whosampled', 'secondhandsongs', 'setlistfm', 'deezer', 'musixmatch'],
+  streaming_links: ['spotify', 'appleMusic', 'lastfm', 'musicbrainz', 'allmusic', 'wikipedia', 'secondhandsongs', 'setlistfm', 'deezer', 'musixmatch'],
   reviews: ['allmusic', 'lastfm', 'spotify', 'appleMusic', 'wikipedia', 'rateyourmusic', 'pitchfork'],
   // NOTE: billboard is not implemented in the current fetch pipeline.
   chart_data: ['wikipedia', 'rateyourmusic', 'wikidata'],
@@ -90,9 +89,9 @@ export const DATA_CATEGORY_DESCRIPTIONS: Record<DataCategory, string> = {
   artwork: 'Front cover, back cover, spine, inner sleeves, and vinyl label images',
   credits: 'Musicians, producers, engineers, songwriters, composers, and conductors',
   tracklists: 'Complete track listings with durations, ISRCs, and per-track artists',
-  sonic_domain: 'BPM, Key, Cover Songs, Original Artists, Samples, and Remix data',
+  sonic_domain: 'BPM, Key, Cover Songs, and Original Artist data',
   genres: 'Genre classifications, styles, moods, and folksonomy tags',
-  streaming_links: 'Service IDs and links (Spotify, Apple, WhoSampled, SecondHandSongs, etc)',
+  streaming_links: 'Service IDs and links (Spotify, Apple, SecondHandSongs, etc)',
   reviews: 'Professional reviews, ratings, playcounts, popularity scores, and editorial notes',
   chart_data: 'Chart positions, sales certifications (Gold/Platinum/Diamond), and awards',
   release_metadata: 'Labels, catalog numbers, barcodes, countries, release dates, release notes, and companies',
@@ -156,8 +155,7 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
     'is_cover',
     'original_artist',
     'original_year',
-    'samples',
-    'sampled_by'
+    // intentionally excludes samples/sampled_by (WhoSampled removed from enrichment)
   ],
   genres: [
     'genres',
@@ -247,8 +245,8 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'is_cover': ['musicbrainz', 'discogs', 'secondhandsongs'],
   'original_artist': ['musicbrainz', 'discogs', 'secondhandsongs'],
   'original_year': ['musicbrainz', 'discogs', 'secondhandsongs'],
-  'samples': ['whosampled'],
-  'sampled_by': ['whosampled'],
+  'samples': [],
+  'sampled_by': [],
   
   // --- AUDIO ANALYSIS ---
   'tempo_bpm': ['musicbrainz', 'spotify'],
@@ -331,7 +329,6 @@ export const SERVICE_DISPLAY_NAMES: Record<EnrichmentService, string> = {
   wikipedia: 'Wikipedia',
   discogs: 'Discogs',
   genius: 'Genius',
-  whosampled: 'WhoSampled',
   secondhandsongs: 'SecondHandSongs',
   theaudiodb: 'TheAudioDB',
   rateyourmusic: 'Rate Your Music',
@@ -358,7 +355,6 @@ export const SERVICE_ICONS: Record<EnrichmentService, string> = {
   wikipedia: '📖',
   discogs: '💿',
   genius: '📝',
-  whosampled: '✂️',
   secondhandsongs: '♻️',
   theaudiodb: '🔊',
   rateyourmusic: '📈',
@@ -391,7 +387,6 @@ export function dataCategoriesToServices(
     discogsMetadata: false,
     discogsTracklist: false,
     genius: false,
-    whosampled: false,
     secondhandsongs: false
   };
 
@@ -414,7 +409,6 @@ export function dataCategoriesToServices(
           services.discogsTracklist = true;
           break;
         case 'genius': services.genius = true; break;
-        case 'whosampled': services.whosampled = true; break;
         case 'secondhandsongs': services.secondhandsongs = true; break;
       }
     });

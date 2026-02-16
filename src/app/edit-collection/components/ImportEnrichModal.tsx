@@ -154,7 +154,6 @@ const SERVICE_FLAG_TO_ID: Record<string, string> = {
   wikipedia: 'wikipedia',
   genius: 'genius',
   coverArt: 'coverArtArchive',
-  whosampled: 'whosampled',
   secondhandsongs: 'secondhandsongs',
   theaudiodb: 'theaudiodb',
   wikidata: 'wikidata',
@@ -224,7 +223,6 @@ function getServicesForSelectionFromConfig(config: FieldConfigMap) {
     wikipedia: activeServices.has('wikipedia'),
     genius: activeServices.has('genius'),
     coverArt: activeServices.has('coverArtArchive'),
-    whosampled: activeServices.has('whosampled'),
     secondhandsongs: activeServices.has('secondhandsongs'),
     theaudiodb: activeServices.has('theaudiodb'),
     wikidata: activeServices.has('wikidata'),
@@ -657,6 +655,8 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
         break;
       case 'tracklist':
       case 'tracklists':
+      case 'samples':
+      case 'sampled_by':
       case 'tempo_bpm':
       case 'musical_key':
       case 'time_signature':
@@ -1298,7 +1298,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       'rateyourmusic', 'lastfm', 'theaudiodb', 'wikipedia', 'wikidata', 
       'coverArt', 'fanarttv', 
       'genius', 'musixmatch', 
-      'whosampled', 'secondhandsongs', 'setlistfm', 
+      'secondhandsongs', 'setlistfm', 
       'popsike', 'pitchfork'
     ];
     
