@@ -2,8 +2,18 @@
 import Genius from 'genius-lyrics';
 import { parseDiscogsFormat } from './formatParser';
 
+const getEnv = (...keys: string[]): string | undefined => {
+  for (const key of keys) {
+    const value = process.env[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return undefined;
+};
+
 // Initialize Genius Client if token exists
-const GENIUS_TOKEN = process.env.GENIUS_ACCESS_TOKEN;
+const GENIUS_TOKEN = getEnv('GENIUS_ACCESS_TOKEN', 'GENIUS_API_TOKEN');
 const geniusClient = GENIUS_TOKEN ? new Genius.Client(GENIUS_TOKEN) : null;
 
 // ============================================================================
@@ -143,6 +153,27 @@ const cleanWikiText = (text: string) => {
 
 const truncateText = (text: string, max = 1400) =>
   text.length > max ? `${text.slice(0, max).trim()}…` : text;
+
+const buildTitleVariants = (title: string): string[] => {
+  const clean = (value: string) => value.replace(/\s+/g, ' ').trim();
+  const base = clean(title);
+  const variants = new Set<string>([base]);
+  variants.add(clean(base.split(' / ')[0] || base));
+  variants.add(clean(base.replace(/\(.*?\)|\[.*?\]/g, '')));
+  variants.add(clean(base.replace(/\b(feat|featuring|ft)\.?.*$/i, '')));
+  variants.add(clean(base.replace(/[-:]\s+.*$/, '')));
+  return Array.from(variants).filter((value) => value.length > 0);
+};
+
+const buildArtistVariants = (artist: string): string[] => {
+  const clean = (value: string) => value.replace(/\s+/g, ' ').trim();
+  const base = clean(artist);
+  const variants = new Set<string>([base]);
+  variants.add(clean(base.split('&')[0] || base));
+  variants.add(clean(base.split(',')[0] || base));
+  variants.add(clean(base.replace(/\s+\(\d+\)\s*$/, '')));
+  return Array.from(variants).filter((value) => value.length > 0);
+};
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -446,16 +477,22 @@ const isValidDate = (d: string) => /^\d{4}/.test(d);
 
 async function mbSearch(artist: string, title: string): Promise<string | null> {
   try {
-    const query = `artist:"${artist}" AND release:"${title}"`;
-    const url = `${MB_BASE}/release/?query=${encodeURIComponent(query)}&fmt=json&limit=3`;
-    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
-    const data = await res.json() as MBSearchResponse;
-    
-    // Prefer "Official" releases
-    const releases = data.releases;
-    const release = releases?.find((r) => r.status === 'Official') || releases?.[0];
-    
-    return release?.id || null;
+    const artistVariants = buildArtistVariants(artist);
+    const titleVariants = buildTitleVariants(title);
+    for (const artistVariant of artistVariants) {
+      for (const titleVariant of titleVariants) {
+        const query = `artist:"${artistVariant}" AND release:"${titleVariant}"`;
+        const url = `${MB_BASE}/release/?query=${encodeURIComponent(query)}&fmt=json&limit=3`;
+        const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+        const data = await res.json() as MBSearchResponse;
+        
+        // Prefer "Official" releases
+        const releases = data.releases;
+        const release = releases?.find((r) => r.status === 'Official') || releases?.[0];
+        if (release?.id) return release.id;
+      }
+    }
+    return null;
   } catch { return null; }
 }
 
@@ -469,11 +506,22 @@ async function mbGetRelease(mbid: string): Promise<MBRelease | null> {
 
 export async function fetchMusicBrainzData(album: { artist: string, title: string, musicbrainz_id?: string }): Promise<EnrichmentResult> {
   try {
-    const mbid = album.musicbrainz_id || await mbSearch(album.artist, album.title);
-    if (!mbid) return { success: false, source: 'musicbrainz', error: 'Not found' };
+    // Some records may store a release-group id in musicbrainz_id; if direct fetch fails,
+    // fall back to search so we can still resolve the canonical release id.
+    let mbid = album.musicbrainz_id ?? null;
+    let release: MBRelease | null = null;
 
-    const release = await mbGetRelease(mbid);
-    if (!release) return { success: false, source: 'musicbrainz', error: 'Fetch failed' };
+    if (mbid) {
+      release = await mbGetRelease(mbid);
+    }
+
+    if (!release) {
+      mbid = await mbSearch(album.artist, album.title);
+      if (!mbid) return { success: false, source: 'musicbrainz', error: 'Not found' };
+      release = await mbGetRelease(mbid);
+    }
+
+    if (!release || !mbid) return { success: false, source: 'musicbrainz', error: 'Fetch failed' };
 
     const candidate: CandidateData = {
       musicbrainz_id: mbid,
@@ -564,11 +612,14 @@ export async function fetchMusicBrainzData(album: { artist: string, title: strin
 // ============================================================================
 // 2. SPOTIFY (Genres, Dates, BPM, Key, Energy, Danceability, Moods)
 // ============================================================================
-const SP_ID = process.env.SPOTIFY_CLIENT_ID!;
-const SP_SECRET = process.env.SPOTIFY_CLIENT_SECRET!;
+const SP_ID = getEnv('SPOTIFY_CLIENT_ID');
+const SP_SECRET = getEnv('SPOTIFY_CLIENT_SECRET');
 let spToken: { token: string; exp: number } | null = null;
 
 async function spGetToken(): Promise<string> {
+  if (!SP_ID || !SP_SECRET) {
+    throw new Error('Missing Spotify credentials (SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET)');
+  }
   if (spToken && spToken.exp > Date.now()) return spToken.token;
   const res = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
@@ -579,6 +630,12 @@ async function spGetToken(): Promise<string> {
     body: 'grant_type=client_credentials'
   });
   const data = await res.json();
+  if (!res.ok || !data?.access_token) {
+    const detail = typeof data?.error_description === 'string'
+      ? data.error_description
+      : (typeof data?.error === 'string' ? data.error : 'token request failed');
+    throw new Error(`Spotify auth failed: ${detail}`);
+  }
   spToken = { token: data.access_token, exp: Date.now() + (data.expires_in * 1000) - 60000 };
   return spToken.token;
 }
@@ -591,12 +648,20 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
     let spId = album.spotify_id;
 
     if (!spId) {
-      const q = `album:${album.title} artist:${album.artist}`;
-      const searchRes = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=album&limit=1`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const searchData = await searchRes.json();
-      spId = searchData.albums?.items?.[0]?.id;
+      const artistVariants = buildArtistVariants(album.artist);
+      const titleVariants = buildTitleVariants(album.title);
+      for (const artistVariant of artistVariants) {
+        if (spId) break;
+        for (const titleVariant of titleVariants) {
+          const q = `album:${titleVariant} artist:${artistVariant}`;
+          const searchRes = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=album&limit=1`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const searchData = await searchRes.json();
+          spId = searchData.albums?.items?.[0]?.id;
+          if (spId) break;
+        }
+      }
     }
 
     if (!spId) return { success: false, source: 'spotify', error: 'Not found' };
@@ -694,7 +759,7 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
 // ============================================================================
 // 3. APPLE MUSIC (Genres, Dates, High-Res Images)
 // ============================================================================
-const AM_TOKEN = process.env.APPLE_MUSIC_TOKEN!;
+const AM_TOKEN = getEnv('APPLE_MUSIC_TOKEN');
 
 export async function fetchAppleMusicData(album: { artist: string, title: string, apple_music_id?: string }): Promise<EnrichmentResult> {
   try {
@@ -750,7 +815,7 @@ export async function fetchAppleMusicData(album: { artist: string, title: string
 // ============================================================================
 // 4. DISCOGS (Styles, Genres, Year, Credits, Barcodes, Deep Images)
 // ============================================================================
-const DISCOGS_TOKEN = process.env.DISCOGS_ACCESS_TOKEN!;
+const DISCOGS_TOKEN = getEnv('DISCOGS_ACCESS_TOKEN', 'NEXT_PUBLIC_DISCOGS_TOKEN');
 
 const buildDiscogsFormatString = (formats?: Array<{ name?: string; qty?: string | number; descriptions?: string[] }>) => {
   if (!formats || formats.length === 0) return '';
@@ -766,6 +831,9 @@ const buildDiscogsFormatString = (formats?: Array<{ name?: string; qty?: string 
 
 export async function fetchDiscogsData(album: { artist: string, title: string, discogs_release_id?: string }): Promise<EnrichmentResult> {
   try {
+    if (!DISCOGS_TOKEN) {
+      return { success: false, source: 'discogs', error: 'Missing Discogs token (DISCOGS_ACCESS_TOKEN or NEXT_PUBLIC_DISCOGS_TOKEN)' };
+    }
     let releaseId = album.discogs_release_id;
 
     if (!releaseId) {
@@ -886,7 +954,7 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
 // ============================================================================
 // 5. LAST.FM (Tags/Genres/Moods)
 // ============================================================================
-const LFM_KEY = process.env.LASTFM_API_KEY!;
+const LFM_KEY = getEnv('LASTFM_API_KEY');
 const LFM_BASE = 'https://ws.audioscrobbler.com/2.0/';
 
 function mapTagsToMoods(tags: string[], candidate: CandidateData) {
@@ -913,6 +981,9 @@ function mapTagsToMoods(tags: string[], candidate: CandidateData) {
 
 export async function fetchLastFmData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
   try {
+    if (!LFM_KEY) {
+      return { success: false, source: 'lastfm', error: 'Missing Last.fm API key (LASTFM_API_KEY)' };
+    }
     const url = `${LFM_BASE}?method=album.getinfo&artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.title)}&api_key=${LFM_KEY}&format=json`;
     const res = await fetch(url);
     const data = await res.json();
@@ -1037,17 +1108,45 @@ export async function fetchGeniusData(album: { artist: string, title: string }):
 // ============================================================================
 export async function fetchWikipediaData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
     try {
-        const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(album.artist + ' ' + album.title + ' album')}&format=json`;
-        const res = await fetch(searchUrl);
-        const data = await res.json();
+        const artistVariants = buildArtistVariants(album.artist);
+        const titleVariants = buildTitleVariants(album.title);
+        let pageId: number | null = null;
+
+        for (const artistVariant of artistVariants) {
+          if (pageId) break;
+          for (const titleVariant of titleVariants) {
+            const queries = [
+              `${artistVariant} ${titleVariant} album`,
+              `${artistVariant} ${titleVariant}`,
+              `${titleVariant} album`
+            ];
+            for (const query of queries) {
+              const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json`;
+              const res = await fetch(searchUrl, { headers: { 'User-Agent': USER_AGENT } });
+              const data = await res.json();
+              const results = Array.isArray(data?.query?.search) ? data.query.search : [];
+              const titleToken = titleVariant.toLowerCase();
+              const artistToken = artistVariant.toLowerCase();
+              const preferred = results.find((entry: { title?: string; snippet?: string }) => {
+                const haystack = `${entry?.title ?? ''} ${entry?.snippet ?? ''}`.toLowerCase();
+                return haystack.includes(titleToken) && haystack.includes(artistToken);
+              });
+              const fallback = results[0];
+              const match = preferred?.pageid ?? fallback?.pageid;
+              if (match) {
+                pageId = match;
+                break;
+              }
+            }
+            if (pageId) break;
+          }
+        }
         
-        if (!data.query?.search?.length) return { success: false, source: 'wikipedia', error: 'Not found' };
-        
-        const pageId = data.query.search[0].pageid;
+        if (!pageId) return { success: false, source: 'wikipedia', error: 'Not found' };
         
         // Step 2: Fetch the actual summary
         const summaryUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&pageids=${pageId}&format=json`;
-        const summaryRes = await fetch(summaryUrl);
+        const summaryRes = await fetch(summaryUrl, { headers: { 'User-Agent': USER_AGENT } });
         const summaryData = await summaryRes.json();
         const extract = summaryData.query?.pages?.[pageId]?.extract;
         
@@ -1055,7 +1154,7 @@ export async function fetchWikipediaData(album: { artist: string, title: string 
         let wikitext = '';
         try {
           const parseUrl = `https://en.wikipedia.org/w/api.php?action=parse&pageid=${pageId}&prop=wikitext&format=json`;
-          const parseRes = await fetch(parseUrl);
+          const parseRes = await fetch(parseUrl, { headers: { 'User-Agent': USER_AGENT } });
           const parseData = await parseRes.json();
           wikitext = parseData?.parse?.wikitext?.['*'] ?? '';
         } catch {
@@ -1121,17 +1220,23 @@ export async function fetchAllMusicData(album: { artist: string, title: string, 
     try {
         let allmusicUrl = album.allmusic_url;
         if (!allmusicUrl) {
-            const query = `${album.artist} ${album.title}`;
-            const searchUrl = `https://www.allmusic.com/search/albums/${encodeURIComponent(query)}`;
-            const searchRes = await fetch(searchUrl);
-            const html = await searchRes.text();
-
-            const match = html.match(/href="(\/album\/[^"?]+)"/i);
-            if (match?.[1]) {
-                allmusicUrl = `https://www.allmusic.com${match[1]}`;
-            } else {
-                return { success: false, source: 'allmusic', error: 'Not found' };
+            const artistVariants = buildArtistVariants(album.artist);
+            const titleVariants = buildTitleVariants(album.title);
+            for (const artistVariant of artistVariants) {
+              if (allmusicUrl) break;
+              for (const titleVariant of titleVariants) {
+                const query = `${artistVariant} ${titleVariant}`;
+                const searchUrl = `https://www.allmusic.com/search/albums/${encodeURIComponent(query)}`;
+                const searchRes = await fetch(searchUrl);
+                const html = await searchRes.text();
+                const match = html.match(/href="(\/album\/[^"?]+)"/i);
+                if (match?.[1]) {
+                    allmusicUrl = `https://www.allmusic.com${match[1]}`;
+                    break;
+                }
+              }
             }
+            if (!allmusicUrl) return { success: false, source: 'allmusic', error: 'Not found' };
         }
 
         let reviewSnippet: string | undefined;

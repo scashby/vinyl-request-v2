@@ -1639,7 +1639,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               field,
               diagSummary
                 ? `no candidate data (${diagSummary})`
-                : 'no candidate data from selected sources'
+                : 'no candidate data (diagnostics unavailable - backend may be outdated)'
             );
           } else {
             unresolvedMissingReasons.set(field, 'not applied after normalization');
