@@ -324,6 +324,30 @@ const isEmptyValue = (val: unknown): boolean => {
   return false;
 };
 
+const isFieldMissingOnAlbum = (album: Record<string, unknown>, field: string): boolean => {
+  if (field === 'tracks.lyrics_url') {
+    return isEmptyValue(album.tracks_lyrics_url);
+  }
+  if (field === 'tracks.lyrics') {
+    const hasLyrics = !isEmptyValue(album.tracks_lyrics);
+    const hasLyricsUrl = !isEmptyValue(album.tracks_lyrics_url);
+    return !(hasLyrics || hasLyricsUrl);
+  }
+  if (field === 'labels') {
+    return isEmptyValue(album.labels) && isEmptyValue(album.label);
+  }
+  if (field === 'release_notes') {
+    return isEmptyValue(album.release_notes) && isEmptyValue(album.notes);
+  }
+  if (field === 'original_release_date') {
+    return isEmptyValue(album.original_release_date) && isEmptyValue(album.year);
+  }
+
+  const rootField = field.split('.')[0];
+  if (!isEmptyValue(album[field])) return false;
+  return isEmptyValue(album[rootField]);
+};
+
 const areValuesEqual = (a: unknown, b: unknown): boolean => {
   return normalizeValue(a) === normalizeValue(b);
 };
@@ -1335,7 +1359,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const fieldCandidates: Record<string, Record<string, unknown>> = {};
       const unresolvedMissingReasons = new Map<string, string>();
       const updatedMissingFields = new Set<string>();
-      const selectedMissingFields = selectedFields.filter((field) => isEmptyValue(album[field]));
+      const albumRecord = album as Record<string, unknown>;
+      const selectedMissingFields = selectedFields.filter((field) => isFieldMissingOnAlbum(albumRecord, field));
       let derivedDiscData: { disc_metadata: unknown; matrix_numbers: unknown } | null = null;
 
       for (const source of GLOBAL_PRIORITY) {
