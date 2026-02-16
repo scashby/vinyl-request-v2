@@ -849,6 +849,15 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
       };
     }
     let releaseId = album.discogs_release_id;
+    const readDiscogsJson = async (res: Response) => {
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        const snippet = text.slice(0, 140).replace(/\s+/g, ' ');
+        throw new Error(`Discogs returned non-JSON (${res.status}): ${snippet}`);
+      }
+    };
 
     if (!releaseId) {
       const q = `${album.artist} - ${album.title}`;
@@ -856,7 +865,7 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
         discogsUrl(`https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release`),
         { headers: discogsHeaders(USER_AGENT) }
       );
-      const searchData = await searchRes.json();
+      const searchData = await readDiscogsJson(searchRes);
       releaseId = searchData.results?.[0]?.id;
     }
 
@@ -868,7 +877,7 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
       { headers: discogsHeaders(USER_AGENT) }
     );
 
-    const data = await releaseRes.json() as DiscogsRelease;
+    const data = (await readDiscogsJson(releaseRes)) as DiscogsRelease;
 
     const formatString = buildDiscogsFormatString(data.formats as Array<{ name?: string; qty?: string | number; descriptions?: string[] }> | undefined);
     const parsedFormat = formatString ? parseDiscogsFormat(formatString) : null;
@@ -880,7 +889,7 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
           discogsUrl(`https://api.discogs.com/masters/${data.master_id}`),
           { headers: discogsHeaders(USER_AGENT) }
         );
-        if (masterRes.ok) masterData = await masterRes.json();
+        if (masterRes.ok) masterData = await readDiscogsJson(masterRes);
     }
 
     // Capture all images (prefer Discogs type hints)

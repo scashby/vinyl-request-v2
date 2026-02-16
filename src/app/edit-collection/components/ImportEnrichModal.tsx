@@ -120,6 +120,8 @@ interface CandidateResult {
   album: Album;
   candidates: Record<string, unknown>;
   sourceDiagnostics?: Record<string, { status: 'returned' | 'no_data' | 'error'; reason?: string }>;
+  attemptedSources?: string[];
+  sourceFieldCoverage?: Record<string, string[]>;
 }
 
 type FetchCandidatesResponse = {
@@ -169,6 +171,38 @@ const normalizeSourceForLog = (source: string): string => {
   if (source === 'coverArt') return 'coverArtArchive';
   if (source === 'appleMusicEnhanced') return 'appleMusic';
   return source;
+};
+
+const toDiagnosticsSourceKey = (source: string): string => {
+  if (source === 'coverArtArchive') return 'coverArt';
+  return source;
+};
+
+const CANDIDATE_FIELD_ALIASES: Record<string, string[]> = {
+  labels: ['labels', 'label'],
+  release_notes: ['release_notes', 'notes'],
+  original_release_date: ['original_release_date', 'year'],
+  tracks: ['tracks', 'tracklist', 'tracklists'],
+  tracklist: ['tracklist', 'tracklists', 'tracks'],
+  tracklists: ['tracklists', 'tracklist', 'tracks'],
+  master_notes: ['master_notes', 'notes'],
+};
+
+const NON_ENRICHABLE_FIELDS = new Set<string>([
+  'time_signature',
+  'samples',
+  'sampled_by',
+  'lastfm_id',
+  'recording_date',
+  'studio',
+  'allmusic_similar_albums',
+]);
+
+const candidateKeysForField = (field: string): string[] => {
+  const aliases = CANDIDATE_FIELD_ALIASES[field];
+  if (aliases) return aliases;
+  const rootField = field.split('.')[0];
+  return rootField === field ? [field] : [field, rootField];
 };
 
 const createEnrichmentRunId = (): string => {
@@ -1276,7 +1310,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     results.forEach((item) => {
       processedIds.push(item.album.id);
-      const { album, candidates, sourceDiagnostics } = item;
+      const { album, candidates, sourceDiagnostics, attemptedSources, sourceFieldCoverage } = item;
       const genrePool = [
         ...(Array.isArray(album.genres) ? album.genres : []),
         ...(Array.isArray(album.styles) ? album.styles : []),
@@ -1626,15 +1660,35 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         selectedMissingFields.forEach((field) => {
           if (updatedMissingFields.has(field)) return;
           if (unresolvedMissingReasons.has(field)) return;
+          if (NON_ENRICHABLE_FIELDS.has(field)) {
+            unresolvedMissingReasons.set(field, 'not currently supported by implemented sources');
+            return;
+          }
           const candidatesForField = fieldCandidates[field];
           if (!candidatesForField || Object.keys(candidatesForField).length === 0) {
-            const diagSummary = sourceDiagnostics
-              ? Object.entries(sourceDiagnostics)
-                  .filter(([, diag]) => diag.status !== 'returned')
-                  .slice(0, 2)
-                  .map(([source, diag]) => `${source}: ${diag.reason || diag.status}`)
-                  .join(' | ')
-              : '';
+            const allowedSources = Array.from(fieldConfig[field] ?? []);
+            const candidateKeys = candidateKeysForField(field);
+            const diagSummary = allowedSources
+              .map((source) => {
+                const diagSource = toDiagnosticsSourceKey(source);
+                const diag = sourceDiagnostics?.[diagSource];
+                const attempted = attemptedSources?.includes(diagSource) ?? false;
+
+                if (!attempted || !diag) {
+                  return `${source}: not called`;
+                }
+                if (diag.status === 'error' || diag.status === 'no_data') {
+                  return `${source}: ${diag.reason || diag.status}`;
+                }
+
+                const returnedKeys = sourceFieldCoverage?.[diagSource] ?? [];
+                const hitField = candidateKeys.some((key) => returnedKeys.includes(key));
+                return hitField
+                  ? `${source}: returned`
+                  : `${source}: returned other fields`;
+              })
+              .join(' | ');
+
             unresolvedMissingReasons.set(
               field,
               diagSummary

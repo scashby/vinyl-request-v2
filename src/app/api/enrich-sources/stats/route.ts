@@ -4,6 +4,16 @@ import { DATA_CATEGORY_CHECK_FIELDS } from "src/lib/enrichment-data-mapping";
 
 export const dynamic = 'force-dynamic';
 
+const NON_ENRICHABLE_FIELDS = new Set<string>([
+  'time_signature',
+  'samples',
+  'sampled_by',
+  'lastfm_id',
+  'recording_date',
+  'studio',
+  'allmusic_similar_albums',
+]);
+
 type RecordingRow = {
   duration_seconds: number | null;
   credits: unknown;
@@ -547,6 +557,7 @@ export async function GET(request: Request) {
       };
 
       for (const field of allCheckFields) {
+        if (NON_ENRICHABLE_FIELDS.has(field)) continue;
         fieldApplicable[field] += 1;
         if (!hasFieldValue(field)) {
           fieldMissing[field] += 1;

@@ -150,7 +150,9 @@ export async function POST(req: Request) {
     const results: {
       album: ReturnType<typeof mapInventoryToCandidate>,
       candidates: Record<string, CandidateData>,
-      sourceDiagnostics?: Record<string, { status: 'returned' | 'no_data' | 'error'; reason?: string }>
+      sourceDiagnostics?: Record<string, { status: 'returned' | 'no_data' | 'error'; reason?: string }>,
+      attemptedSources?: string[],
+      sourceFieldCoverage?: Record<string, string[]>
     }[] = [];
 
     type CandidateAlbumRow = {
@@ -373,6 +375,7 @@ export async function POST(req: Request) {
        const chunkPromises = chunk.map(async (album) => {
           const candidates: Record<string, CandidateData> = {};
           const sourceDiagnostics: Record<string, { status: 'returned' | 'no_data' | 'error'; reason?: string }> = {};
+          const sourceFieldCoverage: Record<string, string[]> = {};
           const tasks: { source: string; promise: Promise<EnrichmentResult | null> }[] = [];
 
           const typedAlbum = mapInventoryToCandidate(album);
@@ -411,14 +414,25 @@ export async function POST(req: Request) {
               const value = res.value;
               if (value && value.success && value.data) {
                 candidates[value.source] = value.data;
+                sourceFieldCoverage[task.source] = Object.entries(value.data)
+                  .filter(([, v]) => {
+                    if (v === null || v === undefined) return false;
+                    if (typeof v === 'string') return v.trim().length > 0;
+                    if (Array.isArray(v)) return v.length > 0;
+                    if (typeof v === 'object') return Object.keys(v as Record<string, unknown>).length > 0;
+                    return true;
+                  })
+                  .map(([k]) => k);
                 sourceDiagnostics[task.source] = { status: 'returned' };
               } else {
+                sourceFieldCoverage[task.source] = [];
                 sourceDiagnostics[task.source] = {
                   status: 'no_data',
                   reason: value?.error || 'No match'
                 };
               }
             } else {
+              sourceFieldCoverage[task.source] = [];
               sourceDiagnostics[task.source] = {
                 status: 'error',
                 reason: res.reason instanceof Error ? res.reason.message : 'Unknown error'
@@ -427,9 +441,21 @@ export async function POST(req: Request) {
           });
 
           if (Object.keys(candidates).length > 0) {
-            return { album: typedAlbum, candidates, sourceDiagnostics };
+            return {
+              album: typedAlbum,
+              candidates,
+              sourceDiagnostics,
+              attemptedSources: tasks.map((task) => task.source),
+              sourceFieldCoverage
+            };
           }
-          return { album: typedAlbum, candidates, sourceDiagnostics };
+          return {
+            album: typedAlbum,
+            candidates,
+            sourceDiagnostics,
+            attemptedSources: tasks.map((task) => task.source),
+            sourceFieldCoverage
+          };
        });
 
        // Wait for this chunk of albums to complete
