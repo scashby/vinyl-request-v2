@@ -273,6 +273,9 @@ export async function POST(req: Request) {
     let enrichedCount = 0;
     let syncedCount = 0;
     let skippedCount = 0;
+    let skippedExistingCount = 0;
+    let skippedNoTitleCount = 0;
+    let attemptedCount = 0;
     let failedCount = 0;
     const enrichedTracksList = [];
     const failedTracksList = [];
@@ -285,6 +288,7 @@ export async function POST(req: Request) {
         console.log(`    ⏭️ Skipping: No title`);
         enrichedTracks.push(track);
         skippedCount++;
+        skippedNoTitleCount++;
         continue;
       }
 
@@ -292,10 +296,12 @@ export async function POST(req: Request) {
         console.log(`    ⏭️ Skipping: Already has lyrics URL`);
         enrichedTracks.push(track);
         skippedCount++;
+        skippedExistingCount++;
         continue;
       }
 
       try {
+        attemptedCount++;
         let lyricsUrl: string | null = null;
         let lyricsSource = 'genius';
         const providerErrors: string[] = [];
@@ -436,7 +442,10 @@ export async function POST(req: Request) {
         totalTracks: tracks.length,
         enrichedCount,
         syncedCount,
+        attemptedCount,
         skippedCount,
+        skippedExistingCount,
+        skippedNoTitleCount,
         failedCount,
         enrichedTracks: enrichedTracksList,
         failedTracks: failedTracksList

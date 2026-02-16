@@ -1553,14 +1553,22 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           if (data?.success) {
             const failedCount = Number(data.data?.failedCount ?? 0);
             const syncedCount = Number(data.data?.syncedCount ?? 0);
+            const attemptedCount = Number(data.data?.attemptedCount ?? 0);
+            const skippedExistingCount = Number(data.data?.skippedExistingCount ?? 0);
             const failedSample = Array.isArray(data.data?.failedTracks) && data.data.failedTracks.length > 0
               ? String(data.data.failedTracks[0]?.error ?? '')
               : '';
             const baseCountLabel = syncedCount > 0
               ? `Lyrics URLs: ${data.data?.enrichedCount ?? 0}/${data.data?.totalTracks ?? 0} (synced existing: ${syncedCount})`
               : `Lyrics URLs: ${data.data?.enrichedCount ?? 0}/${data.data?.totalTracks ?? 0}`;
-            const detail = failedCount > 0 && failedSample
-              ? `${baseCountLabel} (failed: ${failedCount}; sample: ${failedSample})`
+            const attemptedLabel = attemptedCount > 0 ? `attempted: ${attemptedCount}` : null;
+            const skippedLabel = skippedExistingCount > 0 ? `already had URL: ${skippedExistingCount}` : null;
+            const failedLabel = failedCount > 0 && failedSample
+              ? `failed: ${failedCount}; sample: ${failedSample}`
+              : (failedCount > 0 ? `failed: ${failedCount}` : null);
+            const extras = [attemptedLabel, skippedLabel, failedLabel].filter((value): value is string => !!value);
+            const detail = extras.length > 0
+              ? `${baseCountLabel} (${extras.join('; ')})`
               : baseCountLabel;
             addLog(`${job.artist} - ${job.title}`, 'info', detail);
           } else {
