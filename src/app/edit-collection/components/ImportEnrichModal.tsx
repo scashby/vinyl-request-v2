@@ -299,6 +299,31 @@ const normalizeValue = (val: unknown): string => {
   return clean(val);
 };
 
+const hasMeaningfulValue = (val: unknown): boolean => {
+  if (val === null || val === undefined) return false;
+  if (typeof val === 'string') return val.trim().length > 0;
+  if (Array.isArray(val)) {
+    return val.some((item) => hasMeaningfulValue(item));
+  }
+  if (typeof val === 'object') {
+    const obj = val as Record<string, unknown>;
+    return Object.values(obj).some((item) => hasMeaningfulValue(item));
+  }
+  return true;
+};
+
+const isEmptyValue = (val: unknown): boolean => {
+  if (val === null || val === undefined) return true;
+  if (typeof val === 'string') return val.trim() === '';
+  if (Array.isArray(val)) {
+    return val.length === 0 || val.every((item) => isEmptyValue(item));
+  }
+  if (typeof val === 'object') {
+    return Object.keys(val as object).length === 0;
+  }
+  return false;
+};
+
 const areValuesEqual = (a: unknown, b: unknown): boolean => {
   return normalizeValue(a) === normalizeValue(b);
 };
@@ -801,6 +826,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const hasMoreRef = useRef(true);
   const isLoopingRef = useRef(false);
   const cursorRef = useRef(0); // Tracks current position in DB
+  const statsRefreshInFlightRef = useRef(false);
 
   useEffect(() => {
     if (isOpen) loadStats();
@@ -821,8 +847,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [sessionLog]);
 
-  async function loadStats() {
-    setLoading(true);
+  async function loadStats(background = false) {
+    if (statsRefreshInFlightRef.current) return;
+    statsRefreshInFlightRef.current = true;
+    if (!background) setLoading(true);
     try {
       const res = await fetch('/api/enrich-sources/stats');
       const data = await res.json();
@@ -833,9 +861,18 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     } catch (error) {
       console.error('Failed to load stats:', error);
     } finally {
-      setLoading(false);
+      statsRefreshInFlightRef.current = false;
+      if (!background) setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!isOpen || !enriching) return;
+    const timer = setInterval(() => {
+      void loadStats(true);
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [isOpen, enriching]);
 
   function getServicesForSelection() {
     return getServicesForSelectionFromConfig(fieldConfig);
@@ -1235,7 +1272,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const foundKeys = new Set<string>();
       Object.values(candidates).forEach((c) => {
         if (c && typeof c === 'object') {
-          Object.keys(c as Record<string, unknown>).forEach(k => foundKeys.add(k));
+          Object.entries(c as Record<string, unknown>).forEach(([k, v]) => {
+            if (hasMeaningfulValue(v)) {
+              foundKeys.add(k);
+            }
+          });
         }
       });
       
@@ -1244,7 +1285,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         .filter(k => ALLOWED_COLUMNS.has(k))
         .filter(k => !!fieldConfig[k]);
 
-      if (allowedSummaryKeys.length > 0) {
+      if (!missingDataOnly && allowedSummaryKeys.length > 0) {
          const summary = allowedSummaryKeys
             .map(k => k.replace(/_/g, ' '))
             .join(', ');
@@ -1292,6 +1333,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const updatesForAlbum: Record<string, unknown> = {};
       const autoFilledFields: string[] = [];
       const fieldCandidates: Record<string, Record<string, unknown>> = {};
+      const unresolvedMissingReasons = new Map<string, string>();
+      const updatedMissingFields = new Set<string>();
+      const selectedMissingFields = selectedFields.filter((field) => isEmptyValue(album[field]));
       let derivedDiscData: { disc_metadata: unknown; matrix_numbers: unknown } | null = null;
 
       for (const source of GLOBAL_PRIORITY) {
@@ -1381,13 +1425,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const currentVal = (album as any)[key];
           
-          const isCurrentEmpty = !currentVal || 
-            (Array.isArray(currentVal) && (
-               currentVal.length === 0 || 
-               currentVal.every(v => !v || String(v).trim() === '')
-            )) ||
-            (typeof currentVal === 'string' && currentVal.trim() === '') ||
-            (typeof currentVal === 'object' && Object.keys(currentVal as object).length === 0);
+          const isCurrentEmpty = isEmptyValue(currentVal);
 
           const sources = Object.keys(sourceValues);
           if (sources.length === 0) return;
@@ -1459,20 +1497,35 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
              proposedValue = sourceValues[winnerSrc];
           }
 
-          if (proposedValue === null || proposedValue === undefined || proposedValue === '') return;
+          if (proposedValue === null || proposedValue === undefined || proposedValue === '') {
+            if (missingDataOnly && isCurrentEmpty) {
+              unresolvedMissingReasons.set(key, 'candidate value empty');
+            }
+            return;
+          }
           
           if (Array.isArray(proposedValue)) {
              const filtered = proposedValue.filter(v => v && String(v).trim() !== '');
-             if (filtered.length === 0) return;
+             if (filtered.length === 0) {
+               if (missingDataOnly && isCurrentEmpty) {
+                 unresolvedMissingReasons.set(key, 'candidate array empty');
+               }
+               return;
+             }
              proposedValue = filtered;
           }
           
-          if (typeof proposedValue === 'object' && Object.keys(proposedValue as object).length === 0) return;
+          if (typeof proposedValue === 'object' && Object.keys(proposedValue as object).length === 0) {
+            if (missingDataOnly && isCurrentEmpty) {
+              unresolvedMissingReasons.set(key, 'candidate object empty');
+            }
+            return;
+          }
 
           const uniqueSingleValues = new Set(Object.values(sourceValues).map(v => normalizeValue(v)));
           const singleValuesAgree = !isArrayField && uniqueSingleValues.size === 1;
 
-          if (isCurrentEmpty && (isMerge || singleValuesAgree)) {
+          if (isCurrentEmpty && (isMerge || singleValuesAgree || missingDataOnly)) {
               if (key === 'enriched_metadata') {
                  // Auto-fill logic for metadata
                  const base = (currentVal as Record<string, unknown>) || {};
@@ -1488,6 +1541,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               } else {
                  updatesForAlbum[key] = proposedValue;
                  autoFilledFields.push(key);
+              }
+              if (missingDataOnly) {
+                updatedMissingFields.add(key);
+                unresolvedMissingReasons.delete(key);
               }
               
               sources.forEach(src => {
@@ -1542,6 +1599,39 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const hasConflictsForAlbum = newConflicts.some(c => c.album_id === album.id);
       if (!hasConflictsForAlbum) {
         updatesForAlbum.last_reviewed_at = new Date().toISOString();
+      }
+
+      if (missingDataOnly) {
+        selectedMissingFields.forEach((field) => {
+          if (updatedMissingFields.has(field)) return;
+          if (unresolvedMissingReasons.has(field)) return;
+          const candidatesForField = fieldCandidates[field];
+          if (!candidatesForField || Object.keys(candidatesForField).length === 0) {
+            unresolvedMissingReasons.set(field, 'no candidate data from selected sources');
+          } else {
+            unresolvedMissingReasons.set(field, 'not applied after normalization');
+          }
+        });
+
+        const formatField = (field: string) => field.replace(/_/g, ' ');
+        if (updatedMissingFields.size > 0) {
+          const updatedList = Array.from(updatedMissingFields).map(formatField);
+          addLog(
+            `${album.artist} - ${album.title}`,
+            'auto-fill',
+            `Updated missing fields: ${updatedList.join(', ')}`
+          );
+        }
+        if (unresolvedMissingReasons.size > 0) {
+          const unresolvedList = Array.from(unresolvedMissingReasons.entries()).map(
+            ([field, reason]) => `${formatField(field)} (${reason})`
+          );
+          addLog(
+            `${album.artist} - ${album.title}`,
+            'skipped',
+            `Still missing: ${unresolvedList.join(', ')}`
+          );
+        }
       }
 
       const conflictFieldsForAlbum = newConflicts
