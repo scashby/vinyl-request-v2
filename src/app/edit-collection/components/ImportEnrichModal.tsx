@@ -1542,12 +1542,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           const data = await res.json();
           if (data?.success) {
             const failedCount = Number(data.data?.failedCount ?? 0);
+            const syncedCount = Number(data.data?.syncedCount ?? 0);
             const failedSample = Array.isArray(data.data?.failedTracks) && data.data.failedTracks.length > 0
               ? String(data.data.failedTracks[0]?.error ?? '')
               : '';
-            const detail = failedCount > 0 && failedSample
-              ? `Lyrics URLs: ${data.data?.enrichedCount ?? 0}/${data.data?.totalTracks ?? 0} (failed: ${failedCount}; sample: ${failedSample})`
+            const baseCountLabel = syncedCount > 0
+              ? `Lyrics URLs: ${data.data?.enrichedCount ?? 0}/${data.data?.totalTracks ?? 0} (synced existing: ${syncedCount})`
               : `Lyrics URLs: ${data.data?.enrichedCount ?? 0}/${data.data?.totalTracks ?? 0}`;
+            const detail = failedCount > 0 && failedSample
+              ? `${baseCountLabel} (failed: ${failedCount}; sample: ${failedSample})`
+              : baseCountLabel;
             addLog(`${job.artist} - ${job.title}`, 'info', detail);
           } else {
             const failedSample = Array.isArray(data?.data?.failedTracks) && data.data.failedTracks.length > 0

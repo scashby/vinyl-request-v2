@@ -10,6 +10,7 @@ type Track = {
   position?: string;
   title?: string;
   recording_id?: number | null;
+  lyrics_url?: string | null;
   credits?: Record<string, unknown> | null;
 };
 
@@ -191,7 +192,8 @@ export async function POST(req: Request) {
             recording:recordings (
               id,
               title,
-              credits
+              credits,
+              lyrics_url
             )
           )
         )
@@ -220,6 +222,7 @@ export async function POST(req: Request) {
         position: track.position,
         title: track.title_override || recording?.title || '',
         recording_id: track.recording_id ?? recording?.id ?? null,
+        lyrics_url: recording?.lyrics_url ?? null,
         credits: normalizeCredits(recording?.credits ?? null)
       };
     });
@@ -240,6 +243,7 @@ export async function POST(req: Request) {
     console.log(`\n🔍 Processing ${tracks.length} tracks...`);
     const enrichedTracks: Track[] = [];
     let enrichedCount = 0;
+    let syncedCount = 0;
     let skippedCount = 0;
     let failedCount = 0;
     const enrichedTracksList = [];
@@ -334,17 +338,22 @@ export async function POST(req: Request) {
 
     console.log(`\n📊 SUMMARY: ${enrichedCount} enriched, ${skippedCount} skipped, ${failedCount} failed`);
 
-    if (enrichedCount > 0) {
+    const tracksWithLyricsUrl = enrichedTracks.filter(
+      (track) => track.recording_id && track.credits?.lyrics_url
+    );
+
+    if (tracksWithLyricsUrl.length > 0) {
       console.log(`💾 Updating database...`);
-      for (const track of enrichedTracks) {
-        if (!track.recording_id || !track.credits?.lyrics_url) continue;
-          const { error: updateError } = await supabase
-            .from('recordings')
-            .update({
-              credits: track.credits as unknown as import('types/supabase').Json,
-              lyrics_url: String(track.credits.lyrics_url)
-            })
-            .eq('id', track.recording_id);
+      for (const track of tracksWithLyricsUrl) {
+        const nextLyricsUrl = String(track.credits?.lyrics_url);
+        const wasMissingColumn = !track.lyrics_url || String(track.lyrics_url).trim().length === 0;
+        const { error: updateError } = await supabase
+          .from('recordings')
+          .update({
+            credits: track.credits as unknown as import('types/supabase').Json,
+            lyrics_url: nextLyricsUrl
+          })
+          .eq('id', track.recording_id as number);
 
         if (updateError) {
           console.log('❌ ERROR: Database update failed', updateError);
@@ -358,6 +367,9 @@ export async function POST(req: Request) {
               enrichedCount
             }
           }, { status: 500 });
+        }
+        if (wasMissingColumn) {
+          syncedCount++;
         }
       }
       console.log(`✅ Database updated successfully`);
@@ -373,6 +385,7 @@ export async function POST(req: Request) {
         title: albumTitle,
         totalTracks: tracks.length,
         enrichedCount,
+        syncedCount,
         skippedCount,
         failedCount,
         enrichedTracks: enrichedTracksList,
