@@ -391,6 +391,13 @@ export async function POST(req: Request) {
 
     console.log(`\n📊 SUMMARY: ${enrichedCount} enriched, ${skippedCount} skipped, ${failedCount} failed`);
 
+    const failureSummary = failedTracksList.reduce<Record<string, number>>((acc, track) => {
+      const raw = String(track.error ?? '').trim();
+      const reason = raw.length > 0 ? raw : 'Unknown failure';
+      acc[reason] = (acc[reason] ?? 0) + 1;
+      return acc;
+    }, {});
+
     const tracksWithLyricsUrl = enrichedTracks.filter(
       (track) => track.recording_id && (track.credits?.lyrics_url || track.credits?.lyrics_last_attempt_at)
     );
@@ -447,6 +454,7 @@ export async function POST(req: Request) {
         skippedExistingCount,
         skippedNoTitleCount,
         failedCount,
+        failureSummary,
         enrichedTracks: enrichedTracksList,
         failedTracks: failedTracksList
       }

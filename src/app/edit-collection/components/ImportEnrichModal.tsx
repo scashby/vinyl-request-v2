@@ -99,6 +99,8 @@ type EnrichmentStats = {
   missingChartData?: number;
   missingSimilar?: number;
   missingContext?: number;
+  fieldMissing?: Record<string, number>;
+  fieldApplicable?: Record<string, number>;
 };
 
 type Album = {
@@ -118,6 +120,14 @@ interface CandidateResult {
   album: Album;
   candidates: Record<string, unknown>;
 }
+
+type FetchCandidatesResponse = {
+  success: boolean;
+  error?: string;
+  nextCursor?: number | null;
+  results?: CandidateResult[];
+  processedCount?: number;
+};
 
 type LogEntry = {
   id: string;
@@ -197,6 +207,22 @@ function getServicesForSelectionFromConfig(config: FieldConfigMap) {
     pitchfork: activeServices.has('pitchfork'),
   };
 }
+
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const isTransientFetchError = (error: unknown): boolean => {
+  const msg = error instanceof Error ? error.message : String(error ?? '');
+  const lower = msg.toLowerCase();
+  return (
+    lower.includes('err_network_io_suspended') ||
+    lower.includes('failed to fetch') ||
+    lower.includes('networkerror') ||
+    lower.includes('network connection') ||
+    lower.includes('load failed') ||
+    lower.includes('timeout') ||
+    lower.includes('temporarily unavailable')
+  );
+};
 
 const checkedSourcesFromActiveServices = (activeServices: ActiveServiceMap): string[] => {
   return Object.entries(activeServices)
@@ -960,14 +986,73 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           missingDataOnly: missingDataOnly
         };
 
-        const res = await fetch('/api/enrich-sources/fetch-candidates', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        const fetchCandidatesWithRetry = async (requestPayload: Record<string, unknown>) => {
+          const maxAttempts = 4;
+          let attempt = 0;
+          let lastError: Error | null = null;
 
-        const result = await res.json();
-        if (!result.success) throw new Error(result.error);
+          while (attempt < maxAttempts) {
+            attempt += 1;
+            try {
+              const res = await fetch('/api/enrich-sources/fetch-candidates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestPayload)
+              });
+
+              let result: Partial<FetchCandidatesResponse> = {};
+              try {
+                result = await res.json();
+              } catch {
+                result = {};
+              }
+
+              if (!res.ok) {
+                const errorMessage =
+                  typeof result.error === 'string'
+                    ? result.error
+                    : `HTTP ${res.status} ${res.statusText}`;
+                const isRetryableStatus = [408, 425, 429, 500, 502, 503, 504].includes(res.status);
+                if (isRetryableStatus && attempt < maxAttempts) {
+                  const delay = Math.min(500 * 2 ** (attempt - 1), 4000);
+                  addLog('System', 'info', `Candidate fetch retry ${attempt}/${maxAttempts} after ${res.status}`);
+                  await wait(delay);
+                  continue;
+                }
+                throw new Error(errorMessage);
+              }
+
+              if (result.success !== true) {
+                const errorMessage =
+                  typeof result.error === 'string'
+                    ? result.error
+                    : 'Unknown candidate fetch error';
+                throw new Error(errorMessage);
+              }
+
+              return { result: result as FetchCandidatesResponse, attempts: attempt };
+            } catch (error) {
+              const err = error instanceof Error ? error : new Error('Unknown fetch error');
+              lastError = err;
+
+              if (!isTransientFetchError(err) || attempt >= maxAttempts) {
+                throw err;
+              }
+
+              const delay = Math.min(500 * 2 ** (attempt - 1), 4000);
+              setStatus(`Network interruption during scan. Retrying (${attempt}/${maxAttempts})...`);
+              addLog('System', 'info', `Transient candidate fetch error; retrying (${attempt}/${maxAttempts}): ${err.message}`);
+              await wait(delay);
+            }
+          }
+
+          throw lastError ?? new Error('Candidate fetch failed after retries');
+        };
+
+        const { result, attempts } = await fetchCandidatesWithRetry(payload);
+        if (attempts > 1) {
+          addLog('System', 'info', `Candidate fetch recovered after ${attempts} attempts.`);
+        }
 
         if (result.nextCursor !== undefined && result.nextCursor !== null) {
           cursorRef.current = result.nextCursor;
@@ -1161,6 +1246,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       }
 
       if (Object.keys(candidates).length === 0) {
+        addLog(
+          `${album.artist} - ${album.title}`,
+          'skipped',
+          `No enrichable data returned from selected sources (${checkedSources.join(', ') || 'none'}) for selected fields (${selectedFields.join(', ') || 'none'}).`
+        );
         pendingAuditRows.push({
           run_id: runId,
           album_id: album.id,
@@ -1566,7 +1656,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             const failedLabel = failedCount > 0 && failedSample
               ? `failed: ${failedCount}; sample: ${failedSample}`
               : (failedCount > 0 ? `failed: ${failedCount}` : null);
-            const extras = [attemptedLabel, skippedLabel, failedLabel].filter((value): value is string => !!value);
+            const failureSummary = (data.data?.failureSummary && typeof data.data.failureSummary === 'object')
+              ? Object.entries(data.data.failureSummary as Record<string, unknown>)
+                  .map(([reason, count]) => `${reason} (${Number(count) || 0})`)
+                  .slice(0, 2)
+              : [];
+            const failureSummaryLabel = failureSummary.length > 0
+              ? `reasons: ${failureSummary.join(' | ')}`
+              : null;
+            const extras = [attemptedLabel, skippedLabel, failedLabel, failureSummaryLabel].filter((value): value is string => !!value);
             const detail = extras.length > 0
               ? `${baseCountLabel} (${extras.join('; ')})`
               : baseCountLabel;
@@ -1729,7 +1827,47 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
 
   // --- NEW: SKIP HANDLER (SNOOZE) ---
-  async function handleSkip(albumId: number) {
+  async function handleSkip(
+    albumId: number,
+    mode: 'snooze' | 'ignore' = 'snooze',
+    note?: string
+  ) {
+    const albumConflicts = conflicts.filter(c => c.album_id === albumId);
+    const conflictSeed = albumConflicts[0];
+    const albumLabel = conflictSeed
+      ? `${conflictSeed.artist ?? 'Unknown Artist'} - ${conflictSeed.title ?? 'Untitled'}`
+      : `Album ${albumId}`;
+    const reason = note ?? (mode === 'ignore' ? 'Manually ignored due to unavailable source data' : 'Skipped for later review');
+    addLog(albumLabel, 'skipped', reason);
+
+    const runId = currentRunId ?? createEnrichmentRunId();
+    if (!currentRunId) {
+      setCurrentRunId(runId);
+    }
+    const checkedSources = Array.from(new Set(
+      albumConflicts.flatMap(c => Object.keys(c.candidates ?? {}).map(normalizeSourceForLog))
+    ));
+    await persistEnrichmentRunLogs([{
+      run_id: runId,
+      album_id: albumId,
+      album_artist: conflictSeed?.artist ?? null,
+      album_title: conflictSeed?.title ?? null,
+      phase: 'review',
+      selected_fields: Object.keys(fieldConfig),
+      checked_sources: checkedSources,
+      returned_sources: checkedSources,
+      returned_fields: albumConflicts.map(c => c.field_name),
+      source_payload: toJsonValue(albumConflicts.reduce<Record<string, unknown>>((acc, c) => {
+        if (c.candidates) acc[c.field_name] = c.candidates;
+        return acc;
+      }, {})),
+      proposed_updates: null,
+      applied_updates: null,
+      conflict_fields: albumConflicts.map(c => c.field_name),
+      update_status: mode === 'ignore' ? 'ignored_manual' : 'skipped_snooze',
+      notes: reason,
+    }]);
+
     setConflicts(prev => {
         const nextQueue = prev.filter(c => c.album_id !== albumId);
         if (nextQueue.length === 0) {
@@ -2299,8 +2437,17 @@ function DataCategoryCard({
     }
   };
 
+  const isFieldTracked = (field: string) =>
+    !!stats?.fieldMissing && Object.prototype.hasOwnProperty.call(stats.fieldMissing, field);
+
+  const isCategoryTracked = () =>
+    validFields.every((field) => isFieldTracked(field));
+
   const getMissing = (field: string) => {
     if (!stats) return 0;
+    if (stats.fieldMissing && typeof stats.fieldMissing[field] === 'number') {
+      return stats.fieldMissing[field];
+    }
     if (field === 'image_url') return stats.missingFrontCover || 0;
     if (field === 'back_image_url') return stats.missingBackCover;
     if (field === 'spine_image_url') return stats.missingSpine || 0;
@@ -2346,11 +2493,16 @@ function DataCategoryCard({
            <span className="text-base">{DATA_CATEGORY_ICONS[category]}</span>
            <span className="text-base font-semibold text-[#1a1a1a]">{DATA_CATEGORY_LABELS[category]}</span>
          </div>
-         {getCategoryMissing() > 0 && (
-           <span className="bg-red-100 text-red-700 text-[11px] px-2 py-0.5 rounded-full font-semibold">
-             {getCategoryMissing()}
-           </span>
-         )}
+         <span
+           className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
+             isCategoryTracked()
+               ? (getCategoryMissing() > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700')
+               : (getCategoryMissing() > 0 ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700')
+           }`}
+           title={isCategoryTracked() ? 'Tracked category count' : 'Untracked category count'}
+         >
+           {getCategoryMissing()}
+         </span>
       </div>
 
       {/* FIELD ROWS (Dashboard Style) */}
@@ -2374,7 +2526,16 @@ function DataCategoryCard({
                         />
                         {formatLabel(field)}
                      </label>
-                     {missing > 0 && <span className="bg-red-100 text-red-700 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">{missing}</span>}
+                     <span
+                       className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                         isFieldTracked(field)
+                           ? (missing > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700')
+                           : (missing > 0 ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700')
+                       }`}
+                       title={isFieldTracked(field) ? 'Tracked field count' : 'Untracked field count'}
+                     >
+                       {missing}
+                     </span>
                   </div>
 
                   {/* Row Bottom: Source Toggles (Only if enabled) */}

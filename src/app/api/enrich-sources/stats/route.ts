@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
+import { DATA_CATEGORY_CHECK_FIELDS } from "src/lib/enrichment-data-mapping";
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +20,10 @@ type MasterRow = {
   cover_image_url?: string | null;
   genres?: string[] | null;
   styles?: string[] | null;
+  discogs_master_id?: string | null;
+  musicbrainz_release_group_id?: string | null;
   original_release_year?: number | null;
+  recording_date?: string | null;
   musicians?: string[] | null;
   producers?: string[] | null;
   engineers?: string[] | null;
@@ -47,8 +51,13 @@ type ReleaseRow = {
   barcode?: string | null;
   label?: string | null;
   catalog_number?: string | null;
+  country?: string | null;
+  notes?: string | null;
+  studio?: string | null;
+  disc_metadata?: unknown;
   release_date?: string | null;
   release_year?: number | null;
+  discogs_release_id?: string | null;
   spotify_album_id?: string | null;
   master?: MasterRow | MasterRow[] | null;
   release_tracks?: ReleaseTrackRow[] | null;
@@ -77,15 +86,23 @@ export async function GET(request: Request) {
             barcode,
             label,
             catalog_number,
+            country,
+            notes,
+            studio,
+            disc_metadata,
             release_date,
             release_year,
+            discogs_release_id,
             spotify_album_id,
             master:masters (
               id,
               cover_image_url,
               genres,
               styles,
+              discogs_master_id,
+              musicbrainz_release_group_id,
               original_release_year,
+              recording_date,
               musicians,
               producers,
               engineers,
@@ -188,6 +205,15 @@ export async function GET(request: Request) {
     let missingSimilar = 0;
 
     const folders = new Set<string>();
+    const allCheckFields = Array.from(
+      new Set(Object.values(DATA_CATEGORY_CHECK_FIELDS).flat())
+    );
+    const fieldMissing: Record<string, number> = Object.fromEntries(
+      allCheckFields.map((field) => [field, 0])
+    );
+    const fieldApplicable: Record<string, number> = Object.fromEntries(
+      allCheckFields.map((field) => [field, 0])
+    );
 
     const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
       Array.isArray(value) ? value[0] ?? null : value ?? null;
@@ -230,6 +256,9 @@ export async function GET(request: Request) {
       const release = toSingle<ReleaseRow>(album.release);
       const master = toSingle<MasterRow>(release?.master ?? null);
       const releaseTracks = release?.release_tracks ?? [];
+      const recordings = releaseTracks
+        .map((track) => toSingle<RecordingRow>(track.recording))
+        .filter((recording): recording is RecordingRow => !!recording);
       const firstRecording = toSingle<RecordingRow>(releaseTracks[0]?.recording ?? null);
       const creditInfo = getAlbumCredits(firstRecording?.credits);
 
@@ -376,6 +405,154 @@ export async function GET(request: Request) {
         || hasArray(creditInfo.albumDetails.allmusic_similar_albums);
       if (!hasSimilarAlbums) missingSimilar++;
 
+      const hasTrackLyrics = recordings.some((recording) => {
+        const credits = asRecord(recording.credits);
+        return hasString(recording.lyrics) || hasString(credits.lyrics);
+      });
+      const hasTrackLyricsUrl = recordings.some((recording) => {
+        const credits = asRecord(recording.credits);
+        return hasString(recording.lyrics_url) || hasString(credits.lyrics_url);
+      });
+      const hasTags =
+        hasArray(creditInfo.albumDetails.tags)
+        || hasArray(creditInfo.albumDetails.lastfm_tags);
+      const hasAllmusicRating =
+        master?.allmusic_rating !== null && master?.allmusic_rating !== undefined
+        || creditInfo.albumDetails.allmusic_rating !== null && creditInfo.albumDetails.allmusic_rating !== undefined;
+      const hasPitchforkScore =
+        master?.pitchfork_score !== null && master?.pitchfork_score !== undefined
+        || creditInfo.albumDetails.pitchfork_score !== null && creditInfo.albumDetails.pitchfork_score !== undefined;
+      const hasMasterNotes = hasString(master?.notes) || hasString(creditInfo.albumDetails.master_notes);
+
+      const hasFieldValue = (field: string): boolean => {
+        switch (field) {
+          case 'image_url': return hasFront;
+          case 'back_image_url': return hasBack;
+          case 'spine_image_url': return hasSpine;
+          case 'inner_sleeve_images': return hasInnerSleeve;
+          case 'vinyl_label_images': return hasVinylLabel;
+          case 'musicians': return musicians.length > 0;
+          case 'producers': return producers.length > 0;
+          case 'engineers': return engineers.length > 0;
+          case 'songwriters': return songwriters.length > 0;
+          case 'tracks':
+          case 'tracklists':
+          case 'tracklist':
+            return hasTracks;
+          case 'disc_metadata':
+            return hasArray(release?.disc_metadata);
+          case 'tempo_bpm':
+            return tempo !== null && tempo !== undefined && `${tempo}`.trim().length > 0;
+          case 'musical_key':
+            return musicalKey !== null && musicalKey !== undefined && `${musicalKey}`.trim().length > 0;
+          case 'time_signature':
+            return creditInfo.albumDetails.time_signature !== null && creditInfo.albumDetails.time_signature !== undefined
+              && `${creditInfo.albumDetails.time_signature}`.trim().length > 0;
+          case 'danceability':
+            return danceability !== null && danceability !== undefined;
+          case 'energy':
+            return energy !== null && energy !== undefined;
+          case 'mood_acoustic':
+          case 'mood_happy':
+          case 'mood_sad':
+          case 'mood_party':
+          case 'mood_relaxed':
+          case 'mood_aggressive':
+          case 'mood_electronic':
+            return creditInfo.albumDetails[field] !== null && creditInfo.albumDetails[field] !== undefined;
+          case 'is_cover':
+            return creditInfo.albumDetails.is_cover !== null && creditInfo.albumDetails.is_cover !== undefined;
+          case 'original_artist':
+            return hasString(creditInfo.albumDetails.original_artist);
+          case 'original_year':
+            return creditInfo.albumDetails.original_year !== null && creditInfo.albumDetails.original_year !== undefined;
+          case 'samples':
+          case 'sampled_by':
+            return hasArray(creditInfo.albumDetails[field]);
+          case 'genres':
+            return hasGenres;
+          case 'styles':
+            return hasStyles;
+          case 'tags':
+            return hasTags;
+          case 'spotify_id':
+            return hasSpotify;
+          case 'apple_music_id':
+            return hasApple;
+          case 'lastfm_id':
+            return hasString(master?.lastfm_url)
+              || hasString(creditInfo.albumDetails.lastfm_id)
+              || hasString(creditInfo.albumDetails.lastfm_url);
+          case 'musicbrainz_id':
+            return hasString(master?.musicbrainz_release_group_id);
+          case 'allmusic_url':
+            return hasString(master?.allmusic_url) || hasString(creditInfo.albumDetails.allmusic_url);
+          case 'wikipedia_url':
+            return hasString(master?.wikipedia_url) || hasString(creditInfo.links.wikipedia_url);
+          case 'discogs_release_id':
+            return hasString(release?.discogs_release_id);
+          case 'discogs_master_id':
+            return hasString(master?.discogs_master_id);
+          case 'allmusic_rating':
+            return hasAllmusicRating;
+          case 'allmusic_review':
+            return hasString(master?.allmusic_review) || hasString(creditInfo.albumDetails.allmusic_review);
+          case 'critical_reception':
+            return hasString(master?.critical_reception) || hasString(creditInfo.albumDetails.critical_reception);
+          case 'apple_music_editorial_notes':
+            return hasString(creditInfo.albumDetails.apple_music_editorial_notes);
+          case 'pitchfork_score':
+            return hasPitchforkScore;
+          case 'chart_positions':
+            return hasArray(master?.chart_positions) || hasArray(creditInfo.albumDetails.chart_positions);
+          case 'certifications':
+            return hasArray(master?.certifications) || hasArray(creditInfo.albumDetails.certifications);
+          case 'awards':
+            return hasArray(master?.awards) || hasArray(creditInfo.albumDetails.awards);
+          case 'labels':
+            return hasLabel;
+          case 'cat_no':
+            return hasCatalogNumber;
+          case 'barcode':
+            return hasBarcode;
+          case 'country':
+            return hasString(release?.country);
+          case 'recording_date':
+            return hasString(master?.recording_date);
+          case 'original_release_date':
+            return hasOriginalDate;
+          case 'studio':
+            return hasString(release?.studio);
+          case 'companies':
+            return hasArray(creditInfo.albumDetails.companies);
+          case 'release_notes':
+            return hasString(release?.notes);
+          case 'tracks.lyrics_url':
+            return hasTrackLyricsUrl;
+          case 'tracks.lyrics':
+            return hasTrackLyrics;
+          case 'lastfm_similar_albums':
+            return hasArray(master?.lastfm_similar_albums) || hasArray(creditInfo.albumDetails.lastfm_similar_albums);
+          case 'allmusic_similar_albums':
+            return hasArray(master?.allmusic_similar_albums) || hasArray(creditInfo.albumDetails.allmusic_similar_albums);
+          case 'cultural_significance':
+            return hasString(master?.cultural_significance) || hasString(creditInfo.albumDetails.cultural_significance);
+          case 'recording_location':
+            return hasString(master?.recording_location) || hasString(creditInfo.albumDetails.recording_location);
+          case 'master_notes':
+            return hasMasterNotes;
+          default:
+            return false;
+        }
+      };
+
+      for (const field of allCheckFields) {
+        fieldApplicable[field] += 1;
+        if (!hasFieldValue(field)) {
+          fieldMissing[field] += 1;
+        }
+      }
+
       const isComplete =
         hasFront &&
         hasTracks &&
@@ -431,7 +608,9 @@ export async function GET(request: Request) {
       missingReviews,
       missingChartData,
       missingContext,
-      missingSimilar
+      missingSimilar,
+      fieldMissing,
+      fieldApplicable
     };
 
     return NextResponse.json({ 

@@ -20,7 +20,7 @@ interface EnrichmentReviewModalProps {
     finalizedFields: Record<string, boolean>,
     albumId: number
   ) => void;
-  onSkip: (albumId: number) => void;
+  onSkip: (albumId: number, mode?: 'snooze' | 'ignore', note?: string) => void;
   onCancel: () => void;
 }
 
@@ -884,10 +884,16 @@ export default function EnrichmentReviewModal({
                Stop Review
             </button>
             <button 
-              onClick={() => onSkip(currentAlbumId)}
+              onClick={() => onSkip(currentAlbumId, 'snooze')}
               className="px-4 py-2 bg-gray-100 border border-gray-300 rounded text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-200"
             >
               Skip (Snooze)
+            </button>
+            <button
+              onClick={() => onSkip(currentAlbumId, 'ignore', 'No reliable enrichment data from selected sources')}
+              className="px-4 py-2 bg-orange-50 border border-orange-300 rounded text-sm font-medium cursor-pointer text-orange-700 hover:bg-orange-100"
+            >
+              Ignore (No Data)
             </button>
             <button 
               onClick={() => onSave(resolutions, finalizedFields, currentAlbumId)}
