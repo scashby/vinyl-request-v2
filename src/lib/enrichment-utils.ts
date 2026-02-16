@@ -1,7 +1,7 @@
 // src/lib/enrichment-utils.ts
 import * as GeniusModule from 'genius-lyrics';
 import { parseDiscogsFormat } from './formatParser';
-import { discogsHeaders, discogsUrl, hasDiscogsCredentials } from './discogsAuth';
+import { fetchDiscogsJson, hasDiscogsCredentials } from './discogsAuth';
 
 const getEnv = (...keys: string[]): string | undefined => {
   for (const key of keys) {
@@ -40,6 +40,7 @@ export type CandidateData = {
   discogs_release_id?: string;
   discogs_master_id?: string;
   lastfm_url?: string;
+  lastfm_id?: string;
   wikipedia_url?: string;
   genius_url?: string;
   allmusic_url?: string;
@@ -72,6 +73,7 @@ export type CandidateData = {
   musical_key?: string;
   danceability?: number;
   energy?: number;
+  time_signature?: number;
   mood_acoustic?: number;
   mood_happy?: number; // Valence
   mood_sad?: number;
@@ -90,6 +92,8 @@ export type CandidateData = {
   notes?: string; // Wikipedia/Discogs Notes
   master_notes?: string;
   cultural_significance?: string;
+  recording_date?: string;
+  studio?: string;
   recording_location?: string;
   critical_reception?: string;
   chart_positions?: string[];
@@ -121,6 +125,7 @@ export type CandidateData = {
     duration?: string;
     tempo_bpm?: number;
     musical_key?: string;
+    time_signature?: number;
     lyrics?: string;
     lyrics_url?: string;
     lyrics_source?: string;
@@ -405,6 +410,7 @@ interface SpotifyAudioFeature {
   valence: number;
   key: number;
   mode: number;
+  time_signature?: number;
 }
 
 interface DiscogsImage {
@@ -538,6 +544,7 @@ export async function fetchMusicBrainzData(album: { artist: string, title: strin
     const candidate: CandidateData = {
       musicbrainz_id: mbid,
       original_release_date: release.date,
+      recording_date: release.date,
       country: release.country,
       tracks: [] // Initialize array for per-track analysis
     };
@@ -738,6 +745,7 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
                 candidate.mood_relaxed = Number((1 - avgEnergy).toFixed(3));
                 candidate.mood_aggressive = (avgEnergy > 0.7 && avgValence < 0.4) ? 1.0 : 0.0;
                 candidate.mood_electronic = (avgAcoustic < 0.1 && avgEnergy > 0.6) ? 1.0 : 0.0;
+                candidate.time_signature = features[0]?.time_signature ?? undefined;
                 
                 if (firstKey >= 0 && firstKey < KEY_MAP.length) {
                     candidate.musical_key = `${KEY_MAP[firstKey]} ${firstMode === 1 ? 'Major' : 'Minor'}`;
@@ -755,7 +763,8 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
                             artist: t.artists?.[0]?.name ?? undefined,
                             duration: t.duration_ms ? `${Math.floor(t.duration_ms / 1000)}s` : undefined,
                             tempo_bpm: feat ? Math.round(feat.tempo) : undefined,
-                            musical_key: keyStr
+                            musical_key: keyStr,
+                            time_signature: feat?.time_signature
                         };
                 });
             }
@@ -849,35 +858,26 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
       };
     }
     let releaseId = album.discogs_release_id;
-    const readDiscogsJson = async (res: Response) => {
-      const text = await res.text();
-      try {
-        return JSON.parse(text);
-      } catch {
-        const snippet = text.slice(0, 140).replace(/\s+/g, ' ');
-        throw new Error(`Discogs returned non-JSON (${res.status}): ${snippet}`);
-      }
-    };
 
     if (!releaseId) {
       const q = `${album.artist} - ${album.title}`;
-      const searchRes = await fetch(
-        discogsUrl(`https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release`),
-        { headers: discogsHeaders(USER_AGENT) }
+      const searchData = await fetchDiscogsJson<{ results?: Array<{ id?: string | number }> }>(
+        `https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release`,
+        USER_AGENT
       );
-      const searchData = await readDiscogsJson(searchRes);
-      releaseId = searchData.results?.[0]?.id;
+      const foundId = searchData.results?.[0]?.id;
+      if (foundId !== null && foundId !== undefined) {
+        releaseId = String(foundId);
+      }
     }
 
     if (!releaseId) return { success: false, source: 'discogs', error: 'Not found' };
 
     // 1. Fetch Specific Release
-    const releaseRes = await fetch(
-      discogsUrl(`https://api.discogs.com/releases/${releaseId}`),
-      { headers: discogsHeaders(USER_AGENT) }
+    const data = await fetchDiscogsJson<DiscogsRelease>(
+      `https://api.discogs.com/releases/${releaseId}`,
+      USER_AGENT
     );
-
-    const data = (await readDiscogsJson(releaseRes)) as DiscogsRelease;
 
     const formatString = buildDiscogsFormatString(data.formats as Array<{ name?: string; qty?: string | number; descriptions?: string[] }> | undefined);
     const parsedFormat = formatString ? parseDiscogsFormat(formatString) : null;
@@ -885,11 +885,10 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
     // 2. Fetch Master Release (Definitive Original Date)
     let masterData: { year?: number } | null = null;
     if (data.master_id) {
-        const masterRes = await fetch(
-          discogsUrl(`https://api.discogs.com/masters/${data.master_id}`),
-          { headers: discogsHeaders(USER_AGENT) }
+        masterData = await fetchDiscogsJson<{ year?: number }>(
+          `https://api.discogs.com/masters/${data.master_id}`,
+          USER_AGENT
         );
-        if (masterRes.ok) masterData = await readDiscogsJson(masterRes);
     }
 
     // Capture all images (prefer Discogs type hints)
@@ -919,6 +918,10 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
       country: data.country,
       notes: data.notes, 
       companies: data.companies?.map((c: DiscogsCompany) => c.name),
+      studio: data.companies?.find((c: DiscogsCompany) => {
+        const kind = String(c.entity_type_name ?? '').toLowerCase();
+        return kind.includes('recorded') || kind.includes('studio');
+      })?.name,
       tracklist: data.tracklist?.map((t: DiscogsTrack) => `${t.position} - ${t.title} (${t.duration})`).join('\n'),
       tracks: data.tracklist
         ?.filter((t: DiscogsTrack) => t.type_ !== 'heading')
@@ -1020,8 +1023,22 @@ export async function fetchLastFmData(album: { artist: string, title: string }):
     const images = data.album.image;
     const largeImg = images?.find((i: LastFMImage) => i.size === 'extralarge' || i.size === 'large')?.['#text'];
 
+    const lastfmUrl = typeof data.album.url === 'string' ? data.album.url : undefined;
+    const derivedLastfmId = lastfmUrl
+      ? (() => {
+          try {
+            const urlObj = new URL(lastfmUrl);
+            const parts = urlObj.pathname.split('/').filter(Boolean);
+            return parts.length > 0 ? decodeURIComponent(parts[parts.length - 1]) : undefined;
+          } catch {
+            return undefined;
+          }
+        })()
+      : undefined;
+
     const candidate: CandidateData = {
       lastfm_url: data.album.url,
+      lastfm_id: data.album.mbid || derivedLastfmId,
       tags: tags, // RENAMED: Match generic bucket in CandidateData
       image_url: toHttps(largeImg)
     };
@@ -1037,6 +1054,7 @@ export async function fetchLastFmData(album: { artist: string, title: string }):
           .slice(0, 12);
         if (similarArtists.length > 0) {
           candidate.lastfm_similar_albums = similarArtists;
+          candidate.allmusic_similar_albums = similarArtists;
         }
       }
     } catch {
@@ -1329,8 +1347,43 @@ export async function fetchSecondHandSongsData(album: { artist: string, title: s
     try {
         // 1. Search for the Work (Song/Album)
         const url = `https://secondhandsongs.com/search/object?q=${encodeURIComponent(album.title)}&performer=${encodeURIComponent(album.artist)}`;
-        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${apiKey}` } });
-        const data = await res.json();
+        const tryRequest = async (headers: HeadersInit) => {
+          const res = await fetch(url, { headers });
+          const text = await res.text();
+          let parsed: unknown = null;
+          try {
+            parsed = JSON.parse(text);
+          } catch {
+            parsed = null;
+          }
+          return { res, text, parsed };
+        };
+
+        // SHS expects X-API-Key. Keep Bearer fallback for compatibility.
+        let attempt = await tryRequest({
+          'X-API-Key': apiKey,
+          'Accept': 'application/json',
+          'User-Agent': USER_AGENT
+        });
+
+        if (!attempt.res.ok) {
+          attempt = await tryRequest({
+            'Authorization': `Bearer ${apiKey}`,
+            'Accept': 'application/json',
+            'User-Agent': USER_AGENT
+          });
+        }
+
+        if (!attempt.res.ok) {
+          const snippet = attempt.text.slice(0, 120).replace(/\s+/g, ' ');
+          return {
+            success: false,
+            source: 'secondhandsongs',
+            error: `API ${attempt.res.status}: ${snippet || 'request failed'}`
+          };
+        }
+
+        const data = Array.isArray(attempt.parsed) ? attempt.parsed : [];
         
         if (data.length === 0) return { success: false, source: 'secondhandsongs', error: 'Not Found' };
 
@@ -1421,11 +1474,22 @@ export async function fetchWikidataData(album: { artist: string, title: string }
 
         const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(sparql)}&format=json`;
         const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
-        const data = await res.json();
+        const body = await res.text();
+        let data: Record<string, unknown>;
+        try {
+          data = JSON.parse(body) as Record<string, unknown>;
+        } catch {
+          const snippet = body.slice(0, 140).replace(/\s+/g, ' ');
+          return { success: false, source: 'wikidata', error: `Wikidata non-JSON (${res.status}): ${snippet}` };
+        }
+        if (!res.ok) {
+          return { success: false, source: 'wikidata', error: `Wikidata error ${res.status}` };
+        }
         
-        if (!data.results?.bindings?.length) return { success: false, source: 'wikidata', error: 'Not Found' };
+        const bindings = ((data.results as { bindings?: unknown[] } | undefined)?.bindings) ?? [];
+        if (!bindings.length) return { success: false, source: 'wikidata', error: 'Not Found' };
 
-        const result = data.results.bindings[0];
+        const result = bindings[0] as Record<string, { value?: string }>;
         const date = result.date?.value; // ISO Date
 
         return {

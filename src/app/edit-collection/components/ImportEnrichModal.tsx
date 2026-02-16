@@ -189,13 +189,8 @@ const CANDIDATE_FIELD_ALIASES: Record<string, string[]> = {
 };
 
 const NON_ENRICHABLE_FIELDS = new Set<string>([
-  'time_signature',
   'samples',
   'sampled_by',
-  'lastfm_id',
-  'recording_date',
-  'studio',
-  'allmusic_similar_albums',
 ]);
 
 const candidateKeysForField = (field: string): string[] => {
@@ -664,6 +659,7 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'tracklists':
       case 'tempo_bpm':
       case 'musical_key':
+      case 'time_signature':
       case 'energy':
       case 'danceability':
       case 'mood_acoustic':
@@ -781,7 +777,8 @@ const applyAlbumCreditsToRecordings = async (
             energy: details.energy ? Number(details.energy) : null,
             danceability: details.danceability ? Number(details.danceability) : null,
             valence: details.mood_happy ? Number(details.mood_happy) : null,
-            musical_key: details.musical_key || null
+            musical_key: details.musical_key || null,
+            time_signature: details.time_signature ? Number(details.time_signature) : null
           })
           .eq('id', recording.id)
       );
@@ -1407,7 +1404,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             
             if (!allowedSources.has(normalizedSource)) return; 
 
-            if (['bpm', 'key', 'time_signature'].includes(key)) return;
+            if (['bpm', 'key'].includes(key)) return;
 
             const finalized = (album as Record<string, unknown>).finalized_fields as string[] | undefined;
             if (Array.isArray(finalized) && finalized.includes(key)) return;
@@ -1424,7 +1421,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             const alreadySeen = (resolutions as ResolutionHistory[] | null)?.some(r => 
                r.album_id === album.id && r.field_name === key && r.source === source
             );
-            if (alreadySeen) return; 
+            const isStillMissing = isFieldMissingOnAlbum(albumRecord, key);
+            if (alreadySeen && !(missingDataOnly && isStillMissing)) return;
 
             let newVal = value;
             if (key === 'original_release_date' && typeof newVal === 'string') {
@@ -1667,8 +1665,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           const candidatesForField = fieldCandidates[field];
           if (!candidatesForField || Object.keys(candidatesForField).length === 0) {
             const allowedSources = Array.from(fieldConfig[field] ?? []);
+            const sourcesToInspect = allowedSources.length > 0
+              ? allowedSources
+              : (attemptedSources ?? []).map((source) => normalizeSourceForLog(source));
             const candidateKeys = candidateKeysForField(field);
-            const diagSummary = allowedSources
+            const diagSummary = sourcesToInspect
               .map((source) => {
                 const diagSource = toDiagnosticsSourceKey(source);
                 const diag = sourceDiagnostics?.[diagSource];
@@ -1907,6 +1908,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const credits: Record<string, unknown> = {};
       if (track.tempo_bpm) credits.tempo_bpm = track.tempo_bpm;
       if (track.musical_key) credits.musical_key = track.musical_key;
+      if (track.time_signature) credits.time_signature = track.time_signature;
       if (track.lyrics) credits.lyrics = track.lyrics;
       if (track.lyrics_url) credits.lyrics_url = track.lyrics_url;
       if (track.lyrics_source) credits.lyrics_source = track.lyrics_source;

@@ -5,13 +5,8 @@ import { DATA_CATEGORY_CHECK_FIELDS } from "src/lib/enrichment-data-mapping";
 export const dynamic = 'force-dynamic';
 
 const NON_ENRICHABLE_FIELDS = new Set<string>([
-  'time_signature',
   'samples',
   'sampled_by',
-  'lastfm_id',
-  'recording_date',
-  'studio',
-  'allmusic_similar_albums',
 ]);
 
 type RecordingRow = {
@@ -324,9 +319,10 @@ export async function GET(request: Request) {
 
       const tempo = creditInfo.albumDetails.tempo_bpm ?? null;
       const musicalKey = creditInfo.albumDetails.musical_key ?? null;
+      const timeSignature = creditInfo.albumDetails.time_signature ?? null;
       const energy = creditInfo.albumDetails.energy ?? null;
       const danceability = creditInfo.albumDetails.danceability ?? null;
-      const hasAudio = tempo || musicalKey || energy || danceability;
+      const hasAudio = tempo || musicalKey || timeSignature || energy || danceability;
       if (!hasAudio) missingAudioAnalysis++;
       if (!tempo) missingTempo++;
       if (!musicalKey) missingMusicalKey++;
@@ -347,7 +343,8 @@ export async function GET(request: Request) {
       const hasApple = !!(
         master?.apple_music_url ??
         creditInfo.links.apple_music_url ??
-        creditInfo.albumDetails.apple_music_url
+        creditInfo.albumDetails.apple_music_url ??
+        creditInfo.albumDetails.apple_music_id
       );
       if (!hasSpotify || !hasApple) missingStreamingLinks++;
       if (!hasSpotify) missingSpotify++;
