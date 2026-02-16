@@ -233,6 +233,15 @@ const checkedSourcesFromActiveServices = (activeServices: ActiveServiceMap): str
 
 const DEFERRED_CATEGORY_REASONS: Partial<Record<DataCategory, string>> = {};
 const CLASSICAL_ONLY_FIELDS = new Set(['composer', 'conductor', 'orchestra', 'chorus', 'composition']);
+const TRACKED_ENRICHMENT_CATEGORIES = new Set<DataCategory>([
+  'artwork',
+  'credits',
+  'tracklists',
+  'genres',
+  'streaming_links',
+  'release_metadata',
+  'lyrics',
+]);
 
 // Local interface for resolution history
 interface ResolutionHistory {
@@ -2438,7 +2447,9 @@ function DataCategoryCard({
   };
 
   const isFieldTracked = (field: string) =>
-    !!stats?.fieldMissing && Object.prototype.hasOwnProperty.call(stats.fieldMissing, field);
+    TRACKED_ENRICHMENT_CATEGORIES.has(category)
+    && !!stats?.fieldMissing
+    && Object.prototype.hasOwnProperty.call(stats.fieldMissing, field);
 
   const isCategoryTracked = () =>
     validFields.every((field) => isFieldTracked(field));
