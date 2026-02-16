@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSpotifyToken } from "../../../../lib/spotify";
+import { discogsHeaders, discogsUrl, hasDiscogsCredentials } from "src/lib/discogsAuth";
 
 // --- Configuration ---
-const DISCOGS_TOKEN = process.env.DISCOGS_TOKEN ?? process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
 const USER_AGENT = 'DeadwaxDialogues/1.0 (https://deadwaxdialogues.com)';
 
 // --- Types & Interfaces ---
@@ -113,7 +113,7 @@ async function fetchSpotifyImages(artist: string, album: string): Promise<ImageC
 // 2. Discogs Image Fetcher
 async function fetchDiscogsImages(artist: string, album: string): Promise<ImageCandidate[]> {
   try {
-    if (!DISCOGS_TOKEN) return [];
+    if (!hasDiscogsCredentials()) return [];
 
     const searchParams = new URLSearchParams({
       artist,
@@ -122,12 +122,10 @@ async function fetchDiscogsImages(artist: string, album: string): Promise<ImageC
       per_page: '1'
     });
 
-    const searchRes = await fetch(`https://api.discogs.com/database/search?${searchParams.toString()}`, {
-      headers: { 
-        'User-Agent': USER_AGENT,
-        'Authorization': `Discogs token=${DISCOGS_TOKEN}`
-      }
-    });
+    const searchRes = await fetch(
+      discogsUrl(`https://api.discogs.com/database/search?${searchParams.toString()}`),
+      { headers: discogsHeaders(USER_AGENT) }
+    );
 
     if (!searchRes.ok) return [];
     const searchData = (await searchRes.json()) as DiscogsSearchResponse;
@@ -135,12 +133,10 @@ async function fetchDiscogsImages(artist: string, album: string): Promise<ImageC
 
     if (!releaseId) return [];
 
-    const releaseRes = await fetch(`https://api.discogs.com/releases/${releaseId}`, {
-      headers: { 
-        'User-Agent': USER_AGENT,
-        'Authorization': `Discogs token=${DISCOGS_TOKEN}`
-      }
-    });
+    const releaseRes = await fetch(
+      discogsUrl(`https://api.discogs.com/releases/${releaseId}`),
+      { headers: discogsHeaders(USER_AGENT) }
+    );
 
     if (!releaseRes.ok) return [];
     const releaseData = (await releaseRes.json()) as DiscogsReleaseResponse;

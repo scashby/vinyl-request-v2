@@ -4,8 +4,7 @@ import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 import { hasValidDiscogsId } from 'lib/discogs-validation';
 import { parseDiscogsFormat } from "src/utils/formatUtils";
 import type { Database } from "src/types/supabase";
-
-const DISCOGS_TOKEN = process.env.DISCOGS_TOKEN ?? process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
+import { discogsHeaders, discogsUrl, hasDiscogsCredentials } from "src/lib/discogsAuth";
 
 type DiscogsResponse = {
   master_id?: number;
@@ -132,10 +131,9 @@ const applyArtworkToReleaseRecordings = async (
 async function fetchDiscogsRelease(releaseId: string): Promise<DiscogsResponse> {
   const url = `https://api.discogs.com/releases/${releaseId}`;
   
-  const res = await fetch(url, {
+  const res = await fetch(discogsUrl(url), {
     headers: {
-      'User-Agent': 'DeadwaxDialogues/1.0',
-      'Authorization': `Discogs token=${DISCOGS_TOKEN}`
+      ...discogsHeaders('DeadwaxDialogues/1.0')
     }
   });
   
@@ -160,10 +158,9 @@ async function searchDiscogsForRelease(artist: string, title: string, year?: str
   
   const url = `https://api.discogs.com/database/search?${params.toString()}`;
   
-  const res = await fetch(url, {
+  const res = await fetch(discogsUrl(url), {
     headers: {
-      'User-Agent': 'DeadwaxDialogues/1.0',
-      'Authorization': `Discogs token=${DISCOGS_TOKEN}`
+      ...discogsHeaders('DeadwaxDialogues/1.0')
     }
   });
   
@@ -196,10 +193,10 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    if (!DISCOGS_TOKEN) {
+    if (!hasDiscogsCredentials()) {
       return NextResponse.json({
         success: false,
-        error: 'Discogs token not configured'
+        error: 'Discogs credentials not configured'
       }, { status: 500 });
     }
 

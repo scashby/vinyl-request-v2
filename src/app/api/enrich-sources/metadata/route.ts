@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { discogsHeaders, discogsUrl, hasDiscogsCredentials } from "src/lib/discogsAuth";
 
 // --- Types ---
 export interface NormalizedMetadata {
@@ -23,7 +24,6 @@ interface DiscogsArtistCredit {
 }
 
 // --- Configuration ---
-const DISCOGS_TOKEN = process.env.DISCOGS_TOKEN ?? process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
 const TADB_API_KEY = process.env.THEAUDIODB_API_KEY || '1'; // '1' is the free test key
 const USER_AGENT = process.env.APP_USER_AGENT || 'DeadwaxDialogues/1.0 (https://deadwaxdialogues.com)';
 
@@ -32,7 +32,7 @@ const USER_AGENT = process.env.APP_USER_AGENT || 'DeadwaxDialogues/1.0 (https://
 // 1. Discogs Fetcher
 async function fetchDiscogsMetadata(artist: string, album: string): Promise<NormalizedMetadata | null> {
   try {
-    if (!DISCOGS_TOKEN) return null;
+    if (!hasDiscogsCredentials()) return null;
 
     // Search
     const searchParams = new URLSearchParams({
@@ -42,12 +42,10 @@ async function fetchDiscogsMetadata(artist: string, album: string): Promise<Norm
       per_page: '1'
     });
 
-    const searchRes = await fetch(`https://api.discogs.com/database/search?${searchParams.toString()}`, {
-      headers: { 
-        'User-Agent': USER_AGENT,
-        'Authorization': `Discogs token=${DISCOGS_TOKEN}`
-      }
-    });
+    const searchRes = await fetch(
+      discogsUrl(`https://api.discogs.com/database/search?${searchParams.toString()}`),
+      { headers: discogsHeaders(USER_AGENT) }
+    );
 
     if (!searchRes.ok) return null;
     const searchData = await searchRes.json();
@@ -56,12 +54,10 @@ async function fetchDiscogsMetadata(artist: string, album: string): Promise<Norm
     if (!releaseId) return null;
 
     // Details
-    const releaseRes = await fetch(`https://api.discogs.com/releases/${releaseId}`, {
-      headers: { 
-        'User-Agent': USER_AGENT,
-        'Authorization': `Discogs token=${DISCOGS_TOKEN}`
-      }
-    });
+    const releaseRes = await fetch(
+      discogsUrl(`https://api.discogs.com/releases/${releaseId}`),
+      { headers: discogsHeaders(USER_AGENT) }
+    );
 
     if (!releaseRes.ok) return null;
     const data = await releaseRes.json();

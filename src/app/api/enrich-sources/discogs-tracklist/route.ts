@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 import { parseDiscogsFormat } from "src/utils/formatUtils";
 import type { Json } from "types/supabase";
-const DISCOGS_TOKEN = process.env.DISCOGS_TOKEN ?? process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
+import { discogsHeaders, discogsUrl, hasDiscogsCredentials } from "src/lib/discogsAuth";
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
@@ -56,11 +56,8 @@ const buildDiscogsFormatString = (formats?: { name?: string; qty?: string | numb
 async function fetchDiscogsRelease(releaseId: string): Promise<DiscogsResponse> {
   const url = `https://api.discogs.com/releases/${releaseId}`;
   
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'DeadwaxDialogues/1.0',
-      'Authorization': `Discogs token=${DISCOGS_TOKEN}`
-    }
+  const res = await fetch(discogsUrl(url), {
+    headers: discogsHeaders('DeadwaxDialogues/1.0')
   });
   
   if (!res.ok) {
@@ -86,11 +83,11 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    if (!DISCOGS_TOKEN) {
-      console.log('❌ ERROR: DISCOGS_TOKEN not configured');
+    if (!hasDiscogsCredentials()) {
+      console.log('❌ ERROR: Discogs credentials not configured');
       return NextResponse.json({
         success: false,
-        error: 'Discogs token not configured'
+        error: 'Discogs credentials not configured'
       }, { status: 500 });
     }
 

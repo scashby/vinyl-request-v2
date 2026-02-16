@@ -1,5 +1,6 @@
 // src/app/api/search-covers/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { discogsHeaders, discogsUrl, hasDiscogsCredentials } from 'src/lib/discogsAuth';
 
 interface ImageResult {
   url: string;
@@ -75,10 +76,8 @@ export async function GET(request: NextRequest) {
 }
 
 async function searchDiscogs(barcode: string, artist: string, title: string, coverType: 'front' | 'back'): Promise<ImageResult[]> {
-  const token = process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
-  
-  if (!token) {
-    console.warn('NEXT_PUBLIC_DISCOGS_TOKEN not configured');
+  if (!hasDiscogsCredentials()) {
+    console.warn('Discogs credentials not configured');
     return [];
   }
 
@@ -86,17 +85,15 @@ async function searchDiscogs(barcode: string, artist: string, title: string, cov
     let searchUrl = '';
     
     if (barcode) {
-      searchUrl = `https://api.discogs.com/database/search?barcode=${encodeURIComponent(barcode)}&token=${token}`;
+      searchUrl = `https://api.discogs.com/database/search?barcode=${encodeURIComponent(barcode)}`;
     } else if (artist && title) {
-      searchUrl = `https://api.discogs.com/database/search?artist=${encodeURIComponent(artist)}&release_title=${encodeURIComponent(title)}&type=release&token=${token}`;
+      searchUrl = `https://api.discogs.com/database/search?artist=${encodeURIComponent(artist)}&release_title=${encodeURIComponent(title)}&type=release`;
     } else {
       return [];
     }
 
-    const response = await fetch(searchUrl, {
-      headers: {
-        'User-Agent': 'DWDCollectionManager/1.0'
-      }
+    const response = await fetch(discogsUrl(searchUrl), {
+      headers: discogsHeaders('DWDCollectionManager/1.0')
     });
 
     if (!response.ok) return [];
@@ -110,11 +107,9 @@ async function searchDiscogs(barcode: string, artist: string, title: string, cov
     for (const release of data.results.slice(0, 3)) {
       try {
         const detailResponse = await fetch(
-          `https://api.discogs.com/releases/${release.id}?token=${token}`,
+          discogsUrl(`https://api.discogs.com/releases/${release.id}`),
           {
-            headers: {
-              'User-Agent': 'DWDCollectionManager/1.0'
-            }
+            headers: discogsHeaders('DWDCollectionManager/1.0')
           }
         );
 

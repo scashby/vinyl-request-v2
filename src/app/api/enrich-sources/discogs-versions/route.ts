@@ -1,7 +1,6 @@
 // src/app/api/enrich-sources/discogs-versions/route.ts
 import { NextResponse } from "next/server";
-
-const DISCOGS_TOKEN = process.env.DISCOGS_TOKEN ?? process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
+import { discogsHeaders, discogsUrl, hasDiscogsCredentials } from "src/lib/discogsAuth";
 
 type DiscogsVersion = {
   format?: string;
@@ -26,17 +25,14 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'masterId required' }, { status: 400 });
     }
 
-    if (!DISCOGS_TOKEN) {
-      return NextResponse.json({ error: 'Discogs token not configured' }, { status: 500 });
+    if (!hasDiscogsCredentials()) {
+      return NextResponse.json({ error: 'Discogs credentials not configured' }, { status: 500 });
     }
 
     const res = await fetch(
-      `https://api.discogs.com/masters/${masterId}/versions?per_page=500`,
+      discogsUrl(`https://api.discogs.com/masters/${masterId}/versions?per_page=500`),
       {
-        headers: {
-          'User-Agent': 'DeadwaxDialogues/1.0',
-          'Authorization': `Discogs token=${DISCOGS_TOKEN}`
-        }
+        headers: discogsHeaders('DeadwaxDialogues/1.0')
       }
     );
 

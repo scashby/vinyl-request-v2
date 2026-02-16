@@ -1,6 +1,7 @@
 // src/lib/enrichment-utils.ts
 import * as GeniusModule from 'genius-lyrics';
 import { parseDiscogsFormat } from './formatParser';
+import { discogsHeaders, discogsUrl, hasDiscogsCredentials } from './discogsAuth';
 
 const getEnv = (...keys: string[]): string | undefined => {
   for (const key of keys) {
@@ -826,8 +827,6 @@ export async function fetchAppleMusicData(album: { artist: string, title: string
 // ============================================================================
 // 4. DISCOGS (Styles, Genres, Year, Credits, Barcodes, Deep Images)
 // ============================================================================
-const DISCOGS_TOKEN = getEnv('DISCOGS_ACCESS_TOKEN', 'NEXT_PUBLIC_DISCOGS_TOKEN');
-
 const buildDiscogsFormatString = (formats?: Array<{ name?: string; qty?: string | number; descriptions?: string[] }>) => {
   if (!formats || formats.length === 0) return '';
   const format = formats[0];
@@ -842,16 +841,21 @@ const buildDiscogsFormatString = (formats?: Array<{ name?: string; qty?: string 
 
 export async function fetchDiscogsData(album: { artist: string, title: string, discogs_release_id?: string }): Promise<EnrichmentResult> {
   try {
-    if (!DISCOGS_TOKEN) {
-      return { success: false, source: 'discogs', error: 'Missing Discogs token (DISCOGS_ACCESS_TOKEN or NEXT_PUBLIC_DISCOGS_TOKEN)' };
+    if (!hasDiscogsCredentials()) {
+      return {
+        success: false,
+        source: 'discogs',
+        error: 'Missing Discogs credentials (DISCOGS_TOKEN/DISCOGS_ACCESS_TOKEN/NEXT_PUBLIC_DISCOGS_TOKEN or DISCOGS_CONSUMER_KEY + DISCOGS_CONSUMER_SECRET|DISCOGS_SECRET_KEY)',
+      };
     }
     let releaseId = album.discogs_release_id;
 
     if (!releaseId) {
       const q = `${album.artist} - ${album.title}`;
-      const searchRes = await fetch(`https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release&token=${DISCOGS_TOKEN}`, {
-          headers: { 'User-Agent': USER_AGENT }
-      });
+      const searchRes = await fetch(
+        discogsUrl(`https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release`),
+        { headers: discogsHeaders(USER_AGENT) }
+      );
       const searchData = await searchRes.json();
       releaseId = searchData.results?.[0]?.id;
     }
@@ -859,9 +863,10 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
     if (!releaseId) return { success: false, source: 'discogs', error: 'Not found' };
 
     // 1. Fetch Specific Release
-    const releaseRes = await fetch(`https://api.discogs.com/releases/${releaseId}?token=${DISCOGS_TOKEN}`, {
-        headers: { 'User-Agent': USER_AGENT }
-    });
+    const releaseRes = await fetch(
+      discogsUrl(`https://api.discogs.com/releases/${releaseId}`),
+      { headers: discogsHeaders(USER_AGENT) }
+    );
 
     const data = await releaseRes.json() as DiscogsRelease;
 
@@ -871,9 +876,10 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
     // 2. Fetch Master Release (Definitive Original Date)
     let masterData: { year?: number } | null = null;
     if (data.master_id) {
-        const masterRes = await fetch(`https://api.discogs.com/masters/${data.master_id}?token=${DISCOGS_TOKEN}`, {
-            headers: { 'User-Agent': USER_AGENT }
-        });
+        const masterRes = await fetch(
+          discogsUrl(`https://api.discogs.com/masters/${data.master_id}`),
+          { headers: discogsHeaders(USER_AGENT) }
+        );
         if (masterRes.ok) masterData = await masterRes.json();
     }
 
