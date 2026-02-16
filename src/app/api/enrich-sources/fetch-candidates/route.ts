@@ -147,7 +147,11 @@ export async function POST(req: Request) {
       });
     }
 
-    const results: { album: ReturnType<typeof mapInventoryToCandidate>, candidates: Record<string, CandidateData> }[] = [];
+    const results: {
+      album: ReturnType<typeof mapInventoryToCandidate>,
+      candidates: Record<string, CandidateData>,
+      sourceDiagnostics?: Record<string, { status: 'returned' | 'no_data' | 'error'; reason?: string }>
+    }[] = [];
 
     type CandidateAlbumRow = {
       id: number;
@@ -368,7 +372,8 @@ export async function POST(req: Request) {
     for (const chunk of chunks) {
        const chunkPromises = chunk.map(async (album) => {
           const candidates: Record<string, CandidateData> = {};
-          const promises: Promise<EnrichmentResult | null>[] = [];
+          const sourceDiagnostics: Record<string, { status: 'returned' | 'no_data' | 'error'; reason?: string }> = {};
+          const tasks: { source: string; promise: Promise<EnrichmentResult | null> }[] = [];
 
           const typedAlbum = mapInventoryToCandidate(album);
 
@@ -377,39 +382,54 @@ export async function POST(req: Request) {
           }
 
           // Always fetch requested services
-          if (services.musicbrainz) promises.push(fetchMusicBrainzData(typedAlbum));
-          if (services.discogs) promises.push(fetchDiscogsData(typedAlbum));
-          if (services.spotify) promises.push(fetchSpotifyData(typedAlbum));
-          if (services.appleMusicEnhanced) promises.push(fetchAppleMusicData(typedAlbum));
-          if (services.allmusic) promises.push(fetchAllMusicData(typedAlbum));
-          if (services.lastfm) promises.push(fetchLastFmData(typedAlbum));
-          if (services.wikipedia) promises.push(fetchWikipediaData(typedAlbum));
-          if (services.genius) promises.push(fetchGeniusData(typedAlbum));
-          if (services.coverArt) promises.push(fetchCoverArtData(typedAlbum));
-          if (services.whosampled) promises.push(fetchWhoSampledData(typedAlbum));
-          if (services.secondhandsongs) promises.push(fetchSecondHandSongsData(typedAlbum));
-          if (services.theaudiodb) promises.push(fetchTheAudioDBData(typedAlbum));
-          if (services.wikidata) promises.push(fetchWikidataData(typedAlbum));
-          if (services.setlistfm) promises.push(fetchSetlistFmData(typedAlbum));
-          if (services.rateyourmusic) promises.push(fetchRateYourMusicData(typedAlbum));
-          if (services.fanarttv) promises.push(fetchFanartTvData(typedAlbum));
-          if (services.deezer) promises.push(fetchDeezerData(typedAlbum));
-          if (services.musixmatch) promises.push(fetchMusixmatchData(typedAlbum));
-          if (services.popsike) promises.push(fetchPopsikeData(typedAlbum));
-          if (services.pitchfork) promises.push(fetchPitchforkData(typedAlbum));
+          if (services.musicbrainz) tasks.push({ source: 'musicbrainz', promise: fetchMusicBrainzData(typedAlbum) });
+          if (services.discogs) tasks.push({ source: 'discogs', promise: fetchDiscogsData(typedAlbum) });
+          if (services.spotify) tasks.push({ source: 'spotify', promise: fetchSpotifyData(typedAlbum) });
+          if (services.appleMusicEnhanced) tasks.push({ source: 'appleMusic', promise: fetchAppleMusicData(typedAlbum) });
+          if (services.allmusic) tasks.push({ source: 'allmusic', promise: fetchAllMusicData(typedAlbum) });
+          if (services.lastfm) tasks.push({ source: 'lastfm', promise: fetchLastFmData(typedAlbum) });
+          if (services.wikipedia) tasks.push({ source: 'wikipedia', promise: fetchWikipediaData(typedAlbum) });
+          if (services.genius) tasks.push({ source: 'genius', promise: fetchGeniusData(typedAlbum) });
+          if (services.coverArt) tasks.push({ source: 'coverArt', promise: fetchCoverArtData(typedAlbum) });
+          if (services.whosampled) tasks.push({ source: 'whosampled', promise: fetchWhoSampledData(typedAlbum) });
+          if (services.secondhandsongs) tasks.push({ source: 'secondhandsongs', promise: fetchSecondHandSongsData(typedAlbum) });
+          if (services.theaudiodb) tasks.push({ source: 'theaudiodb', promise: fetchTheAudioDBData(typedAlbum) });
+          if (services.wikidata) tasks.push({ source: 'wikidata', promise: fetchWikidataData(typedAlbum) });
+          if (services.setlistfm) tasks.push({ source: 'setlistfm', promise: fetchSetlistFmData(typedAlbum) });
+          if (services.rateyourmusic) tasks.push({ source: 'rateyourmusic', promise: fetchRateYourMusicData(typedAlbum) });
+          if (services.fanarttv) tasks.push({ source: 'fanarttv', promise: fetchFanartTvData(typedAlbum) });
+          if (services.deezer) tasks.push({ source: 'deezer', promise: fetchDeezerData(typedAlbum) });
+          if (services.musixmatch) tasks.push({ source: 'musixmatch', promise: fetchMusixmatchData(typedAlbum) });
+          if (services.popsike) tasks.push({ source: 'popsike', promise: fetchPopsikeData(typedAlbum) });
+          if (services.pitchfork) tasks.push({ source: 'pitchfork', promise: fetchPitchforkData(typedAlbum) });
 
-          const settled = await Promise.allSettled(promises);
+          const settled = await Promise.allSettled(tasks.map((task) => task.promise));
           
-          settled.forEach(res => {
-            if (res.status === 'fulfilled' && res.value && res.value.success && res.value.data) {
-              candidates[res.value.source] = res.value.data;
+          settled.forEach((res, index) => {
+            const task = tasks[index];
+            if (res.status === 'fulfilled') {
+              const value = res.value;
+              if (value && value.success && value.data) {
+                candidates[value.source] = value.data;
+                sourceDiagnostics[task.source] = { status: 'returned' };
+              } else {
+                sourceDiagnostics[task.source] = {
+                  status: 'no_data',
+                  reason: value?.error || 'No match'
+                };
+              }
+            } else {
+              sourceDiagnostics[task.source] = {
+                status: 'error',
+                reason: res.reason instanceof Error ? res.reason.message : 'Unknown error'
+              };
             }
           });
 
           if (Object.keys(candidates).length > 0) {
-            return { album: typedAlbum, candidates };
+            return { album: typedAlbum, candidates, sourceDiagnostics };
           }
-          return null;
+          return { album: typedAlbum, candidates, sourceDiagnostics };
        });
 
        // Wait for this chunk of albums to complete

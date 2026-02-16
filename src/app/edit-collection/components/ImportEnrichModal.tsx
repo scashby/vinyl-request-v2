@@ -119,6 +119,7 @@ type Album = {
 interface CandidateResult {
   album: Album;
   candidates: Record<string, unknown>;
+  sourceDiagnostics?: Record<string, { status: 'returned' | 'no_data' | 'error'; reason?: string }>;
 }
 
 type FetchCandidatesResponse = {
@@ -1275,7 +1276,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     results.forEach((item) => {
       processedIds.push(item.album.id);
-      const { album, candidates } = item;
+      const { album, candidates, sourceDiagnostics } = item;
       const genrePool = [
         ...(Array.isArray(album.genres) ? album.genres : []),
         ...(Array.isArray(album.styles) ? album.styles : []),
@@ -1627,7 +1628,19 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           if (unresolvedMissingReasons.has(field)) return;
           const candidatesForField = fieldCandidates[field];
           if (!candidatesForField || Object.keys(candidatesForField).length === 0) {
-            unresolvedMissingReasons.set(field, 'no candidate data from selected sources');
+            const diagSummary = sourceDiagnostics
+              ? Object.entries(sourceDiagnostics)
+                  .filter(([, diag]) => diag.status !== 'returned')
+                  .slice(0, 2)
+                  .map(([source, diag]) => `${source}: ${diag.reason || diag.status}`)
+                  .join(' | ')
+              : '';
+            unresolvedMissingReasons.set(
+              field,
+              diagSummary
+                ? `no candidate data (${diagSummary})`
+                : 'no candidate data from selected sources'
+            );
           } else {
             unresolvedMissingReasons.set(field, 'not applied after normalization');
           }
