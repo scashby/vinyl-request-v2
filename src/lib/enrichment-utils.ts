@@ -1436,13 +1436,54 @@ export async function fetchCoverArtData(album: { musicbrainz_id?: string }): Pro
 export async function fetchGeniusData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
     try {
         if (!geniusClient) return { success: false, source: 'genius', error: 'No Token' };
-        
-        const search = await geniusClient.songs.search(`${album.artist} ${album.title}`);
-        
-        const songMatch = search.find(s => 
-            s.album?.name?.toLowerCase().includes(album.title.toLowerCase()) ||
-            s.title.toLowerCase().includes(album.title.toLowerCase())
-        );
+
+        const norm = (value: string) =>
+          value
+            .toLowerCase()
+            .replace(/[^\w\s]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const artistVariants = buildArtistVariants(album.artist).map(norm);
+        const titleVariants = buildTitleVariants(album.title).map(norm);
+        const seen = new Set<string>();
+        const queries = [
+          `${album.artist} ${album.title}`,
+          `${album.title} ${album.artist}`,
+          album.title,
+        ];
+
+        let songMatch:
+          | {
+              url: string;
+              image: string | null;
+            }
+          | null = null;
+
+        for (const query of queries) {
+          if (songMatch) break;
+          const search = await geniusClient.songs.search(query);
+          for (const song of search) {
+            const songUrl = String(song.url ?? '').trim();
+            if (!songUrl || seen.has(songUrl)) continue;
+            seen.add(songUrl);
+
+            const songTitle = norm(String(song.title ?? ''));
+            const songAlbum = norm(String(song.album?.name ?? ''));
+            const songArtist = norm(String(song.artist?.name ?? ''));
+            const artistMatches = artistVariants.some((artist) =>
+              artist && (songArtist.includes(artist) || artist.includes(songArtist))
+            );
+            const titleMatches = titleVariants.some((title) =>
+              title && (songTitle.includes(title) || songAlbum.includes(title) || title.includes(songTitle))
+            );
+            if (!artistMatches || !titleMatches) continue;
+            songMatch = {
+              url: songUrl,
+              image: song.image ?? null,
+            };
+            break;
+          }
+        }
 
         if (!songMatch) return { success: false, source: 'genius', error: 'Not Found' };
 

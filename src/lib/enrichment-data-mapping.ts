@@ -48,7 +48,7 @@ export type EnrichmentService =
  */
 export const DATA_TO_SERVICES: Record<DataCategory, EnrichmentService[]> = {
   artwork: ['coverArtArchive', 'discogs', 'spotify', 'appleMusic', 'lastfm', 'theaudiodb', 'fanarttv', 'deezer'],
-  credits: ['musicbrainz', 'appleMusic', 'discogs', 'genius', 'wikidata'],
+  credits: ['musicbrainz', 'appleMusic', 'discogs', 'wikidata'],
   tracklists: ['discogs', 'musicbrainz', 'spotify', 'appleMusic', 'lastfm', 'setlistfm', 'deezer'],
   // NOTE: acousticbrainz is not implemented in the current fetch pipeline.
   sonic_domain: [
@@ -238,7 +238,7 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'musicians': ['musicbrainz', 'discogs'],
   'producers': ['musicbrainz', 'discogs'],
   'engineers': ['musicbrainz', 'discogs'],
-  'songwriters': ['musicbrainz', 'genius', 'discogs'],
+  'songwriters': ['musicbrainz', 'discogs'],
   'composer': ['musicbrainz', 'appleMusic'],
   'conductor': ['musicbrainz'],
   'orchestra': ['musicbrainz'],

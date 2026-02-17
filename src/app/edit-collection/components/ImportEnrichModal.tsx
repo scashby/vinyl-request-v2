@@ -186,6 +186,8 @@ const CANDIDATE_FIELD_ALIASES: Record<string, string[]> = {
   tracks: ['tracks', 'tracklist', 'tracklists'],
   tracklist: ['tracklist', 'tracklists', 'tracks'],
   tracklists: ['tracklists', 'tracklist', 'tracks'],
+  'tracks.lyrics': ['tracks_lyrics', 'tracks_lyrics_url'],
+  'tracks.lyrics_url': ['tracks_lyrics_url'],
   master_notes: ['master_notes', 'notes'],
 };
 
