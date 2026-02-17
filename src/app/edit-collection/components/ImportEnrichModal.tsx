@@ -1167,18 +1167,22 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
         const fetchCandidatesWithRetry = async (requestPayload: Record<string, unknown>) => {
           const maxAttempts = 4;
+          const requestTimeoutMs = 25000;
           let attempt = 0;
           let lastError: Error | null = null;
 
           while (attempt < maxAttempts) {
             attempt += 1;
             try {
+              const controller = new AbortController();
+              const timeoutHandle = setTimeout(() => controller.abort(), requestTimeoutMs);
               const res = await fetch('/api/enrich-sources/fetch-candidates', {
                 method: 'POST',
                 credentials: 'include',
+                signal: controller.signal,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestPayload)
-              });
+              }).finally(() => clearTimeout(timeoutHandle));
 
               let result: Partial<FetchCandidatesResponse> = {};
               try {
@@ -1213,15 +1217,26 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               return { result: result as FetchCandidatesResponse, attempts: attempt };
             } catch (error) {
               const err = error instanceof Error ? error : new Error('Unknown fetch error');
+              const normalizedErr =
+                err.name === 'AbortError'
+                  ? new Error(`fetch-candidates timed out after ${requestTimeoutMs / 1000}s`)
+                  : err;
+              const isNetworkFailure =
+                normalizedErr.message === 'Failed to fetch' ||
+                normalizedErr.message.toLowerCase().includes('networkerror');
               lastError = err;
 
-              if (!isTransientFetchError(err) || attempt >= maxAttempts) {
-                throw err;
+              if (!isTransientFetchError(normalizedErr) || attempt >= maxAttempts) {
+                throw normalizedErr;
               }
 
               const delay = Math.min(500 * 2 ** (attempt - 1), 4000);
               setStatus(`Network interruption during scan. Retrying (${attempt}/${maxAttempts})...`);
-              addLog('System', 'info', `Transient candidate fetch error; retrying (${attempt}/${maxAttempts}): ${err.message}`);
+              addLog(
+                'System',
+                'info',
+                `Transient candidate fetch error; retrying (${attempt}/${maxAttempts}): ${normalizedErr.message}${isNetworkFailure ? ' (check API reachability/deployment)' : ''}`
+              );
               await wait(delay);
             }
           }
@@ -1293,7 +1308,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         }
 
       } catch (error) {
-        setStatus(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        setStatus(`❌ Error: ${message}`);
+        addLog('System', 'skipped', `Scan stopped: ${message}`);
         setEnriching(false);
         isLoopingRef.current = false;
         return;
