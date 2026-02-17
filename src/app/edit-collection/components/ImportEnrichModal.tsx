@@ -834,6 +834,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [status, setStatus] = useState('');
   const [folderFilter, setFolderFilter] = useState('');
   const [batchSize, setBatchSize] = useState('10');
+  const [startEntry, setStartEntry] = useState('1');
+  const [endEntry, setEndEntry] = useState('');
   const [autoSnooze, setAutoSnooze] = useState(true); // Default to true (30-day skip)
   const [missingDataOnly, setMissingDataOnly] = useState(false);
   
@@ -882,6 +884,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const hasMoreRef = useRef(true);
   const isLoopingRef = useRef(false);
   const cursorRef = useRef(0); // Tracks current position in DB
+  const scanIndexRef = useRef(0);
+  const scanRangeRef = useRef<{ start: number; end: number | null }>({ start: 1, end: null });
+  const specificAlbumQueueRef = useRef<number[] | null>(null);
   const statsRefreshInFlightRef = useRef(false);
 
   useEffect(() => {
@@ -1028,6 +1033,71 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }]);
   }
 
+  const summarizeLogValue = (value: unknown): string => {
+    if (value === null || value === undefined) return 'null';
+    if (typeof value === 'string') {
+      const compact = value.replace(/\s+/g, ' ').trim();
+      return compact.length > 80 ? `${compact.slice(0, 77)}...` : compact;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (Array.isArray(value)) {
+      if (value.length === 0) return '[]';
+      const preview = value.slice(0, 3).map((item) => summarizeLogValue(item)).join(', ');
+      return value.length > 3 ? `[${preview}, ...]` : `[${preview}]`;
+    }
+    if (typeof value === 'object') {
+      const keys = Object.keys(value as Record<string, unknown>);
+      if (keys.length === 0) return '{}';
+      return `{${keys.slice(0, 3).join(', ')}${keys.length > 3 ? ', ...' : ''}}`;
+    }
+    return String(value);
+  };
+
+  const logCheckedFieldResults = (
+    album: Album,
+    candidates: Record<string, unknown>,
+    sourceDiagnostics: Record<string, { status: 'returned' | 'no_data' | 'error'; reason?: string }> | undefined,
+    attemptedSources: string[] | undefined,
+    sourceFieldCoverage: Record<string, string[]> | undefined
+  ) => {
+    const albumLabel = `${album.artist} - ${album.title}`;
+    const selectedFields = Object.keys(fieldConfig).filter((field) => !NON_ENRICHABLE_FIELDS.has(field));
+
+    addLog(albumLabel, 'info', `Checking ${selectedFields.length} field(s) from selected sources.`);
+
+    selectedFields.forEach((field) => {
+      const allowedSources = Array.from(fieldConfig[field] ?? []);
+      if (allowedSources.length === 0) return;
+      const candidateKeys = candidateKeysForField(field);
+      let hasAnyFieldValue = false;
+
+      const sourceDetails = allowedSources.map((source) => {
+        const diagSource = toDiagnosticsSourceKey(source);
+        const diag = sourceDiagnostics?.[diagSource];
+        const attempted = attemptedSources?.includes(diagSource) ?? false;
+        if (!attempted || !diag) return `${source}=not called`;
+        if (diag.status === 'error' || diag.status === 'no_data') {
+          return `${source}=${diag.reason || diag.status}`;
+        }
+
+        const returnedKeys = sourceFieldCoverage?.[diagSource] ?? [];
+        const sourcePayload = candidates[diagSource] as Record<string, unknown> | undefined;
+        const hits = candidateKeys.filter((key) => returnedKeys.includes(key));
+        if (hits.length === 0) return `${source}=returned other fields`;
+        hasAnyFieldValue = true;
+        const valueDetails = hits
+          .map((key) => `${key}:${summarizeLogValue(sourcePayload?.[key])}`)
+          .join(', ');
+        return `${source}=returned ${valueDetails}`;
+      });
+
+      addLog(albumLabel, 'info', `${field.replace(/_/g, ' ')} -> ${sourceDetails.join(' | ')}`);
+      if (!hasAnyFieldValue) {
+        addLog(albumLabel, 'skipped', `NOT ENRICHED anywhere for ${field.replace(/_/g, ' ')}`);
+      }
+    });
+  };
+
   // --- MAIN LOOP LOGIC ---
 
   async function startEnrichment(specificAlbumIds?: number[]) {
@@ -1036,16 +1106,24 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       return;
     }
 
+    const parsedStart = Number.parseInt(startEntry, 10);
+    const parsedEnd = endEntry.trim().length > 0 ? Number.parseInt(endEntry, 10) : null;
+    const safeStart = Number.isFinite(parsedStart) && parsedStart > 0 ? parsedStart : 1;
+    const safeEnd = parsedEnd !== null && Number.isFinite(parsedEnd) && parsedEnd > 0 ? parsedEnd : null;
+    if (safeEnd !== null && safeEnd < safeStart) {
+      alert('End entry must be greater than or equal to start entry.');
+      return;
+    }
+
     hasMoreRef.current = true;
     isLoopingRef.current = true;
-    cursorRef.current = 0; 
+    cursorRef.current = 0;
+    scanIndexRef.current = 0;
+    scanRangeRef.current = { start: safeStart, end: safeEnd };
+    specificAlbumQueueRef.current = specificAlbumIds && specificAlbumIds.length > 0 ? [...specificAlbumIds] : null;
     setConflicts([]);
     if (!currentRunId) {
       setCurrentRunId(createEnrichmentRunId());
-    }
-    
-    if (specificAlbumIds && specificAlbumIds.length > 0) {
-      isLoopingRef.current = false;
     }
 
     await runScanLoop(specificAlbumIds);
@@ -1065,13 +1143,18 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     let collectedSummary: {album: string, field: string, action: string}[] = [];
 
     while ((collectedConflicts.length < targetConflicts || specificAlbumIds) && hasMoreRef.current) {
-      setStatus(`Scanning... Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
+      const { start, end } = scanRangeRef.current;
+      const rangeLabel = end ? `${start}-${end}` : `${start}+`;
+      setStatus(`Scanning entry-by-entry (range ${rangeLabel})... Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
 
       try {
+        const queuedAlbumId = specificAlbumQueueRef.current && specificAlbumQueueRef.current.length > 0
+          ? specificAlbumQueueRef.current[0]
+          : undefined;
         const payload = {
-          albumIds: specificAlbumIds,
-          limit: specificAlbumIds ? undefined : 5, // Reduced to prevent timeouts
-          cursor: specificAlbumIds ? undefined : cursorRef.current,
+          albumIds: queuedAlbumId ? [queuedAlbumId] : undefined,
+          limit: queuedAlbumId ? undefined : 1,
+          cursor: queuedAlbumId ? undefined : cursorRef.current,
           // FIXED: Renamed folder to location in API call if necessary, or just don't pass it if it's dead
           // Assuming the API expects 'folder' to filter by location:
           location: folderFilter || undefined, 
@@ -1159,11 +1242,30 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         }
 
         const candidates = result.results || [];
+        const processedCount = Math.max(1, Number(result.processedCount ?? (queuedAlbumId ? 1 : candidates.length || 0)));
+        scanIndexRef.current += processedCount;
+        if (specificAlbumQueueRef.current && specificAlbumQueueRef.current.length > 0) {
+          specificAlbumQueueRef.current.shift();
+          if (specificAlbumQueueRef.current.length === 0) {
+            hasMoreRef.current = false;
+          }
+        }
+
+        const { start, end } = scanRangeRef.current;
+        if (end !== null && scanIndexRef.current > end) {
+          hasMoreRef.current = false;
+          break;
+        }
+
+        if (scanIndexRef.current < start) {
+          continue;
+        }
+
         const lastCheckedAlbum = candidates.length > 0 ? candidates[candidates.length - 1].album : null;
         const lastCheckedLabel = lastCheckedAlbum
           ? `${lastCheckedAlbum.artist} - ${lastCheckedAlbum.title}`
           : (result.processedCount ? `No matches in last batch (${result.processedCount} checked)` : 'No matches in last batch');
-        setStatus(`Scanning... Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
+        setStatus(`Scanning entry ${scanIndexRef.current}. Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
 
         if (result.processedCount > candidates.length) {
           // This is fine, logs empty results if any
@@ -1173,17 +1275,21 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           break; 
         }
 
-        const { conflicts: batchConflicts, summary: batchSummaryItems } = await processBatchAndSave(candidates);
+        let batchConflicts: ExtendedFieldConflict[] = [];
+        let batchSummaryItems: {album: string, field: string, action: string}[] = [];
+        for (const candidate of candidates) {
+          const albumResult = await processBatchAndSave([candidate]);
+          batchConflicts = [...batchConflicts, ...albumResult.conflicts];
+          batchSummaryItems = [...batchSummaryItems, ...(albumResult.summary || [])];
+        }
         
         collectedConflicts = [...collectedConflicts, ...batchConflicts];
         if (batchSummaryItems && batchSummaryItems.length > 0) {
             collectedSummary = [...collectedSummary, ...batchSummaryItems];
         }
         if (batchConflicts.length > 0) {
-          setStatus(`Scanning... Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
+          setStatus(`Scanning entry ${scanIndexRef.current}. Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
         }
-
-        if (specificAlbumIds) break;
 
       } catch (error) {
         setStatus(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1334,6 +1440,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         .filter(k => !['artist', 'title'].includes(k))
         .filter(k => ALLOWED_COLUMNS.has(k))
         .filter(k => !!fieldConfig[k]);
+
+      logCheckedFieldResults(album, candidates, sourceDiagnostics, attemptedSources, sourceFieldCoverage);
 
       if (!missingDataOnly && allowedSummaryKeys.length > 0) {
          const summary = allowedSummaryKeys
@@ -2473,6 +2581,29 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                     <option value="25">25 (Standard)</option>
                   </select>
                 </div>
+                <div className="flex items-center gap-2">
+                  <label className="font-semibold text-sm text-gray-900">Entry Range:</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={startEntry}
+                    onChange={(e) => setStartEntry(e.target.value)}
+                    disabled={enriching}
+                    className="w-20 p-1.5 rounded border border-gray-300 text-gray-900"
+                    title="Start entry number"
+                  />
+                  <span className="text-sm text-gray-500">to</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={endEntry}
+                    onChange={(e) => setEndEntry(e.target.value)}
+                    disabled={enriching}
+                    placeholder="end"
+                    className="w-20 p-1.5 rounded border border-gray-300 text-gray-900"
+                    title="End entry number (optional)"
+                  />
+                </div>
                 <label className="flex items-center gap-2 text-sm font-semibold text-gray-900">
                   <input
                     type="checkbox"
@@ -2493,7 +2624,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                   <div className="px-3 py-2 bg-gray-100 border-b border-gray-200 text-xs font-semibold text-gray-700">
                     Session Activity ({sessionLog.length})
                   </div>
-                  <div className="max-h-[150px] overflow-y-auto p-2 bg-white">
+                  <div className="max-h-[280px] overflow-y-auto p-2 bg-white">
                     {sessionLog.map(log => (
                       <div key={log.id} className="text-xs mb-1 flex gap-2">
                         <span className="text-gray-400">{log.timestamp.toLocaleTimeString()}</span>
