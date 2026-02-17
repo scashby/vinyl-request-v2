@@ -36,6 +36,14 @@ const chunkArray = <T>(array: T[], size: number): T[][] => {
   return chunked;
 };
 
+const isWithinSnoozeWindow = (lastReviewedAt: unknown, days = 30): boolean => {
+  if (typeof lastReviewedAt !== 'string' || !lastReviewedAt.trim()) return false;
+  const ts = new Date(lastReviewedAt).getTime();
+  if (!Number.isFinite(ts)) return false;
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  return ts > cutoff;
+};
+
 export async function POST(req: Request) {
   const supabase = supabaseServer(getAuthHeader(req));
   try {
@@ -181,9 +189,6 @@ export async function POST(req: Request) {
       if (typeof maxId === 'number' && Number.isFinite(maxId) && maxId > 0) {
         query = query.lte('id', maxId);
       }
-
-      // SERVER-SIDE SNOOZE FILTERING
-      void autoSnooze;
 
       const { data, error } = await query;
       if (error) throw error;
@@ -435,6 +440,17 @@ export async function POST(req: Request) {
           const tasks: { source: string; promise: Promise<EnrichmentResult | null> }[] = [];
 
           const typedAlbum = mapInventoryToCandidate(album);
+
+          if (autoSnooze && isWithinSnoozeWindow(typedAlbum.last_reviewed_at)) {
+            return {
+              album: typedAlbum,
+              candidates,
+              sourceDiagnostics: {},
+              attemptedSources: [],
+              sourceFieldCoverage: {},
+              scanNote: `Snoozed server-side (recently reviewed on ${typedAlbum.last_reviewed_at})`
+            };
+          }
 
           if (!hasMissingSelectedField(typedAlbum)) {
             return {

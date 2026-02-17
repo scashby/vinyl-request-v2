@@ -383,6 +383,14 @@ const areValuesEqual = (a: unknown, b: unknown): boolean => {
   return normalizeValue(a) === normalizeValue(b);
 };
 
+const isWithinSnoozeWindow = (lastReviewedAt: unknown, days = 30): boolean => {
+  if (typeof lastReviewedAt !== 'string' || !lastReviewedAt.trim()) return false;
+  const ts = new Date(lastReviewedAt).getTime();
+  if (!Number.isFinite(ts)) return false;
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  return ts > cutoff;
+};
+
 const toJsonValue = (value: unknown): import('types/supabase').Json | null => {
   if (value === undefined) return null;
   try {
@@ -1264,7 +1272,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       return scanRangeRef.current.start;
     };
 
-    while ((collectedConflicts.length < targetConflicts || specificAlbumIds) && hasMoreRef.current) {
+    // Always scan the full requested range/queue; conflicts are reviewed at the end.
+    while (hasMoreRef.current) {
       const { start, end } = scanRangeRef.current;
       const rangeLabel = end ? `${start}-${end}` : `${start}+`;
 
@@ -1273,7 +1282,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           ? specificAlbumQueueRef.current[0]
           : undefined;
         const currentScanId = getCurrentScanId(queuedAlbumId);
-        setStatus(`Scanning by ID (range ${rangeLabel})... Currently scanning ID: ${currentScanId}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
+        setStatus(`Scanning by ID (range ${rangeLabel})... Currently scanning ID: ${currentScanId}. Found ${collectedConflicts.length} conflict(s).`);
         const payload = {
           albumIds: queuedAlbumId ? [queuedAlbumId] : undefined,
           limit: queuedAlbumId ? undefined : 1,
@@ -1354,7 +1363,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               }
 
               const delay = Math.min(500 * 2 ** (attempt - 1), 4000);
-              setStatus(`Network interruption during scan. Retrying (${attempt}/${maxAttempts})... Currently scanning ID: ${currentScanId}.`);
+              setStatus(`Network interruption during scan. Retrying (${attempt}/${maxAttempts})... Currently scanning ID: ${currentScanId}. Found ${collectedConflicts.length} conflict(s).`);
               addLog(
                 'System',
                 'info',
@@ -1402,7 +1411,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             ? specificAlbumQueueRef.current[0]
             : undefined
         );
-        setStatus(`Scanning by ID. Currently scanning ID: ${nextScanId}. Processed: ${processedDuringScanRef.current}. Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
+        setStatus(`Scanning by ID. Currently scanning ID: ${nextScanId}. Processed: ${processedDuringScanRef.current}. Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length} conflict(s).`);
 
         if (result.processedCount > candidates.length) {
           // This is fine, logs empty results if any
@@ -1425,7 +1434,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             collectedSummary = [...collectedSummary, ...batchSummaryItems];
         }
         if (batchConflicts.length > 0) {
-          setStatus(`Scanning by ID. Currently scanning ID: ${nextScanId}. Processed: ${processedDuringScanRef.current}. Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
+          setStatus(`Scanning by ID. Currently scanning ID: ${nextScanId}. Processed: ${processedDuringScanRef.current}. Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length} conflict(s).`);
         }
 
       } catch (error) {
@@ -1565,6 +1574,31 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     results.forEach((item) => {
       processedIds.push(item.album.id);
       const { album, candidates, sourceDiagnostics, attemptedSources, sourceFieldCoverage, scanNote } = item;
+      if (autoSnooze && isWithinSnoozeWindow((album as Record<string, unknown>).last_reviewed_at)) {
+        addLog(
+          formatAlbumLogLabel(album),
+          'info',
+          `Snoozed: skipped (reviewed recently on ${(album as Record<string, unknown>).last_reviewed_at as string}).`
+        );
+        pendingAuditRows.push({
+          run_id: runId,
+          album_id: album.id,
+          album_artist: album.artist,
+          album_title: album.title,
+          phase: 'scan',
+          selected_fields: selectedFields,
+          checked_sources: checkedSources,
+          returned_sources: [],
+          returned_fields: [],
+          source_payload: toJsonValue({}),
+          proposed_updates: null,
+          applied_updates: null,
+          conflict_fields: [],
+          update_status: 'skipped_snooze',
+          notes: 'Skipped by snooze window (recently reviewed)',
+        });
+        return;
+      }
       const genrePool = [
         ...(Array.isArray(album.genres) ? album.genres : []),
         ...(Array.isArray(album.styles) ? album.styles : []),
@@ -2330,6 +2364,22 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const checkedSources = Array.from(new Set(
       albumConflicts.flatMap(c => Object.keys(c.candidates ?? {}).map(normalizeSourceForLog))
     ));
+    const timestamp = new Date().toISOString();
+    if (mode === 'snooze') {
+      const albumStub: Album = {
+        id: albumId,
+        release_id: conflictSeed?.release_id ?? null,
+        master_id: conflictSeed?.master_id ?? null,
+        artist: conflictSeed?.artist ?? 'Unknown Artist',
+        title: conflictSeed?.title ?? 'Untitled',
+        image_url: null,
+      };
+      try {
+        await applyAlbumUpdates(albumStub, { last_reviewed_at: timestamp });
+      } catch (error) {
+        console.error(`Failed to write last_reviewed_at for album ${albumId}:`, error);
+      }
+    }
     await persistEnrichmentRunLogs([{
       run_id: runId,
       album_id: albumId,
@@ -2426,6 +2476,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             updates.finalized_fields = [...new Set([...existing, fieldName])];
         }
     });
+
+    // Mark reviewed so snooze can skip this album in subsequent scans.
+    updates.last_reviewed_at = timestamp;
 
     // 3. Database Updates
     const conflictSeed = conflicts.find(c => c.album_id === albumId);
