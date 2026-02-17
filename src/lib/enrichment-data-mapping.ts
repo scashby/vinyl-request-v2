@@ -49,7 +49,7 @@ export type EnrichmentService =
 export const DATA_TO_SERVICES: Record<DataCategory, EnrichmentService[]> = {
   artwork: ['coverArtArchive', 'discogs', 'spotify', 'appleMusic', 'lastfm', 'theaudiodb', 'fanarttv', 'deezer'],
   credits: ['musicbrainz', 'appleMusic', 'discogs', 'genius', 'wikidata'],
-  tracklists: ['discogs', 'spotify', 'appleMusic', 'lastfm', 'setlistfm', 'deezer'],
+  tracklists: ['discogs', 'musicbrainz', 'spotify', 'appleMusic', 'lastfm', 'setlistfm', 'deezer'],
   // NOTE: acousticbrainz is not implemented in the current fetch pipeline.
   sonic_domain: [
     'spotify',
@@ -245,9 +245,9 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'chorus': ['musicbrainz'],
   
   // --- TRACKLISTS ---
-  'tracks': ['discogs', 'spotify', 'appleMusic', 'lastfm'],
-  'tracklists': ['discogs', 'spotify', 'appleMusic'],
-  'tracklist': ['discogs', 'spotify', 'appleMusic', 'lastfm'],
+  'tracks': ['discogs', 'musicbrainz', 'spotify', 'appleMusic', 'lastfm'],
+  'tracklists': ['discogs', 'musicbrainz', 'spotify', 'appleMusic'],
+  'tracklist': ['discogs', 'musicbrainz', 'spotify', 'appleMusic', 'lastfm'],
   'disc_metadata': ['discogs'],
 
   // --- SONIC DOMAIN ---
@@ -285,15 +285,15 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'recording_date': ['musicbrainz', 'wikipedia'],
   'master_release_date': ['discogs'],
   'studio': [],
-  'companies': ['discogs', 'spotify'],
+  'companies': ['musicbrainz', 'discogs', 'spotify'],
   
   // --- CONTEXT ---
   'notes': ['wikipedia', 'discogs', 'appleMusic'],
-  'release_notes': ['discogs'],
+  'release_notes': ['musicbrainz', 'discogs'],
   'master_notes': ['wikipedia', 'appleMusic'],
   'wikipedia_url': ['wikipedia'],
   'cultural_significance': ['wikipedia'],
-  'recording_location': ['wikipedia', 'wikidata'],
+  'recording_location': ['musicbrainz', 'wikipedia', 'wikidata'],
   'critical_reception': ['wikipedia'],
   'apple_music_editorial_notes': ['appleMusic'],
   
