@@ -378,8 +378,6 @@ const splitDiscogsUpdates = (payload: Record<string, unknown>) => {
       case 'certifications':
       case 'cultural_significance':
       case 'critical_reception':
-      case 'allmusic_rating':
-      case 'allmusic_review':
       case 'pitchfork_score':
       case 'pitchfork_review':
       case 'recording_location':
@@ -389,7 +387,6 @@ const splitDiscogsUpdates = (payload: Record<string, unknown>) => {
       case 'recording_date':
       case 'recording_year':
       case 'wikipedia_url':
-      case 'allmusic_url':
       case 'apple_music_url':
       case 'lastfm_url':
       case 'spotify_url':

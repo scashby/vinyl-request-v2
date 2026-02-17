@@ -29,7 +29,7 @@ const ALLOWED_COLUMNS = new Set([
   'image_url', 'back_image_url', 'sell_price', 'media_condition', 'location', // FIXED: Was 'folder'
   'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
   'apple_music_id', 'apple_music_url', 'lastfm_id', 'lastfm_url', 
-  'musicbrainz_id', 'musicbrainz_url', 'wikipedia_url', 'genius_url', 'allmusic_url',
+  'musicbrainz_id', 'musicbrainz_url', 'wikipedia_url', 'genius_url',
   'tags', 'lastfm_tags', 'notes', 'release_notes', 'master_notes', 'enriched_metadata', 'enrichment_summary', 'companies', 'genres', 'styles', 'original_release_date',
   'inner_sleeve_images', 'musicians', 'credits', 'producers', 'engineers', 
   'songwriters', 'composer', 'conductor', 'orchestra',
@@ -43,9 +43,9 @@ const ALLOWED_COLUMNS = new Set([
   'tracks.lyrics', 'tracks.lyrics_url',
   'cultural_significance', 'recording_location', 'critical_reception', 'awards', 'certifications',
   'chart_positions', 'sort_title', 'subtitle', 'master_release_date', 'recording_date', 'recording_year',
-  'allmusic_rating', 'allmusic_review', 'pitchfork_score', 'pitchfork_review',
+  'pitchfork_score', 'pitchfork_review',
   'apple_music_editorial_notes',
-  'lastfm_similar_albums', 'allmusic_similar_albums'
+  'lastfm_similar_albums'
 ]);
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
@@ -153,7 +153,6 @@ const SERVICE_FLAG_TO_ID: Record<string, string> = {
   discogs: 'discogs',
   lastfm: 'lastfm',
   appleMusicEnhanced: 'appleMusic',
-  allmusic: 'allmusic',
   wikipedia: 'wikipedia',
   genius: 'genius',
   coverArt: 'coverArtArchive',
@@ -222,7 +221,6 @@ function getServicesForSelectionFromConfig(config: FieldConfigMap) {
     discogs: activeServices.has('discogs'),
     lastfm: activeServices.has('lastfm'),
     appleMusicEnhanced: activeServices.has('appleMusic'),
-    allmusic: activeServices.has('allmusic'),
     wikipedia: activeServices.has('wikipedia'),
     genius: activeServices.has('genius'),
     coverArt: activeServices.has('coverArtArchive'),
@@ -636,12 +634,9 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'chart_positions':
       case 'awards':
       case 'certifications':
-      case 'allmusic_rating':
-      case 'allmusic_review':
       case 'pitchfork_score':
       case 'pitchfork_review':
       case 'lastfm_similar_albums':
-      case 'allmusic_similar_albums':
         masterUpdates[key] = normalizeCreditsValue(value) ?? null;
         break;
       case 'packaging':
@@ -691,7 +686,6 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
         break;
       case 'apple_music_url':
       case 'lastfm_url':
-      case 'allmusic_url':
       case 'wikipedia_url':
       case 'genius_url':
         masterUpdates[key] = normalizeCreditsValue(value) ?? null;
@@ -1480,7 +1474,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const pendingAuditRows: EnrichmentRunLogInsert[] = [];
     
     const GLOBAL_PRIORITY = [
-      'discogs', 'musicbrainz', 'spotify', 'appleMusic', 'allmusic', 'deezer', 
+      'discogs', 'musicbrainz', 'spotify', 'appleMusic', 'deezer', 
       'rateyourmusic', 'lastfm', 'theaudiodb', 'wikipedia', 'wikidata', 
       'coverArt', 'fanarttv', 
       'genius', 'musixmatch', 
@@ -1784,7 +1778,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                  Object.entries(sourceValues).forEach(([src, txt]) => {
                      if (src === 'wikipedia') newMeta['wiki_bio'] = txt;
                      if (src === 'discogs') newMeta['media_notes'] = txt;
-                     if (src === 'allmusic') newMeta['review'] = txt;
                      else newMeta[`${src}_notes`] = txt;
                  });
                  updatesForAlbum[key] = newMeta;

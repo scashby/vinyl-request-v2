@@ -52,12 +52,6 @@ export function LinksTab({ album, onChange }: LinksTabProps) {
       placeholder: 'https://www.last.fm/...',
     },
     {
-      key: 'allmusic_url',
-      label: 'AllMusic URL',
-      value: album.allmusic_url ?? '',
-      placeholder: 'https://www.allmusic.com/...',
-    },
-    {
       key: 'wikipedia_url',
       label: 'Wikipedia URL',
       value: album.wikipedia_url ?? '',

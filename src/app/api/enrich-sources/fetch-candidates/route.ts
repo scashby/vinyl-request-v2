@@ -8,7 +8,6 @@ import {
   fetchDiscogsData, 
   fetchLastFmData, 
   fetchAppleMusicData, 
-  fetchAllMusicData,
   fetchCoverArtData, 
   fetchWikipediaData, 
   fetchGeniusData,
@@ -143,19 +142,15 @@ export async function POST(req: Request) {
             genres,
             styles,
             lastfm_similar_albums,
-            allmusic_similar_albums,
             notes,
             original_release_year,
             recording_date,
             wikipedia_url,
-            allmusic_url,
             apple_music_url,
             lastfm_url,
             cultural_significance,
             recording_location,
             critical_reception,
-            allmusic_rating,
-            allmusic_review,
             pitchfork_score,
             chart_positions,
             awards,
@@ -252,14 +247,11 @@ export async function POST(req: Request) {
           original_release_year?: number | null;
           recording_date?: string | null;
           wikipedia_url?: string | null;
-          allmusic_url?: string | null;
           apple_music_url?: string | null;
           lastfm_url?: string | null;
           cultural_significance?: string | null;
           recording_location?: string | null;
           critical_reception?: string | null;
-          allmusic_rating?: number | string | null;
-          allmusic_review?: string | null;
           pitchfork_score?: number | string | null;
           chart_positions?: string[] | null;
           awards?: string[] | null;
@@ -267,7 +259,6 @@ export async function POST(req: Request) {
           genres?: string[] | null;
           styles?: string[] | null;
           lastfm_similar_albums?: string[] | null;
-          allmusic_similar_albums?: string[] | null;
           artist?: { name?: string | null } | null;
           master_tag_links?: {
             tag?: { name?: string | null } | null;
@@ -373,20 +364,16 @@ export async function POST(req: Request) {
         genres: master?.genres ?? null,
         styles: master?.styles ?? null,
         lastfm_similar_albums: master?.lastfm_similar_albums ?? null,
-        allmusic_similar_albums: master?.allmusic_similar_albums ?? null,
         master_notes: master?.notes ?? null,
         cultural_significance: master?.cultural_significance ?? albumDetails.cultural_significance ?? null,
         recording_location: master?.recording_location ?? albumDetails.recording_location ?? null,
         critical_reception: master?.critical_reception ?? albumDetails.critical_reception ?? null,
-        allmusic_rating: master?.allmusic_rating ?? albumDetails.allmusic_rating ?? null,
-        allmusic_review: master?.allmusic_review ?? albumDetails.allmusic_review ?? null,
         apple_music_editorial_notes: albumDetails.apple_music_editorial_notes ?? null,
         pitchfork_score: master?.pitchfork_score ?? albumDetails.pitchfork_score ?? null,
         chart_positions: master?.chart_positions ?? albumDetails.chart_positions ?? null,
         awards: master?.awards ?? albumDetails.awards ?? null,
         certifications: master?.certifications ?? albumDetails.certifications ?? null,
         wikipedia_url: asString(master?.wikipedia_url) ?? asString(links.wikipedia_url),
-        allmusic_url: asString(master?.allmusic_url) ?? asString(links.allmusic_url),
         apple_music_url: asString(master?.apple_music_url) ?? asString(links.apple_music_url),
         lastfm_url: asString(master?.lastfm_url) ?? asString(links.lastfm_url),
         tracks: releaseTracks.length > 0 ? ['has_tracks'] : [],
@@ -480,7 +467,6 @@ export async function POST(req: Request) {
           }
           if (services.spotify) addTask('spotify', runSpotifyQueued(typedAlbum));
           if (services.appleMusicEnhanced) addTask('appleMusic', fetchAppleMusicData(typedAlbum));
-          if (services.allmusic) addTask('allmusic', fetchAllMusicData(typedAlbum));
           if (services.lastfm) addTask('lastfm', fetchLastFmData(typedAlbum));
           if (services.wikipedia) addTask('wikipedia', fetchWikipediaData(typedAlbum));
           if (services.genius) addTask('genius', fetchGeniusData(typedAlbum));

@@ -43,9 +43,6 @@ export type CandidateData = {
   lastfm_id?: string;
   wikipedia_url?: string;
   genius_url?: string;
-  allmusic_url?: string;
-  allmusic_rating?: string | number;
-  allmusic_review?: string;
   apple_music_editorial_notes?: string;
   pitchfork_score?: string | number;
 
@@ -100,8 +97,7 @@ export type CandidateData = {
   awards?: string[];
   certifications?: string[];
   lastfm_similar_albums?: string[];
-  allmusic_similar_albums?: string[];
-  enrichment_summary?: Record<string, string>; // Structured External Data (Setlist.fm, WhoSampled, etc)
+  enrichment_summary?: Record<string, string>; // Structured External Data (Setlist.fm, links, etc)
   companies?: string[]; // Discogs Companies
   rpm?: string;
   vinyl_weight?: string;
@@ -1116,7 +1112,6 @@ export async function fetchLastFmData(album: { artist: string, title: string }):
           .slice(0, 12);
         if (similarArtists.length > 0) {
           candidate.lastfm_similar_albums = similarArtists;
-          candidate.allmusic_similar_albums = similarArtists;
         }
       }
     } catch {
@@ -1316,206 +1311,6 @@ export async function fetchWikipediaData(album: { artist: string, title: string 
         };
     } catch (e) {
         return { success: false, source: 'wikipedia', error: (e as Error).message };
-    }
-}
-
-// ============================================================================
-// 8b. ALLMUSIC (Review Snippet + Link)
-// ============================================================================
-export async function fetchAllMusicData(album: { artist: string, title: string, allmusic_url?: string }): Promise<EnrichmentResult> {
-    try {
-        let allmusicUrl = album.allmusic_url;
-        if (!allmusicUrl) {
-            const artistVariants = buildArtistVariants(album.artist);
-            const titleVariants = buildTitleVariants(album.title);
-            for (const artistVariant of artistVariants) {
-              if (allmusicUrl) break;
-              for (const titleVariant of titleVariants) {
-                const query = `${artistVariant} ${titleVariant}`;
-                const searchUrl = `https://www.allmusic.com/search/albums/${encodeURIComponent(query)}`;
-                const searchRes = await fetch(searchUrl);
-                const html = await searchRes.text();
-                const match = html.match(/href="(\/album\/[^"?]+)"/i);
-                if (match?.[1]) {
-                    allmusicUrl = `https://www.allmusic.com${match[1]}`;
-                    break;
-                }
-              }
-            }
-            if (!allmusicUrl) return { success: false, source: 'allmusic', error: 'Not found' };
-        }
-
-        let reviewSnippet: string | undefined;
-        let allmusicRating: string | undefined;
-        if (allmusicUrl) {
-            const pageRes = await fetch(allmusicUrl);
-            if (pageRes.ok) {
-                const pageHtml = await pageRes.text();
-                const descMatch = pageHtml.match(/<meta\\s+name="description"\\s+content="([^"]+)"/i);
-                if (descMatch?.[1]) {
-                    const cleaned = decodeHtml(descMatch[1]).trim();
-                    reviewSnippet = truncateText(cleaned, 900);
-                }
-                const ratingMatch = pageHtml.match(/class="allmusic-rating[^"]*"[^>]*>([0-9.]+)</i)
-                  || pageHtml.match(/data-rating="([0-9.]+)"/i)
-                  || pageHtml.match(/"ratingValue"\\s*:\\s*"?([0-9.]+)"?/i);
-                if (ratingMatch?.[1]) {
-                    allmusicRating = ratingMatch[1].trim();
-                }
-            }
-        }
-
-        return {
-            success: true,
-            source: 'allmusic',
-            data: {
-                allmusic_url: allmusicUrl,
-                critical_reception: reviewSnippet,
-                master_notes: reviewSnippet,
-                allmusic_review: reviewSnippet,
-                allmusic_rating: allmusicRating
-            }
-        };
-    } catch (e) {
-        return { success: false, source: 'allmusic', error: (e as Error).message };
-    }
-}
-// ============================================================================
-// 9. WHOSAMPLED (Samples & Covers)
-// ============================================================================
-const stripHtmlTags = (value: string) =>
-  decodeHtml(value)
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-const normalizeWsPath = (href: string) => {
-  const trimmed = href.trim();
-  if (!trimmed) return null;
-  if (!trimmed.startsWith('/')) return null;
-  if (trimmed.startsWith('/search') || trimmed.startsWith('/login') || trimmed.startsWith('/forum')) return null;
-  return trimmed.split('#')[0].split('?')[0];
-};
-
-const parseWhoSampledAnchors = (html: string) => {
-  const anchors: Array<{ href: string; text: string; index: number }> = [];
-  const re = /<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(html)) !== null) {
-    const href = normalizeWsPath(match[1] || '');
-    const text = stripHtmlTags(match[2] || '');
-    if (!href || !text) continue;
-    anchors.push({ href, text, index: match.index });
-  }
-  return anchors;
-};
-
-const parseWhoSampledRelations = (
-  html: string,
-  anchors: Array<{ href: string; text: string; index: number }>
-) => {
-  const samples = new Set<string>();
-  const sampledBy = new Set<string>();
-
-  anchors.forEach((anchor) => {
-    const context = html.slice(Math.max(0, anchor.index - 900), Math.min(html.length, anchor.index + 900)).toLowerCase();
-    const isSampleContext =
-      context.includes('contains samples of') ||
-      context.includes('contains a sample of') ||
-      context.includes('contains interpolation') ||
-      context.includes('samples from');
-    const isSampledByContext =
-      context.includes('was sampled in') ||
-      context.includes('was remixed in') ||
-      context.includes('was covered in') ||
-      context.includes('sampled by');
-
-    if (!isSampleContext && !isSampledByContext) return;
-    if (anchor.text.length < 2 || anchor.text.length > 140) return;
-    if (/^(view|see|submit|buy|play|login)\b/i.test(anchor.text)) return;
-    if (!/^\/[^/]+\/[^/]+/.test(anchor.href)) return;
-
-    if (isSampleContext) samples.add(anchor.text);
-    if (isSampledByContext) sampledBy.add(anchor.text);
-  });
-
-  return {
-    samples: Array.from(samples).slice(0, 60),
-    sampled_by: Array.from(sampledBy).slice(0, 60),
-  };
-};
-
-const pickWhoSampledDetailPath = (html: string, album: { artist: string; title: string }) => {
-  const anchors = parseWhoSampledAnchors(html);
-  if (anchors.length === 0) return null;
-
-  const artistTokens = buildArtistVariants(album.artist)
-    .flatMap((v) => v.toLowerCase().split(/[^a-z0-9]+/g))
-    .filter((v) => v.length > 1);
-  const titleTokens = buildTitleVariants(album.title)
-    .flatMap((v) => v.toLowerCase().split(/[^a-z0-9]+/g))
-    .filter((v) => v.length > 1);
-
-  let best: { href: string; score: number } | null = null;
-  for (const anchor of anchors) {
-    const haystack = `${anchor.href} ${anchor.text}`.toLowerCase();
-    let score = 0;
-    artistTokens.forEach((token) => { if (haystack.includes(token)) score += 2; });
-    titleTokens.forEach((token) => { if (haystack.includes(token)) score += 3; });
-    if (!best || score > best.score) best = { href: anchor.href, score };
-  }
-
-  if (!best || best.score < 4) return null;
-  return best.href;
-};
-
-export async function fetchWhoSampledData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
-    try {
-        const query = `${album.artist} ${album.title}`;
-        const baseUrl = 'https://www.whosampled.com';
-        const searchUrl = `${baseUrl}/search/?q=${encodeURIComponent(query)}`;
-        const headers = { 'User-Agent': USER_AGENT, 'Accept-Language': 'en-US,en;q=0.9' };
-
-        const searchRes = await fetch(searchUrl, { headers });
-        const searchHtml = await searchRes.text();
-        if (!searchRes.ok) {
-          return { success: false, source: 'whosampled', error: `Search ${searchRes.status}` };
-        }
-        if (/just a moment|attention required|cf-chl|cloudflare/i.test(searchHtml)) {
-          return { success: false, source: 'whosampled', error: 'Blocked by anti-bot protection' };
-        }
-
-        const detailPath = pickWhoSampledDetailPath(searchHtml, album);
-        if (!detailPath) {
-          return { success: false, source: 'whosampled', error: 'No validated match found' };
-        }
-
-        const detailUrl = `${baseUrl}${detailPath}`;
-        const detailRes = await fetch(detailUrl, { headers });
-        const detailHtml = await detailRes.text();
-        if (!detailRes.ok) {
-          return { success: false, source: 'whosampled', error: `Detail ${detailRes.status}` };
-        }
-        if (/just a moment|attention required|cf-chl|cloudflare/i.test(detailHtml)) {
-          return { success: false, source: 'whosampled', error: 'Blocked by anti-bot protection' };
-        }
-
-        const anchors = parseWhoSampledAnchors(detailHtml);
-        const relations = parseWhoSampledRelations(detailHtml, anchors);
-        if (relations.samples.length === 0 && relations.sampled_by.length === 0) {
-          return { success: false, source: 'whosampled', error: 'No sample relationships found' };
-        }
-
-        return {
-          success: true,
-          source: 'whosampled',
-          data: {
-            ...relations,
-            enrichment_summary: { whosampled: detailUrl }
-          }
-        };
-    } catch (e) {
-        return { success: false, source: 'whosampled', error: (e as Error).message };
     }
 }
 

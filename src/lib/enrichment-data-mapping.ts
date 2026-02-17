@@ -29,7 +29,6 @@ export type EnrichmentService =
   | 'lastfm'
   | 'spotify'
   | 'appleMusic'
-  | 'allmusic'
   | 'wikipedia'
   | 'discogs'
   | 'genius'
@@ -49,7 +48,7 @@ export type EnrichmentService =
  */
 export const DATA_TO_SERVICES: Record<DataCategory, EnrichmentService[]> = {
   artwork: ['coverArtArchive', 'musicbrainz', 'discogs', 'spotify', 'appleMusic', 'lastfm', 'theaudiodb', 'fanarttv', 'deezer'],
-  credits: ['musicbrainz', 'allmusic', 'appleMusic', 'discogs', 'genius', 'wikidata'],
+  credits: ['musicbrainz', 'appleMusic', 'discogs', 'genius', 'wikidata'],
   tracklists: ['discogs', 'spotify', 'appleMusic', 'lastfm', 'setlistfm', 'deezer'],
   // NOTE: acousticbrainz is not implemented in the current fetch pipeline.
   sonic_domain: [
@@ -57,26 +56,25 @@ export const DATA_TO_SERVICES: Record<DataCategory, EnrichmentService[]> = {
     'spotify',
     'secondhandsongs',
   ],
-  genres: ['discogs', 'spotify', 'appleMusic', 'allmusic', 'lastfm', 'musicbrainz', 'rateyourmusic', 'theaudiodb', 'deezer'],
+  genres: ['discogs', 'spotify', 'appleMusic', 'lastfm', 'musicbrainz', 'rateyourmusic', 'theaudiodb', 'deezer'],
   streaming_links: [
     'spotify',
     'appleMusic',
     'lastfm',
     'musicbrainz',
-    'allmusic',
     'wikipedia',
     'secondhandsongs',
     'setlistfm',
     'deezer',
     'musixmatch',
   ],
-  reviews: ['allmusic', 'lastfm', 'spotify', 'appleMusic', 'wikipedia', 'rateyourmusic', 'pitchfork'],
+  reviews: ['lastfm', 'spotify', 'appleMusic', 'wikipedia', 'rateyourmusic', 'pitchfork'],
   // NOTE: billboard is not implemented in the current fetch pipeline.
   chart_data: ['wikipedia', 'rateyourmusic', 'wikidata'],
   release_metadata: ['musicbrainz', 'discogs', 'spotify', 'appleMusic', 'wikipedia', 'wikidata', 'popsike'],
   lyrics: ['genius', 'musixmatch'],
   similar_albums: ['lastfm'],
-  cultural_context: ['wikipedia', 'wikidata', 'allmusic', 'appleMusic'],
+  cultural_context: ['wikipedia', 'wikidata', 'appleMusic'],
 };
 
 /**
@@ -182,14 +180,11 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
     'apple_music_id',
     'lastfm_id',
     'musicbrainz_id',
-    'allmusic_url',
     'wikipedia_url',
     'discogs_release_id',
     'discogs_master_id'
   ],
   reviews: [
-    'allmusic_rating',
-    'allmusic_review',
     'critical_reception',
     'apple_music_editorial_notes',
     'pitchfork_score'
@@ -216,14 +211,13 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
     'tracks.lyrics'
   ],
   similar_albums: [
-    'lastfm_similar_albums',
-    'allmusic_similar_albums'
+    'lastfm_similar_albums'
   ],
   cultural_context: [
     'cultural_significance',
     'recording_location',
     'critical_reception',
-    'master_notes', // Maps to Wikipedia/AllMusic summaries
+    'master_notes',
     'wikipedia_url'
   ],
 };
@@ -241,11 +235,11 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'vinyl_label_images': ['coverArtArchive', 'musicbrainz', 'discogs'],
   
   // --- CREDITS ---
-  'musicians': ['musicbrainz', 'discogs', 'allmusic'],
-  'producers': ['musicbrainz', 'discogs', 'allmusic'],
-  'engineers': ['musicbrainz', 'discogs', 'allmusic'],
-  'songwriters': ['musicbrainz', 'allmusic', 'genius', 'discogs'],
-  'composer': ['musicbrainz', 'appleMusic', 'allmusic'],
+  'musicians': ['musicbrainz', 'discogs'],
+  'producers': ['musicbrainz', 'discogs'],
+  'engineers': ['musicbrainz', 'discogs'],
+  'songwriters': ['musicbrainz', 'genius', 'discogs'],
+  'composer': ['musicbrainz', 'appleMusic'],
   'conductor': ['musicbrainz'],
   'orchestra': ['musicbrainz'],
   'chorus': ['musicbrainz'],
@@ -278,8 +272,8 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'mood_electronic': ['musicbrainz', 'spotify'],
   
   // --- GENRES & TAGS ---
-  'genres': ['discogs', 'spotify', 'appleMusic', 'lastfm', 'allmusic', 'theaudiodb', 'deezer'],
-  'styles': ['discogs', 'lastfm', 'allmusic', 'theaudiodb'],
+  'genres': ['discogs', 'spotify', 'appleMusic', 'lastfm', 'theaudiodb', 'deezer'],
+  'styles': ['discogs', 'lastfm', 'theaudiodb'],
   'tags': ['lastfm', 'discogs', 'musicbrainz'], // Generic bucket
   
   // --- METADATA ---
@@ -294,19 +288,16 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'companies': ['discogs', 'spotify'],
   
   // --- CONTEXT ---
-  'notes': ['wikipedia', 'discogs', 'allmusic', 'appleMusic'],
+  'notes': ['wikipedia', 'discogs', 'appleMusic'],
   'release_notes': ['discogs'],
-  'master_notes': ['wikipedia', 'allmusic', 'appleMusic'],
+  'master_notes': ['wikipedia', 'appleMusic'],
   'wikipedia_url': ['wikipedia'],
-  'cultural_significance': ['wikipedia', 'allmusic'],
+  'cultural_significance': ['wikipedia'],
   'recording_location': ['wikipedia', 'wikidata'],
-  'critical_reception': ['wikipedia', 'allmusic'],
-  'allmusic_rating': ['allmusic'],
-  'allmusic_review': ['allmusic'],
+  'critical_reception': ['wikipedia'],
   'apple_music_editorial_notes': ['appleMusic'],
   
   // --- LINKS ---
-  'allmusic_url': ['allmusic'],
   'spotify_id': ['spotify'],
   'apple_music_id': ['appleMusic'],
   'lastfm_id': ['lastfm'],
@@ -321,11 +312,10 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
 
   // --- SIMILAR ALBUMS ---
   'lastfm_similar_albums': ['lastfm'],
-  'allmusic_similar_albums': ['lastfm'],
 
   // --- REVIEWS & CHARTS (Newly Added) ---
   'pitchfork_score': ['pitchfork'],
-  'awards': ['wikipedia', 'wikidata', 'allmusic'],
+  'awards': ['wikipedia', 'wikidata'],
   'certifications': ['wikipedia', 'wikidata']
   ,
   'chart_positions': ['wikipedia', 'wikidata']
@@ -341,7 +331,6 @@ export const SERVICE_DISPLAY_NAMES: Record<EnrichmentService, string> = {
   lastfm: 'Last.fm',
   spotify: 'Spotify',
   appleMusic: 'Apple Music',
-  allmusic: 'AllMusic',
   wikipedia: 'Wikipedia',
   discogs: 'Discogs',
   genius: 'Genius',
@@ -367,7 +356,6 @@ export const SERVICE_ICONS: Record<EnrichmentService, string> = {
   lastfm: '📻',
   spotify: '🎧',
   appleMusic: '🍎',
-  allmusic: '⭐',
   wikipedia: '📖',
   discogs: '💿',
   genius: '📝',
@@ -395,7 +383,6 @@ export function dataCategoriesToServices(
     lastfm: false,
     spotifyEnhanced: false,
     appleMusicEnhanced: false,
-    allmusic: false,
     wikipedia: false,
     wikidata: false,
     coverArtArchive: false,
@@ -417,7 +404,6 @@ export function dataCategoriesToServices(
         case 'lastfm': services.lastfm = true; break;
         case 'spotify': services.spotifyEnhanced = true; break;
         case 'appleMusic': services.appleMusicEnhanced = true; break;
-        case 'allmusic': services.allmusic = true; break;
         case 'wikipedia': services.wikipedia = true; break;
         case 'wikidata': services.wikidata = true; break;
         case 'discogs': 

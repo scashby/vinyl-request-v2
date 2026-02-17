@@ -619,7 +619,6 @@ export default function EnrichmentReviewModal({
                          // We need to decide a key for it.
                          if (candSource === 'wikipedia') newMeta['wiki_bio'] = candVal;
                          else if (candSource === 'discogs') newMeta['media_notes'] = candVal;
-                         else if (candSource === 'allmusic') newMeta['review'] = candVal;
                          else newMeta[`${candSource}_notes`] = candVal;
                      }
                  });

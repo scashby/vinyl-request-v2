@@ -33,8 +33,6 @@ type MasterRow = {
   producers?: string[] | null;
   engineers?: string[] | null;
   songwriters?: string[] | null;
-  allmusic_rating?: number | string | null;
-  allmusic_review?: string | null;
   critical_reception?: string | null;
   pitchfork_score?: number | string | null;
   chart_positions?: string[] | null;
@@ -44,11 +42,9 @@ type MasterRow = {
   recording_location?: string | null;
   notes?: string | null;
   wikipedia_url?: string | null;
-  allmusic_url?: string | null;
   apple_music_url?: string | null;
   lastfm_url?: string | null;
   lastfm_similar_albums?: string[] | null;
-  allmusic_similar_albums?: string[] | null;
 };
 
 type ReleaseRow = {
@@ -112,8 +108,6 @@ export async function GET(request: Request) {
               producers,
               engineers,
               songwriters,
-              allmusic_rating,
-              allmusic_review,
               critical_reception,
               pitchfork_score,
               chart_positions,
@@ -123,11 +117,9 @@ export async function GET(request: Request) {
               recording_location,
               notes,
               wikipedia_url,
-              allmusic_url,
               apple_music_url,
               lastfm_url,
-              lastfm_similar_albums,
-              allmusic_similar_albums
+              lastfm_similar_albums
             ),
             release_tracks:release_tracks (
               recording:recordings (
@@ -373,12 +365,8 @@ export async function GET(request: Request) {
       if (!hasLyrics) missingLyrics++;
 
       const hasReviews =
-        master?.allmusic_rating !== null && master?.allmusic_rating !== undefined
-        || hasString(master?.allmusic_review)
-        || hasString(master?.critical_reception)
+        hasString(master?.critical_reception)
         || master?.pitchfork_score !== null && master?.pitchfork_score !== undefined
-        || hasString(creditInfo.albumDetails.allmusic_rating)
-        || hasString(creditInfo.albumDetails.allmusic_review)
         || hasString(creditInfo.albumDetails.critical_reception)
         || hasString(creditInfo.albumDetails.apple_music_editorial_notes)
         || hasString(creditInfo.albumDetails.pitchfork_score);
@@ -407,9 +395,7 @@ export async function GET(request: Request) {
 
       const hasSimilarAlbums =
         hasArray(master?.lastfm_similar_albums)
-        || hasArray(master?.allmusic_similar_albums)
-        || hasArray(creditInfo.albumDetails.lastfm_similar_albums)
-        || hasArray(creditInfo.albumDetails.allmusic_similar_albums);
+        || hasArray(creditInfo.albumDetails.lastfm_similar_albums);
       if (!hasSimilarAlbums) missingSimilar++;
 
       const hasTrackLyrics = recordings.some((recording) => {
@@ -423,9 +409,6 @@ export async function GET(request: Request) {
       const hasTags =
         hasArray(creditInfo.albumDetails.tags)
         || hasArray(creditInfo.albumDetails.lastfm_tags);
-      const hasAllmusicRating =
-        master?.allmusic_rating !== null && master?.allmusic_rating !== undefined
-        || creditInfo.albumDetails.allmusic_rating !== null && creditInfo.albumDetails.allmusic_rating !== undefined;
       const hasPitchforkScore =
         master?.pitchfork_score !== null && master?.pitchfork_score !== undefined
         || creditInfo.albumDetails.pitchfork_score !== null && creditInfo.albumDetails.pitchfork_score !== undefined;
@@ -492,18 +475,12 @@ export async function GET(request: Request) {
               || hasString(creditInfo.albumDetails.lastfm_url);
           case 'musicbrainz_id':
             return hasString(master?.musicbrainz_release_group_id);
-          case 'allmusic_url':
-            return hasString(master?.allmusic_url) || hasString(creditInfo.albumDetails.allmusic_url);
           case 'wikipedia_url':
             return hasString(master?.wikipedia_url) || hasString(creditInfo.links.wikipedia_url);
           case 'discogs_release_id':
             return hasString(release?.discogs_release_id);
           case 'discogs_master_id':
             return hasString(master?.discogs_master_id);
-          case 'allmusic_rating':
-            return hasAllmusicRating;
-          case 'allmusic_review':
-            return hasString(master?.allmusic_review) || hasString(creditInfo.albumDetails.allmusic_review);
           case 'critical_reception':
             return hasString(master?.critical_reception) || hasString(creditInfo.albumDetails.critical_reception);
           case 'apple_music_editorial_notes':
@@ -540,8 +517,6 @@ export async function GET(request: Request) {
             return hasTrackLyrics;
           case 'lastfm_similar_albums':
             return hasArray(master?.lastfm_similar_albums) || hasArray(creditInfo.albumDetails.lastfm_similar_albums);
-          case 'allmusic_similar_albums':
-            return hasArray(master?.allmusic_similar_albums) || hasArray(creditInfo.albumDetails.allmusic_similar_albums);
           case 'cultural_significance':
             return hasString(master?.cultural_significance) || hasString(creditInfo.albumDetails.cultural_significance);
           case 'recording_location':
