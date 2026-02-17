@@ -661,6 +661,15 @@ const SP_ID = getEnv('SPOTIFY_CLIENT_ID');
 const SP_SECRET = getEnv('SPOTIFY_CLIENT_SECRET');
 let spToken: { token: string; exp: number } | null = null;
 
+const readJsonResponse = async (res: Response): Promise<{ json: any | null; text: string }> => {
+  const text = await res.text();
+  try {
+    return { json: JSON.parse(text), text };
+  } catch {
+    return { json: null, text };
+  }
+};
+
 async function spGetToken(): Promise<string> {
   if (!SP_ID || !SP_SECRET) {
     throw new Error('Missing Spotify credentials (SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET)');
@@ -674,11 +683,13 @@ async function spGetToken(): Promise<string> {
     },
     body: 'grant_type=client_credentials'
   });
-  const data = await res.json();
+  const { json: data, text } = await readJsonResponse(res);
   if (!res.ok || !data?.access_token) {
     const detail = typeof data?.error_description === 'string'
       ? data.error_description
-      : (typeof data?.error === 'string' ? data.error : 'token request failed');
+      : (typeof data?.error === 'string'
+          ? data.error
+          : (text.slice(0, 120).replace(/\s+/g, ' ') || 'token request failed'));
     throw new Error(`Spotify auth failed: ${detail}`);
   }
   spToken = { token: data.access_token, exp: Date.now() + (data.expires_in * 1000) - 60000 };
@@ -702,7 +713,14 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
           const searchRes = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=album&limit=1`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
-          const searchData = await searchRes.json();
+          const { json: searchData, text: searchText } = await readJsonResponse(searchRes);
+          if (!searchRes.ok) {
+            if (searchRes.status === 429) {
+              const retryAfter = searchRes.headers.get('retry-after');
+              throw new Error(`Spotify rate limited (search, 429${retryAfter ? `, retry-after ${retryAfter}s` : ''})`);
+            }
+            throw new Error(`Spotify search failed (${searchRes.status}): ${searchText.slice(0, 120).replace(/\s+/g, ' ')}`);
+          }
           spId = searchData.albums?.items?.[0]?.id;
           if (spId) break;
         }
@@ -715,8 +733,15 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
     const albumRes = await fetch(`https://api.spotify.com/v1/albums/${spId}?market=US`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
-
-    const data = await albumRes.json() as SpotifyAlbum;
+    const { json: albumData, text: albumText } = await readJsonResponse(albumRes);
+    if (!albumRes.ok || !albumData) {
+      if (albumRes.status === 429) {
+        const retryAfter = albumRes.headers.get('retry-after');
+        throw new Error(`Spotify rate limited (album, 429${retryAfter ? `, retry-after ${retryAfter}s` : ''})`);
+      }
+      throw new Error(`Spotify album lookup failed (${albumRes.status}): ${albumText.slice(0, 120).replace(/\s+/g, ' ')}`);
+    }
+    const data = albumData as SpotifyAlbum;
 
     const candidate: CandidateData = {
       spotify_id: spId,
@@ -737,7 +762,8 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
        const artistRes = await fetch(`https://api.spotify.com/v1/artists/${data.artists[0].id}`, {
          headers: { 'Authorization': `Bearer ${token}` }
        });
-       const artistData = await artistRes.json() as SpotifyArtist;
+       const { json: artistDataJson } = await readJsonResponse(artistRes);
+       const artistData = (artistDataJson ?? {}) as SpotifyArtist;
        if (artistData.genres) candidate.genres = artistData.genres;
     }
 
@@ -748,7 +774,10 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
         });
         
         if (featRes.ok) {
-            const featData = await featRes.json();
+            const { json: featData } = await readJsonResponse(featRes);
+            if (!featData) {
+              return { success: true, source: 'spotify', data: candidate };
+            }
             const features = (featData.audio_features as (SpotifyAudioFeature | null)[]).filter((f): f is SpotifyAudioFeature => f !== null);
             
             if (features.length > 0) {

@@ -25,7 +25,8 @@ import {
   type CandidateData, 
   type EnrichmentResult
 } from "lib/enrichment-utils";
-import { getDiscogsOAuthFromCookieHeader } from "lib/discogsAuth";
+import { FIELD_TO_SERVICES } from "lib/enrichment-data-mapping";
+import { getDiscogsOAuthFromCookieHeader, hasDiscogsCredentials } from "lib/discogsAuth";
 
 // Helper to chunk arrays for concurrency control
 const chunkArray = <T>(array: T[], size: number): T[][] => {
@@ -48,6 +49,7 @@ export async function POST(req: Request) {
       ? getDiscogsOAuthFromCookieHeader(`discogs_access_token=${encodeURIComponent(discogsToken)}; discogs_access_secret=${encodeURIComponent(discogsSecret)}`)
       : getDiscogsOAuthFromCookieHeader(fallbackCookieHeader);
     let discogsQueue: Promise<void> = Promise.resolve();
+    let spotifyQueue: Promise<void> = Promise.resolve();
     const runDiscogsQueued = async (
       album: { artist: string; title: string; discogs_release_id?: string }
     ): Promise<EnrichmentResult> => {
@@ -58,6 +60,18 @@ export async function POST(req: Request) {
           await sleep(250);
         });
       discogsQueue = pending.then(() => undefined, () => undefined);
+      return pending;
+    };
+    const runSpotifyQueued = async (
+      album: { artist: string; title: string; spotify_id?: string }
+    ): Promise<EnrichmentResult> => {
+      const pending = spotifyQueue
+        .catch(() => undefined)
+        .then(() => fetchSpotifyData(album))
+        .finally(async () => {
+          await sleep(350);
+        });
+      spotifyQueue = pending.then(() => undefined, () => undefined);
       return pending;
     };
 
@@ -72,6 +86,22 @@ export async function POST(req: Request) {
       fields = [],
       missingDataOnly = false
     } = body;
+
+    // Preflight: fail fast when selected fields depend on services that are definitely unavailable.
+    const selectedFields = Array.isArray(fields)
+      ? fields.filter((value): value is string => typeof value === 'string' && value.length > 0)
+      : [];
+    const requiredServices = new Set<string>();
+    selectedFields.forEach((field) => {
+      const serviceList = FIELD_TO_SERVICES[field] ?? FIELD_TO_SERVICES[field.split('.')[0]] ?? [];
+      serviceList.forEach((svc) => requiredServices.add(svc));
+    });
+
+    const unavailableServices = new Set<string>();
+    const discogsAvailable = Boolean(discogsOAuth) || hasDiscogsCredentials();
+    if (requiredServices.has('discogs') && !discogsAvailable) {
+      unavailableServices.add('discogs');
+    }
 
     let targetAlbums: Record<string, unknown>[] = [];
     let nextCursor = null;
@@ -409,10 +439,21 @@ export async function POST(req: Request) {
             return null;
           }
 
+          unavailableServices.forEach((source) => {
+            sourceDiagnostics[source] = {
+              status: 'no_data',
+                reason: source === 'discogs'
+                ? 'service unavailable for this run: no discogs oauth cookie or server discogs credentials configured'
+                : 'service unavailable for this run'
+            };
+          });
+
           // Always fetch requested services
           if (services.musicbrainz) tasks.push({ source: 'musicbrainz', promise: fetchMusicBrainzData(typedAlbum) });
-          if (services.discogs) tasks.push({ source: 'discogs', promise: runDiscogsQueued(typedAlbum) });
-          if (services.spotify) tasks.push({ source: 'spotify', promise: fetchSpotifyData(typedAlbum) });
+          if (services.discogs && !unavailableServices.has('discogs')) {
+            tasks.push({ source: 'discogs', promise: runDiscogsQueued(typedAlbum) });
+          }
+          if (services.spotify) tasks.push({ source: 'spotify', promise: runSpotifyQueued(typedAlbum) });
           if (services.appleMusicEnhanced) tasks.push({ source: 'appleMusic', promise: fetchAppleMusicData(typedAlbum) });
           if (services.allmusic) tasks.push({ source: 'allmusic', promise: fetchAllMusicData(typedAlbum) });
           if (services.lastfm) tasks.push({ source: 'lastfm', promise: fetchLastFmData(typedAlbum) });
@@ -454,7 +495,11 @@ export async function POST(req: Request) {
               } else {
                 sourceFieldCoverage[task.source] = [];
                 const authHint = task.source === 'discogs'
-                  ? (discogsOAuth ? 'discogs auth: oauth cookie present' : 'discogs auth: oauth cookie missing')
+                  ? (
+                    discogsOAuth
+                      ? 'discogs auth: oauth cookie present'
+                      : (hasDiscogsCredentials() ? 'discogs auth: server credentials present' : 'discogs auth: unavailable')
+                  )
                   : null;
                 sourceDiagnostics[task.source] = {
                   status: 'no_data',
@@ -466,7 +511,11 @@ export async function POST(req: Request) {
             } else {
               sourceFieldCoverage[task.source] = [];
               const authHint = task.source === 'discogs'
-                ? (discogsOAuth ? 'discogs auth: oauth cookie present' : 'discogs auth: oauth cookie missing')
+                ? (
+                  discogsOAuth
+                    ? 'discogs auth: oauth cookie present'
+                    : (hasDiscogsCredentials() ? 'discogs auth: server credentials present' : 'discogs auth: unavailable')
+                )
                 : null;
               sourceDiagnostics[task.source] = {
                 status: 'error',
@@ -507,7 +556,13 @@ export async function POST(req: Request) {
       success: true, 
       results, 
       nextCursor: nextCursor,
-      processedCount: targetAlbums.length
+      processedCount: targetAlbums.length,
+      preflight: {
+        unavailableServices: Array.from(unavailableServices),
+        requiredServices: Array.from(requiredServices),
+        discogsOAuthPresent: Boolean(discogsOAuth),
+        discogsServerCredentialsPresent: hasDiscogsCredentials(),
+      }
     });
 
   } catch (error) {
