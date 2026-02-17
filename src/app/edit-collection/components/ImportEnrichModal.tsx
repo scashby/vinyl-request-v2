@@ -59,6 +59,7 @@ interface ImportEnrichModalProps {
 
 // Map: FieldName -> Set of Allowed Service IDs
 export type FieldConfigMap = Record<string, Set<string>>;
+type EnrichmentMode = 'content' | 'source';
 
 type EnrichmentStats = {
   total: number;
@@ -837,6 +838,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [batchSize, setBatchSize] = useState('10');
   const [startEntry, setStartEntry] = useState('1');
   const [endEntry, setEndEntry] = useState('');
+  const [enrichmentMode, setEnrichmentMode] = useState<EnrichmentMode>('content');
+  const [sourceSelection, setSourceSelection] = useState<string[]>([]);
   const [autoSnooze, setAutoSnooze] = useState(true); // Default to true (30-day skip)
   const [missingDataOnly, setMissingDataOnly] = useState(false);
   
@@ -861,6 +864,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         });
       });
       setFieldConfig(initialConfig);
+      setEnrichmentMode('content');
+      setSourceSelection([]);
     }
   }, [isOpen]);
   
@@ -888,7 +893,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const scanIndexRef = useRef(0);
   const scanRangeRef = useRef<{ start: number; end: number | null }>({ start: 1, end: null });
   const specificAlbumQueueRef = useRef<number[] | null>(null);
+  const runFieldConfigRef = useRef<FieldConfigMap>({});
   const statsRefreshInFlightRef = useRef(false);
+  const availableSourceIds = Array.from(
+    new Set(Object.values(FIELD_TO_SERVICES).flat())
+  ).sort();
 
   useEffect(() => {
     if (isOpen) loadStats();
@@ -928,8 +937,26 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
   }
 
-  function getServicesForSelection() {
-    return getServicesForSelectionFromConfig(fieldConfig);
+  const buildSourceModeFieldConfig = (): FieldConfigMap => {
+    const selected = new Set(sourceSelection);
+    const config: FieldConfigMap = {};
+    Object.entries(FIELD_TO_SERVICES).forEach(([field, services]) => {
+      if (!ALLOWED_COLUMNS.has(field) || NON_ENRICHABLE_FIELDS.has(field)) return;
+      const matched = services.filter((service) => selected.has(service));
+      if (matched.length > 0) {
+        config[field] = new Set(matched);
+      }
+    });
+    return config;
+  };
+
+  const getEffectiveFieldConfig = (): FieldConfigMap => {
+    if (enrichmentMode === 'source') return buildSourceModeFieldConfig();
+    return fieldConfig;
+  };
+
+  function getServicesForSelection(configOverride?: FieldConfigMap) {
+    return getServicesForSelectionFromConfig(configOverride ?? getEffectiveFieldConfig());
   }
 
   function disableHistoryWrites(context: string, error: unknown) {
@@ -1005,6 +1032,14 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     });
   };
 
+  const toggleSourceSelection = (source: string) => {
+    setSourceSelection((prev) => (
+      prev.includes(source)
+        ? prev.filter((item) => item !== source)
+        : [...prev, source]
+    ));
+  };
+
   const toggleCategory = (category: DataCategory) => {
     const fields = DATA_CATEGORY_CHECK_FIELDS[category] || [];
     const validFields = fields.filter(f => ALLOWED_COLUMNS.has(f) && !NON_ENRICHABLE_FIELDS.has(f));
@@ -1054,20 +1089,36 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     return String(value);
   };
 
+  const summarizeReason = (reason?: string): string => {
+    if (!reason) return 'no_data';
+    const compact = reason.replace(/\s+/g, ' ').trim();
+    const nonJsonMatch = compact.match(/non-JSON\s+\((\d{3})\)/i);
+    if (nonJsonMatch) {
+      return `non-JSON (${nonJsonMatch[1]})`;
+    }
+    const retryMatch = compact.match(/retry-after\s+\d+s/i);
+    if (retryMatch) {
+      const prefix = compact.split('|')[0]?.trim() || compact;
+      return `${prefix} | ${retryMatch[0]}`;
+    }
+    return compact.length > 180 ? `${compact.slice(0, 177)}...` : compact;
+  };
+
   const logCheckedFieldResults = (
     album: Album,
     candidates: Record<string, unknown>,
     sourceDiagnostics: Record<string, { status: 'returned' | 'no_data' | 'error'; reason?: string }> | undefined,
     attemptedSources: string[] | undefined,
-    sourceFieldCoverage: Record<string, string[]> | undefined
+    sourceFieldCoverage: Record<string, string[]> | undefined,
+    activeFieldConfig: FieldConfigMap
   ) => {
     const albumLabel = `${album.artist} - ${album.title}`;
-    const selectedFields = Object.keys(fieldConfig).filter((field) => !NON_ENRICHABLE_FIELDS.has(field));
+    const selectedFields = Object.keys(activeFieldConfig).filter((field) => !NON_ENRICHABLE_FIELDS.has(field));
 
     addLog(albumLabel, 'info', `Checking ${selectedFields.length} field(s) from selected sources.`);
 
     selectedFields.forEach((field) => {
-      const allowedSources = Array.from(fieldConfig[field] ?? []);
+      const allowedSources = Array.from(activeFieldConfig[field] ?? []);
       if (allowedSources.length === 0) return;
       const candidateKeys = candidateKeysForField(field);
       let hasAnyFieldValue = false;
@@ -1078,7 +1129,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const attempted = attemptedSources?.includes(diagSource) ?? false;
         if (!attempted || !diag) return `${source}=not called`;
         if (diag.status === 'error' || diag.status === 'no_data') {
-          return `${source}=${diag.reason || diag.status}`;
+          return `${source}=${summarizeReason(diag.reason || diag.status)}`;
         }
 
         const returnedKeys = sourceFieldCoverage?.[diagSource] ?? [];
@@ -1102,7 +1153,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   // --- MAIN LOOP LOGIC ---
 
   async function startEnrichment(specificAlbumIds?: number[]) {
-    if (Object.keys(fieldConfig).length === 0) {
+    const effectiveFieldConfig = getEffectiveFieldConfig();
+    if (Object.keys(effectiveFieldConfig).length === 0) {
       alert('Please select at least one field to enrich');
       return;
     }
@@ -1122,6 +1174,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     scanIndexRef.current = 0;
     scanRangeRef.current = { start: safeStart, end: safeEnd };
     specificAlbumQueueRef.current = specificAlbumIds && specificAlbumIds.length > 0 ? [...specificAlbumIds] : null;
+    runFieldConfigRef.current = effectiveFieldConfig;
     setConflicts([]);
     if (!currentRunId) {
       setCurrentRunId(createEnrichmentRunId());
@@ -1159,15 +1212,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           // FIXED: Renamed folder to location in API call if necessary, or just don't pass it if it's dead
           // Assuming the API expects 'folder' to filter by location:
           location: folderFilter || undefined, 
-          services: getServicesForSelection(),
-          fields: Object.keys(fieldConfig).filter((field) => !NON_ENRICHABLE_FIELDS.has(field)),
+          services: getServicesForSelection(runFieldConfigRef.current),
+          fields: Object.keys(runFieldConfigRef.current).filter((field) => !NON_ENRICHABLE_FIELDS.has(field)),
           autoSnooze: autoSnooze, // PASSED TO SERVER
           missingDataOnly: missingDataOnly
         };
 
         const fetchCandidatesWithRetry = async (requestPayload: Record<string, unknown>) => {
           const maxAttempts = 4;
-          const requestTimeoutMs = 90000;
+          const requestTimeoutMs = 45000;
           let attempt = 0;
           let lastError: Error | null = null;
 
@@ -1294,7 +1347,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         let batchConflicts: ExtendedFieldConflict[] = [];
         let batchSummaryItems: {album: string, field: string, action: string}[] = [];
         for (const candidate of candidates) {
-          const albumResult = await processBatchAndSave([candidate]);
+          const albumResult = await processBatchAndSave([candidate], runFieldConfigRef.current);
           batchConflicts = [...batchConflicts, ...albumResult.conflicts];
           batchSummaryItems = [...batchSummaryItems, ...(albumResult.summary || [])];
         }
@@ -1389,15 +1442,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
   };
 
-  async function processBatchAndSave(results: CandidateResult[]) {
-    const activeServices = getServicesForSelection();
+  async function processBatchAndSave(results: CandidateResult[], activeFieldConfig: FieldConfigMap) {
+    const activeServices = getServicesForSelection(activeFieldConfig);
     const checkedSources = checkedSourcesFromActiveServices(activeServices);
-    const selectedFields = Object.keys(fieldConfig).filter((field) => !NON_ENRICHABLE_FIELDS.has(field));
+    const selectedFields = Object.keys(activeFieldConfig).filter((field) => !NON_ENRICHABLE_FIELDS.has(field));
     const runId = currentRunId ?? createEnrichmentRunId();
     if (!currentRunId) {
       setCurrentRunId(runId);
     }
-    const wantsLyrics = !!fieldConfig['tracks.lyrics'] || !!fieldConfig['tracks.lyrics_url'];
+    const wantsLyrics = !!activeFieldConfig['tracks.lyrics'] || !!activeFieldConfig['tracks.lyrics_url'];
     const runGeniusLyrics = wantsLyrics && activeServices.genius;
 
     const albumIds = results.map(r => r.album.id);
@@ -1457,9 +1510,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const allowedSummaryKeys = Array.from(foundKeys)
         .filter(k => !['artist', 'title'].includes(k))
         .filter(k => ALLOWED_COLUMNS.has(k))
-        .filter(k => !!fieldConfig[k]);
+        .filter(k => !!activeFieldConfig[k]);
 
-      logCheckedFieldResults(album, candidates, sourceDiagnostics, attemptedSources, sourceFieldCoverage);
+      logCheckedFieldResults(album, candidates, sourceDiagnostics, attemptedSources, sourceFieldCoverage, activeFieldConfig);
       if (scanNote) {
         addLog(`${album.artist} - ${album.title}`, 'info', scanNote);
       }
@@ -1526,7 +1579,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             if (!ALLOWED_COLUMNS.has(key)) return;
             if (CLASSICAL_ONLY_FIELDS.has(key) && !isClassicalAlbum) return;
             
-            const allowedSources = fieldConfig[key];
+            const allowedSources = activeFieldConfig[key];
             if (!allowedSources) return; 
 
             let normalizedSource = source;
@@ -1597,8 +1650,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               derivedDiscData = deriveDiscDataFromTracks(tracks as Record<string, unknown>[]);
             }
 
-            const discMetadataAllowed = !!fieldConfig.disc_metadata && fieldConfig.disc_metadata.has(source);
-            const matrixNumbersAllowed = !!fieldConfig.matrix_numbers && fieldConfig.matrix_numbers.has(source);
+            const discMetadataAllowed = !!activeFieldConfig.disc_metadata && activeFieldConfig.disc_metadata.has(source);
+            const matrixNumbersAllowed = !!activeFieldConfig.matrix_numbers && activeFieldConfig.matrix_numbers.has(source);
 
             if (discMetadataAllowed && derivedDiscData?.disc_metadata && !fieldCandidates.disc_metadata) {
               fieldCandidates.disc_metadata = { [source]: derivedDiscData.disc_metadata };
@@ -1800,7 +1853,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           }
           const candidatesForField = fieldCandidates[field];
           if (!candidatesForField || Object.keys(candidatesForField).length === 0) {
-            const allowedSources = Array.from(fieldConfig[field] ?? []);
+            const allowedSources = Array.from(activeFieldConfig[field] ?? []);
             const sourcesToInspect = allowedSources.length > 0
               ? allowedSources
               : (attemptedSources ?? []).map((source) => normalizeSourceForLog(source));
@@ -2205,7 +2258,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       album_artist: conflictSeed?.artist ?? null,
       album_title: conflictSeed?.title ?? null,
       phase: 'review',
-      selected_fields: Object.keys(fieldConfig),
+      selected_fields: Object.keys(runFieldConfigRef.current).length > 0
+        ? Object.keys(runFieldConfigRef.current)
+        : Object.keys(getEffectiveFieldConfig()),
       checked_sources: checkedSources,
       returned_sources: checkedSources,
       returned_fields: albumConflicts.map(c => c.field_name),
@@ -2554,39 +2609,98 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                 </div>
               </div>
 
-              {/* 2. DATA CATEGORY SELECTION */}
-              <div className="bg-white border-2 border-[#D8D8D8] rounded-md p-5 mb-6">
-                <h3 className="flex items-center gap-2 text-[15px] font-semibold text-green-700 mb-2">Select Data to Enrich</h3>
-                {deferredCategories.length > 0 && (
-                  <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                    <span className="font-semibold">Temporarily unavailable:</span>{' '}
-                    {deferredCategories.map((category) => DATA_CATEGORY_LABELS[category]).join(', ')}.
-                    {deferredCategories
-                      .map((category) => DEFERRED_CATEGORY_REASONS[category])
-                      .filter((reason): reason is string => !!reason)
-                      .map((reason, index) => (
-                        <span key={`${reason}-${index}`}> {reason}</span>
-                      ))}
-                  </div>
-                )}
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-3">
-                  {/* Note: dataCategoriesConfig is used for sorting/structure, but props are new */}
-                  {dataCategoriesConfig.map(({ category }) => (
-                    <DataCategoryCard
-                      key={category} 
-                      category={category} 
-                      stats={stats}
-                      fieldConfig={fieldConfig}
-                      onToggleCategory={() => toggleCategory(category)}
-                      onToggleField={toggleField}
-                      onToggleFieldSource={toggleFieldSource}
-                      disabled={enriching}
-                    />
-                  ))}
-                </div>
+              {/* 2. ENRICHMENT MODE */}
+              <div className="mb-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEnrichmentMode('content')}
+                  disabled={enriching}
+                  className={`px-3 py-1.5 rounded text-xs font-semibold border ${
+                    enrichmentMode === 'content'
+                      ? 'bg-[#4FC3F7] text-white border-[#4FC3F7]'
+                      : 'bg-white text-gray-700 border-gray-300'
+                  }`}
+                >
+                  By Content
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEnrichmentMode('source')}
+                  disabled={enriching}
+                  className={`px-3 py-1.5 rounded text-xs font-semibold border ${
+                    enrichmentMode === 'source'
+                      ? 'bg-[#4FC3F7] text-white border-[#4FC3F7]'
+                      : 'bg-white text-gray-700 border-gray-300'
+                  }`}
+                >
+                  By Source
+                </button>
               </div>
 
-              {/* 3. FILTERS */}
+              {/* 3. DATA SELECTION */}
+              <div className="bg-white border-2 border-[#D8D8D8] rounded-md p-5 mb-6">
+                {enrichmentMode === 'content' ? (
+                  <>
+                    <h3 className="flex items-center gap-2 text-[15px] font-semibold text-green-700 mb-2">Select Data to Enrich</h3>
+                    {deferredCategories.length > 0 && (
+                      <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        <span className="font-semibold">Temporarily unavailable:</span>{' '}
+                        {deferredCategories.map((category) => DATA_CATEGORY_LABELS[category]).join(', ')}.
+                        {deferredCategories
+                          .map((category) => DEFERRED_CATEGORY_REASONS[category])
+                          .filter((reason): reason is string => !!reason)
+                          .map((reason, index) => (
+                            <span key={`${reason}-${index}`}> {reason}</span>
+                          ))}
+                      </div>
+                    )}
+                    <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-3">
+                      {dataCategoriesConfig.map(({ category }) => (
+                        <DataCategoryCard
+                          key={category} 
+                          category={category} 
+                          stats={stats}
+                          fieldConfig={fieldConfig}
+                          onToggleCategory={() => toggleCategory(category)}
+                          onToggleField={toggleField}
+                          onToggleFieldSource={toggleFieldSource}
+                          disabled={enriching}
+                        />
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="flex items-center gap-2 text-[15px] font-semibold text-green-700 mb-2">Select Sources to Enrich From</h3>
+                    <div className="mb-3 text-xs text-gray-600">
+                      Only data from the checked sources will be fetched and applied.
+                    </div>
+                    <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-2">
+                      {availableSourceIds.map((source) => {
+                        const selected = sourceSelection.includes(source);
+                        return (
+                          <label key={source} className={`flex items-center gap-2 px-2 py-1.5 rounded border text-xs font-medium cursor-pointer ${
+                            selected ? 'border-[#4FC3F7] bg-[#F0F9FF] text-[#0369A1]' : 'border-gray-200 text-gray-700'
+                          }`}>
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() => toggleSourceSelection(source)}
+                              disabled={enriching}
+                            />
+                            <span>{SERVICE_ICONS[source] || '🔗'} {source}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-3 text-xs text-gray-500">
+                      Selected sources: {sourceSelection.length} | Runnable fields from selection: {Object.keys(getEffectiveFieldConfig()).length}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* 4. FILTERS */}
               <div className="bg-white border-2 border-[#D8D8D8] rounded-md p-5 mb-6 flex gap-4 flex-wrap items-center">
                 <div className="flex items-center gap-2">
                   <label className="font-semibold text-sm">Folder:</label>
@@ -2685,14 +2799,14 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           </button>
           <button 
             onClick={() => startEnrichment()} 
-            disabled={enriching || !stats || Object.keys(fieldConfig).length === 0} 
+            disabled={enriching || !stats || Object.keys(getEffectiveFieldConfig()).length === 0} 
             className={`text-white border-none px-8 py-3 rounded-md text-[15px] font-medium cursor-pointer shadow transition-all ${
               enriching 
                 ? 'bg-gray-300 cursor-not-allowed' 
                 : 'bg-[#4FC3F7] hover:bg-[#29B6F6] hover:shadow-md'
             }`}
           >
-            {enriching ? 'Scanning...' : '⚡ Start Scan & Review'}
+            {enriching ? 'Scanning...' : (enrichmentMode === 'source' ? '⚡ Start Source Scan' : '⚡ Start Scan & Review')}
           </button>
         </div>
         </div>
