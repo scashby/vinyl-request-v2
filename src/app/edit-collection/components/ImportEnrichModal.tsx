@@ -17,6 +17,7 @@ import {
   type EnrichmentService,
   DATA_CATEGORY_CHECK_FIELDS, 
   FIELD_TO_SERVICES,
+  SERVICE_DISPLAY_NAMES,
   SERVICE_ICONS,
   DATA_CATEGORY_LABELS,
   DATA_CATEGORY_ICONS
@@ -839,7 +840,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [startEntry, setStartEntry] = useState('1');
   const [endEntry, setEndEntry] = useState('');
   const [enrichmentMode, setEnrichmentMode] = useState<EnrichmentMode>('content');
-  const [sourceSelection, setSourceSelection] = useState<string[]>([]);
+  const [sourceSelection, setSourceSelection] = useState<EnrichmentService[]>([]);
   const [autoSnooze, setAutoSnooze] = useState(true); // Default to true (30-day skip)
   const [missingDataOnly, setMissingDataOnly] = useState(false);
   
@@ -895,9 +896,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const specificAlbumQueueRef = useRef<number[] | null>(null);
   const runFieldConfigRef = useRef<FieldConfigMap>({});
   const statsRefreshInFlightRef = useRef(false);
-  const availableSourceIds = Array.from(
-    new Set(Object.values(FIELD_TO_SERVICES).flat())
-  ).sort();
+  const availableSourceIds = (Object.keys(SERVICE_DISPLAY_NAMES) as EnrichmentService[])
+    .filter((source) => source !== 'acousticbrainz')
+    .sort();
 
   useEffect(() => {
     if (isOpen) loadStats();
@@ -1032,7 +1033,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     });
   };
 
-  const toggleSourceSelection = (source: string) => {
+  const toggleSourceSelection = (source: EnrichmentService) => {
     setSourceSelection((prev) => (
       prev.includes(source)
         ? prev.filter((item) => item !== source)
@@ -2688,7 +2689,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                               onChange={() => toggleSourceSelection(source)}
                               disabled={enriching}
                             />
-                            <span>{SERVICE_ICONS[source] || '🔗'} {source}</span>
+                            <span>{SERVICE_ICONS[source] || '🔗'} {SERVICE_DISPLAY_NAMES[source] || source}</span>
                           </label>
                         );
                       })}

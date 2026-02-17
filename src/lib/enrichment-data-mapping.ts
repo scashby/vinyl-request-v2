@@ -55,7 +55,7 @@ export const DATA_TO_SERVICES: Record<DataCategory, EnrichmentService[]> = {
   sonic_domain: [
     'musicbrainz',
     'spotify',
-    // 'secondhandsongs', // TEMP disabled until stable API access is restored
+    'secondhandsongs',
   ],
   genres: ['discogs', 'spotify', 'appleMusic', 'allmusic', 'lastfm', 'musicbrainz', 'rateyourmusic', 'theaudiodb', 'deezer'],
   streaming_links: [
@@ -65,7 +65,7 @@ export const DATA_TO_SERVICES: Record<DataCategory, EnrichmentService[]> = {
     'musicbrainz',
     'allmusic',
     'wikipedia',
-    // 'secondhandsongs', // TEMP disabled until stable API access is restored
+    'secondhandsongs',
     'setlistfm',
     'deezer',
     'musixmatch',
@@ -257,9 +257,9 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'disc_metadata': ['discogs'],
 
   // --- SONIC DOMAIN ---
-  'is_cover': ['musicbrainz', 'discogs'],
-  'original_artist': ['musicbrainz', 'discogs'],
-  'original_year': ['musicbrainz', 'discogs'],
+  'is_cover': ['musicbrainz', 'discogs', 'secondhandsongs'],
+  'original_artist': ['musicbrainz', 'discogs', 'secondhandsongs'],
+  'original_year': ['musicbrainz', 'discogs', 'secondhandsongs'],
   'samples': [],
   'sampled_by': [],
   

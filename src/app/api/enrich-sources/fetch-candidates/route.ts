@@ -481,10 +481,9 @@ export async function POST(req: Request) {
           if (services.wikipedia) addTask('wikipedia', fetchWikipediaData(typedAlbum));
           if (services.genius) addTask('genius', fetchGeniusData(typedAlbum));
           if (services.coverArt) addTask('coverArt', fetchCoverArtData(typedAlbum));
-          // TEMP disabled until SecondHandSongs API access is reliable again.
-          // if (services.secondhandsongs) {
-          //   addTask('secondhandsongs', fetchSecondHandSongsData(typedAlbum));
-          // }
+          if (services.secondhandsongs) {
+            addTask('secondhandsongs', fetchSecondHandSongsData(typedAlbum));
+          }
           if (services.theaudiodb) addTask('theaudiodb', fetchTheAudioDBData(typedAlbum));
           if (services.wikidata) addTask('wikidata', fetchWikidataData(typedAlbum));
           if (services.setlistfm) addTask('setlistfm', fetchSetlistFmData(typedAlbum));
