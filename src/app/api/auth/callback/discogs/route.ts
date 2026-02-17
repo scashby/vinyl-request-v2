@@ -59,11 +59,15 @@ export async function GET(req: NextRequest) {
     cookieStore.set('discogs_access_token', token, { 
         httpOnly: true, 
         secure: process.env.NODE_ENV === 'production', 
+        sameSite: 'lax',
+        path: '/',
         maxAge: 60 * 60 * 24 * 30 
     });
     cookieStore.set('discogs_access_secret', tokenSecret, { 
         httpOnly: true, 
         secure: process.env.NODE_ENV === 'production', 
+        sameSite: 'lax',
+        path: '/',
         maxAge: 60 * 60 * 24 * 30 
     });
     
@@ -94,6 +98,8 @@ export async function GET(req: NextRequest) {
         cookieStore.set('discogs_username', username, { 
             httpOnly: true, 
             secure: process.env.NODE_ENV === 'production', 
+            sameSite: 'lax',
+            path: '/',
             maxAge: 60 * 60 * 24 * 30 
         });
     }
