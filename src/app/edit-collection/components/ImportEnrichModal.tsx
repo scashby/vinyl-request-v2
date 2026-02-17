@@ -769,20 +769,41 @@ const applyAlbumCreditsToRecordings = async (
       // EXTRACT VALUES FROM THE JSON TO SAVE TO COLUMNS
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const details = (mergedCredits as any).album_details || {};
+      const hasDetail = (key: string) => Object.prototype.hasOwnProperty.call(details, key);
+      const toFiniteNumber = (value: unknown): number | null => {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : null;
+      };
+      const recordingUpdates: Record<string, unknown> = {
+        credits: mergedCredits as unknown as import('types/supabase').Json,
+      };
+
+      if (hasDetail('tempo_bpm')) {
+        const tempo = toFiniteNumber(details.tempo_bpm);
+        recordingUpdates.bpm = tempo !== null ? Math.round(tempo) : null;
+      }
+      if (hasDetail('energy')) {
+        recordingUpdates.energy = toFiniteNumber(details.energy);
+      }
+      if (hasDetail('danceability')) {
+        recordingUpdates.danceability = toFiniteNumber(details.danceability);
+      }
+      if (hasDetail('mood_happy')) {
+        recordingUpdates.valence = toFiniteNumber(details.mood_happy);
+      }
+      if (hasDetail('musical_key')) {
+        recordingUpdates.musical_key = typeof details.musical_key === 'string'
+          ? details.musical_key
+          : null;
+      }
+      if (hasDetail('time_signature')) {
+        recordingUpdates.time_signature = toFiniteNumber(details.time_signature);
+      }
 
       return Promise.resolve(
         supabase
           .from('recordings')
-          .update({ 
-            credits: mergedCredits as unknown as import('types/supabase').Json,
-            // FORCE DATA INTO THE COLUMNS
-            bpm: details.tempo_bpm ? Math.round(Number(details.tempo_bpm)) : null,
-            energy: details.energy ? Number(details.energy) : null,
-            danceability: details.danceability ? Number(details.danceability) : null,
-            valence: details.mood_happy ? Number(details.mood_happy) : null,
-            musical_key: details.musical_key || null,
-            time_signature: details.time_signature ? Number(details.time_signature) : null
-          })
+          .update(recordingUpdates)
           .eq('id', recording.id)
       );
     })
