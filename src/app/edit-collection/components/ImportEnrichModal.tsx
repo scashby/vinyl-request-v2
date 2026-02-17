@@ -1484,6 +1484,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           if (error) throw new Error(`releases(${album.release_id}) update failed: ${error.message}`);
         })()
       );
+    } else if (Object.keys(releaseUpdates).length > 0) {
+      throw new Error(`album ${album.id} has release updates but no release_id`);
     }
 
     if (album.master_id && Object.keys(masterUpdates).length > 0) {
@@ -1496,6 +1498,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           if (error) throw new Error(`masters(${album.master_id}) update failed: ${error.message}`);
         })()
       );
+    } else if (Object.keys(masterUpdates).length > 0) {
+      throw new Error(`album ${album.id} has master updates but no master_id`);
     }
 
     if (operations.length > 0) {
@@ -1506,7 +1510,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       await applyAlbumCreditsToRecordings(album.id, albumCredits);
     }
 
-    if (tagNames.length > 0 && album.master_id) {
+    if (tagNames.length > 0) {
+      if (!album.master_id) {
+        throw new Error(`album ${album.id} has tags to write but no master_id`);
+      }
       await addTagsToMaster(album.master_id, tagNames);
     }
   };
