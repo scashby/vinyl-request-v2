@@ -419,7 +419,10 @@ export async function POST(req: Request) {
           if (services.wikipedia) tasks.push({ source: 'wikipedia', promise: fetchWikipediaData(typedAlbum) });
           if (services.genius) tasks.push({ source: 'genius', promise: fetchGeniusData(typedAlbum) });
           if (services.coverArt) tasks.push({ source: 'coverArt', promise: fetchCoverArtData(typedAlbum) });
-          if (services.secondhandsongs) tasks.push({ source: 'secondhandsongs', promise: fetchSecondHandSongsData(typedAlbum) });
+          // TEMP disabled until SecondHandSongs API access is reliable again.
+          // if (services.secondhandsongs) {
+          //   tasks.push({ source: 'secondhandsongs', promise: fetchSecondHandSongsData(typedAlbum) });
+          // }
           if (services.theaudiodb) tasks.push({ source: 'theaudiodb', promise: fetchTheAudioDBData(typedAlbum) });
           if (services.wikidata) tasks.push({ source: 'wikidata', promise: fetchWikidataData(typedAlbum) });
           if (services.setlistfm) tasks.push({ source: 'setlistfm', promise: fetchSetlistFmData(typedAlbum) });

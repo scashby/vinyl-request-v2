@@ -52,9 +52,24 @@ export const DATA_TO_SERVICES: Record<DataCategory, EnrichmentService[]> = {
   credits: ['musicbrainz', 'allmusic', 'appleMusic', 'discogs', 'genius', 'wikidata'],
   tracklists: ['discogs', 'spotify', 'appleMusic', 'lastfm', 'setlistfm', 'deezer'],
   // NOTE: acousticbrainz is not implemented in the current fetch pipeline.
-  sonic_domain: ['musicbrainz', 'spotify', 'secondhandsongs'],
+  sonic_domain: [
+    'musicbrainz',
+    'spotify',
+    // 'secondhandsongs', // TEMP disabled until stable API access is restored
+  ],
   genres: ['discogs', 'spotify', 'appleMusic', 'allmusic', 'lastfm', 'musicbrainz', 'rateyourmusic', 'theaudiodb', 'deezer'],
-  streaming_links: ['spotify', 'appleMusic', 'lastfm', 'musicbrainz', 'allmusic', 'wikipedia', 'secondhandsongs', 'setlistfm', 'deezer', 'musixmatch'],
+  streaming_links: [
+    'spotify',
+    'appleMusic',
+    'lastfm',
+    'musicbrainz',
+    'allmusic',
+    'wikipedia',
+    // 'secondhandsongs', // TEMP disabled until stable API access is restored
+    'setlistfm',
+    'deezer',
+    'musixmatch',
+  ],
   reviews: ['allmusic', 'lastfm', 'spotify', 'appleMusic', 'wikipedia', 'rateyourmusic', 'pitchfork'],
   // NOTE: billboard is not implemented in the current fetch pipeline.
   chart_data: ['wikipedia', 'rateyourmusic', 'wikidata'],
@@ -91,7 +106,7 @@ export const DATA_CATEGORY_DESCRIPTIONS: Record<DataCategory, string> = {
   tracklists: 'Complete track listings with durations, ISRCs, and per-track artists',
   sonic_domain: 'BPM, Key, Cover Songs, and Original Artist data',
   genres: 'Genre classifications, styles, moods, and folksonomy tags',
-  streaming_links: 'Service IDs and links (Spotify, Apple, SecondHandSongs, etc)',
+  streaming_links: 'Service IDs and links (Spotify, Apple, etc)',
   reviews: 'Professional reviews, ratings, playcounts, popularity scores, and editorial notes',
   chart_data: 'Chart positions, sales certifications (Gold/Platinum/Diamond), and awards',
   release_metadata: 'Labels, catalog numbers, barcodes, countries, release dates, release notes, and companies',
@@ -242,9 +257,9 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'disc_metadata': ['discogs'],
 
   // --- SONIC DOMAIN ---
-  'is_cover': ['musicbrainz', 'discogs', 'secondhandsongs'],
-  'original_artist': ['musicbrainz', 'discogs', 'secondhandsongs'],
-  'original_year': ['musicbrainz', 'discogs', 'secondhandsongs'],
+  'is_cover': ['musicbrainz', 'discogs'],
+  'original_artist': ['musicbrainz', 'discogs'],
+  'original_year': ['musicbrainz', 'discogs'],
   'samples': [],
   'sampled_by': [],
   
