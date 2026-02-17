@@ -891,7 +891,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const hasMoreRef = useRef(true);
   const isLoopingRef = useRef(false);
   const cursorRef = useRef(0); // Tracks current position in DB
-  const scanIndexRef = useRef(0);
   const scanRangeRef = useRef<{ start: number; end: number | null }>({ start: 1, end: null });
   const specificAlbumQueueRef = useRef<number[] | null>(null);
   const runFieldConfigRef = useRef<FieldConfigMap>({});
@@ -1171,8 +1170,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     hasMoreRef.current = true;
     isLoopingRef.current = true;
-    cursorRef.current = 0;
-    scanIndexRef.current = 0;
+    cursorRef.current = specificAlbumIds && specificAlbumIds.length > 0 ? 0 : (safeStart - 1);
     scanRangeRef.current = { start: safeStart, end: safeEnd };
     specificAlbumQueueRef.current = specificAlbumIds && specificAlbumIds.length > 0 ? [...specificAlbumIds] : null;
     runFieldConfigRef.current = effectiveFieldConfig;
@@ -1200,7 +1198,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     while ((collectedConflicts.length < targetConflicts || specificAlbumIds) && hasMoreRef.current) {
       const { start, end } = scanRangeRef.current;
       const rangeLabel = end ? `${start}-${end}` : `${start}+`;
-      setStatus(`Scanning entry-by-entry (range ${rangeLabel})... Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
+      setStatus(`Scanning by ID (range ${rangeLabel})... Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
 
       try {
         const queuedAlbumId = specificAlbumQueueRef.current && specificAlbumQueueRef.current.length > 0
@@ -1210,6 +1208,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           albumIds: queuedAlbumId ? [queuedAlbumId] : undefined,
           limit: queuedAlbumId ? undefined : 1,
           cursor: queuedAlbumId ? undefined : cursorRef.current,
+          maxId: queuedAlbumId ? undefined : scanRangeRef.current.end ?? undefined,
           // FIXED: Renamed folder to location in API call if necessary, or just don't pass it if it's dead
           // Assuming the API expects 'folder' to filter by location:
           location: folderFilter || undefined, 
@@ -1312,8 +1311,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         }
 
         const candidates = result.results || [];
-        const processedCount = Math.max(1, Number(result.processedCount ?? (queuedAlbumId ? 1 : candidates.length || 0)));
-        scanIndexRef.current += processedCount;
         if (specificAlbumQueueRef.current && specificAlbumQueueRef.current.length > 0) {
           specificAlbumQueueRef.current.shift();
           if (specificAlbumQueueRef.current.length === 0) {
@@ -1321,21 +1318,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           }
         }
 
-        const { start, end } = scanRangeRef.current;
-        if (end !== null && scanIndexRef.current > end) {
-          hasMoreRef.current = false;
-          break;
-        }
-
-        if (scanIndexRef.current < start) {
-          continue;
-        }
-
         const lastCheckedAlbum = candidates.length > 0 ? candidates[candidates.length - 1].album : null;
         const lastCheckedLabel = lastCheckedAlbum
-          ? `${lastCheckedAlbum.artist} - ${lastCheckedAlbum.title}`
+          ? `${lastCheckedAlbum.artist} - ${lastCheckedAlbum.title} (#${lastCheckedAlbum.id})`
           : (result.processedCount ? `No matches in last batch (${result.processedCount} checked)` : 'No matches in last batch');
-        setStatus(`Scanning entry ${scanIndexRef.current}. Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
+        setStatus(`Scanning by ID. Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
 
         if (result.processedCount > candidates.length) {
           // This is fine, logs empty results if any
@@ -1358,7 +1345,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             collectedSummary = [...collectedSummary, ...batchSummaryItems];
         }
         if (batchConflicts.length > 0) {
-          setStatus(`Scanning entry ${scanIndexRef.current}. Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
+          setStatus(`Scanning by ID. Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
         }
 
       } catch (error) {

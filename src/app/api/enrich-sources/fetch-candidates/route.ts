@@ -89,6 +89,7 @@ export async function POST(req: Request) {
       albumIds,
       cursor = 0,
       limit = 10,
+      maxId,
       location, // FIXED: Expect 'location' not 'folder'
       services,
       autoSnooze = false,
@@ -182,6 +183,9 @@ export async function POST(req: Request) {
         .limit(limit);
 
       if (location) query = query.eq('location', location);
+      if (typeof maxId === 'number' && Number.isFinite(maxId) && maxId > 0) {
+        query = query.lte('id', maxId);
+      }
 
       // SERVER-SIDE SNOOZE FILTERING
       void autoSnooze;
