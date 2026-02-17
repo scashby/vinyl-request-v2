@@ -1167,7 +1167,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
         const fetchCandidatesWithRetry = async (requestPayload: Record<string, unknown>) => {
           const maxAttempts = 4;
-          const requestTimeoutMs = 25000;
+          const requestTimeoutMs = 90000;
           let attempt = 0;
           let lastError: Error | null = null;
 

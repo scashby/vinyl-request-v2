@@ -41,6 +41,15 @@ export async function POST(req: Request) {
   const supabase = supabaseServer(getAuthHeader(req));
   try {
     const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    const sourceTimeoutMs = 12000;
+    const withSourceTimeout = async <T,>(source: string, promise: Promise<T>): Promise<T> => {
+      return await Promise.race([
+        promise,
+        new Promise<T>((_, reject) => {
+          setTimeout(() => reject(new Error(`${source} timed out after ${sourceTimeoutMs / 1000}s`)), sourceTimeoutMs);
+        })
+      ]);
+    };
     const cookieStore = await cookies();
     const discogsToken = cookieStore.get('discogs_access_token')?.value;
     const discogsSecret = cookieStore.get('discogs_access_secret')?.value;
@@ -456,31 +465,35 @@ export async function POST(req: Request) {
             };
           });
 
+          const addTask = (source: string, promise: Promise<EnrichmentResult | null>) => {
+            tasks.push({ source, promise: withSourceTimeout(source, promise) });
+          };
+
           // Always fetch requested services
-          if (services.musicbrainz) tasks.push({ source: 'musicbrainz', promise: fetchMusicBrainzData(typedAlbum) });
+          if (services.musicbrainz) addTask('musicbrainz', fetchMusicBrainzData(typedAlbum));
           if (services.discogs && !unavailableServices.has('discogs')) {
-            tasks.push({ source: 'discogs', promise: runDiscogsQueued(typedAlbum) });
+            addTask('discogs', runDiscogsQueued(typedAlbum));
           }
-          if (services.spotify) tasks.push({ source: 'spotify', promise: runSpotifyQueued(typedAlbum) });
-          if (services.appleMusicEnhanced) tasks.push({ source: 'appleMusic', promise: fetchAppleMusicData(typedAlbum) });
-          if (services.allmusic) tasks.push({ source: 'allmusic', promise: fetchAllMusicData(typedAlbum) });
-          if (services.lastfm) tasks.push({ source: 'lastfm', promise: fetchLastFmData(typedAlbum) });
-          if (services.wikipedia) tasks.push({ source: 'wikipedia', promise: fetchWikipediaData(typedAlbum) });
-          if (services.genius) tasks.push({ source: 'genius', promise: fetchGeniusData(typedAlbum) });
-          if (services.coverArt) tasks.push({ source: 'coverArt', promise: fetchCoverArtData(typedAlbum) });
+          if (services.spotify) addTask('spotify', runSpotifyQueued(typedAlbum));
+          if (services.appleMusicEnhanced) addTask('appleMusic', fetchAppleMusicData(typedAlbum));
+          if (services.allmusic) addTask('allmusic', fetchAllMusicData(typedAlbum));
+          if (services.lastfm) addTask('lastfm', fetchLastFmData(typedAlbum));
+          if (services.wikipedia) addTask('wikipedia', fetchWikipediaData(typedAlbum));
+          if (services.genius) addTask('genius', fetchGeniusData(typedAlbum));
+          if (services.coverArt) addTask('coverArt', fetchCoverArtData(typedAlbum));
           // TEMP disabled until SecondHandSongs API access is reliable again.
           // if (services.secondhandsongs) {
-          //   tasks.push({ source: 'secondhandsongs', promise: fetchSecondHandSongsData(typedAlbum) });
+          //   addTask('secondhandsongs', fetchSecondHandSongsData(typedAlbum));
           // }
-          if (services.theaudiodb) tasks.push({ source: 'theaudiodb', promise: fetchTheAudioDBData(typedAlbum) });
-          if (services.wikidata) tasks.push({ source: 'wikidata', promise: fetchWikidataData(typedAlbum) });
-          if (services.setlistfm) tasks.push({ source: 'setlistfm', promise: fetchSetlistFmData(typedAlbum) });
-          if (services.rateyourmusic) tasks.push({ source: 'rateyourmusic', promise: fetchRateYourMusicData(typedAlbum) });
-          if (services.fanarttv) tasks.push({ source: 'fanarttv', promise: fetchFanartTvData(typedAlbum) });
-          if (services.deezer) tasks.push({ source: 'deezer', promise: fetchDeezerData(typedAlbum) });
-          if (services.musixmatch) tasks.push({ source: 'musixmatch', promise: fetchMusixmatchData(typedAlbum) });
-          if (services.popsike) tasks.push({ source: 'popsike', promise: fetchPopsikeData(typedAlbum) });
-          if (services.pitchfork) tasks.push({ source: 'pitchfork', promise: fetchPitchforkData(typedAlbum) });
+          if (services.theaudiodb) addTask('theaudiodb', fetchTheAudioDBData(typedAlbum));
+          if (services.wikidata) addTask('wikidata', fetchWikidataData(typedAlbum));
+          if (services.setlistfm) addTask('setlistfm', fetchSetlistFmData(typedAlbum));
+          if (services.rateyourmusic) addTask('rateyourmusic', fetchRateYourMusicData(typedAlbum));
+          if (services.fanarttv) addTask('fanarttv', fetchFanartTvData(typedAlbum));
+          if (services.deezer) addTask('deezer', fetchDeezerData(typedAlbum));
+          if (services.musixmatch) addTask('musixmatch', fetchMusixmatchData(typedAlbum));
+          if (services.popsike) addTask('popsike', fetchPopsikeData(typedAlbum));
+          if (services.pitchfork) addTask('pitchfork', fetchPitchforkData(typedAlbum));
 
           const settled = await Promise.allSettled(tasks.map((task) => task.promise));
           
