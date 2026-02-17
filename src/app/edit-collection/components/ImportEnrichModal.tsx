@@ -1098,6 +1098,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }]);
   }
 
+  const formatAlbumLogLabel = (album: { artist: string; title: string; id?: number | null }) =>
+    `${album.artist} - ${album.title}${typeof album.id === 'number' ? ` (#${album.id})` : ''}`;
+
   const summarizeLogValue = (value: unknown): string => {
     if (value === null || value === undefined) return 'null';
     if (typeof value === 'string') {
@@ -1141,7 +1144,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     sourceFieldCoverage: Record<string, string[]> | undefined,
     activeFieldConfig: FieldConfigMap
   ) => {
-    const albumLabel = `${album.artist} - ${album.title}`;
+    const albumLabel = formatAlbumLogLabel(album);
     const selectedFields = Object.keys(activeFieldConfig).filter((field) => !NON_ENRICHABLE_FIELDS.has(field));
 
     addLog(albumLabel, 'info', `Checking ${selectedFields.length} field(s) from selected sources.`);
@@ -1548,7 +1551,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
       logCheckedFieldResults(album, candidates, sourceDiagnostics, attemptedSources, sourceFieldCoverage, activeFieldConfig);
       if (scanNote) {
-        addLog(`${album.artist} - ${album.title}`, 'info', scanNote);
+        addLog(formatAlbumLogLabel(album), 'info', scanNote);
       }
 
       if (!missingDataOnly && allowedSummaryKeys.length > 0) {
@@ -1557,13 +1560,13 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             .join(', ');
             
          if (summary) {
-             addLog(`${album.artist} - ${album.title}`, 'info', `Found: ${summary}`);
+             addLog(formatAlbumLogLabel(album), 'info', `Found: ${summary}`);
          }
       }
 
       if (Object.keys(candidates).length === 0) {
         addLog(
-          `${album.artist} - ${album.title}`,
+          formatAlbumLogLabel(album),
           'skipped',
           `No enrichable data returned from selected sources (${checkedSources.join(', ') || 'none'}) for selected fields (${selectedFields.join(', ') || 'none'}).`
         );
@@ -2007,7 +2010,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           appliedUpdatesByAlbumId.add(albumId);
         } else {
           failedAutoApplyAlbumIds.add(albumId);
-          addLog(`${autoUpdates[index].album.artist} - ${autoUpdates[index].album.title}`, 'skipped', `Auto-save failed: ${res.reason instanceof Error ? res.reason.message : 'Unknown error'}`);
+          addLog(formatAlbumLogLabel(autoUpdates[index].album), 'skipped', `Auto-save failed: ${res.reason instanceof Error ? res.reason.message : 'Unknown error'}`);
         }
       });
     }
@@ -2090,7 +2093,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               const detail = detailExtras.length > 0
                 ? `Updated lyrics for ${updatesApplied}/${totalTracks} track(s) (${detailExtras.join('; ')})`
                 : `Updated lyrics for ${updatesApplied}/${totalTracks} track(s)`;
-              addLog(`${job.artist} - ${job.title}`, 'info', detail);
+              addLog(formatAlbumLogLabel({ artist: job.artist, title: job.title, id: job.albumId }), 'info', detail);
             } else if (failedCount > 0) {
               const titleSuffix = failedTitles.length > 0
                 ? `: ${failedTitles.join(', ')}${failedCount > failedTitles.length ? ', ...' : ''}`
@@ -2099,23 +2102,23 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               const detail = detailExtras.length > 0
                 ? `Failed to update lyrics for ${failedCount} track(s)${titleSuffix} (${detailExtras.join('; ')})`
                 : `Failed to update lyrics for ${failedCount} track(s)${titleSuffix}`;
-              addLog(`${job.artist} - ${job.title}`, 'skipped', detail);
+              addLog(formatAlbumLogLabel({ artist: job.artist, title: job.title, id: job.albumId }), 'skipped', detail);
             } else if (skippedNoTitleCount > 0 && skippedExistingCount === 0) {
-              addLog(`${job.artist} - ${job.title}`, 'info', `No lyrics updates attempted (${skippedNoTitleCount} track(s) missing usable titles).`);
+              addLog(formatAlbumLogLabel({ artist: job.artist, title: job.title, id: job.albumId }), 'info', `No lyrics updates attempted (${skippedNoTitleCount} track(s) missing usable titles).`);
             } else if (skippedExistingCount === totalTracks && totalTracks > 0) {
-              addLog(`${job.artist} - ${job.title}`, 'info', 'No lyrics updates needed (all tracks already had lyrics URLs).');
+              addLog(formatAlbumLogLabel({ artist: job.artist, title: job.title, id: job.albumId }), 'info', 'No lyrics updates needed (all tracks already had lyrics URLs).');
             } else {
-              addLog(`${job.artist} - ${job.title}`, 'info', 'No lyrics updates applied.');
+              addLog(formatAlbumLogLabel({ artist: job.artist, title: job.title, id: job.albumId }), 'info', 'No lyrics updates applied.');
             }
           } else {
             const failedSample = Array.isArray(data?.data?.failedTracks) && data.data.failedTracks.length > 0
               ? String(data.data.failedTracks[0]?.error ?? '')
               : '';
             const reason = data?.error || failedSample || `HTTP ${res.status}`;
-            addLog(`${job.artist} - ${job.title}`, 'skipped', `Lyrics enrichment failed: ${reason}`);
+            addLog(formatAlbumLogLabel({ artist: job.artist, title: job.title, id: job.albumId }), 'skipped', `Lyrics enrichment failed: ${reason}`);
           }
         } catch (error) {
-          addLog(`${job.artist} - ${job.title}`, 'skipped', `Lyrics enrichment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          addLog(formatAlbumLogLabel({ artist: job.artist, title: job.title, id: job.albumId }), 'skipped', `Lyrics enrichment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }));
       void lyricResults;
