@@ -47,13 +47,13 @@ export type EnrichmentService =
  * Maps data categories to the services that can provide that data
  */
 export const DATA_TO_SERVICES: Record<DataCategory, EnrichmentService[]> = {
-  artwork: ['coverArtArchive', 'musicbrainz', 'discogs', 'spotify', 'appleMusic', 'lastfm', 'theaudiodb', 'fanarttv', 'deezer'],
+  artwork: ['coverArtArchive', 'discogs', 'spotify', 'appleMusic', 'lastfm', 'theaudiodb', 'fanarttv', 'deezer'],
   credits: ['musicbrainz', 'appleMusic', 'discogs', 'genius', 'wikidata'],
   tracklists: ['discogs', 'spotify', 'appleMusic', 'lastfm', 'setlistfm', 'deezer'],
   // NOTE: acousticbrainz is not implemented in the current fetch pipeline.
   sonic_domain: [
-    'musicbrainz',
     'spotify',
+    'musicbrainz',
     'secondhandsongs',
   ],
   genres: ['discogs', 'spotify', 'appleMusic', 'lastfm', 'musicbrainz', 'rateyourmusic', 'theaudiodb', 'deezer'],
@@ -228,11 +228,11 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
  */
 export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   // --- ARTWORK ---
-  'image_url': ['coverArtArchive', 'musicbrainz', 'discogs', 'spotify', 'appleMusic', 'lastfm', 'theaudiodb', 'fanarttv', 'deezer'],
-  'back_image_url': ['coverArtArchive', 'musicbrainz', 'discogs', 'theaudiodb'],
-  'spine_image_url': ['coverArtArchive', 'musicbrainz', 'discogs'],
-  'inner_sleeve_images': ['coverArtArchive', 'musicbrainz', 'discogs', 'theaudiodb', 'fanarttv'],
-  'vinyl_label_images': ['coverArtArchive', 'musicbrainz', 'discogs'],
+  'image_url': ['coverArtArchive', 'discogs', 'spotify', 'appleMusic', 'lastfm', 'theaudiodb', 'fanarttv', 'deezer'],
+  'back_image_url': ['coverArtArchive', 'discogs', 'theaudiodb'],
+  'spine_image_url': ['coverArtArchive', 'discogs'],
+  'inner_sleeve_images': ['coverArtArchive', 'discogs', 'theaudiodb', 'fanarttv'],
+  'vinyl_label_images': ['coverArtArchive', 'discogs'],
   
   // --- CREDITS ---
   'musicians': ['musicbrainz', 'discogs'],
@@ -258,18 +258,18 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'sampled_by': [],
   
   // --- AUDIO ANALYSIS ---
-  'tempo_bpm': ['musicbrainz', 'spotify'],
-  'musical_key': ['musicbrainz', 'spotify'],
-  'time_signature': ['musicbrainz', 'spotify'],
-  'danceability': ['musicbrainz', 'spotify'],
-  'energy': ['musicbrainz', 'spotify'],
-  'mood_acoustic': ['musicbrainz', 'spotify'],
-  'mood_happy': ['musicbrainz', 'spotify'],
-  'mood_sad': ['musicbrainz', 'spotify'],
-  'mood_party': ['musicbrainz', 'spotify'],
-  'mood_relaxed': ['musicbrainz', 'spotify'],
-  'mood_aggressive': ['musicbrainz', 'spotify'],
-  'mood_electronic': ['musicbrainz', 'spotify'],
+  'tempo_bpm': ['spotify'],
+  'musical_key': ['spotify'],
+  'time_signature': ['spotify'],
+  'danceability': ['spotify'],
+  'energy': ['spotify'],
+  'mood_acoustic': ['spotify'],
+  'mood_happy': ['spotify'],
+  'mood_sad': ['spotify'],
+  'mood_party': ['spotify'],
+  'mood_relaxed': ['spotify'],
+  'mood_aggressive': ['spotify'],
+  'mood_electronic': ['spotify'],
   
   // --- GENRES & TAGS ---
   'genres': ['discogs', 'spotify', 'appleMusic', 'lastfm', 'theaudiodb', 'deezer'],
@@ -284,7 +284,7 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'country': ['musicbrainz', 'discogs', 'theaudiodb'],
   'recording_date': ['musicbrainz'],
   'master_release_date': ['discogs'],
-  'studio': ['musicbrainz'],
+  'studio': [],
   'companies': ['discogs', 'spotify'],
   
   // --- CONTEXT ---

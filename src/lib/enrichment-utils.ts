@@ -54,6 +54,10 @@ export type CandidateData = {
   producers?: string[];
   engineers?: string[];
   songwriters?: string[];
+  composer?: string;
+  conductor?: string;
+  orchestra?: string;
+  chorus?: string;
   original_release_date?: string;
   labels?: string[]; // FIXED: Match schema plural
   cat_no?: string;
@@ -367,6 +371,13 @@ interface MBRelease {
   date?: string;
   country?: string;
   barcode?: string;
+  genres?: Array<{ name?: string }>;
+  tags?: Array<{ name?: string }>;
+  'release-group'?: {
+    id: string;
+    genres?: Array<{ name?: string }>;
+    tags?: Array<{ name?: string }>;
+  };
   media?: MBMedia[]; // ADDED: Access to tracks
   'label-info'?: Array<{
     label?: { name: string };
@@ -376,6 +387,13 @@ interface MBRelease {
 }
 interface MBSearchResponse {
   releases: MBRelease[];
+}
+
+interface MBReleaseGroup {
+  id: string;
+  'first-release-date'?: string;
+  genres?: Array<{ name?: string }>;
+  tags?: Array<{ name?: string }>;
 }
 
 interface SpotifyImage {
@@ -507,65 +525,168 @@ const toHttps = (url: string | undefined | null) => {
 // ============================================================================
 const MB_BASE = 'https://musicbrainz.org/ws/2';
 const isValidDate = (d: string) => /^\d{4}/.test(d);
+const MB_MIN_REQUEST_INTERVAL_MS = 1100;
+let mbLastRequestAt = 0;
 
-async function mbSearch(artist: string, title: string): Promise<string | null> {
-  try {
-    const artistVariants = buildArtistVariants(artist);
-    const titleVariants = buildTitleVariants(title);
-    for (const artistVariant of artistVariants) {
-      for (const titleVariant of titleVariants) {
-        const query = `artist:"${artistVariant}" AND release:"${titleVariant}"`;
-        const url = `${MB_BASE}/release/?query=${encodeURIComponent(query)}&fmt=json&limit=3`;
-        const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
-        const data = await res.json() as MBSearchResponse;
-        
-        // Prefer "Official" releases
-        const releases = data.releases;
-        const release = releases?.find((r) => r.status === 'Official') || releases?.[0];
-        if (release?.id) return release.id;
-      }
-    }
-    return null;
-  } catch { return null; }
+const normalizeMbId = (value: string | undefined | null): string | null => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const releaseMatch = trimmed.match(/musicbrainz\.org\/release\/([0-9a-f-]{36})/i);
+  if (releaseMatch?.[1]) return releaseMatch[1];
+  const rgMatch = trimmed.match(/musicbrainz\.org\/release-group\/([0-9a-f-]{36})/i);
+  if (rgMatch?.[1]) return rgMatch[1];
+  const bare = trimmed.match(/^([0-9a-f-]{36})$/i);
+  return bare?.[1] ?? null;
+};
+
+const isReleaseGroupLike = (value: string | undefined | null) =>
+  Boolean(value?.includes('/release-group/'));
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function mbFetch(url: string): Promise<Response> {
+  const waitMs = MB_MIN_REQUEST_INTERVAL_MS - (Date.now() - mbLastRequestAt);
+  if (waitMs > 0) {
+    await sleep(waitMs);
+  }
+  mbLastRequestAt = Date.now();
+  return fetch(url, { headers: { 'User-Agent': USER_AGENT } });
 }
 
-async function mbGetRelease(mbid: string): Promise<MBRelease | null> {
+const compactErrorText = (input: string) => input.slice(0, 220).replace(/\s+/g, ' ').trim();
+
+async function mbSearch(artist: string, title: string): Promise<{ id: string | null; error?: string }> {
+  const artistVariants = buildArtistVariants(artist);
+  const titleVariants = buildTitleVariants(title);
+  for (const artistVariant of artistVariants) {
+    for (const titleVariant of titleVariants) {
+      const query = `artist:"${artistVariant}" AND release:"${titleVariant}"`;
+      const url = `${MB_BASE}/release/?query=${encodeURIComponent(query)}&fmt=json&limit=5`;
+      let res: Response;
+      try {
+        res = await mbFetch(url);
+      } catch (error) {
+        return { id: null, error: `MusicBrainz search failed: ${(error as Error).message}` };
+      }
+      const text = await res.text();
+      if (!res.ok) {
+        return { id: null, error: `MusicBrainz search failed (${res.status}): ${compactErrorText(text)}` };
+      }
+      let data: MBSearchResponse;
+      try {
+        data = JSON.parse(text) as MBSearchResponse;
+      } catch {
+        return { id: null, error: `MusicBrainz search returned non-JSON (${res.status})` };
+      }
+      const releases = data.releases;
+      const release = releases?.find((r) => r.status === 'Official') || releases?.[0];
+      if (release?.id) return { id: release.id };
+    }
+  }
+  return { id: null };
+}
+
+async function mbGetRelease(mbid: string): Promise<{ release: MBRelease | null; error?: string }> {
+  const url = `${MB_BASE}/release/${mbid}?inc=artists+labels+recordings+release-groups+artist-rels+recording-level-rels+work-rels+work-level-rels+tags+genres+url-rels+release-group-rels&fmt=json`;
+  let res: Response;
   try {
-    const url = `${MB_BASE}/release/${mbid}?inc=artists+labels+recordings+release-groups+artist-rels+recording-level-rels+work-rels+work-level-rels&fmt=json`;
-    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
-    return res.ok ? (await res.json() as MBRelease) : null;
-  } catch { return null; }
+    res = await mbFetch(url);
+  } catch (error) {
+    return { release: null, error: `MusicBrainz release fetch failed: ${(error as Error).message}` };
+  }
+  const text = await res.text();
+  if (!res.ok) {
+    return { release: null, error: `MusicBrainz release fetch failed (${res.status}): ${compactErrorText(text)}` };
+  }
+  try {
+    return { release: JSON.parse(text) as MBRelease };
+  } catch {
+    return { release: null, error: `MusicBrainz release returned non-JSON (${res.status})` };
+  }
+}
+
+async function mbGetReleaseGroup(id: string): Promise<{ group: MBReleaseGroup | null; error?: string }> {
+  const url = `${MB_BASE}/release-group/${id}?inc=tags+genres&fmt=json`;
+  let res: Response;
+  try {
+    res = await mbFetch(url);
+  } catch (error) {
+    return { group: null, error: `MusicBrainz release-group fetch failed: ${(error as Error).message}` };
+  }
+  const text = await res.text();
+  if (!res.ok) {
+    return { group: null, error: `MusicBrainz release-group fetch failed (${res.status}): ${compactErrorText(text)}` };
+  }
+  try {
+    return { group: JSON.parse(text) as MBReleaseGroup };
+  } catch {
+    return { group: null, error: `MusicBrainz release-group returned non-JSON (${res.status})` };
+  }
 }
 
 export async function fetchMusicBrainzData(album: { artist: string, title: string, musicbrainz_id?: string }): Promise<EnrichmentResult> {
   try {
-    // Some records may store a release-group id in musicbrainz_id; if direct fetch fails,
-    // fall back to search so we can still resolve the canonical release id.
-    let mbid = album.musicbrainz_id ?? null;
+    let mbid = normalizeMbId(album.musicbrainz_id);
+    const mbidLooksLikeReleaseGroup = isReleaseGroupLike(album.musicbrainz_id);
     let release: MBRelease | null = null;
+    let releaseGroup: MBReleaseGroup | null = null;
+    const mbErrors: string[] = [];
 
     if (mbid) {
-      release = await mbGetRelease(mbid);
+      if (!mbidLooksLikeReleaseGroup) {
+        const releaseResult = await mbGetRelease(mbid);
+        release = releaseResult.release;
+        if (releaseResult.error) mbErrors.push(releaseResult.error);
+      }
+
+      if (!release) {
+        const rgResult = await mbGetReleaseGroup(mbid);
+        releaseGroup = rgResult.group;
+        if (rgResult.error) mbErrors.push(rgResult.error);
+      }
     }
 
     if (!release) {
-      mbid = await mbSearch(album.artist, album.title);
-      if (!mbid) return { success: false, source: 'musicbrainz', error: 'Not found' };
-      release = await mbGetRelease(mbid);
+      const searchResult = await mbSearch(album.artist, album.title);
+      if (searchResult.error) mbErrors.push(searchResult.error);
+      mbid = searchResult.id;
+      if (!mbid) {
+        const detail = mbErrors.length > 0 ? ` | ${mbErrors.join(' | ')}` : '';
+        return { success: false, source: 'musicbrainz', error: `Not found${detail}` };
+      }
+      const releaseResult = await mbGetRelease(mbid);
+      release = releaseResult.release;
+      if (releaseResult.error) mbErrors.push(releaseResult.error);
     }
 
-    if (!release || !mbid) return { success: false, source: 'musicbrainz', error: 'Fetch failed' };
+    if (!release || !mbid) {
+      if (!releaseGroup && mbid) {
+        const rgResult = await mbGetReleaseGroup(mbid);
+        releaseGroup = rgResult.group;
+        if (rgResult.error) mbErrors.push(rgResult.error);
+      }
+      if (!releaseGroup) {
+        const detail = mbErrors.length > 0 ? ` | ${mbErrors.join(' | ')}` : '';
+        return { success: false, source: 'musicbrainz', error: `Fetch failed${detail}` };
+      }
+    }
+
+    const releaseGroupId = release?.['release-group']?.id ?? releaseGroup?.id ?? null;
 
     const candidate: CandidateData = {
       musicbrainz_id: mbid,
-      original_release_date: release.date,
-      recording_date: release.date,
-      country: release.country,
+      original_release_date:
+        release?.['release-group']?.['first-release-date'] ??
+        releaseGroup?.['first-release-date'] ??
+        release?.date,
+      recording_date: release?.date,
+      country: release?.country,
       tracks: [] // Initialize array for per-track analysis
     };
 
     // --- SONIC DOMAIN: Cover Song Analysis ---
-    if (release.media) {
+    if (release?.media) {
        release.media.forEach(medium => {
           medium.tracks?.forEach(track => {
              if (!track.recording?.relations) return;
@@ -635,15 +756,15 @@ export async function fetchMusicBrainzData(album: { artist: string, title: strin
       }
     }
 
-    if (release['label-info']?.[0]) {
+    if (release?.['label-info']?.[0]) {
       const info = release['label-info'][0];
       if (info.label?.name) candidate.labels = [info.label.name]; // FIXED: labels
       if (info['catalog-number']) candidate.cat_no = info['catalog-number'];
     }
     
-    if (release.barcode) candidate.barcode = release.barcode;
+    if (release?.barcode) candidate.barcode = release.barcode;
 
-    if (release.relations) {
+    if (release?.relations) {
         candidate.producers = release.relations
             .filter(r => r.type === 'producer' && r.artist)
             .map(r => r.artist!.name);
@@ -659,6 +780,48 @@ export async function fetchMusicBrainzData(album: { artist: string, title: strin
         candidate.songwriters = release.relations
             .filter(r => (r.type === 'composer' || r.type === 'writer' || r.type === 'lyricist') && r.artist)
             .map(r => r.artist!.name);
+
+        candidate.composer = release.relations
+            .filter(r => r.type === 'composer' && r.artist)
+            .map(r => r.artist!.name)[0];
+
+        candidate.conductor = release.relations
+            .filter(r => r.type === 'conductor' && r.artist)
+            .map(r => r.artist!.name)[0];
+
+        candidate.orchestra = release.relations
+            .filter(r => r.type === 'orchestra' && r.artist)
+            .map(r => r.artist!.name)[0];
+
+        candidate.chorus = release.relations
+            .filter(r => r.type === 'choir' && r.artist)
+            .map(r => r.artist!.name)[0];
+    }
+
+    const mbGenres = [
+      ...(release?.genres ?? []),
+      ...(release?.['release-group']?.genres ?? []),
+      ...(releaseGroup?.genres ?? [])
+    ]
+      .map((entry) => entry?.name?.trim())
+      .filter((value): value is string => Boolean(value));
+    if (mbGenres.length > 0) {
+      candidate.genres = Array.from(new Set(mbGenres));
+    }
+
+    const mbTags = [
+      ...(release?.tags ?? []),
+      ...(release?.['release-group']?.tags ?? []),
+      ...(releaseGroup?.tags ?? [])
+    ]
+      .map((entry) => entry?.name?.trim())
+      .filter((value): value is string => Boolean(value));
+    if (mbTags.length > 0) {
+      candidate.tags = Array.from(new Set(mbTags));
+    }
+
+    if (releaseGroupId) {
+      candidate.musicbrainz_id = releaseGroupId;
     }
 
     return { success: true, source: 'musicbrainz', data: candidate };
