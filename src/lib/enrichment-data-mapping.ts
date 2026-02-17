@@ -282,7 +282,7 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'cat_no': ['musicbrainz', 'discogs'],
   'barcode': ['musicbrainz', 'discogs', 'deezer'],
   'country': ['musicbrainz', 'discogs', 'theaudiodb'],
-  'recording_date': [],
+  'recording_date': ['wikipedia'],
   'master_release_date': ['discogs'],
   'studio': [],
   'companies': ['discogs', 'spotify'],

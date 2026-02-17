@@ -1454,8 +1454,11 @@ export async function fetchWikipediaData(album: { artist: string, title: string 
           'Cultural impact'
         ]) || (extract ? truncateText(cleanWikiText(extract), 900) : '');
 
+        const recordingDateText = extractInfoboxField(wikitext, [
+          'recorded'
+        ]);
+
         const recordingLocation = extractInfoboxField(wikitext, [
-          'recorded',
           'studio',
           'venue',
           'location'
@@ -1482,6 +1485,7 @@ export async function fetchWikipediaData(album: { artist: string, title: string 
                 notes: extract, // Legacy mapping
                 master_notes: extract ? truncateText(cleanWikiText(extract), 1200) : undefined,
                 cultural_significance: culturalSignificance || undefined,
+                recording_date: recordingDateText || undefined,
                 recording_location: recordingLocation || undefined,
                 critical_reception: criticalReception || undefined,
                 chart_positions: chartPositions.length > 0 ? chartPositions : undefined,

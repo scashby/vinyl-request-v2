@@ -461,8 +461,8 @@ const isValidDate = (dateStr: unknown): boolean => {
 };
 
 const normalizeOriginalReleaseDate = (value: unknown): string | null => {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
+  if (value === null || value === undefined) return null;
+  const trimmed = String(value).trim();
   if (!trimmed) return null;
   if (/^\d{4}$/.test(trimmed)) return `${trimmed}-12-25`;
   if (/^\d{4}-\d{2}$/.test(trimmed)) return `${trimmed}-25`;
@@ -1631,7 +1631,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             if (alreadySeen && !(missingDataOnly && isStillMissing)) return;
 
             let newVal = value;
-            if (key === 'original_release_date' && typeof newVal === 'string') {
+            if (key === 'original_release_date') {
                  const normalizedDate = normalizeOriginalReleaseDate(newVal);
                  if (!normalizedDate) return;
                  newVal = normalizedDate;
