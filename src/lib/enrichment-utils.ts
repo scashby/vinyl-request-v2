@@ -92,9 +92,11 @@ export type CandidateData = {
   lyrics?: string;
   lyrics_url?: string;
   notes?: string; // Wikipedia/Discogs Notes
+  release_notes?: string;
   master_notes?: string;
   cultural_significance?: string;
   recording_date?: string;
+  recording_year?: string;
   studio?: string;
   recording_location?: string;
   critical_reception?: string;
@@ -287,6 +289,7 @@ interface MBWorkRelation {
   recording?: {
     id: string;
     title: string;
+    length?: number;
     'first-release-date'?: string;
     'artist-credit'?: MBArtistCredit[];
   };
@@ -294,6 +297,9 @@ interface MBWorkRelation {
 
 interface MBRecordingRelation {
   type: string;
+  begin?: string;
+  end?: string;
+  attributes?: string[];
   work?: {
     id: string;
     title: string;
@@ -304,65 +310,35 @@ interface MBRecordingRelation {
 interface MBTrack {
   position: string;
   title: string;
+  length?: number;
+  'artist-credit'?: MBArtistCredit[];
   recording?: {
     id: string;
     title: string;
+    length?: number;
+    'first-release-date'?: string;
     relations?: MBRecordingRelation[];
   };
 }
 
 interface MBMedia {
   format?: string;
+  title?: string;
+  position?: number;
+  'track-count'?: number;
   tracks?: MBTrack[];
 }
 
 interface MBRelation {
   type: string;
-  direction: string;
-  artist?: { name: string };
-  attributes?: string[];
-}
-
-interface MBArtistCredit {
-  name: string;
-  artist?: { name: string };
-}
-
-interface MBWorkRelation {
-  type: string;
-  begin?: string; // Relation start date
+  direction?: string;
+  begin?: string;
   end?: string;
   attributes?: string[];
-  recording?: {
-    id: string;
-    title: string;
-    'first-release-date'?: string; // The golden nugget
-    'artist-credit'?: MBArtistCredit[];
-  };
-}
-
-interface MBRecordingRelation {
-  type: string; // Look for 'performance'
-  work?: {
-    id: string;
-    title: string;
-    relations?: MBWorkRelation[]; // Relationships on the Work itself (to find other recordings)
-  };
-}
-
-interface MBTrack {
-  position: string;
-  title: string;
-  recording?: {
-    id: string;
-    title: string;
-    relations?: MBRecordingRelation[];
-  };
-}
-
-interface MBMedia {
-  format?: string;
-  tracks?: MBTrack[];
+  artist?: { name: string };
+  label?: { name: string };
+  place?: { name: string };
+  area?: { name: string };
 }
 
 interface MBRelease {
@@ -371,6 +347,7 @@ interface MBRelease {
   date?: string;
   country?: string;
   barcode?: string;
+  annotation?: string;
   genres?: Array<{ name?: string }>;
   tags?: Array<{ name?: string }>;
   'release-group'?: {
@@ -588,7 +565,7 @@ async function mbSearch(artist: string, title: string): Promise<{ id: string | n
 }
 
 async function mbGetRelease(mbid: string): Promise<{ release: MBRelease | null; error?: string }> {
-  const url = `${MB_BASE}/release/${mbid}?inc=artists+labels+recordings+release-groups+artist-rels+recording-level-rels+work-rels+work-level-rels+tags+genres+url-rels+release-group-rels&fmt=json`;
+  const url = `${MB_BASE}/release/${mbid}?inc=artists+labels+recordings+media+release-groups+artist-rels+label-rels+recording-rels+work-rels+release-rels+release-group-rels+url-rels+isrcs+tags+genres+annotation&fmt=json`;
   let res: Response;
   try {
     res = await mbFetch(url);
@@ -681,54 +658,103 @@ export async function fetchMusicBrainzData(album: { artist: string, title: strin
         releaseGroup?.['first-release-date'] ??
         release?.date,
       country: release?.country,
-      tracks: [] // Initialize array for per-track analysis
+      tracks: []
     };
 
-    // --- SONIC DOMAIN: Cover Song Analysis ---
+    const recordingDateCandidates = new Set<string>();
+    const formatCandidates = new Set<string>();
+
+    const toDuration = (ms: number | undefined): string | undefined => {
+      if (!ms || !Number.isFinite(ms) || ms <= 0) return undefined;
+      const totalSeconds = Math.round(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}:${String(seconds).padStart(2, '0')}`;
+    };
+
+    if (release?.annotation) {
+      const cleanedAnnotation = cleanWikiText(release.annotation);
+      if (cleanedAnnotation) {
+        candidate.release_notes = truncateText(cleanedAnnotation, 1400);
+      }
+    }
+
     if (release?.media) {
-       release.media.forEach(medium => {
-          medium.tracks?.forEach(track => {
-             if (!track.recording?.relations) return;
+      const builtTracks: NonNullable<CandidateData['tracks']> = [];
 
-             // 1. Find link to a "Work"
-             const workRel = track.recording.relations.find(r => r.type === 'performance' && r.work);
-             if (!workRel || !workRel.work?.relations) return;
+      release.media.forEach((medium) => {
+        if (medium.format?.trim()) {
+          const formatText = medium['track-count']
+            ? `${medium.format} (${medium['track-count']} tracks)`
+            : medium.format;
+          formatCandidates.add(formatText);
+        }
 
-             const work = workRel.work;
-             
-             // 2. Find earliest recording of this work
-             let earliestDate = release.date || '9999';
-             let originalArtist: string | undefined;
-             let isCover = false;
+        medium.tracks?.forEach((track) => {
+          const trackItem: NonNullable<CandidateData['tracks']>[number] = {
+            position: track.position || '',
+            title: track.title || track.recording?.title || ''
+          };
 
-             work.relations.forEach(rel => {
-                // We look for other recordings of this work
+          const duration = toDuration(track.length ?? track.recording?.length);
+          if (duration) trackItem.duration = duration;
+
+          const trackArtist = track['artist-credit']?.map((ac) => ac.name).filter(Boolean).join(', ');
+          if (trackArtist) trackItem.artist = trackArtist;
+
+          const directRecDate = track.recording?.['first-release-date'];
+          if (directRecDate && /^\d{4}(?:-\d{2}(?:-\d{2})?)?$/.test(directRecDate)) {
+            recordingDateCandidates.add(directRecDate);
+          }
+
+          if (track.recording?.relations) {
+            const workRel = track.recording.relations.find((r) => r.type === 'performance' && r.work);
+            if (workRel?.work?.relations) {
+              const work = workRel.work;
+              let earliestDate = release.date || '9999';
+              let originalArtist: string | undefined;
+              let isCover = false;
+
+              work.relations.forEach((rel) => {
                 if (rel.type === 'performance' && rel.recording) {
-                   const recDate = rel.recording['first-release-date'] || rel.begin;
-                   
-                   // Strict check: Must have a date, and date must be before our album's release
-                   if (recDate && isValidDate(recDate) && recDate < earliestDate) {
-                      earliestDate = recDate;
-                      originalArtist = rel.recording['artist-credit']?.[0]?.name;
-                      isCover = true;
-                   }
-                }
-             });
+                  const recDate = rel.recording['first-release-date'] || rel.begin;
+                  if (recDate && /^\d{4}(?:-\d{2}(?:-\d{2})?)?$/.test(recDate)) {
+                    recordingDateCandidates.add(recDate);
+                  }
 
-             // 3. Add to candidate track list
-             if (isCover && originalArtist) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (candidate.tracks as any[]).push({
-                   position: track.position,
-                   title: track.title,
-                   is_cover: true,
-                   original_artist: originalArtist,
-                   original_year: parseInt(earliestDate.substring(0, 4)),
-                   mb_work_id: work.id
-                });
-             }
-          });
-       });
+                  if (recDate && isValidDate(recDate) && recDate < earliestDate) {
+                    earliestDate = recDate;
+                    originalArtist = rel.recording['artist-credit']?.[0]?.name;
+                    isCover = true;
+                  }
+                }
+              });
+
+              if (isCover && originalArtist) {
+                trackItem.is_cover = true;
+                trackItem.original_artist = originalArtist;
+                trackItem.original_year = parseInt(earliestDate.substring(0, 4), 10);
+                trackItem.mb_work_id = work.id;
+              }
+            }
+          }
+
+          if (trackItem.title) {
+            builtTracks.push(trackItem);
+          }
+        });
+      });
+
+      if (builtTracks.length > 0) {
+        candidate.tracks = builtTracks;
+        candidate.tracklist = builtTracks
+          .map((track) => `${track.position}. ${track.title}${track.duration ? ` (${track.duration})` : ''}`)
+          .join('\n');
+      }
+
+      if (formatCandidates.size > 0) {
+        candidate.format = Array.from(formatCandidates).join(' | ');
+      }
     }
 
     // Promote track-level cover evidence to album-level fields when possible.
@@ -755,47 +781,98 @@ export async function fetchMusicBrainzData(album: { artist: string, title: strin
       }
     }
 
-    if (release?.['label-info']?.[0]) {
-      const info = release['label-info'][0];
-      if (info.label?.name) candidate.labels = [info.label.name]; // FIXED: labels
-      if (info['catalog-number']) candidate.cat_no = info['catalog-number'];
+    if (recordingDateCandidates.size > 0) {
+      const dates = Array.from(recordingDateCandidates).sort();
+      const firstDate = dates[0];
+      if (firstDate) {
+        candidate.recording_date = firstDate;
+        candidate.recording_year = firstDate.slice(0, 4);
+      }
     }
-    
+
+    if (release?.relations?.length) {
+      const recordingPlace = release.relations
+        .filter((relation) => relation.type.toLowerCase().includes('recorded'))
+        .map((relation) => relation.place?.name || relation.area?.name)
+        .find((value): value is string => Boolean(value && value.trim()));
+      if (recordingPlace) {
+        candidate.recording_location = recordingPlace;
+      }
+    }
+
+    if (release?.['label-info']?.length) {
+      const labelSet = new Set<string>();
+      const catSet = new Set<string>();
+      release['label-info'].forEach((info) => {
+        if (info.label?.name?.trim()) labelSet.add(info.label.name.trim());
+        if (info['catalog-number']?.trim()) catSet.add(info['catalog-number'].trim());
+      });
+      if (labelSet.size > 0) candidate.labels = Array.from(labelSet);
+      if (catSet.size > 0) candidate.cat_no = Array.from(catSet).join(', ');
+    }
+
     if (release?.barcode) candidate.barcode = release.barcode;
 
-    if (release?.relations) {
-        candidate.producers = release.relations
-            .filter(r => r.type === 'producer' && r.artist)
-            .map(r => r.artist!.name);
-            
-        candidate.engineers = release.relations
-            .filter(r => r.type === 'engineer' && r.artist)
-            .map(r => r.artist!.name);
-            
-        candidate.musicians = release.relations
-            .filter(r => (r.type === 'instrument' || r.type === 'vocal') && r.artist)
-            .map(r => `${r.artist!.name} (${r.attributes?.join(', ') || 'Musician'})`);
-            
-        candidate.songwriters = release.relations
-            .filter(r => (r.type === 'composer' || r.type === 'writer' || r.type === 'lyricist') && r.artist)
-            .map(r => r.artist!.name);
+    const producerSet = new Set<string>();
+    const engineerSet = new Set<string>();
+    const musicianSet = new Set<string>();
+    const songwriterSet = new Set<string>();
+    const composerSet = new Set<string>();
+    const conductorSet = new Set<string>();
+    const orchestraSet = new Set<string>();
+    const chorusSet = new Set<string>();
+    const companySet = new Set<string>();
 
-        candidate.composer = release.relations
-            .filter(r => r.type === 'composer' && r.artist)
-            .map(r => r.artist!.name)[0];
+    const collectRelations = (relations: MBRelation[] | undefined) => {
+      if (!relations || relations.length === 0) return;
+      relations.forEach((relation) => {
+        const artistName = relation.artist?.name?.trim();
+        const relType = relation.type.toLowerCase();
+        const attrs = (relation.attributes ?? []).filter(Boolean);
 
-        candidate.conductor = release.relations
-            .filter(r => r.type === 'conductor' && r.artist)
-            .map(r => r.artist!.name)[0];
+        const labelName = relation.label?.name?.trim();
+        if (labelName) companySet.add(labelName);
+        if (relation.place?.name?.trim() && relType.includes('recorded') && !candidate.recording_location) {
+          candidate.recording_location = relation.place.name.trim();
+        }
 
-        candidate.orchestra = release.relations
-            .filter(r => r.type === 'orchestra' && r.artist)
-            .map(r => r.artist!.name)[0];
+        if (!artistName) return;
 
-        candidate.chorus = release.relations
-            .filter(r => r.type === 'choir' && r.artist)
-            .map(r => r.artist!.name)[0];
-    }
+        if (relType === 'producer') producerSet.add(artistName);
+        if (relType === 'engineer' || relType === 'mix' || relType === 'mastering') engineerSet.add(artistName);
+        if (relType === 'composer' || relType === 'writer' || relType === 'lyricist' || relType === 'librettist') {
+          songwriterSet.add(artistName);
+        }
+        if (relType === 'composer') composerSet.add(artistName);
+        if (relType === 'conductor') conductorSet.add(artistName);
+        if (relType === 'orchestra') orchestraSet.add(artistName);
+        if (relType === 'choir') chorusSet.add(artistName);
+        if (relType === 'instrument' || relType === 'vocal' || relType === 'performer') {
+          musicianSet.add(
+            attrs.length > 0
+              ? `${artistName} (${attrs.join(', ')})`
+              : `${artistName} (Musician)`
+          );
+        }
+      });
+    };
+
+    collectRelations(release?.relations);
+    release?.media?.forEach((medium) => {
+      medium.tracks?.forEach((track) => {
+        collectRelations(track.recording?.relations as MBRelation[] | undefined);
+      });
+    });
+
+    if (producerSet.size > 0) candidate.producers = Array.from(producerSet);
+    if (engineerSet.size > 0) candidate.engineers = Array.from(engineerSet);
+    if (musicianSet.size > 0) candidate.musicians = Array.from(musicianSet);
+    if (songwriterSet.size > 0) candidate.songwriters = Array.from(songwriterSet);
+    if (composerSet.size > 0) candidate.composer = Array.from(composerSet)[0];
+    if (conductorSet.size > 0) candidate.conductor = Array.from(conductorSet)[0];
+    if (orchestraSet.size > 0) candidate.orchestra = Array.from(orchestraSet)[0];
+    if (chorusSet.size > 0) candidate.chorus = Array.from(chorusSet)[0];
+    if (companySet.size > 0) candidate.companies = Array.from(companySet);
 
     const mbGenres = [
       ...(release?.genres ?? []),

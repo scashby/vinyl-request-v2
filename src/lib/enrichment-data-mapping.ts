@@ -272,7 +272,7 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'mood_electronic': ['spotify'],
   
   // --- GENRES & TAGS ---
-  'genres': ['discogs', 'spotify', 'appleMusic', 'lastfm', 'theaudiodb', 'deezer'],
+  'genres': ['discogs', 'spotify', 'appleMusic', 'lastfm', 'musicbrainz', 'rateyourmusic', 'theaudiodb', 'deezer'],
   'styles': ['discogs', 'lastfm', 'theaudiodb'],
   'tags': ['lastfm', 'discogs', 'musicbrainz'], // Generic bucket
   
@@ -282,7 +282,7 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'cat_no': ['musicbrainz', 'discogs'],
   'barcode': ['musicbrainz', 'discogs', 'deezer'],
   'country': ['musicbrainz', 'discogs', 'theaudiodb'],
-  'recording_date': ['wikipedia'],
+  'recording_date': ['musicbrainz', 'wikipedia'],
   'master_release_date': ['discogs'],
   'studio': [],
   'companies': ['discogs', 'spotify'],
