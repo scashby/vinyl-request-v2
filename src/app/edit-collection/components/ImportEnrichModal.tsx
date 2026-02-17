@@ -809,10 +809,30 @@ const applyAlbumCreditsToRecordings = async (
       }
 
       return Promise.resolve(
-        supabase
-          .from('recordings')
-          .update(recordingUpdates)
-          .eq('id', recording.id)
+        (async () => {
+          const maxAttempts = 3;
+          for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+            const { error: updateError } = await supabase
+              .from('recordings')
+              .update(recordingUpdates)
+              .eq('id', recording.id);
+
+            if (!updateError) return;
+
+            const message = (updateError.message || '').toLowerCase();
+            const retryable = (
+              message.includes('connection') ||
+              message.includes('closed') ||
+              message.includes('timeout') ||
+              message.includes('network')
+            );
+
+            if (!retryable || attempt >= maxAttempts) {
+              throw new Error(`recordings(${recording.id}) update failed: ${updateError.message}`);
+            }
+            await wait(250 * attempt);
+          }
+        })()
       );
     })
     .filter(Boolean) as Promise<unknown>[];
@@ -924,6 +944,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const specificAlbumQueueRef = useRef<number[] | null>(null);
   const runFieldConfigRef = useRef<FieldConfigMap>({});
   const statsRefreshInFlightRef = useRef(false);
+  const processedDuringScanRef = useRef(0);
+  const nextStatsRefreshAtRef = useRef(25);
   const availableSourceIds = (Object.keys(SERVICE_DISPLAY_NAMES) as EnrichmentService[])
     .filter((source) => source !== 'acousticbrainz')
     .sort();
@@ -1206,6 +1228,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     scanRangeRef.current = { start: safeStart, end: safeEnd };
     specificAlbumQueueRef.current = specificAlbumIds && specificAlbumIds.length > 0 ? [...specificAlbumIds] : null;
     runFieldConfigRef.current = effectiveFieldConfig;
+    processedDuringScanRef.current = 0;
+    nextStatsRefreshAtRef.current = 25;
     setConflicts([]);
     if (!currentRunId) {
       setCurrentRunId(createEnrichmentRunId());
@@ -1355,6 +1379,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         }
 
         const candidates = result.results || [];
+        processedDuringScanRef.current += Number(result.processedCount || candidates.length || 0);
+        if (processedDuringScanRef.current >= nextStatsRefreshAtRef.current) {
+          void loadStats(true);
+          nextStatsRefreshAtRef.current += 25;
+        }
         if (specificAlbumQueueRef.current && specificAlbumQueueRef.current.length > 0) {
           specificAlbumQueueRef.current.shift();
           if (specificAlbumQueueRef.current.length === 0) {
@@ -1371,7 +1400,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             ? specificAlbumQueueRef.current[0]
             : undefined
         );
-        setStatus(`Scanning by ID. Currently scanning ID: ${nextScanId}. Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
+        setStatus(`Scanning by ID. Currently scanning ID: ${nextScanId}. Processed: ${processedDuringScanRef.current}. Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
 
         if (result.processedCount > candidates.length) {
           // This is fine, logs empty results if any
@@ -1394,7 +1423,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             collectedSummary = [...collectedSummary, ...batchSummaryItems];
         }
         if (batchConflicts.length > 0) {
-          setStatus(`Scanning by ID. Currently scanning ID: ${nextScanId}. Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
+          setStatus(`Scanning by ID. Currently scanning ID: ${nextScanId}. Processed: ${processedDuringScanRef.current}. Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
         }
 
       } catch (error) {
@@ -1436,10 +1465,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     if (Object.keys(inventoryUpdates).length > 0) {
       operations.push(
         (async () => {
-          await supabase
+          const { error } = await supabase
             .from('inventory')
             .update(inventoryUpdates as Record<string, unknown>)
             .eq('id', album.id);
+          if (error) throw new Error(`inventory(${album.id}) update failed: ${error.message}`);
         })()
       );
     }
@@ -1447,10 +1477,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     if (album.release_id && Object.keys(releaseUpdates).length > 0) {
       operations.push(
         (async () => {
-          await supabase
+          const { error } = await supabase
             .from('releases')
             .update(releaseUpdates as Record<string, unknown>)
             .eq('id', album.release_id);
+          if (error) throw new Error(`releases(${album.release_id}) update failed: ${error.message}`);
         })()
       );
     }
@@ -1458,10 +1489,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     if (album.master_id && Object.keys(masterUpdates).length > 0) {
       operations.push(
         (async () => {
-          await supabase
+          const { error } = await supabase
             .from('masters')
             .update(masterUpdates as Record<string, unknown>)
             .eq('id', album.master_id);
+          if (error) throw new Error(`masters(${album.master_id}) update failed: ${error.message}`);
         })()
       );
     }

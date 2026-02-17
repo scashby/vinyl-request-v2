@@ -46,6 +46,7 @@ type MasterRow = {
   apple_music_url?: string | null;
   lastfm_url?: string | null;
   lastfm_similar_albums?: string[] | null;
+  master_tag_links?: { tag?: { name?: string | null } | null }[] | null;
 };
 
 type ReleaseRow = {
@@ -121,7 +122,10 @@ export async function GET(request: Request) {
               wikipedia_url,
               apple_music_url,
               lastfm_url,
-              lastfm_similar_albums
+              lastfm_similar_albums,
+              master_tag_links:master_tag_links (
+                tag:master_tags ( name )
+              )
             ),
             release_tracks:release_tracks (
               recording:recordings (
@@ -409,7 +413,8 @@ export async function GET(request: Request) {
         return hasString(recording.lyrics_url) || hasString(credits.lyrics_url);
       });
       const hasTags =
-        hasArray(creditInfo.albumDetails.tags)
+        hasArray(master?.master_tag_links)
+        || hasArray(creditInfo.albumDetails.tags)
         || hasArray(creditInfo.albumDetails.lastfm_tags);
       const hasPitchforkScore =
         master?.pitchfork_score !== null && master?.pitchfork_score !== undefined
