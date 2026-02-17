@@ -2,6 +2,7 @@
 import * as GeniusModule from 'genius-lyrics';
 import { parseDiscogsFormat } from './formatParser';
 import { fetchDiscogsJson, hasDiscogsCredentials, type DiscogsOAuthCredentials } from './discogsAuth';
+import { getWikimediaAppAccessToken } from './wikimediaAuth';
 
 const getEnv = (...keys: string[]): string | undefined => {
   for (const key of keys) {
@@ -164,6 +165,22 @@ const cleanWikiText = (text: string) => {
     .replace(/''+/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+};
+
+const getWikimediaRequestHeaders = async (): Promise<HeadersInit> => {
+  const headers: HeadersInit = { 'User-Agent': USER_AGENT };
+  try {
+    const token = await getWikimediaAppAccessToken();
+    if (token) {
+      return {
+        ...headers,
+        Authorization: `Bearer ${token}`,
+      };
+    }
+  } catch {
+    // Fall back to public, unauthenticated requests.
+  }
+  return headers;
 };
 
 const truncateText = (text: string, max = 1400) =>
@@ -1209,6 +1226,7 @@ export async function fetchGeniusData(album: { artist: string, title: string }):
 // ============================================================================
 export async function fetchWikipediaData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
     try {
+        const wikiHeaders = await getWikimediaRequestHeaders();
         const artistVariants = buildArtistVariants(album.artist);
         const titleVariants = buildTitleVariants(album.title);
         let pageId: number | null = null;
@@ -1223,7 +1241,7 @@ export async function fetchWikipediaData(album: { artist: string, title: string 
             ];
             for (const query of queries) {
               const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json`;
-              const res = await fetch(searchUrl, { headers: { 'User-Agent': USER_AGENT } });
+              const res = await fetch(searchUrl, { headers: wikiHeaders });
               const data = await res.json();
               const results = Array.isArray(data?.query?.search) ? data.query.search : [];
               const titleToken = titleVariant.toLowerCase();
@@ -1247,7 +1265,7 @@ export async function fetchWikipediaData(album: { artist: string, title: string 
         
         // Step 2: Fetch the actual summary
         const summaryUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&pageids=${pageId}&format=json`;
-        const summaryRes = await fetch(summaryUrl, { headers: { 'User-Agent': USER_AGENT } });
+        const summaryRes = await fetch(summaryUrl, { headers: wikiHeaders });
         const summaryData = await summaryRes.json();
         const extract = summaryData.query?.pages?.[pageId]?.extract;
         
@@ -1255,7 +1273,7 @@ export async function fetchWikipediaData(album: { artist: string, title: string 
         let wikitext = '';
         try {
           const parseUrl = `https://en.wikipedia.org/w/api.php?action=parse&pageid=${pageId}&prop=wikitext&format=json`;
-          const parseRes = await fetch(parseUrl, { headers: { 'User-Agent': USER_AGENT } });
+          const parseRes = await fetch(parseUrl, { headers: wikiHeaders });
           const parseData = await parseRes.json();
           wikitext = parseData?.parse?.wikitext?.['*'] ?? '';
         } catch {
@@ -1431,6 +1449,7 @@ export async function fetchTheAudioDBData(album: { artist: string, title: string
 // ============================================================================
 export async function fetchWikidataData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
     try {
+        const wikiHeaders = await getWikimediaRequestHeaders();
         // SPARQL Query to find album by Title AND Artist Label
         const sparql = `
             SELECT ?item ?itemLabel ?date ?producerLabel WHERE {
@@ -1450,7 +1469,7 @@ export async function fetchWikidataData(album: { artist: string, title: string }
         `;
 
         const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(sparql)}&format=json`;
-        const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+        const res = await fetch(url, { headers: wikiHeaders });
         const body = await res.text();
         let data: Record<string, unknown>;
         try {
