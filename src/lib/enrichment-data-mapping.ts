@@ -234,10 +234,10 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
  */
 export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   // --- ARTWORK ---
-  'image_url': ['coverArtArchive', 'musicbrainz', 'discogs', 'spotify', 'appleMusic', 'lastfm'],
-  'back_image_url': ['coverArtArchive', 'musicbrainz', 'discogs'],
+  'image_url': ['coverArtArchive', 'musicbrainz', 'discogs', 'spotify', 'appleMusic', 'lastfm', 'theaudiodb', 'fanarttv', 'deezer'],
+  'back_image_url': ['coverArtArchive', 'musicbrainz', 'discogs', 'theaudiodb'],
   'spine_image_url': ['coverArtArchive', 'musicbrainz', 'discogs'],
-  'inner_sleeve_images': ['coverArtArchive', 'musicbrainz', 'discogs'],
+  'inner_sleeve_images': ['coverArtArchive', 'musicbrainz', 'discogs', 'theaudiodb', 'fanarttv'],
   'vinyl_label_images': ['coverArtArchive', 'musicbrainz', 'discogs'],
   
   // --- CREDITS ---
@@ -278,16 +278,16 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'mood_electronic': ['musicbrainz', 'spotify'],
   
   // --- GENRES & TAGS ---
-  'genres': ['discogs', 'spotify', 'appleMusic', 'lastfm', 'allmusic'],
-  'styles': ['discogs', 'lastfm', 'allmusic'],
+  'genres': ['discogs', 'spotify', 'appleMusic', 'lastfm', 'allmusic', 'theaudiodb', 'deezer'],
+  'styles': ['discogs', 'lastfm', 'allmusic', 'theaudiodb'],
   'tags': ['lastfm', 'discogs', 'musicbrainz'], // Generic bucket
   
   // --- METADATA ---
-  'original_release_date': ['musicbrainz', 'discogs', 'spotify', 'appleMusic'],
-  'labels': ['musicbrainz', 'discogs', 'spotify', 'appleMusic'],
+  'original_release_date': ['musicbrainz', 'discogs', 'spotify', 'appleMusic', 'theaudiodb', 'deezer'],
+  'labels': ['musicbrainz', 'discogs', 'spotify', 'appleMusic', 'theaudiodb', 'deezer'],
   'cat_no': ['musicbrainz', 'discogs'],
-  'barcode': ['musicbrainz', 'discogs'],
-  'country': ['musicbrainz', 'discogs'],
+  'barcode': ['musicbrainz', 'discogs', 'deezer'],
+  'country': ['musicbrainz', 'discogs', 'theaudiodb'],
   'recording_date': ['musicbrainz'],
   'master_release_date': ['discogs'],
   'studio': ['musicbrainz'],
@@ -306,6 +306,7 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'apple_music_editorial_notes': ['appleMusic'],
   
   // --- LINKS ---
+  'allmusic_url': ['allmusic'],
   'spotify_id': ['spotify'],
   'apple_music_id': ['appleMusic'],
   'lastfm_id': ['lastfm'],
