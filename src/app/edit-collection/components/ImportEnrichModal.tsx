@@ -1459,7 +1459,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const pendingAuditRows: EnrichmentRunLogInsert[] = [];
     
     const GLOBAL_PRIORITY = [
-      'discogs', 'musicbrainz', 'spotify', 'appleMusic', 'deezer', 
+      'discogs', 'musicbrainz', 'spotify', 'appleMusic', 'allmusic', 'deezer', 
       'rateyourmusic', 'lastfm', 'theaudiodb', 'wikipedia', 'wikidata', 
       'coverArt', 'fanarttv', 
       'genius', 'musixmatch', 
