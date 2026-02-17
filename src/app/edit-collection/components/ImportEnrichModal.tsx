@@ -122,6 +122,7 @@ interface CandidateResult {
   sourceDiagnostics?: Record<string, { status: 'returned' | 'no_data' | 'error'; reason?: string }>;
   attemptedSources?: string[];
   sourceFieldCoverage?: Record<string, string[]>;
+  scanNote?: string;
 }
 
 type FetchCandidatesResponse = {
@@ -1415,7 +1416,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     results.forEach((item) => {
       processedIds.push(item.album.id);
-      const { album, candidates, sourceDiagnostics, attemptedSources, sourceFieldCoverage } = item;
+      const { album, candidates, sourceDiagnostics, attemptedSources, sourceFieldCoverage, scanNote } = item;
       const genrePool = [
         ...(Array.isArray(album.genres) ? album.genres : []),
         ...(Array.isArray(album.styles) ? album.styles : []),
@@ -1442,6 +1443,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         .filter(k => !!fieldConfig[k]);
 
       logCheckedFieldResults(album, candidates, sourceDiagnostics, attemptedSources, sourceFieldCoverage);
+      if (scanNote) {
+        addLog(`${album.artist} - ${album.title}`, 'info', scanNote);
+      }
 
       if (!missingDataOnly && allowedSummaryKeys.length > 0) {
          const summary = allowedSummaryKeys

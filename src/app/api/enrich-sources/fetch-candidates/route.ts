@@ -205,7 +205,8 @@ export async function POST(req: Request) {
       candidates: Record<string, CandidateData>,
       sourceDiagnostics?: Record<string, { status: 'returned' | 'no_data' | 'error'; reason?: string }>,
       attemptedSources?: string[],
-      sourceFieldCoverage?: Record<string, string[]>
+      sourceFieldCoverage?: Record<string, string[]>,
+      scanNote?: string
     }[] = [];
 
     type CandidateAlbumRow = {
@@ -436,7 +437,14 @@ export async function POST(req: Request) {
           const typedAlbum = mapInventoryToCandidate(album);
 
           if (!hasMissingSelectedField(typedAlbum)) {
-            return null;
+            return {
+              album: typedAlbum,
+              candidates,
+              sourceDiagnostics: {},
+              attemptedSources: [],
+              sourceFieldCoverage: {},
+              scanNote: 'Skipped before source fetch: selected fields already populated for this album'
+            };
           }
 
           unavailableServices.forEach((source) => {
