@@ -680,7 +680,6 @@ export async function fetchMusicBrainzData(album: { artist: string, title: strin
         release?.['release-group']?.['first-release-date'] ??
         releaseGroup?.['first-release-date'] ??
         release?.date,
-      recording_date: release?.date,
       country: release?.country,
       tracks: [] // Initialize array for per-track analysis
     };
@@ -1499,8 +1498,7 @@ export async function fetchWikipediaData(album: { artist: string, title: string 
 // 10. SECONDHANDSONGS (Originals & Adaptations)
 // ============================================================================
 export async function fetchSecondHandSongsData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
-    const apiKey = process.env.SHS_API_KEY;
-    if (!apiKey) return { success: false, source: 'secondhandsongs', error: 'No API Key' };
+    const apiKey = getEnv('SHS_API_KEY');
 
     try {
         // 1. Search for the Work (Song/Album)
@@ -1517,27 +1515,40 @@ export async function fetchSecondHandSongsData(album: { artist: string, title: s
           return { res, text, parsed };
         };
 
-        // SHS expects X-API-Key. Keep Bearer fallback for compatibility.
-        let attempt = await tryRequest({
-          'X-API-Key': apiKey,
-          'Accept': 'application/json',
-          'User-Agent': USER_AGENT
-        });
-
-        if (!attempt.res.ok) {
-          attempt = await tryRequest({
+        // SHS now allows keyless usage. Try anonymous first, then key headers if configured.
+        const attempts: HeadersInit[] = [
+          {
+            'Accept': 'application/json',
+            'User-Agent': USER_AGENT
+          }
+        ];
+        if (apiKey) {
+          attempts.push({
+            'X-API-Key': apiKey,
+            'Accept': 'application/json',
+            'User-Agent': USER_AGENT
+          });
+          attempts.push({
             'Authorization': `Bearer ${apiKey}`,
             'Accept': 'application/json',
             'User-Agent': USER_AGENT
           });
         }
 
-        if (!attempt.res.ok) {
-          const snippet = attempt.text.slice(0, 120).replace(/\s+/g, ' ');
+        let attempt: Awaited<ReturnType<typeof tryRequest>> | null = null;
+        for (const headers of attempts) {
+          attempt = await tryRequest(headers);
+          if (attempt.res.ok) break;
+        }
+
+        if (!attempt || !attempt.res.ok) {
+          const status = attempt?.res.status ?? 0;
+          const text = attempt?.text ?? '';
+          const snippet = text.slice(0, 120).replace(/\s+/g, ' ');
           return {
             success: false,
             source: 'secondhandsongs',
-            error: `API ${attempt.res.status}: ${snippet || 'request failed'}`
+            error: `API ${status}: ${snippet || 'request failed'}`
           };
         }
 

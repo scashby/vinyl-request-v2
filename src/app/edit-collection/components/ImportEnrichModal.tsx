@@ -460,6 +460,16 @@ const isValidDate = (dateStr: unknown): boolean => {
   return /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
 };
 
+const normalizeOriginalReleaseDate = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^\d{4}$/.test(trimmed)) return `${trimmed}-12-25`;
+  if (/^\d{4}-\d{2}$/.test(trimmed)) return `${trimmed}-25`;
+  if (isValidDate(trimmed)) return trimmed;
+  return null;
+};
+
 type UpdateBatch = {
   inventoryUpdates: Record<string, unknown>;
   releaseUpdates: Record<string, unknown>;
@@ -572,8 +582,11 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
         releaseUpdates.release_year = coerceYear(value);
         break;
       case 'original_release_date':
-        if (isValidDate(value)) {
-          releaseUpdates.release_date = value;
+        {
+          const normalizedDate = normalizeOriginalReleaseDate(value);
+          if (normalizedDate) {
+            masterUpdates.master_release_date = normalizedDate;
+          }
           const yearMatch = String(value).match(/^(\d{4})/);
           if (yearMatch) {
             const yearNum = Number(yearMatch[1]);
@@ -791,7 +804,8 @@ const applyAlbumCreditsToRecordings = async (
           : null;
       }
       if (hasDetail('time_signature')) {
-        recordingUpdates.time_signature = toFiniteNumber(details.time_signature);
+        // recordings table does not have a time_signature column; keep in credits only.
+        void details.time_signature;
       }
 
       return Promise.resolve(
