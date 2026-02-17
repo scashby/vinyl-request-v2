@@ -1224,15 +1224,27 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     let collectedConflicts: ExtendedFieldConflict[] = [];
     let collectedSummary: {album: string, field: string, action: string}[] = [];
 
+    const getCurrentScanId = (queuedAlbumId?: number) => {
+      if (typeof queuedAlbumId === 'number' && Number.isFinite(queuedAlbumId)) {
+        return queuedAlbumId;
+      }
+      const cursorValue = Number(cursorRef.current);
+      if (Number.isFinite(cursorValue)) {
+        return Math.max(1, Math.floor(cursorValue) + 1);
+      }
+      return scanRangeRef.current.start;
+    };
+
     while ((collectedConflicts.length < targetConflicts || specificAlbumIds) && hasMoreRef.current) {
       const { start, end } = scanRangeRef.current;
       const rangeLabel = end ? `${start}-${end}` : `${start}+`;
-      setStatus(`Scanning by ID (range ${rangeLabel})... Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
 
       try {
         const queuedAlbumId = specificAlbumQueueRef.current && specificAlbumQueueRef.current.length > 0
           ? specificAlbumQueueRef.current[0]
           : undefined;
+        const currentScanId = getCurrentScanId(queuedAlbumId);
+        setStatus(`Scanning by ID (range ${rangeLabel})... Currently scanning ID: ${currentScanId}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
         const payload = {
           albumIds: queuedAlbumId ? [queuedAlbumId] : undefined,
           limit: queuedAlbumId ? undefined : 1,
@@ -1313,7 +1325,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               }
 
               const delay = Math.min(500 * 2 ** (attempt - 1), 4000);
-              setStatus(`Network interruption during scan. Retrying (${attempt}/${maxAttempts})...`);
+              setStatus(`Network interruption during scan. Retrying (${attempt}/${maxAttempts})... Currently scanning ID: ${currentScanId}.`);
               addLog(
                 'System',
                 'info',
@@ -1351,7 +1363,12 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const lastCheckedLabel = lastCheckedAlbum
           ? `${lastCheckedAlbum.artist} - ${lastCheckedAlbum.title} (#${lastCheckedAlbum.id})`
           : (result.processedCount ? `No matches in last batch (${result.processedCount} checked)` : 'No matches in last batch');
-        setStatus(`Scanning by ID. Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
+        const nextScanId = getCurrentScanId(
+          specificAlbumQueueRef.current && specificAlbumQueueRef.current.length > 0
+            ? specificAlbumQueueRef.current[0]
+            : undefined
+        );
+        setStatus(`Scanning by ID. Currently scanning ID: ${nextScanId}. Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
 
         if (result.processedCount > candidates.length) {
           // This is fine, logs empty results if any
@@ -1374,7 +1391,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             collectedSummary = [...collectedSummary, ...batchSummaryItems];
         }
         if (batchConflicts.length > 0) {
-          setStatus(`Scanning by ID. Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
+          setStatus(`Scanning by ID. Currently scanning ID: ${nextScanId}. Last checked: ${lastCheckedLabel}. Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
         }
 
       } catch (error) {
