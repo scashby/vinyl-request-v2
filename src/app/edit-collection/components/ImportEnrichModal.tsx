@@ -369,7 +369,7 @@ const isFieldMissingOnAlbum = (album: Record<string, unknown>, field: string): b
     return isEmptyValue(album.release_notes) && isEmptyValue(album.notes);
   }
   if (field === 'original_release_date') {
-    return isEmptyValue(album.original_release_date) && isEmptyValue(album.year);
+    return isEmptyValue(album.master_release_date);
   }
 
   const rootField = field.split('.')[0];
@@ -1632,8 +1632,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
             let newVal = value;
             if (key === 'original_release_date' && typeof newVal === 'string') {
-                 if (/^\d{4}$/.test(newVal)) newVal = `${newVal}-01-01`;
-                 if (!isValidDate(newVal)) return;
+                 const normalizedDate = normalizeOriginalReleaseDate(newVal);
+                 if (!normalizedDate) return;
+                 newVal = normalizedDate;
             }
             
             if (newVal !== null && newVal !== undefined && newVal !== '') {

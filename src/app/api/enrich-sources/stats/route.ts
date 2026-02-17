@@ -28,6 +28,7 @@ type MasterRow = {
   discogs_master_id?: string | null;
   musicbrainz_release_group_id?: string | null;
   original_release_year?: number | null;
+  master_release_date?: string | null;
   recording_date?: string | null;
   musicians?: string[] | null;
   producers?: string[] | null;
@@ -103,6 +104,7 @@ export async function GET(request: Request) {
               discogs_master_id,
               musicbrainz_release_group_id,
               original_release_year,
+              master_release_date,
               recording_date,
               musicians,
               producers,
@@ -342,7 +344,7 @@ export async function GET(request: Request) {
       if (!hasSpotify) missingSpotify++;
       if (!hasApple) missingAppleMusic++;
 
-      const hasOriginalDate = !!master?.original_release_year || !!release?.release_year;
+      const hasOriginalDate = !!master?.master_release_date;
       const hasBarcode = !!release?.barcode;
       const hasLabel = !!release?.label;
       const hasCatalogNumber = !!release?.catalog_number;
