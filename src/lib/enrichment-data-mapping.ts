@@ -40,6 +40,10 @@ export type EnrichmentService =
   | 'fanarttv'
   | 'deezer'
   | 'musixmatch'
+  | 'lrclib'
+  | 'lyricsovh'
+  | 'ksoft'
+  | 'onemusicapi'
   | 'popsike'
   | 'pitchfork';
 
@@ -72,7 +76,7 @@ export const DATA_TO_SERVICES: Record<DataCategory, EnrichmentService[]> = {
   // NOTE: billboard is not implemented in the current fetch pipeline.
   chart_data: ['wikipedia', 'rateyourmusic', 'wikidata'],
   release_metadata: ['musicbrainz', 'discogs', 'spotify', 'appleMusic', 'wikipedia', 'wikidata', 'popsike'],
-  lyrics: ['genius'],
+  lyrics: ['genius', 'lrclib', 'lyricsovh', 'ksoft', 'onemusicapi'],
   similar_albums: ['lastfm'],
   cultural_context: ['wikipedia', 'wikidata', 'appleMusic'],
 };
@@ -108,7 +112,7 @@ export const DATA_CATEGORY_DESCRIPTIONS: Record<DataCategory, string> = {
   reviews: 'Professional reviews, ratings, playcounts, popularity scores, and editorial notes',
   chart_data: 'Chart positions, sales certifications (Gold/Platinum/Diamond), and awards',
   release_metadata: 'Labels, catalog numbers, barcodes, countries, release dates, release notes, and companies',
-  lyrics: 'Song lyrics and URLs via Genius with LRCLIB/lyrics.ovh/KSoft/OneMusic fallback',
+  lyrics: 'Song lyrics and lyrics URLs',
   similar_albums: 'Algorithmically generated similar album recommendations',
   cultural_context: 'Historical significance, cultural impact, and master-level notes from Wikipedia',
 };
@@ -307,8 +311,8 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'genius_url': ['genius'],
 
   // --- LYRICS ---
-  'tracks.lyrics': ['genius'],
-  'tracks.lyrics_url': ['genius'],
+  'tracks.lyrics': ['genius', 'lrclib', 'lyricsovh', 'ksoft', 'onemusicapi'],
+  'tracks.lyrics_url': ['genius', 'lrclib', 'lyricsovh', 'ksoft', 'onemusicapi'],
 
   // --- SIMILAR ALBUMS ---
   'lastfm_similar_albums': ['lastfm'],
@@ -333,7 +337,7 @@ export const SERVICE_DISPLAY_NAMES: Record<EnrichmentService, string> = {
   appleMusic: 'Apple Music',
   wikipedia: 'Wikipedia',
   discogs: 'Discogs',
-  genius: 'Genius + Lyrics Fallbacks',
+  genius: 'Genius',
   secondhandsongs: 'SecondHandSongs',
   theaudiodb: 'TheAudioDB',
   rateyourmusic: 'Rate Your Music',
@@ -342,6 +346,10 @@ export const SERVICE_DISPLAY_NAMES: Record<EnrichmentService, string> = {
   fanarttv: 'Fanart.tv',
   deezer: 'Deezer',
   musixmatch: 'Musixmatch',
+  lrclib: 'LRCLIB',
+  lyricsovh: 'Lyrics.ovh',
+  ksoft: 'KSoft',
+  onemusicapi: 'OneMusicAPI',
   popsike: 'Popsike',
   pitchfork: 'Pitchfork'
 };
@@ -367,6 +375,10 @@ export const SERVICE_ICONS: Record<EnrichmentService, string> = {
   fanarttv: '🎨',
   deezer: '⚡',
   musixmatch: '🎤',
+  lrclib: '🎼',
+  lyricsovh: '📄',
+  ksoft: '🧩',
+  onemusicapi: '🎶',
   popsike: '💲',
   pitchfork: '⚡'
 };

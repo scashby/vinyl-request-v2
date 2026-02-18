@@ -164,9 +164,15 @@ const SERVICE_FLAG_TO_ID: Record<string, string> = {
   fanarttv: 'fanarttv',
   deezer: 'deezer',
   musixmatch: 'musixmatch',
+  lrclib: 'lrclib',
+  lyricsovh: 'lyricsovh',
+  ksoft: 'ksoft',
+  onemusicapi: 'onemusicapi',
   popsike: 'popsike',
   pitchfork: 'pitchfork',
 };
+
+const LYRICS_SERVICE_IDS = ['genius', 'lrclib', 'lyricsovh', 'ksoft', 'onemusicapi'] as const;
 
 const normalizeSourceForLog = (source: string): string => {
   if (source === 'coverArt') return 'coverArtArchive';
@@ -234,6 +240,10 @@ function getServicesForSelectionFromConfig(config: FieldConfigMap) {
     fanarttv: activeServices.has('fanarttv'),
     deezer: activeServices.has('deezer'),
     musixmatch: activeServices.has('musixmatch'),
+    lrclib: activeServices.has('lrclib'),
+    lyricsovh: activeServices.has('lyricsovh'),
+    ksoft: activeServices.has('ksoft'),
+    onemusicapi: activeServices.has('onemusicapi'),
     popsike: activeServices.has('popsike'),
     pitchfork: activeServices.has('pitchfork'),
   };
@@ -1574,7 +1584,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       setCurrentRunId(runId);
     }
     const wantsLyrics = !!activeFieldConfig['tracks.lyrics'] || !!activeFieldConfig['tracks.lyrics_url'];
-    const runGeniusLyrics = wantsLyrics && activeServices.genius;
+    const selectedLyricsProviders = LYRICS_SERVICE_IDS.filter((service) => !!activeServices[service]);
+    const runLyricsEnrichment = wantsLyrics && selectedLyricsProviders.length > 0;
 
     const albumIds = results.map(r => r.album.id);
     const { data: resolutions, error: resError } = await supabase
@@ -1701,7 +1712,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         return;
       }
 
-      if (runGeniusLyrics && Array.isArray(album.tracks) && album.tracks.length > 0) {
+      if (runLyricsEnrichment && Array.isArray(album.tracks) && album.tracks.length > 0) {
         lyricJobs.push({
           albumId: album.id,
           artist: album.artist,
@@ -2156,16 +2167,21 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       await persistEnrichmentRunLogs(finalizedRows);
     }
 
-    if (runGeniusLyrics && lyricJobs.length > 0) {
+    if (runLyricsEnrichment && lyricJobs.length > 0) {
       const lyricResults = await Promise.all(lyricJobs.map(async (job) => {
         try {
           const res = await fetch('/api/enrich-sources/genius', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ albumId: job.albumId })
+            body: JSON.stringify({ albumId: job.albumId, providers: selectedLyricsProviders })
           });
           const data = await res.json();
           if (data?.success) {
+            const providerList = Array.isArray(data.data?.activeProviders)
+              ? (data.data.activeProviders as unknown[])
+                  .map((value) => String(value ?? '').trim())
+                  .filter((value) => value.length > 0)
+              : [];
             const totalTracks = Number(data.data?.totalTracks ?? 0);
             const enrichedCount = Number(data.data?.enrichedCount ?? 0);
             const failedCount = Number(data.data?.failedCount ?? 0);
@@ -2197,6 +2213,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             const updatesApplied = enrichedCount + syncedCount;
             if (updatesApplied > 0) {
               const detailExtras = [
+                providerList.length > 0 ? `providers: ${providerList.join(', ')}` : null,
                 attemptedCount > 0 ? `attempted: ${attemptedCount}` : null,
                 failedLabel,
                 failureSummaryLabel
@@ -2209,7 +2226,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               const titleSuffix = failedTitles.length > 0
                 ? `: ${failedTitles.join(', ')}${failedCount > failedTitles.length ? ', ...' : ''}`
                 : '';
-              const detailExtras = [failedLabel, failureSummaryLabel].filter((value): value is string => !!value);
+              const detailExtras = [
+                providerList.length > 0 ? `providers: ${providerList.join(', ')}` : null,
+                failedLabel,
+                failureSummaryLabel
+              ].filter((value): value is string => !!value);
               const detail = detailExtras.length > 0
                 ? `Failed to update lyrics for ${failedCount} track(s)${titleSuffix} (${detailExtras.join('; ')})`
                 : `Failed to update lyrics for ${failedCount} track(s)${titleSuffix}`;
@@ -3048,7 +3069,6 @@ function DataCategoryCard({
   onToggleFieldSource: (f: string, s: string) => void;
   disabled: boolean; 
 }) {
-  const LYRICS_PROVIDER_CHAIN = ['genius', 'lrclib', 'lyrics.ovh', 'ksoft', 'onemusicapi'];
   const fields = DATA_CATEGORY_CHECK_FIELDS[category] || [];
   const validFields = fields.filter(f => ALLOWED_COLUMNS.has(f) && !NON_ENRICHABLE_FIELDS.has(f));
   const selectableFields = validFields.filter((field) => !NON_ENRICHABLE_FIELDS.has(field));
@@ -3170,7 +3190,6 @@ function DataCategoryCard({
             const isEnabled = !!fieldConfig[field];
             const activeSources = fieldConfig[field] || new Set();
             const services = FIELD_TO_SERVICES[field] || [];
-            const showLyricsProviderChain = field === 'tracks.lyrics' || field === 'tracks.lyrics_url';
             const missing = getMissing(field);
             const badgeText = isUnsupported ? 'N/A' : String(missing);
             const badgeClass = isUnsupported
@@ -3229,20 +3248,6 @@ function DataCategoryCard({
                               </label>
                            );
                         })}
-                        {showLyricsProviderChain && (
-                          <>
-                            <span className="text-[10px] text-gray-500 ml-1">via</span>
-                            {LYRICS_PROVIDER_CHAIN.filter((provider) => provider !== 'genius').map((provider) => (
-                              <span
-                                key={provider}
-                                className="inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] bg-gray-100 border-gray-200 text-gray-600"
-                                title={`Lyrics fallback provider: ${provider}`}
-                              >
-                                {provider}
-                              </span>
-                            ))}
-                          </>
-                        )}
                      </div>
                   )}
                </div>
