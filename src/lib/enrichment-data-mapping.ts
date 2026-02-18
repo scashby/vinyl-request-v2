@@ -72,7 +72,7 @@ export const DATA_TO_SERVICES: Record<DataCategory, EnrichmentService[]> = {
   // NOTE: billboard is not implemented in the current fetch pipeline.
   chart_data: ['wikipedia', 'rateyourmusic', 'wikidata'],
   release_metadata: ['musicbrainz', 'discogs', 'spotify', 'appleMusic', 'wikipedia', 'wikidata', 'popsike'],
-  lyrics: ['genius', 'musixmatch'],
+  lyrics: ['genius'],
   similar_albums: ['lastfm'],
   cultural_context: ['wikipedia', 'wikidata', 'appleMusic'],
 };
@@ -108,7 +108,7 @@ export const DATA_CATEGORY_DESCRIPTIONS: Record<DataCategory, string> = {
   reviews: 'Professional reviews, ratings, playcounts, popularity scores, and editorial notes',
   chart_data: 'Chart positions, sales certifications (Gold/Platinum/Diamond), and awards',
   release_metadata: 'Labels, catalog numbers, barcodes, countries, release dates, release notes, and companies',
-  lyrics: 'Song lyrics and Genius annotations with URLs',
+  lyrics: 'Song lyrics and URLs via Genius with LRCLIB/lyrics.ovh/KSoft/OneMusic fallback',
   similar_albums: 'Algorithmically generated similar album recommendations',
   cultural_context: 'Historical significance, cultural impact, and master-level notes from Wikipedia',
 };
@@ -333,7 +333,7 @@ export const SERVICE_DISPLAY_NAMES: Record<EnrichmentService, string> = {
   appleMusic: 'Apple Music',
   wikipedia: 'Wikipedia',
   discogs: 'Discogs',
-  genius: 'Genius',
+  genius: 'Genius + Lyrics Fallbacks',
   secondhandsongs: 'SecondHandSongs',
   theaudiodb: 'TheAudioDB',
   rateyourmusic: 'Rate Your Music',

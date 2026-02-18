@@ -3048,6 +3048,7 @@ function DataCategoryCard({
   onToggleFieldSource: (f: string, s: string) => void;
   disabled: boolean; 
 }) {
+  const LYRICS_PROVIDER_CHAIN = ['genius', 'lrclib', 'lyrics.ovh', 'ksoft', 'onemusicapi'];
   const fields = DATA_CATEGORY_CHECK_FIELDS[category] || [];
   const validFields = fields.filter(f => ALLOWED_COLUMNS.has(f) && !NON_ENRICHABLE_FIELDS.has(f));
   const selectableFields = validFields.filter((field) => !NON_ENRICHABLE_FIELDS.has(field));
@@ -3169,6 +3170,7 @@ function DataCategoryCard({
             const isEnabled = !!fieldConfig[field];
             const activeSources = fieldConfig[field] || new Set();
             const services = FIELD_TO_SERVICES[field] || [];
+            const showLyricsProviderChain = field === 'tracks.lyrics' || field === 'tracks.lyrics_url';
             const missing = getMissing(field);
             const badgeText = isUnsupported ? 'N/A' : String(missing);
             const badgeClass = isUnsupported
@@ -3223,10 +3225,24 @@ function DataCategoryCard({
                                     className="hidden"
                                  />
                                  <span>{SERVICE_ICONS[srv as EnrichmentService]}</span>
-                                 <span className="ml-1">{srv}</span>
+                                 <span className="ml-1">{SERVICE_DISPLAY_NAMES[srv as EnrichmentService] || srv}</span>
                               </label>
                            );
                         })}
+                        {showLyricsProviderChain && (
+                          <>
+                            <span className="text-[10px] text-gray-500 ml-1">via</span>
+                            {LYRICS_PROVIDER_CHAIN.filter((provider) => provider !== 'genius').map((provider) => (
+                              <span
+                                key={provider}
+                                className="inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] bg-gray-100 border-gray-200 text-gray-600"
+                                title={`Lyrics fallback provider: ${provider}`}
+                              >
+                                {provider}
+                              </span>
+                            ))}
+                          </>
+                        )}
                      </div>
                   )}
                </div>
