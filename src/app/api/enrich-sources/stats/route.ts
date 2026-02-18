@@ -70,19 +70,7 @@ export async function GET(request: Request) {
   const supabase = supabaseServer(getAuthHeader(request));
 
   try {
-    // 1. Fetch Albums (paginate to avoid Supabase 1000-row default cap)
-    const albums: Array<{
-      id: string | number;
-      release?: ReleaseRow | ReleaseRow[] | null;
-    }> = [];
-    const batchSize = 1000;
-    let from = 0;
-    let done = false;
-
-    while (!done) {
-      const { data: batch, error } = await supabase
-        .from('inventory')
-        .select(`
+    const baseSelect = `
           id,
           release:releases (
             id,
@@ -136,18 +124,97 @@ export async function GET(request: Request) {
               )
             )
           )
-        `)
-        .range(from, from + batchSize - 1);
+        `;
 
-      if (error) throw error;
-      if (!batch || batch.length === 0) break;
+    // Fallback select for environments where some optional columns/relations are not yet present.
+    const fallbackSelect = `
+          id,
+          release:releases (
+            id,
+            barcode,
+            label,
+            catalog_number,
+            country,
+            notes,
+            studio,
+            disc_metadata,
+            release_year,
+            discogs_release_id,
+            spotify_album_id,
+            master:masters (
+              id,
+              cover_image_url,
+              genres,
+              styles,
+              discogs_master_id,
+              musicbrainz_release_group_id,
+              original_release_year,
+              master_release_date,
+              recording_date,
+              musicians,
+              producers,
+              engineers,
+              songwriters,
+              notes,
+              wikipedia_url,
+              apple_music_url,
+              lastfm_url
+            ),
+            release_tracks:release_tracks (
+              recording:recordings (
+                duration_seconds,
+                credits,
+                lyrics,
+                lyrics_url
+              )
+            )
+          )
+        `;
 
-      albums.push(...batch);
-      if (batch.length < batchSize) {
-        done = true;
-      } else {
-        from += batchSize;
+    const fetchAlbumsPaginated = async (selectClause: string) => {
+      const rows: Array<{
+        id: string | number;
+        release?: ReleaseRow | ReleaseRow[] | null;
+      }> = [];
+      const batchSize = 1000;
+      let from = 0;
+      let done = false;
+
+      while (!done) {
+        const { data: batch, error } = await supabase
+          .from('inventory')
+          .select(selectClause)
+          .range(from, from + batchSize - 1);
+
+        if (error) throw error;
+        const typedBatch = ((batch ?? []) as unknown) as Array<{
+          id: string | number;
+          release?: ReleaseRow | ReleaseRow[] | null;
+        }>;
+        if (typedBatch.length === 0) break;
+
+        rows.push(...typedBatch);
+        if (typedBatch.length < batchSize) {
+          done = true;
+        } else {
+          from += batchSize;
+        }
       }
+
+      return rows;
+    };
+
+    let albums: Array<{
+      id: string | number;
+      release?: ReleaseRow | ReleaseRow[] | null;
+    }> = [];
+
+    try {
+      albums = await fetchAlbumsPaginated(baseSelect);
+    } catch (primaryError) {
+      const message = primaryError instanceof Error ? primaryError.message : String(primaryError);
+      console.warn('Stats primary query failed; retrying with fallback select.', message);
+      albums = await fetchAlbumsPaginated(fallbackSelect);
     }
 
     if (albums.length === 0) return NextResponse.json({ success: true, stats: null });
