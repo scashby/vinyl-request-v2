@@ -2,6 +2,8 @@
 import { NextResponse } from "next/server";
 import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 const GENIUS_TOKEN = process.env.GENIUS_API_TOKEN;
+const KSOFT_API_KEY = process.env.KSOFT_API_KEY || process.env.KSOFT_API_TOKEN || '';
+const ONEMUSIC_API_KEY = process.env.ONEMUSIC_API_KEY || process.env.ONE_MUSIC_API_KEY || '';
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
@@ -11,6 +13,7 @@ type Track = {
   title?: string;
   recording_id?: number | null;
   lyrics_url?: string | null;
+  lyrics?: string | null;
   track_artist?: string | null;
   credits?: Record<string, unknown> | null;
 };
@@ -185,6 +188,107 @@ async function searchLrcLibLyrics(albumArtist: string, trackTitle: string): Prom
   return apiUrl;
 }
 
+type LyricsLookupResult = {
+  lyricsUrl?: string | null;
+  lyricsText?: string | null;
+  source: string;
+};
+
+const cleanLyricsText = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  return text.length > 0 ? text : null;
+};
+
+async function searchLrcLib(albumArtist: string, trackTitle: string): Promise<LyricsLookupResult | null> {
+  const cleanTitle = simplifyTrackTitle(trackTitle);
+  const params = new URLSearchParams({
+    track_name: cleanTitle || trackTitle,
+    artist_name: albumArtist
+  });
+  const apiUrl = `https://lrclib.net/api/search?${params.toString()}`;
+  const res = await fetch(apiUrl, {
+    headers: { 'User-Agent': 'DeadWaxDialogues/1.0 (+lyrics enrichment)' }
+  });
+  if (!res.ok) throw new Error(`LRCLIB returned ${res.status}`);
+  const data = await res.json();
+  const entries = Array.isArray(data) ? data : [];
+  if (entries.length === 0) return null;
+
+  const normArtist = normalizeForMatch(albumArtist);
+  const normTrack = normalizeForMatch(cleanTitle || trackTitle);
+  const best = entries.find((entry: Record<string, unknown>) => {
+    const entryArtist = normalizeForMatch(String(entry.artistName ?? ''));
+    const entryTrack = normalizeForMatch(String(entry.trackName ?? ''));
+    const artistMatch = entryArtist === normArtist || entryArtist.includes(normArtist) || normArtist.includes(entryArtist);
+    const trackMatch = entryTrack === normTrack || entryTrack.includes(normTrack) || normTrack.includes(entryTrack);
+    return artistMatch && trackMatch;
+  }) || entries[0];
+
+  const bestObj = (best && typeof best === 'object') ? best as Record<string, unknown> : {};
+  const plain = cleanLyricsText(bestObj.plainLyrics);
+  const synced = cleanLyricsText(bestObj.syncedLyrics);
+  const lyricsText = plain || synced;
+  const bestId = bestObj.id;
+  const lyricsUrl = (typeof bestId === 'number' || typeof bestId === 'string')
+    ? `https://lrclib.net/api/get/${bestId}`
+    : apiUrl;
+
+  return { source: 'lrclib', lyricsUrl, lyricsText };
+}
+
+async function searchLyricsOvh(albumArtist: string, trackTitle: string): Promise<LyricsLookupResult | null> {
+  const artist = albumArtist.trim();
+  const title = simplifyTrackTitle(trackTitle) || trackTitle;
+  const url = `https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`;
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'DeadWaxDialogues/1.0 (+lyrics enrichment)' }
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`lyrics.ovh returned ${res.status}`);
+  const data = await res.json();
+  const lyricsText = cleanLyricsText(data?.lyrics);
+  if (!lyricsText) return null;
+  return { source: 'lyricsovh', lyricsUrl: null, lyricsText };
+}
+
+async function searchKSoftLyrics(albumArtist: string, trackTitle: string): Promise<LyricsLookupResult | null> {
+  if (!KSOFT_API_KEY) return null;
+  const query = encodeURIComponent(`${albumArtist} ${simplifyTrackTitle(trackTitle) || trackTitle}`);
+  const url = `https://api.ksoft.si/lyrics/search?q=${query}`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${KSOFT_API_KEY}`,
+      'User-Agent': 'DeadWaxDialogues/1.0 (+lyrics enrichment)'
+    }
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`KSoft returned ${res.status}`);
+  const data = await res.json();
+  const payload = Array.isArray(data?.data) ? data.data[0] : (data?.data || data);
+  const lyricsText = cleanLyricsText(payload?.lyrics || payload?.text);
+  const lyricsUrl = cleanLyricsText(payload?.url || payload?.source || payload?.link);
+  if (!lyricsText) return null;
+  return { source: 'ksoft', lyricsUrl, lyricsText };
+}
+
+async function searchOneMusicLyrics(albumArtist: string, trackTitle: string): Promise<LyricsLookupResult | null> {
+  if (!ONEMUSIC_API_KEY) return null;
+  const query = encodeURIComponent(`${albumArtist} ${simplifyTrackTitle(trackTitle) || trackTitle}`);
+  const url = `http://api.onemusicapi.com/lyric/?apikey=${encodeURIComponent(ONEMUSIC_API_KEY)}&q=${query}`;
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'DeadWaxDialogues/1.0 (+lyrics enrichment)' }
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`OneMusicAPI returned ${res.status}`);
+  const data = await res.json();
+  const payload = Array.isArray(data) ? data[0] : (data?.result || data?.data || data);
+  const lyricsText = cleanLyricsText(payload?.lyrics || payload?.text);
+  const lyricsUrl = cleanLyricsText(payload?.url || payload?.source || payload?.link);
+  if (!lyricsText) return null;
+  return { source: 'onemusicapi', lyricsUrl, lyricsText };
+}
+
 export async function POST(req: Request) {
   const supabase = supabaseServer(getAuthHeader(req));
   try {
@@ -220,7 +324,8 @@ export async function POST(req: Request) {
               title,
               track_artist,
               credits,
-              lyrics_url
+              lyrics_url,
+              lyrics
             )
           )
         )
@@ -250,6 +355,7 @@ export async function POST(req: Request) {
         title: track.title_override || recording?.title || '',
         recording_id: track.recording_id ?? recording?.id ?? null,
         lyrics_url: recording?.lyrics_url ?? null,
+        lyrics: recording?.lyrics ?? null,
         track_artist: recording?.track_artist ?? null,
         credits: normalizeCredits(recording?.credits ?? null)
       };
@@ -292,8 +398,10 @@ export async function POST(req: Request) {
         continue;
       }
 
-      if (track.credits?.lyrics_url) {
-        console.log(`    ⏭️ Skipping: Already has lyrics URL`);
+      const existingLyricsUrl = cleanLyricsText(track.lyrics_url) || cleanLyricsText(track.credits?.lyrics_url);
+      const existingLyricsText = cleanLyricsText(track.lyrics) || cleanLyricsText(track.credits?.lyrics);
+      if (existingLyricsUrl && existingLyricsText) {
+        console.log(`    ⏭️ Skipping: Already has lyrics + lyrics URL`);
         enrichedTracks.push(track);
         skippedCount++;
         skippedExistingCount++;
@@ -302,43 +410,91 @@ export async function POST(req: Request) {
 
       try {
         attemptedCount++;
-        let lyricsUrl: string | null = null;
-        let lyricsSource = 'genius';
+        let lyricsUrl: string | null = existingLyricsUrl ?? null;
+        let lyricsText: string | null = existingLyricsText ?? null;
+        let lyricsSource = cleanLyricsText(track.credits?.lyrics_source) || 'unknown';
         const providerErrors: string[] = [];
         const titleVariants = buildTitleVariants(track.title);
         const artistVariants = buildArtistVariants(artistName, track.track_artist);
 
         for (const artistVariant of artistVariants) {
-          if (lyricsUrl) break;
+          if (lyricsUrl && lyricsText) break;
           for (const titleVariant of titleVariants) {
-            if (lyricsUrl) break;
-            try {
-              lyricsUrl = await searchLyrics(artistVariant, titleVariant);
-            } catch (geniusError) {
-              providerErrors.push(geniusError instanceof Error ? `Genius: ${geniusError.message}` : 'Genius: Unknown error');
-            }
+            if (lyricsUrl && lyricsText) break;
 
             if (!lyricsUrl) {
               try {
-                const lrcLibUrl = await searchLrcLibLyrics(artistVariant, titleVariant);
-                if (lrcLibUrl) {
-                  lyricsUrl = lrcLibUrl;
-                  lyricsSource = 'lrclib';
+                const geniusUrl = await searchLyrics(artistVariant, titleVariant);
+                if (geniusUrl) {
+                  lyricsUrl = geniusUrl;
+                  lyricsSource = 'genius';
+                }
+              } catch (geniusError) {
+                providerErrors.push(geniusError instanceof Error ? `Genius: ${geniusError.message}` : 'Genius: Unknown error');
+              }
+            }
+
+            if (!lyricsText || !lyricsUrl) {
+              try {
+                const lrc = await searchLrcLib(artistVariant, titleVariant);
+                if (lrc) {
+                  if (!lyricsUrl && lrc.lyricsUrl) lyricsUrl = lrc.lyricsUrl;
+                  if (!lyricsText && lrc.lyricsText) lyricsText = lrc.lyricsText;
+                  lyricsSource = lrc.source;
                 }
               } catch (lrcError) {
                 providerErrors.push(lrcError instanceof Error ? `LRCLIB: ${lrcError.message}` : 'LRCLIB: Unknown error');
               }
             }
+
+            if (!lyricsText) {
+              try {
+                const ovh = await searchLyricsOvh(artistVariant, titleVariant);
+                if (ovh?.lyricsText) {
+                  lyricsText = ovh.lyricsText;
+                  lyricsSource = ovh.source;
+                }
+              } catch (ovhError) {
+                providerErrors.push(ovhError instanceof Error ? `lyrics.ovh: ${ovhError.message}` : 'lyrics.ovh: Unknown error');
+              }
+            }
+
+            if (!lyricsText) {
+              try {
+                const ksoft = await searchKSoftLyrics(artistVariant, titleVariant);
+                if (ksoft?.lyricsText) {
+                  lyricsText = ksoft.lyricsText;
+                  if (ksoft.lyricsUrl && !lyricsUrl) lyricsUrl = ksoft.lyricsUrl;
+                  lyricsSource = ksoft.source;
+                }
+              } catch (ksoftError) {
+                providerErrors.push(ksoftError instanceof Error ? `KSoft: ${ksoftError.message}` : 'KSoft: Unknown error');
+              }
+            }
+
+            if (!lyricsText) {
+              try {
+                const oneMusic = await searchOneMusicLyrics(artistVariant, titleVariant);
+                if (oneMusic?.lyricsText) {
+                  lyricsText = oneMusic.lyricsText;
+                  if (oneMusic.lyricsUrl && !lyricsUrl) lyricsUrl = oneMusic.lyricsUrl;
+                  lyricsSource = oneMusic.source;
+                }
+              } catch (oneMusicError) {
+                providerErrors.push(oneMusicError instanceof Error ? `OneMusicAPI: ${oneMusicError.message}` : 'OneMusicAPI: Unknown error');
+              }
+            }
           }
         }
 
-        if (lyricsUrl) {
-          console.log(`    ✅ Found validated lyrics URL (${lyricsSource})`);
+        if (lyricsUrl || lyricsText) {
+          console.log(`    ✅ Found lyrics data (${lyricsSource})`);
           enrichedTracks.push({
             ...track,
             credits: {
               ...track.credits,
-              lyrics_url: lyricsUrl,
+              ...(lyricsUrl ? { lyrics_url: lyricsUrl } : {}),
+              ...(lyricsText ? { lyrics: lyricsText } : {}),
               lyrics_source: lyricsSource
             }
           });
@@ -346,14 +502,15 @@ export async function POST(req: Request) {
           enrichedTracksList.push({
             position: track.position || '',
             title: track.title,
-            lyrics_url: lyricsUrl,
+            ...(lyricsUrl ? { lyrics_url: lyricsUrl } : {}),
+            ...(lyricsText ? { lyrics: '[text]' } : {}),
             source: lyricsSource
           });
         } else {
           console.log(`    ❌ No validated match found`);
           const failureReason = providerErrors.length > 0
             ? providerErrors.join(' | ')
-            : 'No validated match found (Genius + LRCLIB)';
+            : 'No validated match found (Genius + LRCLIB + lyrics.ovh + KSoft + OneMusicAPI)';
           enrichedTracks.push(track);
           const nextCredits = {
             ...(track.credits || {}),
@@ -398,20 +555,23 @@ export async function POST(req: Request) {
       return acc;
     }, {});
 
-    const tracksWithLyricsUrl = enrichedTracks.filter(
-      (track) => track.recording_id && (track.credits?.lyrics_url || track.credits?.lyrics_last_attempt_at)
+    const tracksWithLyricsUpdates = enrichedTracks.filter(
+      (track) => track.recording_id && (track.credits?.lyrics_url || track.credits?.lyrics || track.credits?.lyrics_last_attempt_at)
     );
 
-    if (tracksWithLyricsUrl.length > 0) {
+    if (tracksWithLyricsUpdates.length > 0) {
       console.log(`💾 Updating database...`);
-      for (const track of tracksWithLyricsUrl) {
+      for (const track of tracksWithLyricsUpdates) {
         const nextLyricsUrl = track.credits?.lyrics_url ? String(track.credits.lyrics_url) : null;
-        const wasMissingColumn = !track.lyrics_url || String(track.lyrics_url).trim().length === 0;
+        const nextLyricsText = track.credits?.lyrics ? String(track.credits.lyrics) : null;
         const updatePayload: Record<string, unknown> = {
           credits: track.credits as unknown as import('types/supabase').Json
         };
         if (nextLyricsUrl) {
           updatePayload.lyrics_url = nextLyricsUrl;
+        }
+        if (nextLyricsText) {
+          updatePayload.lyrics = nextLyricsText;
         }
         const { error: updateError } = await supabase
           .from('recordings')
@@ -430,9 +590,6 @@ export async function POST(req: Request) {
               enrichedCount
             }
           }, { status: 500 });
-        }
-        if (wasMissingColumn) {
-          syncedCount++;
         }
       }
       console.log(`✅ Database updated successfully`);

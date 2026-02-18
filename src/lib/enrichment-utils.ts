@@ -192,6 +192,22 @@ const getWikimediaRequestHeaders = async (): Promise<HeadersInit> => {
 const truncateText = (text: string, max = 1400) =>
   text.length > max ? `${text.slice(0, max).trim()}…` : text;
 
+const normalizeLooseDate = (value: string): string | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^\d{4}$/.test(trimmed)) return `${trimmed}-12-25`;
+  if (/^\d{4}-\d{2}$/.test(trimmed)) return `${trimmed}-25`;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const match = trimmed.match(/\b(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?\b/);
+  if (!match) return null;
+  const year = match[1];
+  const month = match[2];
+  const day = match[3];
+  if (!month) return `${year}-12-25`;
+  if (!day) return `${year}-${month}-25`;
+  return `${year}-${month}-${day}`;
+};
+
 const buildTitleVariants = (title: string): string[] => {
   const clean = (value: string) => value.replace(/\s+/g, ' ').trim();
   const base = clean(title);
@@ -950,6 +966,50 @@ async function spGetToken(): Promise<string> {
 
 const KEY_MAP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
+async function spFetchJson(
+  url: string,
+  token: string,
+  context: string,
+  maxAttempts = 3
+): Promise<{ ok: true; data: any } | { ok: false; status: number; text: string; data: any | null }> {
+  let lastStatus = 0;
+  let lastText = '';
+  let lastData: any | null = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const { json, text } = await readJsonResponse(res);
+
+    if (res.ok) {
+      return { ok: true, data: json };
+    }
+
+    lastStatus = res.status;
+    lastText = text;
+    lastData = json;
+
+    if (res.status === 429 && attempt < maxAttempts) {
+      const retryAfterRaw = Number(res.headers.get('retry-after') ?? '1');
+      const retryAfterSec = Number.isFinite(retryAfterRaw) && retryAfterRaw > 0 ? retryAfterRaw : 1;
+      // Cap waits so a full run can continue making progress.
+      const waitMs = Math.min(retryAfterSec, 20) * 1000;
+      await sleep(waitMs);
+      continue;
+    }
+
+    if (res.status >= 500 && attempt < maxAttempts) {
+      await sleep(500 * attempt);
+      continue;
+    }
+
+    break;
+  }
+
+  return { ok: false, status: lastStatus, text: lastText, data: lastData ?? null };
+}
+
 export async function fetchSpotifyData(album: { artist: string, title: string, spotify_id?: string }): Promise<EnrichmentResult> {
   try {
     const token = await spGetToken();
@@ -962,18 +1022,17 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
         if (spId) break;
         for (const titleVariant of titleVariants) {
           const q = `album:${titleVariant} artist:${artistVariant}`;
-          const searchRes = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=album&limit=1`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const { json: searchData, text: searchText } = await readJsonResponse(searchRes);
-          if (!searchRes.ok) {
-            if (searchRes.status === 429) {
-              const retryAfter = searchRes.headers.get('retry-after');
-              throw new Error(`Spotify rate limited (search, 429${retryAfter ? `, retry-after ${retryAfter}s` : ''})`);
-            }
-            throw new Error(`Spotify search failed (${searchRes.status}): ${searchText.slice(0, 120).replace(/\s+/g, ' ')}`);
+          const searchResult = await spFetchJson(
+            `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=album&limit=1`,
+            token,
+            'search'
+          );
+          if (!searchResult.ok) {
+            const failed = searchResult as { ok: false; status: number; text: string; data: any | null };
+            const searchText = failed.text.slice(0, 120).replace(/\s+/g, ' ');
+            throw new Error(`Spotify search failed (${failed.status}): ${searchText}`);
           }
-          spId = searchData.albums?.items?.[0]?.id;
+          spId = searchResult.data?.albums?.items?.[0]?.id;
           if (spId) break;
         }
       }
@@ -982,18 +1041,19 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
     if (!spId) return { success: false, source: 'spotify', error: 'Not found' };
 
     // UPDATED: Added ?market=US to get copyrights/external_ids
-    const albumRes = await fetch(`https://api.spotify.com/v1/albums/${spId}?market=US`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    const { json: albumData, text: albumText } = await readJsonResponse(albumRes);
-    if (!albumRes.ok || !albumData) {
-      if (albumRes.status === 429) {
-        const retryAfter = albumRes.headers.get('retry-after');
-        throw new Error(`Spotify rate limited (album, 429${retryAfter ? `, retry-after ${retryAfter}s` : ''})`);
-      }
-      throw new Error(`Spotify album lookup failed (${albumRes.status}): ${albumText.slice(0, 120).replace(/\s+/g, ' ')}`);
+    const albumResult = await spFetchJson(
+      `https://api.spotify.com/v1/albums/${spId}?market=US`,
+      token,
+      'album'
+    );
+    if (!albumResult.ok) {
+      const failed = albumResult as { ok: false; status: number; text: string; data: any | null };
+      throw new Error(`Spotify album lookup failed (${failed.status}): ${failed.text.slice(0, 120).replace(/\s+/g, ' ')}`);
     }
-    const data = albumData as SpotifyAlbum;
+    if (!albumResult.data) {
+      throw new Error('Spotify album lookup returned empty payload');
+    }
+    const data = albumResult.data as SpotifyAlbum;
 
     const candidate: CandidateData = {
       spotify_id: spId,
@@ -1021,18 +1081,36 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
 
     if (data.tracks?.items?.length > 0) {
         const trackIds = data.tracks.items.map((t: SpotifyTrack) => t.id).slice(0, 50).join(',');
-        const featRes = await fetch(`https://api.spotify.com/v1/audio-features?ids=${trackIds}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (featRes.ok) {
-            const { json: featData } = await readJsonResponse(featRes);
-            if (!featData) {
-              return { success: true, source: 'spotify', data: candidate };
+        const featuresResult = await spFetchJson(
+          `https://api.spotify.com/v1/audio-features?ids=${trackIds}`,
+          token,
+          'audio-features'
+        );
+
+        let features: SpotifyAudioFeature[] = [];
+        if (featuresResult.ok && featuresResult.data) {
+          features = ((featuresResult.data.audio_features as (SpotifyAudioFeature | null)[] | undefined) ?? [])
+            .filter((f): f is SpotifyAudioFeature => f !== null);
+        } else {
+          // Fallback: fetch per-track features when bulk endpoint is flaky/unavailable.
+          const trackIdsList = data.tracks.items
+            .map((t: SpotifyTrack) => t.id)
+            .filter((id): id is string => typeof id === 'string' && id.length > 0)
+            .slice(0, 20);
+          for (const trackId of trackIdsList) {
+            const perTrack = await spFetchJson(
+              `https://api.spotify.com/v1/audio-features/${trackId}`,
+              token,
+              'audio-features-single',
+              2
+            );
+            if (perTrack.ok && perTrack.data?.id) {
+              features.push(perTrack.data as SpotifyAudioFeature);
             }
-            const features = (featData.audio_features as (SpotifyAudioFeature | null)[]).filter((f): f is SpotifyAudioFeature => f !== null);
-            
-            if (features.length > 0) {
+          }
+        }
+
+        if (features.length > 0) {
                 const avgTempo = features.reduce((sum, f) => sum + f.tempo, 0) / features.length;
                 const avgEnergy = features.reduce((sum, f) => sum + f.energy, 0) / features.length;
                 const avgDance = features.reduce((sum, f) => sum + f.danceability, 0) / features.length;
@@ -1074,7 +1152,6 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
                             time_signature: feat?.time_signature
                         };
                 });
-            }
         }
     }
 
@@ -1575,6 +1652,7 @@ export async function fetchWikipediaData(album: { artist: string, title: string 
         const recordingDateText = extractInfoboxField(wikitext, [
           'recorded'
         ]);
+        const normalizedRecordingDate = recordingDateText ? normalizeLooseDate(recordingDateText) : null;
 
         const recordingLocation = extractInfoboxField(wikitext, [
           'studio',
@@ -1603,7 +1681,7 @@ export async function fetchWikipediaData(album: { artist: string, title: string 
                 notes: extract, // Legacy mapping
                 master_notes: extract ? truncateText(cleanWikiText(extract), 1200) : undefined,
                 cultural_significance: culturalSignificance || undefined,
-                recording_date: recordingDateText || undefined,
+                recording_date: normalizedRecordingDate || undefined,
                 recording_location: recordingLocation || undefined,
                 critical_reception: criticalReception || undefined,
                 chart_positions: chartPositions.length > 0 ? chartPositions : undefined,

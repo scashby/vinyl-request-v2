@@ -480,6 +480,16 @@ const normalizeOriginalReleaseDate = (value: unknown): string | null => {
   return null;
 };
 
+const normalizeDbDate = (value: unknown): string | null => {
+  if (value === null || value === undefined) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  if (/^\d{4}$/.test(trimmed)) return `${trimmed}-12-25`;
+  if (/^\d{4}-\d{2}$/.test(trimmed)) return `${trimmed}-25`;
+  if (isValidDate(trimmed)) return trimmed;
+  return null;
+};
+
 type UpdateBatch = {
   inventoryUpdates: Record<string, unknown>;
   releaseUpdates: Record<string, unknown>;
@@ -648,8 +658,6 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
         break;
       case 'sort_title':
       case 'subtitle':
-      case 'master_release_date':
-      case 'recording_date':
       case 'recording_year':
       case 'recording_location':
       case 'critical_reception':
@@ -661,6 +669,22 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'pitchfork_review':
       case 'lastfm_similar_albums':
         masterUpdates[key] = normalizeCreditsValue(value) ?? null;
+        break;
+      case 'master_release_date':
+        {
+          const normalizedDate = normalizeDbDate(value);
+          if (normalizedDate) {
+            masterUpdates.master_release_date = normalizedDate;
+          }
+        }
+        break;
+      case 'recording_date':
+        {
+          const normalizedDate = normalizeDbDate(value);
+          if (normalizedDate) {
+            masterUpdates.recording_date = normalizedDate;
+          }
+        }
         break;
       case 'packaging':
       case 'vinyl_color':

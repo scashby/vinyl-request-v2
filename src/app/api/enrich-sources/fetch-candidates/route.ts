@@ -85,7 +85,7 @@ export async function POST(req: Request) {
         .catch(() => undefined)
         .then(() => fetchSpotifyData(album))
         .finally(async () => {
-          await sleep(350);
+          await sleep(800);
         });
       spotifyQueue = pending.then(() => undefined, () => undefined);
       return pending;
