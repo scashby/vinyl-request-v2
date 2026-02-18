@@ -900,7 +900,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [endEntry, setEndEntry] = useState('');
   const [enrichmentMode, setEnrichmentMode] = useState<EnrichmentMode>('content');
   const [sourceSelection, setSourceSelection] = useState<EnrichmentService[]>([]);
-  const [autoSnooze, setAutoSnooze] = useState(true); // Default to true (30-day skip)
+  const [autoSnooze, setAutoSnooze] = useState(false); // Scan-level option (off by default)
   const [missingDataOnly, setMissingDataOnly] = useState(false);
   
   const [fieldConfig, setFieldConfig] = useState<FieldConfigMap>({});
@@ -1480,7 +1480,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             .from('inventory')
             .update(inventoryUpdates as Record<string, unknown>)
             .eq('id', album.id);
-          if (error) throw new Error(`inventory(${album.id}) update failed: ${error.message}`);
+          if (error) {
+            throw new Error(
+              `inventory(${album.id}) update failed: ${error.message}; code=${error.code ?? 'n/a'}; details=${error.details ?? 'n/a'}; payload_keys=${Object.keys(inventoryUpdates).join(',')}`
+            );
+          }
         })()
       );
     }
@@ -1492,7 +1496,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             .from('releases')
             .update(releaseUpdates as Record<string, unknown>)
             .eq('id', album.release_id);
-          if (error) throw new Error(`releases(${album.release_id}) update failed: ${error.message}`);
+          if (error) {
+            throw new Error(
+              `releases(${album.release_id}) update failed: ${error.message}; code=${error.code ?? 'n/a'}; details=${error.details ?? 'n/a'}; payload_keys=${Object.keys(releaseUpdates).join(',')}`
+            );
+          }
         })()
       );
     } else if (Object.keys(releaseUpdates).length > 0) {
@@ -1506,7 +1514,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             .from('masters')
             .update(masterUpdates as Record<string, unknown>)
             .eq('id', album.master_id);
-          if (error) throw new Error(`masters(${album.master_id}) update failed: ${error.message}`);
+          if (error) {
+            throw new Error(
+              `masters(${album.master_id}) update failed: ${error.message}; code=${error.code ?? 'n/a'}; details=${error.details ?? 'n/a'}; payload_keys=${Object.keys(masterUpdates).join(',')}`
+            );
+          }
         })()
       );
     } else if (Object.keys(masterUpdates).length > 0) {
@@ -2722,21 +2734,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                 <div className="grid grid-cols-3 gap-3">
                   <StatBox label="Total Albums" value={stats.total} color="#3b82f6" onClick={() => {}} disabled />
                   <StatBox label="Fully Enriched" value={stats.fullyEnriched} color="#10b981" onClick={() => showCategory('fully-enriched', 'Fully Enriched')} />
-                  <div className="relative">
-                    <StatBox label="Needs Enrichment" value={stats.needsEnrichment} color="#f59e0b" onClick={() => showCategory('needs-enrichment', 'Needs Enrichment')} />
-                    {/* AUTO-SNOOZE TOGGLE */}
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); setAutoSnooze(!autoSnooze); }}
-                      className={`absolute -top-2.5 right-2.5 px-2 py-0.5 rounded-xl text-[10px] border font-bold cursor-pointer transition-all ${
-                        autoSnooze 
-                          ? 'bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200' 
-                          : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
-                      }`}
-                      title={autoSnooze ? "Skipping items reviewed in last 30 days" : "Checking ALL items (ignoring recent reviews)"}
-                    >
-                      {autoSnooze ? '💤 Snooze Active' : '⚡ Snooze OFF'}
-                    </button>
-                  </div>
+                  <StatBox label="Needs Enrichment" value={stats.needsEnrichment} color="#f59e0b" onClick={() => showCategory('needs-enrichment', 'Needs Enrichment')} />
                 </div>
               </div>
 
@@ -2880,6 +2878,18 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                   Missing data only
                   <span className="text-[11px] font-medium text-gray-500">
                     (skip conflicts unless multiple options)
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                  <input
+                    type="checkbox"
+                    checked={autoSnooze}
+                    onChange={(e) => setAutoSnooze(e.target.checked)}
+                    disabled={enriching}
+                  />
+                  Snooze recently reviewed
+                  <span className="text-[11px] font-medium text-gray-500">
+                    (skip albums reviewed in last 30 days)
                   </span>
                 </label>
               </div>
