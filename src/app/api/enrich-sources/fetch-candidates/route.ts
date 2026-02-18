@@ -48,12 +48,39 @@ export async function POST(req: Request) {
   const supabase = supabaseServer(getAuthHeader(req));
   try {
     const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-    const sourceTimeoutMs = 12000;
+    const parseTimeout = (raw: string | undefined, fallback: number): number => {
+      const value = Number.parseInt(String(raw ?? ''), 10);
+      return Number.isFinite(value) && value > 0 ? value : fallback;
+    };
+    const defaultSourceTimeoutMs = parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_MS, 25000);
+    const sourceSpecificTimeoutMs: Record<string, number> = {
+      wikidata: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_WIKIDATA_MS, 30000),
+      wikipedia: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_WIKIPEDIA_MS, 25000),
+      musicbrainz: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_MUSICBRAINZ_MS, 25000),
+      discogs: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_DISCOGS_MS, 25000),
+      spotify: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_SPOTIFY_MS, 25000),
+      appleMusic: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_APPLEMUSIC_MS, 25000),
+      lastfm: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_LASTFM_MS, 25000),
+      genius: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_GENIUS_MS, 25000),
+      secondhandsongs: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_SECONDHANDSONGS_MS, 25000),
+      theaudiodb: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_THEAUDIODB_MS, 25000),
+      setlistfm: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_SETLISTFM_MS, 25000),
+      rateyourmusic: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_RATEYOURMUSIC_MS, 25000),
+      fanarttv: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_FANARTTV_MS, 25000),
+      deezer: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_DEEZER_MS, 25000),
+      musixmatch: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_MUSIXMATCH_MS, 25000),
+      popsike: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_POPSIKE_MS, 25000),
+      pitchfork: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_PITCHFORK_MS, 25000),
+      coverArt: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_COVERART_MS, 25000),
+    };
+    const getSourceTimeoutMs = (source: string) =>
+      sourceSpecificTimeoutMs[source] ?? defaultSourceTimeoutMs;
     const withSourceTimeout = async <T,>(source: string, promise: Promise<T>): Promise<T> => {
+      const timeoutMs = getSourceTimeoutMs(source);
       return await Promise.race([
         promise,
         new Promise<T>((_, reject) => {
-          setTimeout(() => reject(new Error(`${source} timed out after ${sourceTimeoutMs / 1000}s`)), sourceTimeoutMs);
+          setTimeout(() => reject(new Error(`${source} timed out after ${Math.round(timeoutMs / 1000)}s`)), timeoutMs);
         })
       ]);
     };
