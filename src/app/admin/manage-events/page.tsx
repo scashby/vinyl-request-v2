@@ -30,7 +30,6 @@ const eventTypeLabels: Record<string, string> = {
   brewery: 'Brewery Event',
   'public-dj': 'Public DJ Event',
   'private-dj': 'Private DJ Event',
-  'music-bingo': 'Music Bingo',
   other: 'Other Event',
 };
 

@@ -78,27 +78,6 @@ export const defaultEventTypeConfig: EventTypeConfigState = {
       description: 'Off-site DJ events with public details.',
     },
     {
-      id: 'music-bingo',
-      label: 'Music Bingo',
-      description: 'Vinyl-only Music Bingo nights.',
-      template_fields: [
-        'date',
-        'time',
-        'location',
-        'image_url',
-        'info',
-        'info_url',
-        'games',
-        'recurrence',
-        'crate',
-        'formats'
-      ],
-      defaults: {
-        allowed_formats: ['Vinyl'],
-        has_queue: false,
-      },
-    },
-    {
       id: 'private-dj',
       label: 'Private DJ Event',
       description: 'Displays publicly as "Private Event."',

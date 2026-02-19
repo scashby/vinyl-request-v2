@@ -23,7 +23,7 @@ const EVENT_TYPE_SETTINGS_KEY = 'event_type_config';
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
 const EVENT_SUBTYPE_TAG_PREFIX = 'event_subtype:';
 
-const TEMPLATE_FIELDS = ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'queue', 'games', 'recurrence', 'crate', 'formats'];
+const TEMPLATE_FIELDS = ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'queue', 'recurrence', 'crate', 'formats'];
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 const GOOGLE_MAPS_LIBRARIES = 'places';
 let googleMapsScriptPromise: Promise<void> | null = null;
@@ -116,21 +116,6 @@ type DbEvent = Database['public']['Tables']['events']['Row'] & {
 };
 type EventInsert = Database['public']['Tables']['events']['Insert'];
 type EventUpdate = Database['public']['Tables']['events']['Update'];
-
-type GameTemplateSummary = {
-  id: number;
-  name: string;
-  setlist_mode: boolean;
-};
-
-type GameSessionSummary = {
-  id: number;
-  game_code: string | null;
-  variant: string;
-  bingo_target: string;
-  status: string;
-  created_at: string | null;
-};
 
 // Utility function to generate recurring events
 function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<EventData, 'id'>[] {
@@ -295,14 +280,6 @@ export default function EditEventForm() {
   const [eventTypeConfig, setEventTypeConfig] = useState<EventTypeConfigState>(() =>
     normalizeEventTypeConfig(defaultEventTypeConfig)
   );
-  const [gameTemplates, setGameTemplates] = useState<GameTemplateSummary[]>([]);
-  const [gameSessions, setGameSessions] = useState<GameSessionSummary[]>([]);
-  const [gameTemplateId, setGameTemplateId] = useState<number | null>(null);
-  const [gameVariant, setGameVariant] = useState('standard');
-  const [gameTarget, setGameTarget] = useState('one_line');
-  const [gameCardCount, setGameCardCount] = useState(40);
-  const [gameSetlistMode, setGameSetlistMode] = useState(false);
-  const [isCreatingGame, setIsCreatingGame] = useState(false);
   
   const [eventData, setEventData] = useState<EventData>({
     event_type: '',
@@ -345,7 +322,6 @@ export default function EditEventForm() {
   const showInfo = isFieldEnabled('info');
   const showInfoUrl = isFieldEnabled('info_url');
   const locationInputRef = useRef<HTMLInputElement | null>(null);
-  const isMusicBingo = eventData.event_type === 'music-bingo';
 
   // Fetch Available Crates
   useEffect(() => {
@@ -366,32 +342,6 @@ export default function EditEventForm() {
     
     fetchCrates();
   }, []);
-
-  useEffect(() => {
-    const fetchTemplates = async () => {
-      const response = await fetch('/api/game-templates');
-      const payload = await response.json();
-      setGameTemplates(payload.data ?? []);
-    };
-    void fetchTemplates();
-  }, []);
-
-  useEffect(() => {
-    const fetchSessions = async () => {
-      if (!id) return;
-      const response = await fetch(`/api/game-sessions?eventId=${id}`);
-      const payload = await response.json();
-      setGameSessions(payload.data ?? []);
-    };
-    void fetchSessions();
-  }, [id]);
-
-  useEffect(() => {
-    if (!gameTemplateId) return;
-    const template = gameTemplates.find((item) => item.id === gameTemplateId);
-    if (!template) return;
-    setGameSetlistMode(template.setlist_mode);
-  }, [gameTemplateId, gameTemplates]);
 
   useEffect(() => {
     if (!GOOGLE_MAPS_API_KEY || !locationInputRef.current) return;
@@ -799,61 +749,6 @@ export default function EditEventForm() {
       if (checked) return { ...prev, queue_types: [...types, queueType] };
       return { ...prev, queue_types: types.filter((t) => t !== queueType) };
     });
-  };
-
-  const refreshGameSessions = async () => {
-    if (!id) return;
-    const response = await fetch(`/api/game-sessions?eventId=${id}`);
-    const payload = await response.json();
-    setGameSessions(payload.data ?? []);
-  };
-
-  const handleCreateGameSession = async () => {
-    if (!id || !gameTemplateId) return;
-    setIsCreatingGame(true);
-    try {
-      await fetch('/api/game-sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          templateId: gameTemplateId,
-          eventId: Number(id),
-          variant: gameVariant,
-          bingoTarget: gameTarget,
-          cardCount: gameCardCount,
-          setlistMode: gameSetlistMode,
-        }),
-      });
-      await refreshGameSessions();
-    } finally {
-      setIsCreatingGame(false);
-    }
-  };
-
-  const handleDownloadSessionCards = async (sessionId: number, layout: '2-up' | '4-up' = '2-up') => {
-    const response = await fetch(`/api/game-cards?sessionId=${sessionId}`);
-    const payload = await response.json();
-    const cards = (payload.data ?? []).map((card: any) => ({
-      index: card.card_number,
-      cells: card.grid,
-    }));
-    const { generateBingoCardsPdf } = await import('src/lib/bingoPdf');
-    const doc = generateBingoCardsPdf(cards, `Music Bingo Session ${sessionId}`, { layout });
-    doc.save(`music-bingo-session-${sessionId}-cards-${layout}.pdf`);
-  };
-
-  const handleDownloadSessionPickListPdf = async (sessionId: number) => {
-    const response = await fetch(`/api/game-sessions/${sessionId}`);
-    const payload = await response.json();
-    const picks = payload.data?.picks ?? [];
-    const items = picks.map((pick: any) => ({
-      id: String(pick.id),
-      title: pick.game_template_items?.title ?? '',
-      artist: pick.game_template_items?.artist ?? '',
-    }));
-    const { generatePickListPdf } = await import('src/lib/pickListPdf');
-    const doc = generatePickListPdf(items, `Music Bingo Session ${sessionId} Pick List`);
-    doc.save(`music-bingo-session-${sessionId}-pick-list.pdf`);
   };
 
   const applyDefaults = (defaults?: EventSubtypeDefaults, enabledList?: string[]) => {
@@ -1532,152 +1427,6 @@ export default function EditEventForm() {
                   {format}
                 </label>
               ))}
-            </div>
-          </section>
-        )}
-
-        {/* MUSIC BINGO GAME SETUP */}
-        {isFieldEnabled('games') && isMusicBingo && (
-          <section className="p-5 border border-gray-200 rounded-2xl bg-white shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Music Bingo</h3>
-            {!id && (
-              <p className="text-sm text-gray-500 mb-4">
-                Save the event first, then create a game session.
-              </p>
-            )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label className="flex flex-col gap-2 text-sm text-gray-700">
-                Playlist
-                <select
-                  value={gameTemplateId ?? ''}
-                  onChange={(e) => setGameTemplateId(Number(e.target.value) || null)}
-                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
-                >
-                  <option value="">Select playlist</option>
-                  {gameTemplates.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-2 text-sm text-gray-700">
-                Game Type
-                <select
-                  value={gameVariant}
-                  onChange={(e) => setGameVariant(e.target.value)}
-                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
-                >
-                  <option value="standard">Standard Bingo</option>
-                  <option value="death">Death Bingo</option>
-                  <option value="blackout">Blackout Bingo</option>
-                </select>
-              </label>
-              <label className="flex flex-col gap-2 text-sm text-gray-700">
-                Bingo Target
-                <select
-                  value={gameTarget}
-                  onChange={(e) => setGameTarget(e.target.value)}
-                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
-                >
-                  <option value="one_line">Single Line</option>
-                  <option value="two_lines">Double Line</option>
-                  <option value="three_lines">Triple Line</option>
-                  <option value="four_corners">Four Corners</option>
-                  <option value="x_shape">Criss-Cross</option>
-                  <option value="full_card">Blackout</option>
-                </select>
-              </label>
-              <label className="flex flex-col gap-2 text-sm text-gray-700">
-                Card Count
-                <input
-                  type="number"
-                  min="1"
-                  value={gameCardCount}
-                  onChange={(e) => setGameCardCount(Number(e.target.value) || 1)}
-                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
-                />
-              </label>
-              <label className="flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={gameSetlistMode}
-                  onChange={(e) => setGameSetlistMode(e.target.checked)}
-                  className="h-4 w-4"
-                />
-                Setlist mode (ordered picks)
-              </label>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-5">
-              <button
-                type="button"
-                onClick={handleCreateGameSession}
-                disabled={!id || !gameTemplateId || isCreatingGame}
-                className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                Create Game Session
-              </button>
-              <button
-                type="button"
-                onClick={refreshGameSessions}
-                disabled={!id}
-                className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                Refresh Sessions
-              </button>
-              {id && (
-                <>
-                  <Link
-                    href={`/admin/games/vinyl-bingo?eventId=${id}`}
-                    className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                  >
-                    Open Host
-                  </Link>
-                  <Link
-                    href={`/admin/games/vinyl-bingo?eventId=${id}`}
-                    className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                  >
-                    Open Lobby
-                  </Link>
-                </>
-              )}
-            </div>
-
-            <div className="mt-5 space-y-3">
-              {gameSessions.length === 0 ? (
-                <p className="text-sm text-gray-500">No sessions yet for this event.</p>
-              ) : (
-                gameSessions.map((session) => (
-                  <div key={session.id} className="border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      Code: {session.game_code ?? '-'} | {session.variant} | {session.bingo_target} | {session.status}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleDownloadSessionCards(session.id, '2-up')}
-                        className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                      >
-                        Cards PDF (2-up)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDownloadSessionCards(session.id, '4-up')}
-                        className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                      >
-                        Cards PDF (4-up)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDownloadSessionPickListPdf(session.id)}
-                        className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                      >
-                        Pick List PDF
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
             </div>
           </section>
         )}

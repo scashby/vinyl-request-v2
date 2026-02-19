@@ -1,58 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { Container } from "components/ui/Container";
-import { Button } from "components/ui/Button";
 
-const gameCards = [
-  {
-    title: "Music Bingo",
-    description:
-      "Analog-first vinyl bingo control center (host, assistant, jumbotron, print).",
-    href: "/admin/games/vinyl-bingo",
-    cta: "Open",
-    status: "ready",
-  },
-];
-
-export default function Page() {
+export default function GamesHomePage() {
   return (
-    <Container size="md" className="py-8 min-h-screen">
-      <div className="flex items-start justify-between gap-6 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Game Admin Center</h1>
-          <p className="text-sm text-gray-500 mt-2">
-            Command center for creating, running, and managing music game events.
+    <div className="min-h-screen bg-[linear-gradient(145deg,#f7efe2_0%,#efe3d4_100%)] p-6">
+      <div className="mx-auto max-w-5xl">
+        <div className="rounded-3xl border border-stone-300 bg-[#fdf8f0] p-8 shadow-[0_20px_60px_rgba(0,0,0,0.08)]">
+          <p className="text-xs uppercase tracking-[0.2em] text-stone-500">New Build</p>
+          <h1 className="mt-2 text-4xl font-black text-stone-900">Game Admin Center</h1>
+          <p className="mt-3 max-w-2xl text-sm text-stone-700">
+            Fresh implementation. No legacy game routes or legacy game tables are used.
           </p>
+
+          <div className="mt-8 grid gap-4 md:grid-cols-2">
+            <Link
+              href="/admin/games/bingo"
+              className="group rounded-2xl border border-stone-300 bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-lg"
+            >
+              <p className="text-xs uppercase tracking-wide text-stone-500">Active</p>
+              <h2 className="mt-1 text-2xl font-bold text-stone-900">Vinyl Bingo</h2>
+              <p className="mt-2 text-sm text-stone-700">
+                Host, assistant, jumbotron, call-card verification, and printable cards.
+              </p>
+              <p className="mt-4 text-sm font-semibold text-rose-700">Open</p>
+            </Link>
+          </div>
         </div>
       </div>
-
-      <div className="grid grid-cols-1 gap-5">
-        {gameCards.map((game) => {
-          return (
-            <div
-              key={game.title}
-              className="border border-gray-200 rounded-2xl p-5 bg-white shadow-sm flex flex-col gap-4"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">{game.title}</h2>
-                  <p className="text-sm text-gray-600 mt-2">{game.description}</p>
-                </div>
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-green-700 bg-green-100 px-2 py-1 rounded-full">
-                  Active
-                </span>
-              </div>
-
-              <div className="mt-auto">
-                <Link href={game.href}>
-                  <Button size="sm">{game.cta}</Button>
-                </Link>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </Container>
+    </div>
   );
 }
