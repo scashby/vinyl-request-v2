@@ -141,6 +141,52 @@ const normalizeTrackPosition = (position: string | null | undefined, fallback: n
   return String(fallback);
 };
 
+const pickSmartPlaylistMix = (
+  matches: CollectionTrackRow[],
+  maxTracks: number,
+  allowArtistConcentration: boolean,
+  allowAlbumConcentration: boolean
+): Set<string> => {
+  const shuffled = [...matches];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  // For broad mixes (no explicit artist rule), keep artist repeats low:
+  // up to 15 tracks => max 1 per artist, otherwise max 2 per artist.
+  const artistCap = allowArtistConcentration ? Number.POSITIVE_INFINITY : (maxTracks <= 15 ? 1 : 2);
+  // Unless album is explicitly part of the rule, keep album repeats at 1.
+  const albumCap = allowAlbumConcentration ? Number.POSITIVE_INFINITY : 1;
+
+  const artistCounts = new Map<string, number>();
+  const albumCounts = new Map<string, number>();
+  const selected = new Set<string>();
+
+  shuffled.forEach((row) => {
+    if (selected.size >= maxTracks) return;
+    const artist = row.trackArtist || row.albumArtist || '';
+    const album = row.albumTitle || '';
+    const artistCount = artistCounts.get(artist) ?? 0;
+    const albumCount = albumCounts.get(album) ?? 0;
+    if (artistCount >= artistCap || albumCount >= albumCap) return;
+    selected.add(row.key);
+    artistCounts.set(artist, artistCount + 1);
+    albumCounts.set(album, albumCount + 1);
+  });
+
+  // Fill remainder if strict caps underfill the requested max.
+  if (selected.size < maxTracks) {
+    shuffled.forEach((row) => {
+      if (selected.size >= maxTracks) return;
+      if (selected.has(row.key)) return;
+      selected.add(row.key);
+    });
+  }
+
+  return selected;
+};
+
 const getTrackPositionSortValue = (position: string, side: string | null): number => {
   const parsedSide = (side ?? position.trim().charAt(0)).toUpperCase();
   const sideWeight = parsedSide >= 'A' && parsedSide <= 'Z' ? parsedSide.charCodeAt(0) - 65 : 100;
@@ -325,6 +371,7 @@ function CollectionBrowserPage() {
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [showViewModeDropdown, setShowViewModeDropdown] = useState(false);
   const [showTrackFormatDropdown, setShowTrackFormatDropdown] = useState(false);
+  const [smartPlaylistMixNonce, setSmartPlaylistMixNonce] = useState(0);
 
   const [tableSortState, setTableSortState] = useState<SortState>({
     column: null,
@@ -940,6 +987,35 @@ function CollectionBrowserPage() {
     }, {} as Record<number, number>);
   }, [allTrackRows, playlists]);
 
+  const smartPlaylistRandomKeys = useMemo(() => {
+    const result: Record<number, Set<string>> = {};
+
+    playlists.forEach((playlist) => {
+      if (!playlist.isSmart) return;
+      const maxTracks = playlist.smartRules?.maxTracks ?? null;
+      if (typeof maxTracks !== 'number' || maxTracks <= 0) return;
+
+      const matches = allTrackRows.filter((row) => trackMatchesSmartPlaylist(row, playlist));
+      if (matches.length <= maxTracks) {
+        result[playlist.id] = new Set(matches.map((row) => row.key));
+        return;
+      }
+
+      const rules = playlist.smartRules?.rules ?? [];
+      const hasArtistRule = rules.some((rule) => rule.field === 'track_artist' || rule.field === 'album_artist');
+      const hasAlbumRule = rules.some((rule) => rule.field === 'album_title');
+
+      result[playlist.id] = pickSmartPlaylistMix(
+        matches,
+        maxTracks,
+        hasArtistRule,
+        hasAlbumRule
+      );
+    });
+
+    return result;
+  }, [allTrackRows, playlists, smartPlaylistMixNonce]);
+
   const filteredTrackRows = useMemo(() => {
     let rows = allTrackRows;
 
@@ -962,6 +1038,10 @@ function CollectionBrowserPage() {
       if (playlist) {
         if (playlist.isSmart) {
           rows = rows.filter((row) => trackMatchesSmartPlaylist(row, playlist));
+          const randomKeys = smartPlaylistRandomKeys[playlist.id];
+          if (randomKeys) {
+            rows = rows.filter((row) => randomKeys.has(row.key));
+          }
         } else {
           const allowedKeys = new Set(playlist.trackKeys);
           rows = rows.filter((row) => {
@@ -1033,14 +1113,6 @@ function CollectionBrowserPage() {
       }
     });
 
-    if (trackSource === 'playlists' && selectedPlaylistId) {
-      const playlist = playlists.find((item) => item.id === selectedPlaylistId);
-      const maxTracks = playlist?.isSmart ? playlist.smartRules?.maxTracks ?? null : null;
-      if (typeof maxTracks === 'number' && maxTracks > 0) {
-        rows = rows.slice(0, maxTracks);
-      }
-    }
-
     return rows;
   }, [
     allTrackRows,
@@ -1051,6 +1123,7 @@ function CollectionBrowserPage() {
     crateItemsByCrate,
     selectedPlaylistId,
     playlists,
+    smartPlaylistRandomKeys,
     selectedLetter,
     searchQuery,
     trackFormatFilters,
@@ -1206,6 +1279,11 @@ function CollectionBrowserPage() {
     return albums.find(a => a.id === selectedAlbumId) || null;
   }, [albums, selectedAlbumId]);
 
+  const selectedPlaylist = useMemo(() => {
+    if (!selectedPlaylistId) return null;
+    return playlists.find((playlist) => playlist.id === selectedPlaylistId) || null;
+  }, [playlists, selectedPlaylistId]);
+
   const sortOptionsByCategory = useMemo(() => {
     return SORT_OPTIONS.reduce((acc, opt) => {
       if (!acc[opt.category]) acc[opt.category] = [];
@@ -1276,6 +1354,10 @@ function CollectionBrowserPage() {
     }
     setViewMode(mode);
     setShowFolderModeDropdown(false);
+  }, []);
+
+  const handleRefreshSmartPlaylistMix = useCallback(() => {
+    setSmartPlaylistMixNonce((prev) => prev + 1);
   }, []);
 
   const handleAddToCrates = useCallback(async (crateIds: number[]) => {
@@ -1891,6 +1973,15 @@ function CollectionBrowserPage() {
               </div>
               {viewMode === 'album-track' && groupedTrackRows.length > 0 && (
                 <div className="flex items-center gap-1.5">
+                  {folderMode === 'playlists' && selectedPlaylist?.isSmart && (
+                    <button
+                      onClick={handleRefreshSmartPlaylistMix}
+                      title="Refresh smart playlist mix"
+                      className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white"
+                    >
+                      Refresh mix
+                    </button>
+                  )}
                   <button
                     onClick={handleExpandAllAlbums}
                     title="Expand all albums"
@@ -1904,6 +1995,17 @@ function CollectionBrowserPage() {
                     className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white"
                   >
                     Collapse all
+                  </button>
+                </div>
+              )}
+              {viewMode === 'playlist' && folderMode === 'playlists' && selectedPlaylist?.isSmart && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={handleRefreshSmartPlaylistMix}
+                    title="Refresh smart playlist mix"
+                    className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white"
+                  >
+                    Refresh mix
                   </button>
                 </div>
               )}
