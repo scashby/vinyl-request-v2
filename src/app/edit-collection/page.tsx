@@ -16,6 +16,7 @@ import NewPlaylistModal from './playlists/NewPlaylistModal';
 import AddToPlaylistModal from './playlists/AddToPlaylistModal';
 import ManagePlaylistsModal from './playlists/ManagePlaylistsModal';
 import NewSmartPlaylistModal from './playlists/NewSmartPlaylistModal';
+import SpotifyImportModal from './playlists/SpotifyImportModal';
 import Header from './Header';
 import { ManageColumnFavoritesModal, type ColumnFavorite } from './ManageColumnFavoritesModal';
 import type { Crate } from '../../types/crate';
@@ -426,6 +427,7 @@ function CollectionBrowserPage() {
   const [showNewPlaylistModal, setShowNewPlaylistModal] = useState(false);
   const [showAddToPlaylistModal, setShowAddToPlaylistModal] = useState(false);
   const [showManagePlaylistsModal, setShowManagePlaylistsModal] = useState(false);
+  const [showSpotifyImportModal, setShowSpotifyImportModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
   const [showNewSmartPlaylistModal, setShowNewSmartPlaylistModal] = useState(false);
@@ -2475,6 +2477,17 @@ function CollectionBrowserPage() {
             setEditingPlaylist(null);
             setShowNewSmartPlaylistModal(true);
           }}
+          onOpenSpotifyImport={() => {
+            setShowManagePlaylistsModal(false);
+            setShowSpotifyImportModal(true);
+          }}
+        />
+      )}
+      {showSpotifyImportModal && (
+        <SpotifyImportModal
+          isOpen={showSpotifyImportModal}
+          onClose={() => setShowSpotifyImportModal(false)}
+          onImported={loadPlaylists}
         />
       )}
       {showExportModal && (

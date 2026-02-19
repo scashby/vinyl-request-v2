@@ -13,6 +13,7 @@ interface ManagePlaylistsModalProps {
   onEditSmart: (playlist: CollectionPlaylist) => void;
   onOpenNewPlaylist: () => void;
   onOpenNewSmartPlaylist: () => void;
+  onOpenSpotifyImport: () => void;
 }
 
 export function ManagePlaylistsModal({
@@ -24,7 +25,8 @@ export function ManagePlaylistsModal({
   onEdit,
   onEditSmart,
   onOpenNewPlaylist,
-  onOpenNewSmartPlaylist
+  onOpenNewSmartPlaylist,
+  onOpenSpotifyImport
 }: ManagePlaylistsModalProps) {
   const [localPlaylists, setLocalPlaylists] = useState<CollectionPlaylist[]>(playlists);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -72,6 +74,10 @@ export function ManagePlaylistsModal({
             <button onClick={onOpenNewSmartPlaylist} className="px-3 py-1.5 bg-violet-500 text-white border-none rounded text-xs font-medium cursor-pointer flex items-center gap-1 hover:bg-violet-600">
               <span>⚡</span>
               <span>New Smart</span>
+            </button>
+            <button onClick={onOpenSpotifyImport} className="px-3 py-1.5 bg-[#1db954] text-white border-none rounded text-xs font-medium cursor-pointer flex items-center gap-1 hover:opacity-90">
+              <span>🎧</span>
+              <span>Import Spotify</span>
             </button>
             <button onClick={onClose} className="bg-transparent border-none text-2xl cursor-pointer text-gray-500 p-0 leading-none hover:text-gray-700">×</button>
           </div>

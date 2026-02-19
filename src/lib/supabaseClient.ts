@@ -10,5 +10,11 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 // The <Database> generic is vital for table autocompletion
-export const supabase = createClient<Database>(supabaseUrl, supabaseKey);
+export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+    detectSessionInUrl: false,
+  },
+});
 // AUDIT: inspected, no changes.
