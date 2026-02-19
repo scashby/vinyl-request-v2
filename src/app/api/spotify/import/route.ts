@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 import { buildInventoryIndex, fetchInventoryTracks, matchTracks, sanitizePlaylistName } from '../../../../lib/vinylPlaylistImport';
-import { getSpotifyAccessTokenFromCookies, spotifyApiGet, spotifyApiGetByUrl } from '../../../../lib/spotifyUser';
+import { getSpotifyAccessTokenFromCookies, spotifyApiGet } from '../../../../lib/spotifyUser';
 
 type SpotifyTrackItem = {
   track?: {
@@ -17,6 +17,9 @@ type SpotifyPlaylistTracksResponse = {
 
 type SpotifyPlaylistMeta = {
   name?: string;
+  owner?: {
+    id?: string;
+  };
   tracks?: {
     items?: SpotifyTrackItem[];
     total?: number;
@@ -24,9 +27,15 @@ type SpotifyPlaylistMeta = {
   };
 };
 
+type SpotifyMe = {
+  id?: string;
+};
+
 export async function POST(req: Request) {
   let step = 'init';
   let spotifyScope = '';
+  let spotifyUserId = '';
+  let playlistOwnerId = '';
   try {
     step = 'parse-body';
     const body = await req.json();
@@ -43,7 +52,11 @@ export async function POST(req: Request) {
     }
     spotifyScope = tokenData.scope ?? '';
 
-    step = 'spotify-tracks';
+    step = 'spotify-user';
+    const me = await spotifyApiGet<SpotifyMe>(tokenData.accessToken, '/me');
+    spotifyUserId = me.id ?? '';
+
+    step = 'spotify-playlist-meta';
     const rows: Array<{ title?: string; artist?: string }> = [];
     let sourceTotal: number | null = null;
     let partialImport = false;
@@ -59,31 +72,35 @@ export async function POST(req: Request) {
 
     const playlist = await spotifyApiGet<SpotifyPlaylistMeta>(
       tokenData.accessToken,
-      `/playlists/${playlistId}?fields=name,tracks(total,next,items(track(name,artists(name))))`
+      `/playlists/${playlistId}?market=from_token`
     );
 
+    playlistOwnerId = playlist.owner?.id ?? '';
     sourceTotal =
       typeof playlist.tracks?.total === 'number'
         ? playlist.tracks.total
         : null;
     appendRows(playlist.tracks?.items ?? []);
 
-    let nextUrl = playlist.tracks?.next ?? null;
-    while (nextUrl) {
+    step = 'spotify-tracks';
+    let offset = rows.length;
+    const totalToFetch = sourceTotal ?? rows.length;
+    while (offset < totalToFetch) {
       try {
-        const nextPage = await spotifyApiGetByUrl<SpotifyPlaylistTracksResponse>(
+        const nextPage = await spotifyApiGet<SpotifyPlaylistTracksResponse>(
           tokenData.accessToken,
-          nextUrl
+          `/playlists/${playlistId}/tracks?limit=100&offset=${offset}&market=from_token&additional_types=track&fields=items(track(name,artists(name))),next`
         );
-        appendRows(nextPage.items ?? []);
-        nextUrl = nextPage.next ?? null;
+        const pageItems = nextPage.items ?? [];
+        appendRows(pageItems);
+        if (pageItems.length === 0) break;
+        offset += pageItems.length;
       } catch (tracksError) {
         const message = tracksError instanceof Error ? tracksError.message : String(tracksError);
         if (message.toLowerCase().includes('failed (403)')) {
           // Keep the rows gathered so far instead of hard-failing the import.
           partialImport = true;
           importSource = 'playlist_fallback';
-          nextUrl = null;
           break;
         }
         throw tracksError;
@@ -96,6 +113,8 @@ export async function POST(req: Request) {
           error:
             'Spotify returned no accessible track items for this playlist. This playlist cannot be imported through the current API permissions.',
           scope: spotifyScope,
+          spotifyUserId,
+          playlistOwnerId,
           step,
         },
         { status: 403 }
@@ -211,6 +230,8 @@ export async function POST(req: Request) {
             'Spotify denied access to playlist tracks (403). Reconnect Spotify to refresh permissions, then retry.',
           details: message,
           scope: spotifyScope,
+          spotifyUserId,
+          playlistOwnerId,
           step,
         },
         { status: 403 }

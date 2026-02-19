@@ -34,7 +34,7 @@ export async function GET() {
     while (true) {
       const data = await spotifyApiGet<SpotifyPlaylistResponse>(
         tokenData.accessToken,
-        `/me/playlists?limit=${limit}&offset=${offset}&fields=items(id,name,collaborative,owner(id),tracks(total)),next`
+        `/me/playlists?limit=${limit}&offset=${offset}`
       );
       const rows = data.items ?? [];
       items.push(...rows);
