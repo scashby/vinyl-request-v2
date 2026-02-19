@@ -13,7 +13,11 @@ type CreateSessionBody = {
   card_layout?: "2-up" | "4-up";
   card_label_mode?: "track_artist" | "track_only";
   round_count?: number;
-  seconds_to_next_call?: number;
+  remove_resleeve_seconds?: number;
+  place_vinyl_seconds?: number;
+  cue_seconds?: number;
+  start_slide_seconds?: number;
+  host_buffer_seconds?: number;
   sonos_output_delay_ms?: number;
   recent_calls_limit?: number;
   show_title?: boolean;
@@ -91,6 +95,19 @@ export async function POST(request: NextRequest) {
 
     const gameMode = body.game_mode ?? "single_line";
     const code = await generateUniqueSessionCode();
+    const removeResleeveSeconds = body.remove_resleeve_seconds ?? 20;
+    const placeVinylSeconds = body.place_vinyl_seconds ?? 8;
+    const cueSeconds = body.cue_seconds ?? 12;
+    const startSlideSeconds = body.start_slide_seconds ?? 5;
+    const hostBufferSeconds = body.host_buffer_seconds ?? 2;
+    const sonosDelayMs = body.sonos_output_delay_ms ?? 75;
+    const secondsToNextCall =
+      removeResleeveSeconds +
+      placeVinylSeconds +
+      cueSeconds +
+      startSlideSeconds +
+      hostBufferSeconds +
+      Math.ceil(sonosDelayMs / 1000);
 
     const { data: session, error: insertError } = await db
       .from("bingo_sessions")
@@ -107,8 +124,13 @@ export async function POST(request: NextRequest) {
         round_end_policy: "open_until_winner",
         tie_break_policy: "one_song_playoff",
         pool_exhaustion_policy: "declare_tie",
-        seconds_to_next_call: body.seconds_to_next_call ?? 45,
-        sonos_output_delay_ms: body.sonos_output_delay_ms ?? 75,
+        remove_resleeve_seconds: removeResleeveSeconds,
+        place_vinyl_seconds: placeVinylSeconds,
+        cue_seconds: cueSeconds,
+        start_slide_seconds: startSlideSeconds,
+        host_buffer_seconds: hostBufferSeconds,
+        seconds_to_next_call: secondsToNextCall,
+        sonos_output_delay_ms: sonosDelayMs,
         recent_calls_limit: body.recent_calls_limit ?? 5,
         show_title: body.show_title ?? true,
         show_logo: body.show_logo ?? true,

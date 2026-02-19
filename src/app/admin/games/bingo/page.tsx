@@ -38,7 +38,11 @@ export default function BingoSetupPage() {
   const [gameMode, setGameMode] = useState("single_line");
   const [cardCount, setCardCount] = useState(40);
   const [roundCount, setRoundCount] = useState(3);
-  const [secondsToNextCall, setSecondsToNextCall] = useState(45);
+  const [removeResleeveSeconds, setRemoveResleeveSeconds] = useState(20);
+  const [placeVinylSeconds, setPlaceVinylSeconds] = useState(8);
+  const [cueSeconds, setCueSeconds] = useState(12);
+  const [startSlideSeconds, setStartSlideSeconds] = useState(5);
+  const [hostBufferSeconds, setHostBufferSeconds] = useState(2);
   const [sonosDelayMs, setSonosDelayMs] = useState(75);
 
   const [preflight, setPreflight] = useState({
@@ -50,6 +54,16 @@ export default function BingoSetupPage() {
   const [creating, setCreating] = useState(false);
   const preflightComplete = useMemo(() => Object.values(preflight).every(Boolean), [preflight]);
   const minTracksForMode = gameMode === "blackout" ? 100 : 75;
+  const derivedSecondsToNextCall = useMemo(
+    () =>
+      removeResleeveSeconds +
+      placeVinylSeconds +
+      cueSeconds +
+      startSlideSeconds +
+      hostBufferSeconds +
+      Math.ceil(sonosDelayMs / 1000),
+    [cueSeconds, hostBufferSeconds, placeVinylSeconds, removeResleeveSeconds, sonosDelayMs, startSlideSeconds]
+  );
 
   const load = async () => {
     const [pRes, sRes] = await Promise.all([
@@ -85,7 +99,11 @@ export default function BingoSetupPage() {
           game_mode: gameMode,
           card_count: cardCount,
           round_count: roundCount,
-          seconds_to_next_call: secondsToNextCall,
+          remove_resleeve_seconds: removeResleeveSeconds,
+          place_vinyl_seconds: placeVinylSeconds,
+          cue_seconds: cueSeconds,
+          start_slide_seconds: startSlideSeconds,
+          host_buffer_seconds: hostBufferSeconds,
           sonos_output_delay_ms: sonosDelayMs,
         }),
       });
@@ -154,15 +172,33 @@ export default function BingoSetupPage() {
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={1} value={roundCount} onChange={(e) => setRoundCount(Number(e.target.value) || 1)} />
             </label>
 
-            <label className="text-sm">Seconds to Next Call
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={10} value={secondsToNextCall} onChange={(e) => setSecondsToNextCall(Number(e.target.value) || 45)} />
+            <label className="text-sm">Remove + Resleeve (sec)
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={removeResleeveSeconds} onChange={(e) => setRemoveResleeveSeconds(Number(e.target.value) || 0)} />
+            </label>
+
+            <label className="text-sm">Place New Vinyl (sec)
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={placeVinylSeconds} onChange={(e) => setPlaceVinylSeconds(Number(e.target.value) || 0)} />
+            </label>
+
+            <label className="text-sm">Cue Track (sec)
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={cueSeconds} onChange={(e) => setCueSeconds(Number(e.target.value) || 0)} />
+            </label>
+
+            <label className="text-sm">Press Start + Slide (sec)
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={startSlideSeconds} onChange={(e) => setStartSlideSeconds(Number(e.target.value) || 0)} />
+            </label>
+
+            <label className="text-sm">Host Buffer (sec)
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={hostBufferSeconds} onChange={(e) => setHostBufferSeconds(Number(e.target.value) || 0)} />
             </label>
 
             <label className="text-sm">Sonos Output Delay (ms)
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={sonosDelayMs} onChange={(e) => setSonosDelayMs(Number(e.target.value) || 0)} />
             </label>
           </div>
-          <p className="mt-2 text-xs text-stone-500">Delay value is stored for timing reference; default is 75ms.</p>
+          <p className="mt-2 text-xs text-stone-400">
+            Derived time to next call: <span className="font-semibold text-amber-300">{derivedSecondsToNextCall}s</span> (includes Sonos delay).
+          </p>
 
           <div className="mt-4 rounded-xl border border-stone-700 bg-stone-950/80 p-3 text-sm">
             <p className="font-semibold uppercase tracking-wide text-amber-200">Preflight Checklist</p>

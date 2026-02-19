@@ -195,6 +195,11 @@ export type BingoDatabase = {
           round_end_policy: string;
           tie_break_policy: string;
           pool_exhaustion_policy: string;
+          remove_resleeve_seconds: number;
+          place_vinyl_seconds: number;
+          cue_seconds: number;
+          start_slide_seconds: number;
+          host_buffer_seconds: number;
           seconds_to_next_call: number;
           sonos_output_delay_ms: number;
           countdown_started_at: string | null;
@@ -225,6 +230,11 @@ export type BingoDatabase = {
           round_end_policy?: string;
           tie_break_policy?: string;
           pool_exhaustion_policy?: string;
+          remove_resleeve_seconds?: number;
+          place_vinyl_seconds?: number;
+          cue_seconds?: number;
+          start_slide_seconds?: number;
+          host_buffer_seconds?: number;
           seconds_to_next_call?: number;
           sonos_output_delay_ms?: number;
           countdown_started_at?: string | null;
@@ -255,6 +265,11 @@ export type BingoDatabase = {
           round_end_policy?: string;
           tie_break_policy?: string;
           pool_exhaustion_policy?: string;
+          remove_resleeve_seconds?: number;
+          place_vinyl_seconds?: number;
+          cue_seconds?: number;
+          start_slide_seconds?: number;
+          host_buffer_seconds?: number;
           seconds_to_next_call?: number;
           sonos_output_delay_ms?: number;
           countdown_started_at?: string | null;
