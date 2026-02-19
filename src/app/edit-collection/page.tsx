@@ -93,7 +93,6 @@ const TRACK_SORT_OPTIONS: { value: TrackSortOption; label: string; category: str
 type AppViewMode = 'collection' | 'album-track';
 type SidebarMode = 'format' | 'crates' | 'playlists';
 type TrackListSource = 'crates' | 'playlists';
-type CrateGameKey = 'bingo' | 'trivia' | 'brackets';
 
 type Playlist = CollectionPlaylist;
 
@@ -107,8 +106,6 @@ interface TrackAlbumGroup {
   sideTotals: Array<{ side: string; totalSeconds: number; trackCount: number }>;
 }
 
-type CrateGameFlags = Record<number, Record<CrateGameKey, boolean>>;
-
 const MEDIA_TYPE_FACETS = new Set([
   'Vinyl',
   'CD',
@@ -120,12 +117,6 @@ const MEDIA_TYPE_FACETS = new Set([
   'SACD',
   'Flexi-disc',
 ]);
-
-const CRATE_GAME_LABELS: { key: CrateGameKey; icon: string; label: string }[] = [
-  { key: 'bingo', icon: '🎱', label: 'Bingo' },
-  { key: 'trivia', icon: '❓', label: 'Trivia' },
-  { key: 'brackets', icon: '🏆', label: 'Brackets' },
-];
 
 const formatTrackDuration = (seconds: number | null | undefined): string => {
   if (!seconds || seconds <= 0) return '—';
@@ -298,7 +289,6 @@ function CollectionBrowserPage() {
   const [crates, setCrates] = useState<Crate[]>([]);
   const [crateItemCounts, setCrateItemCounts] = useState<Record<number, number>>({});
   const [crateItemsByCrate, setCrateItemsByCrate] = useState<Record<number, Set<number>>>({});
-  const [crateGameFlags, setCrateGameFlags] = useState<CrateGameFlags>({});
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<number | null>(null);
   const [showNewPlaylistModal, setShowNewPlaylistModal] = useState(false);
@@ -370,15 +360,6 @@ function CollectionBrowserPage() {
   }, []);
 
   useEffect(() => {
-    const storedFlags = localStorage.getItem('collection-crate-game-flags');
-    if (storedFlags) {
-      try {
-        setCrateGameFlags(JSON.parse(storedFlags) as CrateGameFlags);
-      } catch {
-        // Invalid JSON, ignore
-      }
-    }
-
     const storedViewMode = localStorage.getItem('collection-view-mode');
     if (storedViewMode === 'collection' || storedViewMode === 'album-track') {
       setViewMode(storedViewMode);
@@ -416,10 +397,6 @@ function CollectionBrowserPage() {
       }
     }
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem('collection-crate-game-flags', JSON.stringify(crateGameFlags));
-  }, [crateGameFlags]);
 
   useEffect(() => {
     localStorage.setItem('collection-view-mode', viewMode);
@@ -1301,19 +1278,6 @@ function CollectionBrowserPage() {
     }
   }, [selectedAlbumIds, crates, loadCrates]);
 
-  const toggleCrateGameFlag = useCallback((crateId: number, flag: CrateGameKey) => {
-    setCrateGameFlags((prev) => {
-      const existing = prev[crateId] ?? { bingo: false, trivia: false, brackets: false };
-      return {
-        ...prev,
-        [crateId]: {
-          ...existing,
-          [flag]: !existing[flag],
-        },
-      };
-    });
-  }, []);
-
   const toggleTrackSelection = useCallback((trackKey: string) => {
     setSelectedTrackKeys((prev) => {
       const next = new Set(prev);
@@ -1780,27 +1744,6 @@ function CollectionBrowserPage() {
                           <span>{crate.icon}</span>
                         )}
                         <span className="truncate">{crate.name}</span>
-                        {viewMode === 'album-track' && (
-                          <span className="flex items-center gap-0.5">
-                            {CRATE_GAME_LABELS.map((badge) => {
-                              const enabled = crateGameFlags[crate.id]?.[badge.key] ?? false;
-                              return (
-                                <span
-                                  key={`${crate.id}-${badge.key}`}
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    toggleCrateGameFlag(crate.id, badge.key);
-                                  }}
-                                  title={`${badge.label} ${enabled ? 'enabled' : 'disabled'}`}
-                                  className={`text-[10px] leading-none px-1 py-0.5 rounded ${enabled ? 'bg-white/25' : 'opacity-40 hover:opacity-80'}`}
-                                >
-                                  {badge.icon}
-                                </span>
-                              );
-                            })}
-                          </span>
-                        )}
                       </span>
                       <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${selectedCrateId === crate.id ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{crate.album_count || 0}</span>
                     </button>
@@ -2200,16 +2143,6 @@ function ExportCsvTxtModal({
       name: 'My Print / Export columns',
       columns: ['Artist', 'Title', 'Format', 'Discs', 'Tracks', 'Length', 'Barcode', 'Cat No', 'Genre', 'Label', 'Added'],
     },
-    {
-      id: 'favorite-bingo',
-      name: 'Bingo Export',
-      columns: ['Artist', 'Title', 'Format', 'Length', 'Cat No'],
-    },
-    {
-      id: 'favorite-trivia',
-      name: 'Trivia Export',
-      columns: ['Artist', 'Title', 'Year', 'Genre', 'Label'],
-    },
   ];
 
   const [formatType, setFormatType] = useState<'csv' | 'txt'>('csv');
@@ -2428,37 +2361,6 @@ function ExportCsvTxtModal({
     URL.revokeObjectURL(url);
   };
 
-  const applyPlaylistPreset = (preset: 'bingo_csv' | 'trivia_txt' | 'brackets_csv') => {
-    setScope('current');
-
-    if (preset === 'bingo_csv') {
-      setFormatType('csv');
-      setDelimiter(',');
-      setEnclosure('double');
-      setIncludeHeaders(true);
-      setFilename('bingo_playlist_export');
-      setSelectedTrackColumns(['track_title', 'track_artist', 'album_title', 'position', 'side', 'length', 'format', 'playlist']);
-      return;
-    }
-
-    if (preset === 'trivia_txt') {
-      setFormatType('txt');
-      setDelimiter('\t');
-      setEnclosure('none');
-      setIncludeHeaders(true);
-      setFilename('trivia_playlist_export');
-      setSelectedTrackColumns(['track_title', 'track_artist', 'album_title', 'playlist']);
-      return;
-    }
-
-    setFormatType('csv');
-    setDelimiter(',');
-    setEnclosure('double');
-    setIncludeHeaders(true);
-    setFilename('brackets_playlist_export');
-    setSelectedTrackColumns(['track_title', 'track_artist', 'album_title', 'length', 'playlist']);
-  };
-
   return (
     <>
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30003]" onClick={onClose}>
@@ -2575,17 +2477,6 @@ function ExportCsvTxtModal({
               )}
             </div>
           </div>
-
-          {viewMode === 'album-track' && (
-            <div className="mb-4 border border-gray-200 rounded p-3">
-              <div className="text-sm font-semibold text-gray-900 mb-2">Playlist Presets</div>
-              <div className="flex flex-wrap gap-2">
-                <button onClick={() => applyPlaylistPreset('bingo_csv')} className="px-3 py-1.5 text-xs rounded bg-blue-500 text-white hover:bg-blue-600 cursor-pointer">Bingo CSV Preset</button>
-                <button onClick={() => applyPlaylistPreset('trivia_txt')} className="px-3 py-1.5 text-xs rounded bg-indigo-500 text-white hover:bg-indigo-600 cursor-pointer">Trivia TXT Preset</button>
-                <button onClick={() => applyPlaylistPreset('brackets_csv')} className="px-3 py-1.5 text-xs rounded bg-emerald-500 text-white hover:bg-emerald-600 cursor-pointer">Brackets CSV Preset</button>
-              </div>
-            </div>
-          )}
 
           <div className="mb-3 flex items-center gap-2">
             <button onClick={() => setFormatType('csv')} className={`px-4 py-2 rounded text-sm font-semibold ${formatType === 'csv' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}>CSV</button>

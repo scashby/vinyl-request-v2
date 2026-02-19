@@ -5,10 +5,10 @@ export interface SharedIconPreset {
 
 export const SHARED_ICON_PRESETS: SharedIconPreset[] = [
   { icon: '📦', keywords: ['crate', 'box', 'collection'] },
-  { icon: '🎱', keywords: ['bingo', 'pool', 'game'] },
-  { icon: '❓', keywords: ['trivia', 'question', 'quiz'] },
-  { icon: '🏆', keywords: ['brackets', 'tournament', 'winner'] },
-  { icon: '🎮', keywords: ['game', 'gaming', 'other'] },
+  { icon: '🎱', keywords: ['pool'] },
+  { icon: '❓', keywords: ['question', 'quiz'] },
+  { icon: '🏆', keywords: ['tournament', 'winner'] },
+  { icon: '🎮', keywords: ['gaming', 'other'] },
   { icon: '🎲', keywords: ['dice', 'board', 'random'] },
   { icon: '🧩', keywords: ['puzzle', 'piece'] },
   { icon: '🎯', keywords: ['target', 'focus'] },
@@ -52,7 +52,7 @@ export const SHARED_ICON_PRESETS: SharedIconPreset[] = [
   { icon: '🆕', keywords: ['new', 'fresh'] },
   { icon: '🔒', keywords: ['private', 'lock'] },
   { icon: '🔓', keywords: ['open', 'unlock'] },
-  { icon: '🧠', keywords: ['brain', 'smart', 'trivia'] },
+  { icon: '🧠', keywords: ['brain', 'smart'] },
   { icon: '🛸', keywords: ['space', 'weird'] },
   { icon: '👑', keywords: ['king', 'queen', 'top'] },
   { icon: '🐺', keywords: ['wolf', 'animal'] },
