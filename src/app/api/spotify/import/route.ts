@@ -15,8 +15,19 @@ type SpotifyPlaylistTracksResponse = {
   next?: string | null;
 };
 
+type SpotifyPlaylistMeta = {
+  name?: string;
+  collaborative?: boolean;
+  owner?: { id?: string | null };
+};
+
+type SpotifyMe = {
+  id?: string;
+};
+
 export async function POST(req: Request) {
   let step = 'init';
+  let spotifyScope = '';
   try {
     step = 'parse-body';
     const body = await req.json();
@@ -30,6 +41,30 @@ export async function POST(req: Request) {
     const tokenData = await getSpotifyAccessTokenFromCookies();
     if (!tokenData.accessToken) {
       return NextResponse.json({ error: 'Not connected to Spotify' }, { status: 401 });
+    }
+    spotifyScope = tokenData.scope ?? '';
+
+    step = 'spotify-access-check';
+    const [me, playlistMeta] = await Promise.all([
+      spotifyApiGet<SpotifyMe>(tokenData.accessToken, '/me'),
+      spotifyApiGet<SpotifyPlaylistMeta>(
+        tokenData.accessToken,
+        `/playlists/${playlistId}?fields=name,collaborative,owner(id)`
+      ),
+    ]);
+    const currentUserId = me.id ?? '';
+    const isOwner = !!currentUserId && (playlistMeta.owner?.id ?? '') === currentUserId;
+    const isCollaborator = !!playlistMeta.collaborative;
+    if (!isOwner && !isCollaborator) {
+      return NextResponse.json(
+        {
+          error:
+            'Spotify blocked playlist item access for this playlist. Only owner/collaborator playlists are importable.',
+          scope: spotifyScope,
+          step,
+        },
+        { status: 403 }
+      );
     }
 
     step = 'spotify-tracks';
@@ -138,6 +173,13 @@ export async function POST(req: Request) {
         path: '/',
         maxAge: 60 * 60 * 24 * 90,
       });
+      response.cookies.set('spotify_scope', tokenData.refreshed.scope ?? tokenData.scope ?? '', {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 90,
+      });
     }
 
     return response;
@@ -150,6 +192,7 @@ export async function POST(req: Request) {
           error:
             'Spotify denied access to playlist tracks (403). Reconnect Spotify to refresh permissions, then retry.',
           details: message,
+          scope: spotifyScope,
           step,
         },
         { status: 403 }

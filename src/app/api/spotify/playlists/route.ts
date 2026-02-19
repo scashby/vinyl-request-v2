@@ -4,6 +4,8 @@ import { getSpotifyAccessTokenFromCookies, spotifyApiGet } from '../../../../lib
 type SpotifyPlaylistRow = {
   id: string;
   name: string;
+  collaborative?: boolean;
+  owner?: { id?: string | null };
   tracks?: { total?: number };
 };
 
@@ -12,12 +14,18 @@ type SpotifyPlaylistResponse = {
   next?: string | null;
 };
 
+type SpotifyMe = {
+  id?: string;
+};
+
 export async function GET() {
   try {
     const tokenData = await getSpotifyAccessTokenFromCookies();
     if (!tokenData.accessToken) {
       return NextResponse.json({ error: 'Not connected to Spotify' }, { status: 401 });
     }
+    const me = await spotifyApiGet<SpotifyMe>(tokenData.accessToken, '/me');
+    const currentUserId = me.id ?? '';
 
     const items: SpotifyPlaylistRow[] = [];
     let offset = 0;
@@ -26,7 +34,7 @@ export async function GET() {
     while (true) {
       const data = await spotifyApiGet<SpotifyPlaylistResponse>(
         tokenData.accessToken,
-        `/me/playlists?limit=${limit}&offset=${offset}`
+        `/me/playlists?limit=${limit}&offset=${offset}&fields=items(id,name,collaborative,owner(id),tracks(total)),next`
       );
       const rows = data.items ?? [];
       items.push(...rows);
@@ -36,6 +44,7 @@ export async function GET() {
     }
 
     const response = NextResponse.json({
+      scope: tokenData.scope ?? '',
       playlists: await Promise.all(
         items.map(async (row) => {
           let trackCount = row.tracks?.total;
@@ -54,6 +63,14 @@ export async function GET() {
             id: row.id,
             name: row.name,
             trackCount: trackCount ?? 0,
+            canImport:
+              !!row.collaborative ||
+              (!!currentUserId && (row.owner?.id ?? '') === currentUserId),
+            importReason:
+              !!row.collaborative ||
+              (!!currentUserId && (row.owner?.id ?? '') === currentUserId)
+                ? null
+                : 'Spotify only allows track-item API access for owner/collaborator playlists.',
           };
         })
       ),
@@ -77,6 +94,13 @@ export async function GET() {
         });
       }
       response.cookies.set('spotify_expires_at', String(Date.now() + tokenData.refreshed.expires_in * 1000), {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 90,
+      });
+      response.cookies.set('spotify_scope', tokenData.refreshed.scope ?? tokenData.scope ?? '', {
         httpOnly: true,
         secure: true,
         sameSite: 'lax',

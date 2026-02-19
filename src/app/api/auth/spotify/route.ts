@@ -28,6 +28,13 @@ export async function GET() {
       path: '/',
       maxAge: 0,
     });
+    cookieStore.set('spotify_scope', '', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 0,
+    });
     cookieStore.set('spotify_oauth_state', state, {
       httpOnly: true,
       secure: true,

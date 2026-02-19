@@ -6,6 +6,8 @@ type SpotifyPlaylist = {
   id: string;
   name: string;
   trackCount: number;
+  canImport?: boolean;
+  importReason?: string | null;
 };
 
 interface SpotifyImportModalProps {
@@ -22,6 +24,7 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
   const [isConnected, setIsConnected] = useState(true);
   const [importingId, setImportingId] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
+  const [scope, setScope] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -46,6 +49,7 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
         if (!active) return;
         setIsConnected(true);
         setPlaylists(payload.playlists ?? []);
+        setScope(payload.scope ?? '');
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : 'Failed to load Spotify playlists');
@@ -89,6 +93,11 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                   Reconnect Spotify
                 </a>
               </div>
+              {scope && (
+                <div className="mb-3 text-xs text-gray-600">
+                  Granted scopes: <code>{scope}</code>
+                </div>
+              )}
               <div className="mb-3">
                 <input
                   value={query}
@@ -108,6 +117,9 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                       <div>
                         <div className="text-sm font-medium text-gray-900">{playlist.name}</div>
                         <div className="text-xs text-gray-500">{playlist.trackCount} tracks</div>
+                        {!playlist.canImport && (
+                          <div className="text-xs text-amber-700">{playlist.importReason || 'Not importable'}</div>
+                        )}
                       </div>
                       <button
                         onClick={async () => {
@@ -125,7 +137,9 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                             });
                             const payload = await res.json().catch(() => ({}));
                             if (!res.ok) {
-                              throw new Error(payload?.error || `Import failed (${res.status})`);
+                              const detail = payload?.details ? ` (${payload.details})` : '';
+                              const granted = payload?.scope ? ` [scope: ${payload.scope}]` : '';
+                              throw new Error((payload?.error || `Import failed (${res.status})`) + detail + granted);
                             }
                             setLastResult(
                               `Imported "${playlist.name}": ${payload.matchedCount} matched, ${payload.unmatchedCount} unmatched`
@@ -137,10 +151,10 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                             setImportingId(null);
                           }
                         }}
-                        disabled={importingId === playlist.id}
-                        className={`px-3 py-1.5 rounded text-xs font-medium text-white ${importingId === playlist.id ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'}`}
+                        disabled={importingId === playlist.id || playlist.canImport === false}
+                        className={`px-3 py-1.5 rounded text-xs font-medium text-white ${importingId === playlist.id || playlist.canImport === false ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'}`}
                       >
-                        {importingId === playlist.id ? 'Importing...' : 'Import'}
+                        {playlist.canImport === false ? 'Blocked' : importingId === playlist.id ? 'Importing...' : 'Import'}
                       </button>
                     </div>
                   ))}

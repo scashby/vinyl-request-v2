@@ -49,6 +49,13 @@ export async function GET(req: NextRequest) {
       path: '/',
       maxAge: 60 * 60 * 24 * 90,
     });
+    res.cookies.set('spotify_scope', token.scope ?? '', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 90,
+    });
     res.cookies.set('spotify_oauth_state', '', {
       httpOnly: true,
       secure: true,

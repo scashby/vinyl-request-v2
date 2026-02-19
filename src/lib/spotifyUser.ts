@@ -8,6 +8,7 @@ type TokenPayload = {
   token_type: string;
   expires_in: number;
   refresh_token?: string;
+  scope?: string;
 };
 
 function getSpotifyEnv() {
@@ -36,7 +37,10 @@ export function getSpotifyAuthorizeUrl(state: string) {
   url.searchParams.set('client_id', clientId);
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('redirect_uri', redirectUri);
-  url.searchParams.set('scope', 'playlist-read-private playlist-read-collaborative');
+  url.searchParams.set(
+    'scope',
+    'playlist-read-private playlist-read-collaborative user-read-private user-read-email'
+  );
   // Force consent so stale tokens/scopes do not linger between reconnects.
   url.searchParams.set('show_dialog', 'true');
   url.searchParams.set('state', state);
@@ -91,13 +95,14 @@ export async function getSpotifyAccessTokenFromCookies() {
   const access = cookieStore.get('spotify_access_token')?.value ?? '';
   const refresh = cookieStore.get('spotify_refresh_token')?.value ?? '';
   const expiresAt = Number(cookieStore.get('spotify_expires_at')?.value ?? '0');
+  const scope = cookieStore.get('spotify_scope')?.value ?? '';
 
   if (access && Date.now() < expiresAt - 30_000) {
-    return { accessToken: access, refreshToken: refresh, refreshed: null as TokenPayload | null };
+    return { accessToken: access, refreshToken: refresh, scope, refreshed: null as TokenPayload | null };
   }
 
   if (!refresh) {
-    return { accessToken: '', refreshToken: '', refreshed: null as TokenPayload | null };
+    return { accessToken: '', refreshToken: '', scope, refreshed: null as TokenPayload | null };
   }
 
   const refreshed = await refreshSpotifyAccessToken(refresh);
@@ -105,6 +110,7 @@ export async function getSpotifyAccessTokenFromCookies() {
   return {
     accessToken: refreshed.access_token,
     refreshToken: nextRefresh,
+    scope: refreshed.scope ?? scope,
     refreshed,
   };
 }
