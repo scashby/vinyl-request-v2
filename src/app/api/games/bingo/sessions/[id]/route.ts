@@ -15,14 +15,11 @@ type SessionRow = {
   card_label_mode: string;
   round_count: number;
   current_round: number;
-  songs_per_round: number;
-  clip_seconds: number;
-  prep_buffer_seconds: number;
-  auto_advance: boolean;
   round_end_policy: string;
   tie_break_policy: string;
   pool_exhaustion_policy: string;
   seconds_to_next_call: number;
+  sonos_output_delay_ms: number;
   countdown_started_at: string | null;
   paused_remaining_seconds: number | null;
   paused_at: string | null;
@@ -52,7 +49,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const db = getBingoDb();
   const { data, error } = await db
     .from("bingo_sessions")
-    .select("id, event_id, playlist_id, session_code, game_mode, card_count, card_layout, card_label_mode, round_count, current_round, songs_per_round, clip_seconds, prep_buffer_seconds, auto_advance, round_end_policy, tie_break_policy, pool_exhaustion_policy, seconds_to_next_call, countdown_started_at, paused_remaining_seconds, paused_at, current_call_index, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at")
+    .select("id, event_id, playlist_id, session_code, game_mode, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, seconds_to_next_call, sonos_output_delay_ms, countdown_started_at, paused_remaining_seconds, paused_at, current_call_index, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at")
     .eq("id", sessionId)
     .maybeSingle();
 

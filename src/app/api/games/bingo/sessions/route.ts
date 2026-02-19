@@ -13,12 +13,8 @@ type CreateSessionBody = {
   card_layout?: "2-up" | "4-up";
   card_label_mode?: "track_artist" | "track_only";
   round_count?: number;
-  songs_per_round?: number;
-  clip_seconds?: number;
-  prep_buffer_seconds?: number;
-  auto_advance?: boolean;
   seconds_to_next_call?: number;
-  setlist_mode?: boolean;
+  sonos_output_delay_ms?: number;
   recent_calls_limit?: number;
   show_title?: boolean;
   show_logo?: boolean;
@@ -108,14 +104,11 @@ export async function POST(request: NextRequest) {
         card_label_mode: body.card_label_mode ?? "track_artist",
         round_count: body.round_count ?? 3,
         current_round: 1,
-        songs_per_round: body.songs_per_round ?? 15,
-        clip_seconds: body.clip_seconds ?? 80,
-        prep_buffer_seconds: body.prep_buffer_seconds ?? 45,
-        auto_advance: body.auto_advance ?? false,
         round_end_policy: "open_until_winner",
         tie_break_policy: "one_song_playoff",
         pool_exhaustion_policy: "declare_tie",
         seconds_to_next_call: body.seconds_to_next_call ?? 45,
+        sonos_output_delay_ms: body.sonos_output_delay_ms ?? 75,
         recent_calls_limit: body.recent_calls_limit ?? 5,
         show_title: body.show_title ?? true,
         show_logo: body.show_logo ?? true,
@@ -131,7 +124,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await generateSessionCalls(db, session.id, playlistId, Boolean(body.setlist_mode));
+      await generateSessionCalls(db, session.id, playlistId, gameMode);
       await generateCards(db, session.id, session.card_count, session.card_label_mode as "track_artist" | "track_only");
     } catch (error) {
       await db.from("bingo_sessions").delete().eq("id", session.id);

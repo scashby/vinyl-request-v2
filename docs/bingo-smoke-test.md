@@ -7,7 +7,7 @@
 ## 2. Setup page
 1. Open `/admin/games/bingo`.
 2. Confirm playlist dropdown is populated from collection playlists.
-3. Select a playlist with at least 25 tracks.
+3. Select a playlist with at least 75 tracks (100 for Blackout mode).
 4. Create a session.
 
 Expected:

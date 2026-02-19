@@ -38,22 +38,18 @@ export default function BingoSetupPage() {
   const [gameMode, setGameMode] = useState("single_line");
   const [cardCount, setCardCount] = useState(40);
   const [roundCount, setRoundCount] = useState(3);
-  const [songsPerRound, setSongsPerRound] = useState(15);
   const [secondsToNextCall, setSecondsToNextCall] = useState(45);
-  const [clipSeconds, setClipSeconds] = useState(80);
-  const [prepBufferSeconds, setPrepBufferSeconds] = useState(45);
-  const [autoAdvance, setAutoAdvance] = useState(false);
-  const [setlistMode, setSetlistMode] = useState(false);
+  const [sonosDelayMs, setSonosDelayMs] = useState(75);
 
   const [preflight, setPreflight] = useState({
     cratePull: false,
     needleReady: false,
     backupsReady: false,
-    boardReset: false,
   });
 
   const [creating, setCreating] = useState(false);
   const preflightComplete = useMemo(() => Object.values(preflight).every(Boolean), [preflight]);
+  const minTracksForMode = gameMode === "blackout" ? 100 : 75;
 
   const load = async () => {
     const [pRes, sRes] = await Promise.all([
@@ -89,12 +85,8 @@ export default function BingoSetupPage() {
           game_mode: gameMode,
           card_count: cardCount,
           round_count: roundCount,
-          songs_per_round: songsPerRound,
           seconds_to_next_call: secondsToNextCall,
-          clip_seconds: clipSeconds,
-          prep_buffer_seconds: prepBufferSeconds,
-          auto_advance: autoAdvance,
-          setlist_mode: setlistMode,
+          sonos_output_delay_ms: sonosDelayMs,
         }),
       });
 
@@ -137,6 +129,9 @@ export default function BingoSetupPage() {
 
         <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-amber-100">Create Session</h2>
+          <p className="mt-1 text-xs text-stone-400">
+            Minimum playlist size: <span className="font-semibold text-amber-300">{minTracksForMode}</span> tracks for {gameMode === "blackout" ? "Blackout" : "current mode"}.
+          </p>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <label className="text-sm">Playlist
               <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={playlistId ?? ""} onChange={(e) => setPlaylistId(Number(e.target.value) || null)}>
@@ -159,27 +154,15 @@ export default function BingoSetupPage() {
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={1} value={roundCount} onChange={(e) => setRoundCount(Number(e.target.value) || 1)} />
             </label>
 
-            <label className="text-sm">Songs per Round
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={1} value={songsPerRound} onChange={(e) => setSongsPerRound(Number(e.target.value) || 1)} />
-            </label>
-
             <label className="text-sm">Seconds to Next Call
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={10} value={secondsToNextCall} onChange={(e) => setSecondsToNextCall(Number(e.target.value) || 45)} />
             </label>
 
-            <label className="text-sm">Clip Seconds
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={10} value={clipSeconds} onChange={(e) => setClipSeconds(Number(e.target.value) || 80)} />
-            </label>
-
-            <label className="text-sm">Prep Buffer Seconds
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={10} value={prepBufferSeconds} onChange={(e) => setPrepBufferSeconds(Number(e.target.value) || 45)} />
+            <label className="text-sm">Sonos Output Delay (ms)
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={sonosDelayMs} onChange={(e) => setSonosDelayMs(Number(e.target.value) || 0)} />
             </label>
           </div>
-
-          <div className="mt-4 flex flex-wrap gap-4 text-sm">
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={setlistMode} onChange={(e) => setSetlistMode(e.target.checked)} /> Setlist mode</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={autoAdvance} onChange={(e) => setAutoAdvance(e.target.checked)} /> Auto advance</label>
-          </div>
+          <p className="mt-2 text-xs text-stone-500">Delay value is stored for timing reference; default is 75ms.</p>
 
           <div className="mt-4 rounded-xl border border-stone-700 bg-stone-950/80 p-3 text-sm">
             <p className="font-semibold uppercase tracking-wide text-amber-200">Preflight Checklist</p>
@@ -187,7 +170,6 @@ export default function BingoSetupPage() {
               <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.cratePull} onChange={(e) => setPreflight((p) => ({ ...p, cratePull: e.target.checked }))} /> Crate pull complete</label>
               <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.needleReady} onChange={(e) => setPreflight((p) => ({ ...p, needleReady: e.target.checked }))} /> Needle/cleaning ready</label>
               <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.backupsReady} onChange={(e) => setPreflight((p) => ({ ...p, backupsReady: e.target.checked }))} /> Backup tracks staged</label>
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.boardReset} onChange={(e) => setPreflight((p) => ({ ...p, boardReset: e.target.checked }))} /> Dry-erase board reset</label>
             </div>
           </div>
 

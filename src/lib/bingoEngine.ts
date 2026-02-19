@@ -217,13 +217,14 @@ export async function generateSessionCalls(
   db: BingoDbClient,
   sessionId: number,
   playlistId: number,
-  setlistMode: boolean
+  gameMode: GameMode
 ): Promise<number> {
   const tracks = await resolvePlaylistTracks(db, playlistId);
-  const source = setlistMode ? tracks : shuffle(tracks);
+  const source = shuffle(tracks);
 
-  if (source.length < 25) {
-    throw new Error("Playlist must contain at least 25 tracks to generate cards.");
+  const minTracks = gameMode === "blackout" ? 100 : 75;
+  if (source.length < minTracks) {
+    throw new Error(`Playlist must contain at least ${minTracks} tracks for ${gameMode === "blackout" ? "Blackout" : "this game mode"}.`);
   }
 
   const rows = source.map((track, idx) => ({
