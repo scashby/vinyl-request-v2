@@ -102,7 +102,8 @@ const buildOAuthHeader = (oauth: DiscogsOAuthCredentials): string => {
 const buildDiscogsAttempts = (
   url: string,
   userAgent?: string,
-  oauth?: DiscogsOAuthCredentials | null
+  oauth?: DiscogsOAuthCredentials | null,
+  opts?: { oauthOnly?: boolean }
 ): DiscogsAttempt[] => {
   const ua = userAgent || process.env.APP_USER_AGENT || DEFAULT_USER_AGENT;
   const baseHeaders: HeadersInit = {
@@ -110,6 +111,7 @@ const buildDiscogsAttempts = (
     Accept: 'application/vnd.discogs.v2.discogs+json, application/json',
   };
   const attempts: DiscogsAttempt[] = [];
+  const oauthOnly = Boolean(opts?.oauthOnly);
 
   if (oauth) {
     attempts.push({
@@ -121,6 +123,8 @@ const buildDiscogsAttempts = (
       },
     });
   }
+
+  if (oauthOnly) return attempts;
 
   if (HAS_TOKEN_AUTH) {
     attempts.push({
@@ -158,10 +162,13 @@ const buildDiscogsAttempts = (
 export async function fetchDiscogsJson<T>(
   url: string,
   userAgent?: string,
-  opts?: { oauth?: DiscogsOAuthCredentials | null }
+  opts?: { oauth?: DiscogsOAuthCredentials | null; oauthOnly?: boolean }
 ): Promise<T> {
-  const attempts = buildDiscogsAttempts(url, userAgent, opts?.oauth);
+  const attempts = buildDiscogsAttempts(url, userAgent, opts?.oauth, { oauthOnly: opts?.oauthOnly });
   if (attempts.length === 0) {
+    if (opts?.oauthOnly) {
+      throw new Error('Discogs OAuth cookie missing');
+    }
     throw new Error('Discogs credentials not configured');
   }
 

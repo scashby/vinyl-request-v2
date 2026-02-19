@@ -1255,11 +1255,11 @@ export async function fetchDiscogsData(
   opts?: { oauth?: DiscogsOAuthCredentials | null }
 ): Promise<EnrichmentResult> {
   try {
-    if (!hasDiscogsCredentials() && !opts?.oauth) {
+    if (!opts?.oauth) {
       return {
         success: false,
         source: 'discogs',
-        error: 'Missing Discogs credentials (no OAuth cookie and no DISCOGS_TOKEN/DISCOGS_ACCESS_TOKEN/NEXT_PUBLIC_DISCOGS_TOKEN or DISCOGS_CONSUMER_KEY + DISCOGS_CONSUMER_SECRET|DISCOGS_SECRET_KEY)',
+        error: 'Missing Discogs OAuth cookie. Reconnect Discogs.',
       };
     }
     let releaseId = album.discogs_release_id;
@@ -1269,7 +1269,7 @@ export async function fetchDiscogsData(
       const searchData = await fetchDiscogsJson<{ results?: Array<{ id?: string | number }> }>(
         `https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release`,
         USER_AGENT,
-        { oauth: opts?.oauth }
+        { oauth: opts?.oauth, oauthOnly: true }
       );
       const foundId = searchData.results?.[0]?.id;
       if (foundId !== null && foundId !== undefined) {
@@ -1283,7 +1283,7 @@ export async function fetchDiscogsData(
     const data = await fetchDiscogsJson<DiscogsRelease>(
       `https://api.discogs.com/releases/${releaseId}`,
       USER_AGENT,
-      { oauth: opts?.oauth }
+      { oauth: opts?.oauth, oauthOnly: true }
     );
 
     const formatString = buildDiscogsFormatString(data.formats as Array<{ name?: string; qty?: string | number; descriptions?: string[] }> | undefined);
@@ -1295,7 +1295,7 @@ export async function fetchDiscogsData(
         masterData = await fetchDiscogsJson<{ year?: number }>(
           `https://api.discogs.com/masters/${data.master_id}`,
           USER_AGENT,
-          { oauth: opts?.oauth }
+          { oauth: opts?.oauth, oauthOnly: true }
         );
     }
 
@@ -1384,8 +1384,7 @@ export async function fetchDiscogsData(
 
     return { success: true, source: 'discogs', data: candidate };
   } catch (e) {
-    const oauthContext = opts?.oauth ? 'oauth_cookie:present' : 'oauth_cookie:missing';
-    return { success: false, source: 'discogs', error: `${oauthContext} | ${(e as Error).message}` };
+    return { success: false, source: 'discogs', error: (e as Error).message };
   }
 }
 
