@@ -47,22 +47,26 @@ export async function GET() {
       scope: tokenData.scope ?? '',
       playlists: await Promise.all(
         items.map(async (row) => {
-          let trackCount = row.tracks?.total;
-          if (typeof trackCount !== 'number') {
+          let trackCount: number | null =
+            typeof row.tracks?.total === 'number' ? row.tracks.total : null;
+          if (trackCount === null) {
             try {
               const playlist = await spotifyApiGet<{ tracks?: { total?: number } }>(
                 tokenData.accessToken,
                 `/playlists/${row.id}?fields=tracks(total)`
               );
-              trackCount = playlist.tracks?.total;
+              trackCount =
+                typeof playlist.tracks?.total === 'number'
+                  ? playlist.tracks.total
+                  : null;
             } catch {
-              trackCount = 0;
+              trackCount = null;
             }
           }
           return {
             id: row.id,
             name: row.name,
-            trackCount: trackCount ?? 0,
+            trackCount,
             canImport:
               !!row.collaborative ||
               (!!currentUserId && (row.owner?.id ?? '') === currentUserId),

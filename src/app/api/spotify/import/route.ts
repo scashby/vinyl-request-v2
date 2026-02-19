@@ -19,6 +19,11 @@ type SpotifyPlaylistMeta = {
   name?: string;
   collaborative?: boolean;
   owner?: { id?: string | null };
+  tracks?: {
+    items?: SpotifyTrackItem[];
+    total?: number;
+    next?: string | null;
+  };
 };
 
 type SpotifyMe = {
@@ -69,22 +74,53 @@ export async function POST(req: Request) {
 
     step = 'spotify-tracks';
     const rows: Array<{ title?: string; artist?: string }> = [];
-    let offset = 0;
-    const limit = 100;
-    while (true) {
-      const data = await spotifyApiGet<SpotifyPlaylistTracksResponse>(
+    let sourceTotal: number | null = null;
+    let partialImport = false;
+    let importSource: 'playlist_items' | 'playlist_fallback' = 'playlist_items';
+    try {
+      let offset = 0;
+      const limit = 100;
+      while (true) {
+        const data = await spotifyApiGet<SpotifyPlaylistTracksResponse>(
+          tokenData.accessToken,
+          `/playlists/${playlistId}/tracks?limit=${limit}&offset=${offset}&fields=items(track(name,artists(name))),next`
+        );
+        const items = data.items ?? [];
+        items.forEach((item) => {
+          const title = item.track?.name;
+          const artist = (item.track?.artists ?? []).map((a) => a.name).filter(Boolean).join(', ');
+          if (title) rows.push({ title, artist });
+        });
+        if (!data.next || items.length === 0) break;
+        offset += limit;
+        if (offset > 5000) break;
+      }
+      sourceTotal = rows.length;
+    } catch (tracksError) {
+      const message = tracksError instanceof Error ? tracksError.message : String(tracksError);
+      if (!message.toLowerCase().includes('failed (403)')) {
+        throw tracksError;
+      }
+
+      // Fallback path: for some public playlists Spotify still exposes first-page
+      // track items through GET /playlists/{id} even when /tracks is restricted.
+      importSource = 'playlist_fallback';
+      const fallback = await spotifyApiGet<SpotifyPlaylistMeta>(
         tokenData.accessToken,
-        `/playlists/${playlistId}/tracks?limit=${limit}&offset=${offset}&fields=items(track(name,artists(name))),next`
+        `/playlists/${playlistId}?fields=tracks(total,next,items(track(name,artists(name))))`
       );
-      const items = data.items ?? [];
-      items.forEach((item) => {
+      sourceTotal =
+        typeof fallback.tracks?.total === 'number' ? fallback.tracks.total : null;
+      partialImport = !!fallback.tracks?.next;
+      for (const item of fallback.tracks?.items ?? []) {
         const title = item.track?.name;
         const artist = (item.track?.artists ?? []).map((a) => a.name).filter(Boolean).join(', ');
         if (title) rows.push({ title, artist });
-      });
-      if (!data.next || items.length === 0) break;
-      offset += limit;
-      if (offset > 5000) break;
+      }
+
+      if (rows.length === 0) {
+        throw tracksError;
+      }
     }
 
     step = 'inventory-index';
@@ -144,6 +180,9 @@ export async function POST(req: Request) {
       playlistId: inserted.id,
       playlistName,
       sourceCount: rows.length,
+      sourceTotal,
+      importSource,
+      partialImport,
       matchedCount: dedupedTrackKeys.length,
       unmatchedCount: missing.length,
       unmatchedSample: missing.slice(0, 25),
