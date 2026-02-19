@@ -742,6 +742,51 @@ function CollectionBrowserPage() {
     }
 
     if ((playlistRows ?? []).length === 0) {
+      const backup = localStorage.getItem('collection-playlists-backup-v2');
+      if (backup) {
+        try {
+          const parsed = JSON.parse(backup) as Playlist[];
+          if (parsed.length > 0) {
+            for (let i = 0; i < parsed.length; i += 1) {
+              const item = parsed[i];
+              const { data: inserted, error: insertError } = await (supabase as any)
+                .from('collection_playlists')
+                .insert({
+                  name: item.name,
+                  icon: item.icon || (item.isSmart ? '⚡' : '🎵'),
+                  color: item.color || '#3578b3',
+                  sort_order: i,
+                  created_at: item.createdAt || new Date().toISOString(),
+                  is_smart: !!item.isSmart,
+                  smart_rules: item.smartRules ?? null,
+                  match_rules: item.matchRules ?? 'all',
+                  live_update: item.liveUpdate !== false,
+                })
+                .select('id')
+                .single();
+              if (insertError || !inserted) throw insertError || new Error('Failed to restore playlist from backup');
+
+              const trackKeys = item.trackKeys ?? [];
+              if (trackKeys.length > 0) {
+                const records = trackKeys.map((trackKey, idx) => ({
+                  playlist_id: inserted.id,
+                  track_key: trackKey,
+                  sort_order: idx,
+                }));
+                const { error: itemsInsertError } = await (supabase as any)
+                  .from('collection_playlist_items')
+                  .insert(records);
+                if (itemsInsertError) throw itemsInsertError;
+              }
+            }
+            await loadPlaylists();
+            return;
+          }
+        } catch (backupError) {
+          console.error('Failed restoring playlists from local backup:', backupError);
+        }
+      }
+
       const legacy = localStorage.getItem('collection-track-playlists');
       if (legacy) {
         try {
@@ -824,6 +869,7 @@ function CollectionBrowserPage() {
     }));
 
     setPlaylists(mapped);
+    localStorage.setItem('collection-playlists-backup-v2', JSON.stringify(mapped));
   }, []);
 
   useEffect(() => {
