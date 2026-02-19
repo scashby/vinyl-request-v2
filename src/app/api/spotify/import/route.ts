@@ -4,6 +4,11 @@ import { buildInventoryIndex, fetchInventoryTracks, matchTracks, sanitizePlaylis
 import { getSpotifyAccessTokenFromCookies, spotifyApiGet } from '../../../../lib/spotifyUser';
 
 type SpotifyTrackItem = {
+  item?: {
+    type?: string;
+    name?: string;
+    artists?: Array<{ name?: string }>;
+  };
   track?: {
     name?: string;
     artists?: Array<{ name?: string }>;
@@ -30,6 +35,11 @@ type SpotifyPlaylistMeta = {
 type SpotifyMe = {
   id?: string;
 };
+
+function isForbiddenSpotifyError(message: string) {
+  const lowered = message.toLowerCase();
+  return lowered.includes('failed (403)') || lowered.includes('forbidden');
+}
 
 export async function POST(req: Request) {
   let step = 'init';
@@ -64,16 +74,34 @@ export async function POST(req: Request) {
 
     const appendRows = (items: SpotifyTrackItem[] = []) => {
       for (const item of items) {
-        const title = item.track?.name;
-        const artist = (item.track?.artists ?? []).map((a) => a.name).filter(Boolean).join(', ');
+        const trackNode = item.track ?? (item.item?.type === 'track' ? item.item : undefined);
+        const title = trackNode?.name;
+        const artist = (trackNode?.artists ?? []).map((a) => a.name).filter(Boolean).join(', ');
         if (title) rows.push({ title, artist });
       }
     };
 
-    const playlist = await spotifyApiGet<SpotifyPlaylistMeta>(
-      tokenData.accessToken,
-      `/playlists/${playlistId}?market=from_token`
-    );
+    let playlist: SpotifyPlaylistMeta | null = null;
+    const playlistMetaPaths = [
+      `/playlists/${playlistId}?fields=name,owner(id),tracks(total,next,items(item(type,name,artists(name)),track(name,artists(name))))&market=from_token`,
+      `/playlists/${playlistId}?fields=name,owner(id),tracks(total,next,items(item(type,name,artists(name)),track(name,artists(name))))`,
+      `/playlists/${playlistId}?market=from_token`,
+      `/playlists/${playlistId}`,
+    ];
+    let lastPlaylistMetaError: unknown = null;
+    for (const path of playlistMetaPaths) {
+      try {
+        playlist = await spotifyApiGet<SpotifyPlaylistMeta>(tokenData.accessToken, path);
+        break;
+      } catch (err) {
+        lastPlaylistMetaError = err;
+        const message = err instanceof Error ? err.message : String(err);
+        if (!isForbiddenSpotifyError(message)) throw err;
+      }
+    }
+    if (!playlist) {
+      throw lastPlaylistMetaError instanceof Error ? lastPlaylistMetaError : new Error('Failed to fetch Spotify playlist metadata');
+    }
 
     playlistOwnerId = playlist.owner?.id ?? '';
     sourceTotal =
@@ -86,25 +114,47 @@ export async function POST(req: Request) {
     let offset = rows.length;
     const totalToFetch = sourceTotal ?? rows.length;
     while (offset < totalToFetch) {
-      try {
-        const nextPage = await spotifyApiGet<SpotifyPlaylistTracksResponse>(
-          tokenData.accessToken,
-          `/playlists/${playlistId}/tracks?limit=100&offset=${offset}&market=from_token&additional_types=track&fields=items(track(name,artists(name))),next`
-        );
-        const pageItems = nextPage.items ?? [];
-        appendRows(pageItems);
-        if (pageItems.length === 0) break;
-        offset += pageItems.length;
-      } catch (tracksError) {
-        const message = tracksError instanceof Error ? tracksError.message : String(tracksError);
-        if (message.toLowerCase().includes('failed (403)')) {
-          // Keep the rows gathered so far instead of hard-failing the import.
-          partialImport = true;
-          importSource = 'playlist_fallback';
+      const trackPagePaths = [
+        `/playlists/${playlistId}/items?limit=50&offset=${offset}&market=from_token&additional_types=track&fields=items(item(type,name,artists(name)),track(name,artists(name))),next`,
+        `/playlists/${playlistId}/items?limit=50&offset=${offset}&market=from_token&fields=items(item(type,name,artists(name)),track(name,artists(name))),next`,
+        `/playlists/${playlistId}/items?limit=50&offset=${offset}&fields=items(item(type,name,artists(name)),track(name,artists(name))),next`,
+        `/playlists/${playlistId}/items?limit=50&offset=${offset}&market=from_token`,
+        `/playlists/${playlistId}/items?limit=50&offset=${offset}`,
+      ];
+      let pageLoaded = false;
+      let forbiddenOnAllVariants = true;
+      let lastTrackPageError: unknown = null;
+
+      for (const path of trackPagePaths) {
+        try {
+          const nextPage = await spotifyApiGet<SpotifyPlaylistTracksResponse>(tokenData.accessToken, path);
+          const pageItems = nextPage.items ?? [];
+          appendRows(pageItems);
+          if (pageItems.length === 0) {
+            offset = totalToFetch;
+          } else {
+            offset += pageItems.length;
+          }
+          pageLoaded = true;
           break;
+        } catch (tracksError) {
+          lastTrackPageError = tracksError;
+          const message = tracksError instanceof Error ? tracksError.message : String(tracksError);
+          if (!isForbiddenSpotifyError(message)) {
+            throw tracksError;
+          }
+          forbiddenOnAllVariants = true;
         }
-        throw tracksError;
       }
+
+      if (pageLoaded) continue;
+      if (forbiddenOnAllVariants) {
+        // Keep the rows gathered so far instead of hard-failing the import.
+        partialImport = true;
+        importSource = 'playlist_fallback';
+        break;
+      }
+      throw lastTrackPageError instanceof Error ? lastTrackPageError : new Error('Failed to fetch Spotify playlist tracks');
     }
 
     if (rows.length === 0 && (sourceTotal === null || sourceTotal > 0)) {

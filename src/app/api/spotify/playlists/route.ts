@@ -50,17 +50,25 @@ export async function GET() {
           let trackCount: number | null =
             typeof row.tracks?.total === 'number' ? row.tracks.total : null;
           if (trackCount === null) {
-            try {
-              const playlist = await spotifyApiGet<{ tracks?: { total?: number } }>(
-                tokenData.accessToken,
-                `/playlists/${row.id}?fields=tracks(total)`
-              );
-              trackCount =
-                typeof playlist.tracks?.total === 'number'
-                  ? playlist.tracks.total
-                  : null;
-            } catch {
-              trackCount = null;
+            const fallbackPaths = [
+              `/playlists/${row.id}?market=from_token`,
+              `/playlists/${row.id}?fields=tracks(total)&market=from_token`,
+              `/playlists/${row.id}?fields=tracks(total)`,
+            ];
+            for (const path of fallbackPaths) {
+              try {
+                const playlist = await spotifyApiGet<{ tracks?: { total?: number } }>(
+                  tokenData.accessToken,
+                  path
+                );
+                trackCount =
+                  typeof playlist.tracks?.total === 'number'
+                    ? playlist.tracks.total
+                    : null;
+                if (trackCount !== null) break;
+              } catch {
+                // Try next fallback shape.
+              }
             }
           }
           return {
