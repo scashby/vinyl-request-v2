@@ -147,23 +147,34 @@ export default function Page() {
 
   useEffect(() => {
     const loadEvents = async () => {
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout")), 5000)
-      );
-
       try {
-        const fetchEvents = supabase
-          .from("events")
-          .select("*")
-          .order("date", { ascending: true });
+        const fetchEvents = async () =>
+          supabase.from("events").select("*").order("date", { ascending: true });
 
-        const { data: ev, error } = (await Promise.race([
-          fetchEvents,
-          timeoutPromise,
-        ])) as { data: Event[] | null; error: { message?: string } | null };
+        let { data: ev, error } = await fetchEvents();
+
+        // Retry once on transient server-side failures so brief Supabase pressure
+        // does not surface as a hard empty/failed landing load.
+        if (error) {
+          const status =
+            typeof (error as unknown as { status?: number }).status === "number"
+              ? (error as unknown as { status?: number }).status
+              : 0;
+          if (status >= 500 || status === 0) {
+            await new Promise((resolve) => setTimeout(resolve, 1200));
+            const retry = await fetchEvents();
+            ev = retry.data;
+            error = retry.error;
+          }
+        }
 
         if (error) {
-          console.error("Error loading events", error);
+          console.error("Error loading events", {
+            message: error.message,
+            details: (error as unknown as { details?: string }).details,
+            hint: (error as unknown as { hint?: string }).hint,
+            code: (error as unknown as { code?: string }).code,
+          });
         }
 
         setEvents(ev || []);

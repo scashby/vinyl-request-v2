@@ -12,9 +12,11 @@ if (!supabaseUrl || !supabaseKey) {
 // The <Database> generic is vital for table autocompletion
 export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-    detectSessionInUrl: false,
+    // Google OAuth callback handling requires URL session detection and persistence.
+    // Using explicit true values here avoids accidental regressions from local overrides.
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
   },
 });
 // AUDIT: inspected, no changes.

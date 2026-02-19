@@ -580,7 +580,7 @@ function CollectionBrowserPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let allRows: any[] = [];
     let from = 0;
-    const batchSize = 1000;
+    const batchSize = 300;
     let keepGoing = true;
 
     while (keepGoing) {
@@ -618,17 +618,6 @@ function CollectionBrowserPage() {
                track_count,
                qty,
                format_details,
-               release_tracks:release_tracks (
-                 id,
-                 position,
-                 side,
-                 title_override,
-                 recording:recordings (
-                   id,
-                   title,
-                   duration_seconds
-                 )
-               ),
                master:masters (
                  id,
                  title,
@@ -658,6 +647,11 @@ function CollectionBrowserPage() {
       allRows = allRows.concat(batch);
       keepGoing = batch.length === batchSize;
       from += batchSize;
+
+      if (keepGoing) {
+        // Avoid blasting PostgREST with back-to-back large pages.
+        await new Promise((resolve) => setTimeout(resolve, 75));
+      }
     }
 
     const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
@@ -674,7 +668,66 @@ function CollectionBrowserPage() {
       };
     });
 
-    setAlbums(mapped as Album[]);
+    const releaseIds = Array.from(
+      new Set(
+        mapped
+          .map((row) => row.release?.id)
+          .filter((id): id is number => typeof id === 'number')
+      )
+    );
+
+    const releaseTracksByReleaseId: Record<number, unknown[]> = {};
+    const releaseChunkSize = 200;
+
+    for (let i = 0; i < releaseIds.length; i += releaseChunkSize) {
+      const releaseIdChunk = releaseIds.slice(i, i + releaseChunkSize);
+      const { data: tracks, error: tracksError } = await supabase
+        .from('release_tracks')
+        .select(
+          `id,
+           release_id,
+           position,
+           side,
+           title_override,
+           recording:recordings (
+             id,
+             title,
+             duration_seconds
+           )`
+        )
+        .in('release_id', releaseIdChunk);
+
+      if (tracksError) {
+        console.error('Error loading release tracks:', tracksError);
+        break;
+      }
+
+      for (const track of tracks ?? []) {
+        const releaseId = (track as { release_id?: number }).release_id;
+        if (!releaseId) continue;
+        if (!releaseTracksByReleaseId[releaseId]) {
+          releaseTracksByReleaseId[releaseId] = [];
+        }
+        releaseTracksByReleaseId[releaseId].push(track);
+      }
+
+      if (i + releaseChunkSize < releaseIds.length) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    }
+
+    const hydrated = mapped.map((row) => {
+      if (!row.release?.id) return row;
+      return {
+        ...row,
+        release: {
+          ...row.release,
+          release_tracks: releaseTracksByReleaseId[row.release.id] ?? [],
+        },
+      };
+    });
+
+    setAlbums(hydrated as Album[]);
     setLoading(false);
   }, []);
 
