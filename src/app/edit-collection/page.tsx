@@ -340,6 +340,12 @@ const buildTrackRuleMetadata = (album: Album) => {
   const release = album.release;
   const master = release?.master;
   const masterTagLinks = master?.master_tag_links ?? [];
+  const combinedGenres = Array.from(
+    new Set([
+      ...toSafeStringArray(master?.genres ?? album.genres),
+      ...toSafeStringArray(master?.styles ?? album.styles),
+    ])
+  );
   const normalizedTags = masterTagLinks
     .map((link) => link.master_tags?.name)
     .filter((name): name is string => Boolean(name));
@@ -391,7 +397,7 @@ const buildTrackRuleMetadata = (album: Album) => {
     forSale: album.status === 'for_sale' || album.for_sale === true,
     isLive: album.is_live === true,
     customTags: toSafeStringArray(album.custom_tags ?? album.tags ?? normalizedTags),
-    genres: toSafeStringArray(master?.genres ?? album.genres),
+    genres: combinedGenres,
     labels: toSafeStringArray(album.labels ?? release?.label),
     signedBy: toSafeStringArray(album.signed_by),
     songwriters: toSafeStringArray(album.songwriters),

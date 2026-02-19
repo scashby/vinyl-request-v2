@@ -99,12 +99,14 @@ function trackMatchesRule(track: CollectionTrackRow, rule: SmartPlaylistRule): b
       return new Date(String(trackValue)) > new Date(String(rule.value));
     case 'includes':
       if (Array.isArray(trackValue)) {
-        return trackValue.some((item) => String(item).toLowerCase() === String(rule.value).toLowerCase());
+        const target = String(rule.value).toLowerCase();
+        return trackValue.some((item) => String(item).toLowerCase().includes(target));
       }
       return false;
     case 'excludes':
       if (Array.isArray(trackValue)) {
-        return !trackValue.some((item) => String(item).toLowerCase() === String(rule.value).toLowerCase());
+        const target = String(rule.value).toLowerCase();
+        return !trackValue.some((item) => String(item).toLowerCase().includes(target));
       }
       return true;
     default:
