@@ -6,7 +6,7 @@ type SpotifyPlaylistRow = {
   name: string;
   collaborative?: boolean;
   owner?: { id?: string | null };
-  tracks?: { total?: number };
+  tracks?: { total?: number; href?: string };
 };
 
 type SpotifyPlaylistResponse = {
@@ -54,17 +54,21 @@ export async function GET() {
               `/playlists/${row.id}?market=from_token`,
               `/playlists/${row.id}?fields=tracks(total)&market=from_token`,
               `/playlists/${row.id}?fields=tracks(total)`,
+              `/playlists/${row.id}/items?limit=1&market=from_token`,
+              `/playlists/${row.id}/items?limit=1`,
             ];
             for (const path of fallbackPaths) {
               try {
-                const playlist = await spotifyApiGet<{ tracks?: { total?: number } }>(
+                const payload = await spotifyApiGet<{ tracks?: { total?: number }; total?: number }>(
                   tokenData.accessToken,
                   path
                 );
                 trackCount =
-                  typeof playlist.tracks?.total === 'number'
-                    ? playlist.tracks.total
-                    : null;
+                  typeof payload.tracks?.total === 'number'
+                    ? payload.tracks.total
+                    : typeof payload.total === 'number'
+                      ? payload.total
+                      : null;
                 if (trackCount !== null) break;
               } catch {
                 // Try next fallback shape.

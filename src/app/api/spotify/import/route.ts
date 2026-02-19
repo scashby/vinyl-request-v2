@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 import { buildInventoryIndex, fetchInventoryTracks, matchTracks, sanitizePlaylistName } from '../../../../lib/vinylPlaylistImport';
-import { getSpotifyAccessTokenFromCookies, spotifyApiGet } from '../../../../lib/spotifyUser';
+import { getSpotifyAccessTokenFromCookies, spotifyApiGet, spotifyApiGetByUrl } from '../../../../lib/spotifyUser';
 
 type SpotifyTrackItem = {
   item?: {
@@ -28,6 +28,7 @@ type SpotifyPlaylistMeta = {
   tracks?: {
     items?: SpotifyTrackItem[];
     total?: number;
+    href?: string;
     next?: string | null;
   };
 };
@@ -46,6 +47,8 @@ export async function POST(req: Request) {
   let spotifyScope = '';
   let spotifyUserId = '';
   let playlistOwnerId = '';
+  const trackFetchErrors: Array<{ path: string; error: string }> = [];
+  const metaFetchErrors: Array<{ path: string; error: string }> = [];
   try {
     step = 'parse-body';
     const body = await req.json();
@@ -96,6 +99,7 @@ export async function POST(req: Request) {
       } catch (err) {
         lastPlaylistMetaError = err;
         const message = err instanceof Error ? err.message : String(err);
+        metaFetchErrors.push({ path, error: message });
         if (!isForbiddenSpotifyError(message)) throw err;
       }
     }
@@ -140,6 +144,7 @@ export async function POST(req: Request) {
         } catch (tracksError) {
           lastTrackPageError = tracksError;
           const message = tracksError instanceof Error ? tracksError.message : String(tracksError);
+          trackFetchErrors.push({ path, error: message });
           if (!isForbiddenSpotifyError(message)) {
             throw tracksError;
           }
@@ -157,6 +162,27 @@ export async function POST(req: Request) {
       throw lastTrackPageError instanceof Error ? lastTrackPageError : new Error('Failed to fetch Spotify playlist tracks');
     }
 
+    if (rows.length === 0 && playlist.tracks?.href) {
+      const hrefPaths = [
+        `${playlist.tracks.href}?limit=50&offset=0`,
+        playlist.tracks.href,
+      ];
+      for (const href of hrefPaths) {
+        try {
+          const page = await spotifyApiGetByUrl<SpotifyPlaylistTracksResponse>(tokenData.accessToken, href);
+          appendRows(page.items ?? []);
+          if (rows.length > 0) {
+            partialImport = true;
+            importSource = 'playlist_fallback';
+            break;
+          }
+        } catch (hrefError) {
+          const message = hrefError instanceof Error ? hrefError.message : String(hrefError);
+          trackFetchErrors.push({ path: href, error: message });
+        }
+      }
+    }
+
     if (rows.length === 0 && (sourceTotal === null || sourceTotal > 0)) {
       return NextResponse.json(
         {
@@ -166,6 +192,10 @@ export async function POST(req: Request) {
           spotifyUserId,
           playlistOwnerId,
           step,
+          debug: {
+            metaFetchErrors: metaFetchErrors.slice(-10),
+            trackFetchErrors: trackFetchErrors.slice(-20),
+          },
         },
         { status: 403 }
       );
@@ -283,6 +313,10 @@ export async function POST(req: Request) {
           spotifyUserId,
           playlistOwnerId,
           step,
+          debug: {
+            metaFetchErrors: metaFetchErrors.slice(-10),
+            trackFetchErrors: trackFetchErrors.slice(-20),
+          },
         },
         { status: 403 }
       );
