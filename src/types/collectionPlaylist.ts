@@ -14,6 +14,7 @@ export interface CollectionPlaylist {
 
 export interface SmartPlaylistRules {
   rules: SmartPlaylistRule[];
+  maxTracks?: number | null;
 }
 
 export interface SmartPlaylistRule {

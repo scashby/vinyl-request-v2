@@ -20,7 +20,7 @@ import Header from './Header';
 import { ManageColumnFavoritesModal, type ColumnFavorite } from './ManageColumnFavoritesModal';
 import type { Crate } from '../../types/crate';
 import type { CollectionPlaylist } from '../../types/collectionPlaylist';
-import type { SmartPlaylistRule } from '../../types/collectionPlaylist';
+import type { SmartPlaylistRules } from '../../types/collectionPlaylist';
 import type { CollectionTrackRow } from '../../types/collectionTrackRow';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import { trackMatchesSmartPlaylist } from '../../lib/playlistUtils';
@@ -90,7 +90,7 @@ const TRACK_SORT_OPTIONS: { value: TrackSortOption; label: string; category: str
   { value: 'duration-desc', label: 'Duration (Longest)', category: 'Duration' },
 ];
 
-type AppViewMode = 'collection' | 'album-track';
+type AppViewMode = 'collection' | 'album-track' | 'playlist';
 type SidebarMode = 'format' | 'crates' | 'playlists';
 type TrackListSource = 'crates' | 'playlists';
 
@@ -361,7 +361,7 @@ function CollectionBrowserPage() {
 
   useEffect(() => {
     const storedViewMode = localStorage.getItem('collection-view-mode');
-    if (storedViewMode === 'collection' || storedViewMode === 'album-track') {
+    if (storedViewMode === 'collection' || storedViewMode === 'album-track' || storedViewMode === 'playlist') {
       setViewMode(storedViewMode);
     }
   }, []);
@@ -914,17 +914,28 @@ function CollectionBrowserPage() {
       country: collect(allTrackRows.map((row) => row.country)),
       year_int: collect(allTrackRows.map((row) => (row.yearInt != null ? String(row.yearInt) : null))),
       decade: collect(allTrackRows.map((row) => (row.decade != null ? String(row.decade) : null))),
+      my_rating: collect(allTrackRows.map((row) => (row.myRating != null ? String(row.myRating) : null))),
       side: collect(allTrackRows.map((row) => row.side)),
       genre: collectArrayValues(allTrackRows.map((row) => row.genres)),
       label: collect(allTrackRows.map((row) => row.label)),
+      date_added: collect(allTrackRows.map((row) => row.dateAdded)),
+      purchase_date: collect(allTrackRows.map((row) => row.purchaseDate)),
+      last_played_at: collect(allTrackRows.map((row) => row.lastPlayedAt)),
+      last_cleaned_date: collect(allTrackRows.map((row) => row.lastCleanedDate)),
+      original_release_date: collect(allTrackRows.map((row) => row.originalReleaseDate)),
+      recording_date: collect(allTrackRows.map((row) => row.recordingDate)),
     };
   }, [allTrackRows]);
 
   const playlistCounts = useMemo(() => {
     return playlists.reduce((acc, playlist) => {
-      acc[playlist.id] = playlist.isSmart
-        ? allTrackRows.filter((row) => trackMatchesSmartPlaylist(row, playlist)).length
-        : playlist.trackKeys.length;
+      if (playlist.isSmart) {
+        const matched = allTrackRows.filter((row) => trackMatchesSmartPlaylist(row, playlist)).length;
+        const maxTracks = playlist.smartRules?.maxTracks ?? null;
+        acc[playlist.id] = typeof maxTracks === 'number' && maxTracks > 0 ? Math.min(matched, maxTracks) : matched;
+      } else {
+        acc[playlist.id] = playlist.trackKeys.length;
+      }
       return acc;
     }, {} as Record<number, number>);
   }, [allTrackRows, playlists]);
@@ -953,7 +964,15 @@ function CollectionBrowserPage() {
           rows = rows.filter((row) => trackMatchesSmartPlaylist(row, playlist));
         } else {
           const allowedKeys = new Set(playlist.trackKeys);
-          rows = rows.filter((row) => allowedKeys.has(row.key));
+          rows = rows.filter((row) => {
+            if (allowedKeys.has(row.key)) return true;
+            const legacyReleaseTrackKey = row.releaseTrackId != null ? `${row.inventoryId}:${row.releaseTrackId}` : null;
+            const legacyPositionKey = `${row.inventoryId}:${row.position}`;
+            return (
+              (legacyReleaseTrackKey !== null && allowedKeys.has(legacyReleaseTrackKey)) ||
+              allowedKeys.has(legacyPositionKey)
+            );
+          });
         }
       }
     }
@@ -1013,6 +1032,14 @@ function CollectionBrowserPage() {
           return getTrackPositionSortValue(a.position, a.side) - getTrackPositionSortValue(b.position, b.side);
       }
     });
+
+    if (trackSource === 'playlists' && selectedPlaylistId) {
+      const playlist = playlists.find((item) => item.id === selectedPlaylistId);
+      const maxTracks = playlist?.isSmart ? playlist.smartRules?.maxTracks ?? null : null;
+      if (typeof maxTracks === 'number' && maxTracks > 0) {
+        rows = rows.slice(0, maxTracks);
+      }
+    }
 
     return rows;
   }, [
@@ -1212,7 +1239,7 @@ function CollectionBrowserPage() {
   }, [selectedAlbumIds]);
 
   useEffect(() => {
-    if (viewMode === 'album-track') {
+    if (viewMode !== 'collection') {
       setFolderMode(trackSource);
       setSelectedFolderValue(null);
     } else if (folderMode === 'playlists') {
@@ -1234,13 +1261,19 @@ function CollectionBrowserPage() {
     setSelectedPlaylistId(null);
     if (mode === 'playlists') {
       setTrackSource('playlists');
-      setViewMode('album-track');
+      if (viewMode === 'collection') {
+        setViewMode('playlist');
+      }
     } else if (mode === 'crates') {
       setTrackSource('crates');
     }
-  }, []);
+  }, [viewMode]);
 
   const handleViewModeChange = useCallback((mode: AppViewMode) => {
+    if (mode === 'playlist') {
+      setTrackSource('playlists');
+      setFolderMode('playlists');
+    }
     setViewMode(mode);
     setShowFolderModeDropdown(false);
   }, []);
@@ -1338,7 +1371,7 @@ function CollectionBrowserPage() {
       setSelectedPlaylistId(data.id);
       setShowNewPlaylistModal(false);
       setTrackSource('playlists');
-      setViewMode('album-track');
+      setViewMode('playlist');
     } catch (err) {
       console.error('Failed to create playlist:', err);
       alert('Failed to create playlist. Please try again.');
@@ -1373,7 +1406,7 @@ function CollectionBrowserPage() {
     color: string;
     matchRules: 'all' | 'any';
     liveUpdate: boolean;
-    smartRules: { rules: SmartPlaylistRule[] };
+    smartRules: SmartPlaylistRules;
   }) => {
     try {
       const maxSort = playlists.reduce((max, item) => Math.max(max, item.sortOrder ?? 0), -1);
@@ -1398,7 +1431,7 @@ function CollectionBrowserPage() {
       setSelectedPlaylistId(data.id);
       setShowNewSmartPlaylistModal(false);
       setTrackSource('playlists');
-      setViewMode('album-track');
+      setViewMode('playlist');
     } catch (err) {
       console.error('Failed to create smart playlist:', err);
       alert('Failed to create smart playlist. Please try again.');
@@ -1563,7 +1596,7 @@ function CollectionBrowserPage() {
           </div>
 
           <div className="flex items-center shrink-0">
-            {viewMode === 'album-track' && (
+            {viewMode !== 'collection' && (
               <div className="relative mr-1.5">
                 <button
                   onClick={() => setShowTrackFormatDropdown(!showTrackFormatDropdown)}
@@ -1648,7 +1681,7 @@ function CollectionBrowserPage() {
           </div>
         )}
 
-        {viewMode === 'album-track' && selectedTrackKeys.size > 0 && (
+        {viewMode !== 'collection' && selectedTrackKeys.size > 0 && (
           <div className="bg-[#5BA3D0] text-white px-4 py-2 flex items-center gap-2 h-10 shrink-0">
             <button onClick={() => setSelectedTrackKeys(new Set())} title="Clear selection" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">✕ Cancel</button>
             <button onClick={() => setSelectedTrackKeys(new Set(filteredTrackRows.map((row) => row.key)))} title="Select all tracks" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">☑ All</button>
@@ -1689,7 +1722,7 @@ function CollectionBrowserPage() {
                         <span>📦</span>
                         <span>Crates</span>
                       </button>
-                      {viewMode === 'album-track' && (
+                      {viewMode !== 'collection' && (
                         <button onClick={() => handleFolderModeChange('playlists')} className={`w-full px-4 py-2 bg-transparent border-none text-left cursor-pointer text-[13px] text-white flex items-center gap-2 hover:bg-[#3a3a3a] ${folderMode === 'playlists' ? 'bg-[#5A9BD5]' : ''}`}>
                           <span>🎵</span>
                           <span>Playlists</span>
@@ -1713,7 +1746,7 @@ function CollectionBrowserPage() {
                   className="flex-1 px-2 py-1.5 bg-[#3a3a3a] text-white border border-[#555] rounded text-xs outline-none"
                 />
                 <button onClick={() => setFolderSortByCount(!folderSortByCount)} title={folderSortByCount ? "Sort alphabetically" : "Sort by count"} className="bg-[#3a3a3a] text-white border border-[#555] px-2 py-1 rounded cursor-pointer text-xs shrink-0">{folderSortByCount ? '🔢' : '🔤'}</button>
-                {viewMode === 'album-track' && folderMode === 'playlists' && (
+                {viewMode !== 'collection' && folderMode === 'playlists' && (
                   <button onClick={() => setShowNewPlaylistModal(true)} title="Create playlist" className="bg-[#3a3a3a] text-white border border-[#555] px-2 py-1 rounded cursor-pointer text-xs shrink-0">＋</button>
                 )}
               </div>
@@ -1786,7 +1819,7 @@ function CollectionBrowserPage() {
               <div className="flex gap-1.5 items-center">
                 <div className="relative">
                   <button onClick={() => setShowViewModeDropdown(!showViewModeDropdown)} title="Change view mode" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
-                    <span>{viewMode === 'collection' ? '☰' : '🎵'}</span>
+                    <span>{viewMode === 'collection' ? '☰' : viewMode === 'album-track' ? '🧱' : '🎵'}</span>
                     <span style={{ fontSize: '9px' }}>▼</span>
                   </button>
                   {showViewModeDropdown && (
@@ -1800,6 +1833,10 @@ function CollectionBrowserPage() {
                         <button onClick={() => { handleViewModeChange('album-track'); setShowViewModeDropdown(false); }} className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${viewMode === 'album-track' ? 'bg-[#e3f2fd]' : ''}`}>
                           <span>Album / Track Builder</span>
                           {viewMode === 'album-track' && <span className="text-[#2196F3]">✓</span>}
+                        </button>
+                        <button onClick={() => { handleViewModeChange('playlist'); setShowViewModeDropdown(false); }} className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${viewMode === 'playlist' ? 'bg-[#e3f2fd]' : ''}`}>
+                          <span>Playlist View</span>
+                          {viewMode === 'playlist' && <span className="text-[#2196F3]">✓</span>}
                         </button>
                       </div>
                     </>
@@ -1878,7 +1915,7 @@ function CollectionBrowserPage() {
               ) : (
                 viewMode === 'collection' ? (
                   <CollectionTable albums={filteredAndSortedAlbums} visibleColumns={visibleColumns} lockedColumns={lockedColumns} onAlbumClick={handleAlbumClick} selectedAlbums={selectedAlbumsAsStrings} onSelectionChange={handleSelectionChange} sortState={tableSortState} onSortChange={handleTableSortChange} onEditAlbum={handleEditAlbum} />
-                ) : (
+                ) : viewMode === 'album-track' ? (
                   <div className="h-full overflow-auto">
                     <table className="w-full border-collapse text-sm">
                       <thead className="sticky top-0 z-10 bg-[#f5f5f5] border-b border-[#ddd]">
@@ -1988,6 +2025,66 @@ function CollectionBrowserPage() {
                       </tbody>
                     </table>
                     {groupedTrackRows.length === 0 && (
+                      <div className="p-10 text-center text-[#666] text-sm">No tracks match the current filters.</div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="h-full overflow-auto">
+                    <table className="w-full border-collapse text-sm">
+                      <thead className="sticky top-0 z-10 bg-[#f5f5f5] border-b border-[#ddd]">
+                        <tr>
+                          <th className="w-[42px] px-2 py-2 text-left font-semibold text-[#666]">
+                            <input
+                              type="checkbox"
+                              checked={filteredTrackRows.length > 0 && selectedTrackKeys.size === filteredTrackRows.length}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedTrackKeys(new Set(filteredTrackRows.map((row) => row.key)));
+                                } else {
+                                  setSelectedTrackKeys(new Set());
+                                }
+                              }}
+                            />
+                          </th>
+                          <th className="px-2 py-2 text-left font-semibold text-[#666]">Track</th>
+                          <th className="px-2 py-2 text-left font-semibold text-[#666]">Artist</th>
+                          <th className="px-2 py-2 text-left font-semibold text-[#666]">Album</th>
+                          <th className="px-2 py-2 text-left font-semibold text-[#666]">Pos</th>
+                          <th className="px-2 py-2 text-right font-semibold text-[#666]">Length</th>
+                          <th className="px-2 py-2 text-right font-semibold text-[#666]">Rating</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredTrackRows.map((row) => {
+                          const isChecked = selectedTrackKeys.has(row.key);
+                          const positionNumber = (row.position.match(/\d+/g) ?? [row.position]).slice(-1)[0];
+                          const positionLabel = row.side ? `${row.side}${positionNumber}` : row.position;
+                          return (
+                            <tr
+                              key={row.key}
+                              onClick={() => setSelectedAlbumId(row.inventoryId)}
+                              className={`border-b border-[#eee] cursor-pointer ${selectedAlbumId === row.inventoryId ? 'bg-[#f8fbff]' : 'hover:bg-[#fafafa]'}`}
+                            >
+                              <td className="px-2 py-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => toggleTrackSelection(row.key)}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </td>
+                              <td className="px-2 py-2 text-[#1f2937]">{row.trackTitle}</td>
+                              <td className="px-2 py-2 text-[#374151]">{row.trackArtist}</td>
+                              <td className="px-2 py-2 text-[#6b7280]">{row.albumTitle}</td>
+                              <td className="px-2 py-2 text-[#4b5563]">{positionLabel}</td>
+                              <td className="px-2 py-2 text-right text-[#4b5563]">{row.durationLabel}</td>
+                              <td className="px-2 py-2 text-right text-[#4b5563]">{row.myRating ?? '—'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    {filteredTrackRows.length === 0 && (
                       <div className="p-10 text-center text-[#666] text-sm">No tracks match the current filters.</div>
                     )}
                   </div>

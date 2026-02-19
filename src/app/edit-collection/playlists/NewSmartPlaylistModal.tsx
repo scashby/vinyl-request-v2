@@ -6,7 +6,8 @@ import type {
   SmartPlaylistFieldType,
   SmartPlaylistOperatorType,
   SmartPlaylistRule,
-  SmartPlaylistRuleValue
+  SmartPlaylistRuleValue,
+  SmartPlaylistRules
 } from '../../../types/collectionPlaylist';
 
 interface NewSmartPlaylistModalProps {
@@ -18,7 +19,7 @@ interface NewSmartPlaylistModalProps {
     color: string;
     matchRules: 'all' | 'any';
     liveUpdate: boolean;
-    smartRules: { rules: SmartPlaylistRule[] };
+    smartRules: SmartPlaylistRules;
   }) => Promise<void>;
   onUpdate: (playlist: CollectionPlaylist) => Promise<void>;
   editingPlaylist: CollectionPlaylist | null;
@@ -56,6 +57,13 @@ const FIELD_OPTIONS: { value: SmartPlaylistFieldType; label: string; type: 'text
   { value: 'country', label: 'Country', type: 'text' },
   { value: 'year_int', label: 'Year', type: 'number' },
   { value: 'decade', label: 'Decade', type: 'number' },
+  { value: 'my_rating', label: 'Rating', type: 'number' },
+  { value: 'date_added', label: 'Date Added', type: 'date' },
+  { value: 'purchase_date', label: 'Purchase Date', type: 'date' },
+  { value: 'last_played_at', label: 'Last Played', type: 'date' },
+  { value: 'last_cleaned_date', label: 'Last Cleaned', type: 'date' },
+  { value: 'original_release_date', label: 'Original Release Date', type: 'date' },
+  { value: 'recording_date', label: 'Recording Date', type: 'date' },
   { value: 'custom_tags', label: 'Tags', type: 'array' },
   { value: 'genre', label: 'Genre', type: 'array' },
   { value: 'label', label: 'Label', type: 'text' },
@@ -108,9 +116,16 @@ const DROPDOWN_FIELDS = new Set<SmartPlaylistFieldType>([
   'country',
   'year_int',
   'decade',
+  'my_rating',
   'side',
   'genre',
   'label',
+  'date_added',
+  'purchase_date',
+  'last_played_at',
+  'last_cleaned_date',
+  'original_release_date',
+  'recording_date',
 ]);
 
 const SUPPORTED_FIELDS = new Set<SmartPlaylistFieldType>(FIELD_OPTIONS.map((field) => field.value));
@@ -124,6 +139,7 @@ export function NewSmartPlaylistModal({ isOpen, onClose, valueOptions, onCreate,
   const [matchRules, setMatchRules] = useState<'all' | 'any'>('all');
   const [liveUpdate, setLiveUpdate] = useState(true);
   const [rules, setRules] = useState<SmartPlaylistRule[]>([]);
+  const [maxTracks, setMaxTracks] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isEditing = !!editingPlaylist;
@@ -143,6 +159,7 @@ export function NewSmartPlaylistModal({ isOpen, onClose, valueOptions, onCreate,
         }))
         .filter((rule) => SUPPORTED_FIELDS.has(rule.field));
       setRules(normalizedRules);
+      setMaxTracks(editingPlaylist.smartRules?.maxTracks ? String(editingPlaylist.smartRules.maxTracks) : '');
       return;
     }
     setName('');
@@ -150,6 +167,7 @@ export function NewSmartPlaylistModal({ isOpen, onClose, valueOptions, onCreate,
     setMatchRules('all');
     setLiveUpdate(true);
     setRules([]);
+    setMaxTracks('');
   }, [editingPlaylist, isOpen]);
 
   if (!isOpen) return null;
@@ -215,6 +233,12 @@ export function NewSmartPlaylistModal({ isOpen, onClose, valueOptions, onCreate,
       setError('At least one rule is required');
       return;
     }
+    const normalizedMaxTracks = maxTracks.trim();
+    const parsedMaxTracks = normalizedMaxTracks === '' ? null : Number(normalizedMaxTracks);
+    if (normalizedMaxTracks !== '' && (!Number.isFinite(parsedMaxTracks) || parsedMaxTracks <= 0)) {
+      setError('Playlist length limit must be a positive number');
+      return;
+    }
     const invalidRule = rules.find((rule) => {
       if (rule.operator === 'between') {
         if (!isBetweenValue(rule.value)) return true;
@@ -237,7 +261,7 @@ export function NewSmartPlaylistModal({ isOpen, onClose, valueOptions, onCreate,
           icon: '⚡',
           color,
           isSmart: true,
-          smartRules: { rules },
+          smartRules: { rules, maxTracks: parsedMaxTracks },
           matchRules,
           liveUpdate,
         });
@@ -247,7 +271,7 @@ export function NewSmartPlaylistModal({ isOpen, onClose, valueOptions, onCreate,
           color,
           matchRules,
           liveUpdate,
-          smartRules: { rules },
+          smartRules: { rules, maxTracks: parsedMaxTracks },
         });
       }
       handleClose();
@@ -291,6 +315,16 @@ export function NewSmartPlaylistModal({ isOpen, onClose, valueOptions, onCreate,
               <option value="all">All</option>
               <option value="any">Any</option>
             </select>
+            <label className="text-sm font-semibold text-gray-700 ml-3">Max Tracks (optional):</label>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={maxTracks}
+              onChange={(e) => setMaxTracks(e.target.value)}
+              placeholder="e.g. 75"
+              className="w-[140px] px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 outline-none bg-white focus:border-blue-500"
+            />
           </div>
 
           <div className="mb-5">
@@ -339,16 +373,33 @@ export function NewSmartPlaylistModal({ isOpen, onClose, valueOptions, onCreate,
                           <option value="false">False</option>
                         </select>
                       ) : usesDropdown ? (
-                        <select value={String(rule.value)} onChange={(e) => handleRuleChange(index, 'value', e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none cursor-pointer bg-white">
-                          <option value="">Select value...</option>
-                          {dropdownOptions.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
+                        <>
+                          <input
+                            list={`smart-rule-options-${index}`}
+                            type={fieldDef?.type === 'date' ? 'date' : fieldDef?.type === 'number' ? 'number' : 'text'}
+                            value={String(rule.value)}
+                            onChange={(e) =>
+                              handleRuleChange(
+                                index,
+                                'value',
+                                fieldDef?.type === 'number'
+                                  ? (e.target.value === '' ? '' : Number(e.target.value))
+                                  : e.target.value
+                              )
+                            }
+                            placeholder="Select or type..."
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none bg-white"
+                          />
+                          <datalist id={`smart-rule-options-${index}`}>
+                            {dropdownOptions.map((opt) => (
+                              <option key={opt} value={opt} />
+                            ))}
+                          </datalist>
+                        </>
                       ) : fieldDef?.type === 'date' ? (
                         <input type="date" value={String(rule.value)} onChange={(e) => handleRuleChange(index, 'value', e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none bg-white" />
                       ) : fieldDef?.type === 'number' ? (
-                        <input type="number" value={String(rule.value)} onChange={(e) => handleRuleChange(index, 'value', Number(e.target.value))} placeholder="Value..." className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none bg-white" />
+                        <input type="number" value={String(rule.value)} onChange={(e) => handleRuleChange(index, 'value', e.target.value === '' ? '' : Number(e.target.value))} placeholder="Value..." className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none bg-white" />
                       ) : (
                         <input type="text" value={String(rule.value)} onChange={(e) => handleRuleChange(index, 'value', e.target.value)} placeholder="Value..." className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 outline-none bg-white" />
                       )}

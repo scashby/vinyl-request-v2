@@ -113,7 +113,7 @@ export function ManagePlaylistsModal({
                       <div className="text-sm font-semibold text-gray-900 mb-0.5">{playlist.name}</div>
                       <div className="text-xs text-gray-500">
                         {playlist.isSmart
-                          ? `Smart Playlist • ${playlist.smartRules?.rules?.length || 0} rule(s) • ${playlist.matchRules === 'all' ? 'Match All' : 'Match Any'}${playlist.liveUpdate ? ' • Live Update' : ''}`
+                          ? `Smart Playlist • ${playlist.smartRules?.rules?.length || 0} rule(s) • ${playlist.matchRules === 'all' ? 'Match All' : 'Match Any'}${playlist.smartRules?.maxTracks ? ` • Max ${playlist.smartRules.maxTracks}` : ''}${playlist.liveUpdate ? ' • Live Update' : ''}`
                           : `Manual Playlist • ${playlist.trackKeys.length} track${playlist.trackKeys.length !== 1 ? 's' : ''}`}
                       </div>
                     </div>
