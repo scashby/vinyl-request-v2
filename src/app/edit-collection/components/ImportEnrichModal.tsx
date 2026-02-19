@@ -133,6 +133,12 @@ type FetchCandidatesResponse = {
   nextCursor?: number | null;
   results?: CandidateResult[];
   processedCount?: number;
+  preflight?: {
+    unavailableServices?: string[];
+    requiredServices?: string[];
+    discogsOAuthPresent?: boolean;
+    discogsServerCredentialsPresent?: boolean;
+  };
 };
 
 type LogEntry = {
@@ -1413,6 +1419,25 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const { result, attempts } = await fetchCandidatesWithRetry(payload);
         if (attempts > 1) {
           addLog('System', 'info', `Candidate fetch recovered after ${attempts} attempts.`);
+        }
+
+        const unavailable = result.preflight?.unavailableServices ?? [];
+        const discogsSelected = !!getServicesForSelection(runFieldConfigRef.current).discogs;
+        if (discogsSelected && unavailable.includes('discogs')) {
+          const hasServerCreds = !!result.preflight?.discogsServerCredentialsPresent;
+          const hasOAuth = !!result.preflight?.discogsOAuthPresent;
+          if (!hasServerCreds && !hasOAuth) {
+            setEnriching(false);
+            isLoopingRef.current = false;
+            const msg = 'Discogs is selected but not authenticated for enrichment. Please reconnect Discogs and run again.';
+            setStatus(`❌ ${msg}`);
+            addLog('System', 'skipped', msg);
+            const shouldLogin = window.confirm('Discogs auth is missing for enrichment. Connect Discogs now?');
+            if (shouldLogin) {
+              window.location.href = '/api/auth/discogs';
+            }
+            return;
+          }
         }
 
         if (result.nextCursor !== undefined && result.nextCursor !== null) {

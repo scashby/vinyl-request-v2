@@ -1,4 +1,4 @@
-// Path: src/app/admin/games/bingo/test/playlists/create/page.tsx
+// Path: src/app/admin/games/vinyl-bingo/playlists/create/page.tsx
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -36,7 +36,7 @@ export default function CreatePlaylistPage() {
           {/* Import from Spotify */}
           <button
             onClick={() =>
-              router.push("/admin/games/bingo/test/playlists/import/spotify")
+              router.push("/admin/games/vinyl-bingo/playlists/import/spotify")
             }
             className="flex w-full items-center justify-between rounded-lg bg-[#1a1a1a] p-4 text-left transition hover:bg-[#222]"
           >
@@ -53,7 +53,7 @@ export default function CreatePlaylistPage() {
           {/* Import a Spreadsheet */}
           <button
             onClick={() =>
-              router.push("/admin/games/bingo/test/playlists/import/spreadsheet")
+              router.push("/admin/games/vinyl-bingo/playlists/import/spreadsheet")
             }
             className="flex w-full items-center justify-between rounded-lg bg-[#1a1a1a] p-4 text-left transition hover:bg-[#222]"
           >
@@ -70,7 +70,7 @@ export default function CreatePlaylistPage() {
           {/* Import a JSON file */}
           <button
             onClick={() =>
-              router.push("/admin/games/bingo/test/playlists/import/json")
+              router.push("/admin/games/vinyl-bingo/playlists/import/json")
             }
             className="flex w-full items-center justify-between rounded-lg bg-[#1a1a1a] p-4 text-left transition hover:bg-[#222]"
           >

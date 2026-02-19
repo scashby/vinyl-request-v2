@@ -3,11 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Play, Pause, Monitor, Music2, Copy, Check, Clock3 } from "lucide-react";
+import { ArrowLeft, Clock3 } from "lucide-react";
 
 type Session = {
   id: number;
-  game_code: string;
   status: "pending" | "active" | "paused" | "completed";
   current_pick_index: number;
   round_count?: number;
@@ -34,20 +33,17 @@ type Pick = {
 const COLS = ["B", "I", "N", "G", "O"] as const;
 const DEFAULT_SECONDS_TO_NEXT_CALL = 45;
 
-export default function HostDashboard() {
+export default function SidekickPage() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("sessionId");
 
   const [session, setSession] = useState<Session | null>(null);
   const [picks, setPicks] = useState<Pick[]>([]);
-  const [copied, setCopied] = useState(false);
   const [countdown, setCountdown] = useState(DEFAULT_SECONDS_TO_NEXT_CALL);
-
-  const currentIdx = session?.current_pick_index ?? 0;
-  const currentPick = picks.find((p) => p.pick_index === currentIdx) ?? null;
 
   const fetchData = useCallback(async () => {
     if (!sessionId) return;
+
     const [sRes, pRes] = await Promise.all([
       fetch(`/api/game-sessions/${sessionId}`),
       fetch(`/api/game-sessions/${sessionId}/picks`),
@@ -88,83 +84,27 @@ export default function HostDashboard() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [session?.status, currentIdx]);
+  }, [session?.status, session?.current_pick_index]);
 
+  const currentIdx = session?.current_pick_index ?? 0;
+  const currentPick = picks.find((p) => p.pick_index === currentIdx) ?? null;
   const callCard = useMemo(() => picks.filter((pick) => pick.status === "played"), [picks]);
-
-  const markCurrentPlayedAndAdvance = async () => {
-    if (!session || !currentPick) return;
-
-    await fetch(`/api/game-session-picks/${currentPick.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "played" }),
-    });
-
-    await fetch(`/api/game-sessions/${session.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "active" }),
-    });
-
-    fetchData();
-  };
-
-  const rewindOne = async () => {
-    if (!currentPick || currentIdx <= 0) return;
-    const previousPick = picks.find((p) => p.pick_index === currentIdx - 1);
-    if (!previousPick) return;
-
-    await fetch(`/api/game-session-picks/${previousPick.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "pending" }),
-    });
-
-    fetchData();
-  };
-
-  const togglePlay = async () => {
-    if (!session) return;
-    await fetch(`/api/game-sessions/${session.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: session.status === "active" ? "paused" : "active" }),
-    });
-    fetchData();
-  };
-
-  const copyCode = () => {
-    if (!session) return;
-    navigator.clipboard.writeText(session.game_code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  if (!session) {
-    return <div className="flex min-h-screen items-center justify-center bg-[#121212] text-white">Loading session...</div>;
-  }
 
   return (
     <div className="min-h-screen bg-[#121212] text-white">
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-[#121212]/95 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-white/10 bg-[#121212]/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-          <Link href="/admin/games/bingo/test" className="flex items-center gap-2 text-white/80 hover:text-white">
-            <ChevronLeft className="h-5 w-5" />
-            <span className="font-semibold">Rockstar Bingo Host</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-white/70">Round {session.current_round ?? 1} of {session.round_count ?? 3}</span>
-            <button onClick={copyCode} className="flex items-center gap-2 rounded-lg border border-pink-500/40 bg-pink-500/10 px-3 py-1.5 text-pink-200">
-              <span className="font-bold tracking-widest">{session.game_code}</span>
-              {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
-            </button>
-            <Link href={`/admin/games/bingo/test/sidekick?sessionId=${session.id}`} className="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-white/80 hover:bg-white/10">
-              <Music2 className="mr-2 inline h-4 w-4" />Assistant
+          <div className="flex items-center gap-3">
+            <Link href={`/admin/games/vinyl-bingo/host?sessionId=${sessionId}`} className="rounded-lg p-2 hover:bg-white/10">
+              <ArrowLeft className="h-5 w-5" />
             </Link>
-            <Link href={`/admin/games/bingo/test/jumbotron?sessionId=${session.id}`} className="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-white/80 hover:bg-white/10">
-              <Monitor className="mr-2 inline h-4 w-4" />Jumbotron
-            </Link>
+            <div>
+              <h1 className="font-semibold">Assistant Card Check</h1>
+              <p className="text-sm text-white/60">{session?.game_templates.name}</p>
+            </div>
+          </div>
+          <div className="text-sm text-white/70">
+            Round {session?.current_round ?? 1} of {session?.round_count ?? 3}
           </div>
         </div>
       </header>
@@ -173,12 +113,11 @@ export default function HostDashboard() {
         <section className="rounded-2xl border border-white/10 bg-[#1a1a1a] p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold">Round Playlist</h2>
-            <div className="flex items-center gap-3 text-sm text-white/70">
+            <div className="flex items-center gap-2 text-sm text-white/70">
               <Clock3 className="h-4 w-4" />
-              {session.status === "paused" ? "Paused" : `Next call in ${countdown}s`}
+              {session?.status === "paused" ? "Paused" : `Next call in ${countdown}s`}
             </div>
           </div>
-
           <div className="overflow-auto rounded-xl border border-white/10">
             <table className="min-w-full text-sm">
               <thead className="bg-white/5 text-left text-xs uppercase tracking-wide text-white/60">
@@ -192,10 +131,9 @@ export default function HostDashboard() {
               <tbody>
                 {picks.map((pick) => {
                   const isCurrent = pick.pick_index === currentIdx;
-                  const letter = pick.column_letter ?? COLS[pick.pick_index % 5];
                   return (
                     <tr key={pick.id} className={`border-t border-white/5 ${isCurrent ? "bg-pink-500/10" : ""}`}>
-                      <td className="px-3 py-2 font-bold text-pink-300">{letter}</td>
+                      <td className="px-3 py-2 font-bold text-pink-300">{pick.column_letter ?? COLS[pick.pick_index % 5]}</td>
                       <td className="px-3 py-2">{pick.track_title ?? pick.game_template_items.title}</td>
                       <td className="px-3 py-2 text-white/80">{pick.artist_name ?? pick.game_template_items.artist}</td>
                       <td className="px-3 py-2 text-white/60">{pick.album_name ?? pick.game_template_items.album_name ?? "-"}</td>
@@ -218,25 +156,13 @@ export default function HostDashboard() {
                 <p className="mt-1 text-lg text-white/80">{currentPick.artist_name ?? currentPick.game_template_items.artist}</p>
               </>
             ) : (
-              <p className="mt-2 text-white/70">No current call.</p>
+              <p className="mt-2 text-white/70">Waiting for first call.</p>
             )}
-
-            <div className="mt-5 flex items-center gap-3">
-              <button onClick={rewindOne} className="rounded-full border border-white/20 p-3 hover:bg-white/10" title="Undo last call">
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-              <button onClick={togglePlay} className="rounded-full bg-pink-600 p-4 text-white hover:bg-pink-500" title="Toggle paused/active">
-                {session.status === "active" ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
-              </button>
-              <button onClick={markCurrentPlayedAndAdvance} className="rounded-full border border-white/20 p-3 hover:bg-white/10" title="Call and advance">
-                <ChevronRight className="h-5 w-5" />
-              </button>
-            </div>
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-[#1a1a1a] p-5">
             <h3 className="text-lg font-semibold">Call Card</h3>
-            <p className="mt-1 text-sm text-white/60">Full called order for paper card verification.</p>
+            <p className="mt-1 text-sm text-white/60">Use this list to verify paper-card claims.</p>
             <ol className="mt-4 max-h-[360px] space-y-2 overflow-auto pr-1">
               {callCard.length === 0 ? (
                 <li className="text-sm text-white/60">No songs called yet.</li>

@@ -1,10 +1,21 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-export async function GET() {
-  const callbackUrl = process.env.NODE_ENV === 'production'
-    ? 'https://deadwaxdialogues.com/api/auth/callback/discogs'
-    : 'http://localhost:3000/api/auth/callback/discogs';
+const resolveCookieDomain = (host: string | null): string | undefined => {
+  const normalized = (host || '').toLowerCase().split(':')[0];
+  if (normalized === 'deadwaxdialogues.com' || normalized.endsWith('.deadwaxdialogues.com')) {
+    return '.deadwaxdialogues.com';
+  }
+  return undefined;
+};
+
+export async function GET(req: Request) {
+  const reqUrl = new URL(req.url);
+  const host = req.headers.get('host');
+  const callbackUrl =
+    process.env.DISCOGS_CALLBACK_URL ||
+    `${reqUrl.protocol}//${host || reqUrl.host}/api/auth/callback/discogs`;
+  const cookieDomain = resolveCookieDomain(host);
 
   const nonce = Math.floor(Math.random() * 1000000000).toString();
   const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -48,6 +59,7 @@ export async function GET() {
       httpOnly: true, 
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
       path: '/',
       maxAge: 60 * 10 // 10 minutes
     });

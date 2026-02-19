@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
+const resolveCookieDomain = (host: string | null): string | undefined => {
+  const normalized = (host || '').toLowerCase().split(':')[0];
+  if (normalized === 'deadwaxdialogues.com' || normalized.endsWith('.deadwaxdialogues.com')) {
+    return '.deadwaxdialogues.com';
+  }
+  return undefined;
+};
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const oauthToken = searchParams.get('oauth_token');
   const oauthVerifier = searchParams.get('oauth_verifier');
+  const cookieDomain = resolveCookieDomain(req.headers.get('host'));
 
   const cookieStore = await cookies();
   const requestSecret = cookieStore.get('discogs_request_secret')?.value;
@@ -60,6 +69,7 @@ export async function GET(req: NextRequest) {
         httpOnly: true, 
         secure: process.env.NODE_ENV === 'production', 
         sameSite: 'lax',
+        ...(cookieDomain ? { domain: cookieDomain } : {}),
         path: '/',
         maxAge: 60 * 60 * 24 * 30 
     });
@@ -67,6 +77,7 @@ export async function GET(req: NextRequest) {
         httpOnly: true, 
         secure: process.env.NODE_ENV === 'production', 
         sameSite: 'lax',
+        ...(cookieDomain ? { domain: cookieDomain } : {}),
         path: '/',
         maxAge: 60 * 60 * 24 * 30 
     });
@@ -99,12 +110,23 @@ export async function GET(req: NextRequest) {
             httpOnly: true, 
             secure: process.env.NODE_ENV === 'production', 
             sameSite: 'lax',
+            ...(cookieDomain ? { domain: cookieDomain } : {}),
             path: '/',
             maxAge: 60 * 60 * 24 * 30 
         });
     }
 
     cookieStore.delete('discogs_request_secret');
+    if (cookieDomain) {
+      cookieStore.set('discogs_request_secret', '', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        domain: cookieDomain,
+        path: '/',
+        maxAge: 0
+      });
+    }
 
     const redirectUrl = new URL('/edit-collection', req.url);
     redirectUrl.searchParams.set('import', 'discogs_success');

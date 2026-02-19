@@ -1,4 +1,4 @@
-// Path: src/app/admin/games/bingo/test/history/page.tsx
+// Path: src/app/admin/games/vinyl-bingo/history/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";

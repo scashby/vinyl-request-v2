@@ -1,4 +1,4 @@
-// Path: src/app/admin/games/bingo/test/lobby/page.tsx
+// Path: src/app/admin/games/vinyl-bingo/lobby/page.tsx
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -92,7 +92,7 @@ export default function LobbyPage() {
       <header className={`border-b ${border} px-6 py-4`}>
         <div className="mx-auto flex max-w-2xl items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href={`/admin/games/bingo/test/host?sessionId=${sessionId}`} className="rounded-lg p-2 hover:bg-white/10">
+            <Link href={`/admin/games/vinyl-bingo/host?sessionId=${sessionId}`} className="rounded-lg p-2 hover:bg-white/10">
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <div>

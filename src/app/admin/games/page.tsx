@@ -8,24 +8,10 @@ const gameCards = [
   {
     title: "Music Bingo",
     description:
-      "Build and export CSV playlists for Rockstar Bingo import.",
-    href: "/admin/games/bingo",
+      "Analog-first vinyl bingo control center (host, assistant, jumbotron, print).",
+    href: "/admin/games/vinyl-bingo",
     cta: "Open",
     status: "ready",
-  },
-  {
-    title: "Music Trivia",
-    description: "Question rounds powered by your vinyl collection.",
-    href: "/admin/games",
-    cta: "Coming soon",
-    status: "coming",
-  },
-  {
-    title: "Bracket Tournaments",
-    description: "Track vs track elimination brackets.",
-    href: "/admin/games",
-    cta: "Coming soon",
-    status: "coming",
   },
 ];
 
@@ -41,9 +27,8 @@ export default function Page() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 gap-5">
         {gameCards.map((game) => {
-          const isComing = game.status === "coming";
           return (
             <div
               key={game.title}
@@ -54,27 +39,15 @@ export default function Page() {
                   <h2 className="text-lg font-semibold text-gray-900">{game.title}</h2>
                   <p className="text-sm text-gray-600 mt-2">{game.description}</p>
                 </div>
-                {isComing ? (
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                    Coming Soon
-                  </span>
-                ) : (
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-green-700 bg-green-100 px-2 py-1 rounded-full">
-                    Active
-                  </span>
-                )}
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-green-700 bg-green-100 px-2 py-1 rounded-full">
+                  Active
+                </span>
               </div>
 
               <div className="mt-auto">
-                {isComing ? (
-                  <Button variant="secondary" size="sm" disabled>
-                    {game.cta}
-                  </Button>
-                ) : (
-                  <Link href={game.href}>
-                    <Button size="sm">{game.cta}</Button>
-                  </Link>
-                )}
+                <Link href={game.href}>
+                  <Button size="sm">{game.cta}</Button>
+                </Link>
               </div>
             </div>
           );

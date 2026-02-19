@@ -1628,13 +1628,13 @@ export default function EditEventForm() {
               {id && (
                 <>
                   <Link
-                    href={`/admin/games/bingo/host?eventId=${id}`}
+                    href={`/admin/games/vinyl-bingo?eventId=${id}`}
                     className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                   >
                     Open Host
                   </Link>
                   <Link
-                    href={`/admin/games/bingo/lobby?eventId=${id}`}
+                    href={`/admin/games/vinyl-bingo?eventId=${id}`}
                     className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                   >
                     Open Lobby

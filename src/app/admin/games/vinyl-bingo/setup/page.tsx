@@ -1,4 +1,4 @@
-// Path: src/app/admin/games/bingo/test/setup/page.tsx
+// Path: src/app/admin/games/vinyl-bingo/setup/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -150,7 +150,7 @@ export default function GameSetupPage() {
 
       if (res.ok) {
         const session = await res.json();
-        router.push(`/admin/games/bingo/test/host?sessionId=${session.id}`);
+        router.push(`/admin/games/vinyl-bingo/host?sessionId=${session.id}`);
       }
     } catch (error) {
       console.error("Failed to create game:", error);
@@ -170,7 +170,7 @@ export default function GameSetupPage() {
           </button>
           <h1 className="text-lg font-semibold">Game Setup</h1>
           <button
-            onClick={() => router.push("/admin/games/bingo/test")}
+            onClick={() => router.push("/admin/games/vinyl-bingo")}
             className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10"
           >
             <X className="h-5 w-5" />

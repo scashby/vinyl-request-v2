@@ -237,6 +237,16 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
               >
                 🎵 Music Games
               </Link>
+              <Link
+                href="/admin/games/vinyl-bingo"
+                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+                  pathname?.startsWith("/admin/games/vinyl-bingo")
+                    ? "bg-slate-700 text-white"
+                    : "bg-slate-600 text-white hover:bg-slate-700"
+                }`}
+              >
+                🎱 Vinyl Bingo
+              </Link>
             </div>
           </div>
 

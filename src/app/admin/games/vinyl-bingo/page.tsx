@@ -1,4 +1,4 @@
-// Path: src/app/admin/games/bingo/test/page.tsx
+// Path: src/app/admin/games/vinyl-bingo/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -96,7 +96,7 @@ export default function BingoPlaylistsPage() {
 
   const startGame = () => {
     if (previewPlaylist) {
-      router.push(`/admin/games/bingo/test/setup?templateId=${previewPlaylist.id}`);
+      router.push(`/admin/games/vinyl-bingo/setup?templateId=${previewPlaylist.id}`);
     }
   };
 
@@ -122,7 +122,7 @@ export default function BingoPlaylistsPage() {
           </div>
           <div className="flex items-center gap-1">
             <button
-              onClick={() => router.push("/admin/games/bingo/test/history")}
+              onClick={() => router.push("/admin/games/vinyl-bingo/history")}
               className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10"
             >
               <History className="h-5 w-5" />
@@ -213,7 +213,7 @@ export default function BingoPlaylistsPage() {
                 {/* Create New */}
                 <button
                   onClick={() =>
-                    router.push("/admin/games/bingo/test/playlists/create")
+                    router.push("/admin/games/vinyl-bingo/playlists/create")
                   }
                   className="group flex aspect-[2/1] flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-purple-500/50 bg-transparent transition-colors hover:border-purple-400 hover:bg-purple-500/5"
                 >
