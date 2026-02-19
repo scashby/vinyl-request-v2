@@ -175,16 +175,59 @@ const pickSmartPlaylistMix = (
     albumCounts.set(album, albumCount + 1);
   });
 
-  // Fill remainder if strict caps underfill the requested max.
-  if (selected.size < maxTracks) {
-    shuffled.forEach((row) => {
-      if (selected.size >= maxTracks) return;
-      if (selected.has(row.key)) return;
-      selected.add(row.key);
-    });
+  return selected;
+};
+
+const getDateScore = (value: string | null | undefined): number => {
+  if (!value) return Number.NEGATIVE_INFINITY;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed;
+};
+
+const selectSmartPlaylistKeys = (
+  matches: CollectionTrackRow[],
+  maxTracks: number,
+  selectedBy: NonNullable<SmartPlaylistRules['selectedBy']>,
+  allowArtistConcentration: boolean,
+  allowAlbumConcentration: boolean
+): Set<string> => {
+  if (selectedBy === 'random') {
+    return pickSmartPlaylistMix(matches, maxTracks, allowArtistConcentration, allowAlbumConcentration);
   }
 
-  return selected;
+  const sorted = [...matches];
+  sorted.sort((a, b) => {
+    switch (selectedBy) {
+      case 'album':
+        return `${a.albumTitle} ${a.trackTitle}`.localeCompare(`${b.albumTitle} ${b.trackTitle}`);
+      case 'artist':
+        return `${a.trackArtist} ${a.trackTitle}`.localeCompare(`${b.trackArtist} ${b.trackTitle}`);
+      case 'genre':
+        return `${a.genres?.[0] ?? ''} ${a.trackTitle}`.localeCompare(`${b.genres?.[0] ?? ''} ${b.trackTitle}`);
+      case 'title':
+        return a.trackTitle.localeCompare(b.trackTitle);
+      case 'highest_rating':
+        return (b.myRating ?? 0) - (a.myRating ?? 0);
+      case 'lowest_rating':
+        return (a.myRating ?? 0) - (b.myRating ?? 0);
+      case 'most_recently_played':
+        return getDateScore(b.lastPlayedAt) - getDateScore(a.lastPlayedAt);
+      case 'least_recently_played':
+        return getDateScore(a.lastPlayedAt) - getDateScore(b.lastPlayedAt);
+      case 'most_often_played':
+        return (b.playCount ?? 0) - (a.playCount ?? 0);
+      case 'least_often_played':
+        return (a.playCount ?? 0) - (b.playCount ?? 0);
+      case 'most_recently_added':
+        return getDateScore(b.dateAdded) - getDateScore(a.dateAdded);
+      case 'least_recently_added':
+        return getDateScore(a.dateAdded) - getDateScore(b.dateAdded);
+      default:
+        return 0;
+    }
+  });
+
+  return new Set(sorted.slice(0, maxTracks).map((row) => row.key));
 };
 
 const getTrackPositionSortValue = (position: string, side: string | null): number => {
@@ -987,7 +1030,7 @@ function CollectionBrowserPage() {
     }, {} as Record<number, number>);
   }, [allTrackRows, playlists]);
 
-  const smartPlaylistRandomKeys = useMemo(() => {
+  const smartPlaylistSelectedKeys = useMemo(() => {
     const result: Record<number, Set<string>> = {};
 
     playlists.forEach((playlist) => {
@@ -1004,10 +1047,12 @@ function CollectionBrowserPage() {
       const rules = playlist.smartRules?.rules ?? [];
       const hasArtistRule = rules.some((rule) => rule.field === 'track_artist' || rule.field === 'album_artist');
       const hasAlbumRule = rules.some((rule) => rule.field === 'album_title');
+      const selectedBy = playlist.smartRules?.selectedBy ?? 'random';
 
-      result[playlist.id] = pickSmartPlaylistMix(
+      result[playlist.id] = selectSmartPlaylistKeys(
         matches,
         maxTracks,
+        selectedBy,
         hasArtistRule,
         hasAlbumRule
       );
@@ -1038,9 +1083,9 @@ function CollectionBrowserPage() {
       if (playlist) {
         if (playlist.isSmart) {
           rows = rows.filter((row) => trackMatchesSmartPlaylist(row, playlist));
-          const randomKeys = smartPlaylistRandomKeys[playlist.id];
-          if (randomKeys) {
-            rows = rows.filter((row) => randomKeys.has(row.key));
+          const selectedKeys = smartPlaylistSelectedKeys[playlist.id];
+          if (selectedKeys) {
+            rows = rows.filter((row) => selectedKeys.has(row.key));
           }
         } else {
           const allowedKeys = new Set(playlist.trackKeys);
@@ -1123,7 +1168,7 @@ function CollectionBrowserPage() {
     crateItemsByCrate,
     selectedPlaylistId,
     playlists,
-    smartPlaylistRandomKeys,
+    smartPlaylistSelectedKeys,
     selectedLetter,
     searchQuery,
     trackFormatFilters,

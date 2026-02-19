@@ -15,6 +15,20 @@ export interface CollectionPlaylist {
 export interface SmartPlaylistRules {
   rules: SmartPlaylistRule[];
   maxTracks?: number | null;
+  selectedBy?:
+    | 'random'
+    | 'album'
+    | 'artist'
+    | 'genre'
+    | 'title'
+    | 'highest_rating'
+    | 'lowest_rating'
+    | 'most_recently_played'
+    | 'least_recently_played'
+    | 'most_often_played'
+    | 'least_often_played'
+    | 'most_recently_added'
+    | 'least_recently_added';
 }
 
 export interface SmartPlaylistRule {

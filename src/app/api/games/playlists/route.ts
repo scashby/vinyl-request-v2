@@ -24,12 +24,28 @@ export async function GET() {
 
   const withCounts = await Promise.all(
     ((playlists ?? []) as PlaylistRow[]).map(async (playlist) => {
-      return {
-        id: playlist.id,
-        name: playlist.name,
-        is_smart: playlist.is_smart,
-        track_count: await getPlaylistTrackCount(db, playlist.id),
-      };
+      try {
+        const smartCount = await getPlaylistTrackCount(db, playlist.id);
+        return {
+          id: playlist.id,
+          name: playlist.name,
+          is_smart: playlist.is_smart,
+          track_count: smartCount,
+        };
+      } catch {
+        // Fail-open per playlist so one bad smart playlist never blanks the whole dropdown.
+        const { count } = await db
+          .from("collection_playlist_items")
+          .select("id", { count: "exact", head: true })
+          .eq("playlist_id", playlist.id);
+
+        return {
+          id: playlist.id,
+          name: playlist.name,
+          is_smart: playlist.is_smart,
+          track_count: count ?? 0,
+        };
+      }
     })
   );
 

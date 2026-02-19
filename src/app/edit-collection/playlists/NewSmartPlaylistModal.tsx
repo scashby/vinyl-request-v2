@@ -130,6 +130,22 @@ const DROPDOWN_FIELDS = new Set<SmartPlaylistFieldType>([
 
 const SUPPORTED_FIELDS = new Set<SmartPlaylistFieldType>(FIELD_OPTIONS.map((field) => field.value));
 
+const LIMIT_SELECTION_OPTIONS: Array<{ value: NonNullable<SmartPlaylistRules['selectedBy']>; label: string }> = [
+  { value: 'random', label: 'Random' },
+  { value: 'album', label: 'Album' },
+  { value: 'artist', label: 'Artist' },
+  { value: 'genre', label: 'Genre' },
+  { value: 'title', label: 'Title' },
+  { value: 'highest_rating', label: 'Highest Rating' },
+  { value: 'lowest_rating', label: 'Lowest Rating' },
+  { value: 'most_recently_played', label: 'Most Recently Played' },
+  { value: 'least_recently_played', label: 'Least Recently Played' },
+  { value: 'most_often_played', label: 'Most Often Played' },
+  { value: 'least_often_played', label: 'Least Often Played' },
+  { value: 'most_recently_added', label: 'Most Recently Added' },
+  { value: 'least_recently_added', label: 'Least Recently Added' },
+];
+
 const normalizeRuleField = (field: string): SmartPlaylistFieldType =>
   LEGACY_RULE_FIELD_MAP[field] ?? (field as SmartPlaylistFieldType);
 
@@ -140,6 +156,7 @@ export function NewSmartPlaylistModal({ isOpen, onClose, valueOptions, onCreate,
   const [liveUpdate, setLiveUpdate] = useState(true);
   const [rules, setRules] = useState<SmartPlaylistRule[]>([]);
   const [maxTracks, setMaxTracks] = useState('');
+  const [selectedBy, setSelectedBy] = useState<NonNullable<SmartPlaylistRules['selectedBy']>>('random');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isEditing = !!editingPlaylist;
@@ -160,6 +177,7 @@ export function NewSmartPlaylistModal({ isOpen, onClose, valueOptions, onCreate,
         .filter((rule) => SUPPORTED_FIELDS.has(rule.field));
       setRules(normalizedRules);
       setMaxTracks(editingPlaylist.smartRules?.maxTracks ? String(editingPlaylist.smartRules.maxTracks) : '');
+      setSelectedBy(editingPlaylist.smartRules?.selectedBy ?? 'random');
       return;
     }
     setName('');
@@ -168,6 +186,7 @@ export function NewSmartPlaylistModal({ isOpen, onClose, valueOptions, onCreate,
     setLiveUpdate(true);
     setRules([]);
     setMaxTracks('');
+    setSelectedBy('random');
   }, [editingPlaylist, isOpen]);
 
   if (!isOpen) return null;
@@ -261,7 +280,7 @@ export function NewSmartPlaylistModal({ isOpen, onClose, valueOptions, onCreate,
           icon: '⚡',
           color,
           isSmart: true,
-          smartRules: { rules, maxTracks: parsedMaxTracks },
+          smartRules: { rules, maxTracks: parsedMaxTracks, selectedBy },
           matchRules,
           liveUpdate,
         });
@@ -271,7 +290,7 @@ export function NewSmartPlaylistModal({ isOpen, onClose, valueOptions, onCreate,
           color,
           matchRules,
           liveUpdate,
-          smartRules: { rules, maxTracks: parsedMaxTracks },
+          smartRules: { rules, maxTracks: parsedMaxTracks, selectedBy },
         });
       }
       handleClose();
@@ -325,6 +344,19 @@ export function NewSmartPlaylistModal({ isOpen, onClose, valueOptions, onCreate,
               placeholder="e.g. 75"
               className="w-[140px] px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 outline-none bg-white focus:border-blue-500"
             />
+            <label className="text-sm font-semibold text-gray-700 ml-3">Selected by:</label>
+            <select
+              value={selectedBy}
+              onChange={(e) => setSelectedBy(e.target.value as NonNullable<SmartPlaylistRules['selectedBy']>)}
+              disabled={maxTracks.trim() === ''}
+              className="w-[220px] px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 outline-none cursor-pointer bg-white focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {LIMIT_SELECTION_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="mb-5">
