@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 import { buildInventoryIndex, fetchInventoryTracks, matchTracks, sanitizePlaylistName } from '../../../../lib/vinylPlaylistImport';
-import { getSpotifyAccessTokenFromCookies, spotifyApiGet } from '../../../../lib/spotifyUser';
+import { getSpotifyAccessTokenFromCookies, spotifyApiGet, spotifyApiGetByUrl } from '../../../../lib/spotifyUser';
 
 type SpotifyTrackItem = {
   track?: {
@@ -17,17 +17,11 @@ type SpotifyPlaylistTracksResponse = {
 
 type SpotifyPlaylistMeta = {
   name?: string;
-  collaborative?: boolean;
-  owner?: { id?: string | null };
   tracks?: {
     items?: SpotifyTrackItem[];
     total?: number;
     next?: string | null;
   };
-};
-
-type SpotifyMe = {
-  id?: string;
 };
 
 export async function POST(req: Request) {
@@ -49,78 +43,63 @@ export async function POST(req: Request) {
     }
     spotifyScope = tokenData.scope ?? '';
 
-    step = 'spotify-access-check';
-    const [me, playlistMeta] = await Promise.all([
-      spotifyApiGet<SpotifyMe>(tokenData.accessToken, '/me'),
-      spotifyApiGet<SpotifyPlaylistMeta>(
-        tokenData.accessToken,
-        `/playlists/${playlistId}?fields=name,collaborative,owner(id)`
-      ),
-    ]);
-    const currentUserId = me.id ?? '';
-    const isOwner = !!currentUserId && (playlistMeta.owner?.id ?? '') === currentUserId;
-    const isCollaborator = !!playlistMeta.collaborative;
-    if (!isOwner && !isCollaborator) {
-      return NextResponse.json(
-        {
-          error:
-            'Spotify blocked playlist item access for this playlist. Only owner/collaborator playlists are importable.',
-          scope: spotifyScope,
-          step,
-        },
-        { status: 403 }
-      );
-    }
-
     step = 'spotify-tracks';
     const rows: Array<{ title?: string; artist?: string }> = [];
     let sourceTotal: number | null = null;
     let partialImport = false;
     let importSource: 'playlist_items' | 'playlist_fallback' = 'playlist_items';
-    try {
-      let offset = 0;
-      const limit = 100;
-      while (true) {
-        const data = await spotifyApiGet<SpotifyPlaylistTracksResponse>(
-          tokenData.accessToken,
-          `/playlists/${playlistId}/tracks?limit=${limit}&offset=${offset}&fields=items(track(name,artists(name))),next`
-        );
-        const items = data.items ?? [];
-        items.forEach((item) => {
-          const title = item.track?.name;
-          const artist = (item.track?.artists ?? []).map((a) => a.name).filter(Boolean).join(', ');
-          if (title) rows.push({ title, artist });
-        });
-        if (!data.next || items.length === 0) break;
-        offset += limit;
-        if (offset > 5000) break;
-      }
-      sourceTotal = rows.length;
-    } catch (tracksError) {
-      const message = tracksError instanceof Error ? tracksError.message : String(tracksError);
-      if (!message.toLowerCase().includes('failed (403)')) {
-        throw tracksError;
-      }
 
-      // Fallback path: for some public playlists Spotify still exposes first-page
-      // track items through GET /playlists/{id} even when /tracks is restricted.
-      importSource = 'playlist_fallback';
-      const fallback = await spotifyApiGet<SpotifyPlaylistMeta>(
-        tokenData.accessToken,
-        `/playlists/${playlistId}?fields=tracks(total,next,items(track(name,artists(name))))`
-      );
-      sourceTotal =
-        typeof fallback.tracks?.total === 'number' ? fallback.tracks.total : null;
-      partialImport = !!fallback.tracks?.next;
-      for (const item of fallback.tracks?.items ?? []) {
+    const appendRows = (items: SpotifyTrackItem[] = []) => {
+      for (const item of items) {
         const title = item.track?.name;
         const artist = (item.track?.artists ?? []).map((a) => a.name).filter(Boolean).join(', ');
         if (title) rows.push({ title, artist });
       }
+    };
 
-      if (rows.length === 0) {
+    const playlist = await spotifyApiGet<SpotifyPlaylistMeta>(
+      tokenData.accessToken,
+      `/playlists/${playlistId}?fields=name,tracks(total,next,items(track(name,artists(name))))`
+    );
+
+    sourceTotal =
+      typeof playlist.tracks?.total === 'number'
+        ? playlist.tracks.total
+        : null;
+    appendRows(playlist.tracks?.items ?? []);
+
+    let nextUrl = playlist.tracks?.next ?? null;
+    while (nextUrl) {
+      try {
+        const nextPage = await spotifyApiGetByUrl<SpotifyPlaylistTracksResponse>(
+          tokenData.accessToken,
+          nextUrl
+        );
+        appendRows(nextPage.items ?? []);
+        nextUrl = nextPage.next ?? null;
+      } catch (tracksError) {
+        const message = tracksError instanceof Error ? tracksError.message : String(tracksError);
+        if (message.toLowerCase().includes('failed (403)')) {
+          // Keep the rows gathered so far instead of hard-failing the import.
+          partialImport = true;
+          importSource = 'playlist_fallback';
+          nextUrl = null;
+          break;
+        }
         throw tracksError;
       }
+    }
+
+    if (rows.length === 0 && (sourceTotal === null || sourceTotal > 0)) {
+      return NextResponse.json(
+        {
+          error:
+            'Spotify returned no accessible track items for this playlist. This playlist cannot be imported through the current API permissions.',
+          scope: spotifyScope,
+          step,
+        },
+        { status: 403 }
+      );
     }
 
     step = 'inventory-index';

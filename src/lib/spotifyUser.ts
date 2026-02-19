@@ -134,3 +134,23 @@ export async function spotifyApiGet<T>(accessToken: string, path: string): Promi
   }
   return (await res.json()) as T;
 }
+
+export async function spotifyApiGetByUrl<T>(accessToken: string, url: string): Promise<T> {
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null) as {
+      error?: { status?: number; message?: string } | string;
+    } | null;
+    const details =
+      typeof payload?.error === 'string'
+        ? payload.error
+        : payload?.error?.message;
+    throw new Error(`Spotify API ${url} failed (${res.status})${details ? `: ${details}` : ''}`);
+  }
+  return (await res.json()) as T;
+}
