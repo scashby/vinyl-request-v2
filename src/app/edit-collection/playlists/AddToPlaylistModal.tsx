@@ -32,8 +32,8 @@ export function AddToPlaylistModal({
 
   if (!isOpen) return null;
 
-  const manualPlaylists = playlists.filter((playlist) => !playlist.isSmart);
-  const filteredPlaylists = manualPlaylists.filter((playlist) => playlist.name.toLowerCase().includes(query.toLowerCase()));
+  const editablePlaylists = playlists.filter((playlist) => !playlist.isSmart || playlist.liveUpdate === false);
+  const filteredPlaylists = editablePlaylists.filter((playlist) => playlist.name.toLowerCase().includes(query.toLowerCase()));
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30002]" onClick={onClose}>
@@ -49,7 +49,7 @@ export function AddToPlaylistModal({
         <div className="flex-1 overflow-y-auto p-2">
           {filteredPlaylists.length === 0 ? (
             <div className="p-10 text-center text-gray-400 text-[13px]">
-              {manualPlaylists.length === 0 ? 'No manual playlists available. Smart playlists auto-populate from rules.' : 'No playlists match your search.'}
+              {editablePlaylists.length === 0 ? 'No editable playlists available yet.' : 'No playlists match your search.'}
             </div>
           ) : (
             filteredPlaylists.map((playlist) => {

@@ -230,6 +230,43 @@ const selectSmartPlaylistKeys = (
   return new Set(sorted.slice(0, maxTracks).map((row) => row.key));
 };
 
+const buildSmartPlaylistTrackKeys = (
+  rows: CollectionTrackRow[],
+  config: {
+    smartRules: SmartPlaylistRules;
+    matchRules: 'all' | 'any';
+  }
+): string[] => {
+  const tempPlaylist: CollectionPlaylist = {
+    id: -1,
+    name: '__temp_smart__',
+    icon: '⚡',
+    color: '#3b82f6',
+    trackKeys: [],
+    createdAt: new Date().toISOString(),
+    sortOrder: 0,
+    isSmart: true,
+    smartRules: config.smartRules,
+    matchRules: config.matchRules,
+    liveUpdate: true,
+  };
+
+  const matches = rows.filter((row) => trackMatchesSmartPlaylist(row, tempPlaylist));
+  const maxTracks = config.smartRules.maxTracks ?? null;
+  if (typeof maxTracks !== 'number' || maxTracks <= 0 || matches.length <= maxTracks) {
+    return matches.map((row) => row.key);
+  }
+
+  const rules = config.smartRules.rules ?? [];
+  const hasArtistRule = rules.some((rule) => rule.field === 'track_artist' || rule.field === 'album_artist');
+  const hasAlbumRule = rules.some((rule) => rule.field === 'album_title');
+  const selectedBy = config.smartRules.selectedBy ?? 'random';
+
+  return Array.from(
+    selectSmartPlaylistKeys(matches, maxTracks, selectedBy, hasArtistRule, hasAlbumRule)
+  );
+};
+
 const getTrackPositionSortValue = (position: string, side: string | null): number => {
   const parsedSide = (side ?? position.trim().charAt(0)).toUpperCase();
   const sideWeight = parsedSide >= 'A' && parsedSide <= 'Z' ? parsedSide.charCodeAt(0) - 65 : 100;
@@ -1019,7 +1056,7 @@ function CollectionBrowserPage() {
 
   const playlistCounts = useMemo(() => {
     return playlists.reduce((acc, playlist) => {
-      if (playlist.isSmart) {
+      if (playlist.isSmart && playlist.liveUpdate) {
         const matched = allTrackRows.filter((row) => trackMatchesSmartPlaylist(row, playlist)).length;
         const maxTracks = playlist.smartRules?.maxTracks ?? null;
         acc[playlist.id] = typeof maxTracks === 'number' && maxTracks > 0 ? Math.min(matched, maxTracks) : matched;
@@ -1034,7 +1071,7 @@ function CollectionBrowserPage() {
     const result: Record<number, Set<string>> = {};
 
     playlists.forEach((playlist) => {
-      if (!playlist.isSmart) return;
+      if (!playlist.isSmart || !playlist.liveUpdate) return;
       const maxTracks = playlist.smartRules?.maxTracks ?? null;
       if (typeof maxTracks !== 'number' || maxTracks <= 0) return;
 
@@ -1081,7 +1118,7 @@ function CollectionBrowserPage() {
     if (trackSource === 'playlists' && selectedPlaylistId) {
       const playlist = playlists.find((item) => item.id === selectedPlaylistId);
       if (playlist) {
-        if (playlist.isSmart) {
+        if (playlist.isSmart && playlist.liveUpdate) {
           rows = rows.filter((row) => trackMatchesSmartPlaylist(row, playlist));
           const selectedKeys = smartPlaylistSelectedKeys[playlist.id];
           if (selectedKeys) {
@@ -1521,12 +1558,34 @@ function CollectionBrowserPage() {
         .eq('id', playlist.id);
 
       if (error) throw error;
+      if (playlist.isSmart && !playlist.liveUpdate && playlist.smartRules) {
+        const snapshotTrackKeys = buildSmartPlaylistTrackKeys(allTrackRows, {
+          smartRules: playlist.smartRules,
+          matchRules: playlist.matchRules,
+        });
+        const { error: deleteItemsError } = await (supabase as any)
+          .from('collection_playlist_items')
+          .delete()
+          .eq('playlist_id', playlist.id);
+        if (deleteItemsError) throw deleteItemsError;
+        if (snapshotTrackKeys.length > 0) {
+          const items = snapshotTrackKeys.map((trackKey, index) => ({
+            playlist_id: playlist.id,
+            track_key: trackKey,
+            sort_order: index,
+          }));
+          const { error: insertItemsError } = await (supabase as any)
+            .from('collection_playlist_items')
+            .insert(items);
+          if (insertItemsError) throw insertItemsError;
+        }
+      }
       await loadPlaylists();
     } catch (err) {
       console.error('Failed to update playlist:', err);
       alert('Failed to update playlist. Please try again.');
     }
-  }, [loadPlaylists]);
+  }, [allTrackRows, loadPlaylists]);
 
   const handleCreateSmartPlaylist = useCallback(async (payload: {
     name: string;
@@ -1538,6 +1597,12 @@ function CollectionBrowserPage() {
     try {
       const maxSort = playlists.reduce((max, item) => Math.max(max, item.sortOrder ?? 0), -1);
       const nextSortOrder = maxSort + 1;
+      const snapshotTrackKeys = payload.liveUpdate
+        ? []
+        : buildSmartPlaylistTrackKeys(allTrackRows, {
+            smartRules: payload.smartRules,
+            matchRules: payload.matchRules,
+          });
       const { data, error } = await (supabase as any)
         .from('collection_playlists')
         .insert({
@@ -1554,6 +1619,17 @@ function CollectionBrowserPage() {
         .single();
 
       if (error || !data) throw error || new Error('Failed to create smart playlist');
+      if (!payload.liveUpdate && snapshotTrackKeys.length > 0) {
+        const items = snapshotTrackKeys.map((trackKey, index) => ({
+          playlist_id: data.id,
+          track_key: trackKey,
+          sort_order: index,
+        }));
+        const { error: itemsError } = await (supabase as any)
+          .from('collection_playlist_items')
+          .insert(items);
+        if (itemsError) throw itemsError;
+      }
       await loadPlaylists();
       setSelectedPlaylistId(data.id);
       setShowNewSmartPlaylistModal(false);
@@ -1563,7 +1639,7 @@ function CollectionBrowserPage() {
       console.error('Failed to create smart playlist:', err);
       alert('Failed to create smart playlist. Please try again.');
     }
-  }, [loadPlaylists, playlists]);
+  }, [allTrackRows, loadPlaylists, playlists]);
 
   const handleDeletePlaylist = useCallback(async (playlistId: number, playlistName: string) => {
     if (!confirm(`Delete playlist "${playlistName}"? This cannot be undone.`)) {
@@ -2018,7 +2094,7 @@ function CollectionBrowserPage() {
               </div>
               {viewMode === 'album-track' && groupedTrackRows.length > 0 && (
                 <div className="flex items-center gap-1.5">
-                  {folderMode === 'playlists' && selectedPlaylist?.isSmart && (
+                  {folderMode === 'playlists' && selectedPlaylist?.isSmart && selectedPlaylist.liveUpdate && (
                     <button
                       onClick={handleRefreshSmartPlaylistMix}
                       title="Refresh smart playlist mix"
@@ -2043,7 +2119,7 @@ function CollectionBrowserPage() {
                   </button>
                 </div>
               )}
-              {viewMode === 'playlist' && folderMode === 'playlists' && selectedPlaylist?.isSmart && (
+              {viewMode === 'playlist' && folderMode === 'playlists' && selectedPlaylist?.isSmart && selectedPlaylist.liveUpdate && (
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={handleRefreshSmartPlaylistMix}
