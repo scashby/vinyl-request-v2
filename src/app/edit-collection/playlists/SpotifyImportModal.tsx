@@ -82,6 +82,14 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
           ) : (
             <>
               <div className="mb-3">
+                <a
+                  href="/api/auth/spotify"
+                  className="inline-flex items-center px-3 py-2 rounded bg-[#1db954] text-white text-xs font-medium"
+                >
+                  Reconnect Spotify
+                </a>
+              </div>
+              <div className="mb-3">
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}

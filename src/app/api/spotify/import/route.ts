@@ -143,6 +143,18 @@ export async function POST(req: Request) {
     return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Spotify import failed';
+    const lowered = message.toLowerCase();
+    if (lowered.includes('failed (403)') || lowered.includes('insufficient') || lowered.includes('forbidden')) {
+      return NextResponse.json(
+        {
+          error:
+            'Spotify denied access to playlist tracks (403). Reconnect Spotify to refresh permissions, then retry.',
+          details: message,
+          step,
+        },
+        { status: 403 }
+      );
+    }
     return NextResponse.json({ error: message, step }, { status: 500 });
   }
 }

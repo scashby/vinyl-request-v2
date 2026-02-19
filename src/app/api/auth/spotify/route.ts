@@ -7,6 +7,27 @@ export async function GET() {
   try {
     const state = randomBytes(16).toString('hex');
     const cookieStore = await cookies();
+    cookieStore.set('spotify_access_token', '', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 0,
+    });
+    cookieStore.set('spotify_refresh_token', '', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 0,
+    });
+    cookieStore.set('spotify_expires_at', '', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 0,
+    });
     cookieStore.set('spotify_oauth_state', state, {
       httpOnly: true,
       secure: true,

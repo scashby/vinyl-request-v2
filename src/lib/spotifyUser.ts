@@ -37,6 +37,8 @@ export function getSpotifyAuthorizeUrl(state: string) {
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('redirect_uri', redirectUri);
   url.searchParams.set('scope', 'playlist-read-private playlist-read-collaborative');
+  // Force consent so stale tokens/scopes do not linger between reconnects.
+  url.searchParams.set('show_dialog', 'true');
   url.searchParams.set('state', state);
   return url.toString();
 }
@@ -115,7 +117,14 @@ export async function spotifyApiGet<T>(accessToken: string, path: string): Promi
     cache: 'no-store',
   });
   if (!res.ok) {
-    throw new Error(`Spotify API ${path} failed (${res.status})`);
+    const payload = await res.json().catch(() => null) as {
+      error?: { status?: number; message?: string } | string;
+    } | null;
+    const details =
+      typeof payload?.error === 'string'
+        ? payload.error
+        : payload?.error?.message;
+    throw new Error(`Spotify API ${path} failed (${res.status})${details ? `: ${details}` : ''}`);
   }
   return (await res.json()) as T;
 }
