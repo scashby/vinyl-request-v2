@@ -146,6 +146,7 @@ export type EnrichmentResult = {
   source: string;
   data?: CandidateData;
   error?: string;
+  warning?: string;
 };
 
 // ============================================================================
@@ -1079,6 +1080,8 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
        if (artistData.genres) candidate.genres = artistData.genres;
     }
 
+    const spotifyWarnings: string[] = [];
+
     if (data.tracks?.items?.length > 0) {
         const trackIds = data.tracks.items.map((t: SpotifyTrack) => t.id).slice(0, 50).join(',');
         const featuresResult = await spFetchJson(
@@ -1092,20 +1095,30 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
           features = ((featuresResult.data.audio_features as (SpotifyAudioFeature | null)[] | undefined) ?? [])
             .filter((f): f is SpotifyAudioFeature => f !== null);
         } else {
-          // Fallback: fetch per-track features when bulk endpoint is flaky/unavailable.
-          const trackIdsList = data.tracks.items
-            .map((t: SpotifyTrack) => t.id)
-            .filter((id): id is string => typeof id === 'string' && id.length > 0)
-            .slice(0, 20);
-          for (const trackId of trackIdsList) {
-            const perTrack = await spFetchJson(
-              `https://api.spotify.com/v1/audio-features/${trackId}`,
-              token,
-              'audio-features-single',
-              2
-            );
-            if (perTrack.ok && perTrack.data?.id) {
-              features.push(perTrack.data as SpotifyAudioFeature);
+          const failed = featuresResult as { ok: false; status: number; text: string; data: any | null };
+          // Hard failures indicate this app cannot access audio-features at all.
+          // Avoid per-track retry loops that waste requests.
+          if ([400, 401, 403, 404].includes(failed.status)) {
+            spotifyWarnings.push(`audio-features unavailable (${failed.status})`);
+          } else {
+            // Fallback: fetch per-track features when bulk endpoint is flaky.
+            const trackIdsList = data.tracks.items
+              .map((t: SpotifyTrack) => t.id)
+              .filter((id): id is string => typeof id === 'string' && id.length > 0)
+              .slice(0, 20);
+            for (const trackId of trackIdsList) {
+              const perTrack = await spFetchJson(
+                `https://api.spotify.com/v1/audio-features/${trackId}`,
+                token,
+                'audio-features-single',
+                2
+              );
+              if (perTrack.ok && perTrack.data?.id) {
+                features.push(perTrack.data as SpotifyAudioFeature);
+              }
+            }
+            if (features.length === 0) {
+              spotifyWarnings.push(`audio-features unavailable (${failed.status})`);
             }
           }
         }
@@ -1155,7 +1168,12 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
         }
     }
 
-    return { success: true, source: 'spotify', data: candidate };
+    return {
+      success: true,
+      source: 'spotify',
+      data: candidate,
+      warning: spotifyWarnings.length > 0 ? spotifyWarnings.join(' | ') : undefined,
+    };
   } catch (e) {
     return { success: false, source: 'spotify', error: (e as Error).message };
   }

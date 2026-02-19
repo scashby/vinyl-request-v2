@@ -2034,7 +2034,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                 const hitField = candidateKeys.some((key) => returnedKeys.includes(key));
                 return hitField
                   ? `${source}: returned`
-                  : `${source}: returned other fields`;
+                  : `${source}: ${diag.reason || 'returned other fields'}`;
               })
               .join(' | ');
 

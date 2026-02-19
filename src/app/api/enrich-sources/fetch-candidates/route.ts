@@ -544,7 +544,10 @@ export async function POST(req: Request) {
                     return true;
                   })
                   .map(([k]) => k);
-                sourceDiagnostics[task.source] = { status: 'returned' };
+                sourceDiagnostics[task.source] = {
+                  status: 'returned',
+                  reason: value.warning || undefined
+                };
               } else {
                 sourceFieldCoverage[task.source] = [];
                 const authHint = task.source === 'discogs'
