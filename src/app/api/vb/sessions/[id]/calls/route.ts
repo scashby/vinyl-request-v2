@@ -15,7 +15,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
 
   const { data, error } = await db
     .from("vb_session_calls")
-    .select("id, call_index, status, called_at, vb_template_tracks ( id, track_title, artist_name, album_name )")
+    .select("id, call_index, status, prep_started_at, called_at, completed_at, vb_template_tracks ( id, track_title, artist_name, album_name, side, position )")
     .eq("session_id", sessionId)
     .order("call_index", { ascending: true });
 
@@ -25,11 +25,15 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
     id: row.id,
     call_index: row.call_index,
     status: row.status,
+    prep_started_at: row.prep_started_at,
     called_at: row.called_at,
+    completed_at: row.completed_at,
     column_letter: getColumnLetter(row.call_index),
     track_title: row.vb_template_tracks?.track_title ?? "",
     artist_name: row.vb_template_tracks?.artist_name ?? "",
     album_name: row.vb_template_tracks?.album_name ?? null,
+    side: row.vb_template_tracks?.side ?? null,
+    position: row.vb_template_tracks?.position ?? null,
   }));
 
   return NextResponse.json({ data: normalized }, { status: 200 });

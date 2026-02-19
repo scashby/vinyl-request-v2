@@ -14,7 +14,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
 
   const { data, error } = await db
     .from("vb_sessions")
-    .select("id, event_id, template_id, session_code, game_mode, variant, bingo_target, death_target, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, seconds_to_next_call, current_call_index, paused_at, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at, vb_templates ( id, name )")
+    .select("id, event_id, template_id, session_code, game_mode, variant, bingo_target, death_target, card_count, card_layout, card_label_mode, songs_per_round, round_count, current_round, clip_seconds, prep_buffer_seconds, auto_advance, host_mode, round_end_policy, tie_break_policy, pool_exhaustion_policy, seconds_to_next_call, current_call_index, paused_at, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at, vb_templates ( id, name )")
     .eq("id", sessionId)
     .single();
 
@@ -52,6 +52,9 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   if (typeof body.current_call_index === "number") patch.current_call_index = body.current_call_index;
   if (typeof body.current_round === "number") patch.current_round = body.current_round;
   if (typeof body.seconds_to_next_call === "number") patch.seconds_to_next_call = body.seconds_to_next_call;
+  if (typeof body.clip_seconds === "number") patch.clip_seconds = body.clip_seconds;
+  if (typeof body.prep_buffer_seconds === "number") patch.prep_buffer_seconds = body.prep_buffer_seconds;
+  if (typeof body.auto_advance === "boolean") patch.auto_advance = body.auto_advance;
   if (typeof body.recent_calls_limit === "number") patch.recent_calls_limit = body.recent_calls_limit;
   if (typeof body.show_title === "boolean") patch.show_title = body.show_title;
   if (typeof body.show_logo === "boolean") patch.show_logo = body.show_logo;
@@ -65,7 +68,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
   const { data, error } = await db
     .from("vb_sessions")
-    .select("id, event_id, template_id, session_code, game_mode, variant, bingo_target, death_target, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, seconds_to_next_call, current_call_index, paused_at, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at, vb_templates ( id, name )")
+    .select("id, event_id, template_id, session_code, game_mode, variant, bingo_target, death_target, card_count, card_layout, card_label_mode, songs_per_round, round_count, current_round, clip_seconds, prep_buffer_seconds, auto_advance, host_mode, round_end_policy, tie_break_policy, pool_exhaustion_policy, seconds_to_next_call, current_call_index, paused_at, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at, vb_templates ( id, name )")
     .eq("id", sessionId)
     .single();
 

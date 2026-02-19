@@ -13,13 +13,21 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   }
 
   const body = (await request.json()) as { status?: string };
-  const status = body.status === "played" ? "played" : "pending";
-  const calledAt = status === "played" ? new Date().toISOString() : null;
+  const allowed = new Set(["pending", "prep_started", "called", "played", "skipped", "completed"]);
+  const status = allowed.has(String(body.status)) ? String(body.status) : "pending";
+  const now = new Date().toISOString();
 
-  const { error } = await db
-    .from("vb_session_calls")
-    .update({ status, called_at: calledAt })
-    .eq("id", callId);
+  const patch: Record<string, string | null> = { status };
+  if (status === "prep_started") patch.prep_started_at = now;
+  if (status === "called" || status === "played") patch.called_at = now;
+  if (status === "completed" || status === "played" || status === "skipped") patch.completed_at = now;
+  if (status === "pending") {
+    patch.prep_started_at = null;
+    patch.called_at = null;
+    patch.completed_at = null;
+  }
+
+  const { error } = await db.from("vb_session_calls").update(patch).eq("id", callId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true }, { status: 200 });

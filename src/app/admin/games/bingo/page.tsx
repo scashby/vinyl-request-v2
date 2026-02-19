@@ -32,9 +32,19 @@ export default function VinylBingoSetupPage() {
   const [gameMode, setGameMode] = useState("single_line");
   const [cardCount, setCardCount] = useState(40);
   const [roundCount, setRoundCount] = useState(3);
+  const [songsPerRound, setSongsPerRound] = useState(15);
   const [secondsToNextCall, setSecondsToNextCall] = useState(45);
+  const [clipSeconds, setClipSeconds] = useState(80);
+  const [prepBufferSeconds, setPrepBufferSeconds] = useState(45);
+  const [autoAdvance, setAutoAdvance] = useState(false);
   const [setlistMode, setSetlistMode] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [preflight, setPreflight] = useState({
+    cratePull: false,
+    needleReady: false,
+    backupsReady: false,
+    boardReset: false,
+  });
 
   const load = async () => {
     const [tRes, sRes] = await Promise.all([
@@ -76,7 +86,12 @@ export default function VinylBingoSetupPage() {
           game_mode: gameMode,
           card_count: cardCount,
           round_count: roundCount,
+          songs_per_round: songsPerRound,
           seconds_to_next_call: secondsToNextCall,
+          clip_seconds: clipSeconds,
+          prep_buffer_seconds: prepBufferSeconds,
+          auto_advance: autoAdvance,
+          host_mode: "solo",
           setlist_mode: setlistMode,
         }),
       });
@@ -167,8 +182,20 @@ export default function VinylBingoSetupPage() {
               <input className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2" type="number" min={1} value={roundCount} onChange={(e) => setRoundCount(Number(e.target.value) || 1)} />
             </label>
 
+            <label className="text-sm text-stone-700">Songs per Round
+              <input className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2" type="number" min={1} value={songsPerRound} onChange={(e) => setSongsPerRound(Number(e.target.value) || 1)} />
+            </label>
+
             <label className="text-sm text-stone-700">Seconds to Next Call
               <input className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2" type="number" min={10} value={secondsToNextCall} onChange={(e) => setSecondsToNextCall(Number(e.target.value) || 45)} />
+            </label>
+
+            <label className="text-sm text-stone-700">Clip Seconds
+              <input className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2" type="number" min={10} value={clipSeconds} onChange={(e) => setClipSeconds(Number(e.target.value) || 80)} />
+            </label>
+
+            <label className="text-sm text-stone-700">Prep Buffer Seconds
+              <input className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2" type="number" min={10} value={prepBufferSeconds} onChange={(e) => setPrepBufferSeconds(Number(e.target.value) || 45)} />
             </label>
           </div>
 
@@ -176,12 +203,26 @@ export default function VinylBingoSetupPage() {
             <input type="checkbox" checked={setlistMode} onChange={(e) => setSetlistMode(e.target.checked)} />
             Setlist mode (ordered calls)
           </label>
+          <label className="mt-2 inline-flex items-center gap-2 text-sm text-stone-700">
+            <input type="checkbox" checked={autoAdvance} onChange={(e) => setAutoAdvance(e.target.checked)} />
+            Auto advance (off recommended for solo host)
+          </label>
+
+          <div className="mt-4 rounded-lg border border-stone-200 bg-stone-50 p-3 text-sm">
+            <p className="font-semibold text-stone-800">Preflight Checklist</p>
+            <div className="mt-2 grid gap-2 md:grid-cols-2">
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.cratePull} onChange={(e) => setPreflight((p) => ({ ...p, cratePull: e.target.checked }))} /> Crate pull complete</label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.needleReady} onChange={(e) => setPreflight((p) => ({ ...p, needleReady: e.target.checked }))} /> Needle/cleaning ready</label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.backupsReady} onChange={(e) => setPreflight((p) => ({ ...p, backupsReady: e.target.checked }))} /> Backup tracks staged</label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.boardReset} onChange={(e) => setPreflight((p) => ({ ...p, boardReset: e.target.checked }))} /> Dry-erase board reset</label>
+            </div>
+          </div>
 
           <div className="mt-5">
             <button
               type="button"
               onClick={createSession}
-              disabled={!templateId || creating}
+              disabled={!templateId || creating || !Object.values(preflight).every(Boolean)}
               className="rounded-lg bg-rose-700 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-800 disabled:opacity-50"
             >
               {creating ? "Creating..." : "Create Session"}

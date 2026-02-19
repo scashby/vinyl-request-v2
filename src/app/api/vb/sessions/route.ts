@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
 
   let q = db
     .from("vb_sessions")
-    .select("id, event_id, template_id, session_code, game_mode, variant, bingo_target, death_target, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, seconds_to_next_call, current_call_index, paused_at, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at")
+    .select("id, event_id, template_id, session_code, game_mode, variant, bingo_target, death_target, card_count, card_layout, card_label_mode, songs_per_round, round_count, current_round, clip_seconds, prep_buffer_seconds, auto_advance, host_mode, round_end_policy, tie_break_policy, pool_exhaustion_policy, seconds_to_next_call, current_call_index, paused_at, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at")
     .order("created_at", { ascending: false });
 
   if (eventId) q = q.eq("event_id", Number(eventId));
@@ -81,8 +81,13 @@ export async function POST(request: NextRequest) {
     const mode = parseGameMode(body);
     const cardCount = Math.max(1, Number(body.card_count ?? body.cardCount ?? 40));
     const roundCount = Math.max(1, Number(body.round_count ?? body.roundCount ?? 3));
+    const songsPerRound = Math.max(1, Number(body.songs_per_round ?? body.songsPerRound ?? 15));
     const secondsToNextCall = Math.max(10, Number(body.seconds_to_next_call ?? body.secondsToNextCall ?? 45));
+    const clipSeconds = Math.max(10, Number(body.clip_seconds ?? body.clipSeconds ?? 80));
+    const prepBufferSeconds = Math.max(10, Number(body.prep_buffer_seconds ?? body.prepBufferSeconds ?? 45));
     const setlistMode = Boolean(body.setlist_mode ?? body.setlistMode ?? false);
+    const autoAdvance = Boolean(body.auto_advance ?? body.autoAdvance ?? false);
+    const hostMode = String(body.host_mode ?? body.hostMode ?? "solo");
     const deathTarget = mode.deathTarget;
     const cardLayout = String(body.card_layout ?? body.cardLayout ?? "2-up");
     const cardLabelMode = String(body.card_label_mode ?? body.cardLabelMode ?? "track_artist");
@@ -132,8 +137,13 @@ export async function POST(request: NextRequest) {
         card_count: cardCount,
         card_layout: cardLayout,
         card_label_mode: cardLabelMode,
+        songs_per_round: songsPerRound,
         round_count: roundCount,
         current_round: 1,
+        clip_seconds: clipSeconds,
+        prep_buffer_seconds: prepBufferSeconds,
+        auto_advance: autoAdvance,
+        host_mode: hostMode,
         round_end_policy: roundEndPolicy,
         tie_break_policy: tieBreakPolicy,
         pool_exhaustion_policy: poolExhaustionPolicy,
@@ -159,7 +169,9 @@ export async function POST(request: NextRequest) {
       template_track_id: track.id,
       call_index: idx,
       status: "pending",
+      prep_started_at: null,
       called_at: null,
+      completed_at: null,
     }));
 
     const cardRows = cards.map((card) => ({

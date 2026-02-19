@@ -38,8 +38,13 @@ CREATE TABLE IF NOT EXISTS public.vb_sessions (
   card_count integer NOT NULL DEFAULT 40,
   card_layout text NOT NULL DEFAULT '2-up',
   card_label_mode text NOT NULL DEFAULT 'track_artist',
+  songs_per_round integer NOT NULL DEFAULT 15,
   round_count integer NOT NULL DEFAULT 3,
   current_round integer NOT NULL DEFAULT 1,
+  clip_seconds integer NOT NULL DEFAULT 80,
+  prep_buffer_seconds integer NOT NULL DEFAULT 45,
+  auto_advance boolean NOT NULL DEFAULT false,
+  host_mode text NOT NULL DEFAULT 'solo',
   round_end_policy text NOT NULL DEFAULT 'open_until_winner',
   tie_break_policy text NOT NULL DEFAULT 'one_song_playoff',
   pool_exhaustion_policy text NOT NULL DEFAULT 'declare_tie',
@@ -63,7 +68,9 @@ CREATE TABLE IF NOT EXISTS public.vb_session_calls (
   template_track_id bigint REFERENCES public.vb_template_tracks(id) ON DELETE SET NULL,
   call_index integer NOT NULL,
   status text NOT NULL DEFAULT 'pending',
+  prep_started_at timestamptz,
   called_at timestamptz,
+  completed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 

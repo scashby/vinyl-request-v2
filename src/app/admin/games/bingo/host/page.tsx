@@ -13,16 +13,20 @@ type Session = {
   round_count: number;
   current_round: number;
   seconds_to_next_call: number;
+  clip_seconds: number;
+  prep_buffer_seconds: number;
 };
 
 type Call = {
   id: number;
   call_index: number;
-  status: "pending" | "played";
+  status: "pending" | "prep_started" | "called" | "played" | "skipped" | "completed";
   column_letter: "B" | "I" | "N" | "G" | "O";
   track_title: string;
   artist_name: string;
   album_name: string | null;
+  side?: string | null;
+  position?: string | null;
 };
 
 export default function BingoHostPage() {
@@ -66,7 +70,14 @@ export default function BingoHostPage() {
   }, [session?.status, session?.current_call_index]);
 
   const currentCall = calls.find((c) => c.call_index === (session?.current_call_index ?? 0)) ?? null;
-  const playedCalls = useMemo(() => calls.filter((c) => c.status === "played"), [calls]);
+  const playedCalls = useMemo(() => calls.filter((c) => ["played", "completed", "called"].includes(c.status)), [calls]);
+  const nextTwo = useMemo(
+    () =>
+      calls
+        .filter((c) => c.call_index > (session?.current_call_index ?? 0))
+        .slice(0, 2),
+    [calls, session?.current_call_index]
+  );
 
   const patchSession = async (patch: Record<string, unknown>) => {
     if (!session) return;
@@ -83,7 +94,40 @@ export default function BingoHostPage() {
     await fetch(`/api/vb/calls/${currentCall.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "played" }),
+      body: JSON.stringify({ status: "called" }),
+    });
+    await patchSession({
+      status: "active",
+      current_call_index: Math.min(session.current_call_index + 1, Math.max(0, calls.length - 1)),
+    });
+  };
+
+  const markPrep = async () => {
+    if (!currentCall) return;
+    await fetch(`/api/vb/calls/${currentCall.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "prep_started" }),
+    });
+    await load();
+  };
+
+  const markCompleted = async () => {
+    if (!currentCall) return;
+    await fetch(`/api/vb/calls/${currentCall.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "completed" }),
+    });
+    await load();
+  };
+
+  const skipCurrent = async () => {
+    if (!session || !currentCall) return;
+    await fetch(`/api/vb/calls/${currentCall.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "skipped" }),
     });
     await patchSession({
       status: "active",
@@ -119,6 +163,7 @@ export default function BingoHostPage() {
             <div>
               <h1 className="text-2xl font-black">Host Console</h1>
               <p className="text-sm text-white/60">Code {session?.session_code ?? "----"} · Round {session?.current_round ?? 1} of {session?.round_count ?? 3}</p>
+              <p className="text-xs text-white/50">Clip {session?.clip_seconds ?? 80}s · Prep buffer {session?.prep_buffer_seconds ?? 45}s</p>
             </div>
             <div className="flex gap-2">
               <Link href={`/admin/games/bingo/assistant?sessionId=${sessionId}`} className="rounded border border-white/20 px-2 py-1 text-xs"><Music2 className="mr-1 inline h-4 w-4" />Assistant</Link>
@@ -167,6 +212,25 @@ export default function BingoHostPage() {
                 {session?.status === "active" ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
               </button>
               <button onClick={callAndAdvance} className="rounded-full border border-white/20 p-3"><SkipForward className="h-5 w-5" /></button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              <button onClick={markPrep} className="rounded border border-white/20 px-2 py-1">Prep Started</button>
+              <button onClick={callAndAdvance} className="rounded border border-white/20 px-2 py-1">Called + Next</button>
+              <button onClick={markCompleted} className="rounded border border-white/20 px-2 py-1">Completed</button>
+              <button onClick={skipCurrent} className="rounded border border-white/20 px-2 py-1 text-amber-300">Skip</button>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-[#1b1b1b] p-5">
+            <h2 className="text-lg font-bold">Up Next</h2>
+            <div className="mt-3 space-y-2 text-sm">
+              {nextTwo.length === 0 ? <p className="text-white/60">No upcoming tracks.</p> : nextTwo.map((c) => (
+                <div key={c.id} className="rounded border border-white/10 px-3 py-2">
+                  <span className="mr-2 font-bold text-rose-300">{c.column_letter}</span>
+                  {c.track_title} <span className="text-white/60">- {c.artist_name}</span>
+                  <div className="text-xs text-white/50">{c.album_name ?? "-"} {c.side ? `· Side ${c.side}` : ""} {c.position ? `· ${c.position}` : ""}</div>
+                </div>
+              ))}
             </div>
           </div>
 

@@ -12,16 +12,20 @@ type Session = {
   current_round: number;
   seconds_to_next_call: number;
   session_code: string;
+  clip_seconds: number;
+  prep_buffer_seconds: number;
 };
 
 type Call = {
   id: number;
   call_index: number;
-  status: "pending" | "played";
+  status: "pending" | "prep_started" | "called" | "played" | "skipped" | "completed";
   column_letter: "B" | "I" | "N" | "G" | "O";
   track_title: string;
   artist_name: string;
   album_name: string | null;
+  side?: string | null;
+  position?: string | null;
 };
 
 export default function BingoAssistantPage() {
@@ -65,7 +69,14 @@ export default function BingoAssistantPage() {
   }, [session?.status, session?.current_call_index]);
 
   const currentCall = calls.find((c) => c.call_index === (session?.current_call_index ?? 0)) ?? null;
-  const playedCalls = useMemo(() => calls.filter((c) => c.status === "played"), [calls]);
+  const playedCalls = useMemo(() => calls.filter((c) => ["played", "completed", "called"].includes(c.status)), [calls]);
+  const nextTwo = useMemo(
+    () =>
+      calls
+        .filter((c) => c.call_index > (session?.current_call_index ?? 0))
+        .slice(0, 2),
+    [calls, session?.current_call_index]
+  );
 
   return (
     <div className="min-h-screen bg-[#121212] p-6 text-white">
@@ -75,6 +86,7 @@ export default function BingoAssistantPage() {
             <div>
               <h1 className="text-2xl font-black">Assistant Card Check</h1>
               <p className="text-sm text-white/60">Code {session?.session_code ?? "----"} · Round {session?.current_round ?? 1} of {session?.round_count ?? 3}</p>
+              <p className="text-xs text-white/50">Clip {session?.clip_seconds ?? 80}s · Prep buffer {session?.prep_buffer_seconds ?? 45}s</p>
             </div>
             <Link href={`/admin/games/bingo/host?sessionId=${sessionId}`} className="rounded border border-white/20 px-3 py-1 text-xs">Back to Host</Link>
           </div>
@@ -113,6 +125,22 @@ export default function BingoAssistantPage() {
               </>
             ) : <p className="mt-2 text-white/70">No call selected.</p>}
             <p className="mt-4 text-sm text-white/60">{session?.status === "paused" ? "Paused" : `Time Until Next Call: ${countdown}s`}</p>
+            {currentCall && (
+              <div className="mt-2 text-xs text-white/60">Checklist: Pull now / Cue now / Called · status: <span className="font-semibold text-white/80">{currentCall.status}</span></div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-[#1b1b1b] p-5">
+            <h2 className="text-lg font-bold">Up Next</h2>
+            <div className="mt-3 space-y-2 text-sm">
+              {nextTwo.length === 0 ? <p className="text-white/60">No upcoming tracks.</p> : nextTwo.map((c) => (
+                <div key={c.id} className="rounded border border-white/10 px-3 py-2">
+                  <span className="mr-2 font-bold text-rose-300">{c.column_letter}</span>
+                  {c.track_title} <span className="text-white/60">- {c.artist_name}</span>
+                  <div className="text-xs text-white/50">{c.album_name ?? "-"} {c.side ? `· Side ${c.side}` : ""} {c.position ? `· ${c.position}` : ""}</div>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-[#1b1b1b] p-5">

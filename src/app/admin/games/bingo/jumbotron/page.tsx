@@ -21,7 +21,7 @@ type Session = {
 type Call = {
   id: number;
   call_index: number;
-  status: "pending" | "played";
+  status: "pending" | "prep_started" | "called" | "played" | "skipped" | "completed";
   column_letter: "B" | "I" | "N" | "G" | "O";
   track_title: string;
   artist_name: string;
@@ -70,7 +70,7 @@ export default function BingoJumbotronPage() {
   const current = calls.find((c) => c.call_index === (session?.current_call_index ?? 0)) ?? null;
   const recent = useMemo(() => {
     const limit = session?.recent_calls_limit ?? 5;
-    return calls.filter((c) => c.status === "played").slice(-limit).reverse();
+    return calls.filter((c) => ["played", "called", "completed"].includes(c.status)).slice(-limit).reverse();
   }, [calls, session?.recent_calls_limit]);
 
   return (
