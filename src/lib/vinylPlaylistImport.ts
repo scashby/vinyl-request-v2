@@ -65,50 +65,109 @@ export const matchTracks = (
 
 export const fetchInventoryTracks = async (limit?: number) => {
   const tracks: InventoryTrack[] = [];
-  let page = 0;
 
+  // Step 1: fetch vinyl release ids first (cheap filter on releases table).
+  const releaseIds: number[] = [];
+  let releasePage = 0;
   while (true) {
-    const from = page * PAGE_SIZE;
+    const from = releasePage * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
-
-    const { data: inventoryRows, error } = await supabaseAdmin
-      .from("inventory")
-      .select(
-        "id, releases ( id, media_type, format_details, release_tracks ( id, position, side, title_override, recordings ( id, title, track_artist ) ) )"
-      )
-      .eq("releases.media_type", "Vinyl")
-      .overlaps("releases.format_details", VINYL_SIZES)
+    const { data: releases, error: releasesError } = await supabaseAdmin
+      .from("releases")
+      .select("id")
+      .eq("media_type", "Vinyl")
+      .overlaps("format_details", VINYL_SIZES)
       .range(from, to);
 
-    if (error) {
-      throw new Error(error.message);
+    if (releasesError) {
+      throw new Error(`Failed loading vinyl releases: ${releasesError.message}`);
     }
 
-    const rows = inventoryRows ?? [];
+    const rows = releases ?? [];
     for (const row of rows) {
-      const release = row.releases;
-      if (!release || !release.release_tracks) continue;
+      if (typeof row.id === "number") {
+        releaseIds.push(row.id);
+      }
+    }
+    if (rows.length < PAGE_SIZE) break;
+    releasePage += 1;
+  }
 
-      for (const track of release.release_tracks) {
-        const recording = track.recordings;
-        const title = track.title_override || recording?.title;
-        const artist = recording?.track_artist || "Unknown Artist";
-        if (!title) continue;
+  if (releaseIds.length === 0) return tracks;
 
+  // Step 2: prefetch release tracks for those releases in chunks.
+  const trackMap = new Map<number, Array<{
+    recording_id: number | null;
+    title: string;
+    artist: string;
+    side: string | null;
+    position: string | null;
+  }>>();
+
+  const releaseChunkSize = 250;
+  for (let i = 0; i < releaseIds.length; i += releaseChunkSize) {
+    const chunk = releaseIds.slice(i, i + releaseChunkSize);
+    const { data: releaseTracks, error: releaseTracksError } = await supabaseAdmin
+      .from("release_tracks")
+      .select("release_id, position, side, title_override, recordings ( id, title, track_artist )")
+      .in("release_id", chunk);
+
+    if (releaseTracksError) {
+      throw new Error(`Failed loading release tracks: ${releaseTracksError.message}`);
+    }
+
+    for (const row of releaseTracks ?? []) {
+      const releaseId = row.release_id;
+      if (typeof releaseId !== "number") continue;
+      const recording = Array.isArray(row.recordings) ? row.recordings[0] : row.recordings;
+      const title = row.title_override || recording?.title;
+      if (!title) continue;
+      const trackRow = {
+        recording_id: recording?.id ?? null,
+        title,
+        artist: recording?.track_artist || "Unknown Artist",
+        side: row.side ?? null,
+        position: row.position ?? null,
+      };
+      if (!trackMap.has(releaseId)) {
+        trackMap.set(releaseId, []);
+      }
+      trackMap.get(releaseId)!.push(trackRow);
+    }
+  }
+
+  // Step 3: fetch inventory rows and project the preloaded tracks.
+  for (let i = 0; i < releaseIds.length; i += releaseChunkSize) {
+    const chunk = releaseIds.slice(i, i + releaseChunkSize);
+    const { data: inventoryRows, error: inventoryError } = await supabaseAdmin
+      .from("inventory")
+      .select("id, release_id")
+      .in("release_id", chunk);
+
+    if (inventoryError) {
+      throw new Error(`Failed loading inventory rows: ${inventoryError.message}`);
+    }
+
+    for (const row of inventoryRows ?? []) {
+      const inventoryId = row.id ?? null;
+      const releaseId = row.release_id;
+      if (!releaseId || !trackMap.has(releaseId)) continue;
+      const releaseTracks = trackMap.get(releaseId)!;
+      for (const track of releaseTracks) {
         tracks.push({
-          inventory_id: row.id ?? null,
-          recording_id: recording?.id ?? null,
-          title,
-          artist,
-          side: track.side ?? null,
-          position: track.position ?? null,
+          inventory_id: inventoryId,
+          recording_id: track.recording_id,
+          title: track.title,
+          artist: track.artist,
+          side: track.side,
+          position: track.position,
         });
       }
     }
 
-    if (rows.length < PAGE_SIZE) break;
-    if (limit && tracks.length >= limit) break;
-    page += 1;
+    if (limit && tracks.length >= limit) {
+      return tracks.slice(0, limit);
+    }
   }
 
   return tracks;

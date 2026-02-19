@@ -36,11 +36,27 @@ export async function GET() {
     }
 
     const response = NextResponse.json({
-      playlists: items.map((row) => ({
-        id: row.id,
-        name: row.name,
-        trackCount: row.tracks?.total ?? 0,
-      })),
+      playlists: await Promise.all(
+        items.map(async (row) => {
+          let trackCount = row.tracks?.total;
+          if (typeof trackCount !== 'number') {
+            try {
+              const playlist = await spotifyApiGet<{ tracks?: { total?: number } }>(
+                tokenData.accessToken,
+                `/playlists/${row.id}?fields=tracks(total)`
+              );
+              trackCount = playlist.tracks?.total;
+            } catch {
+              trackCount = 0;
+            }
+          }
+          return {
+            id: row.id,
+            name: row.name,
+            trackCount: trackCount ?? 0,
+          };
+        })
+      ),
     });
 
     if (tokenData.refreshed) {

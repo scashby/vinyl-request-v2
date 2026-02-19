@@ -16,7 +16,9 @@ type SpotifyPlaylistTracksResponse = {
 };
 
 export async function POST(req: Request) {
+  let step = 'init';
   try {
+    step = 'parse-body';
     const body = await req.json();
     const playlistId = String(body?.playlistId ?? '').trim();
     const playlistName = sanitizePlaylistName(String(body?.playlistName ?? ''));
@@ -24,11 +26,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'playlistId is required' }, { status: 400 });
     }
 
+    step = 'spotify-token';
     const tokenData = await getSpotifyAccessTokenFromCookies();
     if (!tokenData.accessToken) {
       return NextResponse.json({ error: 'Not connected to Spotify' }, { status: 401 });
     }
 
+    step = 'spotify-tracks';
     const rows: Array<{ title?: string; artist?: string }> = [];
     let offset = 0;
     const limit = 100;
@@ -48,10 +52,12 @@ export async function POST(req: Request) {
       if (offset > 5000) break;
     }
 
+    step = 'inventory-index';
     const inventoryTracks = await fetchInventoryTracks();
     const index = buildInventoryIndex(inventoryTracks);
     const { matched, missing } = matchTracks(rows, index);
 
+    step = 'create-playlist';
     const { data: maxSortRow } = await (supabaseAdmin as any)
       .from('collection_playlists')
       .select('sort_order')
@@ -79,6 +85,7 @@ export async function POST(req: Request) {
       throw insertError || new Error('Failed to create local playlist');
     }
 
+    step = 'insert-playlist-items';
     const trackKeys = matched
       .filter((row) => row.inventory_id && row.position)
       .map((row) => `${row.inventory_id}:${row.position}`);
@@ -96,6 +103,7 @@ export async function POST(req: Request) {
       if (itemsError) throw itemsError;
     }
 
+    step = 'build-response';
     const response = NextResponse.json({
       ok: true,
       playlistId: inserted.id,
@@ -135,6 +143,6 @@ export async function POST(req: Request) {
     return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Spotify import failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message, step }, { status: 500 });
   }
 }
