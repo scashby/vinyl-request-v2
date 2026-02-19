@@ -19,13 +19,43 @@ function parseVariant(value: unknown): VbVariant {
   return raw === "death" || raw === "blackout" ? raw : "standard";
 }
 
+function parseGameMode(body: Record<string, unknown>) {
+  const gameMode = String(body.game_mode ?? body.gameMode ?? "").trim();
+  const allowed = new Set([
+    "single_line",
+    "double_line",
+    "triple_line",
+    "criss_cross",
+    "four_corners",
+    "blackout",
+    "death",
+  ]);
+
+  if (allowed.has(gameMode)) {
+    if (gameMode === "death") {
+      return { gameMode, variant: "death" as VbVariant, bingoTarget: "single_line", deathTarget: "single_line" };
+    }
+    if (gameMode === "blackout") {
+      return { gameMode, variant: "blackout" as VbVariant, bingoTarget: "blackout", deathTarget: "single_line" };
+    }
+    return { gameMode, variant: "standard" as VbVariant, bingoTarget: gameMode, deathTarget: "single_line" };
+  }
+
+  const variant = parseVariant(body.variant);
+  const bingoTarget = String(body.bingo_target ?? body.bingoTarget ?? "single_line");
+  const deathTarget = String(body.death_target ?? body.deathTarget ?? "single_line");
+  const fallbackMode =
+    variant === "death" ? "death" : variant === "blackout" ? "blackout" : bingoTarget;
+  return { gameMode: fallbackMode, variant, bingoTarget, deathTarget };
+}
+
 export async function GET(request: NextRequest) {
   const db = supabaseAdmin as any;
   const eventId = request.nextUrl.searchParams.get("eventId");
 
   let q = db
     .from("vb_sessions")
-    .select("id, event_id, template_id, session_code, variant, bingo_target, death_target, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, seconds_to_next_call, current_call_index, paused_at, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at")
+    .select("id, event_id, template_id, session_code, game_mode, variant, bingo_target, death_target, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, seconds_to_next_call, current_call_index, paused_at, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at")
     .order("created_at", { ascending: false });
 
   if (eventId) q = q.eq("event_id", Number(eventId));
@@ -48,13 +78,12 @@ export async function POST(request: NextRequest) {
 
     const eventIdRaw = body.event_id ?? body.eventId;
     const eventId = eventIdRaw ? Number(eventIdRaw) : null;
-    const variant = parseVariant(body.variant);
-    const bingoTarget = String(body.bingo_target ?? body.bingoTarget ?? "single_line");
+    const mode = parseGameMode(body);
     const cardCount = Math.max(1, Number(body.card_count ?? body.cardCount ?? 40));
     const roundCount = Math.max(1, Number(body.round_count ?? body.roundCount ?? 3));
     const secondsToNextCall = Math.max(10, Number(body.seconds_to_next_call ?? body.secondsToNextCall ?? 45));
     const setlistMode = Boolean(body.setlist_mode ?? body.setlistMode ?? false);
-    const deathTarget = String(body.death_target ?? body.deathTarget ?? "single_line");
+    const deathTarget = mode.deathTarget;
     const cardLayout = String(body.card_layout ?? body.cardLayout ?? "2-up");
     const cardLabelMode = String(body.card_label_mode ?? body.cardLabelMode ?? "track_artist");
     const roundEndPolicy = String(body.round_end_policy ?? body.roundEndPolicy ?? "open_until_winner");
@@ -81,7 +110,7 @@ export async function POST(request: NextRequest) {
     }
 
     const callOrder = buildCallOrder(tracks, setlistMode);
-    const cards = buildCards(tracks, cardCount, variant);
+    const cards = buildCards(tracks, cardCount, mode.variant);
 
     let code = randomCode();
     for (let i = 0; i < 4; i += 1) {
@@ -96,8 +125,9 @@ export async function POST(request: NextRequest) {
         event_id: Number.isFinite(eventId as number) ? eventId : null,
         template_id: templateId,
         session_code: code,
-        variant,
-        bingo_target: bingoTarget,
+        variant: mode.variant,
+        bingo_target: mode.bingoTarget,
+        game_mode: mode.gameMode,
         death_target: deathTarget,
         card_count: cardCount,
         card_layout: cardLayout,
@@ -135,7 +165,7 @@ export async function POST(request: NextRequest) {
     const cardRows = cards.map((card) => ({
       session_id: inserted.id,
       card_number: card.index,
-      has_free_space: variant === "standard",
+      has_free_space: mode.variant === "standard",
       grid: card.cells,
     }));
 

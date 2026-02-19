@@ -16,8 +16,7 @@ type Template = {
 type Session = {
   id: number;
   session_code: string;
-  variant: string;
-  bingo_target: string;
+  game_mode: string;
   status: string;
   created_at: string;
 };
@@ -30,8 +29,7 @@ export default function VinylBingoSetupPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [templateId, setTemplateId] = useState<number | null>(null);
-  const [variant, setVariant] = useState("standard");
-  const [target, setTarget] = useState("single_line");
+  const [gameMode, setGameMode] = useState("single_line");
   const [cardCount, setCardCount] = useState(40);
   const [roundCount, setRoundCount] = useState(3);
   const [secondsToNextCall, setSecondsToNextCall] = useState(45);
@@ -75,8 +73,7 @@ export default function VinylBingoSetupPage() {
         body: JSON.stringify({
           template_id: templateId,
           event_id: eventId ? Number(eventId) : null,
-          variant,
-          bingo_target: target,
+          game_mode: gameMode,
           card_count: cardCount,
           round_count: roundCount,
           seconds_to_next_call: secondsToNextCall,
@@ -150,23 +147,15 @@ export default function VinylBingoSetupPage() {
             </label>
 
             <label className="text-sm text-stone-700">
-              Variant
-              <select className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2" value={variant} onChange={(e) => setVariant(e.target.value)}>
-                <option value="standard">Standard</option>
-                <option value="death">Death (reverse bingo)</option>
-                <option value="blackout">Blackout</option>
-              </select>
-            </label>
-
-            <label className="text-sm text-stone-700">
-              Bingo Target
-              <select className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2" value={target} onChange={(e) => setTarget(e.target.value)}>
+              Game Mode
+              <select className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2" value={gameMode} onChange={(e) => setGameMode(e.target.value)}>
                 <option value="single_line">Single Line</option>
                 <option value="double_line">Double Line</option>
                 <option value="triple_line">Triple Line</option>
                 <option value="criss_cross">Criss-Cross</option>
                 <option value="four_corners">Four Corners</option>
                 <option value="blackout">Blackout</option>
+                <option value="death">Death</option>
               </select>
             </label>
 
@@ -212,7 +201,7 @@ export default function VinylBingoSetupPage() {
             <div className="space-y-3">
               {sessions.map((s) => (
                 <div key={s.id} className="rounded-xl border border-stone-200 p-3">
-                  <div className="text-sm text-stone-800">Code: <span className="font-bold">{s.session_code}</span> | {s.variant} | {s.bingo_target} | {s.status}</div>
+                  <div className="text-sm text-stone-800">Code: <span className="font-bold">{s.session_code}</span> | {s.game_mode} | {s.status}</div>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <button onClick={() => router.push(`/admin/games/bingo/host?sessionId=${s.id}`)} className="rounded border border-stone-300 px-2 py-1 text-xs">Host</button>
                     <button onClick={() => router.push(`/admin/games/bingo/assistant?sessionId=${s.id}`)} className="rounded border border-stone-300 px-2 py-1 text-xs">Assistant</button>

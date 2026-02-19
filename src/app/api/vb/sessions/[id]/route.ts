@@ -14,7 +14,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
 
   const { data, error } = await db
     .from("vb_sessions")
-    .select("id, event_id, template_id, session_code, variant, bingo_target, death_target, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, seconds_to_next_call, current_call_index, paused_at, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at, vb_templates ( id, name )")
+    .select("id, event_id, template_id, session_code, game_mode, variant, bingo_target, death_target, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, seconds_to_next_call, current_call_index, paused_at, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at, vb_templates ( id, name )")
     .eq("id", sessionId)
     .single();
 
@@ -65,7 +65,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
   const { data, error } = await db
     .from("vb_sessions")
-    .select("id, event_id, template_id, session_code, variant, bingo_target, death_target, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, seconds_to_next_call, current_call_index, paused_at, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at, vb_templates ( id, name )")
+    .select("id, event_id, template_id, session_code, game_mode, variant, bingo_target, death_target, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, seconds_to_next_call, current_call_index, paused_at, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at, vb_templates ( id, name )")
     .eq("id", sessionId)
     .single();
 

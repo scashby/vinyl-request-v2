@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS public.vb_sessions (
   event_id bigint REFERENCES public.events(id) ON DELETE SET NULL,
   template_id bigint REFERENCES public.vb_templates(id) ON DELETE SET NULL,
   session_code text UNIQUE,
+  game_mode text NOT NULL DEFAULT 'single_line',
   variant text NOT NULL DEFAULT 'standard',
   bingo_target text NOT NULL DEFAULT 'single_line',
   death_target text NOT NULL DEFAULT 'single_line',
