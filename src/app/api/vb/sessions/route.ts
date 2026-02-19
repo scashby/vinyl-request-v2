@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   let q = db
     .from("vb_sessions")
-    .select("id, event_id, template_id, session_code, variant, bingo_target, card_count, round_count, current_round, seconds_to_next_call, current_call_index, paused_at, status, created_at")
+    .select("id, event_id, template_id, session_code, variant, bingo_target, death_target, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, seconds_to_next_call, current_call_index, paused_at, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at")
     .order("created_at", { ascending: false });
 
   if (eventId) q = q.eq("event_id", Number(eventId));
@@ -54,6 +54,17 @@ export async function POST(request: NextRequest) {
     const roundCount = Math.max(1, Number(body.round_count ?? body.roundCount ?? 3));
     const secondsToNextCall = Math.max(10, Number(body.seconds_to_next_call ?? body.secondsToNextCall ?? 45));
     const setlistMode = Boolean(body.setlist_mode ?? body.setlistMode ?? false);
+    const deathTarget = String(body.death_target ?? body.deathTarget ?? "single_line");
+    const cardLayout = String(body.card_layout ?? body.cardLayout ?? "2-up");
+    const cardLabelMode = String(body.card_label_mode ?? body.cardLabelMode ?? "track_artist");
+    const roundEndPolicy = String(body.round_end_policy ?? body.roundEndPolicy ?? "open_until_winner");
+    const tieBreakPolicy = String(body.tie_break_policy ?? body.tieBreakPolicy ?? "one_song_playoff");
+    const poolExhaustionPolicy = String(body.pool_exhaustion_policy ?? body.poolExhaustionPolicy ?? "declare_tie");
+    const recentCallsLimit = Math.max(1, Number(body.recent_calls_limit ?? body.recentCallsLimit ?? 5));
+    const showTitle = body.show_title === undefined ? true : Boolean(body.show_title);
+    const showLogo = body.show_logo === undefined ? true : Boolean(body.show_logo);
+    const showRounds = body.show_rounds === undefined ? true : Boolean(body.show_rounds);
+    const showCountdown = body.show_countdown === undefined ? true : Boolean(body.show_countdown);
 
     const { data: templateTracks, error: tracksError } = await db
       .from("vb_template_tracks")
@@ -87,12 +98,23 @@ export async function POST(request: NextRequest) {
         session_code: code,
         variant,
         bingo_target: bingoTarget,
+        death_target: deathTarget,
         card_count: cardCount,
+        card_layout: cardLayout,
+        card_label_mode: cardLabelMode,
         round_count: roundCount,
         current_round: 1,
+        round_end_policy: roundEndPolicy,
+        tie_break_policy: tieBreakPolicy,
+        pool_exhaustion_policy: poolExhaustionPolicy,
         seconds_to_next_call: secondsToNextCall,
         current_call_index: 0,
         paused_at: null,
+        recent_calls_limit: recentCallsLimit,
+        show_title: showTitle,
+        show_logo: showLogo,
+        show_rounds: showRounds,
+        show_countdown: showCountdown,
         status: "pending",
       })
       .select("id")
