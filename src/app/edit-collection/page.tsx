@@ -1550,6 +1550,7 @@ function CollectionBrowserPage() {
 
   const handleUpdatePlaylist = useCallback(async (playlist: Playlist) => {
     try {
+      const previous = playlists.find((item) => item.id === playlist.id);
       const { error } = await (supabase as any)
         .from('collection_playlists')
         .update({
@@ -1564,17 +1565,25 @@ function CollectionBrowserPage() {
         .eq('id', playlist.id);
 
       if (error) throw error;
-      if (playlist.isSmart && !playlist.liveUpdate && playlist.smartRules) {
+
+      // Only materialize a static snapshot when explicitly switching from live -> static.
+      if (
+        playlist.isSmart &&
+        playlist.smartRules &&
+        previous?.liveUpdate === true &&
+        playlist.liveUpdate === false
+      ) {
         const snapshotTrackKeys = buildSmartPlaylistTrackKeys(allTrackRows, {
           smartRules: playlist.smartRules,
           matchRules: playlist.matchRules,
         });
-        const { error: deleteItemsError } = await (supabase as any)
-          .from('collection_playlist_items')
-          .delete()
-          .eq('playlist_id', playlist.id);
-        if (deleteItemsError) throw deleteItemsError;
         if (snapshotTrackKeys.length > 0) {
+          const { error: deleteItemsError } = await (supabase as any)
+            .from('collection_playlist_items')
+            .delete()
+            .eq('playlist_id', playlist.id);
+          if (deleteItemsError) throw deleteItemsError;
+
           const items = snapshotTrackKeys.map((trackKey, index) => ({
             playlist_id: playlist.id,
             track_key: trackKey,
@@ -1584,6 +1593,9 @@ function CollectionBrowserPage() {
             .from('collection_playlist_items')
             .insert(items);
           if (insertItemsError) throw insertItemsError;
+        } else {
+          // Keep existing items if snapshot unexpectedly resolves empty.
+          console.warn(`Skipped snapshot materialization for playlist ${playlist.id}: no tracks matched.`);
         }
       }
       await loadPlaylists();
@@ -1591,7 +1603,7 @@ function CollectionBrowserPage() {
       console.error('Failed to update playlist:', err);
       alert('Failed to update playlist. Please try again.');
     }
-  }, [allTrackRows, loadPlaylists]);
+  }, [allTrackRows, loadPlaylists, playlists]);
 
   const handleCreateSmartPlaylist = useCallback(async (payload: {
     name: string;
