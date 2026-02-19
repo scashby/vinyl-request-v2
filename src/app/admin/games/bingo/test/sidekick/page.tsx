@@ -1,45 +1,37 @@
-// Path: src/app/admin/games/bingo/test/sidekick/page.tsx
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Copy, Check, Music, Clock, Hash, Moon, Sun } from "lucide-react";
+import { ArrowLeft, Clock3 } from "lucide-react";
 
 type Session = {
   id: number;
-  game_code: string;
-  status: string;
+  status: "pending" | "active" | "paused" | "completed";
   current_pick_index: number;
+  round_count?: number;
+  current_round?: number;
+  seconds_to_next_call?: number;
   game_templates: { name: string };
 };
 
 type Pick = {
   id: number;
   pick_index: number;
-  status: string;
+  status: "pending" | "played" | "skipped";
+  column_letter?: "B" | "I" | "N" | "G" | "O";
+  track_title?: string;
+  artist_name?: string;
+  album_name?: string | null;
   game_template_items: {
     title: string;
     artist: string;
-    duration_ms?: number;
-    bpm?: number;
-    key_signature?: string;
+    album_name?: string | null;
   };
 };
 
-const COLS = [
-  { letter: "B", bg: "bg-blue-500" },
-  { letter: "I", bg: "bg-green-500" },
-  { letter: "N", bg: "bg-yellow-500" },
-  { letter: "G", bg: "bg-orange-500" },
-  { letter: "O", bg: "bg-red-500" },
-];
-
-function formatDuration(ms?: number): string {
-  if (!ms) return "--:--";
-  const s = Math.floor(ms / 1000);
-  return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
-}
+const COLS = ["B", "I", "N", "G", "O"] as const;
+const DEFAULT_SECONDS_TO_NEXT_CALL = 45;
 
 export default function SidekickPage() {
   const searchParams = useSearchParams();
@@ -47,21 +39,31 @@ export default function SidekickPage() {
 
   const [session, setSession] = useState<Session | null>(null);
   const [picks, setPicks] = useState<Pick[]>([]);
-  const [darkMode, setDarkMode] = useState(true);
-  const [copied, setCopied] = useState(false);
-
-  const currentIdx = session?.current_pick_index ?? 0;
-  const currentPick = picks.find((p) => p.pick_index === currentIdx);
-  const col = COLS[currentIdx % 5];
-  const upcoming = picks.filter((p) => p.pick_index > currentIdx).slice(0, 5);
+  const [countdown, setCountdown] = useState(DEFAULT_SECONDS_TO_NEXT_CALL);
 
   const fetchData = useCallback(async () => {
     if (!sessionId) return;
+
     const [sRes, pRes] = await Promise.all([
       fetch(`/api/game-sessions/${sessionId}`),
       fetch(`/api/game-sessions/${sessionId}/picks`),
     ]);
-    if (sRes.ok) setSession(await sRes.json());
+
+    if (sRes.ok) {
+      const raw = await sRes.json();
+      const nextSession = (raw.data ?? raw) as Session;
+      setSession((prev) => {
+        const shouldResetCountdown =
+          !prev ||
+          prev.current_pick_index !== nextSession.current_pick_index ||
+          prev.status !== nextSession.status;
+        if (shouldResetCountdown) {
+          setCountdown(nextSession.seconds_to_next_call ?? DEFAULT_SECONDS_TO_NEXT_CALL);
+        }
+        return nextSession;
+      });
+    }
+
     if (pRes.ok) {
       const d = await pRes.json();
       setPicks((d.data ?? d).sort((a: Pick, b: Pick) => a.pick_index - b.pick_index));
@@ -74,144 +76,108 @@ export default function SidekickPage() {
     return () => clearInterval(i);
   }, [fetchData]);
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  useEffect(() => {
+    if (!session || session.status !== "active") return;
 
-  const bg = darkMode ? "bg-[#1a1625]" : "bg-gray-100";
-  const card = darkMode ? "bg-[#252236]" : "bg-white";
-  const text = darkMode ? "text-white" : "text-gray-900";
-  const muted = darkMode ? "text-gray-400" : "text-gray-500";
-  const border = darkMode ? "border-[#2d2a3e]" : "border-gray-200";
+    const timer = setInterval(() => {
+      setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [session?.status, session?.current_pick_index]);
+
+  const currentIdx = session?.current_pick_index ?? 0;
+  const currentPick = picks.find((p) => p.pick_index === currentIdx) ?? null;
+  const callCard = useMemo(() => picks.filter((pick) => pick.status === "played"), [picks]);
 
   return (
-    <div className={`min-h-screen ${bg} ${text}`}>
-      {/* Header */}
-      <header className={`border-b ${border} px-6 py-4`}>
-        <div className="mx-auto flex max-w-3xl items-center justify-between">
+    <div className="min-h-screen bg-[#121212] text-white">
+      <header className="sticky top-0 z-10 border-b border-white/10 bg-[#121212]/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-3">
             <Link href={`/admin/games/bingo/test/host?sessionId=${sessionId}`} className="rounded-lg p-2 hover:bg-white/10">
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <div>
-              <h1 className="font-bold">Sidekick View</h1>
-              <p className={`text-sm ${muted}`}>{session?.game_templates.name}</p>
+              <h1 className="font-semibold">Assistant Card Check</h1>
+              <p className="text-sm text-white/60">{session?.game_templates.name}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={copyLink} className={`flex items-center gap-2 rounded-lg ${card} border ${border} px-3 py-2 text-sm hover:border-pink-500`}>
-              {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-              {copied ? "Copied!" : "Share Link"}
-            </button>
-            <button onClick={() => setDarkMode(!darkMode)} className={`rounded-lg p-2 ${card} border ${border}`}>
-              {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </button>
+          <div className="text-sm text-white/70">
+            Round {session?.current_round ?? 1} of {session?.round_count ?? 3}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-6 py-8">
-        {/* Now Playing */}
-        <section className={`mb-6 overflow-hidden rounded-2xl ${card} border ${border}`}>
-          <div className={`border-b ${border} px-6 py-3`}>
-            <div className="flex items-center gap-2">
-              <Music className="h-4 w-4 text-pink-500" />
-              <span className="font-medium">Now Playing</span>
-              <span className={`ml-auto text-sm ${muted}`}>Song {currentIdx + 1} of {picks.length}</span>
+      <main className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-6 py-6 lg:grid-cols-[1.3fr_1fr]">
+        <section className="rounded-2xl border border-white/10 bg-[#1a1a1a] p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Round Playlist</h2>
+            <div className="flex items-center gap-2 text-sm text-white/70">
+              <Clock3 className="h-4 w-4" />
+              {session?.status === "paused" ? "Paused" : `Next call in ${countdown}s`}
             </div>
           </div>
-
-          {currentPick ? (
-            <div className="p-6">
-              <div className="flex items-start gap-6">
-                <div className={`flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-2xl text-5xl font-bold text-white shadow-lg ${col.bg}`}>
-                  {col.letter}
-                </div>
-                <div className="flex-1">
-                  <h2 className="text-3xl font-bold">{currentPick.game_template_items.title}</h2>
-                  <p className={`mt-1 text-xl ${muted}`}>{currentPick.game_template_items.artist}</p>
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    {currentPick.game_template_items.bpm && (
-                      <div className={`flex items-center gap-2 rounded-lg px-3 py-2 ${darkMode ? "bg-white/10" : "bg-gray-100"}`}>
-                        <Hash className="h-4 w-4 text-pink-500" />
-                        <span className="text-sm font-medium">{currentPick.game_template_items.bpm} BPM</span>
-                      </div>
-                    )}
-                    {currentPick.game_template_items.key_signature && (
-                      <div className={`flex items-center gap-2 rounded-lg px-3 py-2 ${darkMode ? "bg-white/10" : "bg-gray-100"}`}>
-                        <Music className="h-4 w-4 text-pink-500" />
-                        <span className="text-sm font-medium">Key: {currentPick.game_template_items.key_signature}</span>
-                      </div>
-                    )}
-                    {currentPick.game_template_items.duration_ms && (
-                      <div className={`flex items-center gap-2 rounded-lg px-3 py-2 ${darkMode ? "bg-white/10" : "bg-gray-100"}`}>
-                        <Clock className="h-4 w-4 text-pink-500" />
-                        <span className="text-sm font-medium">{formatDuration(currentPick.game_template_items.duration_ms)}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Lyrics */}
-              <div className={`mt-6 rounded-xl p-6 ${darkMode ? "bg-white/5" : "bg-gray-50"}`}>
-                <p className="mb-2 text-sm font-medium uppercase tracking-wider text-pink-500">Lyrics</p>
-                <p className={`text-sm italic ${muted}`}>
-                  Lyrics will appear here when connected to a lyrics provider like Genius.
-                </p>
-                <p className={`mt-2 text-sm ${muted}`}>
-                  Search for &ldquo;{currentPick.game_template_items.title}&rdquo; by {currentPick.game_template_items.artist}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className={`p-8 text-center ${muted}`}>
-              {session?.status === "completed" ? "Game finished!" : "Waiting for game to start..."}
-            </div>
-          )}
-        </section>
-
-        {/* Up Next */}
-        <section className={`overflow-hidden rounded-2xl ${card} border ${border}`}>
-          <div className={`border-b ${border} px-6 py-3`}>
-            <span className="font-medium">Up Next</span>
-            <span className={`ml-2 text-sm ${muted}`}>{upcoming.length} songs</span>
+          <div className="overflow-auto rounded-xl border border-white/10">
+            <table className="min-w-full text-sm">
+              <thead className="bg-white/5 text-left text-xs uppercase tracking-wide text-white/60">
+                <tr>
+                  <th className="px-3 py-2">Column</th>
+                  <th className="px-3 py-2">Track Name</th>
+                  <th className="px-3 py-2">Artist Name</th>
+                  <th className="px-3 py-2">Album Name</th>
+                </tr>
+              </thead>
+              <tbody>
+                {picks.map((pick) => {
+                  const isCurrent = pick.pick_index === currentIdx;
+                  return (
+                    <tr key={pick.id} className={`border-t border-white/5 ${isCurrent ? "bg-pink-500/10" : ""}`}>
+                      <td className="px-3 py-2 font-bold text-pink-300">{pick.column_letter ?? COLS[pick.pick_index % 5]}</td>
+                      <td className="px-3 py-2">{pick.track_title ?? pick.game_template_items.title}</td>
+                      <td className="px-3 py-2 text-white/80">{pick.artist_name ?? pick.game_template_items.artist}</td>
+                      <td className="px-3 py-2 text-white/60">{pick.album_name ?? pick.game_template_items.album_name ?? "-"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-          {upcoming.length === 0 ? (
-            <div className={`p-6 text-center text-sm ${muted}`}>No more songs</div>
-          ) : (
-            <div>
-              {upcoming.map((p) => {
-                const c = COLS[p.pick_index % 5];
-                return (
-                  <div key={p.id} className={`flex items-center gap-4 border-b ${border} px-6 py-3 last:border-0`}>
-                    <div className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold text-white ${c.bg}`}>
-                      {c.letter}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{p.game_template_items.title}</div>
-                      <div className={`truncate text-sm ${muted}`}>{p.game_template_items.artist}</div>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm">
-                      {p.game_template_items.bpm && <span className={muted}>{p.game_template_items.bpm} BPM</span>}
-                      {p.game_template_items.key_signature && <span className={muted}>{p.game_template_items.key_signature}</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </section>
 
-        {/* Info */}
-        <div className={`mt-6 rounded-xl ${card} border ${border} p-6`}>
-          <p className="text-sm font-medium text-pink-500">About Sidekick View</p>
-          <p className={`mt-2 text-sm ${muted}`}>
-            This view is for band members and co-hosts. It syncs with the host every 3 seconds. Share the link with your bandmates!
-          </p>
-        </div>
+        <section className="space-y-6">
+          <div className="rounded-2xl border border-white/10 bg-[#1a1a1a] p-5">
+            <p className="text-xs uppercase tracking-wide text-white/50">Current Call</p>
+            {currentPick ? (
+              <>
+                <p className="mt-2 text-2xl font-bold text-pink-300">
+                  {(currentPick.column_letter ?? COLS[currentPick.pick_index % 5])}: {currentPick.track_title ?? currentPick.game_template_items.title}
+                </p>
+                <p className="mt-1 text-lg text-white/80">{currentPick.artist_name ?? currentPick.game_template_items.artist}</p>
+              </>
+            ) : (
+              <p className="mt-2 text-white/70">Waiting for first call.</p>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-[#1a1a1a] p-5">
+            <h3 className="text-lg font-semibold">Call Card</h3>
+            <p className="mt-1 text-sm text-white/60">Use this list to verify paper-card claims.</p>
+            <ol className="mt-4 max-h-[360px] space-y-2 overflow-auto pr-1">
+              {callCard.length === 0 ? (
+                <li className="text-sm text-white/60">No songs called yet.</li>
+              ) : (
+                callCard.map((pick) => (
+                  <li key={pick.id} className="rounded-lg border border-white/10 px-3 py-2 text-sm">
+                    <span className="mr-2 font-bold text-pink-300">{pick.column_letter ?? COLS[pick.pick_index % 5]}</span>
+                    <span>{pick.track_title ?? pick.game_template_items.title}</span>
+                    <span className="text-white/60"> - {pick.artist_name ?? pick.game_template_items.artist}</span>
+                  </li>
+                ))
+              )}
+            </ol>
+          </div>
+        </section>
       </main>
     </div>
   );

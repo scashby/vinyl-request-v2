@@ -1,32 +1,40 @@
-// Path: src/app/admin/games/bingo/test/jumbotron/page.tsx
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Settings, Maximize, Volume2, VolumeX, X } from "lucide-react";
+import { Maximize } from "lucide-react";
 
 type Session = {
   id: number;
   game_code: string;
-  status: string;
+  status: "pending" | "active" | "paused" | "completed";
   current_pick_index: number;
+  round_count?: number;
+  current_round?: number;
+  seconds_to_next_call?: number;
+  jumbotron_settings?: {
+    recent_calls_limit?: number;
+    show_title?: boolean;
+    show_logo?: boolean;
+    show_rounds?: boolean;
+    show_countdown?: boolean;
+  };
   game_templates: { name: string };
 };
 
 type Pick = {
   id: number;
   pick_index: number;
-  status: string;
+  status: "pending" | "played" | "skipped";
+  column_letter?: "B" | "I" | "N" | "G" | "O";
+  track_title?: string;
+  artist_name?: string;
   game_template_items: { title: string; artist: string };
 };
 
-const COLS = [
-  { letter: "B", bg: "bg-blue-500" },
-  { letter: "I", bg: "bg-green-500" },
-  { letter: "N", bg: "bg-yellow-500" },
-  { letter: "G", bg: "bg-orange-500" },
-  { letter: "O", bg: "bg-red-500" },
-];
+const COLS = ["B", "I", "N", "G", "O"] as const;
+const DEFAULT_SECONDS_TO_NEXT_CALL = 45;
+const RECENT_CALLS_LIMIT = 5;
 
 export default function JumbotronPage() {
   const searchParams = useSearchParams();
@@ -34,22 +42,31 @@ export default function JumbotronPage() {
 
   const [session, setSession] = useState<Session | null>(null);
   const [picks, setPicks] = useState<Pick[]>([]);
-  const [showSettings, setShowSettings] = useState(false);
-  const [muted, setMuted] = useState(true);
-  const [settings, setSettings] = useState({ pregameVideo: "", defaultVideo: "", showQR: true, showLogo: true });
-
-  const currentIdx = session?.current_pick_index ?? 0;
-  const currentPick = picks.find((p) => p.pick_index === currentIdx);
-  const col = COLS[currentIdx % 5];
-  const recentPlayed = picks.filter((p) => p.status === "played").slice(-3).reverse();
+  const [countdown, setCountdown] = useState(DEFAULT_SECONDS_TO_NEXT_CALL);
 
   const fetchData = useCallback(async () => {
     if (!sessionId) return;
+
     const [sRes, pRes] = await Promise.all([
       fetch(`/api/game-sessions/${sessionId}`),
       fetch(`/api/game-sessions/${sessionId}/picks`),
     ]);
-    if (sRes.ok) setSession(await sRes.json());
+
+    if (sRes.ok) {
+      const raw = await sRes.json();
+      const nextSession = (raw.data ?? raw) as Session;
+      setSession((prev) => {
+        const shouldResetCountdown =
+          !prev ||
+          prev.current_pick_index !== nextSession.current_pick_index ||
+          prev.status !== nextSession.status;
+        if (shouldResetCountdown) {
+          setCountdown(nextSession.seconds_to_next_call ?? DEFAULT_SECONDS_TO_NEXT_CALL);
+        }
+        return nextSession;
+      });
+    }
+
     if (pRes.ok) {
       const d = await pRes.json();
       setPicks((d.data ?? d).sort((a: Pick, b: Pick) => a.pick_index - b.pick_index));
@@ -62,6 +79,29 @@ export default function JumbotronPage() {
     return () => clearInterval(i);
   }, [fetchData]);
 
+  useEffect(() => {
+    if (!session || session.status !== "active") return;
+
+    const timer = setInterval(() => {
+      setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [session?.status, session?.current_pick_index]);
+
+  const currentIdx = session?.current_pick_index ?? 0;
+  const currentPick = picks.find((p) => p.pick_index === currentIdx) ?? null;
+  const currentLetter = currentPick?.column_letter ?? COLS[currentIdx % 5];
+
+  const recentPlayed = useMemo(
+    () =>
+      picks
+        .filter((p) => p.status === "played")
+        .slice(-(session?.jumbotron_settings?.recent_calls_limit ?? RECENT_CALLS_LIMIT))
+        .reverse(),
+    [picks, session?.jumbotron_settings?.recent_calls_limit]
+  );
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen();
@@ -70,168 +110,89 @@ export default function JumbotronPage() {
     }
   };
 
-  const isPregame = session?.status === "pending" || !session;
-  const videoUrl = isPregame ? settings.pregameVideo : settings.defaultVideo;
-
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#0d0a14]">
-      {/* Video Background */}
-      {videoUrl && (
-        <iframe
-          className="pointer-events-none absolute inset-0 h-full w-full scale-110"
-          src={`${videoUrl}${videoUrl.includes("?") ? "&" : "?"}autoplay=1&loop=1&controls=0&mute=${muted ? 1 : 0}`}
-          allow="autoplay; fullscreen"
-        />
-      )}
+    <div className="relative h-screen w-screen overflow-hidden bg-[#0d0a14] text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(236,72,153,0.25),transparent_35%),radial-gradient(circle_at_90%_85%,rgba(59,130,246,0.25),transparent_35%),linear-gradient(180deg,#100b1a,#0a0810)]" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-black/30" />
 
-      {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/50" />
-
-      {/* Content */}
       <div className="relative z-10 flex h-full flex-col p-8">
-        {/* Top: Logo & Controls */}
-        <div className="flex items-start justify-between">
-          {settings.showLogo && (
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 shadow-lg">
-                <span className="text-2xl text-white">★</span>
-              </div>
+        <header className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {(session?.jumbotron_settings?.show_logo ?? true) && (
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-red-600 text-2xl font-black">★</div>
+            )}
+            {(session?.jumbotron_settings?.show_title ?? true) && (
               <div>
-                <div className="text-xl font-bold text-white">Rockstar Bingo</div>
-                <div className="text-sm text-white/60">{session?.game_templates.name}</div>
+                <div className="text-2xl font-extrabold uppercase tracking-wide">Rockstar Bingo</div>
+                <div className="text-sm text-white/70">{session?.game_templates.name ?? "Vinyl Session"}</div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+          <button onClick={toggleFullscreen} className="rounded-lg bg-black/40 p-2 text-white/80 hover:text-white">
+            <Maximize className="h-5 w-5" />
+          </button>
+        </header>
 
-          <div className="flex gap-2 opacity-0 transition-opacity hover:opacity-100">
-            <button onClick={() => setMuted(!muted)} className="rounded-lg bg-black/50 p-2 text-white backdrop-blur hover:bg-black/70">
-              {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-            </button>
-            <button onClick={toggleFullscreen} className="rounded-lg bg-black/50 p-2 text-white backdrop-blur hover:bg-black/70">
-              <Maximize className="h-5 w-5" />
-            </button>
-            <button onClick={() => setShowSettings(true)} className="rounded-lg bg-black/50 p-2 text-white backdrop-blur hover:bg-black/70">
-              <Settings className="h-5 w-5" />
-            </button>
+        <div className="mt-4 flex items-center justify-between text-lg text-white/80">
+          <div>
+            {(session?.jumbotron_settings?.show_rounds ?? true)
+              ? `Round ${session?.current_round ?? 1} of ${session?.round_count ?? 3}`
+              : ""}
+          </div>
+          <div className="font-semibold">
+            {(session?.jumbotron_settings?.show_countdown ?? true)
+              ? session?.status === "paused"
+                ? "Paused"
+                : `Time Until Next Call: ${countdown}s`
+              : ""}
           </div>
         </div>
 
-        {/* Center: Current Song */}
-        <div className="flex flex-1 items-center justify-center">
-          {isPregame ? (
-            <div className="text-center">
-              <p className="mb-4 text-2xl text-white/60">Join the game!</p>
-              <p className="text-8xl font-bold tracking-[0.25em] text-pink-500 drop-shadow-2xl">{session?.game_code ?? "----"}</p>
-              <p className="mt-4 text-xl text-white/60">rockstar.bingo</p>
+        <main className="flex flex-1 items-center justify-center">
+          {session?.status === "paused" ? (
+            <div className="rounded-2xl border border-yellow-400/40 bg-yellow-500/10 px-10 py-8 text-center">
+              <p className="text-6xl font-black uppercase tracking-wide text-yellow-300">Paused</p>
             </div>
           ) : currentPick ? (
             <div className="text-center">
-              <div className={`mx-auto mb-8 flex h-36 w-36 items-center justify-center rounded-3xl text-8xl font-bold text-white shadow-2xl ${col.bg}`}>
-                {col.letter}
-              </div>
-              <h1 className="text-6xl font-bold text-white drop-shadow-lg">{currentPick.game_template_items.title}</h1>
-              <p className="mt-4 text-3xl text-white/70">{currentPick.game_template_items.artist}</p>
+              <div className="mx-auto mb-6 inline-flex items-center justify-center rounded-2xl bg-pink-500 px-8 py-4 text-7xl font-black">{currentLetter}</div>
+              <h1 className="text-6xl font-black leading-tight">{currentPick.track_title ?? currentPick.game_template_items.title}</h1>
+              <p className="mt-3 text-3xl text-white/75">{currentPick.artist_name ?? currentPick.game_template_items.artist}</p>
             </div>
           ) : (
-            <p className="text-2xl text-white/60">Game Over!</p>
+            <div className="text-center">
+              <p className="text-5xl font-bold">Waiting for first call</p>
+              <p className="mt-4 text-2xl text-white/70">Game Code: {session?.game_code ?? "----"}</p>
+            </div>
           )}
-        </div>
+        </main>
 
-        {/* Bottom */}
-        <div className="flex items-end justify-between">
-          {/* Recently Played */}
+        <footer className="grid grid-cols-[1fr_auto] items-end gap-6">
           <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-white/40">Recently Played</p>
-            {recentPlayed.length === 0 ? (
-              <p className="text-sm text-white/30">No songs yet</p>
-            ) : (
-              <div className="space-y-1">
-                {recentPlayed.map((p) => {
-                  const c = COLS[p.pick_index % 5];
-                  return (
-                    <div key={p.id} className="flex items-center gap-2">
-                      <div className={`flex h-6 w-6 items-center justify-center rounded text-xs font-bold text-white ${c.bg}`}>
-                        {c.letter}
-                      </div>
-                      <span className="text-sm text-white/80">
-                        {p.game_template_items.title} - {p.game_template_items.artist}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/50">Recently Called</p>
+            <div className="space-y-1">
+              {recentPlayed.length === 0 ? (
+                <div className="text-sm text-white/40">No calls yet</div>
+              ) : (
+                recentPlayed.map((pick) => (
+                  <div key={pick.id} className="flex items-center gap-2 text-sm text-white/85">
+                    <span className="inline-flex w-6 justify-center rounded bg-white/15 font-bold">
+                      {pick.column_letter ?? COLS[pick.pick_index % 5]}
+                    </span>
+                    <span>{pick.track_title ?? pick.game_template_items.title}</span>
+                    <span className="text-white/60">- {pick.artist_name ?? pick.game_template_items.artist}</span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
 
-          {/* Game Code & QR */}
           <div className="text-right">
-            {settings.showQR && (
-              <div className="mb-2 inline-block rounded-lg bg-white p-2">
-                <div className="flex h-20 w-20 items-center justify-center text-xs text-gray-400">QR</div>
-              </div>
-            )}
-            <p className="text-sm text-white/50">Game Code</p>
-            <p className="text-4xl font-bold tracking-widest text-pink-500">{session?.game_code ?? "----"}</p>
+            <p className="text-xs uppercase tracking-wider text-white/50">Game Code</p>
+            <p className="text-5xl font-black tracking-[0.2em] text-pink-400">{session?.game_code ?? "----"}</p>
           </div>
-        </div>
+        </footer>
       </div>
-
-      {/* Settings Modal */}
-      {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setShowSettings(false)}>
-          <div className="w-full max-w-md rounded-2xl bg-[#252236] p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-white">Jumbotron Settings</h2>
-              <button onClick={() => setShowSettings(false)} className="text-white/60 hover:text-white">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1 block text-sm text-white/60">Pre-game Video URL</label>
-                <input
-                  type="text"
-                  value={settings.pregameVideo}
-                  onChange={(e) => setSettings({ ...settings, pregameVideo: e.target.value })}
-                  placeholder="YouTube or Vimeo URL"
-                  className="w-full rounded-lg bg-[#1a1625] px-3 py-2 text-white placeholder-white/30"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-white/60">Default Video URL</label>
-                <input
-                  type="text"
-                  value={settings.defaultVideo}
-                  onChange={(e) => setSettings({ ...settings, defaultVideo: e.target.value })}
-                  placeholder="YouTube or Vimeo URL"
-                  className="w-full rounded-lg bg-[#1a1625] px-3 py-2 text-white placeholder-white/30"
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-white">Show QR Code</span>
-                <button
-                  onClick={() => setSettings({ ...settings, showQR: !settings.showQR })}
-                  className={`h-6 w-11 rounded-full transition ${settings.showQR ? "bg-pink-500" : "bg-white/20"}`}
-                >
-                  <div className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${settings.showQR ? "translate-x-5" : "translate-x-0.5"}`} />
-                </button>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-white">Show Logo</span>
-                <button
-                  onClick={() => setSettings({ ...settings, showLogo: !settings.showLogo })}
-                  className={`h-6 w-11 rounded-full transition ${settings.showLogo ? "bg-pink-500" : "bg-white/20"}`}
-                >
-                  <div className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${settings.showLogo ? "translate-x-5" : "translate-x-0.5"}`} />
-                </button>
-              </div>
-            </div>
-            <button onClick={() => setShowSettings(false)} className="mt-6 w-full rounded-lg bg-gradient-to-r from-pink-500 to-rose-600 py-2 font-semibold text-white">
-              Done
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

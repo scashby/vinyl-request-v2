@@ -15,7 +15,7 @@ type BingoTarget = {
 const BINGO_TARGETS: BingoTarget[] = [
   {
     id: "one_line",
-    name: "One Line",
+    name: "Single Line",
     description: "At least one line in any direction",
     pattern: [
       [true, false, false, false, false],
@@ -27,7 +27,7 @@ const BINGO_TARGETS: BingoTarget[] = [
   },
   {
     id: "two_lines",
-    name: "Two Lines",
+    name: "Double Line",
     description: "At least two lines in any direction",
     pattern: [
       [true, false, true, false, false],
@@ -39,7 +39,7 @@ const BINGO_TARGETS: BingoTarget[] = [
   },
   {
     id: "three_lines",
-    name: "Three Lines",
+    name: "Triple Line",
     description: "At least three lines in any direction",
     pattern: [
       [true, false, true, false, true],
@@ -47,18 +47,6 @@ const BINGO_TARGETS: BingoTarget[] = [
       [true, false, true, false, true],
       [true, false, true, false, true],
       [true, false, true, false, true],
-    ],
-  },
-  {
-    id: "four_lines",
-    name: "Four Lines",
-    description: "At least four lines in any direction",
-    pattern: [
-      [true, true, false, true, true],
-      [true, true, false, true, true],
-      [true, true, false, true, true],
-      [true, true, false, true, true],
-      [true, true, false, true, true],
     ],
   },
   {
@@ -87,7 +75,7 @@ const BINGO_TARGETS: BingoTarget[] = [
   },
   {
     id: "x_shape",
-    name: "X Shape",
+    name: "Criss-Cross",
     description: "Both diagonal lines on the card",
     pattern: [
       [true, false, false, false, true],
@@ -99,7 +87,7 @@ const BINGO_TARGETS: BingoTarget[] = [
   },
   {
     id: "full_card",
-    name: "Full Card",
+    name: "Blackout",
     description: "Every square on the card",
     pattern: [
       [true, true, true, true, true],
@@ -143,6 +131,7 @@ export default function GameSetupPage() {
   const [selectedTarget, setSelectedTarget] = useState<BingoTarget>(
     BINGO_TARGETS[0]
   );
+  const [selectedVariant, setSelectedVariant] = useState<"standard" | "death" | "blackout">("standard");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showMore, setShowMore] = useState(false);
 
@@ -155,6 +144,7 @@ export default function GameSetupPage() {
         body: JSON.stringify({
           game_template_id: templateId,
           bingo_target: selectedTarget.id,
+          variant: selectedVariant,
         }),
       });
 
@@ -203,6 +193,19 @@ export default function GameSetupPage() {
         {/* Bingo Target */}
         <div className="rounded-lg bg-[#1a1a1a] p-4">
           <h2 className="mb-4 text-lg font-semibold">Bingo Target</h2>
+
+          <label className="mb-4 block">
+            <span className="mb-2 block text-sm text-gray-300">Mode</span>
+            <select
+              value={selectedVariant}
+              onChange={(e) => setSelectedVariant(e.target.value as "standard" | "death" | "blackout")}
+              className="w-full rounded-lg border border-purple-500 bg-transparent px-4 py-3 text-left transition hover:bg-white/5"
+            >
+              <option value="standard" className="bg-[#252525]">Standard</option>
+              <option value="blackout" className="bg-[#252525]">Blackout</option>
+              <option value="death" className="bg-[#252525]">Death (Reverse Bingo)</option>
+            </select>
+          </label>
 
           {/* Dropdown */}
           <div className="relative">

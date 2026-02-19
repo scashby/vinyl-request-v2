@@ -17,6 +17,7 @@ create table if not exists public.game_template_items (
   recording_id bigint references public.recordings(id) on delete set null,
   title text not null,
   artist text not null,
+  album_name text,
   side text,
   position text,
   sort_order integer,
@@ -32,6 +33,10 @@ create table if not exists public.game_sessions (
   variant text not null default 'standard',
   bingo_target text not null default 'one_line',
   card_count integer not null default 40,
+  round_count integer not null default 3,
+  current_round integer not null default 1,
+  seconds_to_next_call integer not null default 45,
+  paused_at timestamptz,
   setlist_mode boolean not null default false,
   status text not null default 'draft',
   created_at timestamptz not null default now(),
@@ -44,7 +49,10 @@ create table if not exists public.game_session_picks (
   session_id bigint not null references public.game_sessions(id) on delete cascade,
   template_item_id bigint references public.game_template_items(id) on delete set null,
   pick_index integer not null,
-  called_at timestamptz
+  status text not null default 'pending',
+  prep_started_at timestamptz,
+  called_at timestamptz,
+  completed_at timestamptz
 );
 
 create table if not exists public.game_cards (

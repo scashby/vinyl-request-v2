@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Copy, Check, QrCode, UserCheck, UserMinus, Moon, Sun } from "lucide-react";
+import { ArrowLeft, Copy, Check, UserCheck, UserMinus, Moon, Sun } from "lucide-react";
 
 type Session = {
   id: number;
@@ -26,8 +26,6 @@ export default function LobbyPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [darkMode, setDarkMode] = useState(true);
   const [copiedCode, setCopiedCode] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
-  const [showQR, setShowQR] = useState(false);
 
   const waiting = players.filter((p) => p.status === "waiting");
   const playing = players.filter((p) => ["admitted", "playing"].includes(p.status));
@@ -82,12 +80,6 @@ export default function LobbyPage() {
     }
   };
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(`${window.location.origin}/play?code=${session?.game_code}`);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
-  };
-
   const bg = darkMode ? "bg-[#1a1625]" : "bg-gray-100";
   const card = darkMode ? "bg-[#252236]" : "bg-white";
   const text = darkMode ? "text-white" : "text-gray-900";
@@ -119,27 +111,13 @@ export default function LobbyPage() {
         <div className={`mb-8 rounded-2xl ${card} border ${border} p-8 text-center`}>
           <p className={`mb-2 text-sm uppercase tracking-wider ${muted}`}>Game Code</p>
           <p className="mb-6 text-6xl font-bold tracking-[0.3em] text-pink-500">{session?.game_code ?? "----"}</p>
+          <p className="mb-6 text-sm text-gray-400">Vinyl-first analog mode: players use printed cards only.</p>
           <div className="flex flex-wrap justify-center gap-3">
             <button onClick={copyCode} className={`flex items-center gap-2 rounded-lg ${card} border ${border} px-4 py-2 transition hover:border-pink-500`}>
               {copiedCode ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
               {copiedCode ? "Copied!" : "Copy Code"}
             </button>
-            <button onClick={copyLink} className={`flex items-center gap-2 rounded-lg ${card} border ${border} px-4 py-2 transition hover:border-pink-500`}>
-              {copiedLink ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-              {copiedLink ? "Copied!" : "Copy Link"}
-            </button>
-            <button onClick={() => setShowQR(!showQR)} className={`flex items-center gap-2 rounded-lg ${card} border ${border} px-4 py-2 transition hover:border-pink-500`}>
-              <QrCode className="h-4 w-4" />
-              QR Code
-            </button>
           </div>
-          {showQR && (
-            <div className="mt-6 inline-block rounded-xl bg-white p-4">
-              <div className="flex h-32 w-32 items-center justify-center border-2 border-dashed border-gray-300 text-sm text-gray-400">
-                QR Code
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Waiting */}

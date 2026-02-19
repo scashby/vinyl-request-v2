@@ -830,7 +830,7 @@ export default function EditEventForm() {
     }
   };
 
-  const handleDownloadSessionCards = async (sessionId: number) => {
+  const handleDownloadSessionCards = async (sessionId: number, layout: '2-up' | '4-up' = '2-up') => {
     const response = await fetch(`/api/game-cards?sessionId=${sessionId}`);
     const payload = await response.json();
     const cards = (payload.data ?? []).map((card: any) => ({
@@ -838,8 +838,8 @@ export default function EditEventForm() {
       cells: card.grid,
     }));
     const { generateBingoCardsPdf } = await import('src/lib/bingoPdf');
-    const doc = generateBingoCardsPdf(cards, `Music Bingo Session ${sessionId}`);
-    doc.save(`music-bingo-session-${sessionId}-cards.pdf`);
+    const doc = generateBingoCardsPdf(cards, `Music Bingo Session ${sessionId}`, { layout });
+    doc.save(`music-bingo-session-${sessionId}-cards-${layout}.pdf`);
   };
 
   const handleDownloadSessionPickListPdf = async (sessionId: number) => {
@@ -1580,14 +1580,12 @@ export default function EditEventForm() {
                   onChange={(e) => setGameTarget(e.target.value)}
                   className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
                 >
-                  <option value="one_line">One Line</option>
-                  <option value="two_lines">Two Lines</option>
-                  <option value="three_lines">Three Lines</option>
-                  <option value="four_lines">Four Lines</option>
+                  <option value="one_line">Single Line</option>
+                  <option value="two_lines">Double Line</option>
+                  <option value="three_lines">Triple Line</option>
                   <option value="four_corners">Four Corners</option>
-                  <option value="edges">Edges</option>
-                  <option value="x_shape">X Shape</option>
-                  <option value="full_card">Full Card</option>
+                  <option value="x_shape">Criss-Cross</option>
+                  <option value="full_card">Blackout</option>
                 </select>
               </label>
               <label className="flex flex-col gap-2 text-sm text-gray-700">
@@ -1657,10 +1655,17 @@ export default function EditEventForm() {
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => handleDownloadSessionCards(session.id)}
+                        onClick={() => handleDownloadSessionCards(session.id, '2-up')}
                         className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
                       >
-                        Cards PDF
+                        Cards PDF (2-up)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadSessionCards(session.id, '4-up')}
+                        className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                      >
+                        Cards PDF (4-up)
                       </button>
                       <button
                         type="button"

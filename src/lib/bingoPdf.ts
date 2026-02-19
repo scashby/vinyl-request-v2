@@ -5,6 +5,7 @@ const LETTER_WIDTH = 215.9;
 const LETTER_HEIGHT = 279.4;
 const MARGIN = 8;
 const CARD_GAP = 6;
+const TITLE_SPACE = 6;
 
 const drawCard = (
   doc: jsPDF,
@@ -42,33 +43,36 @@ const drawCard = (
 
 export const generateBingoCardsPdf = (
   cards: BingoCard[],
-  title: string
+  title: string,
+  options?: { layout?: "2-up" | "4-up" }
 ): jsPDF => {
   const doc = new jsPDF({ unit: "mm", format: "letter" });
 
-  const usableWidth = LETTER_WIDTH - MARGIN * 2;
-  const usableHeight = LETTER_HEIGHT - MARGIN * 2;
-  const cardWidth = (usableWidth - CARD_GAP) / 2;
-  const cardHeight = (usableHeight - CARD_GAP) / 2;
+  const layout = options?.layout ?? "2-up";
+  const columns = layout === "2-up" ? 1 : 2;
+  const rows = 2;
+  const cardsPerPage = columns * rows;
 
-  let pageIndex = 0;
+  const usableWidth = LETTER_WIDTH - MARGIN * 2;
+  const usableHeight = LETTER_HEIGHT - MARGIN * 2 - TITLE_SPACE;
+  const cardWidth = (usableWidth - CARD_GAP * (columns - 1)) / columns;
+  const cardHeight = (usableHeight - CARD_GAP * (rows - 1)) / rows;
 
   cards.forEach((card, index) => {
-    if (index % 4 === 0 && index !== 0) {
+    if (index % cardsPerPage === 0 && index !== 0) {
       doc.addPage("letter");
-      pageIndex += 1;
     }
 
-    const slot = index % 4;
-    const col = slot % 2;
-    const row = Math.floor(slot / 2);
+    const slot = index % cardsPerPage;
+    const col = slot % columns;
+    const row = Math.floor(slot / columns);
 
     const x = MARGIN + col * (cardWidth + CARD_GAP);
-    const y = MARGIN + row * (cardHeight + CARD_GAP);
+    const y = MARGIN + TITLE_SPACE + row * (cardHeight + CARD_GAP);
 
-    if (index % 4 === 0) {
+    if (index % cardsPerPage === 0) {
       doc.setFontSize(10);
-      doc.text(title, MARGIN, MARGIN - 2);
+      doc.text(title, MARGIN, MARGIN + 1.5);
     }
 
     drawCard(doc, card, x, y, cardWidth, cardHeight);

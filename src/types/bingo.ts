@@ -6,6 +6,10 @@ export type GameSession = {
   status: "pending" | "active" | "paused" | "completed";
   current_pick_index: number;
   bingo_target: string;
+  round_count?: number;
+  current_round?: number;
+  seconds_to_next_call?: number;
+  paused_at?: string | null;
   game_templates: {
     id: number;
     name: string;
@@ -17,10 +21,15 @@ export type PickItem = {
   id: number;
   pick_index: number;
   status: "pending" | "played" | "skipped";
+  column_letter?: "B" | "I" | "N" | "G" | "O";
+  track_title?: string;
+  artist_name?: string;
+  album_name?: string | null;
   game_template_items: {
     id: number;
     title: string;
     artist: string;
+    album_name?: string | null;
     bpm?: number;
     key_signature?: string;
     duration_ms?: number;
@@ -47,11 +56,12 @@ export const COLUMN_COLORS = [
 ] as const;
 
 export const BINGO_TARGETS = [
-  { id: "one_line", label: "One Line" },
-  { id: "two_lines", label: "Two Lines" },
+  { id: "one_line", label: "Single Line" },
+  { id: "two_lines", label: "Double Line" },
+  { id: "three_lines", label: "Triple Line" },
   { id: "four_corners", label: "Four Corners" },
-  { id: "x_shape", label: "X Shape" },
-  { id: "full_card", label: "Full Card" },
+  { id: "x_shape", label: "Criss-Cross" },
+  { id: "full_card", label: "Blackout" },
 ] as const;
 
 export function getColumnInfo(index: number) {
