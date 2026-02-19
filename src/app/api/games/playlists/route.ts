@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
+import { getPlaylistTrackCount } from "src/lib/bingoEngine";
 
 export const runtime = "nodejs";
 
@@ -23,16 +24,11 @@ export async function GET() {
 
   const withCounts = await Promise.all(
     ((playlists ?? []) as PlaylistRow[]).map(async (playlist) => {
-      const { count } = await db
-        .from("collection_playlist_items")
-        .select("id", { count: "exact", head: true })
-        .eq("playlist_id", playlist.id);
-
       return {
         id: playlist.id,
         name: playlist.name,
         is_smart: playlist.is_smart,
-        track_count: count ?? 0,
+        track_count: await getPlaylistTrackCount(db, playlist.id),
       };
     })
   );

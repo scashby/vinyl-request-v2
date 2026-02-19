@@ -1,4 +1,7 @@
 import type { BingoDbClient } from "src/lib/bingoDb";
+import type { CollectionPlaylist, SmartPlaylistRule } from "src/types/collectionPlaylist";
+import type { CollectionTrackRow } from "src/types/collectionTrackRow";
+import { trackMatchesSmartPlaylist } from "src/lib/playlistUtils";
 
 export const BINGO_COLUMNS = ["B", "I", "N", "G", "O"] as const;
 export type BingoColumn = (typeof BINGO_COLUMNS)[number];
@@ -20,6 +23,14 @@ export type ResolvedPlaylistTrack = {
   albumName: string | null;
   side: string | null;
   position: string | null;
+};
+
+type PlaylistConfigRow = {
+  id: number;
+  name: string;
+  is_smart: boolean;
+  smart_rules: { rules?: unknown[]; maxTracks?: number | null } | null;
+  match_rules: string;
 };
 
 export type ParsedTrackKey = {
@@ -97,6 +108,259 @@ export function getColumnLetter(index: number): BingoColumn {
   return BINGO_COLUMNS[(index - 1) % BINGO_COLUMNS.length] ?? "B";
 }
 
+const MEDIA_TYPE_FACETS = new Set([
+  "Vinyl",
+  "CD",
+  "Cassette",
+  "8-Track",
+  "DVD",
+  "All Media",
+  "Box Set",
+  "SACD",
+  "Flexi-disc",
+]);
+
+function canonicalizeFormatFacet(value: string): string | null {
+  const token = value.trim().toLowerCase();
+  if (!token) return null;
+  const mapped: Array<[RegExp, string]> = [
+    [/^vinyl$/, "Vinyl"],
+    [/^cd$|^compact disc$/, "CD"],
+    [/^cassette$|^cass$/, "Cassette"],
+    [/^8[- ]?track cartridge$|^8[- ]?track$/, "8-Track"],
+    [/^dvd$/, "DVD"],
+    [/^all media$/, "All Media"],
+    [/^box set$/, "Box Set"],
+    [/^lp$/, "LP"],
+    [/^ep$/, "EP"],
+    [/^single$/, "Single"],
+    [/^album$/, "Album"],
+    [/^mini-album$/, "Mini-Album"],
+    [/^maxi-single$/, "Maxi-Single"],
+    [/^7"$/, '7"'],
+    [/^10"$/, '10"'],
+    [/^12"$/, '12"'],
+    [/^45 rpm$|^45$/, "45 RPM"],
+    [/^33 ?1\/3 rpm$|^33⅓ rpm$|^33 rpm$/, "33 RPM"],
+    [/^78 rpm$|^78$/, "78 RPM"],
+    [/^reissue$/, "Reissue"],
+    [/^stereo$/, "Stereo"],
+    [/^mono$/, "Mono"],
+  ];
+
+  for (const [regex, label] of mapped) {
+    if (regex.test(token)) return label;
+  }
+  return null;
+}
+
+function buildTrackFormatFacets(mediaType: string | null, formatDetails: string[] | null): string[] {
+  const rawTokens: string[] = [];
+  if (mediaType) rawTokens.push(mediaType);
+  for (const entry of formatDetails ?? []) {
+    if (!entry) continue;
+    rawTokens.push(entry);
+    for (const part of entry.split(/[,/]/)) {
+      const next = part.trim();
+      if (next) rawTokens.push(next);
+    }
+  }
+
+  const facets = new Set<string>();
+  for (const token of rawTokens) {
+    const normalized = canonicalizeFormatFacet(token);
+    if (normalized) facets.add(normalized);
+  }
+  return Array.from(facets);
+}
+
+function parseDurationLabel(seconds: number | null): string {
+  if (!seconds || seconds <= 0) return "0:00";
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${minutes}:${String(remainder).padStart(2, "0")}`;
+}
+
+async function getPlaylistConfig(db: BingoDbClient, playlistId: number): Promise<PlaylistConfigRow> {
+  const { data, error } = await db
+    .from("collection_playlists")
+    .select("id, name, is_smart, smart_rules, match_rules")
+    .eq("id", playlistId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Playlist not found.");
+  return data as PlaylistConfigRow;
+}
+
+async function buildCollectionTrackRows(db: BingoDbClient): Promise<CollectionTrackRow[]> {
+  const dbAny = db as any;
+
+  const { data: inventoryRows, error: inventoryError } = await dbAny
+    .from("inventory")
+    .select("id, release_id, status, location, media_condition, sleeve_condition, owner, personal_notes, barcode");
+  if (inventoryError) throw new Error(inventoryError.message);
+
+  const inventory = (inventoryRows ?? []) as Array<{
+    id: number;
+    release_id: number | null;
+    status: string | null;
+    location: string | null;
+    media_condition: string | null;
+    sleeve_condition: string | null;
+    owner: string | null;
+    personal_notes: string | null;
+    barcode: string | null;
+  }>;
+
+  const releaseIds = Array.from(new Set(inventory.map((row) => row.release_id).filter((v): v is number => typeof v === "number")));
+  const { data: releases, error: releaseError } = releaseIds.length
+    ? await dbAny
+        .from("releases")
+        .select("id, master_id, media_type, label, catalog_number, country, release_date, release_year, notes, qty, format_details, packaging, vinyl_weight, rpm, spars_code, box_set, sound, studio")
+        .in("id", releaseIds)
+    : { data: [], error: null };
+  if (releaseError) throw new Error(releaseError.message);
+
+  const releaseRows = (releases ?? []) as Array<{
+    id: number;
+    master_id: number | null;
+    media_type: string | null;
+    label: string | null;
+    catalog_number: string | null;
+    country: string | null;
+    release_date: string | null;
+    release_year: number | null;
+    notes: string | null;
+    qty: number | null;
+    format_details: string[] | null;
+    packaging: string | null;
+    vinyl_weight: string | null;
+    rpm: string | null;
+    spars_code: string | null;
+    box_set: string | null;
+    sound: string | null;
+    studio: string | null;
+  }>;
+  const releasesById = new Map<number, (typeof releaseRows)[number]>(releaseRows.map((row) => [row.id, row]));
+
+  const masterIds = Array.from(new Set(releaseRows.map((row) => row.master_id).filter((v): v is number => typeof v === "number")));
+  const { data: masters, error: masterError } = masterIds.length
+    ? await dbAny.from("masters").select("id, title, main_artist_id, notes, genres").in("id", masterIds)
+    : { data: [], error: null };
+  if (masterError) throw new Error(masterError.message);
+  const masterRows = (masters ?? []) as Array<{
+    id: number;
+    title: string;
+    main_artist_id: number | null;
+    notes: string | null;
+    genres: string[] | null;
+  }>;
+  const mastersById = new Map<number, (typeof masterRows)[number]>(masterRows.map((row) => [row.id, row]));
+
+  const artistIds = Array.from(new Set(masterRows.map((row) => row.main_artist_id).filter((v): v is number => typeof v === "number")));
+  const { data: artists, error: artistError } = artistIds.length
+    ? await dbAny.from("artists").select("id, name").in("id", artistIds)
+    : { data: [], error: null };
+  if (artistError) throw new Error(artistError.message);
+  const artistsById = new Map<number, string>(((artists ?? []) as Array<{ id: number; name: string }>).map((row) => [row.id, row.name]));
+
+  const { data: releaseTracks, error: releaseTrackError } = releaseIds.length
+    ? await dbAny.from("release_tracks").select("id, release_id, recording_id, position, side, title_override").in("release_id", releaseIds)
+    : { data: [], error: null };
+  if (releaseTrackError) throw new Error(releaseTrackError.message);
+
+  const releaseTrackRows = (releaseTracks ?? []) as Array<{
+    id: number;
+    release_id: number | null;
+    recording_id: number | null;
+    position: string;
+    side: string | null;
+    title_override: string | null;
+  }>;
+
+  const recordingIds = Array.from(new Set(releaseTrackRows.map((row) => row.recording_id).filter((v): v is number => typeof v === "number")));
+  const { data: recordings, error: recordingError } = recordingIds.length
+    ? await dbAny.from("recordings").select("id, title, track_artist, duration_seconds").in("id", recordingIds)
+    : { data: [], error: null };
+  if (recordingError) throw new Error(recordingError.message);
+  const recordingsById = new Map<number, { id: number; title: string | null; track_artist: string | null; duration_seconds: number | null }>(
+    ((recordings ?? []) as Array<{ id: number; title: string | null; track_artist: string | null; duration_seconds: number | null }>).map((row) => [row.id, row])
+  );
+
+  const trackRows: CollectionTrackRow[] = [];
+
+  for (const inv of inventory) {
+    if (!inv.release_id) continue;
+    const release = releasesById.get(inv.release_id);
+    if (!release) continue;
+    const master = release.master_id ? mastersById.get(release.master_id) : undefined;
+    const albumTitle = master?.title ?? "Unknown Album";
+    const albumArtist = master?.main_artist_id ? artistsById.get(master.main_artist_id) ?? "Unknown Artist" : "Unknown Artist";
+    const trackFormatFacets = buildTrackFormatFacets(release.media_type, release.format_details);
+
+    const tracksForRelease = releaseTrackRows.filter((row) => row.release_id === release.id);
+    for (let idx = 0; idx < tracksForRelease.length; idx += 1) {
+      const track = tracksForRelease[idx];
+      const recording = track.recording_id ? recordingsById.get(track.recording_id) : undefined;
+      const position = track.position?.trim() || String(idx + 1);
+      const side = track.side ? track.side.toUpperCase() : null;
+      const key = `${inv.id}:${track.id ?? `p:${position}`}:${recording?.id ?? idx}`;
+
+      trackRows.push({
+        key,
+        inventoryId: inv.id,
+        releaseTrackId: track.id ?? null,
+        recordingId: recording?.id ?? null,
+        albumArtist,
+        albumTitle,
+        trackArtist: recording?.track_artist ?? albumArtist,
+        trackTitle: track.title_override ?? recording?.title ?? `Track ${idx + 1}`,
+        position,
+        side,
+        durationSeconds: recording?.duration_seconds ?? null,
+        durationLabel: parseDurationLabel(recording?.duration_seconds ?? null),
+        albumMediaType: release.media_type ?? "Unknown",
+        trackFormatFacets,
+        format: release.media_type ?? null,
+        country: release.country ?? null,
+        location: inv.location ?? null,
+        status: inv.status ?? null,
+        barcode: inv.barcode ?? null,
+        catalogNumber: release.catalog_number ?? null,
+        label: release.label ?? null,
+        owner: inv.owner ?? null,
+        personalNotes: inv.personal_notes ?? null,
+        releaseNotes: release.notes ?? null,
+        masterNotes: master?.notes ?? null,
+        mediaCondition: inv.media_condition ?? null,
+        sleeveCondition: inv.sleeve_condition ?? null,
+        packaging: release.packaging ?? null,
+        studio: release.studio ?? null,
+        sound: release.sound ?? null,
+        vinylWeight: release.vinyl_weight ?? null,
+        rpm: release.rpm ?? null,
+        sparsCode: release.spars_code ?? null,
+        boxSet: release.box_set ?? null,
+        yearInt: release.release_year ?? null,
+        discs: release.qty ?? null,
+        dateAdded: null,
+        purchaseDate: null,
+        lastPlayedAt: null,
+        lastCleanedDate: null,
+        originalReleaseDate: release.release_date ?? null,
+        recordingDate: null,
+        forSale: inv.status === "for_sale",
+        isLive: false,
+        genres: master?.genres ?? [],
+        labels: release.label ? [release.label] : [],
+      });
+    }
+  }
+
+  return trackRows;
+}
+
 function shuffle<T>(items: T[]): T[] {
   const next = [...items];
   for (let i = next.length - 1; i > 0; i -= 1) {
@@ -107,6 +371,40 @@ function shuffle<T>(items: T[]): T[] {
 }
 
 export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: number): Promise<ResolvedPlaylistTrack[]> {
+  const playlist = await getPlaylistConfig(db, playlistId);
+  if (playlist.is_smart) {
+    const sourceRows = await buildCollectionTrackRows(db);
+    const playlistModel: CollectionPlaylist = {
+      id: playlist.id,
+      name: playlist.name,
+      icon: "🎵",
+      color: "#3578b3",
+      trackKeys: [],
+      createdAt: new Date().toISOString(),
+      sortOrder: 0,
+      isSmart: true,
+      smartRules: playlist.smart_rules && Array.isArray(playlist.smart_rules.rules)
+        ? { rules: playlist.smart_rules.rules as SmartPlaylistRule[], maxTracks: playlist.smart_rules.maxTracks ?? null }
+        : { rules: [], maxTracks: null },
+      matchRules: playlist.match_rules === "any" ? "any" : "all",
+      liveUpdate: true,
+    };
+
+    const filtered = sourceRows.filter((row) => trackMatchesSmartPlaylist(row, playlistModel));
+    const maxTracks = playlistModel.smartRules?.maxTracks ?? null;
+    const clipped = maxTracks && maxTracks > 0 ? filtered.slice(0, maxTracks) : filtered;
+
+    return clipped.map((row, index) => ({
+      trackKey: row.key,
+      sortOrder: index,
+      trackTitle: row.trackTitle,
+      artistName: row.trackArtist,
+      albumName: row.albumTitle,
+      side: row.side,
+      position: row.position,
+    }));
+  }
+
   const { data: playlistItems, error: itemError } = await db
     .from("collection_playlist_items")
     .select("playlist_id, track_key, sort_order")
@@ -211,6 +509,20 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
       position: releaseTrack?.position ?? parsed.fallbackPosition,
     };
   });
+}
+
+export async function getPlaylistTrackCount(db: BingoDbClient, playlistId: number): Promise<number> {
+  const playlist = await getPlaylistConfig(db, playlistId);
+  if (!playlist.is_smart) {
+    const { count } = await db
+      .from("collection_playlist_items")
+      .select("id", { count: "exact", head: true })
+      .eq("playlist_id", playlistId);
+    return count ?? 0;
+  }
+
+  const tracks = await resolvePlaylistTracks(db, playlistId);
+  return tracks.length;
 }
 
 export async function generateSessionCalls(

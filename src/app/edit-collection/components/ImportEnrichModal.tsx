@@ -12,6 +12,9 @@ import { supabase } from 'lib/supabaseClient';
 import EnrichmentReviewModal from './EnrichmentReviewModal';
 import { type FieldConflict } from 'lib/conflictDetection';
 import { parseDiscogsFormat } from 'lib/formatParser';
+import {
+  buildFieldDiagnosticsForAlbum,
+} from 'lib/enrichmentDiagnostics';
 import { 
   type DataCategory, 
   type EnrichmentService,
@@ -22,6 +25,13 @@ import {
   DATA_CATEGORY_LABELS,
   DATA_CATEGORY_ICONS
 } from 'lib/enrichment-data-mapping';
+import type {
+  FieldDiagnosticRow,
+  OutcomeCode,
+  PatternActionCode,
+  PatternRootCause,
+  SourceDiagnostic,
+} from 'types/enrichmentDiagnostics';
 
 const ALLOWED_COLUMNS = new Set([
   'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels', 'cat_no',
@@ -121,7 +131,7 @@ type Album = {
 interface CandidateResult {
   album: Album;
   candidates: Record<string, unknown>;
-  sourceDiagnostics?: Record<string, { status: 'returned' | 'no_data' | 'error'; reason?: string }>;
+  sourceDiagnostics?: Record<string, SourceDiagnostic>;
   attemptedSources?: string[];
   sourceFieldCoverage?: Record<string, string[]>;
   scanNote?: string;
@@ -152,6 +162,22 @@ type LogEntry = {
 type EnrichmentRunLogInsert = import('types/supabase').Database['public']['Tables']['enrichment_run_logs']['Insert'];
 
 type ActiveServiceMap = ReturnType<typeof getServicesForSelectionFromConfig>;
+
+type EnrichmentFieldDiagnosticInsert = FieldDiagnosticRow;
+
+type PatternFinding = {
+  runId: string | null;
+  field: string;
+  source: string;
+  sampleSize: number;
+  dominantOutcome: OutcomeCode;
+  dominantCount: number;
+  dominantPct: number;
+  rootCause: PatternRootCause;
+  recommendedActionCode: PatternActionCode;
+  recommendedActionText: string;
+  patternFlag: boolean;
+};
 
 const SERVICE_FLAG_TO_ID: Record<string, string> = {
   musicbrainz: 'musicbrainz',
@@ -982,9 +1008,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [currentRunId, setCurrentRunId] = useState<string | null>(null);
   const [historyWriteEnabled, setHistoryWriteEnabled] = useState(true);
   const [auditLogWriteEnabled, setAuditLogWriteEnabled] = useState(true);
+  const [fieldDiagnosticWriteEnabled, setFieldDiagnosticWriteEnabled] = useState(true);
+  const [patternFindings, setPatternFindings] = useState<PatternFinding[]>([]);
+  const [patternFindingsLoading, setPatternFindingsLoading] = useState(false);
+  const [patternFindingsError, setPatternFindingsError] = useState<string | null>(null);
   const historyWriteModeRef = useRef<'upsert' | 'insert' | 'disabled'>('upsert');
   const historyDisabledRef = useRef(false);
   const auditDisabledRef = useRef(false);
+  const fieldDiagDisabledRef = useRef(false);
+  const runIdRef = useRef<string | null>(null);
 
   // Loop Control Refs
   const hasMoreRef = useRef(true);
@@ -1009,11 +1041,22 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       setCurrentRunId(null);
       setHistoryWriteEnabled(true);
       setAuditLogWriteEnabled(true);
+      setFieldDiagnosticWriteEnabled(true);
+      setPatternFindings([]);
+      setPatternFindingsError(null);
       historyWriteModeRef.current = 'upsert';
       historyDisabledRef.current = false;
       auditDisabledRef.current = false;
+      fieldDiagDisabledRef.current = false;
+      runIdRef.current = null;
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (currentRunId) {
+      runIdRef.current = currentRunId;
+    }
+  }, [currentRunId]);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1109,6 +1152,40 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
   }
 
+  async function persistEnrichmentFieldDiagnostics(rows: EnrichmentFieldDiagnosticInsert[]) {
+    if (!fieldDiagnosticWriteEnabled || fieldDiagDisabledRef.current || rows.length === 0) return;
+    const sb = supabase as unknown as {
+      from: (table: string) => { insert: (payload: unknown) => Promise<{ error: { message: string } | null }> };
+    };
+    const { error } = await sb.from('enrichment_field_diagnostics').insert(rows);
+    if (error) {
+      fieldDiagDisabledRef.current = true;
+      setFieldDiagnosticWriteEnabled(false);
+      addLog('System', 'skipped', `Disabled field diagnostics logging: ${error.message}`);
+    }
+  }
+
+  async function loadPatternFindings(runId: string) {
+    if (!runId) return;
+    setPatternFindingsLoading(true);
+    setPatternFindingsError(null);
+    try {
+      const res = await fetch(`/api/enrich-sources/patterns?runId=${encodeURIComponent(runId)}`);
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || `Failed to load pattern report (${res.status})`);
+      }
+      const incoming = Array.isArray(data.patterns) ? (data.patterns as PatternFinding[]) : [];
+      setPatternFindings(incoming.filter((row) => row.patternFlag));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setPatternFindingsError(message);
+      addLog('System', 'skipped', `Pattern findings unavailable: ${message}`);
+    } finally {
+      setPatternFindingsLoading(false);
+    }
+  }
+
   const toggleField = (field: string) => {
     if (NON_ENRICHABLE_FIELDS.has(field)) return;
     setFieldConfig(prev => {
@@ -1173,6 +1250,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const formatAlbumLogLabel = (album: { artist: string; title: string; id?: number | null }) =>
     `${album.artist} - ${album.title}${typeof album.id === 'number' ? ` (#${album.id})` : ''}`;
 
+  const getOrCreateRunId = (): string => {
+    if (runIdRef.current) return runIdRef.current;
+    const nextRunId = currentRunId ?? createEnrichmentRunId();
+    runIdRef.current = nextRunId;
+    if (!currentRunId) {
+      setCurrentRunId(nextRunId);
+    }
+    return nextRunId;
+  };
+
   const summarizeLogValue = (value: unknown): string => {
     if (value === null || value === undefined) return 'null';
     if (typeof value === 'string') {
@@ -1211,13 +1298,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const logCheckedFieldResults = (
     album: Album,
     candidates: Record<string, unknown>,
-    sourceDiagnostics: Record<string, { status: 'returned' | 'no_data' | 'error'; reason?: string }> | undefined,
-    attemptedSources: string[] | undefined,
-    sourceFieldCoverage: Record<string, string[]> | undefined,
+    fieldDiagnostics: FieldDiagnosticRow[],
     activeFieldConfig: FieldConfigMap
   ) => {
     const albumLabel = formatAlbumLogLabel(album);
     const selectedFields = Object.keys(activeFieldConfig).filter((field) => !NON_ENRICHABLE_FIELDS.has(field));
+    const diagByFieldSource = new Map<string, FieldDiagnosticRow>();
+    fieldDiagnostics.forEach((row) => {
+      diagByFieldSource.set(`${row.field_name}::${row.source_name}`, row);
+    });
 
     addLog(albumLabel, 'info', `Checking ${selectedFields.length} field(s) from selected sources.`);
 
@@ -1226,20 +1315,29 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       if (allowedSources.length === 0) return;
       const candidateKeys = candidateKeysForField(field);
       let hasAnyFieldValue = false;
+      const outcomeCodes: string[] = [];
 
       const sourceDetails = allowedSources.map((source) => {
-        const diagSource = toDiagnosticsSourceKey(source);
-        const diag = sourceDiagnostics?.[diagSource];
-        const attempted = attemptedSources?.includes(diagSource) ?? false;
-        if (!attempted || !diag) return `${source}=not called`;
-        if (diag.status === 'error' || diag.status === 'no_data') {
-          return `${source}=${summarizeReason(diag.reason || diag.status)}`;
+        const row = diagByFieldSource.get(`${field}::${source}`);
+        if (!row) {
+          outcomeCodes.push(`${source}:source_not_called`);
+          return `${source}=not called`;
+        }
+        outcomeCodes.push(`${source}:${row.outcome_code}`);
+        if (row.outcome_code === 'source_not_called') return `${source}=not called`;
+        if (
+          row.outcome_code === 'not_found' ||
+          row.outcome_code === 'source_unavailable' ||
+          row.outcome_code.startsWith('source_error')
+        ) {
+          return `${source}=${summarizeReason(row.reason || row.outcome_code)}`;
         }
 
-        const returnedKeys = sourceFieldCoverage?.[diagSource] ?? [];
-        const sourcePayload = candidates[diagSource] as Record<string, unknown> | undefined;
+        const returnedKeys = row.returned_keys ?? [];
+        const diagSource = toDiagnosticsSourceKey(source);
+        const sourcePayload = (candidates[diagSource] ?? candidates[source]) as Record<string, unknown> | undefined;
         const hits = candidateKeys.filter((key) => returnedKeys.includes(key));
-        if (hits.length === 0) return `${source}=returned other fields`;
+        if (row.outcome_code === 'returned_other_fields' || hits.length === 0) return `${source}=returned other fields`;
         hasAnyFieldValue = true;
         const valueDetails = hits
           .map((key) => `${key}:${summarizeLogValue(sourcePayload?.[key])}`)
@@ -1249,7 +1347,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
       addLog(albumLabel, 'info', `${field.replace(/_/g, ' ')} -> ${sourceDetails.join(' | ')}`);
       if (!hasAnyFieldValue) {
-        addLog(albumLabel, 'skipped', `NOT ENRICHED anywhere for ${field.replace(/_/g, ' ')}`);
+        addLog(
+          albumLabel,
+          'skipped',
+          `NOT ENRICHED anywhere for ${field.replace(/_/g, ' ')} [codes: ${outcomeCodes.join(' | ')}]`
+        );
       }
     });
   };
@@ -1281,9 +1383,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     processedDuringScanRef.current = 0;
     nextStatsRefreshAtRef.current = 25;
     setConflicts([]);
-    if (!currentRunId) {
-      setCurrentRunId(createEnrichmentRunId());
-    }
+    getOrCreateRunId();
 
     await runScanLoop(specificAlbumIds);
   }
@@ -1507,6 +1607,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
 
     setEnriching(false);
+    const completedRunId = runIdRef.current;
+    if (completedRunId) {
+      void loadPatternFindings(completedRunId);
+    }
 
     if (collectedSummary.length > 0) {
         setBatchSummary(prev => [...(prev || []), ...collectedSummary]);
@@ -1604,10 +1708,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const activeServices = getServicesForSelection(activeFieldConfig);
     const checkedSources = checkedSourcesFromActiveServices(activeServices);
     const selectedFields = Object.keys(activeFieldConfig).filter((field) => !NON_ENRICHABLE_FIELDS.has(field));
-    const runId = currentRunId ?? createEnrichmentRunId();
-    if (!currentRunId) {
-      setCurrentRunId(runId);
-    }
+    const runId = getOrCreateRunId();
     const wantsLyrics = !!activeFieldConfig['tracks.lyrics'] || !!activeFieldConfig['tracks.lyrics_url'];
     const selectedLyricsProviders = LYRICS_SERVICE_IDS.filter((service) => !!activeServices[service]);
     const runLyricsEnrichment = wantsLyrics && selectedLyricsProviders.length > 0;
@@ -1628,6 +1729,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const trackSavePromises: Promise<unknown>[] = [];
     const lyricJobs: { albumId: number; artist: string; title: string; appleMusicId?: string | null }[] = [];
     const pendingAuditRows: EnrichmentRunLogInsert[] = [];
+    const pendingFieldDiagnosticRows: EnrichmentFieldDiagnosticInsert[] = [];
     
     const GLOBAL_PRIORITY = [
       'discogs', 'musicbrainz', 'spotify', 'appleMusic', 'deezer', 
@@ -1646,6 +1748,19 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     results.forEach((item) => {
       processedIds.push(item.album.id);
       const { album, candidates, sourceDiagnostics, attemptedSources, sourceFieldCoverage, scanNote } = item;
+      const albumFieldDiagnostics = buildFieldDiagnosticsForAlbum({
+        runId,
+        albumId: album.id,
+        selectedFields,
+        activeFieldConfig,
+        candidates,
+        sourceDiagnostics,
+        attemptedSources,
+        sourceFieldCoverage,
+        candidateKeysForField,
+        toDiagnosticsSourceKey,
+      });
+      pendingFieldDiagnosticRows.push(...albumFieldDiagnostics);
       if (autoSnooze && isWithinSnoozeWindow((album as Record<string, unknown>).last_reviewed_at)) {
         addLog(
           formatAlbumLogLabel(album),
@@ -1696,7 +1811,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         .filter(k => ALLOWED_COLUMNS.has(k))
         .filter(k => !!activeFieldConfig[k]);
 
-      logCheckedFieldResults(album, candidates, sourceDiagnostics, attemptedSources, sourceFieldCoverage, activeFieldConfig);
+      logCheckedFieldResults(album, candidates, albumFieldDiagnostics, activeFieldConfig);
       if (scanNote) {
         addLog(formatAlbumLogLabel(album), 'info', scanNote);
       }
@@ -2162,6 +2277,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       });
     }
 
+    if (pendingFieldDiagnosticRows.length > 0) {
+      await persistEnrichmentFieldDiagnostics(pendingFieldDiagnosticRows);
+    }
+
     if (pendingAuditRows.length > 0) {
       const finalizedRows = pendingAuditRows.map((row) => {
         const hasProposed = !!row.proposed_updates && row.proposed_updates !== null && row.proposed_updates !== '{}';
@@ -2439,10 +2558,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const reason = note ?? (mode === 'ignore' ? 'Manually ignored due to unavailable source data' : 'Skipped for later review');
     addLog(albumLabel, 'skipped', reason);
 
-    const runId = currentRunId ?? createEnrichmentRunId();
-    if (!currentRunId) {
-      setCurrentRunId(runId);
-    }
+    const runId = getOrCreateRunId();
     const checkedSources = Array.from(new Set(
       albumConflicts.flatMap(c => Object.keys(c.candidates ?? {}).map(normalizeSourceForLog))
     ));
@@ -2598,10 +2714,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       await persistConflictResolutionHistory(resolutionRecords, 'manual review');
     }
 
-    const runId = currentRunId ?? createEnrichmentRunId();
-    if (!currentRunId) {
-      setCurrentRunId(runId);
-    }
+    const runId = getOrCreateRunId();
     const albumConflicts = conflicts.filter(c => c.album_id === albumId);
     const sourcePayload = albumConflicts.reduce<Record<string, unknown>>((acc, conflict) => {
       if (conflict.candidates) {
@@ -2983,6 +3096,34 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                       </div>
                     ))}
                     <div ref={logEndRef} />
+                  </div>
+                </div>
+              )}
+
+              {(patternFindingsLoading || patternFindingsError || patternFindings.length > 0) && (
+                <div className="mb-4 border border-blue-200 rounded-md overflow-hidden">
+                  <div className="px-3 py-2 bg-blue-50 border-b border-blue-200 text-xs font-semibold text-blue-900">
+                    Pattern Findings {currentRunId ? `(run ${currentRunId.slice(0, 8)})` : ''}
+                  </div>
+                  <div className="p-3 bg-white">
+                    {patternFindingsLoading && (
+                      <div className="text-xs text-gray-600">Analyzing field/source patterns...</div>
+                    )}
+                    {!patternFindingsLoading && patternFindingsError && (
+                      <div className="text-xs text-amber-700">Pattern report unavailable: {patternFindingsError}</div>
+                    )}
+                    {!patternFindingsLoading && !patternFindingsError && patternFindings.length === 0 && (
+                      <div className="text-xs text-gray-600">No systemic field/source patterns crossed thresholds.</div>
+                    )}
+                    {!patternFindingsLoading && patternFindings.length > 0 && (
+                      <div className="space-y-1">
+                        {patternFindings.slice(0, 12).map((pattern, index) => (
+                          <div key={`${pattern.field}-${pattern.source}-${index}`} className="text-xs text-gray-900">
+                            <b>{pattern.field.replace(/_/g, ' ')}</b> via <b>{pattern.source}</b>: {pattern.dominantOutcome} ({pattern.dominantPct.toFixed(1)}% of {pattern.sampleSize}) {'->'} {pattern.recommendedActionText}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
