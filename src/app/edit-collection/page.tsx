@@ -1125,9 +1125,17 @@ function CollectionBrowserPage() {
     if (groupedTrackRows.length === 0) return;
     setExpandedAlbumIds((prev) => {
       if (prev.size > 0) return prev;
-      return new Set([groupedTrackRows[0].inventoryId]);
+      return new Set(groupedTrackRows.map((group) => group.inventoryId));
     });
   }, [viewMode, groupedTrackRows]);
+
+  const handleExpandAllAlbums = useCallback(() => {
+    setExpandedAlbumIds(new Set(groupedTrackRows.map((group) => group.inventoryId)));
+  }, [groupedTrackRows]);
+
+  const handleCollapseAllAlbums = useCallback(() => {
+    setExpandedAlbumIds(new Set());
+  }, []);
 
   const sortedFolderItems = useMemo(() => {
     return Object.entries(folderCounts)
@@ -1844,6 +1852,24 @@ function CollectionBrowserPage() {
               <div className="text-xs text-[#ddd] font-semibold">
                 {loading ? 'Loading...' : viewMode === 'collection' ? `${filteredAndSortedAlbums.length} albums` : `${filteredTrackRows.length} tracks`}
               </div>
+              {viewMode === 'album-track' && groupedTrackRows.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={handleExpandAllAlbums}
+                    title="Expand all albums"
+                    className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white"
+                  >
+                    Expand all
+                  </button>
+                  <button
+                    onClick={handleCollapseAllAlbums}
+                    title="Collapse all albums"
+                    className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white"
+                  >
+                    Collapse all
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex-1 overflow-hidden bg-white min-h-0">
