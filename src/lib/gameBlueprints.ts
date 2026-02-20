@@ -1,4 +1,4 @@
-export type GameStatus = "undeveloped" | "needs_workshopping";
+export type GameStatus = "in_development" | "undeveloped" | "needs_workshopping";
 
 export type GameBlueprint = {
   slug: string;
@@ -20,7 +20,7 @@ export const gameBlueprints: GameBlueprint[] = [
   {
     slug: "music-trivia",
     title: "Music Trivia",
-    status: "needs_workshopping",
+    status: "in_development",
     coreMechanic: "Host asks music questions between spins; teams submit answers.",
     setup: "Question deck by category/difficulty, answer slips, and 2+ teams.",
     scoring: "1 point per correct answer, optional bonus for harder categories.",
@@ -160,7 +160,12 @@ export const gameBlueprints: GameBlueprint[] = [
 ];
 
 export const getGameBuildPrompt = (game: GameBlueprint): string => {
-  const statusLabel = game.status === "needs_workshopping" ? "needs_workshopping" : "undeveloped";
+  const statusLabel =
+    game.status === "needs_workshopping"
+      ? "needs_workshopping"
+      : game.status === "in_development"
+        ? "in_development"
+        : "undeveloped";
 
   return [
     `Build and/or plan this game module: ${game.title}.`,
