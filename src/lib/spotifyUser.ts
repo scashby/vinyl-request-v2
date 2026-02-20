@@ -22,6 +22,10 @@ export class SpotifyApiError extends Error {
   }
 }
 
+type SpotifyApiGetOptions = {
+  maxAttempts?: number;
+};
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const parseRetryAfterSeconds = (value: string | null) => {
@@ -135,12 +139,21 @@ export async function getSpotifyAccessTokenFromCookies() {
   };
 }
 
-export async function spotifyApiGet<T>(accessToken: string, path: string): Promise<T> {
-  return spotifyApiGetByUrl<T>(accessToken, `${SPOTIFY_API}${path}`, path);
+export async function spotifyApiGet<T>(
+  accessToken: string,
+  path: string,
+  options?: SpotifyApiGetOptions
+): Promise<T> {
+  return spotifyApiGetByUrl<T>(accessToken, `${SPOTIFY_API}${path}`, path, options);
 }
 
-export async function spotifyApiGetByUrl<T>(accessToken: string, url: string, label = url): Promise<T> {
-  const maxAttempts = 3;
+export async function spotifyApiGetByUrl<T>(
+  accessToken: string,
+  url: string,
+  label = url,
+  options?: SpotifyApiGetOptions
+): Promise<T> {
+  const maxAttempts = Math.max(1, options?.maxAttempts ?? 1);
   let lastError: SpotifyApiError | null = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
