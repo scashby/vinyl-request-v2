@@ -18,6 +18,15 @@ const EVENT_LINK_REQUIREMENT =
 
 export const gameBlueprints: GameBlueprint[] = [
   {
+    slug: "bingo",
+    title: "Music Bingo",
+    status: "in_development",
+    coreMechanic: "Spin records and verify matches against printed cards.",
+    setup: "Playlist/deck source, card generation, and 2+ teams.",
+    scoring: "Standard bingo progression with configurable win patterns.",
+    whyItWorks: "Familiar format that is easy to host with analog-first workflow.",
+  },
+  {
     slug: "music-trivia",
     title: "Music Trivia",
     status: "in_development",

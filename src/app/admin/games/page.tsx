@@ -1,10 +1,29 @@
+import path from "node:path";
+import { existsSync } from "node:fs";
 import Link from "next/link";
 import PromptCopyButton from "src/components/PromptCopyButton";
 import { gameBlueprints, getGameBuildPrompt } from "src/lib/gameBlueprints";
 
 export default function GamesHomePage() {
-  const needsWorkshop = gameBlueprints.filter((game) => game.status === "needs_workshopping");
-  const undeveloped = gameBlueprints.filter((game) => game.status === "undeveloped");
+  const hasConcreteModule = (slug: string) =>
+    existsSync(path.join(process.cwd(), "src", "app", "admin", "games", slug, "page.tsx"));
+
+  const resolvedGames = gameBlueprints.map((game) => {
+    if (game.status === "undeveloped" && hasConcreteModule(game.slug)) {
+      return { ...game, status: "in_development" as const };
+    }
+    return game;
+  });
+
+  const inDevelopmentModules = resolvedGames
+    .filter((game) => game.status === "in_development")
+    .map((game) => ({
+      slug: game.slug,
+      title: game.title,
+      description: game.setup,
+    }));
+  const needsWorkshop = resolvedGames.filter((game) => game.status === "needs_workshopping");
+  const undeveloped = resolvedGames.filter((game) => game.status === "undeveloped");
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,#4a1f16,transparent_40%),radial-gradient(circle_at_80%_0%,#1f3c42,transparent_35%),linear-gradient(180deg,#121212,#1b1b1b)] p-6 text-stone-100">
@@ -25,57 +44,20 @@ export default function GamesHomePage() {
 
           <h2 className="mt-10 text-xl font-black uppercase tracking-[0.08em] text-amber-200">In Development</h2>
           <div className="mt-4 grid gap-4">
-            <section className="rounded-2xl border border-amber-900/50 bg-amber-950/20 p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Testing Module</p>
-                  <h3 className="text-2xl font-black text-amber-100">Music Bingo</h3>
+            {inDevelopmentModules.map((module) => (
+              <section key={module.slug} className="rounded-2xl border border-amber-900/50 bg-amber-950/20 p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Testing Module</p>
+                    <h3 className="text-2xl font-black text-amber-100">{module.title}</h3>
+                  </div>
+                  <Link className="rounded border border-amber-700 px-3 py-1 text-xs uppercase tracking-[0.15em] hover:border-amber-400 hover:text-amber-200" href={`/admin/games/${module.slug}`}>
+                    Open Module
+                  </Link>
                 </div>
-                <Link className="rounded border border-amber-700 px-3 py-1 text-xs uppercase tracking-[0.15em] hover:border-amber-400 hover:text-amber-200" href="/admin/games/bingo">
-                  Open Module
-                </Link>
-              </div>
-              <p className="mt-3 text-sm text-amber-100/90">Setup, host, assistant, jumbotron, print pack, and call verification.</p>
-            </section>
-
-            <section className="rounded-2xl border border-amber-900/50 bg-amber-950/20 p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Testing Module</p>
-                  <h3 className="text-2xl font-black text-amber-100">Music Trivia</h3>
-                </div>
-                <Link className="rounded border border-amber-700 px-3 py-1 text-xs uppercase tracking-[0.15em] hover:border-amber-400 hover:text-amber-200" href="/admin/games/music-trivia">
-                  Open Module
-                </Link>
-              </div>
-              <p className="mt-3 text-sm text-amber-100/90">Paper-first setup, host console, scoring, and optional jumbotron.</p>
-            </section>
-
-            <section className="rounded-2xl border border-amber-900/50 bg-amber-950/20 p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Testing Module</p>
-                  <h3 className="text-2xl font-black text-amber-100">Name That Tune</h3>
-                </div>
-                <Link className="rounded border border-amber-700 px-3 py-1 text-xs uppercase tracking-[0.15em] hover:border-amber-400 hover:text-amber-200" href="/admin/games/name-that-tune">
-                  Open Module
-                </Link>
-              </div>
-              <p className="mt-3 text-sm text-amber-100/90">Snippet-first setup, lock-in rule controls, and solo-host pacing safeguards.</p>
-            </section>
-
-            <section className="rounded-2xl border border-amber-900/50 bg-amber-950/20 p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Testing Module</p>
-                  <h3 className="text-2xl font-black text-amber-100">Bracket Battle</h3>
-                </div>
-                <Link className="rounded border border-amber-700 px-3 py-1 text-xs uppercase tracking-[0.15em] hover:border-amber-400 hover:text-amber-200" href="/admin/games/bracket-battle">
-                  Open Module
-                </Link>
-              </div>
-              <p className="mt-3 text-sm text-amber-100/90">Seeded bracket setup, event-aware session history, and crowd-vote progression scaffolding.</p>
-            </section>
+                <p className="mt-3 text-sm text-amber-100/90">{module.description}</p>
+              </section>
+            ))}
           </div>
 
           <h2 className="mt-10 text-xl font-black uppercase tracking-[0.08em] text-amber-200">Undeveloped Games</h2>
