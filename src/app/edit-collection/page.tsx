@@ -2,7 +2,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, useMemo, Suspense, Fragment } from 'react';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase as supabaseTyped } from '../../lib/supabaseClient';
 import CollectionTable from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
 import { ColumnId, COLUMN_DEFINITIONS, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
@@ -38,6 +38,9 @@ import {
   getAlbumYearInt,
   getAlbumYearValue
 } from './albumHelpers';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const supabase = supabaseTyped as any;
 
 type SortOption = 
   | 'artist-asc' | 'artist-desc' 

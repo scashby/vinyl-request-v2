@@ -546,7 +546,8 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           .select(fullSelect)
           .eq('id', albumId)
           .single();
-        let data: Record<string, unknown> | null = (initial.data as Record<string, unknown> | null) ?? null;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let data: any = initial.data;
         let fetchError = initial.error;
 
         if (fetchError) {

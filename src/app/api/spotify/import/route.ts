@@ -237,15 +237,19 @@ export async function POST(req: Request) {
     const { matched, missing } = matchTracks(rows, index);
 
     step = 'create-playlist';
-    const { data: maxSortRow } = await supabaseAdmin
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = supabaseAdmin as any;
+    const { data: maxSortRow } = await db
       .from('collection_playlists')
       .select('sort_order')
       .order('sort_order', { ascending: false })
       .limit(1)
-      .single();
-    const nextSortOrder = Number(maxSortRow?.sort_order ?? -1) + 1;
+      .maybeSingle();
+    const maxSortOrder =
+      maxSortRow && typeof maxSortRow.sort_order === 'number' ? maxSortRow.sort_order : -1;
+    const nextSortOrder = maxSortOrder + 1;
 
-    const { data: inserted, error: insertError } = await supabaseAdmin
+    const { data: inserted, error: insertError } = await db
       .from('collection_playlists')
       .insert({
         name: playlistName,
@@ -276,7 +280,7 @@ export async function POST(req: Request) {
         track_key: trackKey,
         sort_order: idx,
       }));
-      const { error: itemsError } = await supabaseAdmin
+      const { error: itemsError } = await db
         .from('collection_playlist_items')
         .insert(records);
       if (itemsError) throw itemsError;

@@ -1,4 +1,5 @@
 // src/lib/enrichment-utils.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as GeniusModule from 'genius-lyrics';
 import { parseDiscogsFormat } from './formatParser';
 import { fetchDiscogsJson, type DiscogsOAuthCredentials } from './discogsAuth';
@@ -18,7 +19,7 @@ const getEnv = (...keys: string[]): string | undefined => {
 const GENIUS_TOKEN = getEnv('GENIUS_ACCESS_TOKEN', 'GENIUS_API_TOKEN');
 type GeniusLikeClient = {
   songs: {
-    search: (query: string) => Promise<unknown[]>;
+    search: (query: string) => Promise<any[]>;
   };
 };
 
@@ -929,7 +930,7 @@ const SP_ID = getEnv('SPOTIFY_CLIENT_ID');
 const SP_SECRET = getEnv('SPOTIFY_CLIENT_SECRET');
 let spToken: { token: string; exp: number } | null = null;
 
-const readJsonResponse = async (res: Response): Promise<{ json: unknown | null; text: string }> => {
+const readJsonResponse = async (res: Response): Promise<{ json: any | null; text: string }> => {
   const text = await res.text();
   try {
     return { json: JSON.parse(text), text };
@@ -971,10 +972,10 @@ async function spFetchJson(
   token: string,
   context: string,
   maxAttempts = 3
-): Promise<{ ok: true; data: unknown } | { ok: false; status: number; text: string; data: unknown | null }> {
+): Promise<{ ok: true; data: any } | { ok: false; status: number; text: string; data: any | null }> {
   let lastStatus = 0;
   let lastText = '';
-  let lastData: unknown | null = null;
+  let lastData: any | null = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const res = await fetch(url, {
@@ -1028,7 +1029,7 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
             'search'
           );
           if (!searchResult.ok) {
-            const failed = searchResult as { ok: false; status: number; text: string; data: unknown | null };
+            const failed = searchResult as { ok: false; status: number; text: string; data: any | null };
             const searchText = failed.text.slice(0, 120).replace(/\s+/g, ' ');
             throw new Error(`Spotify search failed (${failed.status}): ${searchText}`);
           }
@@ -1047,7 +1048,7 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
       'album'
     );
     if (!albumResult.ok) {
-      const failed = albumResult as { ok: false; status: number; text: string; data: unknown | null };
+      const failed = albumResult as { ok: false; status: number; text: string; data: any | null };
       throw new Error(`Spotify album lookup failed (${failed.status}): ${failed.text.slice(0, 120).replace(/\s+/g, ' ')}`);
     }
     if (!albumResult.data) {
@@ -1094,7 +1095,7 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
           features = ((featuresResult.data.audio_features as (SpotifyAudioFeature | null)[] | undefined) ?? [])
             .filter((f): f is SpotifyAudioFeature => f !== null);
         } else {
-          const failed = featuresResult as { ok: false; status: number; text: string; data: unknown | null };
+          const failed = featuresResult as { ok: false; status: number; text: string; data: any | null };
           // Hard failures indicate this app cannot access audio-features at all.
           // Avoid per-track retry loops that waste requests.
           if ([400, 401, 403, 404].includes(failed.status)) {
@@ -1219,7 +1220,6 @@ export async function fetchAppleMusicData(album: { artist: string, title: string
         apple_music_editorial_notes: editorialNotes,
         barcode: attrs?.upc,
         // NEW: Tracks
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         tracks: data.data?.[0]?.relationships?.tracks?.data?.map((t: any) => ({
             position: String(t.attributes?.trackNumber),
             title: t.attributes?.name,
@@ -2006,7 +2006,6 @@ export async function fetchDeezerData(album: { artist: string, title: string }):
         const detailRes = await fetch(`https://api.deezer.com/album/${info.id}`);
         const detail = await detailRes.json();
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const genres = detail.genres?.data?.map((g: any) => g.name);
 
         return {
