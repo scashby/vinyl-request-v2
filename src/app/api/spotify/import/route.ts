@@ -125,8 +125,10 @@ export async function POST(req: Request) {
 
     step = 'spotify-tracks';
     let offset = rows.length;
-    const totalToFetch = sourceTotal ?? rows.length;
-    while (offset < totalToFetch) {
+    let shouldProbeFirstPage = rows.length === 0;
+    const totalToFetch = sourceTotal ?? Number.MAX_SAFE_INTEGER;
+    while (shouldProbeFirstPage || offset < totalToFetch) {
+      shouldProbeFirstPage = false;
       const trackPagePaths = [
         `/playlists/${playlistId}/items?limit=50&offset=${offset}&market=from_token&additional_types=track&fields=items(item(type,name,artists(name)),track(name,artists(name))),next`,
         `/playlists/${playlistId}/items?limit=50&offset=${offset}&market=from_token&fields=items(item(type,name,artists(name)),track(name,artists(name))),next`,
@@ -215,6 +217,8 @@ export async function POST(req: Request) {
           spotifyUserId,
           playlistOwnerId,
           step,
+          sourceTotal,
+          sourceCount: rows.length,
           debug: {
             metaItemsRawCount,
             metaItemsParsedCount,
