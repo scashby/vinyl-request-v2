@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type EventRow = {
@@ -109,7 +109,7 @@ export default function NameThatTuneSetupPage() {
     [cueSeconds, findRecordSeconds, hostBufferSeconds, removeResleeveSeconds]
   );
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const [eventRes, sessionRes] = await Promise.all([
       fetch("/api/games/name-that-tune/events"),
       fetch(`/api/games/name-that-tune/sessions${eventId ? `?eventId=${eventId}` : ""}`),
@@ -124,11 +124,11 @@ export default function NameThatTuneSetupPage() {
       const payload = await sessionRes.json();
       setSessions(payload.data ?? []);
     }
-  };
+  }, [eventId]);
 
   useEffect(() => {
     load();
-  }, [eventId]);
+  }, [load]);
 
   const createSession = async () => {
     setCreating(true);

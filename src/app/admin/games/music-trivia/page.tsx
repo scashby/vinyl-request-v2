@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type EventRow = {
@@ -98,7 +98,7 @@ export default function MusicTriviaSetupPage() {
   const callStackPreview = Math.max(1, roundCount) * Math.max(1, questionsPerRound);
   const preflightComplete = Object.values(preflight).every(Boolean);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const [eventRes, sessionRes] = await Promise.all([
       fetch("/api/games/trivia/events"),
       fetch(`/api/games/trivia/sessions${eventId ? `?eventId=${eventId}` : ""}`),
@@ -113,11 +113,11 @@ export default function MusicTriviaSetupPage() {
       const payload = await sessionRes.json();
       setSessions(payload.data ?? []);
     }
-  };
+  }, [eventId]);
 
   useEffect(() => {
     load();
-  }, [eventId]);
+  }, [load]);
 
   const toggleCategory = (category: string) => {
     setCategories((current) => {

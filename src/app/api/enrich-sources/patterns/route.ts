@@ -55,7 +55,7 @@ const asIso = (value: string | null): string | null => {
 const keyForGroup = (field: string, source: string) => `${field}::${source}`;
 
 export async function GET(request: Request) {
-  const supabase = supabaseServer(getAuthHeader(request)) as any;
+  const supabase = supabaseServer(getAuthHeader(request));
 
   try {
     const { searchParams } = new URL(request.url);

@@ -148,47 +148,6 @@ async function searchLyrics(albumArtist: string, trackTitle: string): Promise<st
   return null;
 }
 
-async function searchLrcLibLyrics(albumArtist: string, trackTitle: string): Promise<string | null> {
-  const cleanTitle = simplifyTrackTitle(trackTitle);
-  const params = new URLSearchParams({
-    track_name: cleanTitle || trackTitle,
-    artist_name: albumArtist
-  });
-  const apiUrl = `https://lrclib.net/api/search?${params.toString()}`;
-  console.log(`    → Searching LRCLIB: "${albumArtist}" - "${cleanTitle || trackTitle}"`);
-
-  const res = await fetch(apiUrl, {
-    headers: { 'User-Agent': 'DeadWaxDialogues/1.0 (+lyrics enrichment)' }
-  });
-
-  if (!res.ok) {
-    throw new Error(`LRCLIB returned ${res.status}`);
-  }
-
-  const data = await res.json();
-  const entries = Array.isArray(data) ? data : [];
-  if (entries.length === 0) {
-    return null;
-  }
-
-  const normArtist = normalizeForMatch(albumArtist);
-  const normTrack = normalizeForMatch(cleanTitle || trackTitle);
-
-  const best = entries.find((entry: Record<string, unknown>) => {
-    const entryArtist = normalizeForMatch(String(entry.artistName ?? ''));
-    const entryTrack = normalizeForMatch(String(entry.trackName ?? ''));
-    const artistMatch = entryArtist === normArtist || entryArtist.includes(normArtist) || normArtist.includes(entryArtist);
-    const trackMatch = entryTrack === normTrack || entryTrack.includes(normTrack) || normTrack.includes(entryTrack);
-    return artistMatch && trackMatch;
-  }) || entries[0];
-
-  const bestId = best && typeof best === 'object' ? (best as Record<string, unknown>).id : null;
-  if (typeof bestId === 'number' || typeof bestId === 'string') {
-    return `https://lrclib.net/api/get/${bestId}`;
-  }
-
-  return apiUrl;
-}
 
 type LyricsLookupResult = {
   lyricsUrl?: string | null;
@@ -383,7 +342,7 @@ export async function POST(req: Request) {
     console.log(`\n🔍 Processing ${tracks.length} tracks...`);
     const enrichedTracks: Track[] = [];
     let enrichedCount = 0;
-    let syncedCount = 0;
+    const syncedCount = 0;
     let skippedCount = 0;
     let skippedExistingCount = 0;
     let skippedNoTitleCount = 0;

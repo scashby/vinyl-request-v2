@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 type Session = {
@@ -42,7 +42,7 @@ export default function MusicTriviaJumbotronPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [remaining, setRemaining] = useState(0);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
 
     const [sessionRes, callsRes, leaderboardRes] = await Promise.all([
@@ -66,13 +66,13 @@ export default function MusicTriviaJumbotronPage() {
       const payload = await leaderboardRes.json();
       setLeaderboard(payload.data ?? []);
     }
-  };
+  }, [sessionId]);
 
   useEffect(() => {
     load();
     const poll = setInterval(load, 3000);
     return () => clearInterval(poll);
-  }, [sessionId]);
+  }, [load]);
 
   useEffect(() => {
     const tick = setInterval(() => {

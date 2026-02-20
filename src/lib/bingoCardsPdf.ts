@@ -1,7 +1,5 @@
 import { jsPDF } from "jspdf";
 
-type Cell = { label: string };
-
 type Card = {
   card_number: number;
   grid: Array<{ row: number; col: number; label: string }>;

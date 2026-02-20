@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 type Session = { session_code: string; playlist_name: string; current_round: number; round_count: number };
@@ -12,7 +12,7 @@ export default function BingoAssistantPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
     const [sRes, cRes] = await Promise.all([
       fetch(`/api/games/bingo/sessions/${sessionId}`),
@@ -23,13 +23,13 @@ export default function BingoAssistantPage() {
       const payload = await cRes.json();
       setCalls(payload.data ?? []);
     }
-  };
+  }, [sessionId]);
 
   useEffect(() => {
     load();
     const timer = setInterval(load, 3500);
     return () => clearInterval(timer);
-  }, [sessionId]);
+  }, [load]);
 
   const called = useMemo(() => calls.filter((call) => ["called", "completed", "skipped"].includes(call.status)), [calls]);
   const current = called.at(-1) ?? null;

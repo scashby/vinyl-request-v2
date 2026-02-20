@@ -108,18 +108,6 @@ export function getColumnLetter(index: number): BingoColumn {
   return BINGO_COLUMNS[(index - 1) % BINGO_COLUMNS.length] ?? "B";
 }
 
-const MEDIA_TYPE_FACETS = new Set([
-  "Vinyl",
-  "CD",
-  "Cassette",
-  "8-Track",
-  "DVD",
-  "All Media",
-  "Box Set",
-  "SACD",
-  "Flexi-disc",
-]);
-
 function canonicalizeFormatFacet(value: string): string | null {
   const token = value.trim().toLowerCase();
   if (!token) return null;
@@ -194,9 +182,7 @@ async function getPlaylistConfig(db: BingoDbClient, playlistId: number): Promise
 }
 
 async function buildCollectionTrackRows(db: BingoDbClient): Promise<CollectionTrackRow[]> {
-  const dbAny = db as any;
-
-  const { data: inventoryRows, error: inventoryError } = await dbAny
+  const { data: inventoryRows, error: inventoryError } = await db
     .from("inventory")
     .select("id, release_id, status, location, media_condition, sleeve_condition, owner, personal_notes, barcode");
   if (inventoryError) throw new Error(inventoryError.message);
@@ -215,7 +201,7 @@ async function buildCollectionTrackRows(db: BingoDbClient): Promise<CollectionTr
 
   const releaseIds = Array.from(new Set(inventory.map((row) => row.release_id).filter((v): v is number => typeof v === "number")));
   const { data: releases, error: releaseError } = releaseIds.length
-    ? await dbAny
+    ? await db
         .from("releases")
         .select("id, master_id, media_type, label, catalog_number, country, release_date, release_year, notes, qty, format_details, packaging, vinyl_weight, rpm, spars_code, box_set, sound, studio")
         .in("id", releaseIds)
@@ -246,7 +232,7 @@ async function buildCollectionTrackRows(db: BingoDbClient): Promise<CollectionTr
 
   const masterIds = Array.from(new Set(releaseRows.map((row) => row.master_id).filter((v): v is number => typeof v === "number")));
   const { data: masters, error: masterError } = masterIds.length
-    ? await dbAny.from("masters").select("id, title, main_artist_id, notes, genres").in("id", masterIds)
+    ? await db.from("masters").select("id, title, main_artist_id, notes, genres").in("id", masterIds)
     : { data: [], error: null };
   if (masterError) throw new Error(masterError.message);
   const masterRows = (masters ?? []) as Array<{
@@ -260,13 +246,13 @@ async function buildCollectionTrackRows(db: BingoDbClient): Promise<CollectionTr
 
   const artistIds = Array.from(new Set(masterRows.map((row) => row.main_artist_id).filter((v): v is number => typeof v === "number")));
   const { data: artists, error: artistError } = artistIds.length
-    ? await dbAny.from("artists").select("id, name").in("id", artistIds)
+    ? await db.from("artists").select("id, name").in("id", artistIds)
     : { data: [], error: null };
   if (artistError) throw new Error(artistError.message);
   const artistsById = new Map<number, string>(((artists ?? []) as Array<{ id: number; name: string }>).map((row) => [row.id, row.name]));
 
   const { data: releaseTracks, error: releaseTrackError } = releaseIds.length
-    ? await dbAny.from("release_tracks").select("id, release_id, recording_id, position, side, title_override").in("release_id", releaseIds)
+    ? await db.from("release_tracks").select("id, release_id, recording_id, position, side, title_override").in("release_id", releaseIds)
     : { data: [], error: null };
   if (releaseTrackError) throw new Error(releaseTrackError.message);
 
@@ -281,7 +267,7 @@ async function buildCollectionTrackRows(db: BingoDbClient): Promise<CollectionTr
 
   const recordingIds = Array.from(new Set(releaseTrackRows.map((row) => row.recording_id).filter((v): v is number => typeof v === "number")));
   const { data: recordings, error: recordingError } = recordingIds.length
-    ? await dbAny.from("recordings").select("id, title, track_artist, duration_seconds").in("id", recordingIds)
+    ? await db.from("recordings").select("id, title, track_artist, duration_seconds").in("id", recordingIds)
     : { data: [], error: null };
   if (recordingError) throw new Error(recordingError.message);
   const recordingsById = new Map<number, { id: number; title: string | null; track_artist: string | null; duration_seconds: number | null }>(

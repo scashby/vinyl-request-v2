@@ -1397,7 +1397,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
 
     setEnriching(true);
-    const targetConflicts = parseInt(batchSize);
     let collectedConflicts: ExtendedFieldConflict[] = [];
     let collectedSummary: {album: string, field: string, action: string}[] = [];
 

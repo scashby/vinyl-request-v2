@@ -459,7 +459,7 @@ function CollectionBrowserPage() {
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [showViewModeDropdown, setShowViewModeDropdown] = useState(false);
   const [showTrackFormatDropdown, setShowTrackFormatDropdown] = useState(false);
-  const [smartPlaylistMixNonce, setSmartPlaylistMixNonce] = useState(0);
+  const [, setSmartPlaylistMixNonce] = useState(0);
 
   const [tableSortState, setTableSortState] = useState<SortState>({
     column: null,
@@ -776,7 +776,7 @@ function CollectionBrowserPage() {
   }, []);
 
   const loadPlaylists = useCallback(async () => {
-    const { data: playlistRows, error: playlistError } = await (supabase as any)
+    const { data: playlistRows, error: playlistError } = await supabase
       .from('collection_playlists')
       .select('id, name, icon, color, sort_order, created_at, is_smart, smart_rules, match_rules, live_update')
       .order('sort_order', { ascending: true });
@@ -786,7 +786,7 @@ function CollectionBrowserPage() {
       return;
     }
 
-    const { data: playlistItems, error: itemsError } = await (supabase as any)
+    const { data: playlistItems, error: itemsError } = await supabase
       .from('collection_playlist_items')
       .select('playlist_id, track_key, sort_order')
       .order('sort_order', { ascending: true });
@@ -804,7 +804,7 @@ function CollectionBrowserPage() {
           if (parsed.length > 0) {
             for (let i = 0; i < parsed.length; i += 1) {
               const item = parsed[i];
-              const { data: inserted, error: insertError } = await (supabase as any)
+              const { data: inserted, error: insertError } = await supabase
                 .from('collection_playlists')
                 .insert({
                   name: item.name,
@@ -828,7 +828,7 @@ function CollectionBrowserPage() {
                   track_key: trackKey,
                   sort_order: idx,
                 }));
-                const { error: itemsInsertError } = await (supabase as any)
+                const { error: itemsInsertError } = await supabase
                   .from('collection_playlist_items')
                   .insert(records);
                 if (itemsInsertError) throw itemsInsertError;
@@ -856,7 +856,7 @@ function CollectionBrowserPage() {
           if (parsed.length > 0) {
             for (let i = 0; i < parsed.length; i += 1) {
               const legacyPlaylist = parsed[i];
-              const { data: inserted, error: insertError } = await (supabase as any)
+              const { data: inserted, error: insertError } = await supabase
                 .from('collection_playlists')
                 .insert({
                   name: legacyPlaylist.name,
@@ -883,7 +883,7 @@ function CollectionBrowserPage() {
                   track_key: trackKey,
                   sort_order: idx,
                 }));
-                const { error: itemsInsertError } = await (supabase as any)
+                const { error: itemsInsertError } = await supabase
                   .from('collection_playlist_items')
                   .insert(records);
                 if (itemsInsertError) throw itemsInsertError;
@@ -1203,7 +1203,7 @@ function CollectionBrowserPage() {
     });
 
     return result;
-  }, [allTrackRows, playlists, smartPlaylistMixNonce]);
+  }, [allTrackRows, playlists]);
 
   const filteredTrackRows = useMemo(() => {
     let rows = allTrackRows;
@@ -1619,7 +1619,7 @@ function CollectionBrowserPage() {
       const maxSort = playlists.reduce((max, item) => Math.max(max, item.sortOrder ?? 0), -1);
       const nextSortOrder = maxSort + 1;
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('collection_playlists')
         .insert({
           name: playlist.name.trim(),
@@ -1652,7 +1652,7 @@ function CollectionBrowserPage() {
   const handleUpdatePlaylist = useCallback(async (playlist: Playlist) => {
     try {
       const previous = playlists.find((item) => item.id === playlist.id);
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('collection_playlists')
         .update({
           name: playlist.name,
@@ -1679,7 +1679,7 @@ function CollectionBrowserPage() {
           matchRules: playlist.matchRules,
         });
         if (snapshotTrackKeys.length > 0) {
-          const { error: deleteItemsError } = await (supabase as any)
+          const { error: deleteItemsError } = await supabase
             .from('collection_playlist_items')
             .delete()
             .eq('playlist_id', playlist.id);
@@ -1690,7 +1690,7 @@ function CollectionBrowserPage() {
             track_key: trackKey,
             sort_order: index,
           }));
-          const { error: insertItemsError } = await (supabase as any)
+          const { error: insertItemsError } = await supabase
             .from('collection_playlist_items')
             .insert(items);
           if (insertItemsError) throw insertItemsError;
@@ -1722,7 +1722,7 @@ function CollectionBrowserPage() {
             smartRules: payload.smartRules,
             matchRules: payload.matchRules,
           });
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('collection_playlists')
         .insert({
           name: payload.name.trim(),
@@ -1744,7 +1744,7 @@ function CollectionBrowserPage() {
           track_key: trackKey,
           sort_order: index,
         }));
-        const { error: itemsError } = await (supabase as any)
+        const { error: itemsError } = await supabase
           .from('collection_playlist_items')
           .insert(items);
         if (itemsError) throw itemsError;
@@ -1766,7 +1766,7 @@ function CollectionBrowserPage() {
     }
 
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('collection_playlists')
         .delete()
         .eq('id', playlistId);
@@ -1791,7 +1791,7 @@ function CollectionBrowserPage() {
       }));
 
       for (const update of updates) {
-        const { error } = await (supabase as any)
+        const { error } = await supabase
           .from('collection_playlists')
           .update({ sort_order: update.sort_order })
           .eq('id', update.id);
@@ -1828,7 +1828,7 @@ function CollectionBrowserPage() {
       });
 
       if (records.length > 0) {
-        const { error } = await (supabase as any)
+        const { error } = await supabase
           .from('collection_playlist_items')
           .insert(records);
         if (error) throw error;

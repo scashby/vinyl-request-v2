@@ -1,7 +1,7 @@
 // src/lib/enrichment-utils.ts
 import * as GeniusModule from 'genius-lyrics';
 import { parseDiscogsFormat } from './formatParser';
-import { fetchDiscogsJson, hasDiscogsCredentials, type DiscogsOAuthCredentials } from './discogsAuth';
+import { fetchDiscogsJson, type DiscogsOAuthCredentials } from './discogsAuth';
 import { getWikimediaAppAccessToken } from './wikimediaAuth';
 
 const getEnv = (...keys: string[]): string | undefined => {
@@ -18,8 +18,7 @@ const getEnv = (...keys: string[]): string | undefined => {
 const GENIUS_TOKEN = getEnv('GENIUS_ACCESS_TOKEN', 'GENIUS_API_TOKEN');
 type GeniusLikeClient = {
   songs: {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    search: (query: string) => Promise<any[]>;
+    search: (query: string) => Promise<unknown[]>;
   };
 };
 
@@ -930,7 +929,7 @@ const SP_ID = getEnv('SPOTIFY_CLIENT_ID');
 const SP_SECRET = getEnv('SPOTIFY_CLIENT_SECRET');
 let spToken: { token: string; exp: number } | null = null;
 
-const readJsonResponse = async (res: Response): Promise<{ json: any | null; text: string }> => {
+const readJsonResponse = async (res: Response): Promise<{ json: unknown | null; text: string }> => {
   const text = await res.text();
   try {
     return { json: JSON.parse(text), text };
@@ -972,10 +971,10 @@ async function spFetchJson(
   token: string,
   context: string,
   maxAttempts = 3
-): Promise<{ ok: true; data: any } | { ok: false; status: number; text: string; data: any | null }> {
+): Promise<{ ok: true; data: unknown } | { ok: false; status: number; text: string; data: unknown | null }> {
   let lastStatus = 0;
   let lastText = '';
-  let lastData: any | null = null;
+  let lastData: unknown | null = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const res = await fetch(url, {
@@ -1029,7 +1028,7 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
             'search'
           );
           if (!searchResult.ok) {
-            const failed = searchResult as { ok: false; status: number; text: string; data: any | null };
+            const failed = searchResult as { ok: false; status: number; text: string; data: unknown | null };
             const searchText = failed.text.slice(0, 120).replace(/\s+/g, ' ');
             throw new Error(`Spotify search failed (${failed.status}): ${searchText}`);
           }
@@ -1048,7 +1047,7 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
       'album'
     );
     if (!albumResult.ok) {
-      const failed = albumResult as { ok: false; status: number; text: string; data: any | null };
+      const failed = albumResult as { ok: false; status: number; text: string; data: unknown | null };
       throw new Error(`Spotify album lookup failed (${failed.status}): ${failed.text.slice(0, 120).replace(/\s+/g, ' ')}`);
     }
     if (!albumResult.data) {
@@ -1095,7 +1094,7 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
           features = ((featuresResult.data.audio_features as (SpotifyAudioFeature | null)[] | undefined) ?? [])
             .filter((f): f is SpotifyAudioFeature => f !== null);
         } else {
-          const failed = featuresResult as { ok: false; status: number; text: string; data: any | null };
+          const failed = featuresResult as { ok: false; status: number; text: string; data: unknown | null };
           // Hard failures indicate this app cannot access audio-features at all.
           // Avoid per-track retry loops that waste requests.
           if ([400, 401, 403, 404].includes(failed.status)) {

@@ -237,7 +237,7 @@ export async function POST(req: Request) {
     const { matched, missing } = matchTracks(rows, index);
 
     step = 'create-playlist';
-    const { data: maxSortRow } = await (supabaseAdmin as any)
+    const { data: maxSortRow } = await supabaseAdmin
       .from('collection_playlists')
       .select('sort_order')
       .order('sort_order', { ascending: false })
@@ -245,7 +245,7 @@ export async function POST(req: Request) {
       .single();
     const nextSortOrder = Number(maxSortRow?.sort_order ?? -1) + 1;
 
-    const { data: inserted, error: insertError } = await (supabaseAdmin as any)
+    const { data: inserted, error: insertError } = await supabaseAdmin
       .from('collection_playlists')
       .insert({
         name: playlistName,
@@ -276,7 +276,7 @@ export async function POST(req: Request) {
         track_key: trackKey,
         sort_order: idx,
       }));
-      const { error: itemsError } = await (supabaseAdmin as any)
+      const { error: itemsError } = await supabaseAdmin
         .from('collection_playlist_items')
         .insert(records);
       if (itemsError) throw itemsError;

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 type Session = {
@@ -48,7 +48,7 @@ export default function MusicTriviaHostPage() {
   const [scoreDraft, setScoreDraft] = useState<ScoreDraft>({});
   const [saving, setSaving] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
 
     const [sessionRes, callsRes, leaderboardRes] = await Promise.all([
@@ -66,13 +66,13 @@ export default function MusicTriviaHostPage() {
       const payload = await leaderboardRes.json();
       setLeaderboard(payload.data ?? []);
     }
-  };
+  }, [sessionId]);
 
   useEffect(() => {
     load();
     const poll = setInterval(load, 3000);
     return () => clearInterval(poll);
-  }, [sessionId]);
+  }, [load]);
 
   const activeCall = useMemo(() => {
     if (!session) return null;

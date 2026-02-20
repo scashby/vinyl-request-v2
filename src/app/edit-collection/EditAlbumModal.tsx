@@ -546,7 +546,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           .select(fullSelect)
           .eq('id', albumId)
           .single();
-        let data: any = initial.data;
+        let data: Record<string, unknown> | null = (initial.data as Record<string, unknown> | null) ?? null;
         let fetchError = initial.error;
 
         if (fetchError) {

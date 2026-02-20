@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { generateBingoCardsPdf } from "src/lib/bingoCardsPdf";
 import { generateBingoCallSheetPdf } from "src/lib/bingoCallSheetPdf";
@@ -75,7 +75,7 @@ export default function BingoSetupPage() {
     [cueSeconds, hostBufferSeconds, placeVinylSeconds, removeResleeveSeconds, sonosDelayMs, startSlideSeconds]
   );
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const [eRes, pRes, sRes] = await Promise.all([
       fetch("/api/games/bingo/events"),
       fetch("/api/games/playlists"),
@@ -96,11 +96,11 @@ export default function BingoSetupPage() {
       const payload = await sRes.json();
       setSessions(payload.data ?? []);
     }
-  };
+  }, [eventId]);
 
   useEffect(() => {
     load();
-  }, [eventId]);
+  }, [load]);
 
   const createSession = async () => {
     if (!playlistId) return;

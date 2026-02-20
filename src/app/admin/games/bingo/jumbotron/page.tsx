@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 type Session = {
@@ -25,7 +25,7 @@ export default function BingoJumbotronPage() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [remaining, setRemaining] = useState(0);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
     const [sRes, cRes] = await Promise.all([
       fetch(`/api/games/bingo/sessions/${sessionId}`),
@@ -42,13 +42,13 @@ export default function BingoJumbotronPage() {
       const payload = await cRes.json();
       setCalls(payload.data ?? []);
     }
-  };
+  }, [sessionId]);
 
   useEffect(() => {
     load();
     const poll = setInterval(load, 3000);
     return () => clearInterval(poll);
-  }, [sessionId]);
+  }, [load]);
 
   useEffect(() => {
     const tick = setInterval(() => {

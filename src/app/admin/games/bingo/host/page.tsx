@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 type Session = {
@@ -34,7 +34,7 @@ export default function BingoHostPage() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [backupTrack, setBackupTrack] = useState({ track_title: "", artist_name: "", album_name: "" });
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
     const [sRes, cRes] = await Promise.all([
       fetch(`/api/games/bingo/sessions/${sessionId}`),
@@ -46,13 +46,13 @@ export default function BingoHostPage() {
       const payload = await cRes.json();
       setCalls(payload.data ?? []);
     }
-  };
+  }, [sessionId]);
 
   useEffect(() => {
     load();
     const timer = setInterval(load, 3500);
     return () => clearInterval(timer);
-  }, [sessionId]);
+  }, [load]);
 
   const activeCall = useMemo(
     () => calls.find((call) => call.call_index === (session?.current_call_index ?? 0)),
