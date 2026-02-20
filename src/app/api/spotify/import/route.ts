@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 import { buildInventoryIndex, fetchInventoryTracks, matchTracks, sanitizePlaylistName } from '../../../../lib/vinylPlaylistImport';
-import { getSpotifyAccessTokenFromCookies, spotifyApiGet, spotifyApiGetByUrl } from '../../../../lib/spotifyUser';
+import { getSpotifyAccessTokenFromCookies, spotifyApiGet, spotifyApiGetByUrl, SpotifyApiError } from '../../../../lib/spotifyUser';
 
 type SpotifyTrackItem = {
   item?: {
@@ -332,6 +332,20 @@ export async function POST(req: Request) {
     return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Spotify import failed';
+    if (error instanceof SpotifyApiError && error.status === 429) {
+      return NextResponse.json(
+        {
+          error: 'Spotify rate limit reached. Please retry after a short wait.',
+          details: message,
+          retryAfterSeconds: error.retryAfterSeconds ?? 3,
+          scope: spotifyScope,
+          spotifyUserId,
+          playlistOwnerId,
+          step,
+        },
+        { status: 429 }
+      );
+    }
     const lowered = message.toLowerCase();
     if (lowered.includes('failed (403)') || lowered.includes('insufficient') || lowered.includes('forbidden')) {
       return NextResponse.json(

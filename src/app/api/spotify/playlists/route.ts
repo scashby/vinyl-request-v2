@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSpotifyAccessTokenFromCookies, spotifyApiGet } from '../../../../lib/spotifyUser';
+import { getSpotifyAccessTokenFromCookies, spotifyApiGet, SpotifyApiError } from '../../../../lib/spotifyUser';
 
 type SpotifyPlaylistRow = {
   id: string;
@@ -128,6 +128,12 @@ export async function GET() {
     return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch Spotify playlists';
+    if (error instanceof SpotifyApiError && error.status === 429) {
+      return NextResponse.json(
+        { error: message, retryAfterSeconds: error.retryAfterSeconds ?? 3 },
+        { status: 429 }
+      );
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

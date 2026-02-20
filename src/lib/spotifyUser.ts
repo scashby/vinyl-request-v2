@@ -11,6 +11,26 @@ type TokenPayload = {
   scope?: string;
 };
 
+export class SpotifyApiError extends Error {
+  status: number;
+  retryAfterSeconds: number | null;
+  constructor(message: string, status: number, retryAfterSeconds: number | null = null) {
+    super(message);
+    this.name = 'SpotifyApiError';
+    this.status = status;
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const parseRetryAfterSeconds = (value: string | null) => {
+  if (!value) return null;
+  const seconds = Number.parseInt(value, 10);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds;
+  return null;
+};
+
 function getSpotifyEnv() {
   const clientId = (process.env.SPOTIFY_CLIENT_ID ?? '').trim();
   const clientSecret = (process.env.SPOTIFY_CLIENT_SECRET ?? '').trim();
@@ -116,33 +136,26 @@ export async function getSpotifyAccessTokenFromCookies() {
 }
 
 export async function spotifyApiGet<T>(accessToken: string, path: string): Promise<T> {
-  const res = await fetch(`${SPOTIFY_API}${path}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-    cache: 'no-store',
-  });
-  if (!res.ok) {
-    const payload = await res.json().catch(() => null) as {
-      error?: { status?: number; message?: string } | string;
-    } | null;
-    const details =
-      typeof payload?.error === 'string'
-        ? payload.error
-        : payload?.error?.message;
-    throw new Error(`Spotify API ${path} failed (${res.status})${details ? `: ${details}` : ''}`);
-  }
-  return (await res.json()) as T;
+  return spotifyApiGetByUrl<T>(accessToken, `${SPOTIFY_API}${path}`, path);
 }
 
-export async function spotifyApiGetByUrl<T>(accessToken: string, url: string): Promise<T> {
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-    cache: 'no-store',
-  });
-  if (!res.ok) {
+export async function spotifyApiGetByUrl<T>(accessToken: string, url: string, label = url): Promise<T> {
+  const maxAttempts = 3;
+  let lastError: SpotifyApiError | null = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: 'no-store',
+    });
+
+    if (res.ok) {
+      return (await res.json()) as T;
+    }
+
+    const retryAfterSeconds = parseRetryAfterSeconds(res.headers.get('retry-after'));
     const payload = await res.json().catch(() => null) as {
       error?: { status?: number; message?: string } | string;
     } | null;
@@ -150,7 +163,18 @@ export async function spotifyApiGetByUrl<T>(accessToken: string, url: string): P
       typeof payload?.error === 'string'
         ? payload.error
         : payload?.error?.message;
-    throw new Error(`Spotify API ${url} failed (${res.status})${details ? `: ${details}` : ''}`);
+    const suffix = retryAfterSeconds !== null ? ` [retry_after=${retryAfterSeconds}s]` : '';
+    const message = `Spotify API ${label} failed (${res.status})${details ? `: ${details}` : ''}${suffix}`;
+    lastError = new SpotifyApiError(message, res.status, retryAfterSeconds);
+
+    if (res.status === 429 && attempt < maxAttempts) {
+      const waitSeconds = retryAfterSeconds ?? Math.min(2 * attempt, 5);
+      await sleep(waitSeconds * 1000);
+      continue;
+    }
+
+    throw lastError;
   }
-  return (await res.json()) as T;
+
+  throw lastError ?? new SpotifyApiError(`Spotify API ${label} failed`, 500);
 }
