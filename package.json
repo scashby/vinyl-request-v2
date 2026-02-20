@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "prebuild": "ls -l src/lib && cat jsconfig.json"
   },
   "dependencies": {

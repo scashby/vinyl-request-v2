@@ -30,7 +30,7 @@ export const gameBlueprints: GameBlueprint[] = [
   {
     slug: "name-that-tune",
     title: "Name That Tune",
-    status: "undeveloped",
+    status: "in_development",
     coreMechanic: "Play short snippets; teams identify artist/title.",
     setup: "Curated snippet list, lock-in rule, and 8-15 rounds.",
     scoring: "2 points for artist+title, 1 for either one.",
