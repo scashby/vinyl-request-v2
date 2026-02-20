@@ -16,29 +16,40 @@ export default function GamesHomePage() {
             Vinyl-first control room. Printed play, live host orchestration, and big-screen display scenes.
           </p>
 
-          <h2 className="mt-8 text-xl font-black uppercase tracking-[0.08em] text-amber-200">In Development</h2>
-          <div className="mt-8 grid gap-4 md:grid-cols-2">
-            <Link
-              href="/admin/games/bingo"
-              className="rounded-2xl border border-amber-700/60 bg-gradient-to-br from-amber-950/70 to-red-950/50 p-6 transition hover:-translate-y-0.5 hover:border-amber-400"
-            >
-              <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Testing Module</p>
-              <h2 className="mt-1 text-3xl font-black text-amber-100">Music Bingo</h2>
-              <p className="mt-2 text-sm text-stone-200">Setup, host, assistant, jumbotron, print pack, and call verification.</p>
-            </Link>
-            <Link
-              href="/admin/games/music-trivia"
-              className="rounded-2xl border border-cyan-700/60 bg-gradient-to-br from-cyan-950/70 to-slate-950/60 p-6 transition hover:-translate-y-0.5 hover:border-cyan-400"
-            >
-              <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Testing Module</p>
-              <h2 className="mt-1 text-3xl font-black text-cyan-100">Music Trivia</h2>
-              <p className="mt-2 text-sm text-stone-200">Paper-first setup, host console, scoring, and optional jumbotron.</p>
-            </Link>
+          <h2 className="mt-10 text-xl font-black uppercase tracking-[0.08em] text-amber-200">In Production</h2>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-stone-700 bg-stone-950/40 p-4 text-sm text-stone-300">
+              No games are in production yet.
+            </div>
           </div>
 
-          <h2 className="mt-10 text-xl font-black uppercase tracking-[0.08em] text-amber-200">In Production</h2>
-          <div className="mt-4 rounded-2xl border border-stone-700 bg-stone-950/40 p-5 text-sm text-stone-300">
-            No games are in production yet.
+          <h2 className="mt-10 text-xl font-black uppercase tracking-[0.08em] text-amber-200">In Development</h2>
+          <div className="mt-4 grid gap-4">
+            <section className="rounded-2xl border border-amber-900/50 bg-amber-950/20 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Testing Module</p>
+                  <h3 className="text-2xl font-black text-amber-100">Music Bingo</h3>
+                </div>
+                <Link className="rounded border border-amber-700 px-3 py-1 text-xs uppercase tracking-[0.15em] hover:border-amber-400 hover:text-amber-200" href="/admin/games/bingo">
+                  Open Module
+                </Link>
+              </div>
+              <p className="mt-3 text-sm text-amber-100/90">Setup, host, assistant, jumbotron, print pack, and call verification.</p>
+            </section>
+
+            <section className="rounded-2xl border border-amber-900/50 bg-amber-950/20 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Testing Module</p>
+                  <h3 className="text-2xl font-black text-amber-100">Music Trivia</h3>
+                </div>
+                <Link className="rounded border border-amber-700 px-3 py-1 text-xs uppercase tracking-[0.15em] hover:border-amber-400 hover:text-amber-200" href="/admin/games/music-trivia">
+                  Open Module
+                </Link>
+              </div>
+              <p className="mt-3 text-sm text-amber-100/90">Paper-first setup, host console, scoring, and optional jumbotron.</p>
+            </section>
           </div>
 
           <h2 className="mt-10 text-xl font-black uppercase tracking-[0.08em] text-amber-200">Undeveloped Games</h2>
