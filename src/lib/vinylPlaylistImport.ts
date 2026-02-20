@@ -69,15 +69,37 @@ export const fetchInventoryTracks = async (limit?: number) => {
   // Step 1: fetch vinyl release ids first (cheap filter on releases table).
   const releaseIds: number[] = [];
   let releasePage = 0;
+  let useFormatDetailsFilter = true;
   while (true) {
     const from = releasePage * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
-    const { data: releases, error: releasesError } = await supabaseAdmin
+    let releaseQuery = supabaseAdmin
       .from("releases")
       .select("id")
-      .eq("media_type", "Vinyl")
-      .overlaps("format_details", VINYL_SIZES)
-      .range(from, to);
+      .eq("media_type", "Vinyl");
+
+    if (useFormatDetailsFilter) {
+      releaseQuery = releaseQuery.overlaps("format_details", VINYL_SIZES);
+    }
+
+    let { data: releases, error: releasesError } = await releaseQuery.range(from, to);
+
+    // Some legacy rows have malformed array literals in format_details.
+    // Fall back to media_type-only filtering so imports can proceed.
+    if (
+      releasesError &&
+      useFormatDetailsFilter &&
+      /malformed array literal/i.test(releasesError.message)
+    ) {
+      useFormatDetailsFilter = false;
+      const fallback = await supabaseAdmin
+        .from("releases")
+        .select("id")
+        .eq("media_type", "Vinyl")
+        .range(from, to);
+      releases = fallback.data;
+      releasesError = fallback.error;
+    }
 
     if (releasesError) {
       throw new Error(`Failed loading vinyl releases: ${releasesError.message}`);
