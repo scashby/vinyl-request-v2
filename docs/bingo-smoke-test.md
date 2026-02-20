@@ -1,8 +1,7 @@
 # Bingo Smoke Test (Playlist-First)
 
 ## 1. DB setup
-1. Run `sql/remove-all-games-from-db.sql`.
-2. Run `sql/create-bingo-core.sql`.
+1. Run `sql/create-bingo-core.sql`.
 
 ## 2. Setup page
 1. Open `/admin/games/bingo`.

@@ -18,11 +18,12 @@ export const gameBlueprints: GameBlueprint[] = [
   {
     slug: "music-trivia",
     title: "Music Trivia",
-    status: "undeveloped",
+    status: "needs_workshopping",
     coreMechanic: "Host asks music questions between spins; teams submit answers.",
     setup: "Question deck by category/difficulty, answer slips, and 2+ teams.",
     scoring: "1 point per correct answer, optional bonus for harder categories.",
     whyItWorks: "Familiar format with flexible pacing and low technical overhead.",
+    notes: "Additive rollout only. Do not use destructive DB reset scripts unless explicitly requested.",
   },
   {
     slug: "name-that-tune",

@@ -25,6 +25,14 @@ export default function GamesHomePage() {
               <h2 className="mt-1 text-3xl font-black text-amber-100">Music Bingo</h2>
               <p className="mt-2 text-sm text-stone-200">Setup, host, assistant, jumbotron, print pack, and call verification.</p>
             </Link>
+            <Link
+              href="/admin/games/music-trivia"
+              className="rounded-2xl border border-cyan-700/60 bg-gradient-to-br from-cyan-950/70 to-slate-950/60 p-6 transition hover:-translate-y-0.5 hover:border-cyan-400"
+            >
+              <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Live Module</p>
+              <h2 className="mt-1 text-3xl font-black text-cyan-100">Music Trivia</h2>
+              <p className="mt-2 text-sm text-stone-200">Paper-first setup, host console, scoring, and optional jumbotron.</p>
+            </Link>
           </div>
 
           <h2 className="mt-10 text-xl font-black uppercase tracking-[0.08em] text-amber-200">Undeveloped Games</h2>
