@@ -43,7 +43,7 @@ function parseCalls(lines: string): CallDraft[] {
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
-    .map((line) => {
+    .map<CallDraft | null>((line) => {
       const parts = line.split("|").map((part) => part.trim());
       const [metaPart, yearPart, level1, level2, level3, audioClue, sourceLabel] = parts;
       const [artist, title] = (metaPart ?? "").split(" - ").map((part) => part.trim());
@@ -53,15 +53,15 @@ function parseCalls(lines: string): CallDraft[] {
       return {
         artist,
         title,
-        release_year: Number.isFinite(year) ? year : undefined,
         reveal_level_1_image_url: level1,
         reveal_level_2_image_url: level2,
         reveal_level_3_image_url: level3,
-        audio_clue_source: audioClue || undefined,
-        source_label: sourceLabel || undefined,
+        ...(Number.isFinite(year) ? { release_year: year } : {}),
+        ...(audioClue ? { audio_clue_source: audioClue } : {}),
+        ...(sourceLabel ? { source_label: sourceLabel } : {}),
       };
     })
-    .filter((call): call is CallDraft => Boolean(call));
+    .filter((call): call is CallDraft => call !== null);
 }
 
 export default function CoverArtClueChaseSetupPage() {
