@@ -39,7 +39,7 @@ export const gameBlueprints: GameBlueprint[] = [
   {
     slug: "bracket-battle",
     title: "Bracket Battle",
-    status: "undeveloped",
+    status: "in_development",
     coreMechanic: "Seeded head-to-head matchups where teams or crowd vote winners.",
     setup: "Prebuilt bracket, matchup list, and vote method (hands/slips).",
     scoring: "Bracket pick scoring based on correct advances.",

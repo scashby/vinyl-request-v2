@@ -63,6 +63,19 @@ export default function GamesHomePage() {
               </div>
               <p className="mt-3 text-sm text-amber-100/90">Snippet-first setup, lock-in rule controls, and solo-host pacing safeguards.</p>
             </section>
+
+            <section className="rounded-2xl border border-amber-900/50 bg-amber-950/20 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Testing Module</p>
+                  <h3 className="text-2xl font-black text-amber-100">Bracket Battle</h3>
+                </div>
+                <Link className="rounded border border-amber-700 px-3 py-1 text-xs uppercase tracking-[0.15em] hover:border-amber-400 hover:text-amber-200" href="/admin/games/bracket-battle">
+                  Open Module
+                </Link>
+              </div>
+              <p className="mt-3 text-sm text-amber-100/90">Seeded bracket setup, event-aware session history, and crowd-vote progression scaffolding.</p>
+            </section>
           </div>
 
           <h2 className="mt-10 text-xl font-black uppercase tracking-[0.08em] text-amber-200">Undeveloped Games</h2>

@@ -13,7 +13,12 @@ export default async function GameSkeletonPage({ params }: GameSkeletonPageProps
 
   if (!game) notFound();
 
-  const statusLabel = game.status === "needs_workshopping" ? "Needs Workshopping" : "Undeveloped";
+  const statusLabel =
+    game.status === "needs_workshopping"
+      ? "Needs Workshopping"
+      : game.status === "in_development"
+        ? "In Development"
+        : "Undeveloped";
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_15%_10%,#3f2f15,transparent_35%),radial-gradient(circle_at_85%_0%,#18383e,transparent_35%),linear-gradient(180deg,#111,#1b1b1b)] p-6 text-stone-100">
