@@ -16,6 +16,16 @@ interface SpotifyImportModalProps {
   onImported: () => Promise<void>;
 }
 
+type PlaylistsPayload = {
+  playlists?: SpotifyPlaylist[];
+  scope?: string;
+  retryAfterSeconds?: number;
+  error?: string;
+};
+
+let playlistsCache: { expiresAt: number; payload: PlaylistsPayload } | null = null;
+const PLAYLISTS_CACHE_TTL_MS = 5 * 60 * 1000;
+
 export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImportModalProps) {
   const [loading, setLoading] = useState(false);
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
@@ -25,38 +35,60 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
   const [importingId, setImportingId] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
   const [scope, setScope] = useState('');
+  const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
     let active = true;
-    (async () => {
+    const loadPlaylists = async (force = false) => {
+      if (!force && playlistsCache && playlistsCache.expiresAt > Date.now()) {
+        if (!active) return;
+        setIsConnected(true);
+        setPlaylists(playlistsCache.payload.playlists ?? []);
+        setScope(playlistsCache.payload.scope ?? '');
+        setLastLoadedAt(Date.now());
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError(null);
       setLastResult(null);
       try {
         const res = await fetch('/api/spotify/playlists', { cache: 'no-store' });
+        const payload = await res.json().catch(() => ({}));
         if (res.status === 401) {
           if (!active) return;
           setIsConnected(false);
           setPlaylists([]);
           return;
         }
+        if (res.status === 429) {
+          const wait = typeof payload?.retryAfterSeconds === 'number' ? payload.retryAfterSeconds : null;
+          const waitMsg = wait !== null ? ` Retry after about ${Math.ceil(wait / 60)} minute(s).` : '';
+          throw new Error((payload?.error || 'Spotify rate limit reached.') + waitMsg);
+        }
         if (!res.ok) {
-          const payload = await res.json().catch(() => ({}));
           throw new Error(payload?.error || `Failed to load playlists (${res.status})`);
         }
-        const payload = await res.json();
         if (!active) return;
+        const typedPayload = payload as PlaylistsPayload;
+        playlistsCache = {
+          expiresAt: Date.now() + PLAYLISTS_CACHE_TTL_MS,
+          payload: typedPayload,
+        };
         setIsConnected(true);
-        setPlaylists(payload.playlists ?? []);
-        setScope(payload.scope ?? '');
+        setPlaylists(typedPayload.playlists ?? []);
+        setScope(typedPayload.scope ?? '');
+        setLastLoadedAt(Date.now());
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : 'Failed to load Spotify playlists');
       } finally {
         if (active) setLoading(false);
       }
-    })();
+    };
+    loadPlaylists(false);
     return () => {
       active = false;
     };
@@ -98,6 +130,48 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                   Granted scopes: <code>{scope}</code>
                 </div>
               )}
+              <div className="mb-3 flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    playlistsCache = null;
+                    setLoading(true);
+                    setError(null);
+                    try {
+                      const res = await fetch('/api/spotify/playlists', { cache: 'no-store' });
+                      const payload = await res.json().catch(() => ({}));
+                      if (res.status === 429) {
+                        const wait = typeof payload?.retryAfterSeconds === 'number' ? payload.retryAfterSeconds : null;
+                        const waitMsg = wait !== null ? ` Retry after about ${Math.ceil(wait / 60)} minute(s).` : '';
+                        throw new Error((payload?.error || 'Spotify rate limit reached.') + waitMsg);
+                      }
+                      if (!res.ok) {
+                        throw new Error(payload?.error || `Failed to load playlists (${res.status})`);
+                      }
+                      const typedPayload = payload as PlaylistsPayload;
+                      playlistsCache = {
+                        expiresAt: Date.now() + PLAYLISTS_CACHE_TTL_MS,
+                        payload: typedPayload,
+                      };
+                      setIsConnected(true);
+                      setPlaylists(typedPayload.playlists ?? []);
+                      setScope(typedPayload.scope ?? '');
+                      setLastLoadedAt(Date.now());
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : 'Failed to refresh playlists');
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  className="inline-flex items-center px-3 py-2 rounded bg-gray-700 text-white text-xs font-medium"
+                >
+                  Refresh Playlists
+                </button>
+                {lastLoadedAt && (
+                  <span className="text-xs text-gray-500">
+                    Last loaded {new Date(lastLoadedAt).toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
               <div className="mb-3">
                 <input
                   value={query}

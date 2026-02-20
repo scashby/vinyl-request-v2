@@ -4,6 +4,7 @@ import { getSpotifyAccessTokenFromCookies, spotifyApiGet, SpotifyApiError } from
 type SpotifyPlaylistRow = {
   id: string;
   name: string;
+  snapshot_id?: string;
   collaborative?: boolean;
   owner?: { id?: string | null };
   tracks?: { total?: number; href?: string };
@@ -14,9 +15,37 @@ type SpotifyPlaylistResponse = {
   next?: string | null;
 };
 
-type SpotifyMe = {
-  id?: string;
+type PlaylistsPayload = {
+  scope: string;
+  hasMore: boolean;
+  cached: boolean;
+  playlists: Array<{
+    id: string;
+    name: string;
+    trackCount: number | null;
+    snapshotId: string | null;
+    canImport: boolean;
+    importReason: string | null;
+  }>;
 };
+
+type CachedEntry = {
+  expiresAt: number;
+  payload: PlaylistsPayload;
+};
+
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+const cacheStore: Map<string, CachedEntry> =
+  (globalThis as { __spotifyPlaylistsCache?: Map<string, CachedEntry> }).__spotifyPlaylistsCache ??
+  new Map<string, CachedEntry>();
+(globalThis as { __spotifyPlaylistsCache?: Map<string, CachedEntry> }).__spotifyPlaylistsCache = cacheStore;
+
+const inflightStore: Map<string, Promise<PlaylistsPayload>> =
+  (globalThis as { __spotifyPlaylistsInflight?: Map<string, Promise<PlaylistsPayload>> }).__spotifyPlaylistsInflight ??
+  new Map<string, Promise<PlaylistsPayload>>();
+(globalThis as { __spotifyPlaylistsInflight?: Map<string, Promise<PlaylistsPayload>> }).__spotifyPlaylistsInflight =
+  inflightStore;
 
 export async function GET() {
   try {
@@ -24,73 +53,48 @@ export async function GET() {
     if (!tokenData.accessToken) {
       return NextResponse.json({ error: 'Not connected to Spotify' }, { status: 401 });
     }
-    const me = await spotifyApiGet<SpotifyMe>(tokenData.accessToken, '/me');
-    const currentUserId = me.id ?? '';
-
-    const items: SpotifyPlaylistRow[] = [];
-    let offset = 0;
-    const limit = 50;
-
-    while (true) {
-      const data = await spotifyApiGet<SpotifyPlaylistResponse>(
-        tokenData.accessToken,
-        `/me/playlists?limit=${limit}&offset=${offset}`
-      );
-      const rows = data.items ?? [];
-      items.push(...rows);
-      if (!data.next || rows.length === 0) break;
-      offset += limit;
-      if (offset > 1000) break;
+    const cacheKey = tokenData.refreshToken || tokenData.accessToken.slice(0, 24);
+    const now = Date.now();
+    const cached = cacheStore.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+      return NextResponse.json({ ...cached.payload, cached: true });
     }
 
-    const response = NextResponse.json({
-      scope: tokenData.scope ?? '',
-      playlists: await Promise.all(
-        items.map(async (row) => {
-          let trackCount: number | null =
-            typeof row.tracks?.total === 'number' ? row.tracks.total : null;
-          if (trackCount === null) {
-            const fallbackPaths = [
-              `/playlists/${row.id}?market=from_token`,
-              `/playlists/${row.id}?fields=tracks(total)&market=from_token`,
-              `/playlists/${row.id}?fields=tracks(total)`,
-              `/playlists/${row.id}/items?limit=1&market=from_token`,
-              `/playlists/${row.id}/items?limit=1`,
-            ];
-            for (const path of fallbackPaths) {
-              try {
-                const payload = await spotifyApiGet<{ tracks?: { total?: number }; total?: number }>(
-                  tokenData.accessToken,
-                  path
-                );
-                trackCount =
-                  typeof payload.tracks?.total === 'number'
-                    ? payload.tracks.total
-                    : typeof payload.total === 'number'
-                      ? payload.total
-                      : null;
-                if (trackCount !== null) break;
-              } catch {
-                // Try next fallback shape.
-              }
-            }
-          }
-          return {
+    let inFlight = inflightStore.get(cacheKey);
+    if (!inFlight) {
+      inFlight = (async () => {
+        // Keep this endpoint intentionally low-call during Spotify rate-limit windows:
+        // one request only, no pagination, no per-playlist follow-up fetches.
+        const data = await spotifyApiGet<SpotifyPlaylistResponse>(
+          tokenData.accessToken,
+          '/me/playlists?limit=50&offset=0&fields=items(id,name,snapshot_id,collaborative,owner(id),tracks(total)),next',
+          { maxAttempts: 1 }
+        );
+        const items: SpotifyPlaylistRow[] = data.items ?? [];
+        const payload: PlaylistsPayload = {
+          scope: tokenData.scope ?? '',
+          hasMore: Boolean(data.next),
+          cached: false,
+          playlists: items.map((row) => ({
             id: row.id,
             name: row.name,
-            trackCount,
-            canImport:
-              !!row.collaborative ||
-              (!!currentUserId && (row.owner?.id ?? '') === currentUserId),
-            importReason:
-              !!row.collaborative ||
-              (!!currentUserId && (row.owner?.id ?? '') === currentUserId)
-                ? null
-                : 'Spotify only allows track-item API access for owner/collaborator playlists.',
-          };
-        })
-      ),
-    });
+            trackCount: typeof row.tracks?.total === 'number' ? row.tracks.total : null,
+            snapshotId: row.snapshot_id ?? null,
+            // Do not hard-block in list mode; import endpoint enforces real access.
+            canImport: true,
+            importReason: null,
+          })),
+        };
+        cacheStore.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, payload });
+        return payload;
+      })().finally(() => {
+        inflightStore.delete(cacheKey);
+      });
+      inflightStore.set(cacheKey, inFlight);
+    }
+
+    const payload = await inFlight;
+    const response = NextResponse.json(payload);
 
     if (tokenData.refreshed) {
       response.cookies.set('spotify_access_token', tokenData.refreshed.access_token, {
