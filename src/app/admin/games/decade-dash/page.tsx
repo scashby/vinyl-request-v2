@@ -56,7 +56,7 @@ function parseCalls(lines: string): CallDraft[] {
         source_label: sourceLabel || undefined,
       };
     })
-    .filter((call): call is CallDraft => Boolean(call));
+    .filter((call): call is NonNullable<typeof call> => Boolean(call));
 }
 
 export default function DecadeDashSetupPage() {
