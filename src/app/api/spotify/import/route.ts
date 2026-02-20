@@ -49,6 +49,9 @@ export async function POST(req: Request) {
   let playlistOwnerId = '';
   const trackFetchErrors: Array<{ path: string; error: string }> = [];
   const metaFetchErrors: Array<{ path: string; error: string }> = [];
+  let metaItemsRawCount = 0;
+  let metaItemsParsedCount = 0;
+  let attemptedTrackPageCalls = 0;
   try {
     step = 'parse-body';
     const body = await req.json();
@@ -75,13 +78,15 @@ export async function POST(req: Request) {
     let partialImport = false;
     let importSource: 'playlist_items' | 'playlist_fallback' = 'playlist_items';
 
-    const appendRows = (items: SpotifyTrackItem[] = []) => {
+    const extractRows = (items: SpotifyTrackItem[] = []) => {
+      const parsed: Array<{ title?: string; artist?: string }> = [];
       for (const item of items) {
         const trackNode = item.track ?? (item.item?.type === 'track' ? item.item : undefined);
         const title = trackNode?.name;
         const artist = (trackNode?.artists ?? []).map((a) => a.name).filter(Boolean).join(', ');
-        if (title) rows.push({ title, artist });
+        if (title) parsed.push({ title, artist });
       }
+      return parsed;
     };
 
     let playlist: SpotifyPlaylistMeta | null = null;
@@ -112,7 +117,11 @@ export async function POST(req: Request) {
       typeof playlist.tracks?.total === 'number'
         ? playlist.tracks.total
         : null;
-    appendRows(playlist.tracks?.items ?? []);
+    const metaItems = playlist.tracks?.items ?? [];
+    const metaParsedRows = extractRows(metaItems);
+    metaItemsRawCount = metaItems.length;
+    metaItemsParsedCount = metaParsedRows.length;
+    rows.push(...metaParsedRows);
 
     step = 'spotify-tracks';
     let offset = rows.length;
@@ -131,10 +140,23 @@ export async function POST(req: Request) {
 
       for (const path of trackPagePaths) {
         try {
+          attemptedTrackPageCalls += 1;
           const nextPage = await spotifyApiGet<SpotifyPlaylistTracksResponse>(tokenData.accessToken, path);
           const pageItems = nextPage.items ?? [];
-          appendRows(pageItems);
-          if (pageItems.length === 0) {
+          const parsedRows = extractRows(pageItems);
+
+          // Some field selections can return non-empty items with no usable track payload.
+          // In that case, try the next fallback shape for the same offset.
+          if (pageItems.length > 0 && parsedRows.length === 0) {
+            trackFetchErrors.push({
+              path,
+              error: 'Response contained items but no parseable track objects; trying fallback shape',
+            });
+            continue;
+          }
+
+          rows.push(...parsedRows);
+          if (pageItems.length === 0 || parsedRows.length === 0) {
             offset = totalToFetch;
           } else {
             offset += pageItems.length;
@@ -170,7 +192,8 @@ export async function POST(req: Request) {
       for (const href of hrefPaths) {
         try {
           const page = await spotifyApiGetByUrl<SpotifyPlaylistTracksResponse>(tokenData.accessToken, href);
-          appendRows(page.items ?? []);
+          const parsedRows = extractRows(page.items ?? []);
+          rows.push(...parsedRows);
           if (rows.length > 0) {
             partialImport = true;
             importSource = 'playlist_fallback';
@@ -193,6 +216,9 @@ export async function POST(req: Request) {
           playlistOwnerId,
           step,
           debug: {
+            metaItemsRawCount,
+            metaItemsParsedCount,
+            attemptedTrackPageCalls,
             metaFetchErrors: metaFetchErrors.slice(-10),
             trackFetchErrors: trackFetchErrors.slice(-20),
           },
@@ -314,6 +340,9 @@ export async function POST(req: Request) {
           playlistOwnerId,
           step,
           debug: {
+            metaItemsRawCount,
+            metaItemsParsedCount,
+            attemptedTrackPageCalls,
             metaFetchErrors: metaFetchErrors.slice(-10),
             trackFetchErrors: trackFetchErrors.slice(-20),
           },
