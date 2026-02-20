@@ -55,4 +55,3 @@ ENRICH_SOURCE_TIMEOUT_WIKIPEDIA_MS=30000
 ## When NOT to use env vars
 If you are certain timeouts should never vary across environments/providers, hardcoding is simpler.
 For this enrichment system, provider variability is high enough that env tuning is usually worth it.
-
