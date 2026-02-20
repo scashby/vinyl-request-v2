@@ -48,7 +48,7 @@ export const gameBlueprints: GameBlueprint[] = [
   {
     slug: "needle-drop-roulette",
     title: "Needle Drop Roulette",
-    status: "undeveloped",
+    status: "in_development",
     coreMechanic: "Blind needle drop, 5-10 second play, teams guess artist + song.",
     setup: "2+ teams, answer slips/whiteboards, and 8-12 rounds.",
     scoring: "2 points for artist+title, 1 for either one.",
