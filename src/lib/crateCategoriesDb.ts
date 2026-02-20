@@ -280,5 +280,5 @@ type CrateCategoriesDatabase = {
 };
 
 export function getCrateCategoriesDb(): SupabaseClient<CrateCategoriesDatabase> {
-  return supabaseAdmin as SupabaseClient<CrateCategoriesDatabase>;
+  return supabaseAdmin as unknown as SupabaseClient<CrateCategoriesDatabase>;
 }
