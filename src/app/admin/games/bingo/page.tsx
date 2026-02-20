@@ -6,11 +6,19 @@ import { generateBingoCardsPdf } from "src/lib/bingoCardsPdf";
 import { generateBingoCallSheetPdf } from "src/lib/bingoCallSheetPdf";
 
 type Playlist = { id: number; name: string; track_count: number };
+type EventRow = {
+  id: number;
+  title: string;
+  date: string;
+  time: string | null;
+  location: string | null;
+};
 type Session = {
   id: number;
   session_code: string;
   game_mode: string;
   playlist_name: string;
+  event_title: string | null;
   status: string;
   current_round: number;
   round_count: number;
@@ -29,10 +37,12 @@ const GAME_MODE_OPTIONS = [
 export default function BingoSetupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const eventId = searchParams.get("eventId");
+  const eventIdFromUrl = Number(searchParams.get("eventId"));
 
+  const [events, setEvents] = useState<EventRow[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [eventId, setEventId] = useState<number | null>(Number.isFinite(eventIdFromUrl) ? eventIdFromUrl : null);
 
   const [playlistId, setPlaylistId] = useState<number | null>(null);
   const [gameMode, setGameMode] = useState("single_line");
@@ -66,10 +76,16 @@ export default function BingoSetupPage() {
   );
 
   const load = async () => {
-    const [pRes, sRes] = await Promise.all([
+    const [eRes, pRes, sRes] = await Promise.all([
+      fetch("/api/games/bingo/events"),
       fetch("/api/games/playlists"),
       fetch(`/api/games/bingo/sessions${eventId ? `?eventId=${eventId}` : ""}`),
     ]);
+
+    if (eRes.ok) {
+      const payload = await eRes.json();
+      setEvents(payload.data ?? []);
+    }
 
     if (pRes.ok) {
       const payload = await pRes.json();
@@ -151,6 +167,15 @@ export default function BingoSetupPage() {
             Minimum playlist size: <span className="font-semibold text-amber-300">{minTracksForMode}</span> tracks for {gameMode === "blackout" ? "Blackout" : "current mode"}.
           </p>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <label className="text-sm">Event (optional)
+              <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={eventId ?? ""} onChange={(e) => setEventId(Number(e.target.value) || null)}>
+                <option value="">No linked event</option>
+                {events.map((event) => (
+                  <option key={event.id} value={event.id}>{event.date} - {event.title}</option>
+                ))}
+              </select>
+            </label>
+
             <label className="text-sm">Playlist
               <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={playlistId ?? ""} onChange={(e) => setPlaylistId(Number(e.target.value) || null)}>
                 <option value="">Select playlist</option>
@@ -227,6 +252,9 @@ export default function BingoSetupPage() {
               {sessions.map((session) => (
                 <div key={session.id} className="rounded-xl border border-stone-700 bg-stone-950/70 p-3">
                   <div className="text-sm">{session.session_code} · {session.playlist_name} · {session.game_mode} · Round {session.current_round} of {session.round_count}</div>
+                  {session.event_title ? (
+                    <div className="mt-1 text-xs text-stone-400">Event: {session.event_title}</div>
+                  ) : null}
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/bingo/host?sessionId=${session.id}`)}>Host</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/bingo/assistant?sessionId=${session.id}`)}>Assistant</button>

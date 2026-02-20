@@ -13,6 +13,8 @@ export type GameBlueprint = {
 
 const DJ_CONTEXT =
   "Environment constraints: single DJ, two turntables, brewery setting, limited tech, and enough pacing buffer for resleeve/find/cue between spins.";
+const EVENT_LINK_REQUIREMENT =
+  "Event linkage is required for all game modules: include session-level event association (event_id -> public.events(id), nullable with ON DELETE SET NULL) plus event-aware filtering in admin setup/history views.";
 
 export const gameBlueprints: GameBlueprint[] = [
   {
@@ -164,6 +166,7 @@ export const getGameBuildPrompt = (game: GameBlueprint): string => {
     `Build and/or plan this game module: ${game.title}.`,
     `Status: ${statusLabel}.`,
     DJ_CONTEXT,
+    EVENT_LINK_REQUIREMENT,
     `Core mechanic: ${game.coreMechanic}`,
     `Setup: ${game.setup}`,
     `Scoring: ${game.scoring}`,
@@ -173,6 +176,8 @@ export const getGameBuildPrompt = (game: GameBlueprint): string => {
     "- Admin setup page skeleton",
     "- Host/assistant/jumbotron scope recommendation",
     "- Data model proposal (sessions, rounds, calls, scoring)",
+    "- Ensure event_id is part of the session model and exposed in create/list/get APIs",
+    "- Include event selector in setup flow and event filter in session history/list views",
     "- API route skeleton plan",
     "- Development phases (MVP -> polish)",
     "- Risks and mitigations for vinyl pacing and solo-host operation",

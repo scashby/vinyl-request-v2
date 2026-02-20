@@ -39,6 +39,7 @@ type SessionListRow = {
 };
 
 type PlaylistRow = { id: number; name: string };
+type EventRow = { id: number; title: string };
 
 async function generateUniqueSessionCode() {
   const db = getBingoDb();
@@ -66,17 +67,24 @@ export async function GET(request: NextRequest) {
 
   const sessions = (data ?? []) as SessionListRow[];
   const playlistIds = Array.from(new Set(sessions.map((row) => row.playlist_id)));
+  const eventIds = Array.from(new Set(sessions.map((row) => row.event_id).filter((value): value is number => Number.isFinite(value))));
 
   const { data: playlists } = playlistIds.length
     ? await db.from("collection_playlists").select("id, name").in("id", playlistIds)
     : { data: [] as PlaylistRow[] };
   const playlistById = new Map<number, string>(((playlists ?? []) as PlaylistRow[]).map((row) => [row.id, row.name]));
 
+  const { data: events } = eventIds.length
+    ? await db.from("events").select("id, title").in("id", eventIds)
+    : { data: [] as EventRow[] };
+  const eventsById = new Map<number, EventRow>(((events ?? []) as EventRow[]).map((row) => [row.id, row]));
+
   return NextResponse.json(
     {
       data: sessions.map((row) => ({
         ...row,
         playlist_name: playlistById.get(row.playlist_id) ?? "Unknown Playlist",
+        event_title: row.event_id ? eventsById.get(row.event_id)?.title ?? null : null,
       })),
     },
     { status: 200 }
