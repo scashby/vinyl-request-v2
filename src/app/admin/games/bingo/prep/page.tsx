@@ -30,7 +30,7 @@ type Call = {
   status: string;
 };
 
-type Card = {
+type ApiCardRow = {
   id: number;
   card_number: number;
   has_free_space: boolean;
@@ -83,7 +83,23 @@ export default function BingoPrepPage() {
     const res = await fetch(`/api/games/bingo/cards?sessionId=${sessionId}`);
     if (!res.ok) return;
     const payload = await res.json();
-    const doc = generateBingoCardsPdf((payload.data ?? []) as Card[], layout, `Music Bingo · ${session?.session_code ?? sessionId}`);
+    const apiRows = (payload.data ?? []) as ApiCardRow[];
+    const cards = apiRows.map((row) => {
+      const gridSource = Array.isArray(row.grid) ? row.grid : [];
+      const grid = gridSource
+        .filter((cell) => typeof cell === "object" && cell !== null)
+        .map((cell) => {
+          const typed = cell as Record<string, unknown>;
+          return {
+            row: Number(typed.row ?? 0),
+            col: Number(typed.col ?? 0),
+            label: String(typed.label ?? ""),
+          };
+        });
+      return { card_number: row.card_number, grid };
+    });
+
+    const doc = generateBingoCardsPdf(cards, layout, `Music Bingo · ${session?.session_code ?? sessionId}`);
     doc.save(`bingo-${sessionId}-cards-${layout}.pdf`);
   };
 
@@ -199,4 +215,3 @@ export default function BingoPrepPage() {
     </div>
   );
 }
-
