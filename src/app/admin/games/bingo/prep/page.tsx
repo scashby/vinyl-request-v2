@@ -46,7 +46,7 @@ export default function BingoPrepPage() {
     cratePulled: false,
     callSheetPrinted: false,
     cardsPrinted: false,
-    backupsReady: false,
+    sparesReady: false,
   });
 
   const load = useCallback(async () => {
@@ -185,7 +185,7 @@ export default function BingoPrepPage() {
                     ["cratePulled", "Crate pulled + stacked (Draw order)"],
                     ["callSheetPrinted", "Crate pull sheet printed"],
                     ["cardsPrinted", "Cards printed / distributed"],
-                    ["backupsReady", "Backup records ready"],
+                    ["sparesReady", "Spare records (optional) ready"],
                   ] as const
                 ).map(([key, label]) => (
                   <label key={key} className="flex items-center gap-2 text-stone-200">

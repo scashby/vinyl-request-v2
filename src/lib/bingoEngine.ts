@@ -300,7 +300,7 @@ async function buildCollectionTrackRows(db: BingoDbClient): Promise<CollectionTr
         albumArtist,
         albumTitle,
         trackArtist: recording?.track_artist ?? albumArtist,
-        trackTitle: track.title_override ?? recording?.title ?? `Track ${idx + 1}`,
+        trackTitle: track.title_override ?? recording?.title ?? `Track ${position}`,
         position,
         side,
         durationSeconds: recording?.duration_seconds ?? null,
@@ -481,7 +481,9 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
     const recordingId = parsed.recordingId ?? releaseTrack?.recording_id ?? null;
     const recording = recordingId ? recordingById.get(recordingId) : undefined;
 
-    const trackTitle = releaseTrack?.title_override ?? recording?.title ?? `Track ${index + 1}`;
+    const position = releaseTrack?.position ?? parsed.fallbackPosition ?? null;
+    const fallbackTitle = position ? `Track ${position}` : `Track ${index + 1}`;
+    const trackTitle = releaseTrack?.title_override ?? recording?.title ?? fallbackTitle;
     const artistName = recording?.track_artist ?? (master?.main_artist_id ? artistById.get(master.main_artist_id)?.name : undefined) ?? "Unknown Artist";
 
     return {

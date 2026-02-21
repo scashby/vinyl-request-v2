@@ -34,7 +34,6 @@ export default function BingoHostPage() {
 
   const [session, setSession] = useState<Session | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
-  const [backupTrack, setBackupTrack] = useState({ track_title: "", artist_name: "", album_name: "" });
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -101,17 +100,6 @@ export default function BingoHostPage() {
 
   const replace = async () => {
     await fetch(`/api/games/bingo/sessions/${sessionId}/replace`, { method: "POST" });
-    load();
-  };
-
-  const insertBackup = async () => {
-    if (!backupTrack.track_title || !backupTrack.artist_name) return;
-    await fetch(`/api/games/bingo/sessions/${sessionId}/insert-backup`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(backupTrack),
-    });
-    setBackupTrack({ track_title: "", artist_name: "", album_name: "" });
     load();
   };
 
@@ -197,12 +185,6 @@ export default function BingoHostPage() {
                 <button onClick={resume} className="rounded border border-stone-600 px-2 py-1">Resume</button>
                 <button onClick={skip} className="rounded border border-stone-600 px-2 py-1">Skip</button>
                 <button onClick={replace} className="rounded border border-stone-600 px-2 py-1">Replace with Next</button>
-              </div>
-              <div className="mt-3 grid gap-2 text-xs">
-                <input placeholder="Backup Track" value={backupTrack.track_title} onChange={(e) => setBackupTrack((s) => ({ ...s, track_title: e.target.value }))} className="rounded border border-stone-700 bg-stone-950 px-2 py-1" />
-                <input placeholder="Backup Artist" value={backupTrack.artist_name} onChange={(e) => setBackupTrack((s) => ({ ...s, artist_name: e.target.value }))} className="rounded border border-stone-700 bg-stone-950 px-2 py-1" />
-                <input placeholder="Backup Album" value={backupTrack.album_name} onChange={(e) => setBackupTrack((s) => ({ ...s, album_name: e.target.value }))} className="rounded border border-stone-700 bg-stone-950 px-2 py-1" />
-                <button onClick={insertBackup} className="rounded bg-purple-700 px-2 py-1">Insert Backup Song</button>
               </div>
             </div>
           </section>
