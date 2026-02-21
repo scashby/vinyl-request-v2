@@ -55,14 +55,7 @@ export default function BingoSetupPage() {
   const [hostBufferSeconds, setHostBufferSeconds] = useState(2);
   const [sonosDelayMs, setSonosDelayMs] = useState(75);
 
-  const [preflight, setPreflight] = useState({
-    cratePull: false,
-    needleReady: false,
-    backupsReady: false,
-  });
-
   const [creating, setCreating] = useState(false);
-  const preflightComplete = useMemo(() => Object.values(preflight).every(Boolean), [preflight]);
   const minTracksForMode = 75;
   const derivedSecondsToNextCall = useMemo(
     () =>
@@ -101,6 +94,17 @@ export default function BingoSetupPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const deleteSession = async (sessionId: number, code: string) => {
+    if (!confirm(`Delete session ${code}? This cannot be undone.`)) return;
+    const res = await fetch(`/api/games/bingo/sessions?id=${sessionId}`, { method: "DELETE" });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert((payload as { error?: string }).error ?? "Failed to delete session");
+      return;
+    }
+    load();
+  };
 
   const createSession = async () => {
     if (!playlistId) return;
@@ -225,16 +229,7 @@ export default function BingoSetupPage() {
             Derived time to next call: <span className="font-semibold text-amber-300">{derivedSecondsToNextCall}s</span> (includes Sonos delay).
           </p>
 
-          <div className="mt-4 rounded-xl border border-stone-700 bg-stone-950/80 p-3 text-sm">
-            <p className="font-semibold uppercase tracking-wide text-amber-200">Preflight Checklist</p>
-            <div className="mt-2 grid gap-2 md:grid-cols-2">
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.cratePull} onChange={(e) => setPreflight((p) => ({ ...p, cratePull: e.target.checked }))} /> Crate pull complete</label>
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.needleReady} onChange={(e) => setPreflight((p) => ({ ...p, needleReady: e.target.checked }))} /> Needle/cleaning ready</label>
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.backupsReady} onChange={(e) => setPreflight((p) => ({ ...p, backupsReady: e.target.checked }))} /> Backup tracks staged</label>
-            </div>
-          </div>
-
-          <button disabled={!playlistId || creating || !preflightComplete} onClick={createSession} className="mt-5 rounded bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+          <button disabled={!playlistId || creating} onClick={createSession} className="mt-5 rounded bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
             {creating ? "Creating..." : "Create Session"}
           </button>
         </section>
@@ -262,6 +257,7 @@ export default function BingoSetupPage() {
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "2-up")}>Cards 2-up</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "4-up")}>Cards 4-up</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCallSheet(session.id)}>Call Sheet</button>
+                    <button className="rounded border border-red-800/60 bg-red-950/30 px-2 py-1 text-red-200" onClick={() => deleteSession(session.id, session.session_code)}>Delete</button>
                   </div>
                 </div>
               ))}

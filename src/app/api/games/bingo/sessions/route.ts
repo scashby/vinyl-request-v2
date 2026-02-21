@@ -168,3 +168,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  const idRaw = request.nextUrl.searchParams.get("id");
+  const sessionId = Number(idRaw);
+  if (!Number.isFinite(sessionId)) {
+    return NextResponse.json({ error: "id is required" }, { status: 400 });
+  }
+
+  const db = getBingoDb();
+  const { error } = await db.from("bingo_sessions").delete().eq("id", sessionId);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ ok: true }, { status: 200 });
+}
