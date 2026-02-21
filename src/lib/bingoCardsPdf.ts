@@ -25,6 +25,13 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
   const cellPaddingX = layout === "4-up" ? 0.9 : 1.0;
   const cellPaddingY = layout === "4-up" ? 0.9 : 1.0;
 
+  const splitLabel = (value: string) => {
+    const text = value.trim();
+    const idx = text.lastIndexOf(" - ");
+    if (idx === -1) return { title: text, artist: "" };
+    return { title: text.slice(0, idx).trim(), artist: text.slice(idx + 3).trim() };
+  };
+
   const xOffsets: number[] = [];
   const yOffsets: number[] = [];
   for (let r = 0; r < rows; r += 1) {
@@ -34,48 +41,84 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
     }
   }
 
-  function fitTextToCell(label: string, cellW: number, cellH: number, maxLines: number, maxFont: number, minFont: number) {
+  function buildLines(
+    label: string,
+    availableW: number,
+    maxLines: number,
+    mode: "title_only" | "title_artist"
+  ): string[] {
+    const cleaned = label.trim();
+    if (!cleaned) return [];
+
+    const { title: rawTitle, artist: rawArtist } = splitLabel(cleaned);
+    const title = rawTitle || cleaned;
+    const artist = rawArtist || "";
+
+    if (mode === "title_artist" && artist) {
+      const maxArtistLines = 1;
+      const titleLines = doc.splitTextToSize(title, availableW) as string[];
+      const artistLines = doc.splitTextToSize(artist, availableW) as string[];
+      const keptTitle = titleLines.slice(0, Math.max(0, maxLines - maxArtistLines));
+      const keptArtist = artistLines.slice(0, maxArtistLines);
+      const combined = [...keptTitle, ...keptArtist].filter(Boolean);
+      return combined.length ? combined : (doc.splitTextToSize(title, availableW) as string[]).slice(0, maxLines);
+    }
+
+    return (doc.splitTextToSize(title, availableW) as string[]).slice(0, maxLines);
+  }
+
+  function fitTextToCell(
+    label: string,
+    cellW: number,
+    cellH: number,
+    maxLines: number,
+    maxFont: number,
+    minFont: number,
+    mode: "title_only" | "title_artist"
+  ) {
     const availableW = Math.max(1, cellW - cellPaddingX * 2);
     const availableH = Math.max(1, cellH - cellPaddingY * 2);
 
     for (let fontSize = maxFont; fontSize >= minFont; fontSize -= 0.5) {
       doc.setFontSize(fontSize);
-      const wrapped = doc.splitTextToSize(label, availableW).slice(0, maxLines) as string[];
-      if (wrapped.length === 0) return { lines: [] as string[], fontSize };
-      const lineH = doc.getTextDimensions("M").h * doc.getLineHeightFactor();
-      const totalH = lineH * wrapped.length;
-      if (totalH <= availableH) return { lines: wrapped, fontSize };
+      const lines = buildLines(label, availableW, maxLines, mode);
+      if (lines.length === 0) return { lines: [] as string[], fontSize };
+
+      // jsPDF units are in mm; `getTextDimensions("M").h` behaves like a per-line height already.
+      const lineH = doc.getTextDimensions("M").h;
+      const totalH = lineH * lines.length;
+      if (totalH <= availableH) return { lines, fontSize };
     }
 
     doc.setFontSize(minFont);
-    const wrapped = doc.splitTextToSize(label, Math.max(1, cellW - cellPaddingX * 2)).slice(0, maxLines) as string[];
-    return { lines: wrapped, fontSize: minFont };
+    return { lines: buildLines(label, Math.max(1, cellW - cellPaddingX * 2), maxLines, mode), fontSize: minFont };
   }
 
   function renderCellText(label: string, cellX: number, cellY: number, cellW: number, cellH: number, maxLines: number) {
     const baseLabel = String(label ?? "").trim();
     if (!baseLabel) return;
 
-    const maxFont = layout === "4-up" ? 10 : 12;
+    const maxFont = layout === "4-up" ? 11 : 12;
     const minFont = layout === "4-up" ? 6 : 8;
 
-    const candidates = layout === "4-up" && baseLabel.includes(" - ")
-      ? [baseLabel, baseLabel.split(" - ")[0] ?? baseLabel]
-      : [baseLabel];
+    const innerX = cellX + cellPaddingX;
+    const innerY = cellY + cellPaddingY;
+    const innerW = Math.max(1, cellW - cellPaddingX * 2);
+    const innerH = Math.max(1, cellH - cellPaddingY * 2);
 
-    const fits = candidates.map((candidate) => {
-      const fit = fitTextToCell(candidate, cellW, cellH, maxLines, maxFont, minFont);
-      return { candidate, ...fit };
-    });
+    const primaryMode: "title_only" | "title_artist" = layout === "4-up" ? "title_only" : "title_artist";
+    const secondaryMode: "title_only" | null = primaryMode === "title_artist" ? "title_only" : null;
 
-    fits.sort((a, b) => b.fontSize - a.fontSize);
-    const best = fits[0] ?? { candidate: baseLabel, lines: [baseLabel], fontSize: minFont };
+    const first = fitTextToCell(baseLabel, innerW, innerH, maxLines, maxFont, minFont, primaryMode);
+    const second = secondaryMode ? fitTextToCell(baseLabel, innerW, innerH, maxLines, maxFont, minFont, secondaryMode) : null;
+
+    const best = second && second.fontSize > first.fontSize ? second : first;
 
     doc.setFontSize(best.fontSize);
-    const lineH = doc.getTextDimensions("M").h * doc.getLineHeightFactor();
+    const lineH = doc.getTextDimensions("M").h;
     const totalH = lineH * best.lines.length;
-    const centerX = cellX + cellW / 2;
-    const centerY = cellY + cellH / 2;
+    const centerX = innerX + innerW / 2;
+    const centerY = innerY + innerH / 2;
     const startY = centerY - totalH / 2;
 
     best.lines.forEach((line, index) => {
@@ -108,7 +151,7 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
         const label = match?.label ?? "";
         doc.setFont("helvetica", "normal");
         const maxLines = layout === "4-up" ? 2 : 3;
-        renderCellText(label, x + cellPaddingX, y + cellPaddingY, cellW - cellPaddingX * 2, cellH - cellPaddingY * 2, maxLines);
+        renderCellText(label, x, y, cellW, cellH, maxLines);
       }
     }
   });
