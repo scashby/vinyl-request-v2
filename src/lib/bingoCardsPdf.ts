@@ -21,6 +21,8 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
   const cardWidth = (pageW - margin * 2 - gutterX * (columns - 1)) / columns;
   const cardHeight = (pageH - margin * 2 - gutterY * (rows - 1)) / rows;
 
+  const cellPadding = 1.2;
+
   const xOffsets: number[] = [];
   const yOffsets: number[] = [];
   for (let r = 0; r < rows; r += 1) {
@@ -54,9 +56,22 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
         const match = card.grid.find((cell) => cell.row === r && cell.col === c);
         const label = match?.label ?? "";
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(layout === "4-up" ? 7 : 9);
-        const lines = doc.splitTextToSize(label, cellW - 2);
-        doc.text(lines.slice(0, layout === "4-up" ? 2 : 3), x + 1, y + 3.5);
+        const fontSize = layout === "4-up" ? 9 : 11;
+        doc.setFontSize(fontSize);
+        const maxLines = layout === "4-up" ? 2 : 3;
+        const lines = doc.splitTextToSize(label, cellW - cellPadding * 2).slice(0, maxLines) as string[];
+
+        if (lines.length > 0) {
+          const centerX = x + cellW / 2;
+          const centerY = y + cellH / 2;
+          const baseLineHeight = doc.getTextDimensions("M").h * doc.getLineHeightFactor();
+          const totalH = baseLineHeight * lines.length;
+          const startY = centerY - totalH / 2;
+
+          lines.forEach((line, index) => {
+            doc.text(line, centerX, startY + baseLineHeight * (index + 0.5), { align: "center", baseline: "middle" });
+          });
+        }
       }
     }
   });
