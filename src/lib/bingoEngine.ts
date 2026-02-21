@@ -42,7 +42,7 @@ function normalizePositionKey(position: string | null | undefined): string | nul
   const raw = String(position ?? "").trim();
   if (!raw) return null;
   // Normalize common variants (ex: "B 4" vs "B4") so playlist keys match release_tracks.position.
-  return raw.toUpperCase().replace(/\s+/g, "");
+  return raw.toUpperCase().replace(/[^A-Z0-9]+/g, "");
 }
 
 export type BingoCardCell = {
