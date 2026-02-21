@@ -9,6 +9,8 @@ type CallRow = {
   track_title: string;
   artist_name: string;
   album_name: string | null;
+  side?: string | null;
+  position?: string | null;
 };
 
 export function generateBingoCallSheetPdf(rows: CallRow[], title: string) {
@@ -19,13 +21,15 @@ export function generateBingoCallSheetPdf(rows: CallRow[], title: string) {
 
   autoTable(doc, {
     startY: 18,
-    head: [["#", "Ball", "Track", "Artist", "Album"]],
+    head: [["Draw", "Ball", "Artist", "Album", "Side", "Pos", "Track"]],
     body: rows.map((row) => [
       row.call_index,
       formatBallLabel(row.ball_number ?? null, row.column_letter),
-      row.track_title,
       row.artist_name,
       row.album_name ?? "",
+      row.side ?? "",
+      row.position ?? "",
+      row.track_title,
     ]),
     styles: { fontSize: 8, cellPadding: 1.5 },
     headStyles: { fillColor: [33, 33, 33] },

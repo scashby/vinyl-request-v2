@@ -127,7 +127,7 @@ export default function BingoSetupPage() {
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error ?? "Failed to create session");
 
-      router.push(`/admin/games/bingo/host?sessionId=${payload.id}`);
+      router.push(`/admin/games/bingo/prep?sessionId=${payload.id}`);
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to create session");
     } finally {
