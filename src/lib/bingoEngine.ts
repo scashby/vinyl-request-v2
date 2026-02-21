@@ -38,6 +38,13 @@ export type ParsedTrackKey = {
   fallbackPosition: string | null;
 };
 
+function normalizePositionKey(position: string | null | undefined): string | null {
+  const raw = String(position ?? "").trim();
+  if (!raw) return null;
+  // Normalize common variants (ex: "B 4" vs "B4") so playlist keys match release_tracks.position.
+  return raw.toUpperCase().replace(/\s+/g, "");
+}
+
 export type BingoCardCell = {
   row: number;
   col: number;
@@ -76,6 +83,14 @@ type SessionCallRow = {
   column_letter: string;
   track_title: string;
   artist_name: string;
+};
+
+export type ResolvedTrackKey = {
+  track_title: string;
+  artist_name: string;
+  album_name: string | null;
+  side: string | null;
+  position: string | null;
 };
 
 export function parseTrackKey(trackKey: string): ParsedTrackKey {
@@ -458,9 +473,9 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
   const releaseTrackByReleaseAndPosition = new Map<string, DbReleaseTrack>();
   for (const row of releaseTracksAll) {
     if (!row.release_id) continue;
-    const pos = String(row.position ?? "").trim();
-    if (!pos) continue;
-    releaseTrackByReleaseAndPosition.set(`${row.release_id}:${pos}`, row);
+    const posKey = normalizePositionKey(row.position);
+    if (!posKey) continue;
+    releaseTrackByReleaseAndPosition.set(`${row.release_id}:${posKey}`, row);
   }
 
   const inferredRecordingIds = Array.from(
@@ -515,7 +530,11 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
     const releaseTrack =
       (parsed.releaseTrackId ? releaseTrackById.get(parsed.releaseTrackId) : undefined) ??
       (inventory?.release_id && parsed.fallbackPosition
-        ? releaseTrackByReleaseAndPosition.get(`${inventory.release_id}:${String(parsed.fallbackPosition).trim()}`)
+        ? (() => {
+            const posKey = normalizePositionKey(parsed.fallbackPosition);
+            if (!posKey) return undefined;
+            return releaseTrackByReleaseAndPosition.get(`${inventory.release_id}:${posKey}`);
+          })()
         : undefined);
 
     const recordingId = releaseTrack?.recording_id ?? parsed.recordingId ?? null;
@@ -536,6 +555,138 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
       position: releaseTrack?.position ?? parsed.fallbackPosition,
     };
   });
+}
+
+export async function resolveTrackKeys(db: BingoDbClient, trackKeys: string[]): Promise<Map<string, ResolvedTrackKey>> {
+  const uniqueKeys = Array.from(new Set(trackKeys.map((k) => String(k ?? "").trim()).filter(Boolean)));
+  if (uniqueKeys.length === 0) return new Map();
+
+  const parsedRows = uniqueKeys.map((track_key) => ({ track_key, parsed: parseTrackKey(track_key) }));
+  const inventoryIds = Array.from(new Set(parsedRows.map((row) => row.parsed.inventoryId).filter((id): id is number => id !== null)));
+  const releaseTrackIds = Array.from(new Set(parsedRows.map((row) => row.parsed.releaseTrackId).filter((id): id is number => id !== null)));
+  const directRecordingIds = Array.from(new Set(parsedRows.map((row) => row.parsed.recordingId).filter((id): id is number => id !== null)));
+
+  const { data: inventoryRows, error: inventoryError } = inventoryIds.length
+    ? await db.from("inventory").select("id, release_id").in("id", inventoryIds)
+    : { data: [] as DbInventory[], error: null };
+  if (inventoryError) throw new Error(inventoryError.message);
+  const inventoryById = new Map<number, DbInventory>(((inventoryRows ?? []) as DbInventory[]).map((row) => [row.id, row]));
+
+  const releaseIds = Array.from(
+    new Set(
+      ((inventoryRows ?? []) as DbInventory[])
+        .map((row) => row.release_id)
+        .filter((id): id is number => typeof id === "number")
+    )
+  );
+
+  const { data: releaseTrackRowsById, error: releaseTrackByIdError } = releaseTrackIds.length
+    ? await db.from("release_tracks").select("id, release_id, recording_id, position, side, title_override").in("id", releaseTrackIds)
+    : { data: [] as DbReleaseTrack[], error: null };
+  if (releaseTrackByIdError) throw new Error(releaseTrackByIdError.message);
+
+  const wantsFallbackLookup = parsedRows.some((row) => row.parsed.releaseTrackId === null && row.parsed.fallbackPosition);
+  const { data: releaseTrackRowsByRelease, error: releaseTrackByReleaseError } =
+    wantsFallbackLookup && releaseIds.length
+      ? await db
+          .from("release_tracks")
+          .select("id, release_id, recording_id, position, side, title_override")
+          .in("release_id", releaseIds)
+      : { data: [] as DbReleaseTrack[], error: null };
+  if (releaseTrackByReleaseError) throw new Error(releaseTrackByReleaseError.message);
+
+  const releaseTracksAll = [
+    ...(((releaseTrackRowsById ?? []) as DbReleaseTrack[]) ?? []),
+    ...(((releaseTrackRowsByRelease ?? []) as DbReleaseTrack[]) ?? []),
+  ];
+
+  const releaseTrackById = new Map<number, DbReleaseTrack>(releaseTracksAll.map((row) => [row.id, row]));
+
+  const releaseTrackByReleaseAndPosition = new Map<string, DbReleaseTrack>();
+  for (const row of releaseTracksAll) {
+    if (!row.release_id) continue;
+    const posKey = normalizePositionKey(row.position);
+    if (!posKey) continue;
+    releaseTrackByReleaseAndPosition.set(`${row.release_id}:${posKey}`, row);
+  }
+
+  const inferredRecordingIds = Array.from(
+    new Set(
+      releaseTracksAll
+        .map((row) => row.recording_id)
+        .filter((id): id is number => typeof id === "number")
+    )
+  );
+  const allRecordingIds = Array.from(new Set([...directRecordingIds, ...inferredRecordingIds]));
+
+  const { data: recordingRows, error: recordingError } = allRecordingIds.length
+    ? await db.from("recordings").select("id, title, track_artist").in("id", allRecordingIds)
+    : { data: [] as DbRecording[], error: null };
+  if (recordingError) throw new Error(recordingError.message);
+  const recordingById = new Map<number, DbRecording>(((recordingRows ?? []) as DbRecording[]).map((row) => [row.id, row]));
+
+  const { data: releases } = releaseIds.length
+    ? await db.from("releases").select("id, master_id").in("id", releaseIds)
+    : { data: [] as DbRelease[] };
+  const releaseById = new Map<number, DbRelease>(((releases ?? []) as DbRelease[]).map((row) => [row.id, row]));
+
+  const masterIds = Array.from(
+    new Set(
+      ((releases ?? []) as DbRelease[])
+        .map((row) => row.master_id)
+        .filter((id): id is number => typeof id === "number")
+    )
+  );
+  const { data: masters } = masterIds.length
+    ? await db.from("masters").select("id, title, main_artist_id").in("id", masterIds)
+    : { data: [] as DbMaster[] };
+  const masterById = new Map<number, DbMaster>(((masters ?? []) as DbMaster[]).map((row) => [row.id, row]));
+
+  const artistIds = Array.from(
+    new Set(
+      ((masters ?? []) as DbMaster[])
+        .map((row) => row.main_artist_id)
+        .filter((id): id is number => typeof id === "number")
+    )
+  );
+  const { data: artists } = artistIds.length
+    ? await db.from("artists").select("id, name").in("id", artistIds)
+    : { data: [] as DbArtist[] };
+  const artistById = new Map<number, DbArtist>(((artists ?? []) as DbArtist[]).map((row) => [row.id, row]));
+
+  const result = new Map<string, ResolvedTrackKey>();
+  parsedRows.forEach(({ track_key, parsed }, index) => {
+    const inventory = parsed.inventoryId ? inventoryById.get(parsed.inventoryId) : undefined;
+    const release = inventory?.release_id ? releaseById.get(inventory.release_id) : undefined;
+    const master = release?.master_id ? masterById.get(release.master_id) : undefined;
+    const releaseTrack =
+      (parsed.releaseTrackId ? releaseTrackById.get(parsed.releaseTrackId) : undefined) ??
+      (inventory?.release_id && parsed.fallbackPosition
+        ? (() => {
+            const posKey = normalizePositionKey(parsed.fallbackPosition);
+            if (!posKey) return undefined;
+            return releaseTrackByReleaseAndPosition.get(`${inventory.release_id}:${posKey}`);
+          })()
+        : undefined);
+
+    const recordingId = releaseTrack?.recording_id ?? parsed.recordingId ?? null;
+    const recording = recordingId ? recordingById.get(recordingId) : undefined;
+
+    const position = releaseTrack?.position ?? parsed.fallbackPosition ?? null;
+    const fallbackTitle = position ? `Track ${position}` : `Track ${index + 1}`;
+    const trackTitle = releaseTrack?.title_override ?? recording?.title ?? fallbackTitle;
+    const artistName = recording?.track_artist ?? (master?.main_artist_id ? artistById.get(master.main_artist_id)?.name : undefined) ?? "Unknown Artist";
+
+    result.set(track_key, {
+      track_title: trackTitle,
+      artist_name: artistName,
+      album_name: master?.title ?? null,
+      side: releaseTrack?.side ?? null,
+      position: releaseTrack?.position ?? parsed.fallbackPosition,
+    });
+  });
+
+  return result;
 }
 
 export async function getPlaylistTrackCount(db: BingoDbClient, playlistId: number): Promise<number> {
