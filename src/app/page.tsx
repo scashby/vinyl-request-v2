@@ -335,6 +335,9 @@ export default function Page() {
             <Link href="/events/events-page" className={buttonClass}>
               Events
             </Link>
+            <Link href="/games" className={buttonClass}>
+              Games
+            </Link>
             <Link href="/dj-sets" className={buttonClass}>
               DJ Sets
             </Link>

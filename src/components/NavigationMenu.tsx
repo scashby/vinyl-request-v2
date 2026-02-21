@@ -28,6 +28,7 @@ export default function NavigationMenu() {
   const navLinks = [
     { name: 'About', path: '/about' },
     { name: 'Events', path: '/events/events-page' },
+    { name: 'Games', path: '/games' },
     { name: 'Browse Collection', path: '/browse/browse-albums' },
     { name: 'DJ Sets', path: '/dj-sets' },
     { name: 'Dialogues', path: '/dialogues' },
