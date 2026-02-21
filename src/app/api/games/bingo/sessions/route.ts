@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await generateSessionCalls(db, session.id, playlistId, gameMode);
+      await generateSessionCalls(db, session.id, playlistId);
       await generateCards(db, session.id, session.card_count, session.card_label_mode as "track_artist" | "track_only");
     } catch (error) {
       await db.from("bingo_sessions").delete().eq("id", session.id);

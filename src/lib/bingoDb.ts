@@ -294,6 +294,7 @@ export type BingoDatabase = {
           session_id: number;
           playlist_track_key: string | null;
           call_index: number;
+          ball_number: number | null;
           column_letter: string;
           track_title: string;
           artist_name: string;
@@ -311,6 +312,7 @@ export type BingoDatabase = {
           session_id: number;
           playlist_track_key?: string | null;
           call_index: number;
+          ball_number?: number | null;
           column_letter: string;
           track_title: string;
           artist_name: string;
@@ -328,6 +330,7 @@ export type BingoDatabase = {
           session_id?: number;
           playlist_track_key?: string | null;
           call_index?: number;
+          ball_number?: number | null;
           column_letter?: string;
           track_title?: string;
           artist_name?: string;

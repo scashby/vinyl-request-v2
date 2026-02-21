@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { formatBallLabel } from "src/lib/bingoBall";
 
 type Session = {
   id: number;
@@ -19,6 +20,7 @@ type Session = {
 type Call = {
   id: number;
   call_index: number;
+  ball_number: number | null;
   column_letter: string;
   track_title: string;
   artist_name: string;
@@ -65,6 +67,7 @@ export default function BingoHostPage() {
   const called = useMemo(() => calls.filter((call) => ["called", "completed", "skipped"].includes(call.status)), [calls]);
   const previous = useMemo(() => called.slice(Math.max(0, called.length - 5), called.length - 1), [called]);
   const callForControls = activeCall ?? nextPendingCall;
+  const board = useMemo(() => [...calls].sort((a, b) => (a.ball_number ?? 999) - (b.ball_number ?? 999)), [calls]);
 
   const advance = async () => {
     await fetch(`/api/games/bingo/sessions/${sessionId}/advance`, { method: "POST" });
@@ -142,9 +145,9 @@ export default function BingoHostPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {calls.map((call) => (
+                  {board.map((call) => (
                     <tr key={call.id} className="border-t border-stone-800 align-top">
-                      <td className="py-2 font-bold text-amber-300">{call.column_letter}</td>
+                      <td className="py-2 font-bold text-amber-300">{formatBallLabel(call.ball_number, call.column_letter)}</td>
                       <td className="py-2">{call.track_title}</td>
                       <td className="py-2">{call.artist_name}</td>
                       <td className="py-2 text-stone-400">{call.album_name ?? ""}</td>
@@ -160,20 +163,22 @@ export default function BingoHostPage() {
               <h2 className="text-sm font-bold uppercase tracking-wide text-amber-200">Call Card</h2>
               <div className="mt-3 rounded border border-red-700/50 bg-red-950/30 p-3">
                 <p className="text-xs uppercase text-red-300">Current</p>
-                <p className="text-lg font-black">{callForControls ? `${callForControls.column_letter} - ${callForControls.track_title}` : "No call yet"}</p>
+                <p className="text-lg font-black">
+                  {callForControls ? `${formatBallLabel(callForControls.ball_number, callForControls.column_letter)} - ${callForControls.track_title}` : "No call yet"}
+                </p>
                 <p className="text-sm text-stone-300">{callForControls ? `${callForControls.artist_name} · ${callForControls.album_name ?? ""}` : ""}</p>
               </div>
               <div className="mt-3 text-xs">
                 <p className="font-semibold text-stone-300">Previous Calls</p>
                 <ul className="mt-1 space-y-1 text-stone-400">
-                  {previous.map((call) => <li key={call.id}>{call.column_letter} - {call.track_title}</li>)}
+                  {previous.map((call) => <li key={call.id}>{formatBallLabel(call.ball_number, call.column_letter)} - {call.track_title}</li>)}
                 </ul>
               </div>
               <div className="mt-3 text-xs">
                 <p className="font-semibold text-stone-300">Full Called Order</p>
                 <div className="mt-1 max-h-24 overflow-auto text-stone-400">
                   {called.map((call) => (
-                    <div key={call.id}>{call.call_index}. {call.column_letter} - {call.track_title}</div>
+                    <div key={call.id}>{call.call_index}. {formatBallLabel(call.ball_number, call.column_letter)} - {call.track_title}</div>
                   ))}
                 </div>
               </div>

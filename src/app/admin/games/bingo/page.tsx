@@ -63,7 +63,7 @@ export default function BingoSetupPage() {
 
   const [creating, setCreating] = useState(false);
   const preflightComplete = useMemo(() => Object.values(preflight).every(Boolean), [preflight]);
-  const minTracksForMode = gameMode === "blackout" ? 100 : 75;
+  const minTracksForMode = 75;
   const derivedSecondsToNextCall = useMemo(
     () =>
       removeResleeveSeconds +
@@ -164,7 +164,7 @@ export default function BingoSetupPage() {
         <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-amber-100">Create Session</h2>
           <p className="mt-1 text-xs text-stone-400">
-            Minimum playlist size: <span className="font-semibold text-amber-300">{minTracksForMode}</span> tracks for {gameMode === "blackout" ? "Blackout" : "current mode"}.
+            Minimum playlist size: <span className="font-semibold text-amber-300">{minTracksForMode}</span> tracks for this game.
           </p>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <label className="text-sm">Event (optional)

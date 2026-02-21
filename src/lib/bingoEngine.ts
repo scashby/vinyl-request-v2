@@ -2,9 +2,7 @@ import type { BingoDbClient } from "src/lib/bingoDb";
 import type { CollectionPlaylist, SmartPlaylistRule } from "src/types/collectionPlaylist";
 import type { CollectionTrackRow } from "src/types/collectionTrackRow";
 import { trackMatchesSmartPlaylist } from "src/lib/playlistUtils";
-
-export const BINGO_COLUMNS = ["B", "I", "N", "G", "O"] as const;
-export type BingoColumn = (typeof BINGO_COLUMNS)[number];
+import { BINGO_COLUMNS, type BingoColumn, getColumnLetterForBallNumber } from "src/lib/bingoBall";
 
 export type GameMode =
   | "single_line"
@@ -74,6 +72,7 @@ type DbArtist = { id: number; name: string };
 type SessionCallRow = {
   id: number;
   call_index: number;
+  ball_number: number | null;
   column_letter: string;
   track_title: string;
   artist_name: string;
@@ -104,9 +103,7 @@ export function parseTrackKey(trackKey: string): ParsedTrackKey {
   return { inventoryId, releaseTrackId, recordingId, fallbackPosition };
 }
 
-export function getColumnLetter(index: number): BingoColumn {
-  return BINGO_COLUMNS[(index - 1) % BINGO_COLUMNS.length] ?? "B";
-}
+const GAME_BALL_COUNT = 75;
 
 function canonicalizeFormatFacet(value: string): string | null {
   const token = value.trim().toLowerCase();
@@ -516,22 +513,26 @@ export async function getPlaylistTrackCount(db: BingoDbClient, playlistId: numbe
 export async function generateSessionCalls(
   db: BingoDbClient,
   sessionId: number,
-  playlistId: number,
-  gameMode: GameMode
+  playlistId: number
 ): Promise<number> {
   const tracks = await resolvePlaylistTracks(db, playlistId);
-  const source = shuffle(tracks);
 
-  const minTracks = gameMode === "blackout" ? 100 : 75;
-  if (source.length < minTracks) {
-    throw new Error(`Playlist must contain at least ${minTracks} tracks for ${gameMode === "blackout" ? "Blackout" : "this game mode"}.`);
+  if (tracks.length < GAME_BALL_COUNT) {
+    throw new Error(`Playlist must contain at least ${GAME_BALL_COUNT} tracks for this game mode.`);
   }
 
-  const rows = source.map((track, idx) => ({
+  // 1) Slot the playlist into a standard 75-ball board (B1..O75).
+  // 2) Randomize the draw order (call_index) to simulate ball tumbling.
+  const boardTracks = shuffle(tracks).slice(0, GAME_BALL_COUNT);
+  const boardSlots = boardTracks.map((track, index) => ({ ballNumber: index + 1, track }));
+  const drawOrder = shuffle(boardSlots);
+
+  const rows = drawOrder.map(({ ballNumber, track }, drawIndex) => ({
     session_id: sessionId,
     playlist_track_key: track.trackKey,
-    call_index: idx + 1,
-    column_letter: getColumnLetter(idx + 1),
+    call_index: drawIndex + 1,
+    ball_number: ballNumber,
+    column_letter: getColumnLetterForBallNumber(ballNumber),
     track_title: track.trackTitle,
     artist_name: track.artistName,
     album_name: track.albumName,
@@ -553,19 +554,20 @@ export async function generateCards(
 ): Promise<void> {
   const { data, error } = await db
     .from("bingo_session_calls")
-    .select("id, call_index, column_letter, track_title, artist_name")
+    .select("id, call_index, ball_number, column_letter, track_title, artist_name")
     .eq("session_id", sessionId)
     .order("call_index", { ascending: true });
 
   if (error) throw new Error(error.message);
 
-  const calls = (data ?? []) as SessionCallRow[];
+  const allCalls = (data ?? []) as SessionCallRow[];
+  const baseCalls = allCalls.some((c) => c.ball_number !== null) ? allCalls.filter((c) => c.ball_number !== null) : allCalls;
   const byColumn = {
-    B: calls.filter((c) => c.column_letter === "B"),
-    I: calls.filter((c) => c.column_letter === "I"),
-    N: calls.filter((c) => c.column_letter === "N"),
-    G: calls.filter((c) => c.column_letter === "G"),
-    O: calls.filter((c) => c.column_letter === "O"),
+    B: baseCalls.filter((c) => c.column_letter === "B"),
+    I: baseCalls.filter((c) => c.column_letter === "I"),
+    N: baseCalls.filter((c) => c.column_letter === "N"),
+    G: baseCalls.filter((c) => c.column_letter === "G"),
+    O: baseCalls.filter((c) => c.column_letter === "O"),
   };
 
   const cards: Array<{ session_id: number; card_number: number; has_free_space: boolean; grid: BingoCardCell[] }> = [];
@@ -597,7 +599,7 @@ export async function generateCards(
           continue;
         }
 
-        const source = picked[letter][row] ?? shuffle(calls.filter((item) => item.column_letter === letter))[0];
+        const source = picked[letter][row] ?? shuffle(baseCalls.filter((item) => item.column_letter === letter))[0];
         const label = labelMode === "track_only" ? source.track_title : `${source.track_title} - ${source.artist_name}`;
         grid.push({
           row,

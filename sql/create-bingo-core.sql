@@ -57,13 +57,16 @@ ALTER TABLE public.bingo_sessions
   ADD COLUMN IF NOT EXISTS place_vinyl_seconds integer NOT NULL DEFAULT 8,
   ADD COLUMN IF NOT EXISTS cue_seconds integer NOT NULL DEFAULT 12,
   ADD COLUMN IF NOT EXISTS start_slide_seconds integer NOT NULL DEFAULT 5,
-  ADD COLUMN IF NOT EXISTS host_buffer_seconds integer NOT NULL DEFAULT 2;
+  ADD COLUMN IF NOT EXISTS host_buffer_seconds integer NOT NULL DEFAULT 2,
+  ADD COLUMN IF NOT EXISTS seconds_to_next_call integer NOT NULL DEFAULT 45,
+  ADD COLUMN IF NOT EXISTS sonos_output_delay_ms integer NOT NULL DEFAULT 75;
 
 CREATE TABLE IF NOT EXISTS public.bingo_session_calls (
   id bigserial PRIMARY KEY,
   session_id bigint NOT NULL REFERENCES public.bingo_sessions(id) ON DELETE CASCADE,
   playlist_track_key text,
   call_index integer NOT NULL,
+  ball_number integer,
   column_letter text NOT NULL,
   track_title text NOT NULL,
   artist_name text NOT NULL,
@@ -81,6 +84,9 @@ CREATE TABLE IF NOT EXISTS public.bingo_session_calls (
   ),
   CONSTRAINT bingo_session_calls_unique_call_index UNIQUE (session_id, call_index)
 );
+
+ALTER TABLE public.bingo_session_calls
+  ADD COLUMN IF NOT EXISTS ball_number integer;
 
 CREATE TABLE IF NOT EXISTS public.bingo_cards (
   id bigserial PRIMARY KEY,
@@ -104,6 +110,7 @@ CREATE INDEX IF NOT EXISTS idx_bingo_sessions_event_id ON public.bingo_sessions(
 CREATE INDEX IF NOT EXISTS idx_bingo_sessions_playlist_id ON public.bingo_sessions(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_bingo_calls_session_id ON public.bingo_session_calls(session_id);
 CREATE INDEX IF NOT EXISTS idx_bingo_calls_status ON public.bingo_session_calls(session_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_bingo_calls_unique_ball_number ON public.bingo_session_calls(session_id, ball_number) WHERE ball_number IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_bingo_cards_session_id ON public.bingo_cards(session_id);
 CREATE INDEX IF NOT EXISTS idx_bingo_events_session_id ON public.bingo_session_events(session_id);
 

@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { formatBallLabel } from "src/lib/bingoBall";
 
 type Session = { session_code: string; playlist_name: string; current_round: number; round_count: number };
-type Call = { id: number; call_index: number; column_letter: string; track_title: string; artist_name: string; album_name: string | null; side: string | null; position: string | null; status: string };
+type Call = { id: number; call_index: number; ball_number: number | null; column_letter: string; track_title: string; artist_name: string; album_name: string | null; side: string | null; position: string | null; status: string };
 
 export default function BingoAssistantPage() {
   const sessionId = Number(useSearchParams().get("sessionId"));
@@ -53,14 +54,16 @@ export default function BingoAssistantPage() {
           <section className="rounded-2xl border border-stone-700 bg-black/50 p-4">
             <h2 className="text-sm font-bold uppercase text-cyan-200">Current Call</h2>
             <div className="mt-2 rounded border border-cyan-700/40 bg-cyan-950/20 p-3">
-              <p className="text-lg font-black">{current ? `${current.column_letter} - ${current.track_title}` : "Waiting for first call"}</p>
+              <p className="text-lg font-black">
+                {current ? `${formatBallLabel(current.ball_number, current.column_letter)} - ${current.track_title}` : "Waiting for first call"}
+              </p>
               <p className="text-sm text-stone-300">{current ? `${current.artist_name} · ${current.album_name ?? ""}` : ""}</p>
             </div>
 
             <div className="mt-3 text-xs">
               <p className="font-semibold text-stone-300">Full Called Order</p>
               <div className="mt-2 max-h-52 overflow-auto space-y-1 text-stone-400">
-                {called.map((call) => <div key={call.id}>{call.call_index}. {call.column_letter} - {call.track_title}</div>)}
+                {called.map((call) => <div key={call.id}>{call.call_index}. {formatBallLabel(call.ball_number, call.column_letter)} - {call.track_title}</div>)}
               </div>
             </div>
           </section>
@@ -70,7 +73,7 @@ export default function BingoAssistantPage() {
             <div className="mt-2 space-y-3">
               {nextTwo.map((call, index) => (
                 <div key={call.id} className="rounded border border-stone-700 bg-stone-950/80 p-3 text-xs">
-                  <p className="font-semibold text-cyan-300">#{index + 1} · {call.column_letter} - {call.track_title}</p>
+                  <p className="font-semibold text-cyan-300">#{index + 1} · {formatBallLabel(call.ball_number, call.column_letter)} - {call.track_title}</p>
                   <p className="text-stone-300">{call.artist_name} · {call.album_name ?? ""}</p>
                   <p className="text-stone-500">Side {call.side ?? "-"} · Position {call.position ?? "-"}</p>
                   <div className="mt-2 grid grid-cols-3 gap-2">

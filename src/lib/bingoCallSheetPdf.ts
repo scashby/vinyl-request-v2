@@ -1,8 +1,10 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatBallLabel } from "src/lib/bingoBall";
 
 type CallRow = {
   call_index: number;
+  ball_number?: number | null;
   column_letter: string;
   track_title: string;
   artist_name: string;
@@ -17,10 +19,10 @@ export function generateBingoCallSheetPdf(rows: CallRow[], title: string) {
 
   autoTable(doc, {
     startY: 18,
-    head: [["#", "Col", "Track", "Artist", "Album"]],
+    head: [["#", "Ball", "Track", "Artist", "Album"]],
     body: rows.map((row) => [
       row.call_index,
-      row.column_letter,
+      formatBallLabel(row.ball_number ?? null, row.column_letter),
       row.track_title,
       row.artist_name,
       row.album_name ?? "",

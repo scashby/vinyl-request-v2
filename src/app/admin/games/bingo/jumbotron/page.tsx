@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { formatBallLabel } from "src/lib/bingoBall";
 
 type Session = {
   session_code: string;
@@ -17,7 +18,7 @@ type Session = {
   paused_at: string | null;
 };
 
-type Call = { id: number; call_index: number; column_letter: string; track_title: string; status: string };
+type Call = { id: number; call_index: number; ball_number: number | null; column_letter: string; track_title: string; status: string };
 
 export default function BingoJumbotronPage() {
   const sessionId = Number(useSearchParams().get("sessionId"));
@@ -81,13 +82,15 @@ export default function BingoJumbotronPage() {
 
         <section className="rounded-3xl border border-stone-700 bg-black/45 p-8">
           <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Current Call</p>
-          <p className="mt-2 text-7xl font-black text-amber-200">{current ? `${current.column_letter} - ${current.track_title}` : "Waiting"}</p>
+          <p className="mt-2 text-7xl font-black text-amber-200">
+            {current ? `${formatBallLabel(current.ball_number, current.column_letter)} - ${current.track_title}` : "Waiting"}
+          </p>
         </section>
 
         <section className="rounded-3xl border border-stone-700 bg-black/45 p-6">
           <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Recently Called</p>
           <div className="mt-3 grid gap-2 text-2xl font-semibold">
-            {recent.map((call) => <div key={call.id}>{call.column_letter} - {call.track_title}</div>)}
+            {recent.map((call) => <div key={call.id}>{formatBallLabel(call.ball_number, call.column_letter)} - {call.track_title}</div>)}
           </div>
         </section>
       </div>
