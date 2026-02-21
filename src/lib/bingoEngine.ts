@@ -83,6 +83,20 @@ export function parseTrackKey(trackKey: string): ParsedTrackKey {
   const inventoryIdRaw = Number.parseInt(parts[0] ?? "", 10);
   const inventoryId = Number.isFinite(inventoryIdRaw) ? inventoryIdRaw : null;
 
+  // Some imports/materialized playlists store keys like `${inventory_id}:${position}` (ex: `123:A1`).
+  // Treat the second token as a position lookup.
+  if (parts.length === 2 && inventoryId !== null) {
+    const position = (parts[1] ?? "").trim();
+    if (position) {
+      return {
+        inventoryId,
+        releaseTrackId: null,
+        recordingId: null,
+        fallbackPosition: position,
+      };
+    }
+  }
+
   if (parts[1] === "fallback") {
     return {
       inventoryId,
