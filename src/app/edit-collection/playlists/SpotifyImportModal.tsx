@@ -8,6 +8,20 @@ type SpotifyPlaylist = {
   trackCount: number | null;
   canImport?: boolean;
   importReason?: string | null;
+  snapshotId?: string | null;
+};
+
+type MatchCandidate = {
+  track_key: string;
+  title: string;
+  artist: string;
+  score: number;
+};
+
+type UnmatchedTrack = {
+  title?: string;
+  artist?: string;
+  candidates?: MatchCandidate[];
 };
 
 interface SpotifyImportModalProps {
@@ -36,6 +50,9 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
   const [lastResult, setLastResult] = useState<string | null>(null);
   const [scope, setScope] = useState('');
   const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null);
+  const [unmatched, setUnmatched] = useState<UnmatchedTrack[]>([]);
+  const [lastImportedPlaylistId, setLastImportedPlaylistId] = useState<number | null>(null);
+  const [resolvingTrack, setResolvingTrack] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -54,6 +71,8 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
       setLoading(true);
       setError(null);
       setLastResult(null);
+      setUnmatched([]);
+      setLastImportedPlaylistId(null);
       try {
         const res = await fetch('/api/spotify/playlists', { cache: 'no-store' });
         const payload = await res.json().catch(() => ({}));
@@ -202,6 +221,8 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                           setImportingId(playlist.id);
                           setError(null);
                           setLastResult(null);
+                          setUnmatched([]);
+                          setLastImportedPlaylistId(null);
                           try {
                             const res = await fetch('/api/spotify/import', {
                               method: 'POST',
@@ -220,9 +241,16 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                             const partialNote = payload?.partialImport
                               ? ' (partial import: Spotify blocked full track paging, used first-page fallback)'
                               : '';
+                            const fuzzyNote = payload?.fuzzyMatchedCount
+                              ? `, ${payload.fuzzyMatchedCount} fuzzy-matched`
+                              : '';
                             setLastResult(
-                              `Imported "${playlist.name}": ${payload.matchedCount} matched, ${payload.unmatchedCount} unmatched${partialNote}`
+                              `Imported "${playlist.name}": ${payload.matchedCount} matched${fuzzyNote}, ${payload.unmatchedCount} unmatched${partialNote}`
                             );
+                            setLastImportedPlaylistId(
+                              typeof payload?.playlistId === 'number' ? payload.playlistId : null
+                            );
+                            setUnmatched(Array.isArray(payload?.unmatchedSample) ? payload.unmatchedSample : []);
                             await onImported();
                           } catch (err) {
                             setError(err instanceof Error ? err.message : 'Import failed');
@@ -237,6 +265,66 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                       </button>
                     </div>
                   ))}
+                </div>
+              )}
+              {lastImportedPlaylistId && unmatched.length > 0 && (
+                <div className="mt-4 border border-amber-200 bg-amber-50 rounded p-3">
+                  <div className="text-sm font-semibold text-amber-900 mb-2">
+                    Unmatched Tracks ({unmatched.length})
+                  </div>
+                  <div className="space-y-2 max-h-56 overflow-y-auto">
+                    {unmatched.map((row, idx) => {
+                      const best = row.candidates?.[0];
+                      return (
+                        <div key={`${row.title ?? 'untitled'}-${idx}`} className="bg-white border border-amber-200 rounded p-2">
+                          <div className="text-xs text-gray-800">
+                            <span className="font-medium">{row.title || '(no title)'}</span>
+                            {row.artist ? ` - ${row.artist}` : ''}
+                          </div>
+                          {best ? (
+                            <div className="mt-1 flex items-center justify-between gap-2">
+                              <div className="text-xs text-gray-600">
+                                Suggestion: {best.title} - {best.artist} ({Math.round(best.score * 100)}%)
+                              </div>
+                              <button
+                                disabled={resolvingTrack === best.track_key}
+                                onClick={async () => {
+                                  setResolvingTrack(best.track_key);
+                                  try {
+                                    const res = await fetch('/api/spotify/import/resolve', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        playlistId: lastImportedPlaylistId,
+                                        trackKey: best.track_key,
+                                        sourceTitle: row.title,
+                                        sourceArtist: row.artist,
+                                      }),
+                                    });
+                                    const payload = await res.json().catch(() => ({}));
+                                    if (!res.ok) {
+                                      throw new Error(payload?.error || `Resolve failed (${res.status})`);
+                                    }
+                                    setUnmatched((prev) => prev.filter((_, i) => i !== idx));
+                                    await onImported();
+                                  } catch (err) {
+                                    setError(err instanceof Error ? err.message : 'Resolve failed');
+                                  } finally {
+                                    setResolvingTrack(null);
+                                  }
+                                }}
+                                className={`px-2 py-1 rounded text-xs text-white ${resolvingTrack === best.track_key ? 'bg-gray-400' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                              >
+                                {resolvingTrack === best.track_key ? 'Adding...' : 'Add Suggestion'}
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="mt-1 text-xs text-gray-500">No suggestion found</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </>

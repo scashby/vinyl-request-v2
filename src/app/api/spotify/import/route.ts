@@ -234,7 +234,7 @@ export async function POST(req: Request) {
     step = 'inventory-index';
     const inventoryTracks = await fetchInventoryTracks();
     const index = buildInventoryIndex(inventoryTracks);
-    const { matched, missing } = matchTracks(rows, index);
+    const { matched, missing, fuzzyMatchedCount } = matchTracks(rows, index);
 
     step = 'create-playlist';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -296,6 +296,7 @@ export async function POST(req: Request) {
       importSource,
       partialImport,
       matchedCount: dedupedTrackKeys.length,
+      fuzzyMatchedCount,
       unmatchedCount: missing.length,
       unmatchedSample: missing.slice(0, 25),
     });
