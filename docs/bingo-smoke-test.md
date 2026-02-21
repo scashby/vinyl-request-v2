@@ -1,7 +1,8 @@
 # Bingo Smoke Test (Playlist-First)
 
 ## 1. DB setup
-1. Run `sql/create-bingo-core.sql`.
+1. Run `sql/create-bingo-core.sql` (safe to re-run; it will add any missing columns on existing installs).
+2. If Supabase/PostgREST still reports a schema cache error, reload the API schema (or run `NOTIFY pgrst, 'reload schema';`) and retry.
 
 ## 2. Setup page
 1. Open `/admin/games/bingo`.

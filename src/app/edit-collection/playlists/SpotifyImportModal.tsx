@@ -37,6 +37,14 @@ type PlaylistsPayload = {
   error?: string;
 };
 
+type ImportResume = {
+  spotifyPlaylistId?: string;
+  snapshotId?: string | null;
+  nextOffset?: number | null;
+  maxPages?: number;
+  existingPlaylistId?: number | null;
+};
+
 let playlistsCache: { expiresAt: number; payload: PlaylistsPayload } | null = null;
 const PLAYLISTS_CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -53,6 +61,8 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
   const [unmatched, setUnmatched] = useState<UnmatchedTrack[]>([]);
   const [lastImportedPlaylistId, setLastImportedPlaylistId] = useState<number | null>(null);
   const [resolvingTrack, setResolvingTrack] = useState<string | null>(null);
+  const [resume, setResume] = useState<ImportResume | null>(null);
+  const [retryAfterSeconds, setRetryAfterSeconds] = useState<number | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -73,6 +83,8 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
       setLastResult(null);
       setUnmatched([]);
       setLastImportedPlaylistId(null);
+      setResume(null);
+      setRetryAfterSeconds(null);
       try {
         const res = await fetch('/api/spotify/playlists', { cache: 'no-store' });
         const payload = await res.json().catch(() => ({}));
@@ -223,6 +235,8 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                           setLastResult(null);
                           setUnmatched([]);
                           setLastImportedPlaylistId(null);
+                          setResume(null);
+                          setRetryAfterSeconds(null);
                           try {
                             const res = await fetch('/api/spotify/import', {
                               method: 'POST',
@@ -230,9 +244,18 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                               body: JSON.stringify({
                                 playlistId: playlist.id,
                                 playlistName: playlist.name,
+                                snapshotId: (playlist as any).snapshotId ?? null,
+                                maxPages: 2,
                               }),
                             });
                             const payload = await res.json().catch(() => ({}));
+                            if (res.status === 429) {
+                              setRetryAfterSeconds(
+                                typeof payload?.retryAfterSeconds === 'number' ? payload.retryAfterSeconds : null
+                              );
+                              setResume(payload?.resume ?? null);
+                              throw new Error(payload?.error || `Import rate-limited (${res.status})`);
+                            }
                             if (!res.ok) {
                               const detail = payload?.details ? ` (${payload.details})` : '';
                               const granted = payload?.scope ? ` [scope: ${payload.scope}]` : '';
@@ -251,6 +274,7 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                               typeof payload?.playlistId === 'number' ? payload.playlistId : null
                             );
                             setUnmatched(Array.isArray(payload?.unmatchedSample) ? payload.unmatchedSample : []);
+                            setResume(payload?.resume ?? null);
                             await onImported();
                           } catch (err) {
                             setError(err instanceof Error ? err.message : 'Import failed');
@@ -265,6 +289,59 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                       </button>
                     </div>
                   ))}
+                </div>
+              )}
+              {resume?.nextOffset !== null && typeof resume?.nextOffset === 'number' && lastImportedPlaylistId && (
+                <div className="mt-3 flex items-center justify-between border border-blue-200 bg-blue-50 rounded p-3">
+                  <div className="text-xs text-blue-900">
+                    Import paused at offset {resume.nextOffset}. Continue to import more tracks.
+                    {retryAfterSeconds !== null ? ` Retry after about ${Math.ceil(retryAfterSeconds / 60)} minute(s).` : ''}
+                  </div>
+                  <button
+                    disabled={retryAfterSeconds !== null && retryAfterSeconds > 0}
+                    onClick={async () => {
+                      setError(null);
+                      setLastResult(null);
+                      try {
+                        const res = await fetch('/api/spotify/import', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            playlistId: resume.spotifyPlaylistId,
+                            playlistName: '(resume)',
+                            existingPlaylistId: lastImportedPlaylistId,
+                            offset: resume.nextOffset,
+                            snapshotId: resume.snapshotId ?? null,
+                            maxPages: 2,
+                          }),
+                        });
+                        const payload = await res.json().catch(() => ({}));
+                        if (res.status === 429) {
+                          setRetryAfterSeconds(
+                            typeof payload?.retryAfterSeconds === 'number' ? payload.retryAfterSeconds : null
+                          );
+                          setResume(payload?.resume ?? null);
+                          throw new Error(payload?.error || `Import rate-limited (${res.status})`);
+                        }
+                        if (!res.ok) {
+                          throw new Error(payload?.error || `Continue failed (${res.status})`);
+                        }
+                        const fuzzyNote = payload?.fuzzyMatchedCount ? `, ${payload.fuzzyMatchedCount} fuzzy-matched` : '';
+                        setLastResult(
+                          `Continued import: ${payload.matchedCount} matched${fuzzyNote}, ${payload.unmatchedCount} unmatched`
+                        );
+                        setUnmatched(Array.isArray(payload?.unmatchedSample) ? payload.unmatchedSample : []);
+                        setResume(payload?.resume ?? null);
+                        setRetryAfterSeconds(null);
+                        await onImported();
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : 'Continue import failed');
+                      }
+                    }}
+                    className="px-3 py-2 rounded bg-blue-700 text-white text-xs font-medium disabled:bg-gray-400"
+                  >
+                    Continue Import
+                  </button>
                 </div>
               )}
               {lastImportedPlaylistId && unmatched.length > 0 && (

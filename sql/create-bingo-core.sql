@@ -50,6 +50,15 @@ CREATE TABLE IF NOT EXISTS public.bingo_sessions (
   )
 );
 
+-- Backfill/upgrade for existing installs that ran an older version of this script
+-- (CREATE TABLE IF NOT EXISTS won't add new columns).
+ALTER TABLE public.bingo_sessions
+  ADD COLUMN IF NOT EXISTS remove_resleeve_seconds integer NOT NULL DEFAULT 20,
+  ADD COLUMN IF NOT EXISTS place_vinyl_seconds integer NOT NULL DEFAULT 8,
+  ADD COLUMN IF NOT EXISTS cue_seconds integer NOT NULL DEFAULT 12,
+  ADD COLUMN IF NOT EXISTS start_slide_seconds integer NOT NULL DEFAULT 5,
+  ADD COLUMN IF NOT EXISTS host_buffer_seconds integer NOT NULL DEFAULT 2;
+
 CREATE TABLE IF NOT EXISTS public.bingo_session_calls (
   id bigserial PRIMARY KEY,
   session_id bigint NOT NULL REFERENCES public.bingo_sessions(id) ON DELETE CASCADE,

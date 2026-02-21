@@ -31,6 +31,19 @@ type InventoryIndex = {
   byToken: Map<string, InventoryTrack[]>;
 };
 
+type CachedInventoryIndex = {
+  expiresAt: number;
+  index: InventoryIndex;
+};
+
+const INVENTORY_INDEX_TTL_MS = 10 * 60 * 1000;
+
+const inventoryIndexCache: { current?: CachedInventoryIndex } =
+  (globalThis as { __inventoryIndexCache?: { current?: CachedInventoryIndex } }).__inventoryIndexCache ??
+  {};
+(globalThis as { __inventoryIndexCache?: { current?: CachedInventoryIndex } }).__inventoryIndexCache =
+  inventoryIndexCache;
+
 const normalizeValue = (value: string) =>
   value
     .toLowerCase()
@@ -158,6 +171,18 @@ export const buildInventoryIndex = (tracks: InventoryTrack[]): InventoryIndex =>
     }
   }
   return { exact, titleOnly, byToken };
+};
+
+export const getCachedInventoryIndex = async () => {
+  const now = Date.now();
+  const cached = inventoryIndexCache.current;
+  if (cached && cached.expiresAt > now) {
+    return cached.index;
+  }
+  const tracks = await fetchInventoryTracks();
+  const index = buildInventoryIndex(tracks);
+  inventoryIndexCache.current = { expiresAt: now + INVENTORY_INDEX_TTL_MS, index };
+  return index;
 };
 
 export const matchTracks = (

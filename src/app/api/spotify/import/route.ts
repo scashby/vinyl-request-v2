@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
-import { buildInventoryIndex, fetchInventoryTracks, matchTracks, sanitizePlaylistName } from '../../../../lib/vinylPlaylistImport';
+import { getCachedInventoryIndex, matchTracks, sanitizePlaylistName } from '../../../../lib/vinylPlaylistImport';
 import { getSpotifyAccessTokenFromCookies, spotifyApiGet, spotifyApiGetByUrl, SpotifyApiError } from '../../../../lib/spotifyUser';
 
 type SpotifyTrackItem = {
@@ -47,6 +47,10 @@ export async function POST(req: Request) {
   let spotifyScope = '';
   let spotifyUserId = '';
   let playlistOwnerId = '';
+  let resumeOffset = 0;
+  let spotifyPlaylistId = '';
+  let spotifySnapshotId = '';
+  let localPlaylistId: number | null = null;
   const trackFetchErrors: Array<{ path: string; error: string }> = [];
   const metaFetchErrors: Array<{ path: string; error: string }> = [];
   let metaItemsRawCount = 0;
@@ -57,9 +61,15 @@ export async function POST(req: Request) {
     const body = await req.json();
     const playlistId = String(body?.playlistId ?? '').trim();
     const playlistName = sanitizePlaylistName(String(body?.playlistName ?? ''));
+    const existingPlaylistId = Number(body?.existingPlaylistId ?? 0);
+    const startOffset = Number(body?.offset ?? 0);
+    const maxPages = Math.min(5, Math.max(1, Number(body?.maxPages ?? 2)));
+    const providedSnapshotId = String(body?.snapshotId ?? '').trim();
     if (!playlistId) {
       return NextResponse.json({ error: 'playlistId is required' }, { status: 400 });
     }
+    spotifyPlaylistId = playlistId;
+    resumeOffset = Number.isFinite(startOffset) && startOffset >= 0 ? startOffset : 0;
 
     step = 'spotify-token';
     const tokenData = await getSpotifyAccessTokenFromCookies();
@@ -77,6 +87,7 @@ export async function POST(req: Request) {
     let sourceTotal: number | null = null;
     let partialImport = false;
     let importSource: 'playlist_items' | 'playlist_fallback' = 'playlist_items';
+    let pagesFetched = 0;
 
     const extractRows = (items: SpotifyTrackItem[] = []) => {
       const parsed: Array<{ title?: string; artist?: string }> = [];
@@ -92,7 +103,9 @@ export async function POST(req: Request) {
     let playlist: SpotifyPlaylistMeta | null = null;
     const playlistMetaPaths = [
       `/playlists/${playlistId}?fields=name,owner(id),tracks(total,next,items(item(type,name,artists(name)),track(name,artists(name))))&market=from_token`,
+      `/playlists/${playlistId}?fields=name,owner(id),snapshot_id,tracks(total,href)&market=from_token`,
       `/playlists/${playlistId}?fields=name,owner(id),tracks(total,next,items(item(type,name,artists(name)),track(name,artists(name))))`,
+      `/playlists/${playlistId}?fields=name,owner(id),snapshot_id,tracks(total,href)`,
       `/playlists/${playlistId}?market=from_token`,
       `/playlists/${playlistId}`,
     ];
@@ -113,6 +126,7 @@ export async function POST(req: Request) {
     }
 
     playlistOwnerId = playlist.owner?.id ?? '';
+    spotifySnapshotId = (playlist as unknown as { snapshot_id?: string }).snapshot_id ?? '';
     sourceTotal =
       typeof playlist.tracks?.total === 'number'
         ? playlist.tracks.total
@@ -124,10 +138,10 @@ export async function POST(req: Request) {
     rows.push(...metaParsedRows);
 
     step = 'spotify-tracks';
-    let offset = rows.length;
+    let offset = resumeOffset;
     let shouldProbeFirstPage = rows.length === 0;
     const totalToFetch = sourceTotal ?? Number.MAX_SAFE_INTEGER;
-    while (shouldProbeFirstPage || offset < totalToFetch) {
+    while ((shouldProbeFirstPage || offset < totalToFetch) && pagesFetched < maxPages) {
       shouldProbeFirstPage = false;
       const trackPagePaths = [
         `/playlists/${playlistId}/items?limit=50&offset=${offset}&market=from_token&additional_types=track&fields=items(item(type,name,artists(name)),track(name,artists(name))),next`,
@@ -158,6 +172,7 @@ export async function POST(req: Request) {
           }
 
           rows.push(...parsedRows);
+          pagesFetched += 1;
           if (pageItems.length === 0 || parsedRows.length === 0) {
             offset = totalToFetch;
           } else {
@@ -219,6 +234,12 @@ export async function POST(req: Request) {
           step,
           sourceTotal,
           sourceCount: rows.length,
+          resume: {
+            spotifyPlaylistId,
+            snapshotId: spotifySnapshotId || providedSnapshotId || null,
+            nextOffset: resumeOffset,
+            maxPages,
+          },
           debug: {
             metaItemsRawCount,
             metaItemsParsedCount,
@@ -232,40 +253,44 @@ export async function POST(req: Request) {
     }
 
     step = 'inventory-index';
-    const inventoryTracks = await fetchInventoryTracks();
-    const index = buildInventoryIndex(inventoryTracks);
+    const index = await getCachedInventoryIndex();
     const { matched, missing, fuzzyMatchedCount } = matchTracks(rows, index);
 
     step = 'create-playlist';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = supabaseAdmin as any;
-    const { data: maxSortRow } = await db
-      .from('collection_playlists')
-      .select('sort_order')
-      .order('sort_order', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const maxSortOrder =
-      maxSortRow && typeof maxSortRow.sort_order === 'number' ? maxSortRow.sort_order : -1;
-    const nextSortOrder = maxSortOrder + 1;
+    if (Number.isFinite(existingPlaylistId) && existingPlaylistId > 0) {
+      localPlaylistId = existingPlaylistId;
+    } else {
+      const { data: maxSortRow } = await db
+        .from('collection_playlists')
+        .select('sort_order')
+        .order('sort_order', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const maxSortOrder =
+        maxSortRow && typeof maxSortRow.sort_order === 'number' ? maxSortRow.sort_order : -1;
+      const nextSortOrder = maxSortOrder + 1;
 
-    const { data: inserted, error: insertError } = await db
-      .from('collection_playlists')
-      .insert({
-        name: playlistName,
-        icon: '🎵',
-        color: '#1db954',
-        sort_order: nextSortOrder,
-        is_smart: false,
-        smart_rules: null,
-        match_rules: 'all',
-        live_update: true,
-      })
-      .select('id')
-      .single();
+      const { data: inserted, error: insertError } = await db
+        .from('collection_playlists')
+        .insert({
+          name: playlistName,
+          icon: '🎵',
+          color: '#1db954',
+          sort_order: nextSortOrder,
+          is_smart: false,
+          smart_rules: null,
+          match_rules: 'all',
+          live_update: true,
+        })
+        .select('id')
+        .single();
 
-    if (insertError || !inserted) {
-      throw insertError || new Error('Failed to create local playlist');
+      if (insertError || !inserted) {
+        throw insertError || new Error('Failed to create local playlist');
+      }
+      localPlaylistId = inserted.id;
     }
 
     step = 'insert-playlist-items';
@@ -276,7 +301,7 @@ export async function POST(req: Request) {
 
     if (dedupedTrackKeys.length > 0) {
       const records = dedupedTrackKeys.map((trackKey, idx) => ({
-        playlist_id: inserted.id,
+        playlist_id: localPlaylistId,
         track_key: trackKey,
         sort_order: idx,
       }));
@@ -287,9 +312,10 @@ export async function POST(req: Request) {
     }
 
     step = 'build-response';
+    const moreAvailable = sourceTotal !== null ? offset < sourceTotal : pagesFetched >= maxPages;
     const response = NextResponse.json({
       ok: true,
-      playlistId: inserted.id,
+      playlistId: localPlaylistId,
       playlistName,
       sourceCount: rows.length,
       sourceTotal,
@@ -299,6 +325,12 @@ export async function POST(req: Request) {
       fuzzyMatchedCount,
       unmatchedCount: missing.length,
       unmatchedSample: missing.slice(0, 25),
+      resume: {
+        spotifyPlaylistId,
+        snapshotId: spotifySnapshotId || providedSnapshotId || null,
+        nextOffset: moreAvailable ? offset : null,
+        maxPages,
+      },
     });
 
     if (tokenData.refreshed) {
@@ -347,6 +379,12 @@ export async function POST(req: Request) {
           spotifyUserId,
           playlistOwnerId,
           step,
+          resume: {
+            spotifyPlaylistId,
+            snapshotId: spotifySnapshotId || null,
+            nextOffset: resumeOffset,
+            existingPlaylistId: localPlaylistId,
+          },
         },
         { status: 429 }
       );
