@@ -67,7 +67,6 @@ export default function BingoHostPage() {
   const called = useMemo(() => calls.filter((call) => ["called", "completed", "skipped"].includes(call.status)), [calls]);
   const previous = useMemo(() => called.slice(Math.max(0, called.length - 5), called.length - 1), [called]);
   const callForControls = activeCall ?? nextPendingCall;
-  const board = useMemo(() => [...calls].sort((a, b) => (a.ball_number ?? 999) - (b.ball_number ?? 999)), [calls]);
 
   const advance = async () => {
     await fetch(`/api/games/bingo/sessions/${sessionId}/advance`, { method: "POST" });
@@ -136,17 +135,18 @@ export default function BingoHostPage() {
 
         <div className="grid gap-4 lg:grid-cols-[1.3fr,1fr]">
           <section className="rounded-2xl border border-stone-700 bg-black/50 p-4">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-amber-200">Round Playlist</h2>
+            <h2 className="text-sm font-bold uppercase tracking-wide text-amber-200">Crate (Call Order)</h2>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="text-stone-300">
-                    <th className="pb-2">Column</th><th className="pb-2">Track</th><th className="pb-2">Artist</th><th className="pb-2">Album</th>
+                    <th className="pb-2">Draw</th><th className="pb-2">Ball</th><th className="pb-2">Track</th><th className="pb-2">Artist</th><th className="pb-2">Album</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {board.map((call) => (
+                  {calls.map((call) => (
                     <tr key={call.id} className="border-t border-stone-800 align-top">
+                      <td className="py-2 text-stone-400">{call.call_index}</td>
                       <td className="py-2 font-bold text-amber-300">{formatBallLabel(call.ball_number, call.column_letter)}</td>
                       <td className="py-2">{call.track_title}</td>
                       <td className="py-2">{call.artist_name}</td>
