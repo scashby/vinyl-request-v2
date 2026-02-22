@@ -62,20 +62,10 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
       current = "";
     };
 
-    const splitLongToken = (token: string) => {
-      // Fallback for "words" that won't fit even alone (no spaces).
-      const parts: string[] = [];
-      let remaining = token;
-      while (remaining.length) {
-        let cut = remaining.length;
-        while (cut > 1 && doc.getTextWidth(remaining.slice(0, cut)) > maxWidth) cut -= 1;
-        parts.push(remaining.slice(0, cut));
-        remaining = remaining.slice(cut);
-      }
-      return parts;
-    };
-
     for (const word of words) {
+      // Never break words across lines. If a single word doesn't fit, the caller must reduce font size.
+      if (doc.getTextWidth(word) > maxWidth) return [];
+
       const candidate = current ? `${current} ${word}` : word;
       if (doc.getTextWidth(candidate) <= maxWidth) {
         current = candidate;
@@ -83,20 +73,14 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
       }
 
       if (!current) {
-        // Word alone doesn't fit; split it into chunks.
-        const chunks = splitLongToken(word);
-        lines.push(...chunks);
+        // Single word doesn't fit (handled above). Keep defensive fallback.
+        return [];
         continue;
       }
 
       pushCurrent();
 
-      if (doc.getTextWidth(word) <= maxWidth) {
-        current = word;
-      } else {
-        const chunks = splitLongToken(word);
-        lines.push(...chunks);
-      }
+      current = word;
     }
 
     pushCurrent();
@@ -113,25 +97,49 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
     const { title: rawTitle, artist: rawArtist } = splitLabel(cleaned);
     const titleText = rawTitle || cleaned;
     const artistText = rawArtist || "";
-    const combined = artistText ? `${titleText} — ${artistText}` : titleText;
 
     const maxFont = layout === "4-up" ? 14 : 18;
     // Never truncate: allow font to shrink aggressively to fit the cell.
-    const minFont = layout === "4-up" ? 1.25 : 1.5;
+    const minFont = layout === "4-up" ? 0.75 : 1.0;
     const step = 0.25;
 
     for (let fontSize = maxFont; fontSize >= minFont; fontSize -= step) {
       doc.setFontSize(fontSize);
-      const lines = wrapTextToWidth(combined, availableW);
-      if (lines.length === 0) return { lines: [] as string[], fontSize };
 
-      const lineH = doc.getTextDimensions("Mg").h * 0.98;
-      const totalH = lineH * lines.length;
-      if (totalH <= availableH) return { lines, fontSize };
+      const titleLines = wrapTextToWidth(titleText, availableW);
+      if (titleLines.length === 0) continue;
+
+      const artistLines = artistText ? wrapTextToWidth(artistText, availableW) : [];
+      if (artistText && artistLines.length === 0) continue;
+
+      const titleLineH = doc.getTextDimensions("Mg").h * 0.98;
+      const artistLineH = titleLineH;
+      const sepLineH = artistText ? Math.max(1, fontSize * 0.1) : 0;
+      const sepGap = artistText ? Math.max(2, fontSize * 0.2) : 0;
+
+      const totalH =
+        titleLineH * titleLines.length +
+        (artistText ? sepGap + sepLineH + sepGap : 0) +
+        artistLineH * artistLines.length;
+
+      if (totalH <= availableH) {
+        // Use a sentinel empty string to indicate a separator line between title and artist.
+        const lines = artistText ? [...titleLines, "", ...artistLines] : [...titleLines];
+        return { lines, fontSize, _meta: { titleLines, artistLines, titleLineH, artistLineH, sepLineH, sepGap } };
+      }
     }
 
     doc.setFontSize(minFont);
-    return { lines: wrapTextToWidth(combined, availableW), fontSize: minFont };
+    // If it still doesn't fit at min font, prefer showing all text (may be tiny) over truncation.
+    // We keep "no word breaks" by letting wrapTextToWidth return [] if any word doesn't fit.
+    const titleLines = wrapTextToWidth(titleText, availableW);
+    const artistLines = artistText ? wrapTextToWidth(artistText, availableW) : [];
+    const titleLineH = doc.getTextDimensions("Mg").h * 0.98;
+    const artistLineH = titleLineH;
+    const sepLineH = artistText ? Math.max(1, minFont * 0.1) : 0;
+    const sepGap = artistText ? Math.max(2, minFont * 0.2) : 0;
+    const lines = artistText ? [...titleLines, "", ...artistLines] : [...titleLines];
+    return { lines, fontSize: minFont, _meta: { titleLines, artistLines, titleLineH, artistLineH, sepLineH, sepGap } };
   }
 
   function renderCellText(label: string, cellX: number, cellY: number, cellW: number, cellH: number) {
@@ -143,20 +151,60 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
     const innerW = Math.max(1, cellW - cellPaddingX * 2);
     const innerH = Math.max(1, cellH - cellPaddingY * 2);
 
-    const best = fitTextToCell(baseLabel, innerW, innerH);
+    const best = fitTextToCell(baseLabel, innerW, innerH) as {
+      lines: string[];
+      fontSize: number;
+      _meta?: {
+        titleLines: string[];
+        artistLines: string[];
+        titleLineH: number;
+        artistLineH: number;
+        sepLineH: number;
+        sepGap: number;
+      };
+    };
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(best.fontSize);
-    const lineH = doc.getTextDimensions("Mg").h * 0.98;
-    const totalH = lineH * best.lines.length;
+
+    const meta = best._meta;
+    const titleLines = meta?.titleLines ?? best.lines;
+    const artistLines = meta?.artistLines ?? [];
+    const titleLineH = meta?.titleLineH ?? doc.getTextDimensions("Mg").h * 0.98;
+    const artistLineH = meta?.artistLineH ?? titleLineH;
+    const sepLineH = meta?.sepLineH ?? 0;
+    const sepGap = meta?.sepGap ?? 0;
+
+    const totalH =
+      titleLineH * titleLines.length +
+      (artistLines.length ? sepGap + sepLineH + sepGap : 0) +
+      artistLineH * artistLines.length;
+
     const centerX = innerX + innerW / 2;
     const centerY = innerY + innerH / 2;
     const startY = centerY - totalH / 2;
 
-    // Use baseline=top to reduce the risk of clipping at cell borders.
-    best.lines.forEach((line, index) => {
-      doc.text(line, centerX, startY + lineH * index, { align: "center", baseline: "top" });
+    // Title (top block)
+    titleLines.forEach((line, index) => {
+      doc.text(line, centerX, startY + titleLineH * index, { align: "center", baseline: "top" });
     });
+
+    let cursorY = startY + titleLineH * titleLines.length;
+
+    // Separator line between title and artist
+    if (artistLines.length) {
+      cursorY += sepGap;
+      const lineY = cursorY + sepLineH / 2;
+      const lineX1 = innerX + innerW * 0.15;
+      const lineX2 = innerX + innerW * 0.85;
+      doc.setLineWidth(Math.min(1.0, Math.max(0.5, sepLineH)));
+      doc.line(lineX1, lineY, lineX2, lineY);
+      cursorY += sepLineH + sepGap;
+
+      artistLines.forEach((line, index) => {
+        doc.text(line, centerX, cursorY + artistLineH * index, { align: "center", baseline: "top" });
+      });
+    }
   }
 
   cards.forEach((card, index) => {
