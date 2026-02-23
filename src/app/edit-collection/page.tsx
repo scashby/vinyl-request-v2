@@ -579,181 +579,30 @@ function CollectionBrowserPage() {
 
   const loadAlbums = useCallback(async () => {
     setLoading(true);
-    
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let allRows: any[] = [];
-    let from = 0;
-    const batchSize = 300;
-    let keepGoing = true;
 
-    while (keepGoing) {
-      const { data: batch, error } = await supabase
-        .from('inventory')
-        .select(
-          `id,
-           release_id,
-           status,
-           personal_notes,
-           media_condition,
-           sleeve_condition,
-           location,
-           date_added,
-           created_at,
-           purchase_price,
-           current_value,
-           purchase_date,
-           owner,
-           play_count,
-           last_played_at,
-             release:releases (
-               id,
-               master_id,
-               media_type,
-               label,
-               catalog_number,
-               barcode,
-               country,
-               release_date,
-               release_year,
-               discogs_release_id,
-               spotify_album_id,
-               notes,
-               track_count,
-               qty,
-               format_details,
-               master:masters (
-                 id,
-                 title,
-                 original_release_year,
-                 notes,
-                 discogs_master_id,
-                 cover_image_url,
-                 genres,
-                 styles,
-               artist:artists (id, name),
-               master_tag_links:master_tag_links (
-                 master_tags (name)
-               )
-             )
-           )`
-        )
-        .order('id', { ascending: true })
-        .range(from, from + batchSize - 1);
-
-      if (error) {
-        console.error('Error loading albums:', error);
+    const all: Album[] = [];
+    let page = 0;
+    const pageSize = 75;
+    while (true) {
+      const url = new URL('/api/library/albums', window.location.origin);
+      url.searchParams.set('page', String(page));
+      url.searchParams.set('pageSize', String(pageSize));
+      url.searchParams.set('includeTracks', 'true');
+      const res = await fetch(url.toString(), { cache: 'no-store' });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error('Error loading albums via library API:', payload?.error || res.status);
         break;
       }
-
-      if (!batch || batch.length === 0) break;
-
-      allRows = allRows.concat(batch);
-      keepGoing = batch.length === batchSize;
-      from += batchSize;
-
-      if (keepGoing) {
-        // Avoid blasting PostgREST with back-to-back large pages.
-        await new Promise((resolve) => setTimeout(resolve, 75));
-      }
+      const batch = Array.isArray(payload?.data) ? (payload.data as Album[]) : [];
+      all.push(...batch);
+      const hasMore = Boolean(payload?.hasMore);
+      if (!hasMore || batch.length === 0) break;
+      page += 1;
+      await new Promise((resolve) => setTimeout(resolve, 40));
     }
 
-    const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
-      Array.isArray(value) ? value[0] ?? null : value ?? null;
-
-    const mapped = allRows.map((row) => {
-      const release = toSingle(row.release);
-      const master = toSingle(release?.master);
-      return {
-        ...row,
-        release,
-        release_notes: release?.notes ?? null,
-        master_notes: master?.notes ?? null,
-      };
-    });
-
-    const releaseIds = Array.from(
-      new Set(
-        mapped
-          .map((row) => row.release?.id)
-          .filter((id): id is number => typeof id === 'number')
-      )
-    );
-
-    const releaseTracksByReleaseId: Record<number, unknown[]> = {};
-    const releaseChunkSize = 200;
-
-    for (let i = 0; i < releaseIds.length; i += releaseChunkSize) {
-      const releaseIdChunk = releaseIds.slice(i, i + releaseChunkSize);
-      const { data: tracks, error: tracksError } = await supabase
-        .from('release_tracks')
-        .select(
-          `id,
-           release_id,
-           position,
-           side,
-           title_override,
-           recording_id,
-           recording:recordings (
-             id,
-             title,
-             duration_seconds,
-             track_artist
-           )`
-        )
-        .in('release_id', releaseIdChunk);
-
-      if (tracksError) {
-        console.error('Error loading release tracks (with recordings join):', tracksError);
-        const { data: fallbackTracks, error: fallbackError } = await supabase
-          .from('release_tracks')
-          .select('id, release_id, position, side, title_override, recording_id')
-          .in('release_id', releaseIdChunk);
-
-        if (fallbackError) {
-          console.error('Error loading release tracks (fallback):', fallbackError);
-          continue;
-        }
-
-        for (const track of fallbackTracks ?? []) {
-          const releaseId = (track as { release_id?: number }).release_id;
-          if (!releaseId) continue;
-          if (!releaseTracksByReleaseId[releaseId]) {
-            releaseTracksByReleaseId[releaseId] = [];
-          }
-          releaseTracksByReleaseId[releaseId].push({
-            ...(track as Record<string, unknown>),
-            recording: null,
-          });
-        }
-        continue;
-      }
-
-      for (const track of tracks ?? []) {
-        const releaseId = (track as { release_id?: number }).release_id;
-        if (!releaseId) continue;
-        if (!releaseTracksByReleaseId[releaseId]) {
-          releaseTracksByReleaseId[releaseId] = [];
-        }
-        releaseTracksByReleaseId[releaseId].push(track);
-      }
-
-      if (i + releaseChunkSize < releaseIds.length) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      }
-    }
-
-    const hydrated = mapped.map((row) => {
-      if (!row.release?.id) return row;
-      return {
-        ...row,
-        release: {
-          ...row.release,
-          release_tracks: releaseTracksByReleaseId[row.release.id] ?? [],
-        },
-      };
-    });
-
-    setAlbums(hydrated as Album[]);
+    setAlbums(all);
     setLoading(false);
   }, []);
 

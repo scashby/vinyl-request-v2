@@ -7,6 +7,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
+    "check:consistency": "node scripts/consistency-check.mjs",
     "prebuild": "ls -l src/lib && cat jsconfig.json"
   },
   "dependencies": {

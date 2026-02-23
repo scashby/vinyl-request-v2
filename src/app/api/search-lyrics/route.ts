@@ -1,15 +1,17 @@
 // src/app/api/search-lyrics/route.ts - Fixed with better Genius scraping
 import { NextResponse } from "next/server";
 import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
+import { getRecordingLyricsUrl, toSingle } from "src/lib/library/mappers";
 
-const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
-  Array.isArray(value) ? value[0] ?? null : value ?? null;
+// NOTE: canonical mappers live in src/lib/library/*; avoid duplicating helpers here.
 
 type Track = {
   position?: string;
   title?: string;
   duration?: string;
   lyrics_url?: string;
+  lyrics?: string | null;
+  track_artist?: string | null;
 };
 
 type SearchResult = {
@@ -163,6 +165,9 @@ export async function POST(req: Request) {
             position,
             recording:recordings (
               title,
+              track_artist,
+              lyrics,
+              lyrics_url,
               credits
             )
           )
@@ -210,26 +215,48 @@ export async function POST(req: Request) {
       try {
         const tracklists: Track[] = (release?.release_tracks ?? []).map((track) => {
           const recording = toSingle(track.recording);
-          const credits = (recording?.credits && typeof recording.credits === 'object' && !Array.isArray(recording.credits))
-            ? (recording.credits as Record<string, unknown>)
-            : {};
           return {
             position: track.position || null,
             title: recording?.title || '',
-            lyrics_url: (credits as Record<string, unknown>).lyrics_url as string | undefined
+            lyrics_url: getRecordingLyricsUrl({ lyrics_url: recording?.lyrics_url ?? null, credits: recording?.credits ?? null }) ?? undefined,
+            lyrics: typeof recording?.lyrics === 'string' ? recording.lyrics : null,
+            track_artist: typeof recording?.track_artist === 'string' ? recording.track_artist : null,
           };
         });
 
         for (const track of tracklists) {
-          if (!track.lyrics_url || !track.title) {
+          if (!track.title) {
+            continue;
+          }
+
+          console.log(`\n  🎵 ${track.title}`);
+
+          // Prefer stored lyrics when available for consistency and speed.
+          if (track.lyrics && track.lyrics.trim().length > 0) {
+            if (containsTerm(track.lyrics, searchTerm)) {
+              console.log(`  ✅ MATCH! (stored lyrics)`);
+              tracksMatched++;
+              results.push({
+                inventory_id: album.id,
+                artist: artistName,
+                album_title: albumTitle,
+                track_title: track.title,
+                track_position: track.position || null,
+                genius_url: track.lyrics_url || null,
+                image_url: master?.cover_image_url || null
+              });
+            }
+            continue;
+          }
+
+          if (!track.lyrics_url) {
             continue;
           }
 
           tracksWithUrls++;
-          console.log(`\n  🎵 ${track.title}`);
-          
+
           const lyrics = await fetchLyricsFromGeniusUrl(track.lyrics_url);
-          
+
           if (!lyrics) {
             failedFetches++;
             continue;

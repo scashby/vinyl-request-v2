@@ -85,16 +85,6 @@ const TABS: { id: TabId; label: string; IconComponent: () => React.ReactElement 
   { id: 'links', label: 'Links', IconComponent: TabIcons.globe },
 ];
 
-const parseDurationToSeconds = (duration?: string | null) => {
-  if (!duration) return null;
-  const parts = duration.split(':').map((part) => Number(part));
-  if (parts.some((part) => Number.isNaN(part))) return null;
-  if (parts.length === 1) return parts[0];
-  if (parts.length === 2) return parts[0] * 60 + parts[1];
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  return null;
-};
-
 const extractIdFromUrl = (value: string | null | undefined, marker: string): string | null => {
   if (!value) return null;
   const trimmed = value.trim();
@@ -374,203 +364,14 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
       try {
         setLoading(true);
         setError(null);
-
-        const fullSelect = `id,
-             release_id,
-             status,
-             personal_notes,
-             media_condition,
-             sleeve_condition,
-             location,
-             date_added,
-             purchase_price,
-             current_value,
-             purchase_date,
-             owner,
-             play_count,
-             last_played_at,
-             release:releases (
-               id,
-               master_id,
-               media_type,
-               label,
-               catalog_number,
-               barcode,
-               country,
-               release_date,
-               release_year,
-               discogs_release_id,
-               spotify_album_id,
-               packaging,
-               vinyl_color,
-               vinyl_weight,
-               rpm,
-               spars_code,
-               box_set,
-               sound,
-               studio,
-               disc_metadata,
-               matrix_numbers,
-               track_count,
-               notes,
-               qty,
-               format_details,
-               release_tracks:release_tracks (
-                 id,
-                 position,
-                 side,
-                 title_override,
-                 recording:recordings (
-                   id,
-                   title,
-                   duration_seconds,
-                   credits,
-                   notes,
-                   lyrics,
-                   lyrics_url,
-                   is_cover,
-                   original_artist,
-                   track_artist
-                 )
-               ),
-               master:masters (
-                 id,
-                 title,
-                 original_release_year,
-                 discogs_master_id,
-                 musicbrainz_release_group_id,
-                 cover_image_url,
-                 genres,
-                 styles,
-                 notes,
-                 sort_title,
-                 subtitle,
-                 musicians,
-                 producers,
-                 engineers,
-                 songwriters,
-                 composer,
-                 conductor,
-                 chorus,
-                 composition,
-                 orchestra,
-                 chart_positions,
-                 awards,
-                 certifications,
-                 cultural_significance,
-                 critical_reception,
-                 allmusic_rating,
-                 allmusic_review,
-                 pitchfork_score,
-                 pitchfork_review,
-                 recording_location,
-                 master_release_date,
-                 recording_date,
-                 recording_year,
-                 wikipedia_url,
-                 allmusic_url,
-                 apple_music_url,
-                 lastfm_url,
-                 spotify_url,
-                 genius_url,
-                 custom_links,
-                 artist:artists (id, name),
-                 master_tag_links:master_tag_links (
-                   master_tags (name)
-                 )
-               )
-             )`;
-
-        const fallbackSelect = `id,
-             release_id,
-             status,
-             personal_notes,
-             media_condition,
-             sleeve_condition,
-             location,
-             date_added,
-             purchase_price,
-             current_value,
-             purchase_date,
-             owner,
-             play_count,
-             last_played_at,
-             release:releases (
-               id,
-               master_id,
-               media_type,
-               label,
-               catalog_number,
-               barcode,
-               country,
-               release_date,
-               release_year,
-               discogs_release_id,
-               spotify_album_id,
-               track_count,
-               notes,
-               qty,
-               format_details,
-               release_tracks:release_tracks (
-                 id,
-                 position,
-                 side,
-                 title_override,
-                 recording:recordings (
-                   id,
-                   title,
-                   duration_seconds,
-                   credits,
-                   notes
-                 )
-               ),
-               master:masters (
-                 id,
-                 title,
-                 original_release_year,
-                 discogs_master_id,
-                 musicbrainz_release_group_id,
-                 cover_image_url,
-                 genres,
-                 styles,
-                 notes,
-                 artist:artists (id, name),
-                 master_tag_links:master_tag_links (
-                   master_tags (name)
-                 )
-               )
-             )`;
-
-        const initial = await supabase
-          .from('inventory')
-          .select(fullSelect)
-          .eq('id', albumId)
-          .single();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let data: any = initial.data;
-        let fetchError = initial.error;
-
-        if (fetchError) {
-          const message =
-            typeof fetchError.message === 'string' ? fetchError.message : '';
-          const missingColumn = message.includes('does not exist');
-          if (missingColumn) {
-            console.warn('Album fetch failed due to missing columns. Retrying with fallback select.');
-            const retry = await supabase
-              .from('inventory')
-              .select(fallbackSelect)
-              .eq('id', albumId)
-              .single();
-            data = retry.data as unknown;
-            fetchError = retry.error;
-          }
-          if (fetchError) {
-            console.error('Error fetching album:', fetchError);
-            setError('Failed to load album data');
-            return;
-          }
+        const res = await fetch(`/api/library/albums/${albumId}`, { cache: 'no-store' });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const message = payload?.error || `Failed to load album (${res.status})`;
+          setError(message);
+          return;
         }
-
+        const data = payload?.data;
         if (!data) {
           setError('Album not found');
           return;
@@ -891,75 +692,58 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         console.log('📊 Tracks data:', tracksData);
 
         if (tracksData && editedAlbum.release_id) {
-          const { error: deleteError } = await supabase
-            .from('release_tracks')
-            .delete()
-            .eq('release_id', editedAlbum.release_id);
-
-          if (deleteError) {
-            console.error('❌ Failed to clear release tracks:', deleteError);
-            alert(`Failed to save tracks: ${deleteError.message}`);
-            return;
-          }
-
-          for (const track of tracksData.tracks) {
-            if (track.type === 'header') continue;
-            const trackTitle = track.title?.trim() || '';
-            if (!trackTitle) continue;
-
+          try {
             const albumCredits = buildAlbumCredits(editedAlbum);
-            const recordingCredits = discardEmpty({
-              ...albumCredits,
-              track_artist: track.artist ?? null,
-              disc_number: track.disc_number ?? null,
+
+            const enrichedTracks = tracksData.tracks.map((track) => {
+              if (track.type === 'header') return track;
+              const trackTitle = track.title?.trim() || '';
+              if (!trackTitle) return track;
+
+              const recordingCredits = discardEmpty({
+                ...albumCredits,
+                track_artist: track.artist ?? null,
+                disc_number: track.disc_number ?? null,
+              });
+
+              const details =
+                recordingCredits &&
+                typeof recordingCredits === 'object' &&
+                !Array.isArray(recordingCredits) &&
+                'album_details' in recordingCredits
+                  ? ((recordingCredits as Record<string, unknown>).album_details as Record<string, unknown> | null) ?? null
+                  : null;
+
+              return {
+                ...track,
+                title: trackTitle,
+                credits: Object.keys(recordingCredits).length > 0
+                  ? (recordingCredits as unknown as Database['public']['Tables']['recordings']['Insert']['credits'])
+                  : null,
+                bpm: details && typeof details.tempo_bpm === 'number' ? Math.round(Number(details.tempo_bpm)) : null,
+                energy: details && typeof details.energy === 'number' ? Number(details.energy) : null,
+                danceability: details && typeof details.danceability === 'number' ? Number(details.danceability) : null,
+                valence: details && typeof details.mood_happy === 'number' ? Number(details.mood_happy) : null,
+                musical_key: details && typeof details.musical_key === 'string' ? details.musical_key : null,
+              };
             });
 
-            // HELPER TO EXTRACT VALUES FROM THE JSON STRUCTURE
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const details = (recordingCredits as any).album_details || {};
-
-            const recordingPayload = {
-              title: trackTitle,
-              duration_seconds: parseDurationToSeconds(track.duration),
-              notes: track.note ?? null,
-              track_artist: track.artist ?? null,
-              credits: Object.keys(recordingCredits).length > 0
-                ? (recordingCredits as unknown as Database['public']['Tables']['recordings']['Insert']['credits'])
-                : undefined,
-              // ADD THESE LINES TO SAVE TO COLUMNS:
-              bpm: details.tempo_bpm ? Math.round(Number(details.tempo_bpm)) : null,
-              energy: details.energy ? Number(details.energy) : null,
-              danceability: details.danceability ? Number(details.danceability) : null,
-              valence: details.mood_happy ? Number(details.mood_happy) : null,
-              musical_key: details.musical_key || null
-            };
-
-            const { data: recording, error: recordingError } = await supabase
-              .from('recordings')
-              .insert([recordingPayload])
-              .select('id')
-              .single();
-
-            if (recordingError || !recording) {
-              console.error('❌ Failed to create recording:', recordingError);
-              alert(`Failed to save track: ${recordingError?.message ?? 'Unknown error'}`);
-              return;
+            const res = await fetch(`/api/library/releases/${editedAlbum.release_id}/tracks/save`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                releaseId: editedAlbum.release_id,
+                tracks: enrichedTracks,
+              }),
+            });
+            const payload = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              throw new Error(payload?.error || `Failed to save tracks (${res.status})`);
             }
-
-            const { error: releaseTrackError } = await supabase
-              .from('release_tracks')
-              .insert([{
-                release_id: editedAlbum.release_id,
-                recording_id: recording.id,
-                position: String(track.position ?? ''),
-                side: track.side ?? null,
-              }]);
-
-            if (releaseTrackError) {
-              console.error('❌ Failed to link recording:', releaseTrackError);
-              alert(`Failed to save track: ${releaseTrackError.message}`);
-              return;
-            }
+          } catch (tracksError) {
+            console.error('❌ Failed to save tracks via library endpoint:', tracksError);
+            alert(`Failed to save tracks: ${tracksError instanceof Error ? tracksError.message : 'Unknown error'}`);
+            return;
           }
         }
 

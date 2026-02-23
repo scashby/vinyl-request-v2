@@ -128,13 +128,24 @@ export function NewPlaylistModal({ isOpen, editingPlaylist, onClose, onCreate, o
     setTrackSearching(true);
     const timer = window.setTimeout(async () => {
       try {
-        const url = new URL('/api/inventory/tracks/search', window.location.origin);
+        const url = new URL('/api/library/tracks/search', window.location.origin);
         url.searchParams.set('q', q);
         url.searchParams.set('limit', '8');
         const res = await fetch(url.toString(), { signal: controller.signal });
         const payload = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(payload?.error || `Search failed (${res.status})`);
-        setTrackSearchResults(Array.isArray(payload?.results) ? payload.results : []);
+        const mapped = Array.isArray(payload?.results)
+          ? (payload.results as Array<Record<string, unknown>>).map((item) => ({
+              track_key: String(item.track_key ?? '').trim(),
+              inventory_id: typeof item.inventory_id === 'number' ? item.inventory_id : null,
+              title: String(item.track_title ?? item.title ?? '').trim(),
+              artist: String(item.track_artist ?? item.artist ?? '').trim(),
+              side: typeof item.side === 'string' ? item.side : null,
+              position: typeof item.position === 'string' ? item.position : null,
+              score: typeof item.score === 'number' ? item.score : 0,
+            }))
+          : [];
+        setTrackSearchResults(mapped.filter((c) => !!c.track_key));
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return;
         setTracksError(err instanceof Error ? err.message : 'Search failed');
