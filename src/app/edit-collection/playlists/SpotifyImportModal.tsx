@@ -13,12 +13,16 @@ type SpotifyPlaylist = {
 
 type MatchCandidate = {
   track_key: string;
+  inventory_id?: number | null;
   title: string;
   artist: string;
+  side?: string | null;
+  position?: string | null;
   score: number;
 };
 
 type UnmatchedTrack = {
+  row_id: string;
   title?: string;
   artist?: string;
   candidates?: MatchCandidate[];
@@ -60,9 +64,21 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
   const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null);
   const [unmatched, setUnmatched] = useState<UnmatchedTrack[]>([]);
   const [lastImportedPlaylistId, setLastImportedPlaylistId] = useState<number | null>(null);
-  const [resolvingTrack, setResolvingTrack] = useState<string | null>(null);
   const [resume, setResume] = useState<ImportResume | null>(null);
   const [retryAfterSeconds, setRetryAfterSeconds] = useState<number | null>(null);
+
+  const decorateUnmatched = (rows: unknown): UnmatchedTrack[] => {
+    const list = Array.isArray(rows) ? (rows as Array<Record<string, unknown>>) : [];
+    const base = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    return list.map((row, i) => ({
+      row_id: `${base}-${i}`,
+      title: typeof row?.title === 'string' ? row.title : undefined,
+      artist: typeof row?.artist === 'string' ? row.artist : undefined,
+      candidates: Array.isArray((row as { candidates?: unknown })?.candidates)
+        ? ((row as { candidates?: unknown }).candidates as MatchCandidate[])
+        : undefined,
+    }));
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -128,6 +144,172 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
   if (!isOpen) return null;
 
   const filtered = playlists.filter((playlist) => playlist.name.toLowerCase().includes(query.toLowerCase()));
+
+  const CandidateLabel = ({ candidate }: { candidate: MatchCandidate }) => {
+    const parts: string[] = [];
+    if (candidate.inventory_id) parts.push(`#${candidate.inventory_id}`);
+    if (candidate.position) parts.push(String(candidate.position));
+    const meta = parts.length > 0 ? ` (${parts.join(':')})` : '';
+    return (
+      <span className="text-xs text-gray-700">
+        <span className="font-medium">{candidate.title}</span> - {candidate.artist} ({Math.round(candidate.score * 100)}%){meta}
+      </span>
+    );
+  };
+
+  const UnmatchedTrackRow = ({ row }: { row: UnmatchedTrack }) => {
+    const [addingKey, setAddingKey] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searching, setSearching] = useState(false);
+    const [searchResults, setSearchResults] = useState<MatchCandidate[]>([]);
+
+    useEffect(() => {
+      const q = searchQuery.trim();
+      if (q.length < 2) {
+        setSearchResults([]);
+        setSearching(false);
+        return;
+      }
+
+      const controller = new AbortController();
+      setSearching(true);
+      const timer = window.setTimeout(async () => {
+        try {
+          const url = new URL('/api/inventory/tracks/search', window.location.origin);
+          url.searchParams.set('q', q);
+          if (row.artist) url.searchParams.set('artist', row.artist);
+          url.searchParams.set('limit', '8');
+          const res = await fetch(url.toString(), { signal: controller.signal });
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(payload?.error || `Search failed (${res.status})`);
+          setSearchResults(Array.isArray(payload?.results) ? payload.results : []);
+        } catch (err) {
+          if (err instanceof DOMException && err.name === 'AbortError') return;
+          setError(err instanceof Error ? err.message : 'Search failed');
+        } finally {
+          setSearching(false);
+        }
+      }, 250);
+
+      return () => {
+        controller.abort();
+        window.clearTimeout(timer);
+      };
+    }, [searchQuery, row.artist]);
+
+    const addCandidate = async (candidate: MatchCandidate) => {
+      if (!lastImportedPlaylistId) return;
+      setAddingKey(candidate.track_key);
+      try {
+        const res = await fetch('/api/spotify/import/resolve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            playlistId: lastImportedPlaylistId,
+            trackKey: candidate.track_key,
+            sourceTitle: row.title,
+            sourceArtist: row.artist,
+          }),
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(payload?.error || `Add failed (${res.status})`);
+        setUnmatched((prev) => prev.filter((r) => r.row_id !== row.row_id));
+        await onImported();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Add failed');
+      } finally {
+        setAddingKey(null);
+      }
+    };
+
+    const best = row.candidates?.[0];
+    const otherCandidates = (row.candidates ?? []).slice(0, 5);
+
+    return (
+      <div className="bg-white border border-amber-200 rounded p-2">
+        <div className="flex items-start justify-between gap-2">
+          <div className="text-xs text-gray-800">
+            <span className="font-medium">{row.title || '(no title)'}</span>
+            {row.artist ? ` - ${row.artist}` : ''}
+          </div>
+          <button
+            onClick={() => setUnmatched((prev) => prev.filter((r) => r.row_id !== row.row_id))}
+            className="px-2 py-1 rounded text-xs border border-gray-300 text-gray-700 hover:bg-gray-50"
+          >
+            Skip
+          </button>
+        </div>
+
+        {best ? (
+          <div className="mt-2">
+            <div className="text-xs text-gray-500 mb-1">Suggested match</div>
+            <div className="flex items-center justify-between gap-2">
+              <CandidateLabel candidate={best} />
+              <button
+                disabled={addingKey === best.track_key}
+                onClick={() => addCandidate(best)}
+                className={`px-2 py-1 rounded text-xs text-white ${addingKey === best.track_key ? 'bg-gray-400' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+              >
+                {addingKey === best.track_key ? 'Adding...' : 'Add to playlist'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-2 text-xs text-gray-500">No suggestion yet</div>
+        )}
+
+        {otherCandidates.length > 1 && (
+          <div className="mt-2">
+            <div className="text-xs text-gray-500 mb-1">Other close matches</div>
+            <div className="space-y-1">
+              {otherCandidates.slice(1).map((candidate) => (
+                <div key={candidate.track_key} className="flex items-center justify-between gap-2">
+                  <CandidateLabel candidate={candidate} />
+                  <button
+                    disabled={addingKey === candidate.track_key}
+                    onClick={() => addCandidate(candidate)}
+                    className={`px-2 py-1 rounded text-xs text-white ${addingKey === candidate.track_key ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
+                  >
+                    {addingKey === candidate.track_key ? 'Adding...' : 'Add'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-2">
+          <div className="text-xs text-gray-500 mb-1">Search your inventory</div>
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Type to search…"
+            className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs text-gray-900"
+          />
+          {searching ? (
+            <div className="mt-1 text-xs text-gray-500">Searching…</div>
+          ) : searchResults.length > 0 ? (
+            <div className="mt-2 space-y-1">
+              {searchResults.map((candidate) => (
+                <div key={`search-${candidate.track_key}`} className="flex items-center justify-between gap-2">
+                  <CandidateLabel candidate={candidate} />
+                  <button
+                    disabled={addingKey === candidate.track_key}
+                    onClick={() => addCandidate(candidate)}
+                    className={`px-2 py-1 rounded text-xs text-white ${addingKey === candidate.track_key ? 'bg-gray-400' : 'bg-purple-600 hover:bg-purple-700'}`}
+                  >
+                    {addingKey === candidate.track_key ? 'Adding...' : 'Add'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : searchQuery.trim().length >= 2 ? (
+            <div className="mt-1 text-xs text-gray-500">No matches found</div>
+          ) : null}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30003]" onClick={onClose}>
@@ -244,7 +426,7 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                               body: JSON.stringify({
                                 playlistId: playlist.id,
                                 playlistName: playlist.name,
-                                snapshotId: (playlist as any).snapshotId ?? null,
+                                snapshotId: playlist.snapshotId ?? null,
                                 maxPages: 2,
                               }),
                             });
@@ -273,7 +455,7 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                             setLastImportedPlaylistId(
                               typeof payload?.playlistId === 'number' ? payload.playlistId : null
                             );
-                            setUnmatched(Array.isArray(payload?.unmatchedSample) ? payload.unmatchedSample : []);
+                            setUnmatched(decorateUnmatched(payload?.unmatchedSample));
                             setResume(payload?.resume ?? null);
                             await onImported();
                           } catch (err) {
@@ -330,7 +512,7 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                         setLastResult(
                           `Continued import: ${payload.matchedCount} matched${fuzzyNote}, ${payload.unmatchedCount} unmatched`
                         );
-                        setUnmatched(Array.isArray(payload?.unmatchedSample) ? payload.unmatchedSample : []);
+                        setUnmatched(decorateUnmatched(payload?.unmatchedSample));
                         setResume(payload?.resume ?? null);
                         setRetryAfterSeconds(null);
                         await onImported();
@@ -349,58 +531,13 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                   <div className="text-sm font-semibold text-amber-900 mb-2">
                     Unmatched Tracks ({unmatched.length})
                   </div>
+                  <div className="text-xs text-amber-800 mb-2">
+                    Adding a match only adds that inventory track to this playlist. It does not “train” future Spotify imports.
+                  </div>
                   <div className="space-y-2 max-h-56 overflow-y-auto">
-                    {unmatched.map((row, idx) => {
-                      const best = row.candidates?.[0];
-                      return (
-                        <div key={`${row.title ?? 'untitled'}-${idx}`} className="bg-white border border-amber-200 rounded p-2">
-                          <div className="text-xs text-gray-800">
-                            <span className="font-medium">{row.title || '(no title)'}</span>
-                            {row.artist ? ` - ${row.artist}` : ''}
-                          </div>
-                          {best ? (
-                            <div className="mt-1 flex items-center justify-between gap-2">
-                              <div className="text-xs text-gray-600">
-                                Suggestion: {best.title} - {best.artist} ({Math.round(best.score * 100)}%)
-                              </div>
-                              <button
-                                disabled={resolvingTrack === best.track_key}
-                                onClick={async () => {
-                                  setResolvingTrack(best.track_key);
-                                  try {
-                                    const res = await fetch('/api/spotify/import/resolve', {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                        playlistId: lastImportedPlaylistId,
-                                        trackKey: best.track_key,
-                                        sourceTitle: row.title,
-                                        sourceArtist: row.artist,
-                                      }),
-                                    });
-                                    const payload = await res.json().catch(() => ({}));
-                                    if (!res.ok) {
-                                      throw new Error(payload?.error || `Resolve failed (${res.status})`);
-                                    }
-                                    setUnmatched((prev) => prev.filter((_, i) => i !== idx));
-                                    await onImported();
-                                  } catch (err) {
-                                    setError(err instanceof Error ? err.message : 'Resolve failed');
-                                  } finally {
-                                    setResolvingTrack(null);
-                                  }
-                                }}
-                                className={`px-2 py-1 rounded text-xs text-white ${resolvingTrack === best.track_key ? 'bg-gray-400' : 'bg-emerald-600 hover:bg-emerald-700'}`}
-                              >
-                                {resolvingTrack === best.track_key ? 'Adding...' : 'Add Suggestion'}
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="mt-1 text-xs text-gray-500">No suggestion found</div>
-                          )}
-                        </div>
-                      );
-                    })}
+                    {unmatched.map((row) => (
+                      <UnmatchedTrackRow key={row.row_id} row={row} />
+                    ))}
                   </div>
                 </div>
               )}

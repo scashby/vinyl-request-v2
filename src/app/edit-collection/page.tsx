@@ -1655,6 +1655,26 @@ function CollectionBrowserPage() {
   const handleUpdatePlaylist = useCallback(async (playlist: Playlist) => {
     try {
       const previous = playlists.find((item) => item.id === playlist.id);
+      const dedupeTrackKeys = (keys: string[]) => {
+        const seen = new Set<string>();
+        const out: string[] = [];
+        for (const key of keys) {
+          const value = String(key ?? '').trim();
+          if (!value) continue;
+          if (seen.has(value)) continue;
+          seen.add(value);
+          out.push(value);
+        }
+        return out;
+      };
+
+      const nextManualTrackKeys = !playlist.isSmart ? dedupeTrackKeys(playlist.trackKeys ?? []) : [];
+      const prevManualTrackKeys = previous && !previous.isSmart ? dedupeTrackKeys(previous.trackKeys ?? []) : [];
+      const manualTracksChanged =
+        !playlist.isSmart &&
+        (nextManualTrackKeys.length !== prevManualTrackKeys.length ||
+          nextManualTrackKeys.some((key, idx) => key !== prevManualTrackKeys[idx]));
+
       const { error } = await supabase
         .from('collection_playlists')
         .update({
@@ -1669,6 +1689,28 @@ function CollectionBrowserPage() {
         .eq('id', playlist.id);
 
       if (error) throw error;
+
+      if (manualTracksChanged) {
+        const { error: deleteItemsError } = await supabase
+          .from('collection_playlist_items')
+          .delete()
+          .eq('playlist_id', playlist.id);
+        if (deleteItemsError) throw deleteItemsError;
+
+        const chunkSize = 500;
+        for (let i = 0; i < nextManualTrackKeys.length; i += chunkSize) {
+          const chunk = nextManualTrackKeys.slice(i, i + chunkSize);
+          const items = chunk.map((trackKey, index) => ({
+            playlist_id: playlist.id,
+            track_key: trackKey,
+            sort_order: i + index,
+          }));
+          const { error: insertItemsError } = await supabase
+            .from('collection_playlist_items')
+            .insert(items);
+          if (insertItemsError) throw insertItemsError;
+        }
+      }
 
       // Only materialize a static snapshot when explicitly switching from live -> static.
       if (
@@ -1768,22 +1810,73 @@ function CollectionBrowserPage() {
       return;
     }
 
-    try {
-      const { error } = await supabase
-        .from('collection_playlists')
-        .delete()
-        .eq('id', playlistId);
+    const { count: bingoSessionCount, error: bingoCountError } = await supabase
+      .from('bingo_sessions')
+      .select('id', { count: 'exact', head: true })
+      .eq('playlist_id', playlistId);
 
-      if (error) throw error;
-
-      if (selectedPlaylistId === playlistId) {
-        setSelectedPlaylistId(null);
-      }
-      await loadPlaylists();
-    } catch (err) {
-      console.error('Failed to delete playlist:', err);
-      alert('Failed to delete playlist. Please try again.');
+    if (bingoCountError) {
+      console.warn('Failed checking bingo sessions for playlist delete:', bingoCountError);
     }
+
+    if (typeof bingoSessionCount === 'number' && bingoSessionCount > 0) {
+      const { count: activeBingoCount } = await supabase
+        .from('bingo_sessions')
+        .select('id', { count: 'exact', head: true })
+        .eq('playlist_id', playlistId)
+        .in('status', ['pending', 'running', 'paused']);
+
+      const activeNote =
+        typeof activeBingoCount === 'number' && activeBingoCount > 0
+          ? ` (${activeBingoCount} active)`
+          : '';
+
+      const ok = confirm(
+        `This playlist is referenced by ${bingoSessionCount} Bingo session(s)${activeNote}.\n\n` +
+          `Postgres will block deleting the playlist unless you remove those sessions first.\n\n` +
+          `Delete the playlist AND delete those Bingo sessions + history?`
+      );
+
+      if (!ok) return;
+
+      const { error: deleteSessionsError } = await supabase
+        .from('bingo_sessions')
+        .delete()
+        .eq('playlist_id', playlistId);
+
+      if (deleteSessionsError) {
+        throw deleteSessionsError;
+      }
+    }
+
+    const { error: itemsError } = await supabase
+      .from('collection_playlist_items')
+      .delete()
+      .eq('playlist_id', playlistId);
+    if (itemsError) throw itemsError;
+
+    const { error } = await supabase
+      .from('collection_playlists')
+      .delete()
+      .eq('id', playlistId);
+
+    if (error) {
+      const message = (error as { message?: string; code?: string }).message ?? 'Failed to delete playlist';
+      const code = (error as { code?: string }).code ?? '';
+      const lowered = message.toLowerCase();
+      if (code === '23503' || lowered.includes('foreign key') || lowered.includes('violates foreign key constraint')) {
+        throw new Error(
+          `Delete blocked: this playlist is referenced by other records (likely Bingo sessions). ` +
+            `Delete those sessions first, then retry. (${message})`
+        );
+      }
+      throw error;
+    }
+
+    if (selectedPlaylistId === playlistId) {
+      setSelectedPlaylistId(null);
+    }
+    await loadPlaylists();
   }, [loadPlaylists, selectedPlaylistId]);
 
   const handleReorderPlaylists = useCallback(async (orderedPlaylists: Playlist[]) => {

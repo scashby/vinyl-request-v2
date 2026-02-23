@@ -14,8 +14,11 @@ export type InventoryTrack = {
 
 export type MatchCandidate = {
   track_key: string;
+  inventory_id: number | null;
   title: string;
   artist: string;
+  side: string | null;
+  position: string | null;
   score: number;
 };
 
@@ -66,6 +69,16 @@ const addToListMap = (map: Map<string, InventoryTrack[]>, key: string, track: In
   map.get(key)!.push(track);
 };
 
+const toCandidate = (score: number, track: InventoryTrack): MatchCandidate => ({
+  track_key: getTrackKey(track),
+  inventory_id: track.inventory_id ?? null,
+  title: track.title,
+  artist: track.artist,
+  side: track.side ?? null,
+  position: track.position ?? null,
+  score: Number(score.toFixed(3)),
+});
+
 const diceCoefficient = (a: string, b: string) => {
   if (!a || !b) return 0;
   if (a === b) return 1;
@@ -98,7 +111,7 @@ const scoreCandidate = (rowTitle: string, rowArtist: string, track: InventoryTra
   return Math.min(1, titleScore * 0.75 + artistScore * 0.25 + exactTitleBoost + exactArtistBoost);
 };
 
-const collectCandidates = (rowTitle: string, rowArtist: string, index: InventoryIndex): InventoryTrack[] => {
+const collectCandidates = (rowTitle: string, rowArtist: string, index: InventoryIndex, maxPoolSize = 500): InventoryTrack[] => {
   const pool = new Map<string, InventoryTrack>();
   for (const token of new Set([...tokenize(rowTitle), ...tokenize(rowArtist)])) {
     const tracks = index.byToken.get(token) ?? [];
@@ -106,9 +119,9 @@ const collectCandidates = (rowTitle: string, rowArtist: string, index: Inventory
       const key = getTrackKey(track);
       if (!key) continue;
       pool.set(key, track);
-      if (pool.size >= 500) break;
+      if (pool.size >= maxPoolSize) break;
     }
-    if (pool.size >= 500) break;
+    if (pool.size >= maxPoolSize) break;
   }
   // Fallback for sparse token hits
   if (pool.size === 0) {
@@ -120,7 +133,7 @@ const collectCandidates = (rowTitle: string, rowArtist: string, index: Inventory
         if (!key) continue;
         pool.set(key, track);
       }
-      if (pool.size >= 500) break;
+      if (pool.size >= maxPoolSize) break;
     }
   }
   return Array.from(pool.values());
@@ -129,26 +142,31 @@ const collectCandidates = (rowTitle: string, rowArtist: string, index: Inventory
 const fuzzyCandidates = (
   row: { title?: string; artist?: string },
   index: InventoryIndex,
-  maxCandidates = 3
+  opts?: { maxCandidates?: number; minScore?: number; maxPoolSize?: number }
 ): MatchCandidate[] => {
   const rowTitle = normalizeValue(row.title ?? "");
   const rowArtist = normalizeValue(row.artist ?? "");
   if (!rowTitle) return [];
-  const candidates = collectCandidates(rowTitle, rowArtist, index)
-    .map((track) => ({
-      track,
-      score: scoreCandidate(rowTitle, rowArtist, track),
-    }))
-    .filter((entry) => entry.score >= 0.62)
+  const maxCandidates = opts?.maxCandidates ?? 8;
+  const minScore = opts?.minScore ?? 0.5;
+  const maxPoolSize = opts?.maxPoolSize ?? 500;
+
+  return collectCandidates(rowTitle, rowArtist, index, maxPoolSize)
+    .map((track) => toCandidate(scoreCandidate(rowTitle, rowArtist, track), track))
+    .filter((candidate) => candidate.score >= minScore && !!candidate.track_key)
     .sort((a, b) => b.score - a.score)
-    .slice(0, maxCandidates)
-    .map((entry) => ({
-      track_key: getTrackKey(entry.track),
-      title: entry.track.title,
-      artist: entry.track.artist,
-      score: Number(entry.score.toFixed(3)),
-    }));
-  return candidates.filter((c) => !!c.track_key);
+    .slice(0, maxCandidates);
+};
+
+const pickBestOfTitleMatches = (rowTitle: string, rowArtist: string, titleMatches: InventoryTrack[]) => {
+  const scored = titleMatches
+    .map((track) => ({ track, score: scoreCandidate(rowTitle, rowArtist, track) }))
+    .sort((a, b) => b.score - a.score);
+  return {
+    best: scored[0] ?? null,
+    second: scored[1] ?? null,
+    candidates: scored.map((entry) => toCandidate(entry.score, entry.track)),
+  };
 };
 
 export const buildInventoryIndex = (tracks: InventoryTrack[]): InventoryIndex => {
@@ -200,26 +218,77 @@ export const matchTracks = (
     const fullKey = `${titleKey}::${artistKey}`;
     const exact = index.exact.get(fullKey);
     const titleMatches = index.titleOnly.get(titleKey) ?? [];
-    const track = exact ?? titleMatches[0];
-    if (track) {
-      matched.push(track);
-    } else {
-      const candidates = fuzzyCandidates(row, index);
-      if (candidates.length > 0 && candidates[0].score >= 0.86) {
-        const best = candidates[0];
-        const bestTrack = index.exact.get(`${normalizeValue(best.title)}::${normalizeValue(best.artist)}`) ??
-          (index.titleOnly.get(normalizeValue(best.title)) ?? []).find((t) => getTrackKey(t) === best.track_key);
+
+    if (exact) {
+      matched.push(exact);
+      continue;
+    }
+
+    // If title matches exist, only auto-pick when it's unambiguous.
+    if (titleMatches.length === 1) {
+      matched.push(titleMatches[0]);
+      continue;
+    }
+
+    if (titleMatches.length > 1) {
+      const { best, second, candidates: titleCandidates } = pickBestOfTitleMatches(titleKey, artistKey, titleMatches);
+      const bestScore = best?.score ?? 0;
+      const secondScore = second?.score ?? 0;
+      const delta = bestScore - secondScore;
+      // Only auto-match ambiguous titles when artist similarity clearly breaks the tie.
+      if (best && (bestScore >= 0.95 || (bestScore >= 0.9 && delta >= 0.08))) {
+        matched.push(best.track);
+        fuzzyMatchedCount += 1;
+        continue;
+      }
+      const candidates = titleCandidates
+        .filter((c) => c.score >= 0.35)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 8);
+      missing.push({ ...row, candidates });
+      continue;
+    }
+
+    // Fuzzy fallback (token-based pool)
+    const candidates = fuzzyCandidates(row, index, { maxCandidates: 8, minScore: 0.35, maxPoolSize: 650 });
+    if (candidates.length > 0) {
+      const best = candidates[0];
+      const second = candidates[1];
+      const delta = second ? best.score - second.score : best.score;
+      // Only auto-match very high confidence + separation.
+      if (best.score >= 0.93 && delta >= 0.08) {
+        const bestTrack =
+          (index.titleOnly.get(normalizeValue(best.title)) ?? []).find((t) => getTrackKey(t) === best.track_key) ??
+          index.exact.get(`${normalizeValue(best.title)}::${normalizeValue(best.artist)}`);
         if (bestTrack) {
           matched.push(bestTrack);
           fuzzyMatchedCount += 1;
           continue;
         }
       }
-      missing.push({ ...row, candidates });
     }
+
+    missing.push({ ...row, candidates });
   }
 
   return { matched, missing, fuzzyMatchedCount };
+};
+
+export const searchInventoryCandidates = async (
+  params: { title: string; artist?: string; limit?: number },
+  index?: InventoryIndex
+): Promise<MatchCandidate[]> => {
+  const resolvedIndex = index ?? (await getCachedInventoryIndex());
+  const title = params.title ?? "";
+  const artist = params.artist ?? "";
+  const limit = Math.min(25, Math.max(1, Number(params.limit ?? 10)));
+
+  const candidates = fuzzyCandidates(
+    { title, artist },
+    resolvedIndex,
+    { maxCandidates: limit, minScore: 0.35, maxPoolSize: 900 }
+  );
+  return candidates;
 };
 
 export const fetchInventoryTracks = async (limit?: number) => {

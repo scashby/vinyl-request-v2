@@ -5,7 +5,7 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS public.bingo_sessions (
   id bigserial PRIMARY KEY,
   event_id bigint REFERENCES public.events(id) ON DELETE SET NULL,
-  playlist_id bigint NOT NULL REFERENCES public.collection_playlists(id) ON DELETE RESTRICT,
+  playlist_id bigint REFERENCES public.collection_playlists(id) ON DELETE SET NULL,
   session_code text NOT NULL UNIQUE,
   game_mode text NOT NULL,
   card_count integer NOT NULL DEFAULT 40,
@@ -52,6 +52,16 @@ CREATE TABLE IF NOT EXISTS public.bingo_sessions (
 
 -- Backfill/upgrade for existing installs that ran an older version of this script
 -- (CREATE TABLE IF NOT EXISTS won't add new columns).
+ALTER TABLE public.bingo_sessions
+  DROP CONSTRAINT IF EXISTS bingo_sessions_playlist_id_fkey;
+
+ALTER TABLE public.bingo_sessions
+  ALTER COLUMN playlist_id DROP NOT NULL;
+
+ALTER TABLE public.bingo_sessions
+  ADD CONSTRAINT bingo_sessions_playlist_id_fkey
+  FOREIGN KEY (playlist_id) REFERENCES public.collection_playlists(id) ON DELETE SET NULL;
+
 ALTER TABLE public.bingo_sessions
   ADD COLUMN IF NOT EXISTS remove_resleeve_seconds integer NOT NULL DEFAULT 20,
   ADD COLUMN IF NOT EXISTS place_vinyl_seconds integer NOT NULL DEFAULT 8,
