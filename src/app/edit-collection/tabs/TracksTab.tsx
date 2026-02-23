@@ -286,7 +286,11 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
     getTracksData: (): TracksData => {
       // Format tracks for database
       const formattedTracks = tracks.map((track) => ({
-        position: track.position.toString(),
+        position: track.side
+          ? `${track.side}${track.position}`
+          : track.disc_number && track.disc_number > 1
+            ? `${track.disc_number}-${track.position}`
+            : track.position.toString(),
         title: track.title,
         artist: track.artist || null,
         duration: track.duration || null,

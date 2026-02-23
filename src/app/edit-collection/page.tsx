@@ -692,17 +692,40 @@ function CollectionBrowserPage() {
            position,
            side,
            title_override,
+           recording_id,
            recording:recordings (
              id,
              title,
-             duration_seconds
+             duration_seconds,
+             track_artist
            )`
         )
         .in('release_id', releaseIdChunk);
 
       if (tracksError) {
-        console.error('Error loading release tracks:', tracksError);
-        break;
+        console.error('Error loading release tracks (with recordings join):', tracksError);
+        const { data: fallbackTracks, error: fallbackError } = await supabase
+          .from('release_tracks')
+          .select('id, release_id, position, side, title_override, recording_id')
+          .in('release_id', releaseIdChunk);
+
+        if (fallbackError) {
+          console.error('Error loading release tracks (fallback):', fallbackError);
+          continue;
+        }
+
+        for (const track of fallbackTracks ?? []) {
+          const releaseId = (track as { release_id?: number }).release_id;
+          if (!releaseId) continue;
+          if (!releaseTracksByReleaseId[releaseId]) {
+            releaseTracksByReleaseId[releaseId] = [];
+          }
+          releaseTracksByReleaseId[releaseId].push({
+            ...(track as Record<string, unknown>),
+            recording: null,
+          });
+        }
+        continue;
       }
 
       for (const track of tracks ?? []) {

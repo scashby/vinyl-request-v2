@@ -111,6 +111,24 @@ const scoreCandidate = (rowTitle: string, rowArtist: string, track: InventoryTra
   return Math.min(1, titleScore * 0.75 + artistScore * 0.25 + exactTitleBoost + exactArtistBoost);
 };
 
+const scoreSearchCandidate = (queryTitle: string, queryArtist: string, track: InventoryTrack) => {
+  const tTitle = normalizeValue(track.title);
+  const tArtist = normalizeValue(track.artist);
+
+  const titleScore = queryTitle ? diceCoefficient(queryTitle, tTitle) : 0;
+  const artistScore = queryArtist ? diceCoefficient(queryArtist, tArtist) : 0;
+  const exactTitleBoost = queryTitle && queryTitle === tTitle ? 0.15 : 0;
+  const exactArtistBoost = queryArtist && queryArtist === tArtist ? 0.1 : 0;
+  const fielded = Math.min(1, titleScore * 0.7 + artistScore * 0.3 + exactTitleBoost + exactArtistBoost);
+
+  // If the user types "title + artist" into the title box, this catches it.
+  const combinedQuery = normalizeValue(`${queryTitle} ${queryArtist}`.trim());
+  const combinedTrack = normalizeValue(`${track.title} ${track.artist}`.trim());
+  const combined = combinedQuery ? diceCoefficient(combinedQuery, combinedTrack) : 0;
+
+  return Math.max(fielded, combined);
+};
+
 const collectCandidates = (rowTitle: string, rowArtist: string, index: InventoryIndex, maxPoolSize = 500): InventoryTrack[] => {
   const pool = new Map<string, InventoryTrack>();
   for (const token of new Set([...tokenize(rowTitle), ...tokenize(rowArtist)])) {
@@ -279,16 +297,19 @@ export const searchInventoryCandidates = async (
   index?: InventoryIndex
 ): Promise<MatchCandidate[]> => {
   const resolvedIndex = index ?? (await getCachedInventoryIndex());
-  const title = params.title ?? "";
-  const artist = params.artist ?? "";
+  const titleRaw = params.title ?? "";
+  const artistRaw = params.artist ?? "";
   const limit = Math.min(25, Math.max(1, Number(params.limit ?? 10)));
 
-  const candidates = fuzzyCandidates(
-    { title, artist },
-    resolvedIndex,
-    { maxCandidates: limit, minScore: 0.35, maxPoolSize: 900 }
-  );
-  return candidates;
+  const queryTitle = normalizeValue(titleRaw);
+  const queryArtist = normalizeValue(artistRaw);
+  if (!queryTitle) return [];
+
+  return collectCandidates(queryTitle, queryArtist, resolvedIndex, 1000)
+    .map((track) => toCandidate(scoreSearchCandidate(queryTitle, queryArtist, track), track))
+    .filter((candidate) => !!candidate.track_key && candidate.score >= 0.25)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
 };
 
 export const fetchInventoryTracks = async (limit?: number) => {
