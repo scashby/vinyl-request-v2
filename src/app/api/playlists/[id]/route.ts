@@ -15,7 +15,17 @@ export async function DELETE(_req: Request, context: { params: Promise<{ id: str
     const db = supabaseAdmin as any;
 
     // Detach any foreign-key references that might block deletion.
-    await db.from("bingo_sessions").update({ playlist_id: null }).eq("playlist_id", playlistId);
+    const detachRes = await db.from("bingo_sessions").update({ playlist_id: null }).eq("playlist_id", playlistId);
+    if (detachRes?.error) {
+      // Older installs may have playlist_id NOT NULL; fall back to deleting sessions for this playlist.
+      const deleteSessionsRes = await db.from("bingo_sessions").delete().eq("playlist_id", playlistId);
+      if (deleteSessionsRes?.error) {
+        return NextResponse.json(
+          { error: `Failed to detach/delete Bingo sessions referencing this playlist: ${deleteSessionsRes.error.message}` },
+          { status: 500 }
+        );
+      }
+    }
 
     const { error: itemsError } = await db
       .from("collection_playlist_items")
@@ -36,4 +46,3 @@ export async function DELETE(_req: Request, context: { params: Promise<{ id: str
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-

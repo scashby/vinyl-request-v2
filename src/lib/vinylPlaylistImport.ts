@@ -36,9 +36,11 @@ type InventoryIndex = {
 type CachedInventoryIndex = {
   expiresAt: number;
   index: InventoryIndex;
+  version: number;
 };
 
 const INVENTORY_INDEX_TTL_MS = 10 * 60 * 1000;
+const INVENTORY_INDEX_VERSION = 2;
 
 const inventoryIndexCache: { current?: CachedInventoryIndex } =
   (globalThis as { __inventoryIndexCache?: { current?: CachedInventoryIndex } }).__inventoryIndexCache ??
@@ -272,12 +274,12 @@ export const buildInventoryIndex = (tracks: InventoryTrack[]): InventoryIndex =>
 export const getCachedInventoryIndex = async () => {
   const now = Date.now();
   const cached = inventoryIndexCache.current;
-  if (cached && cached.expiresAt > now) {
+  if (cached && cached.expiresAt > now && cached.version === INVENTORY_INDEX_VERSION) {
     return cached.index;
   }
   const tracks = await fetchInventoryTracks();
   const index = buildInventoryIndex(tracks);
-  inventoryIndexCache.current = { expiresAt: now + INVENTORY_INDEX_TTL_MS, index };
+  inventoryIndexCache.current = { expiresAt: now + INVENTORY_INDEX_TTL_MS, index, version: INVENTORY_INDEX_VERSION };
   return index;
 };
 
@@ -423,6 +425,29 @@ export const fetchInventoryTracks = async (limit?: number) => {
   const releaseChunkSize = 250;
   for (let i = 0; i < releaseIds.length; i += releaseChunkSize) {
     const chunk = releaseIds.slice(i, i + releaseChunkSize);
+
+    // Prefetch album artist for release_id (fallback when track_artist is missing).
+    const releaseArtistById = new Map<number, string>();
+    {
+      const { data: releases, error: releaseError } = await supabaseAdmin
+        .from("releases")
+        .select("id, master:masters(artist:artists(name))")
+        .in("id", chunk);
+      if (releaseError) {
+        throw new Error(`Failed loading release artists: ${releaseError.message}`);
+      }
+      for (const row of releases ?? []) {
+        const releaseId = typeof row.id === "number" ? row.id : null;
+        const master = Array.isArray(row.master) ? row.master[0] : row.master;
+        const artist = master && typeof master === "object" ? (master as { artist?: unknown }).artist : null;
+        const artistRow = Array.isArray(artist) ? artist[0] : artist;
+        const name = artistRow && typeof artistRow === "object" ? (artistRow as { name?: unknown }).name : null;
+        if (releaseId && typeof name === "string" && name.trim().length > 0) {
+          releaseArtistById.set(releaseId, name.trim());
+        }
+      }
+    }
+
     const { data: releaseTracks, error: releaseTracksError } = await supabaseAdmin
       .from("release_tracks")
       .select("release_id, position, side, title_override, recordings ( id, title, track_artist )")
@@ -438,10 +463,12 @@ export const fetchInventoryTracks = async (limit?: number) => {
       const recording = Array.isArray(row.recordings) ? row.recordings[0] : row.recordings;
       const title = row.title_override || recording?.title;
       if (!title) continue;
+      const albumArtist = releaseArtistById.get(releaseId) ?? null;
+      const trackArtist = recording?.track_artist?.trim?.() ? recording.track_artist : null;
       const trackRow = {
         recording_id: recording?.id ?? null,
         title,
-        artist: recording?.track_artist || "Unknown Artist",
+        artist: trackArtist || albumArtist || "Unknown Artist",
         side: row.side ?? null,
         position: row.position ?? null,
       };
