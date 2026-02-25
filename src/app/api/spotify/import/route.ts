@@ -94,7 +94,7 @@ export async function POST(req: Request) {
       for (const item of items) {
         const trackNode = item.track ?? (item.item?.type === 'track' ? item.item : undefined);
         const title = trackNode?.name;
-        const artist = (trackNode?.artists ?? []).map((a) => a.name).filter(Boolean).join(', ');
+        const artist = (trackNode?.artists ?? [])[0]?.name;
         if (title) parsed.push({ title, artist });
       }
       return parsed;

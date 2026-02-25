@@ -1,6 +1,5 @@
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
 
-const VINYL_SIZES = ['7"', '10"', '12"'];
 const PAGE_SIZE = 1000;
 
 export type InventoryTrack = {
@@ -52,8 +51,65 @@ const normalizeValue = (value: string) =>
     .toLowerCase()
     .replace(/["'`]/g, "")
     .replace(/\([^)]*\)/g, "")
+    .replace(/\[[^\]]*\]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+
+const stripTitleNoiseTokens = (value: string) => {
+  const tokens = value.split(/\s+/).map((t) => t.trim()).filter(Boolean);
+  if (tokens.length === 0) return value;
+
+  const noise = new Set([
+    "remaster",
+    "remastered",
+    "remastering",
+    "mono",
+    "stereo",
+    "mix",
+    "remix",
+    "edit",
+    "version",
+    "live",
+    "demo",
+    "bonus",
+    "track",
+    "radio",
+    "single",
+    "album",
+    "explicit",
+    "clean",
+    "deluxe",
+    "expanded",
+    "extended",
+    "original",
+    "acoustic",
+    "instrumental",
+    "feat",
+    "featuring",
+    "ft",
+  ]);
+
+  const filtered = tokens.filter((t) => {
+    if (noise.has(t)) return false;
+    const year = Number(t);
+    if (Number.isInteger(year) && year >= 1900 && year <= 2099 && tokens.length > 1) {
+      return false;
+    }
+    return true;
+  });
+
+  return filtered.join(" ").trim();
+};
+
+const normalizeTitle = (value: string) => stripTitleNoiseTokens(normalizeValue(value));
+
+const normalizeArtist = (value: string) => {
+  const normalized = normalizeValue(value);
+  if (!normalized) return normalized;
+  const tokens = normalized.split(/\s+/).map((t) => t.trim()).filter(Boolean);
+  const filtered = tokens.filter((t) => t !== "the" && t !== "and");
+  return filtered.join(" ").trim();
+};
 
 const tokenize = (value: string) =>
   normalizeValue(value)
@@ -102,24 +158,28 @@ const diceCoefficient = (a: string, b: string) => {
 };
 
 const scoreCandidate = (rowTitle: string, rowArtist: string, track: InventoryTrack) => {
-  const tTitle = normalizeValue(track.title);
-  const tArtist = normalizeValue(track.artist);
+  const tTitle = normalizeTitle(track.title);
+  const tArtist = normalizeArtist(track.artist);
   const titleScore = diceCoefficient(rowTitle, tTitle);
   const artistScore = rowArtist ? diceCoefficient(rowArtist, tArtist) : 0;
   const exactTitleBoost = rowTitle === tTitle ? 0.15 : 0;
   const exactArtistBoost = rowArtist && rowArtist === tArtist ? 0.1 : 0;
-  return Math.min(1, titleScore * 0.75 + artistScore * 0.25 + exactTitleBoost + exactArtistBoost);
+  const artistWeight = rowArtist ? 0.4 : 0;
+  const titleWeight = 1 - artistWeight;
+  return Math.min(1, titleScore * titleWeight + artistScore * artistWeight + exactTitleBoost + exactArtistBoost);
 };
 
 const scoreSearchCandidate = (queryTitle: string, queryArtist: string, track: InventoryTrack) => {
-  const tTitle = normalizeValue(track.title);
-  const tArtist = normalizeValue(track.artist);
+  const tTitle = normalizeTitle(track.title);
+  const tArtist = normalizeArtist(track.artist);
 
   const titleScore = queryTitle ? diceCoefficient(queryTitle, tTitle) : 0;
   const artistScore = queryArtist ? diceCoefficient(queryArtist, tArtist) : 0;
   const exactTitleBoost = queryTitle && queryTitle === tTitle ? 0.15 : 0;
   const exactArtistBoost = queryArtist && queryArtist === tArtist ? 0.1 : 0;
-  const fielded = Math.min(1, titleScore * 0.7 + artistScore * 0.3 + exactTitleBoost + exactArtistBoost);
+  const artistWeight = queryArtist ? 0.35 : 0;
+  const titleWeight = 1 - artistWeight;
+  const fielded = Math.min(1, titleScore * titleWeight + artistScore * artistWeight + exactTitleBoost + exactArtistBoost);
 
   // If the user types "title + artist" into the title box, this catches it.
   const combinedQuery = normalizeValue(`${queryTitle} ${queryArtist}`.trim());
@@ -192,8 +252,8 @@ export const buildInventoryIndex = (tracks: InventoryTrack[]): InventoryIndex =>
   const titleOnly = new Map<string, InventoryTrack[]>();
   const byToken = new Map<string, InventoryTrack[]>();
   for (const track of tracks) {
-    const titleKey = normalizeValue(track.title);
-    const artistKey = normalizeValue(track.artist);
+    const titleKey = normalizeTitle(track.title);
+    const artistKey = normalizeArtist(track.artist);
     if (!titleKey) continue;
     const fullKey = `${titleKey}::${artistKey}`;
     if (!exact.has(fullKey)) {
@@ -301,8 +361,8 @@ export const searchInventoryCandidates = async (
   const artistRaw = params.artist ?? "";
   const limit = Math.min(25, Math.max(1, Number(params.limit ?? 10)));
 
-  const queryTitle = normalizeValue(titleRaw);
-  const queryArtist = normalizeValue(artistRaw);
+  const queryTitle = normalizeTitle(titleRaw);
+  const queryArtist = normalizeArtist(artistRaw);
   if (!queryTitle) return [];
 
   return collectCandidates(queryTitle, queryArtist, resolvedIndex, 1000)
@@ -315,55 +375,40 @@ export const searchInventoryCandidates = async (
 export const fetchInventoryTracks = async (limit?: number) => {
   const tracks: InventoryTrack[] = [];
 
-  // Step 1: fetch vinyl release ids first (cheap filter on releases table).
-  const releaseIds: number[] = [];
-  let releasePage = 0;
-  let useFormatDetailsFilter = true;
+  // Step 1: fetch inventory rows to determine the release ids in the library.
+  // De-dupe by release_id so we don't create duplicate candidate tracks when multiple copies exist.
+  const inventoryByReleaseId = new Map<number, number>();
+  let inventoryPage = 0;
   while (true) {
-    const from = releasePage * PAGE_SIZE;
+    const from = inventoryPage * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
-    let releaseQuery = supabaseAdmin
-      .from("releases")
-      .select("id")
-      .eq("media_type", "Vinyl");
+    const { data: inventoryRows, error: inventoryError } = await supabaseAdmin
+      .from("inventory")
+      .select("id, release_id")
+      .not("release_id", "is", null)
+      .order("id", { ascending: true })
+      .range(from, to);
 
-    if (useFormatDetailsFilter) {
-      releaseQuery = releaseQuery.overlaps("format_details", VINYL_SIZES);
+    if (inventoryError) {
+      throw new Error(`Failed loading inventory rows: ${inventoryError.message}`);
     }
 
-    let { data: releases, error: releasesError } = await releaseQuery.range(from, to);
-
-    // Some legacy rows have malformed array literals in format_details.
-    // Fall back to media_type-only filtering so imports can proceed.
-    if (
-      releasesError &&
-      useFormatDetailsFilter &&
-      /malformed array literal/i.test(releasesError.message)
-    ) {
-      useFormatDetailsFilter = false;
-      const fallback = await supabaseAdmin
-        .from("releases")
-        .select("id")
-        .eq("media_type", "Vinyl")
-        .range(from, to);
-      releases = fallback.data;
-      releasesError = fallback.error;
-    }
-
-    if (releasesError) {
-      throw new Error(`Failed loading vinyl releases: ${releasesError.message}`);
-    }
-
-    const rows = releases ?? [];
+    const rows = inventoryRows ?? [];
     for (const row of rows) {
-      if (typeof row.id === "number") {
-        releaseIds.push(row.id);
+      const inventoryId = typeof row.id === "number" ? row.id : null;
+      const releaseId = typeof row.release_id === "number" ? row.release_id : null;
+      if (!inventoryId || !releaseId) continue;
+      const current = inventoryByReleaseId.get(releaseId);
+      if (!current || inventoryId < current) {
+        inventoryByReleaseId.set(releaseId, inventoryId);
       }
     }
+
     if (rows.length < PAGE_SIZE) break;
-    releasePage += 1;
+    inventoryPage += 1;
   }
 
+  const releaseIds = Array.from(inventoryByReleaseId.keys());
   if (releaseIds.length === 0) return tracks;
 
   // Step 2: prefetch release tracks for those releases in chunks.
@@ -407,37 +452,21 @@ export const fetchInventoryTracks = async (limit?: number) => {
     }
   }
 
-  // Step 3: fetch inventory rows and project the preloaded tracks.
-  for (let i = 0; i < releaseIds.length; i += releaseChunkSize) {
-    const chunk = releaseIds.slice(i, i + releaseChunkSize);
-    const { data: inventoryRows, error: inventoryError } = await supabaseAdmin
-      .from("inventory")
-      .select("id, release_id")
-      .in("release_id", chunk);
-
-    if (inventoryError) {
-      throw new Error(`Failed loading inventory rows: ${inventoryError.message}`);
-    }
-
-    for (const row of inventoryRows ?? []) {
-      const inventoryId = row.id ?? null;
-      const releaseId = row.release_id;
-      if (!releaseId || !trackMap.has(releaseId)) continue;
-      const releaseTracks = trackMap.get(releaseId)!;
-      for (const track of releaseTracks) {
-        tracks.push({
-          inventory_id: inventoryId,
-          recording_id: track.recording_id,
-          title: track.title,
-          artist: track.artist,
-          side: track.side,
-          position: track.position,
-        });
+  // Step 3: project the preloaded tracks onto the de-duped inventory ids.
+  for (const [releaseId, inventoryId] of inventoryByReleaseId) {
+    const releaseTracks = trackMap.get(releaseId) ?? [];
+    for (const track of releaseTracks) {
+      tracks.push({
+        inventory_id: inventoryId,
+        recording_id: track.recording_id,
+        title: track.title,
+        artist: track.artist,
+        side: track.side,
+        position: track.position,
+      });
+      if (limit && tracks.length >= limit) {
+        return tracks.slice(0, limit);
       }
-    }
-
-    if (limit && tracks.length >= limit) {
-      return tracks.slice(0, limit);
     }
   }
 
