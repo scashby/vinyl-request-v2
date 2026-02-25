@@ -290,8 +290,8 @@ export const matchTracks = (
   let fuzzyMatchedCount = 0;
 
   for (const row of rows) {
-    const titleKey = normalizeValue(row.title ?? "");
-    const artistKey = normalizeValue(row.artist ?? "");
+    const titleKey = normalizeTitle(row.title ?? "");
+    const artistKey = normalizeArtist(row.artist ?? "");
     if (!titleKey) continue;
     const fullKey = `${titleKey}::${artistKey}`;
     const exact = index.exact.get(fullKey);

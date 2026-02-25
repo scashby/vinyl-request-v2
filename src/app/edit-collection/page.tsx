@@ -1677,79 +1677,32 @@ function CollectionBrowserPage() {
     }
   }, [allTrackRows, loadPlaylists, playlists]);
 
-  const handleDeletePlaylist = useCallback(async (playlistId: number, playlistName: string) => {
-    if (!confirm(`Delete playlist "${playlistName}"? This cannot be undone.`)) {
-      return;
-    }
+	  const handleDeletePlaylist = useCallback(async (playlistId: number, playlistName: string) => {
+	    if (!confirm(`Delete playlist "${playlistName}"? This cannot be undone.`)) {
+	      return;
+	    }
 
-    const { count: bingoSessionCount, error: bingoCountError } = await supabase
-      .from('bingo_sessions')
-      .select('id', { count: 'exact', head: true })
-      .eq('playlist_id', playlistId);
+	    const res = await fetch(`/api/playlists/${playlistId}`, { method: 'DELETE' });
+	    const payload = await res.json().catch(() => ({}));
+	    if (!res.ok) {
+	      throw new Error(payload?.error || `Failed to delete playlist (${res.status})`);
+	    }
 
-    if (bingoCountError) {
-      console.warn('Failed checking bingo sessions for playlist delete:', bingoCountError);
-    }
+	    if (selectedPlaylistId === playlistId) {
+	      setSelectedPlaylistId(null);
+	    }
+	    await loadPlaylists();
+	  }, [loadPlaylists, selectedPlaylistId]);
 
-    if (typeof bingoSessionCount === 'number' && bingoSessionCount > 0) {
-      const { count: activeBingoCount } = await supabase
-        .from('bingo_sessions')
-        .select('id', { count: 'exact', head: true })
-        .eq('playlist_id', playlistId)
-        .in('status', ['pending', 'running', 'paused']);
-
-      const activeNote =
-        typeof activeBingoCount === 'number' && activeBingoCount > 0
-          ? ` (${activeBingoCount} active)`
-          : '';
-
-      const ok = confirm(
-        `This playlist is referenced by ${bingoSessionCount} Bingo session(s)${activeNote}.\n\n` +
-          `Postgres will block deleting the playlist unless you remove those sessions first.\n\n` +
-          `Delete the playlist AND delete those Bingo sessions + history?`
-      );
-
-      if (!ok) return;
-
-      const { error: deleteSessionsError } = await supabase
-        .from('bingo_sessions')
-        .delete()
-        .eq('playlist_id', playlistId);
-
-      if (deleteSessionsError) {
-        throw deleteSessionsError;
-      }
-    }
-
-    const { error: itemsError } = await supabase
-      .from('collection_playlist_items')
-      .delete()
-      .eq('playlist_id', playlistId);
-    if (itemsError) throw itemsError;
-
-    const { error } = await supabase
-      .from('collection_playlists')
-      .delete()
-      .eq('id', playlistId);
-
-    if (error) {
-      const message = (error as { message?: string; code?: string }).message ?? 'Failed to delete playlist';
-      const code = (error as { code?: string }).code ?? '';
-      const lowered = message.toLowerCase();
-      if (code === '23503' || lowered.includes('foreign key') || lowered.includes('violates foreign key constraint')) {
-        throw new Error(
-          `Delete blocked: this playlist is referenced by other records (likely Bingo sessions). ` +
-            `Delete those sessions first, then retry. (${message})`
-        );
-      }
-      throw error;
-    }
-
-    if (selectedPlaylistId === playlistId) {
-      setSelectedPlaylistId(null);
-    }
-    await loadPlaylists();
-  }, [loadPlaylists, selectedPlaylistId]);
+	  const handleDeleteAllPlaylists = useCallback(async () => {
+	    const res = await fetch('/api/playlists?confirm=yes', { method: 'DELETE' });
+	    const payload = await res.json().catch(() => ({}));
+	    if (!res.ok) {
+	      throw new Error(payload?.error || `Failed to delete playlists (${res.status})`);
+	    }
+	    setSelectedPlaylistId(null);
+	    await loadPlaylists();
+	  }, [loadPlaylists]);
 
   const handleReorderPlaylists = useCallback(async (orderedPlaylists: Playlist[]) => {
     try {
@@ -2478,6 +2431,7 @@ function CollectionBrowserPage() {
           playlists={playlists}
           onReorder={handleReorderPlaylists}
           onDelete={handleDeletePlaylist}
+          onDeleteAll={handleDeleteAllPlaylists}
           onEdit={(playlist) => {
             setShowManagePlaylistsModal(false);
             setEditingPlaylist(playlist);

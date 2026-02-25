@@ -9,6 +9,7 @@ interface ManagePlaylistsModalProps {
   playlists: CollectionPlaylist[];
   onReorder: (playlists: CollectionPlaylist[]) => Promise<void>;
   onDelete: (playlistId: number, playlistName: string) => Promise<void>;
+  onDeleteAll: () => Promise<void>;
   onEdit: (playlist: CollectionPlaylist) => void;
   onEditSmart: (playlist: CollectionPlaylist) => void;
   onOpenNewPlaylist: () => void;
@@ -22,6 +23,7 @@ export function ManagePlaylistsModal({
   playlists,
   onReorder,
   onDelete,
+  onDeleteAll,
   onEdit,
   onEditSmart,
   onOpenNewPlaylist,
@@ -78,6 +80,28 @@ export function ManagePlaylistsModal({
             <button onClick={onOpenSpotifyImport} className="px-3 py-1.5 bg-[#1db954] text-white border-none rounded text-xs font-medium cursor-pointer flex items-center gap-1 hover:opacity-90">
               <span>🎧</span>
               <span>Import Spotify</span>
+            </button>
+            <button
+              onClick={async () => {
+                if (!confirm('Delete ALL playlists? This cannot be undone.')) return;
+                setError(null);
+                try {
+                  setReordering(true);
+                  await onDeleteAll();
+                  setLocalPlaylists([]);
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : 'Failed to delete playlists');
+                } finally {
+                  setReordering(false);
+                }
+              }}
+              disabled={reordering || deletingId !== null}
+              className={`px-3 py-1.5 bg-red-600 text-white border-none rounded text-xs font-medium cursor-pointer hover:bg-red-700 ${
+                reordering || deletingId !== null ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              title="Deletes all playlists"
+            >
+              Delete All
             </button>
             <button onClick={onClose} className="bg-transparent border-none text-2xl cursor-pointer text-gray-500 p-0 leading-none hover:text-gray-700">×</button>
           </div>

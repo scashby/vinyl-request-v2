@@ -1,45 +1,39 @@
-// src/app/api/playlists/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { getAuthHeader, supabaseServer } from 'src/lib/supabaseServer';
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "src/lib/supabaseAdmin";
 
-export const runtime = 'nodejs';
+export const runtime = "nodejs";
 
-export async function GET(request: Request) {
-  const supabase = supabaseServer(getAuthHeader(request));
-  const { data, error } = await supabase
-    .from('playlists')
-    .select('id, platform, embed_url')
-    .order('sort_order', { ascending: true });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json(data, {
-    status: 200,
-    headers: { 'Cache-Control': 's-maxage=60' }
-  });
-}
-
-export async function PUT(request: NextRequest) {
+export async function DELETE(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { id, platform, embed_url } = body;
-    const supabase = supabaseServer(getAuthHeader(request));
-
-    const { error } = await supabase
-      .from("playlists")
-      .update({ platform, embed_url })
-      .eq("id", id);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    const url = new URL(request.url);
+    const confirm = (url.searchParams.get("confirm") ?? "").trim().toLowerCase();
+    if (confirm !== "yes") {
+      return NextResponse.json(
+        { error: "Missing confirmation. Pass ?confirm=yes to delete all playlists." },
+        { status: 400 }
+      );
     }
 
-    return NextResponse.json({ success: true }, { status: 200 });
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: msg }, { status: 500 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = supabaseAdmin as any;
+
+    // Detach any foreign-key references that might block deletion.
+    await db.from("bingo_sessions").update({ playlist_id: null }).not("playlist_id", "is", null);
+
+    const { error: itemsError } = await db.from("collection_playlist_items").delete().neq("playlist_id", 0);
+    if (itemsError) {
+      return NextResponse.json({ error: itemsError.message }, { status: 500 });
+    }
+
+    const { error: playlistsError } = await db.from("collection_playlists").delete().neq("id", 0);
+    if (playlistsError) {
+      return NextResponse.json({ error: playlistsError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true }, { status: 200 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to delete playlists";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-// AUDIT: inspected, no changes.
+
