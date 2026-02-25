@@ -12,7 +12,9 @@ type StatusMeta = { label: string; className: string };
 
 type GamePublicCopy = {
   tagline: string;
-  runthrough: string[];
+  roundFlow: string[];
+  howYouWin: string;
+  scoring?: string;
   whatYouNeed?: string;
   bestFor?: string;
 };
@@ -42,176 +44,217 @@ const publicCopyBySlug: Record<string, GamePublicCopy> = {
   bingo: {
     tagline:
       "The classic: listen for songs, mark your card, and race to hit the pattern first.",
-    runthrough: [
-      "You get a printed bingo card (artist + title or title-only).",
-      "The DJ spins songs and calls them out—mark matches as you hear them.",
-      "First team to complete the night’s win pattern shouts BINGO and gets checked.",
+    roundFlow: [
+      "You get a printed card (each square is a song title, or title + artist).",
+      "The DJ plays a song and calls it out; you mark it if it’s on your card.",
+      "When you complete the night’s win pattern, you shout “Bingo!” and we verify it.",
     ],
+    howYouWin: "Be the first team to complete the selected pattern (or final pattern).",
+    scoring:
+      "Winners per round/pattern (single line → corners → blackout, etc.), depending on the night.",
     bestFor: "Big rooms, mixed crowds, easy entry.",
     whatYouNeed: "Printed cards + pens/daubers, teams at tables.",
   },
   "music-trivia": {
     tagline:
-      "Fast, fun questions with music between rounds—teams write answers and turn them in.",
-    runthrough: [
-      "Teams pick a name and settle in with an answer slip.",
-      "The host asks questions (often with a quick music moment between).",
-      "Answers are revealed and scored—leaderboard stays tight all night.",
+      "A hosted quiz night with a vinyl heart: questions, table talk, reveals, points.",
+    roundFlow: [
+      "Host reads a question (sometimes with a quick music clip or vinyl moment).",
+      "Teams talk it out and write one final answer on their slip/whiteboard.",
+      "Time’s up: answers get locked, the correct answer is revealed, and points are awarded.",
     ],
+    howYouWin:
+      "Stack the most points across all rounds (or win the final round if we run a closer).",
+    scoring:
+      "Usually 1 point per correct answer; optional bonuses for harder questions/categories.",
     bestFor: "Crowds that love laughing, arguing, and shouting answers.",
     whatYouNeed: "Answer slips/pens (or whiteboards), a host mic if available.",
   },
   "name-that-tune": {
     tagline:
       "Short snippets, quick instincts—identify artist + title before the reveal.",
-    runthrough: [
-      "The DJ plays a tiny slice of a track (a few seconds).",
-      "Teams lock in artist/title using the night’s rule (time window, first sheet, or hand raise).",
-      "Reveal, score, repeat—momentum stays high and the room stays loud.",
+    roundFlow: [
+      "The DJ plays a short snippet (just a few seconds).",
+      "Teams lock in artist and song title using the night’s rule (time window, first sheet wins, or hand raise).",
+      "We reveal the answer and score the round—then immediately go again.",
     ],
+    howYouWin: "Earn the most points after the final snippet.",
+    scoring: "2 points for artist + title; 1 point for either one (if enabled).",
     bestFor: "High-energy nights with lots of recognizable music.",
     whatYouNeed: "Answer slips/whiteboards; a clear lock-in rule.",
   },
   "needle-drop-roulette": {
     tagline:
       "A blind needle drop game—tiny clips, zero warning, pure chaos (in a good way).",
-    runthrough: [
-      "The DJ needle-drops a random spot and lets it ride for 5–10 seconds.",
-      "Teams write artist + title as fast as possible.",
-      "Reveal and score immediately—then the next drop hits.",
+    roundFlow: [
+      "The DJ needle-drops a random spot in a record and plays 5–10 seconds.",
+      "Teams write their best guess: artist and song title.",
+      "Answer is revealed and points are awarded on the spot—next drop starts right away.",
     ],
+    howYouWin: "Most points after the last needle drop.",
+    scoring: "2 points for artist + title; 1 point for either one (if enabled).",
     bestFor: "Party crowds, quick rounds, lots of replay value.",
     whatYouNeed: "Answer slips/whiteboards; tight pacing.",
   },
   "bracket-battle": {
     tagline:
       "A tournament of tracks—head-to-head matchups where the room decides who advances.",
-    runthrough: [
-      "A bracket is set (4/8/16 entries) with seeded matchups.",
-      "Each matchup gets played and the crowd/teams vote (hands or slips).",
-      "Winners advance until one champion takes the crown.",
+    roundFlow: [
+      "A themed bracket is posted (4/8/16 entries).",
+      "For each matchup, we play both tracks; the room votes for the winner (hands or slips).",
+      "Winners advance until a final champion is crowned.",
     ],
+    howYouWin:
+      "Pick winners correctly (team bracket) or simply help your favorites win (crowd mode).",
+    scoring:
+      "Either crowd-vote only (no teams), or bracket-pick scoring for teams (more points deeper in the bracket).",
     bestFor: "Theme nights, decade battles, label/showdown energy.",
     whatYouNeed: "A bracket list, a voting method, and a hype host voice.",
   },
   "decade-dash": {
     tagline:
       "Hear a track, pick the decade—quick decisions with big ‘aha’ moments.",
-    runthrough: [
-      "The DJ plays a track; teams choose the decade they think it’s from.",
-      "Optionally, close guesses can still score (adjacent-decade rule).",
-      "Reveal the year/decade and keep moving—fast rounds, easy to follow.",
+    roundFlow: [
+      "The DJ plays a track (usually a short slice, but it can be longer).",
+      "Teams choose the decade they think it’s from (cards/paddles or written).",
+      "We reveal the year/decade and award points—then the next track starts.",
     ],
+    howYouWin: "Most points after the final track.",
+    scoring: "2 points for the exact decade; optional 1 point for an adjacent decade.",
     bestFor: "Mixed-age rooms and low-barrier competition.",
     whatYouNeed: "Decade cards/paddles or answer slips.",
   },
   "genre-imposter": {
     tagline:
       "Two songs fit the category—one is the imposter. Find it and defend your pick.",
-    runthrough: [
-      "The host announces a category (or hands out a category card).",
-      "Three songs are played; teams decide which one doesn’t belong.",
-      "Reveal the imposter and (optionally) award a bonus for the best reason.",
+    roundFlow: [
+      "Host announces the category (e.g., “Disco”, “Three-chord punk”, “Motown energy”).",
+      "Three tracks play; two belong, one is the imposter.",
+      "Teams pick the imposter (and optionally write why), then we reveal and score.",
     ],
+    howYouWin: "Most correct imposters (and bonus reasons) across the night.",
+    scoring: "2 points for the correct imposter; optional +1 for the best/accepted reason.",
     bestFor: "Talkative tables and ‘prove it’ debates.",
     whatYouNeed: "Prepared 3-song sets per round, category prompts.",
   },
   "cover-art-clue-chase": {
     tagline:
       "Guess the album from visuals—art reveals get clearer as the points drop.",
-    runthrough: [
-      "A heavily cropped/blurred cover image appears (Reveal 1).",
-      "If no one nails it, the image becomes clearer (Reveal 2, then 3).",
-      "Optional audio clue for the final push—then the big reveal and scoring.",
+    roundFlow: [
+      "A mystery album cover appears (Reveal 1: hardest). Teams can guess for max points.",
+      "No winner yet? The image becomes clearer (Reveal 2, then Reveal 3).",
+      "Final chance: optional audio clue, then the full reveal and scoring.",
     ],
+    howYouWin: "Rack up points by guessing earlier in the reveal ladder.",
+    scoring: "3 points on Reveal 1, 2 points on Reveal 2, 1 point on Reveal 3/final (typical).",
     bestFor: "Screens-on venues and visual ‘game show’ vibes.",
     whatYouNeed: "A screen + prepared reveal images for each round.",
   },
   "crate-categories": {
     tagline:
       "A flexible ‘shell’ game: each round has a category prompt and a few spins to solve it.",
-    runthrough: [
-      "The host declares the round prompt (odd-one-out, identify the thread, mood match, etc.).",
-      "A short set of tracks gets played from the crates/tag pool.",
-      "Teams submit a summary (and sometimes a rationale) for scoring.",
+    roundFlow: [
+      "Host announces the round prompt (e.g., “identify the thread” or “odd one out”).",
+      "We play a short set of tracks (usually 3–5).",
+      "Teams submit their answer (and sometimes a quick rationale), then we reveal and score.",
     ],
+    howYouWin: "Accumulate the most points across prompts/rounds.",
+    scoring:
+      "Depends on the prompt type (correct thread/odd-one-out/etc.), with optional bonus points for stronger rationales.",
     bestFor: "Repeat bookings—easy to remix into new nights.",
     whatYouNeed: "Category prompts + a small stack of ready-to-play tracks.",
   },
   "wrong-lyric-challenge": {
     tagline:
       "Pick the real lyric from decoys—then scream when everyone realizes they’ve been singing it wrong.",
-    runthrough: [
-      "The host reads lyric options while the DJ cues the track.",
-      "Teams pick the lyric they think is correct (optionally name the song for bonus).",
-      "Play the moment, reveal the right lyric, score, repeat.",
+    roundFlow: [
+      "Host presents 3–4 lyric options for an upcoming moment in a song.",
+      "Teams pick the option they believe is the real lyric (optional: name the song/artist).",
+      "DJ plays the lyric moment, we reveal the correct option, and points get awarded.",
     ],
+    howYouWin: "Most correct lyrics (plus optional song-name bonuses) by the end.",
+    scoring: "2 points for the correct lyric; optional +1 for naming the song (typical).",
     bestFor: "Two-operator nights (host + DJ) and crowd-pleasers.",
     whatYouNeed: "Prepared lyric options; a clear answer/reveal moment.",
   },
   "sample-detective": {
     tagline:
       "Connect the sample to the source—music nerd heaven with a clean, scoreable format.",
-    runthrough: [
-      "You hear a sampled track and its source (order depends on the round).",
-      "Teams identify the pair and (optionally) name both artists for bonus.",
-      "Reveal the connection and keep the pace moving.",
+    roundFlow: [
+      "We play a sampled track and a possible source track (order depends on the round).",
+      "Teams decide which two belong together and write the connection.",
+      "We reveal the correct pairing/source and award points (with optional bonus).",
     ],
+    howYouWin: "Most correctly identified sample/source pairs across the night.",
+    scoring:
+      "2 points for the correct pair; optional +1 for naming both artists (typical).",
     bestFor: "Special nights and crowds that love discovery.",
     whatYouNeed: "Curated sample/source pairs (prep-heavy, worth it).",
   },
   "artist-alias": {
     tagline:
       "A clue ladder game: guess the artist early for more points—wait for clues if you need them.",
-    runthrough: [
-      "Stage 1 clue drops (era/vibe). Teams can guess immediately for max points.",
-      "If needed, Stage 2 adds a collaborator clue; Stage 3 adds label/region.",
-      "Final reveal locks it in and scoring rewards early confidence.",
+    roundFlow: [
+      "Stage 1 clue is revealed (broad: era/vibe). Teams can guess for max points.",
+      "No correct guess? Stage 2 adds a stronger clue (e.g., collaborator).",
+      "Still no? Stage 3 adds label/region—then the final reveal and scoring.",
     ],
+    howYouWin: "Score early guesses; the earlier you nail it, the more you earn.",
+    scoring:
+      "Typically 3 points at Stage 1, 2 points at Stage 2, 1 point at final reveal.",
     bestFor: "Rooms that like a little mystery and suspense.",
     whatYouNeed: "Prepared clue cards per artist; optional audio clue.",
   },
   "original-or-cover": {
     tagline:
       "Hear a version—call it original or cover, then (optional) name the original artist for bonus.",
-    runthrough: [
-      "A track plays and teams decide: original or cover?",
-      "Teams lock in their call, then optionally name the original artist.",
-      "Reveal the original and score—simple rules, lots of ‘no way’ moments.",
+    roundFlow: [
+      "We play a track (a version you might know).",
+      "Teams lock in: “Original” or “Cover” (optional: name the original artist).",
+      "We reveal the truth and award points—then the next track starts.",
     ],
+    howYouWin: "Most points after the final track.",
+    scoring:
+      "2 points for correct original/cover call; optional +1 for naming the original artist (typical).",
     bestFor: "Sing-along crowds and broad music knowledge.",
     whatYouNeed: "A curated list of originals + covers.",
   },
   "back-to-back-connection": {
     tagline:
       "Two tracks in a row—teams figure out the connection (and can earn a detail bonus).",
-    runthrough: [
+    roundFlow: [
       "Track A plays, then Track B plays.",
-      "Teams discuss and write the connection (same sample, same producer, same city, etc.).",
-      "Reveal the intended link and award bonus for a specific detail if used.",
+      "Teams discuss and write the connection (same producer, same sample, same city, same band member, etc.).",
+      "We reveal the intended connection and score; optional bonus for a specific detail.",
     ],
+    howYouWin: "Most correct connections (plus detail bonuses) by the end.",
+    scoring: "2 points for the correct connection; optional +1 for the detail bonus.",
     bestFor: "Table-talk nights and ‘detective work’ energy.",
     whatYouNeed: "Prepared track pairs with one accepted connection per pair.",
   },
   "lyric-gap-relay": {
     tagline:
       "The room sings the missing line—teams race to write what comes next.",
-    runthrough: [
+    roundFlow: [
       "The DJ plays up to a known lyric cue, then stops right before the next line.",
-      "Teams write the next lyric (exact or close-enough based on the night’s rule).",
-      "Reveal, score, and keep the relay moving.",
+      "Teams write the very next lyric line (exact, or close-enough if enabled).",
+      "We reveal the line (often by playing it), then award points and move on.",
     ],
+    howYouWin: "Most points after the final lyric gap.",
+    scoring: "2 points exact; 1 point close-enough; 0 for a miss (typical).",
     bestFor: "Sing-y crowds and throwback-heavy playlists.",
     whatYouNeed: "An answer key to keep disputes low.",
   },
   "odd-one-out-era-edition": {
     tagline:
       "Three tracks, one era window—spot the one that doesn’t belong.",
-    runthrough: [
-      "An era window is announced (e.g., ‘1976–1982’).",
-      "Three tracks play; teams pick the one outside the window.",
-      "Reveal the years and score (optional bonus for naming the correct decade).",
+    roundFlow: [
+      "Host announces an era window (e.g., “1976–1982”).",
+      "Three tracks play; teams pick the one that falls outside the window.",
+      "We reveal the years/decades and award points (optional bonus).",
     ],
+    howYouWin: "Most correct odd-one-out picks (plus optional bonuses) by the end.",
+    scoring: "2 points for the correct odd-one-out; optional +1 for an extra detail (typical).",
     bestFor: "One-off specials when you’ve got great prep.",
     whatYouNeed: "Verified release years (prep matters).",
   },
@@ -304,11 +347,11 @@ export default function GamesPage() {
                     <div className="mt-5 grid grid-cols-1 gap-4">
                       <div className="rounded-xl bg-black/30 ring-1 ring-white/10 p-4">
                         <div className="text-xs uppercase tracking-[0.18em] text-zinc-400">
-                          Run of show
+                          Round flow (what you do)
                         </div>
-                        {publicCopy?.runthrough?.length ? (
+                        {publicCopy?.roundFlow?.length ? (
                           <ol className="mt-3 space-y-2 text-sm text-zinc-200/90 leading-relaxed list-decimal list-inside">
-                            {publicCopy.runthrough.map((step) => (
+                            {publicCopy.roundFlow.map((step) => (
                               <li key={step}>{step}</li>
                             ))}
                           </ol>
@@ -334,8 +377,22 @@ export default function GamesPage() {
                         <div className="text-xs uppercase tracking-[0.18em] text-zinc-400">
                           Booker notes
                         </div>
-                        {publicCopy?.bestFor ? (
+                        {publicCopy?.howYouWin ? (
                           <p className="mt-2 text-sm text-zinc-200/90 leading-relaxed">
+                            <span className="font-semibold text-zinc-200">
+                              How you win:
+                            </span>{" "}
+                            {publicCopy.howYouWin}
+                          </p>
+                        ) : null}
+                        <p className="mt-2 text-sm text-zinc-200/90 leading-relaxed">
+                          <span className="font-semibold text-zinc-200">
+                            Scoring:
+                          </span>{" "}
+                          {publicCopy?.scoring ?? game.scoring}
+                        </p>
+                        {publicCopy?.bestFor ? (
+                          <p className="mt-3 text-sm text-zinc-200/90 leading-relaxed">
                             <span className="font-semibold text-zinc-200">
                               Best for:
                             </span>{" "}
