@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
+import { requireSupabaseAdminServiceRole, supabaseAdmin, supabaseAdminJwtRole } from '../../../../lib/supabaseAdmin';
 import { getCachedInventoryIndex, matchTracks, sanitizePlaylistName } from '../../../../lib/vinylPlaylistImport';
 import { getSpotifyAccessTokenFromCookies, spotifyApiGet, spotifyApiGetByUrl, SpotifyApiError } from '../../../../lib/spotifyUser';
 
@@ -42,6 +42,17 @@ function isForbiddenSpotifyError(message: string) {
   return lowered.includes('failed (403)') || lowered.includes('forbidden');
 }
 
+const getIndexStats = (index: Awaited<ReturnType<typeof getCachedInventoryIndex>>) => {
+  let trackCount = 0;
+  for (const list of index.titleOnly.values()) trackCount += list.length;
+  return {
+    trackCount,
+    exactKeys: index.exact.size,
+    titleKeys: index.titleOnly.size,
+    tokenKeys: index.byToken.size,
+  };
+};
+
 export async function POST(req: Request) {
   let step = 'init';
   let spotifyScope = '';
@@ -56,6 +67,7 @@ export async function POST(req: Request) {
   let metaItemsRawCount = 0;
   let metaItemsParsedCount = 0;
   let attemptedTrackPageCalls = 0;
+  let inventoryIndexStats: ReturnType<typeof getIndexStats> | null = null;
   try {
     step = 'parse-body';
     const body = await req.json();
@@ -70,6 +82,9 @@ export async function POST(req: Request) {
     }
     spotifyPlaylistId = playlistId;
     resumeOffset = Number.isFinite(startOffset) && startOffset >= 0 ? startOffset : 0;
+
+    step = 'supabase-admin-check';
+    requireSupabaseAdminServiceRole();
 
     step = 'spotify-token';
     const tokenData = await getSpotifyAccessTokenFromCookies();
@@ -254,6 +269,12 @@ export async function POST(req: Request) {
 
     step = 'inventory-index';
     const index = await getCachedInventoryIndex();
+    inventoryIndexStats = getIndexStats(index);
+    if (inventoryIndexStats.trackCount < 25) {
+      throw new Error(
+        `Inventory index unexpectedly small (${inventoryIndexStats.trackCount} tracks). Check server Supabase credentials/RLS. (role=${supabaseAdminJwtRole})`
+      );
+    }
     const { matched, missing, fuzzyMatchedCount } = matchTracks(rows, index);
 
     step = 'create-playlist';
@@ -325,6 +346,10 @@ export async function POST(req: Request) {
       fuzzyMatchedCount,
       unmatchedCount: missing.length,
       unmatchedSample: missing.slice(0, 25),
+      debug: {
+        supabase_admin_role: supabaseAdminJwtRole,
+        inventoryIndex: inventoryIndexStats,
+      },
       resume: {
         spotifyPlaylistId,
         snapshotId: spotifySnapshotId || providedSnapshotId || null,
@@ -379,6 +404,10 @@ export async function POST(req: Request) {
           spotifyUserId,
           playlistOwnerId,
           step,
+          debug: {
+            supabase_admin_role: supabaseAdminJwtRole,
+            inventoryIndex: inventoryIndexStats,
+          },
           resume: {
             spotifyPlaylistId,
             snapshotId: spotifySnapshotId || null,
@@ -401,6 +430,8 @@ export async function POST(req: Request) {
           playlistOwnerId,
           step,
           debug: {
+            supabase_admin_role: supabaseAdminJwtRole,
+            inventoryIndex: inventoryIndexStats,
             metaItemsRawCount,
             metaItemsParsedCount,
             attemptedTrackPageCalls,
@@ -411,6 +442,16 @@ export async function POST(req: Request) {
         { status: 403 }
       );
     }
-    return NextResponse.json({ error: message, step }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: message,
+        step,
+        debug: {
+          supabase_admin_role: supabaseAdminJwtRole,
+          inventoryIndex: inventoryIndexStats,
+        },
+      },
+      { status: 500 }
+    );
   }
 }

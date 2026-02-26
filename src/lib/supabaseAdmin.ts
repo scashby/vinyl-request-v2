@@ -10,6 +10,47 @@ if (!supabaseUrl || !supabaseSecretKey) {
   );
 }
 
+const decodeJwtPayload = (token: string): Record<string, unknown> | null => {
+  const parts = token.split('.');
+  if (parts.length < 2) return null;
+  const raw = parts[1] ?? '';
+  const base64 = raw.replace(/-/g, '+').replace(/_/g, '/');
+  const padLen = (4 - (base64.length % 4)) % 4;
+  const padded = base64 + '='.repeat(padLen);
+  try {
+    const json = Buffer.from(padded, 'base64').toString('utf8');
+    const parsed = JSON.parse(json);
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+};
+
+const getJwtRole = (token: string): string | null => {
+  const payload = decodeJwtPayload(token);
+  const role = payload?.role;
+  if (typeof role === 'string' && role.trim().length > 0) return role.trim();
+
+  const appMeta = payload?.app_metadata;
+  if (appMeta && typeof appMeta === 'object') {
+    const metaRole = (appMeta as Record<string, unknown>).role;
+    if (typeof metaRole === 'string' && metaRole.trim().length > 0) return metaRole.trim();
+  }
+
+  return null;
+};
+
+export const supabaseAdminJwtRole = getJwtRole(supabaseSecretKey) ?? 'unknown';
+export const isSupabaseAdminServiceRole = supabaseAdminJwtRole === 'service_role';
+
+export const requireSupabaseAdminServiceRole = () => {
+  if (!isSupabaseAdminServiceRole) {
+    throw new Error(
+      `Server misconfiguration: SUPABASE_SECRET_KEY must be a Supabase service_role key. Detected role: ${supabaseAdminJwtRole}.`
+    );
+  }
+};
+
 export const supabaseAdmin = createClient<Database>(
   supabaseUrl,
   supabaseSecretKey,
