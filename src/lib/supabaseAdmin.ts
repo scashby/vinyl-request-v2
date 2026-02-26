@@ -2,11 +2,16 @@ import { createClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
 
 const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim();
-const supabaseSecretKey = (process.env.SUPABASE_SECRET_KEY ?? '').trim();
+const supabaseServiceRoleKey = (
+  process.env.SUPABASE_SERVICE_ROLE_KEY ??
+  process.env.SUPABASE_SERVICE_KEY ??
+  process.env.SUPABASE_SECRET_KEY ??
+  ''
+).trim();
 
-if (!supabaseUrl || !supabaseSecretKey) {
+if (!supabaseUrl || !supabaseServiceRoleKey) {
   throw new Error(
-    'Missing Supabase environment variables (NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY).'
+    'Missing Supabase environment variables (NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY).'
   );
 }
 
@@ -40,20 +45,24 @@ const getJwtRole = (token: string): string | null => {
   return null;
 };
 
-export const supabaseAdminJwtRole = getJwtRole(supabaseSecretKey) ?? 'unknown';
+export const supabaseAdminJwtRole = getJwtRole(supabaseServiceRoleKey) ?? 'unknown';
 export const isSupabaseAdminServiceRole = supabaseAdminJwtRole === 'service_role';
 
 export const requireSupabaseAdminServiceRole = () => {
   if (!isSupabaseAdminServiceRole) {
+    const keyHint =
+      supabaseServiceRoleKey.split('.').length >= 3
+        ? 'The key looks JWT-shaped but did not include a role claim.'
+        : 'The key does not look like a Supabase API key (JWT). You may have set the JWT secret or database password by mistake.';
     throw new Error(
-      `Server misconfiguration: SUPABASE_SECRET_KEY must be a Supabase service_role key. Detected role: ${supabaseAdminJwtRole}.`
+      `Server misconfiguration: SUPABASE_SERVICE_ROLE_KEY must be a Supabase service_role API key (Supabase Dashboard → Project Settings → API → service_role). Detected role: ${supabaseAdminJwtRole}. ${keyHint}`
     );
   }
 };
 
 export const supabaseAdmin = createClient<Database>(
   supabaseUrl,
-  supabaseSecretKey,
+  supabaseServiceRoleKey,
   {
     auth: {
       autoRefreshToken: false,

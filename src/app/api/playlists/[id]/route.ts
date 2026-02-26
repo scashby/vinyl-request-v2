@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isSupabaseAdminServiceRole, requireSupabaseAdminServiceRole, supabaseAdmin, supabaseAdminJwtRole } from "src/lib/supabaseAdmin";
+import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 
 export const runtime = "nodejs";
 
@@ -16,7 +16,7 @@ const countRows = async (db: any, table: string, apply?: (q: any) => any) => {
 
 export async function DELETE(_req: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    requireSupabaseAdminServiceRole();
+    const req = _req as Request;
     const { id } = await context.params;
     const playlistId = Number(id);
     if (!Number.isFinite(playlistId) || playlistId <= 0) {
@@ -24,14 +24,13 @@ export async function DELETE(_req: Request, context: { params: Promise<{ id: str
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = supabaseAdmin as any;
+    const db = supabaseServer(getAuthHeader(req)) as any;
 
     const before = {
       playlist_exists: (await countRows(db, "collection_playlists", (q) => q.eq("id", playlistId))) > 0,
       playlist_items: await countRows(db, "collection_playlist_items", (q) => q.eq("playlist_id", playlistId)),
       bingo_sessions_with_playlist: await countRows(db, "bingo_sessions", (q) => q.eq("playlist_id", playlistId)),
-      supabase_admin_role: supabaseAdminJwtRole,
-      supabase_service_role: isSupabaseAdminServiceRole,
+      supabase_mode: "publishable",
     };
 
     // Detach any foreign-key references that might block deletion.

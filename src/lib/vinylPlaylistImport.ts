@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "src/lib/supabaseAdmin";
+import { supabaseServer } from "src/lib/supabaseServer";
 
 const PAGE_SIZE = 1000;
 
@@ -376,6 +376,7 @@ export const searchInventoryCandidates = async (
 
 export const fetchInventoryTracks = async (limit?: number) => {
   const tracks: InventoryTrack[] = [];
+  const supabase = supabaseServer();
 
   // Step 1: fetch inventory rows to determine the release ids in the library.
   // De-dupe by release_id so we don't create duplicate candidate tracks when multiple copies exist.
@@ -384,7 +385,7 @@ export const fetchInventoryTracks = async (limit?: number) => {
   while (true) {
     const from = inventoryPage * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
-    const { data: inventoryRows, error: inventoryError } = await supabaseAdmin
+    const { data: inventoryRows, error: inventoryError } = await supabase
       .from("inventory")
       .select("id, release_id")
       .not("release_id", "is", null)
@@ -429,7 +430,7 @@ export const fetchInventoryTracks = async (limit?: number) => {
     // Prefetch album artist for release_id (fallback when track_artist is missing).
     const releaseArtistById = new Map<number, string>();
     {
-      const { data: releases, error: releaseError } = await supabaseAdmin
+      const { data: releases, error: releaseError } = await supabase
         .from("releases")
         .select("id, master:masters(artist:artists(name))")
         .in("id", chunk);
@@ -448,7 +449,7 @@ export const fetchInventoryTracks = async (limit?: number) => {
       }
     }
 
-    const { data: releaseTracks, error: releaseTracksError } = await supabaseAdmin
+    const { data: releaseTracks, error: releaseTracksError } = await supabase
       .from("release_tracks")
       .select("release_id, position, side, title_override, recordings ( id, title, track_artist )")
       .in("release_id", chunk);

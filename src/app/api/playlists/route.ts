@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isSupabaseAdminServiceRole, requireSupabaseAdminServiceRole, supabaseAdmin, supabaseAdminJwtRole } from "src/lib/supabaseAdmin";
+import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 
 export const runtime = "nodejs";
 
@@ -16,7 +16,6 @@ const countRows = async (db: any, table: string, apply?: (q: any) => any) => {
 
 export async function DELETE(request: NextRequest) {
   try {
-    requireSupabaseAdminServiceRole();
     const url = new URL(request.url);
     const confirm = (url.searchParams.get("confirm") ?? "").trim().toLowerCase();
     if (confirm !== "yes") {
@@ -27,14 +26,13 @@ export async function DELETE(request: NextRequest) {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = supabaseAdmin as any;
+    const db = supabaseServer(getAuthHeader(request)) as any;
 
     const before = {
       playlists: await countRows(db, "collection_playlists"),
       playlist_items: await countRows(db, "collection_playlist_items"),
       bingo_sessions_with_playlist: await countRows(db, "bingo_sessions", (q) => q.not("playlist_id", "is", null)),
-      supabase_admin_role: supabaseAdminJwtRole,
-      supabase_service_role: isSupabaseAdminServiceRole,
+      supabase_mode: "publishable",
     };
 
     // Detach any foreign-key references that might block deletion.
