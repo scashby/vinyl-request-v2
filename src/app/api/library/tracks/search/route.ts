@@ -4,7 +4,7 @@ import { getBingoDb } from "src/lib/bingoDb";
 import { resolveTrackKeys } from "src/lib/bingoEngine";
 import { buildPlaylistTrackKey, toSingle } from "src/lib/library/mappers";
 import type { LibraryTrackSearchResult } from "src/lib/library/types";
-import { supabaseAdmin } from "src/lib/supabaseAdmin";
+import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 
 export const runtime = "nodejs";
 
@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "q is required" }, { status: 400 });
     }
 
-    const index = await getCachedInventoryIndex();
+    const authHeader = getAuthHeader(request);
+    const index = await getCachedInventoryIndex(authHeader);
     const candidates = await searchInventoryCandidates({ title: q, artist, limit }, index);
 
     const db = getBingoDb();
@@ -49,7 +50,8 @@ export async function GET(request: NextRequest) {
     // Attempt to fill album artist from masters lookup (best effort).
     const inventoryIds = Array.from(new Set(results.map((r) => r.inventory_id).filter((id): id is number => typeof id === "number")));
     if (inventoryIds.length > 0) {
-      const { data: rows } = await supabaseAdmin
+      const supabase = supabaseServer(authHeader);
+      const { data: rows } = await supabase
         .from("inventory")
         .select("id, release:releases(master:masters(artist:artists(name)))")
         .in("id", inventoryIds);
