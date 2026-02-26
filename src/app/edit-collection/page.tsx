@@ -1677,16 +1677,21 @@ function CollectionBrowserPage() {
     }
   }, [allTrackRows, loadPlaylists, playlists]);
 
-	  const handleDeletePlaylist = useCallback(async (playlistId: number, playlistName: string) => {
-	    if (!confirm(`Delete playlist "${playlistName}"? This cannot be undone.`)) {
-	      return;
-	    }
+		  const handleDeletePlaylist = useCallback(async (playlistId: number, playlistName: string) => {
+		    if (!confirm(`Delete playlist "${playlistName}"? This cannot be undone.`)) {
+		      return;
+		    }
 
-	    const res = await fetch(`/api/playlists/${playlistId}`, { method: 'DELETE' });
-	    const payload = await res.json().catch(() => ({}));
-	    if (!res.ok) {
-	      throw new Error(payload?.error || `Failed to delete playlist (${res.status})`);
-	    }
+		    const { data: { session } } = await supabase.auth.getSession();
+		    const accessToken = session?.access_token;
+		    const res = await fetch(`/api/playlists/${playlistId}`, {
+		      method: 'DELETE',
+		      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+		    });
+		    const payload = await res.json().catch(() => ({}));
+		    if (!res.ok) {
+		      throw new Error(payload?.error || `Failed to delete playlist (${res.status})`);
+		    }
 
 	    if (selectedPlaylistId === playlistId) {
 	      setSelectedPlaylistId(null);
@@ -1694,15 +1699,20 @@ function CollectionBrowserPage() {
 	    await loadPlaylists();
 	  }, [loadPlaylists, selectedPlaylistId]);
 
-	  const handleDeleteAllPlaylists = useCallback(async () => {
-	    const res = await fetch('/api/playlists?confirm=yes', { method: 'DELETE' });
-	    const payload = await res.json().catch(() => ({}));
-	    if (!res.ok) {
-	      throw new Error(payload?.error || `Failed to delete playlists (${res.status})`);
-	    }
-	    setSelectedPlaylistId(null);
-	    await loadPlaylists();
-	  }, [loadPlaylists]);
+		  const handleDeleteAllPlaylists = useCallback(async () => {
+		    const { data: { session } } = await supabase.auth.getSession();
+		    const accessToken = session?.access_token;
+		    const res = await fetch('/api/playlists?confirm=yes', {
+		      method: 'DELETE',
+		      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+		    });
+		    const payload = await res.json().catch(() => ({}));
+		    if (!res.ok) {
+		      throw new Error(payload?.error || `Failed to delete playlists (${res.status})`);
+		    }
+		    setSelectedPlaylistId(null);
+		    await loadPlaylists();
+		  }, [loadPlaylists]);
 
   const handleReorderPlaylists = useCallback(async (orderedPlaylists: Playlist[]) => {
     try {

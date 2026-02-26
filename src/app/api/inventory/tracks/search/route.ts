@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getCachedInventoryIndex, searchInventoryCandidates } from '../../../../../lib/vinylPlaylistImport';
 import { getAuthHeader } from 'src/lib/supabaseServer';
 
+export const runtime = 'nodejs';
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);

@@ -1,6 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { supabase as supabaseTyped } from 'src/lib/supabaseClient';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const supabase = supabaseTyped as any;
 
 type SpotifyPlaylist = {
   id: string;
@@ -67,6 +71,12 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
   const [resume, setResume] = useState<ImportResume | null>(null);
   const [retryAfterSeconds, setRetryAfterSeconds] = useState<number | null>(null);
 
+  const getSupabaseAuthHeaders = async (): Promise<Record<string, string>> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
+    return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  };
+
   const decorateUnmatched = (rows: unknown): UnmatchedTrack[] => {
     const list = Array.isArray(rows) ? (rows as Array<Record<string, unknown>>) : [];
     const base = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -102,7 +112,8 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
       setResume(null);
       setRetryAfterSeconds(null);
       try {
-        const res = await fetch('/api/spotify/playlists', { cache: 'no-store' });
+        const authHeaders = await getSupabaseAuthHeaders();
+        const res = await fetch('/api/spotify/playlists', { cache: 'no-store', headers: authHeaders });
         const payload = await res.json().catch(() => ({}));
         if (res.status === 401) {
           if (!active) return;
@@ -179,7 +190,8 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
           url.searchParams.set('q', q);
           if (row.artist) url.searchParams.set('artist', row.artist);
           url.searchParams.set('limit', '8');
-          const res = await fetch(url.toString(), { signal: controller.signal });
+          const authHeaders = await getSupabaseAuthHeaders();
+          const res = await fetch(url.toString(), { signal: controller.signal, headers: authHeaders });
           const payload = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(payload?.error || `Search failed (${res.status})`);
           const mapped = Array.isArray(payload?.results)
@@ -212,9 +224,10 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
       if (!lastImportedPlaylistId) return;
       setAddingKey(candidate.track_key);
       try {
+        const authHeaders = await getSupabaseAuthHeaders();
         const res = await fetch('/api/spotify/import/resolve', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders },
           body: JSON.stringify({
             playlistId: lastImportedPlaylistId,
             trackKey: candidate.track_key,
@@ -356,16 +369,17 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
               )}
               <div className="mb-3 flex items-center gap-2">
                 <button
-                  onClick={async () => {
-                    playlistsCache = null;
-                    setLoading(true);
-                    setError(null);
-                    try {
-                      const res = await fetch('/api/spotify/playlists', { cache: 'no-store' });
-                      const payload = await res.json().catch(() => ({}));
-                      if (res.status === 429) {
-                        const wait = typeof payload?.retryAfterSeconds === 'number' ? payload.retryAfterSeconds : null;
-                        const waitMsg = wait !== null ? ` Retry after about ${Math.ceil(wait / 60)} minute(s).` : '';
+	                  onClick={async () => {
+	                    playlistsCache = null;
+	                    setLoading(true);
+	                    setError(null);
+	                    try {
+	                      const authHeaders = await getSupabaseAuthHeaders();
+	                      const res = await fetch('/api/spotify/playlists', { cache: 'no-store', headers: authHeaders });
+	                      const payload = await res.json().catch(() => ({}));
+	                      if (res.status === 429) {
+	                        const wait = typeof payload?.retryAfterSeconds === 'number' ? payload.retryAfterSeconds : null;
+	                        const waitMsg = wait !== null ? ` Retry after about ${Math.ceil(wait / 60)} minute(s).` : '';
                         throw new Error((payload?.error || 'Spotify rate limit reached.') + waitMsg);
                       }
                       if (!res.ok) {
@@ -427,20 +441,21 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                           setError(null);
                           setLastResult(null);
                           setUnmatched([]);
-                          setLastImportedPlaylistId(null);
-                          setResume(null);
-                          setRetryAfterSeconds(null);
-                          try {
-                            const res = await fetch('/api/spotify/import', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({
-                                playlistId: playlist.id,
-                                playlistName: playlist.name,
-                                snapshotId: playlist.snapshotId ?? null,
-                                maxPages: 2,
-                              }),
-                            });
+                      setLastImportedPlaylistId(null);
+                      setResume(null);
+                      setRetryAfterSeconds(null);
+                      try {
+                        const authHeaders = await getSupabaseAuthHeaders();
+                        const res = await fetch('/api/spotify/import', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', ...authHeaders },
+                          body: JSON.stringify({
+                            playlistId: playlist.id,
+                            playlistName: playlist.name,
+                            snapshotId: playlist.snapshotId ?? null,
+                            maxPages: 2,
+                          }),
+                        });
                             const payload = await res.json().catch(() => ({}));
                             if (res.status === 429) {
                               setRetryAfterSeconds(
@@ -496,9 +511,10 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                       setError(null);
                       setLastResult(null);
                       try {
+                        const authHeaders = await getSupabaseAuthHeaders();
                         const res = await fetch('/api/spotify/import', {
                           method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
+                          headers: { 'Content-Type': 'application/json', ...authHeaders },
                           body: JSON.stringify({
                             playlistId: resume.spotifyPlaylistId,
                             playlistName: '(resume)',
