@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../../../lib/supabaseAdmin';
+import { getAuthHeader, supabaseServer } from 'src/lib/supabaseServer';
+
+export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
   try {
@@ -17,7 +19,7 @@ export async function POST(req: Request) {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = supabaseAdmin as any;
+    const db = supabaseServer(getAuthHeader(req)) as any;
 
     const { data: existing } = await db
       .from('collection_playlist_items')
@@ -65,4 +67,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-

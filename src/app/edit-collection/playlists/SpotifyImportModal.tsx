@@ -77,6 +77,28 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
     return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
   };
 
+  const formatApiError = (payload: unknown, res: Response) => {
+    const p =
+      payload && typeof payload === 'object'
+        ? (payload as Record<string, unknown>)
+        : {};
+    const base = String(p.error ?? `Request failed (${res.status})`);
+    const detail = p.details ? ` (${String(p.details)})` : '';
+    const step = p.step ? ` [step: ${String(p.step)}]` : '';
+    const debug =
+      p.debug && typeof p.debug === 'object'
+        ? (p.debug as Record<string, unknown>)
+        : null;
+    const inventoryIndex =
+      debug?.inventoryIndex && typeof debug.inventoryIndex === 'object'
+        ? (debug.inventoryIndex as Record<string, unknown>)
+        : null;
+    const debugIndex = inventoryIndex?.trackCount;
+    const indexNote = typeof debugIndex === 'number' ? ` [indexTracks: ${debugIndex}]` : '';
+    const granted = p.scope ? ` [scope: ${String(p.scope)}]` : '';
+    return base + detail + step + indexNote + granted;
+  };
+
   const decorateUnmatched = (rows: unknown): UnmatchedTrack[] => {
     const list = Array.isArray(rows) ? (rows as Array<Record<string, unknown>>) : [];
     const base = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -126,9 +148,7 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
           const waitMsg = wait !== null ? ` Retry after about ${Math.ceil(wait / 60)} minute(s).` : '';
           throw new Error((payload?.error || 'Spotify rate limit reached.') + waitMsg);
         }
-        if (!res.ok) {
-          throw new Error(payload?.error || `Failed to load playlists (${res.status})`);
-        }
+        if (!res.ok) throw new Error(formatApiError(payload, res));
         if (!active) return;
         const typedPayload = payload as PlaylistsPayload;
         playlistsCache = {
@@ -193,7 +213,7 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
           const authHeaders = await getSupabaseAuthHeaders();
           const res = await fetch(url.toString(), { signal: controller.signal, headers: authHeaders });
           const payload = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(payload?.error || `Search failed (${res.status})`);
+	          if (!res.ok) throw new Error(formatApiError(payload, res));
           const mapped = Array.isArray(payload?.results)
             ? (payload.results as Array<Record<string, unknown>>).map((item) => ({
                 track_key: String(item.track_key ?? '').trim(),
@@ -236,7 +256,7 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
           }),
         });
         const payload = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(payload?.error || `Add failed (${res.status})`);
+        if (!res.ok) throw new Error(formatApiError(payload, res));
         setUnmatched((prev) => prev.filter((r) => r.row_id !== row.row_id));
         await onImported();
       } catch (err) {
@@ -464,11 +484,7 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                               setResume(payload?.resume ?? null);
                               throw new Error(payload?.error || `Import rate-limited (${res.status})`);
                             }
-                            if (!res.ok) {
-                              const detail = payload?.details ? ` (${payload.details})` : '';
-                              const granted = payload?.scope ? ` [scope: ${payload.scope}]` : '';
-                              throw new Error((payload?.error || `Import failed (${res.status})`) + detail + granted);
-                            }
+	                            if (!res.ok) throw new Error(formatApiError(payload, res));
                             const partialNote = payload?.partialImport
                               ? ' (partial import: Spotify blocked full track paging, used first-page fallback)'
                               : '';
@@ -532,9 +548,7 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
                           setResume(payload?.resume ?? null);
                           throw new Error(payload?.error || `Import rate-limited (${res.status})`);
                         }
-                        if (!res.ok) {
-                          throw new Error(payload?.error || `Continue failed (${res.status})`);
-                        }
+	                        if (!res.ok) throw new Error(formatApiError(payload, res));
                         const fuzzyNote = payload?.fuzzyMatchedCount ? `, ${payload.fuzzyMatchedCount} fuzzy-matched` : '';
                         setLastResult(
                           `Continued import: ${payload.matchedCount} matched${fuzzyNote}, ${payload.unmatchedCount} unmatched`

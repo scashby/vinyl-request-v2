@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSpotifyAccessTokenFromCookies, spotifyApiGet, SpotifyApiError } from '../../../../lib/spotifyUser';
 
+export const runtime = 'nodejs';
+
 type SpotifyPlaylistRow = {
   id: string;
   name: string;

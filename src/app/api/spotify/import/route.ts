@@ -3,6 +3,8 @@ import { getAuthHeader, supabaseServer } from 'src/lib/supabaseServer';
 import { getCachedInventoryIndex, matchTracks, sanitizePlaylistName } from '../../../../lib/vinylPlaylistImport';
 import { getSpotifyAccessTokenFromCookies, spotifyApiGet, spotifyApiGetByUrl, SpotifyApiError } from '../../../../lib/spotifyUser';
 
+export const runtime = 'nodejs';
+
 type SpotifyTrackItem = {
   item?: {
     type?: string;
