@@ -42,11 +42,39 @@ type CachedInventoryIndex = {
 const INVENTORY_INDEX_TTL_MS = 10 * 60 * 1000;
 const INVENTORY_INDEX_VERSION = 2;
 
-const inventoryIndexCache: { current?: CachedInventoryIndex } =
-  (globalThis as { __inventoryIndexCache?: { current?: CachedInventoryIndex } }).__inventoryIndexCache ??
-  {};
-(globalThis as { __inventoryIndexCache?: { current?: CachedInventoryIndex } }).__inventoryIndexCache =
-  inventoryIndexCache;
+type InventoryIndexCache = Record<string, CachedInventoryIndex | undefined>;
+const inventoryIndexCache: InventoryIndexCache =
+  (globalThis as { __inventoryIndexCache?: InventoryIndexCache }).__inventoryIndexCache ?? {};
+(globalThis as { __inventoryIndexCache?: InventoryIndexCache }).__inventoryIndexCache = inventoryIndexCache;
+
+const decodeJwtPayload = (token: string): Record<string, unknown> | null => {
+  const parts = token.split(".");
+  if (parts.length < 2) return null;
+  const raw = parts[1] ?? "";
+  const base64 = raw.replace(/-/g, "+").replace(/_/g, "/");
+  const padLen = (4 - (base64.length % 4)) % 4;
+  const padded = base64 + "=".repeat(padLen);
+  try {
+    const json = Buffer.from(padded, "base64").toString("utf8");
+    const parsed = JSON.parse(json);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+};
+
+const getCacheKeyForAuthHeader = (authHeader?: string) => {
+  const raw = String(authHeader ?? "").trim();
+  if (!raw) return "public";
+  const token = raw.toLowerCase().startsWith("bearer ") ? raw.slice(7).trim() : raw;
+  if (!token) return "public";
+  const payload = decodeJwtPayload(token);
+  const sub = payload?.sub;
+  if (typeof sub === "string" && sub.trim().length > 0) return `user:${sub.trim()}`;
+  const userId = payload?.user_id;
+  if (typeof userId === "string" && userId.trim().length > 0) return `user:${userId.trim()}`;
+  return "auth:unknown";
+};
 
 const normalizeValue = (value: string) =>
   value
@@ -271,15 +299,16 @@ export const buildInventoryIndex = (tracks: InventoryTrack[]): InventoryIndex =>
   return { exact, titleOnly, byToken };
 };
 
-export const getCachedInventoryIndex = async () => {
+export const getCachedInventoryIndex = async (authHeader?: string) => {
   const now = Date.now();
-  const cached = inventoryIndexCache.current;
+  const key = getCacheKeyForAuthHeader(authHeader);
+  const cached = inventoryIndexCache[key];
   if (cached && cached.expiresAt > now && cached.version === INVENTORY_INDEX_VERSION) {
     return cached.index;
   }
-  const tracks = await fetchInventoryTracks();
+  const tracks = await fetchInventoryTracks(authHeader);
   const index = buildInventoryIndex(tracks);
-  inventoryIndexCache.current = { expiresAt: now + INVENTORY_INDEX_TTL_MS, index, version: INVENTORY_INDEX_VERSION };
+  inventoryIndexCache[key] = { expiresAt: now + INVENTORY_INDEX_TTL_MS, index, version: INVENTORY_INDEX_VERSION };
   return index;
 };
 
@@ -374,9 +403,11 @@ export const searchInventoryCandidates = async (
     .slice(0, limit);
 };
 
-export const fetchInventoryTracks = async (limit?: number) => {
+export const fetchInventoryTracks = async (authHeaderOrLimit?: string | number, limitMaybe?: number) => {
   const tracks: InventoryTrack[] = [];
-  const supabase = supabaseServer();
+  const authHeader = typeof authHeaderOrLimit === "string" ? authHeaderOrLimit : undefined;
+  const limit = typeof authHeaderOrLimit === "number" ? authHeaderOrLimit : limitMaybe;
+  const supabase = supabaseServer(authHeader);
 
   // Step 1: fetch inventory rows to determine the release ids in the library.
   // De-dupe by release_id so we don't create duplicate candidate tracks when multiple copies exist.

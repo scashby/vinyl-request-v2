@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCachedInventoryIndex, searchInventoryCandidates } from '../../../../../lib/vinylPlaylistImport';
+import { getAuthHeader } from 'src/lib/supabaseServer';
 
 export async function GET(req: Request) {
   try {
@@ -13,7 +14,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'q is required' }, { status: 400 });
     }
 
-    const index = await getCachedInventoryIndex();
+    const index = await getCachedInventoryIndex(getAuthHeader(req));
     const results = await searchInventoryCandidates({ title: q, artist, limit }, index);
     return NextResponse.json({ ok: true, results });
   } catch (error) {

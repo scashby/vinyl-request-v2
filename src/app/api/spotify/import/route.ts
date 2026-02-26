@@ -265,7 +265,7 @@ export async function POST(req: Request) {
     }
 
     step = 'inventory-index';
-    const index = await getCachedInventoryIndex();
+    const index = await getCachedInventoryIndex(getAuthHeader(req));
     inventoryIndexStats = getIndexStats(index);
     if (inventoryIndexStats.trackCount < 25) {
       throw new Error(
