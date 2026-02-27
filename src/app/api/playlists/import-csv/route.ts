@@ -1,30 +1,32 @@
 import { NextResponse } from "next/server";
-import { importRowsIntoPlaylist, parsePlaylistCsvText } from "src/lib/playlistImportCore";
-import { sanitizePlaylistName } from "src/lib/vinylPlaylistImport";
+import { getAuthHeader } from "src/lib/supabaseServer";
+import { importRowsToPlaylist, parseCsvRows } from "src/lib/playlistImportEngine";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   let step = "init";
+
   try {
     step = "parse-body";
     const body = await req.json();
     const csvText = String(body?.csvText ?? "").trim();
     const existingPlaylistId = Number(body?.existingPlaylistId ?? 0);
-    const playlistName = sanitizePlaylistName(String(body?.playlistName ?? "CSV Import"));
+    const playlistName = String(body?.playlistName ?? "CSV Import");
 
     if (!csvText) {
       return NextResponse.json({ error: "csvText is required" }, { status: 400 });
     }
 
     step = "parse-csv";
-    const rows = parsePlaylistCsvText(csvText);
+    const rows = parseCsvRows(csvText);
     if (rows.length === 0) {
       return NextResponse.json({ error: "No valid rows found in CSV" }, { status: 400 });
     }
 
     step = "import";
-    const result = await importRowsIntoPlaylist({
+    const result = await importRowsToPlaylist({
+      authHeader: getAuthHeader(req),
       rows,
       playlistName,
       existingPlaylistId,
@@ -32,13 +34,7 @@ export async function POST(req: Request) {
       color: "#3578b3",
     });
 
-    return NextResponse.json(
-      {
-        ok: true,
-        ...result,
-      },
-      { status: 200 }
-    );
+    return NextResponse.json({ ok: true, ...result }, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "CSV import failed";
     return NextResponse.json({ error: message, step }, { status: 500 });

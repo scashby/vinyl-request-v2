@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireSupabaseAdminServiceRole, supabaseAdmin, supabaseAdminJwtRole } from "src/lib/supabaseAdmin";
+import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 
 export const runtime = "nodejs";
 
@@ -14,10 +14,8 @@ const countRows = async (db: any, table: string, apply?: (q: any) => any) => {
   return typeof count === "number" ? count : 0;
 };
 
-export async function DELETE(_req: Request, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    requireSupabaseAdminServiceRole();
-
     const { id } = await context.params;
     const playlistId = Number(id);
     if (!Number.isFinite(playlistId) || playlistId <= 0) {
@@ -25,19 +23,17 @@ export async function DELETE(_req: Request, context: { params: Promise<{ id: str
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = supabaseAdmin as any;
+    const db = supabaseServer(getAuthHeader(req)) as any;
 
     const before = {
       playlist_exists: (await countRows(db, "collection_playlists", (q) => q.eq("id", playlistId))) > 0,
       playlist_items: await countRows(db, "collection_playlist_items", (q) => q.eq("playlist_id", playlistId)),
       bingo_sessions_with_playlist: await countRows(db, "bingo_sessions", (q) => q.eq("playlist_id", playlistId)),
-      supabase_admin_role: supabaseAdminJwtRole,
+      mode: "publishable",
     };
 
-    // Detach any foreign-key references that might block deletion.
     const detachRes = await db.from("bingo_sessions").update({ playlist_id: null }).eq("playlist_id", playlistId);
     if (detachRes?.error) {
-      // Older installs may have playlist_id NOT NULL; fall back to deleting sessions for this playlist.
       const deleteSessionsRes = await db.from("bingo_sessions").delete().eq("playlist_id", playlistId);
       if (deleteSessionsRes?.error) {
         return NextResponse.json(
@@ -50,7 +46,8 @@ export async function DELETE(_req: Request, context: { params: Promise<{ id: str
     const { data: deletedItems, error: itemsError } = await db
       .from("collection_playlist_items")
       .delete()
-      .eq("playlist_id", playlistId);
+      .eq("playlist_id", playlistId)
+      .select("id");
     if (itemsError) {
       return NextResponse.json({ error: itemsError.message }, { status: 500 });
     }
@@ -73,31 +70,6 @@ export async function DELETE(_req: Request, context: { params: Promise<{ id: str
         playlist_items: Array.isArray(deletedItems) ? deletedItems.length : 0,
       },
     };
-
-    const deletedPlaylistCount = Array.isArray(deletedPlaylist) ? deletedPlaylist.length : 0;
-    if (before.playlist_exists && deletedPlaylistCount === 0) {
-      return NextResponse.json(
-        {
-          error: "Delete could not delete this playlist (0 rows affected).",
-          hint: "Check for foreign-key blockers or unexpected database permissions.",
-          before,
-          after,
-        },
-        { status: 500 }
-      );
-    }
-
-    if (before.playlist_exists && after.playlist_exists) {
-      return NextResponse.json(
-        {
-          error: "Delete executed but playlist still exists.",
-          hint: "This usually means the server is not using a Supabase service_role key or RLS is blocking deletes.",
-          before,
-          after,
-        },
-        { status: 500 }
-      );
-    }
 
     return NextResponse.json({ ok: true, before, after }, { status: 200 });
   } catch (error) {

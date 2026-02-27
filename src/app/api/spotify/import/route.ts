@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { importRowsIntoPlaylist, type ImportSourceRow } from 'src/lib/playlistImportCore';
-import { requireSupabaseAdminServiceRole, supabaseAdminJwtRole } from 'src/lib/supabaseAdmin';
-import { sanitizePlaylistName } from 'src/lib/vinylPlaylistImport';
+import { getAuthHeader } from 'src/lib/supabaseServer';
+import { importRowsToPlaylist, type SourceRow } from 'src/lib/playlistImportEngine';
 import { getSpotifyAccessTokenFromCookies, spotifyApiGet, SpotifyApiError } from '../../../../lib/spotifyUser';
 
 export const runtime = 'nodejs';
@@ -44,8 +43,14 @@ const isForbiddenSpotifyError = (message: string) => {
   return lowered.includes('failed (403)') || lowered.includes('forbidden');
 };
 
-const extractRows = (items: SpotifyTrackItem[] = []): ImportSourceRow[] => {
-  const rows: ImportSourceRow[] = [];
+const sanitizePlaylistName = (value?: string) => {
+  const cleaned = String(value ?? '').trim();
+  if (!cleaned) return 'Custom Playlist';
+  return cleaned.slice(0, 80);
+};
+
+const extractRows = (items: SpotifyTrackItem[] = []): SourceRow[] => {
+  const rows: SourceRow[] = [];
   for (const item of items) {
     const trackNode = item.track ?? (item.item?.type === 'track' ? item.item : undefined);
     const title = typeof trackNode?.name === 'string' ? trackNode.name.trim() : '';
@@ -79,10 +84,7 @@ const fetchPlaylistMeta = async (
       debugErrors.push({ path, error: message });
 
       const status = error instanceof SpotifyApiError ? error.status : null;
-      if (status === 400 || status === 403 || isForbiddenSpotifyError(message)) {
-        continue;
-      }
-
+      if (status === 400 || status === 403 || isForbiddenSpotifyError(message)) continue;
       throw error;
     }
   }
@@ -95,7 +97,7 @@ const fetchPlaylistItemsPage = async (
   playlistId: string,
   offset: number,
   debugErrors: Array<{ path: string; error: string }>
-): Promise<{ rows: ImportSourceRow[]; itemCount: number; next: string | null; total: number | null }> => {
+): Promise<{ rows: SourceRow[]; itemCount: number; next: string | null; total: number | null }> => {
   const paths = [
     `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&market=from_token&fields=items(track(name,artists(name)),item(type,name,artists(name))),next,total`,
     `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&fields=items(track(name,artists(name)),item(type,name,artists(name))),next,total`,
@@ -104,7 +106,6 @@ const fetchPlaylistItemsPage = async (
   ];
 
   let lastError: unknown = null;
-
   for (const path of paths) {
     try {
       const page = await spotifyApiGet<SpotifyPlaylistItemsResponse>(accessToken, path, { maxAttempts: 2 });
@@ -112,10 +113,7 @@ const fetchPlaylistItemsPage = async (
       const rows = extractRows(items);
 
       if (items.length > 0 && rows.length === 0) {
-        debugErrors.push({
-          path,
-          error: 'Page had items but no parseable tracks; trying fallback shape',
-        });
+        debugErrors.push({ path, error: 'Page had items but no parseable tracks; trying fallback shape' });
         continue;
       }
 
@@ -131,10 +129,7 @@ const fetchPlaylistItemsPage = async (
       debugErrors.push({ path, error: message });
 
       const status = error instanceof SpotifyApiError ? error.status : null;
-      if (status === 400 || status === 403 || isForbiddenSpotifyError(message)) {
-        continue;
-      }
-
+      if (status === 400 || status === 403 || isForbiddenSpotifyError(message)) continue;
       throw error;
     }
   }
@@ -171,9 +166,6 @@ export async function POST(req: Request) {
     spotifyPlaylistId = playlistId;
     resumeOffset = Number.isFinite(startOffset) && startOffset >= 0 ? startOffset : 0;
 
-    step = 'supabase-admin-check';
-    requireSupabaseAdminServiceRole();
-
     step = 'spotify-token';
     const tokenData = await getSpotifyAccessTokenFromCookies();
     if (!tokenData.accessToken) {
@@ -190,10 +182,7 @@ export async function POST(req: Request) {
     playlistOwnerId = playlist.owner?.id ?? '';
     spotifySnapshotId = typeof playlist.snapshot_id === 'string' ? playlist.snapshot_id : '';
 
-    let sourceTotal =
-      playlist.tracks && typeof playlist.tracks.total === 'number'
-        ? playlist.tracks.total
-        : null;
+    let sourceTotal = playlist.tracks && typeof playlist.tracks.total === 'number' ? playlist.tracks.total : null;
 
     const inferredName =
       requestedName && requestedName !== '(resume)'
@@ -202,7 +191,7 @@ export async function POST(req: Request) {
     const playlistName = sanitizePlaylistName(inferredName);
 
     step = 'spotify-tracks';
-    const rows: ImportSourceRow[] = [];
+    const rows: SourceRow[] = [];
     let offset = resumeOffset;
     let pagesFetched = 0;
     let lastPageNext: string | null = null;
@@ -216,19 +205,10 @@ export async function POST(req: Request) {
         sourceTotal = page.total;
       }
 
-      if (page.itemCount <= 0) {
-        break;
-      }
-
+      if (page.itemCount <= 0) break;
       offset += page.itemCount;
-
-      if (sourceTotal !== null && offset >= sourceTotal) {
-        break;
-      }
-
-      if (!page.next) {
-        break;
-      }
+      if (sourceTotal !== null && offset >= sourceTotal) break;
+      if (!page.next) break;
     }
 
     if (rows.length === 0 && (sourceTotal === null || sourceTotal > resumeOffset)) {
@@ -248,7 +228,7 @@ export async function POST(req: Request) {
             maxPages,
           },
           debug: {
-            supabase_admin_role: supabaseAdminJwtRole,
+            mode: 'publishable',
             metaFetchErrors: metaFetchErrors.slice(-10),
             trackFetchErrors: trackFetchErrors.slice(-20),
           },
@@ -260,7 +240,8 @@ export async function POST(req: Request) {
     const moreAvailable = sourceTotal !== null ? offset < sourceTotal : !!lastPageNext;
 
     step = 'import';
-    const imported = await importRowsIntoPlaylist({
+    const imported = await importRowsToPlaylist({
+      authHeader: getAuthHeader(req),
       rows,
       playlistName,
       existingPlaylistId,
@@ -283,7 +264,7 @@ export async function POST(req: Request) {
         maxPages,
       },
       debug: {
-        supabase_admin_role: supabaseAdminJwtRole,
+        mode: 'publishable',
       },
     });
 
@@ -341,7 +322,7 @@ export async function POST(req: Request) {
             existingPlaylistId: localPlaylistId,
           },
           debug: {
-            supabase_admin_role: supabaseAdminJwtRole,
+            mode: 'publishable',
             metaFetchErrors: metaFetchErrors.slice(-10),
             trackFetchErrors: trackFetchErrors.slice(-20),
           },
@@ -361,7 +342,7 @@ export async function POST(req: Request) {
           playlistOwnerId,
           step,
           debug: {
-            supabase_admin_role: supabaseAdminJwtRole,
+            mode: 'publishable',
             metaFetchErrors: metaFetchErrors.slice(-10),
             trackFetchErrors: trackFetchErrors.slice(-20),
           },
@@ -375,7 +356,7 @@ export async function POST(req: Request) {
         error: message,
         step,
         debug: {
-          supabase_admin_role: supabaseAdminJwtRole,
+          mode: 'publishable',
           metaFetchErrors: metaFetchErrors.slice(-10),
           trackFetchErrors: trackFetchErrors.slice(-20),
         },
