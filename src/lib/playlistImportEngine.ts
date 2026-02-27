@@ -1,5 +1,6 @@
 import Papa from "papaparse";
 import { supabaseServer } from "src/lib/supabaseServer";
+import { fetchInventoryTracks as fetchLegacyInventoryTracks } from "src/lib/vinylPlaylistImport";
 
 export type SourceRow = {
   title?: string;
@@ -76,9 +77,8 @@ type ScoredTrack = {
   score: number;
   titleScore: number;
   artistScore: number;
+  titleTokenOverlap: number;
 };
-
-const PAGE_SIZE = 1000;
 
 const TITLE_KEYS = [
   "title",
@@ -282,22 +282,28 @@ const similarity = (a: string, b: string) => {
 };
 
 const scoreCandidate = (rowTitle: string, rowArtist: string, track: InventoryTrack): ScoredTrack => {
+  const rowTitleTokens = tokenSet(rowTitle);
   const titleScore = similarity(rowTitle, track.canonTitle);
   const artistScore = rowArtist ? similarity(rowArtist, track.canonArtist) : 0;
+  const titleTokenOverlap = setDice(rowTitleTokens, track.titleTokens);
 
-  const titleExact = rowTitle.length > 0 && rowTitle === track.canonTitle ? 0.15 : 0;
-  const artistExact = rowArtist.length > 0 && rowArtist === track.canonArtist ? 0.1 : 0;
-  const artistWeight = rowArtist ? 0.4 : 0;
+  const titleExact = rowTitle.length > 0 && rowTitle === track.canonTitle ? 0.12 : 0;
+  const artistExact = rowArtist.length > 0 && rowArtist === track.canonArtist ? 0.08 : 0;
+  const artistWeight = rowArtist ? 0.28 : 0;
   const titleWeight = 1 - artistWeight;
   let score = titleScore * titleWeight + artistScore * artistWeight + titleExact + artistExact;
 
-  const titleTokenDelta = Math.abs(tokenSet(rowTitle).size - track.titleTokens.size);
+  const titleTokenDelta = Math.abs(rowTitleTokens.size - track.titleTokens.size);
   if (titleTokenDelta >= 5) score -= 0.06;
+  if (rowArtist && artistScore >= 0.9 && titleTokenOverlap < 0.18) score -= 0.18;
+  if (rowArtist && artistScore >= 0.95 && titleTokenOverlap < 0.1) score -= 0.08;
+  if (rowArtist && artistScore >= 0.9 && titleTokenOverlap >= 0.45) score += 0.06;
 
   return {
     track,
     titleScore,
     artistScore,
+    titleTokenOverlap,
     score: Math.max(0, Math.min(1, score)),
   };
 };
@@ -436,123 +442,41 @@ export const parseCsvRows = (csvText: string): SourceRow[] => {
 };
 
 const loadInventoryTracks = async (authHeader?: string): Promise<InventoryTrack[]> => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabaseServer(authHeader) as any;
-
-  const inventoryByRelease = new Map<number, number>();
-  let page = 0;
-
-  while (true) {
-    const from = page * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
-
-    const { data, error } = await db
-      .from("inventory")
-      .select("id, release_id")
-      .not("release_id", "is", null)
-      .order("id", { ascending: true })
-      .range(from, to);
-
-    if (error) throw new Error(`Failed loading inventory rows: ${error.message}`);
-
-    const rows = data ?? [];
-    for (const row of rows) {
-      const inventoryId = typeof row.id === "number" ? row.id : null;
-      const releaseId = typeof row.release_id === "number" ? row.release_id : null;
-      if (!inventoryId || !releaseId) continue;
-      const current = inventoryByRelease.get(releaseId);
-      if (!current || inventoryId < current) inventoryByRelease.set(releaseId, inventoryId);
-    }
-
-    if (rows.length < PAGE_SIZE) break;
-    page += 1;
-  }
-
-  const releaseIds = Array.from(inventoryByRelease.keys());
-  if (releaseIds.length === 0) return [];
-
-  const albumArtistByRelease = new Map<number, string>();
+  const legacyTracks = await fetchLegacyInventoryTracks(authHeader);
   const tracks: InventoryTrack[] = [];
-  const releaseChunkSize = 250;
 
-  for (let i = 0; i < releaseIds.length; i += releaseChunkSize) {
-    const chunk = releaseIds.slice(i, i + releaseChunkSize);
+  for (const row of legacyTracks) {
+    const inventoryId = typeof row.inventory_id === "number" ? row.inventory_id : null;
+    const title = typeof row.title === "string" ? row.title.trim() : "";
+    const artistRaw = typeof row.artist === "string" ? row.artist.trim() : "";
+    const positionRaw = typeof row.position === "string" ? row.position.trim() : "";
+    if (!inventoryId || !title || !positionRaw) continue;
 
-    {
-      const { data: releases, error: releaseError } = await db
-        .from("releases")
-        .select("id, master:masters(artist:artists(name))")
-        .in("id", chunk);
+    const artist = artistRaw || "Unknown Artist";
+    const canonTitle = canonicalTitle(title);
+    const canonArtist = canonicalArtist(artist);
+    if (!canonTitle) continue;
 
-      if (releaseError) throw new Error(`Failed loading release artists: ${releaseError.message}`);
-
-      for (const row of releases ?? []) {
-        const releaseId = typeof row.id === "number" ? row.id : null;
-        if (!releaseId) continue;
-
-        const master = Array.isArray(row.master) ? row.master[0] : row.master;
-        const artistContainer = master && typeof master === "object" ? (master as { artist?: unknown }).artist : null;
-        const artistRow = Array.isArray(artistContainer) ? artistContainer[0] : artistContainer;
-        const name = artistRow && typeof artistRow === "object" ? (artistRow as { name?: unknown }).name : null;
-
-        if (typeof name === "string" && name.trim()) {
-          albumArtistByRelease.set(releaseId, name.trim());
-        }
-      }
-    }
-
-    const { data: releaseTracks, error: tracksError } = await db
-      .from("release_tracks")
-      .select("release_id, position, side, title_override, recordings ( id, title, track_artist, isrc )")
-      .in("release_id", chunk);
-
-    if (tracksError) throw new Error(`Failed loading release tracks: ${tracksError.message}`);
-
-    for (const row of releaseTracks ?? []) {
-      const releaseId = typeof row.release_id === "number" ? row.release_id : null;
-      if (!releaseId) continue;
-
-      const inventoryId = inventoryByRelease.get(releaseId);
-      if (!inventoryId) continue;
-
-      const recording = Array.isArray(row.recordings) ? row.recordings[0] : row.recordings;
-
-      const titleRaw = row.title_override || recording?.title;
-      const title = typeof titleRaw === "string" ? titleRaw.trim() : "";
-      if (!title) continue;
-
-      const positionRaw = row.position;
-      const position = typeof positionRaw === "string" ? positionRaw.trim() : "";
-      if (!position) continue;
-
-      const side = typeof row.side === "string" ? row.side.trim() : null;
-      const trackArtist = typeof recording?.track_artist === "string" ? recording.track_artist.trim() : "";
-      const albumArtist = albumArtistByRelease.get(releaseId) ?? "";
-      const artist = (trackArtist || albumArtist || "Unknown Artist").trim();
-
-      const canonTitle = canonicalTitle(title);
-      const canonArtist = canonicalArtist(artist);
-      if (!canonTitle) continue;
-
-      tracks.push({
-        trackKey: `${inventoryId}:${position}`,
-        inventoryId,
-        title,
-        artist,
-        side: side || null,
-        position,
-        isrc: normalizeIsrc(recording?.isrc) || null,
-        canonTitle,
-        canonArtist,
-        titleTokens: tokenSet(canonTitle),
-        artistTokens: tokenSet(canonArtist),
-      });
-    }
+    tracks.push({
+      trackKey: `${inventoryId}:${positionRaw}`,
+      inventoryId,
+      title,
+      artist,
+      side: typeof row.side === "string" ? row.side.trim() || null : null,
+      position: positionRaw,
+      isrc: null,
+      canonTitle,
+      canonArtist,
+      titleTokens: tokenSet(canonTitle),
+      artistTokens: tokenSet(canonArtist),
+    });
   }
 
   const deduped = new Map<string, InventoryTrack>();
   for (const track of tracks) {
-    if (!deduped.has(track.trackKey)) deduped.set(track.trackKey, track);
+    if (!deduped.has(track.trackKey)) {
+      deduped.set(track.trackKey, track);
+    }
   }
 
   return Array.from(deduped.values());
@@ -636,6 +560,9 @@ const chooseFromTitleMatches = (
   const best = scored[0];
   const second = scored[1];
   const margin = second ? best.score - second.score : best.score;
+  if (best.artistScore >= 0.95 && best.titleTokenOverlap < 0.16 && best.titleScore < 0.45) {
+    return null;
+  }
 
   if (mode === "strict" && (best.score >= 0.95 || (best.score >= 0.9 && margin >= 0.08))) {
     return best.track;
@@ -647,9 +574,10 @@ const chooseFromTitleMatches = (
 
   if (
     mode === "aggressive" &&
-    (best.score >= 0.84 ||
-      (best.score >= 0.74 && margin >= 0.04) ||
-      (best.artistScore >= 0.93 && best.titleScore >= 0.36 && margin >= 0.02))
+    (best.score >= 0.82 ||
+      (best.score >= 0.7 && margin >= 0.06) ||
+      (best.artistScore >= 0.9 && best.titleTokenOverlap >= 0.4 && margin >= 0.02) ||
+      (best.artistScore >= 0.95 && best.titleScore >= 0.48))
   ) {
     return best.track;
   }
@@ -659,6 +587,9 @@ const chooseFromTitleMatches = (
 
 const shouldAutoMatch = (best: ScoredTrack, second: ScoredTrack | undefined, mode: MatchingMode) => {
   const margin = second ? best.score - second.score : best.score;
+  if (best.artistScore >= 0.95 && best.titleTokenOverlap < 0.16 && best.titleScore < 0.45) {
+    return false;
+  }
 
   if (mode === "strict") {
     if (best.score >= 0.95) return true;
@@ -668,10 +599,10 @@ const shouldAutoMatch = (best: ScoredTrack, second: ScoredTrack | undefined, mod
   }
 
   if (mode === "aggressive") {
-    if (best.score >= 0.84) return true;
-    if (best.score >= 0.74 && margin >= 0.04) return true;
-    if (best.artistScore >= 0.93 && best.titleScore >= 0.36 && margin >= 0.02) return true;
-    if (best.artistScore >= 0.97 && best.titleScore >= 0.3) return true;
+    if (best.score >= 0.82) return true;
+    if (best.score >= 0.7 && margin >= 0.06) return true;
+    if (best.artistScore >= 0.9 && best.titleTokenOverlap >= 0.4 && margin >= 0.02) return true;
+    if (best.artistScore >= 0.95 && best.titleScore >= 0.48) return true;
     if (best.titleScore >= 0.93 && best.artistScore >= 0.34 && margin >= 0.04) return true;
     return false;
   }
@@ -718,7 +649,7 @@ const matchRows = (rows: SourceRow[], index: InventoryIndex, mode: MatchingMode)
       continue;
     }
 
-    const minCandidateScore = mode === "strict" ? 0.38 : mode === "aggressive" ? 0.3 : 0.34;
+    const minCandidateScore = mode === "strict" ? 0.38 : mode === "aggressive" ? 0.26 : 0.34;
     const scoredCandidates = collectCandidates(normTitle, normArtist, index)
       .map((track) => scoreCandidate(normTitle, normArtist, track))
       .filter((scored) => scored.score >= minCandidateScore)

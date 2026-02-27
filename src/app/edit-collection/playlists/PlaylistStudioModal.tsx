@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase as supabaseTyped } from 'src/lib/supabaseClient';
 import type {
   CollectionPlaylist,
@@ -265,6 +265,12 @@ const isBetweenValue = (
 
 const inferPlaylistNameFromFile = (file: File) => file.name.replace(/\.[^.]+$/, '').trim() || 'CSV Import';
 
+const toCsvCell = (value: string | undefined) => {
+  const raw = String(value ?? '');
+  if (!raw.includes('"') && !raw.includes(',') && !raw.includes('\n')) return raw;
+  return `"${raw.replace(/"/g, '""')}"`;
+};
+
 export function PlaylistStudioModal({
   isOpen,
   onClose,
@@ -332,6 +338,11 @@ export function PlaylistStudioModal({
   const [lastImportedPlaylistId, setLastImportedPlaylistId] = useState<number | null>(null);
   const [unmatchedRows, setUnmatchedRows] = useState<UnmatchedTrack[]>([]);
   const [resolvingTrackKey, setResolvingTrackKey] = useState<string | null>(null);
+  const [unmatchedQueryByRow, setUnmatchedQueryByRow] = useState<Record<string, string>>({});
+  const [unmatchedSearchByRow, setUnmatchedSearchByRow] = useState<Record<string, MatchCandidate[]>>({});
+  const [unmatchedSearchingRowId, setUnmatchedSearchingRowId] = useState<string | null>(null);
+  const [retryingUnmatched, setRetryingUnmatched] = useState(false);
+  const wasOpenRef = useRef(false);
 
   const appendablePlaylists = useMemo(
     () => localPlaylists.filter((playlist) => !playlist.isSmart),
@@ -426,6 +437,10 @@ export function PlaylistStudioModal({
     setLastImportedPlaylistId(null);
     setResume(null);
     setRetryAfterSeconds(null);
+    setUnmatchedQueryByRow({});
+    setUnmatchedSearchByRow({});
+    setUnmatchedSearchingRowId(null);
+    setRetryingUnmatched(false);
   }, []);
 
   const openManualCreate = useCallback(() => {
@@ -524,7 +539,12 @@ export function PlaylistStudioModal({
   }, [getSupabaseAuthHeaders]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      wasOpenRef.current = false;
+      return;
+    }
+    if (wasOpenRef.current) return;
+    wasOpenRef.current = true;
     setLocalPlaylists(playlists);
     setView(initialView);
     setError(null);
@@ -916,6 +936,8 @@ export function PlaylistStudioModal({
           : destinationPlaylistId
       );
       setUnmatchedRows(decorateUnmatched(payload.unmatchedSample));
+      setUnmatchedQueryByRow({});
+      setUnmatchedSearchByRow({});
       setResume(payload.resume ?? null);
       setRetryAfterSeconds(null);
 
@@ -981,11 +1003,109 @@ export function PlaylistStudioModal({
         typeof payload?.playlistId === 'number' ? payload.playlistId : destinationPlaylistId
       );
       setUnmatchedRows(decorateUnmatched(payload?.unmatchedSample));
+      setUnmatchedQueryByRow({});
+      setUnmatchedSearchByRow({});
       await onImported();
     } catch (importError) {
       setError(importError instanceof Error ? importError.message : 'CSV import failed');
     } finally {
       setCsvImporting(false);
+    }
+  };
+
+  const searchUnmatchedCandidates = async (row: UnmatchedTrack) => {
+    const fallback = `${row.title ?? ''} ${row.artist ?? ''}`.trim();
+    const query = (unmatchedQueryByRow[row.row_id] ?? fallback).trim();
+    if (query.length < 2) {
+      setError('Search query must be at least 2 characters');
+      return;
+    }
+
+    setUnmatchedSearchingRowId(row.row_id);
+    setError(null);
+
+    try {
+      const headers = await getSupabaseAuthHeaders();
+      const url = new URL('/api/library/tracks/search', window.location.origin);
+      url.searchParams.set('q', query);
+      if (row.artist?.trim()) {
+        url.searchParams.set('artist', row.artist.trim());
+      }
+      url.searchParams.set('limit', '8');
+
+      const res = await fetch(url.toString(), { headers });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(formatApiError(payload, res));
+      }
+
+      const mapped = Array.isArray((payload as { results?: unknown[] }).results)
+        ? ((payload as { results: Array<Record<string, unknown>> }).results ?? [])
+            .map((item) => ({
+              track_key: String(item.track_key ?? '').trim(),
+              inventory_id: typeof item.inventory_id === 'number' ? item.inventory_id : null,
+              title: String(item.track_title ?? item.title ?? '').trim(),
+              artist: String(item.track_artist ?? item.artist ?? '').trim(),
+              side: typeof item.side === 'string' ? item.side : null,
+              position: typeof item.position === 'string' ? item.position : null,
+              score: typeof item.score === 'number' ? item.score : 0,
+            }))
+            .filter((item) => item.track_key.length > 0)
+        : [];
+
+      setUnmatchedSearchByRow((prev) => ({
+        ...prev,
+        [row.row_id]: mapped,
+      }));
+    } catch (searchError) {
+      setError(searchError instanceof Error ? searchError.message : 'Unmatched search failed');
+    } finally {
+      setUnmatchedSearchingRowId(null);
+    }
+  };
+
+  const retryUnmatchedMatching = async () => {
+    if (!lastImportedPlaylistId || unmatchedRows.length === 0) return;
+
+    setRetryingUnmatched(true);
+    setError(null);
+
+    try {
+      const csvText = [
+        'title,artist',
+        ...unmatchedRows.map((row) => `${toCsvCell(row.title)},${toCsvCell(row.artist)}`),
+      ].join('\n');
+      const headers = await getSupabaseAuthHeaders();
+      const res = await fetch('/api/playlists/import-csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({
+          playlistName: '(append)',
+          csvText,
+          existingPlaylistId: lastImportedPlaylistId,
+          matchingMode,
+        }),
+      });
+
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(formatApiError(payload, res));
+      }
+
+      const fuzzyNote = payload?.fuzzyMatchedCount ? `, ${payload.fuzzyMatchedCount} fuzzy-matched` : '';
+      const duplicateNote = payload?.duplicatesSkipped ? `, ${payload.duplicatesSkipped} duplicates skipped` : '';
+      setImportSummary(
+        `Retried unmatched rows: ${payload?.matchedCount ?? 0} matched${fuzzyNote}, ${payload?.unmatchedCount ?? 0} still unmatched${duplicateNote}`
+      );
+
+      setUnmatchedRows(decorateUnmatched(payload?.unmatchedSample));
+      setUnmatchedQueryByRow({});
+      setUnmatchedSearchByRow({});
+      await onImported();
+    } catch (retryError) {
+      setError(retryError instanceof Error ? retryError.message : 'Retry matching failed');
+    } finally {
+      setRetryingUnmatched(false);
     }
   };
 
@@ -1014,6 +1134,16 @@ export function PlaylistStudioModal({
       }
 
       setUnmatchedRows((prev) => prev.filter((item) => item.row_id !== row.row_id));
+      setUnmatchedQueryByRow((prev) => {
+        const next = { ...prev };
+        delete next[row.row_id];
+        return next;
+      });
+      setUnmatchedSearchByRow((prev) => {
+        const next = { ...prev };
+        delete next[row.row_id];
+        return next;
+      });
       await onImported();
     } catch (resolveError) {
       setError(resolveError instanceof Error ? resolveError.message : 'Failed to add match');
@@ -2128,11 +2258,24 @@ export function PlaylistStudioModal({
 
                   {lastImportedPlaylistId && unmatchedRows.length > 0 && (
                     <div className="rounded-2xl border border-amber-600/40 bg-amber-950/20 p-4">
-                      <div className="mb-2 text-sm font-semibold text-amber-100">
-                        Unmatched Tracks ({unmatchedRows.length})
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="text-sm font-semibold text-amber-100">
+                          Unmatched Tracks ({unmatchedRows.length})
+                        </div>
+                        <button
+                          onClick={() => void retryUnmatchedMatching()}
+                          disabled={retryingUnmatched}
+                          className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${
+                            retryingUnmatched
+                              ? 'cursor-not-allowed border-[#3d4a65] bg-[#1f2a41] text-[#8094b9]'
+                              : 'border-[#5f9bff] bg-[#1f4f89] text-white hover:bg-[#2866b1]'
+                          }`}
+                        >
+                          {retryingUnmatched ? 'Retrying...' : 'Retry Matching'}
+                        </button>
                       </div>
                       <div className="mb-3 text-xs text-amber-200/90">
-                        Suggestions below use existing fuzzy-match candidates from the import engine.
+                        Use fuzzy suggestions, search inventory manually, or rerun matching on just the remaining rows.
                       </div>
 
                       <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
@@ -2152,6 +2295,68 @@ export function PlaylistStudioModal({
                                 Skip
                               </button>
                             </div>
+
+                            <div className="mt-2 flex items-center gap-2">
+                              <input
+                                value={unmatchedQueryByRow[row.row_id] ?? `${row.title ?? ''} ${row.artist ?? ''}`.trim()}
+                                onChange={(event) =>
+                                  setUnmatchedQueryByRow((prev) => ({
+                                    ...prev,
+                                    [row.row_id]: event.target.value,
+                                  }))
+                                }
+                                placeholder="Search inventory for manual match"
+                                className="w-full rounded-md border border-amber-300/30 bg-amber-950/20 px-2.5 py-1.5 text-xs text-amber-50 outline-none focus:border-amber-300/60"
+                              />
+                              <button
+                                onClick={() => void searchUnmatchedCandidates(row)}
+                                disabled={unmatchedSearchingRowId === row.row_id}
+                                className={`shrink-0 rounded-md border px-2 py-1 text-xs font-semibold ${
+                                  unmatchedSearchingRowId === row.row_id
+                                    ? 'cursor-not-allowed border-[#3d4a65] bg-[#1f2a41] text-[#8094b9]'
+                                    : 'border-[#4cab73] bg-[#1f6d42] text-white hover:bg-[#298f57]'
+                                }`}
+                              >
+                                {unmatchedSearchingRowId === row.row_id ? 'Searching...' : 'Search'}
+                              </button>
+                            </div>
+
+                            {(unmatchedSearchByRow[row.row_id] ?? []).length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                {(unmatchedSearchByRow[row.row_id] ?? []).slice(0, 4).map((candidate) => {
+                                  const meta: string[] = [];
+                                  if (candidate.inventory_id) meta.push(`#${candidate.inventory_id}`);
+                                  if (candidate.position) meta.push(candidate.position);
+                                  return (
+                                    <div
+                                      key={`search-${row.row_id}-${candidate.track_key}`}
+                                      className="flex items-center justify-between gap-2 rounded-md border border-emerald-400/20 bg-emerald-950/20 px-2 py-1.5"
+                                    >
+                                      <div className="min-w-0 text-xs text-emerald-100">
+                                        <div className="truncate">
+                                          <span className="font-medium">{candidate.title}</span> - {candidate.artist}
+                                          {meta.length > 0 ? ` (${meta.join(':')})` : ''}
+                                        </div>
+                                        <div className="text-[11px] text-emerald-100/80">
+                                          Search match {Math.round(candidate.score * 100)}%
+                                        </div>
+                                      </div>
+                                      <button
+                                        disabled={resolvingTrackKey === candidate.track_key}
+                                        onClick={() => void addUnmatchedCandidate(row, candidate)}
+                                        className={`shrink-0 rounded-md border px-2 py-1 text-xs font-semibold ${
+                                          resolvingTrackKey === candidate.track_key
+                                            ? 'cursor-not-allowed border-[#3d4a65] bg-[#1f2a41] text-[#8094b9]'
+                                            : 'border-[#5f9bff] bg-[#1f4f89] text-white hover:bg-[#2866b1]'
+                                        }`}
+                                      >
+                                        {resolvingTrackKey === candidate.track_key ? 'Adding...' : 'Add'}
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
 
                             {row.candidates.length === 0 ? (
                               <div className="mt-2 text-xs text-amber-100/80">No candidate suggestions.</div>
