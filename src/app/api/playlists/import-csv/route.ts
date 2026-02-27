@@ -25,7 +25,7 @@ const strip = (value: unknown) => {
 };
 
 const parseCsvRows = (csvText: string): ParsedRow[] => {
-  const headerProbe = Papa.parse<Record<string, unknown>>(csvText, {
+  const headerProbe = Papa.parse(csvText, {
     header: true,
     skipEmptyLines: "greedy",
     transformHeader: normalizeHeader,
@@ -54,7 +54,7 @@ const parseCsvRows = (csvText: string): ParsedRow[] => {
     return out;
   }
 
-  const raw = Papa.parse<string[]>(csvText, {
+  const raw = Papa.parse(csvText, {
     header: false,
     skipEmptyLines: "greedy",
   });
@@ -64,7 +64,8 @@ const parseCsvRows = (csvText: string): ParsedRow[] => {
   }
 
   const rows: ParsedRow[] = [];
-  for (const row of raw.data ?? []) {
+  for (const candidate of raw.data ?? []) {
+    const row = candidate as unknown;
     if (!Array.isArray(row)) continue;
     const title = strip(row[0]);
     const artist = strip(row[1]);
@@ -197,4 +198,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: message, step }, { status: 500 });
   }
 }
-
