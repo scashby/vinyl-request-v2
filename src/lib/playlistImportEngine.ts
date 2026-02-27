@@ -1,6 +1,10 @@
 import Papa from "papaparse";
 import { supabaseServer } from "src/lib/supabaseServer";
-import { fetchInventoryTracks as fetchLegacyInventoryTracks } from "src/lib/vinylPlaylistImport";
+import {
+  fetchInventoryTracks as fetchLegacyInventoryTracks,
+  getCachedInventoryIndex as getLegacyInventoryIndex,
+  searchInventoryCandidates as searchLegacyInventoryCandidates,
+} from "src/lib/vinylPlaylistImport";
 
 export type SourceRow = {
   title?: string;
@@ -70,6 +74,7 @@ type InventoryIndex = {
   byTitle: Map<string, InventoryTrack[]>;
   byArtist: Map<string, InventoryTrack[]>;
   byToken: Map<string, InventoryTrack[]>;
+  byTrackKey: Map<string, InventoryTrack>;
 };
 
 type ScoredTrack = {
@@ -488,12 +493,14 @@ const buildIndex = (tracks: InventoryTrack[]): InventoryIndex => {
   const byTitle = new Map<string, InventoryTrack[]>();
   const byArtist = new Map<string, InventoryTrack[]>();
   const byToken = new Map<string, InventoryTrack[]>();
+  const byTrackKey = new Map<string, InventoryTrack>();
 
   for (const track of tracks) {
     const exactKey = `${track.canonTitle}::${track.canonArtist}`;
     addMapList(byExact, exactKey, track);
     addMapList(byTitle, track.canonTitle, track);
     addMapList(byArtist, track.canonArtist, track);
+    byTrackKey.set(track.trackKey, track);
 
     for (const token of new Set([...track.titleTokens, ...track.artistTokens])) {
       addMapList(byToken, token, track);
@@ -504,7 +511,7 @@ const buildIndex = (tracks: InventoryTrack[]): InventoryIndex => {
     }
   }
 
-  return { byIsrc, byExact, byTitle, byArtist, byToken };
+  return { byIsrc, byExact, byTitle, byArtist, byToken, byTrackKey };
 };
 
 const collectCandidates = (rowTitle: string, rowArtist: string, index: InventoryIndex): InventoryTrack[] => {
@@ -613,10 +620,72 @@ const shouldAutoMatch = (best: ScoredTrack, second: ScoredTrack | undefined, mod
   return false;
 };
 
-const matchRows = (rows: SourceRow[], index: InventoryIndex, mode: MatchingMode) => {
+const chooseLegacyAutoMatch = (
+  rowTitle: string,
+  rowArtist: string,
+  candidates: MatchCandidate[],
+  mode: MatchingMode
+) => {
+  if (candidates.length === 0) return null;
+  const best = candidates[0];
+  const second = candidates[1];
+  const margin = second ? best.score - second.score : best.score;
+  const bestTitle = canonicalTitle(best.title);
+  const bestArtist = canonicalArtist(best.artist);
+  const exactTitle = bestTitle.length > 0 && bestTitle === rowTitle;
+  const exactArtist = rowArtist.length > 0 && bestArtist === rowArtist;
+
+  if (exactTitle && (!rowArtist || exactArtist)) return best.track_key;
+
+  if (mode === "strict") {
+    if (best.score >= 0.92 && margin >= 0.08) return best.track_key;
+    return null;
+  }
+
+  if (mode === "aggressive") {
+    if (best.score >= 0.8) return best.track_key;
+    if (best.score >= 0.68 && margin >= 0.08) return best.track_key;
+    if (exactArtist && best.score >= 0.58 && margin >= 0.04) return best.track_key;
+    return null;
+  }
+
+  if (best.score >= 0.86) return best.track_key;
+  if (best.score >= 0.76 && margin >= 0.08) return best.track_key;
+  if (exactArtist && best.score >= 0.62 && margin >= 0.06) return best.track_key;
+  return null;
+};
+
+const mergeCandidates = (scored: ScoredTrack[], legacy: MatchCandidate[]) => {
+  const merged = new Map<string, MatchCandidate>();
+
+  for (const candidate of scored.map(toCandidate)) {
+    merged.set(candidate.track_key, candidate);
+  }
+
+  for (const candidate of legacy) {
+    const key = String(candidate.track_key ?? "").trim();
+    if (!key) continue;
+    const current = merged.get(key);
+    if (!current || candidate.score > current.score) {
+      merged.set(key, candidate);
+    }
+  }
+
+  return Array.from(merged.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10);
+};
+
+const matchRows = async (
+  rows: SourceRow[],
+  index: InventoryIndex,
+  mode: MatchingMode,
+  authHeader?: string
+) => {
   const matchedTrackKeys: string[] = [];
   const missing: MissingRow[] = [];
   let fuzzyMatchedCount = 0;
+  const legacyIndex = await getLegacyInventoryIndex(authHeader);
 
   for (const row of rows) {
     const rawTitle = strip(row.title);
@@ -662,10 +731,44 @@ const matchRows = (rows: SourceRow[], index: InventoryIndex, mode: MatchingMode)
       continue;
     }
 
+    const legacyCandidates = await searchLegacyInventoryCandidates(
+      { title: rawTitle || normTitle, artist: rawArtist || undefined, limit: 10 },
+      legacyIndex
+    );
+    const legacyMapped: MatchCandidate[] = legacyCandidates
+      .map((candidate) => {
+        const key = String(candidate.track_key ?? "").trim();
+        if (!key) return null;
+        const mappedTrack = index.byTrackKey.get(key);
+        if (mappedTrack) {
+          const rescored = scoreCandidate(normTitle, normArtist, mappedTrack);
+          return toCandidate(rescored);
+        }
+        return {
+          track_key: key,
+          inventory_id: candidate.inventory_id ?? null,
+          title: candidate.title,
+          artist: candidate.artist,
+          side: candidate.side ?? null,
+          position: candidate.position ?? null,
+          score: Number(candidate.score.toFixed(3)),
+        };
+      })
+      .filter((candidate): candidate is MatchCandidate => Boolean(candidate));
+
+    const legacyAutoTrackKey = chooseLegacyAutoMatch(normTitle, normArtist, legacyMapped, mode);
+    if (legacyAutoTrackKey) {
+      matchedTrackKeys.push(legacyAutoTrackKey);
+      fuzzyMatchedCount += 1;
+      continue;
+    }
+
+    const mergedCandidates = mergeCandidates(scoredCandidates, legacyMapped);
+
     missing.push({
       title: rawTitle || undefined,
       artist: rawArtist || undefined,
-      candidates: scoredCandidates.map(toCandidate),
+      candidates: mergedCandidates,
     });
   }
 
@@ -748,7 +851,7 @@ export const importRowsToPlaylist = async (options: ImportOptions): Promise<Impo
   const inventoryTracks = await loadInventoryTracks(options.authHeader);
   const index = buildIndex(inventoryTracks);
 
-  const { matchedTrackKeys, missing, fuzzyMatchedCount } = matchRows(rows, index, matchingMode);
+  const { matchedTrackKeys, missing, fuzzyMatchedCount } = await matchRows(rows, index, matchingMode, options.authHeader);
   const dedupedMatched = Array.from(new Set(matchedTrackKeys));
 
   const playlistId = await getPlaylistId(db, options, playlistName);

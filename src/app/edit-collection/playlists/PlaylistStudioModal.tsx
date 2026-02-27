@@ -343,6 +343,7 @@ export function PlaylistStudioModal({
   const [unmatchedSearchingRowId, setUnmatchedSearchingRowId] = useState<string | null>(null);
   const [retryingUnmatched, setRetryingUnmatched] = useState(false);
   const wasOpenRef = useRef(false);
+  const unmatchedSectionRef = useRef<HTMLDivElement | null>(null);
 
   const appendablePlaylists = useMemo(
     () => localPlaylists.filter((playlist) => !playlist.isSmart),
@@ -940,6 +941,11 @@ export function PlaylistStudioModal({
       setUnmatchedSearchByRow({});
       setResume(payload.resume ?? null);
       setRetryAfterSeconds(null);
+      if ((payload?.unmatchedCount ?? 0) > 0) {
+        window.setTimeout(() => {
+          unmatchedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 60);
+      }
 
       await onImported();
     } catch (importError) {
@@ -1005,6 +1011,11 @@ export function PlaylistStudioModal({
       setUnmatchedRows(decorateUnmatched(payload?.unmatchedSample));
       setUnmatchedQueryByRow({});
       setUnmatchedSearchByRow({});
+      if ((payload?.unmatchedCount ?? 0) > 0) {
+        window.setTimeout(() => {
+          unmatchedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 60);
+      }
       await onImported();
     } catch (importError) {
       setError(importError instanceof Error ? importError.message : 'CSV import failed');
@@ -2257,7 +2268,7 @@ export function PlaylistStudioModal({
                   </div>
 
                   {lastImportedPlaylistId && unmatchedRows.length > 0 && (
-                    <div className="rounded-2xl border border-amber-600/40 bg-amber-950/20 p-4">
+                    <div ref={unmatchedSectionRef} className="rounded-2xl border border-amber-600/40 bg-amber-950/20 p-4">
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <div className="text-sm font-semibold text-amber-100">
                           Unmatched Tracks ({unmatchedRows.length})
