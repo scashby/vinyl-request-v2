@@ -39,6 +39,9 @@ type SpotifyPlaylistMeta = {
   owner?: {
     id?: string;
   };
+  items?: {
+    total?: number;
+  };
   tracks?: {
     total?: number;
   };
@@ -94,8 +97,8 @@ const fetchPlaylistMeta = async (
   debugErrors: Array<{ path: string; error: string }>
 ): Promise<SpotifyPlaylistMeta> => {
   const paths = [
-    `/playlists/${playlistId}?fields=name,snapshot_id,owner(id),tracks(total)&market=from_token`,
-    `/playlists/${playlistId}?fields=name,snapshot_id,owner(id),tracks(total)`,
+    `/playlists/${playlistId}?fields=name,snapshot_id,owner(id),items(total),tracks(total)&market=from_token`,
+    `/playlists/${playlistId}?fields=name,snapshot_id,owner(id),items(total),tracks(total)`,
     `/playlists/${playlistId}?market=from_token`,
     `/playlists/${playlistId}`,
   ];
@@ -125,8 +128,8 @@ const fetchPlaylistItemsPage = async (
   debugErrors: Array<{ path: string; error: string }>
 ): Promise<{ rows: SourceRow[]; itemCount: number; next: string | null; total: number | null }> => {
   const paths = [
-    `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&market=from_token&fields=items(track(id,uri,name,artists(name),external_ids(isrc)),item(type,id,uri,name,artists(name),external_ids(isrc))),next,total`,
-    `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&fields=items(track(id,uri,name,artists(name),external_ids(isrc)),item(type,id,uri,name,artists(name),external_ids(isrc))),next,total`,
+    `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&market=from_token&fields=items(item(type,id,uri,name,artists(name))),next,total`,
+    `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&fields=items(track(id,uri,name,artists(name)),item(type,id,uri,name,artists(name))),next,total`,
     `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&market=from_token`,
     `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track`,
   ];
@@ -208,7 +211,12 @@ export async function POST(req: Request) {
     playlistOwnerId = playlist.owner?.id ?? '';
     spotifySnapshotId = typeof playlist.snapshot_id === 'string' ? playlist.snapshot_id : '';
 
-    let sourceTotal = playlist.tracks && typeof playlist.tracks.total === 'number' ? playlist.tracks.total : null;
+    let sourceTotal =
+      playlist.items && typeof playlist.items.total === 'number'
+        ? playlist.items.total
+        : playlist.tracks && typeof playlist.tracks.total === 'number'
+          ? playlist.tracks.total
+          : null;
 
     const inferredName =
       requestedName && requestedName !== '(resume)'

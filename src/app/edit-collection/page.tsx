@@ -12,11 +12,8 @@ import EditAlbumModal from './EditAlbumModal';
 import NewCrateModal from './crates/NewCrateModal';
 import NewSmartCrateModal from './crates/NewSmartCrateModal';
 import { AddToCrateModal } from './crates/AddToCrateModal';
-import NewPlaylistModal from './playlists/NewPlaylistModal';
 import AddToPlaylistModal from './playlists/AddToPlaylistModal';
-import ManagePlaylistsModal from './playlists/ManagePlaylistsModal';
-import NewSmartPlaylistModal from './playlists/NewSmartPlaylistModal';
-import SpotifyImportModal from './playlists/SpotifyImportModal';
+import PlaylistStudioModal, { type PlaylistStudioView } from './playlists/PlaylistStudioModal';
 import Header from './Header';
 import { ManageColumnFavoritesModal, type ColumnFavorite } from './ManageColumnFavoritesModal';
 import type { Crate } from '../../types/crate';
@@ -427,13 +424,10 @@ function CollectionBrowserPage() {
   const [crateItemsByCrate, setCrateItemsByCrate] = useState<Record<number, Set<number>>>({});
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<number | null>(null);
-  const [showNewPlaylistModal, setShowNewPlaylistModal] = useState(false);
+  const [showPlaylistStudioModal, setShowPlaylistStudioModal] = useState(false);
+  const [playlistStudioInitialView, setPlaylistStudioInitialView] = useState<PlaylistStudioView>('library');
   const [showAddToPlaylistModal, setShowAddToPlaylistModal] = useState(false);
-  const [showManagePlaylistsModal, setShowManagePlaylistsModal] = useState(false);
-  const [showSpotifyImportModal, setShowSpotifyImportModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
-  const [showNewSmartPlaylistModal, setShowNewSmartPlaylistModal] = useState(false);
   
   const [collectionFilter, setCollectionFilter] = useState<string>('All');
   const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
@@ -1489,10 +1483,11 @@ function CollectionBrowserPage() {
     });
   }, []);
 
-  const handleCreatePlaylist = useCallback(async (playlist: { name: string; icon: string; color: string }) => {
+  const handleCreatePlaylist = useCallback(async (playlist: { name: string; icon: string; color: string; trackKeys: string[] }) => {
     try {
       const maxSort = playlists.reduce((max, item) => Math.max(max, item.sortOrder ?? 0), -1);
       const nextSortOrder = maxSort + 1;
+      const dedupedTrackKeys = Array.from(new Set((playlist.trackKeys ?? []).map((key) => String(key ?? '').trim()).filter(Boolean)));
 
       const { data, error } = await supabase
         .from('collection_playlists')
@@ -1513,9 +1508,20 @@ function CollectionBrowserPage() {
         throw error || new Error('Failed to create playlist');
       }
 
+      if (dedupedTrackKeys.length > 0) {
+        const rows = dedupedTrackKeys.map((trackKey, index) => ({
+          playlist_id: data.id,
+          track_key: trackKey,
+          sort_order: index,
+        }));
+        const { error: itemError } = await supabase
+          .from('collection_playlist_items')
+          .insert(rows);
+        if (itemError) throw itemError;
+      }
+
       await loadPlaylists();
       setSelectedPlaylistId(data.id);
-      setShowNewPlaylistModal(false);
       setTrackSource('playlists');
       setViewMode('playlist');
     } catch (err) {
@@ -1668,7 +1674,6 @@ function CollectionBrowserPage() {
       }
       await loadPlaylists();
       setSelectedPlaylistId(data.id);
-      setShowNewSmartPlaylistModal(false);
       setTrackSource('playlists');
       setViewMode('playlist');
     } catch (err) {
@@ -1803,7 +1808,10 @@ function CollectionBrowserPage() {
           loadCrates={loadCrates}
           filteredAndSortedAlbums={filteredAndSortedAlbums}
           selectedAlbumIds={selectedAlbumIds}
-          onOpenManagePlaylists={() => setShowManagePlaylistsModal(true)}
+          onOpenManagePlaylists={() => {
+            setPlaylistStudioInitialView('library');
+            setShowPlaylistStudioModal(true);
+          }}
           onOpenExportCsvTxt={() => setShowExportModal(true)}
         />
 
@@ -2000,7 +2008,16 @@ function CollectionBrowserPage() {
                 />
                 <button onClick={() => setFolderSortByCount(!folderSortByCount)} title={folderSortByCount ? "Sort alphabetically" : "Sort by count"} className="bg-[#3a3a3a] text-white border border-[#555] px-2 py-1 rounded cursor-pointer text-xs shrink-0">{folderSortByCount ? '🔢' : '🔤'}</button>
                 {viewMode !== 'collection' && folderMode === 'playlists' && (
-                  <button onClick={() => setShowNewPlaylistModal(true)} title="Create playlist" className="bg-[#3a3a3a] text-white border border-[#555] px-2 py-1 rounded cursor-pointer text-xs shrink-0">＋</button>
+                  <button
+                    onClick={() => {
+                      setPlaylistStudioInitialView('manual');
+                      setShowPlaylistStudioModal(true);
+                    }}
+                    title="Create playlist"
+                    className="bg-[#3a3a3a] text-white border border-[#555] px-2 py-1 rounded cursor-pointer text-xs shrink-0"
+                  >
+                    ＋
+                  </button>
                 )}
               </div>
             </div>
@@ -2395,31 +2412,6 @@ function CollectionBrowserPage() {
       {showNewCrateModal && <NewCrateModal isOpen={showNewCrateModal} onClose={() => { setShowNewCrateModal(false); setEditingCrate(null); if (returnToAddToCrate) { setReturnToAddToCrate(false); setNewlyCreatedCrateId(null); }}} onCrateCreated={async (newCrateId) => { await loadCrates(); setEditingCrate(null); if (returnToAddToCrate) { setNewlyCreatedCrateId(newCrateId); setShowNewCrateModal(false); setShowAddToCrateModal(true); } else { setShowNewCrateModal(false); }}} editingCrate={editingCrate} />}
       {showNewSmartCrateModal && <NewSmartCrateModal isOpen={showNewSmartCrateModal} onClose={() => { setShowNewSmartCrateModal(false); setEditingCrate(null); }} onCrateCreated={() => { loadCrates(); setShowNewSmartCrateModal(false); setEditingCrate(null); }} editingCrate={editingCrate} />}
       {showAddToCrateModal && <AddToCrateModal isOpen={showAddToCrateModal} onClose={() => { setShowAddToCrateModal(false); setReturnToAddToCrate(false); setNewlyCreatedCrateId(null); }} crates={cratesWithCounts} onAddToCrates={handleAddToCrates} selectedCount={selectedAlbumIds.size} onOpenNewCrate={() => { setReturnToAddToCrate(true); setShowAddToCrateModal(false); setEditingCrate(null); setShowNewCrateModal(true); }} autoSelectCrateId={newlyCreatedCrateId} />}
-      {showNewPlaylistModal && (
-        <NewPlaylistModal
-          isOpen={showNewPlaylistModal}
-          editingPlaylist={editingPlaylist && !editingPlaylist.isSmart ? editingPlaylist : null}
-          onClose={() => {
-            setShowNewPlaylistModal(false);
-            setEditingPlaylist(null);
-          }}
-          onCreate={handleCreatePlaylist}
-          onUpdate={handleUpdatePlaylist}
-        />
-      )}
-      {showNewSmartPlaylistModal && (
-        <NewSmartPlaylistModal
-          isOpen={showNewSmartPlaylistModal}
-          editingPlaylist={editingPlaylist?.isSmart ? editingPlaylist : null}
-          valueOptions={smartPlaylistValueOptions}
-          onClose={() => {
-            setShowNewSmartPlaylistModal(false);
-            setEditingPlaylist(null);
-          }}
-          onCreate={handleCreateSmartPlaylist}
-          onUpdate={handleUpdatePlaylist}
-        />
-      )}
       {showAddToPlaylistModal && (
         <AddToPlaylistModal
           isOpen={showAddToPlaylistModal}
@@ -2429,49 +2421,24 @@ function CollectionBrowserPage() {
           onAdd={handleAddToPlaylists}
           onOpenNewPlaylist={() => {
             setShowAddToPlaylistModal(false);
-            setEditingPlaylist(null);
-            setShowNewPlaylistModal(true);
+            setPlaylistStudioInitialView('manual');
+            setShowPlaylistStudioModal(true);
           }}
         />
       )}
-      {showManagePlaylistsModal && (
-        <ManagePlaylistsModal
-          isOpen={showManagePlaylistsModal}
-          onClose={() => setShowManagePlaylistsModal(false)}
+      {showPlaylistStudioModal && (
+        <PlaylistStudioModal
+          isOpen={showPlaylistStudioModal}
+          initialView={playlistStudioInitialView}
+          onClose={() => setShowPlaylistStudioModal(false)}
           playlists={playlists}
-          onReorder={handleReorderPlaylists}
-          onDelete={handleDeletePlaylist}
-          onDeleteAll={handleDeleteAllPlaylists}
-          onEdit={(playlist) => {
-            setShowManagePlaylistsModal(false);
-            setEditingPlaylist(playlist);
-            setShowNewPlaylistModal(true);
-          }}
-          onEditSmart={(playlist) => {
-            setShowManagePlaylistsModal(false);
-            setEditingPlaylist(playlist);
-            setShowNewSmartPlaylistModal(true);
-          }}
-          onOpenNewPlaylist={() => {
-            setShowManagePlaylistsModal(false);
-            setEditingPlaylist(null);
-            setShowNewPlaylistModal(true);
-          }}
-          onOpenNewSmartPlaylist={() => {
-            setShowManagePlaylistsModal(false);
-            setEditingPlaylist(null);
-            setShowNewSmartPlaylistModal(true);
-          }}
-          onOpenSpotifyImport={() => {
-            setShowManagePlaylistsModal(false);
-            setShowSpotifyImportModal(true);
-          }}
-        />
-      )}
-      {showSpotifyImportModal && (
-        <SpotifyImportModal
-          isOpen={showSpotifyImportModal}
-          onClose={() => setShowSpotifyImportModal(false)}
+          smartValueOptions={smartPlaylistValueOptions}
+          onReorderPlaylists={handleReorderPlaylists}
+          onDeletePlaylist={handleDeletePlaylist}
+          onDeleteAllPlaylists={handleDeleteAllPlaylists}
+          onCreateManualPlaylist={handleCreatePlaylist}
+          onCreateSmartPlaylist={handleCreateSmartPlaylist}
+          onUpdatePlaylist={handleUpdatePlaylist}
           onImported={loadPlaylists}
         />
       )}

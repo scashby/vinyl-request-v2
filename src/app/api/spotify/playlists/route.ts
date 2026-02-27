@@ -9,12 +9,17 @@ type SpotifyPlaylistRow = {
   snapshot_id?: string;
   collaborative?: boolean;
   owner?: { id?: string | null };
+  items?: { total?: number; href?: string };
   tracks?: { total?: number; href?: string };
 };
 
 type SpotifyPlaylistResponse = {
   items?: SpotifyPlaylistRow[];
   next?: string | null;
+};
+
+type SpotifyMe = {
+  id?: string;
 };
 
 type PlaylistsPayload = {
@@ -66,10 +71,13 @@ export async function GET() {
     if (!inFlight) {
       inFlight = (async () => {
         // Keep this endpoint intentionally low-call during Spotify rate-limit windows:
-        // one request only, no pagination, no per-playlist follow-up fetches.
+        // one playlists request + one /me request only, no pagination or per-playlist follow-ups.
+        const me = await spotifyApiGet<SpotifyMe>(tokenData.accessToken, '/me', { maxAttempts: 1 });
+        const spotifyUserId = (me.id ?? '').trim();
+
         const data = await spotifyApiGet<SpotifyPlaylistResponse>(
           tokenData.accessToken,
-          '/me/playlists?limit=50&offset=0&fields=items(id,name,snapshot_id,collaborative,owner(id),tracks(total)),next',
+          '/me/playlists?limit=50&offset=0&fields=items(id,name,snapshot_id,collaborative,owner(id),items(total),tracks(total)),next',
           { maxAttempts: 1 }
         );
         const items: SpotifyPlaylistRow[] = data.items ?? [];
@@ -77,15 +85,31 @@ export async function GET() {
           scope: tokenData.scope ?? '',
           hasMore: Boolean(data.next),
           cached: false,
-          playlists: items.map((row) => ({
-            id: row.id,
-            name: row.name,
-            trackCount: typeof row.tracks?.total === 'number' ? row.tracks.total : null,
-            snapshotId: row.snapshot_id ?? null,
-            // Do not hard-block in list mode; import endpoint enforces real access.
-            canImport: true,
-            importReason: null,
-          })),
+          playlists: items.map((row) => {
+            const ownerId = (row.owner?.id ?? '').trim();
+            const collaborative = row.collaborative === true;
+            const ownedByMe = !!spotifyUserId && ownerId === spotifyUserId;
+            const trackCount =
+              typeof row.items?.total === 'number'
+                ? row.items.total
+                : typeof row.tracks?.total === 'number'
+                  ? row.tracks.total
+                  : null;
+
+            const canImport = ownedByMe || collaborative || ownerId.length === 0;
+            const importReason = canImport
+              ? null
+              : 'Spotify now restricts playlist-item reads to owned/collaborative playlists.';
+
+            return {
+              id: row.id,
+              name: row.name,
+              trackCount,
+              snapshotId: row.snapshot_id ?? null,
+              canImport,
+              importReason,
+            };
+          }),
         };
         cacheStore.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, payload });
         return payload;
