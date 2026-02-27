@@ -97,6 +97,18 @@ type TrackListSource = 'crates' | 'playlists';
 
 type Playlist = CollectionPlaylist;
 
+const PLAYLIST_STORAGE_KEYS = [
+  'collection-playlists-backup-v2',
+  'collection-track-playlists',
+  'collection-playlists-recovery-migrated-v1',
+];
+
+const clearPlaylistRecoveryStorage = () => {
+  for (const key of PLAYLIST_STORAGE_KEYS) {
+    localStorage.removeItem(key);
+  }
+};
+
 interface TrackAlbumGroup {
   inventoryId: number;
   albumArtist: string;
@@ -470,6 +482,10 @@ function CollectionBrowserPage() {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
   useEffect(() => {
+    clearPlaylistRecoveryStorage();
+  }, []);
+
+  useEffect(() => {
     const stored = localStorage.getItem('collection-visible-columns');
     if (stored) {
       try {
@@ -665,110 +681,6 @@ function CollectionBrowserPage() {
       return;
     }
 
-    if ((playlistRows ?? []).length === 0) {
-      const backup = localStorage.getItem('collection-playlists-backup-v2');
-      if (backup) {
-        try {
-          const parsed = JSON.parse(backup) as Playlist[];
-          if (parsed.length > 0) {
-            for (let i = 0; i < parsed.length; i += 1) {
-              const item = parsed[i];
-              const { data: inserted, error: insertError } = await supabase
-                .from('collection_playlists')
-                .insert({
-                  name: item.name,
-                  icon: item.icon || (item.isSmart ? '⚡' : '🎵'),
-                  color: item.color || '#3578b3',
-                  sort_order: i,
-                  created_at: item.createdAt || new Date().toISOString(),
-                  is_smart: !!item.isSmart,
-                  smart_rules: item.smartRules ?? null,
-                  match_rules: item.matchRules ?? 'all',
-                  live_update: item.liveUpdate !== false,
-                })
-                .select('id')
-                .single();
-              if (insertError || !inserted) throw insertError || new Error('Failed to restore playlist from backup');
-
-              const trackKeys = item.trackKeys ?? [];
-              if (trackKeys.length > 0) {
-                const records = trackKeys.map((trackKey, idx) => ({
-                  playlist_id: inserted.id,
-                  track_key: trackKey,
-                  sort_order: idx,
-                }));
-                const { error: itemsInsertError } = await supabase
-                  .from('collection_playlist_items')
-                  .insert(records);
-                if (itemsInsertError) throw itemsInsertError;
-              }
-            }
-            await loadPlaylists();
-            return;
-          }
-        } catch (backupError) {
-          console.error('Failed restoring playlists from local backup:', backupError);
-        }
-      }
-
-      const legacy = localStorage.getItem('collection-track-playlists');
-      if (legacy) {
-        try {
-          const parsed = JSON.parse(legacy) as Array<{
-            name: string;
-            icon?: string;
-            color?: string;
-            trackKeys?: string[];
-            createdAt?: string;
-          }>;
-
-          if (parsed.length > 0) {
-            for (let i = 0; i < parsed.length; i += 1) {
-              const legacyPlaylist = parsed[i];
-              const { data: inserted, error: insertError } = await supabase
-                .from('collection_playlists')
-                .insert({
-                  name: legacyPlaylist.name,
-                  icon: legacyPlaylist.icon || '🎵',
-                  color: legacyPlaylist.color || '#3578b3',
-                  sort_order: i,
-                  created_at: legacyPlaylist.createdAt || new Date().toISOString(),
-                  is_smart: false,
-                  smart_rules: null,
-                  match_rules: 'all',
-                  live_update: true,
-                })
-                .select('id')
-                .single();
-
-              if (insertError || !inserted) {
-                throw insertError || new Error('Failed to import legacy playlist');
-              }
-
-              const trackKeys = legacyPlaylist.trackKeys || [];
-              if (trackKeys.length > 0) {
-                const records = trackKeys.map((trackKey, idx) => ({
-                  playlist_id: inserted.id,
-                  track_key: trackKey,
-                  sort_order: idx,
-                }));
-                const { error: itemsInsertError } = await supabase
-                  .from('collection_playlist_items')
-                  .insert(records);
-                if (itemsInsertError) throw itemsInsertError;
-              }
-            }
-
-            localStorage.removeItem('collection-track-playlists');
-            await loadPlaylists();
-            return;
-          }
-        } catch (legacyError) {
-          console.error('Failed importing legacy local playlists:', legacyError);
-        }
-      }
-    }
-
     const tracksByPlaylist = (playlistItems ?? []).reduce((acc, item) => {
       if (!item.playlist_id || !item.track_key) return acc;
       if (!acc[item.playlist_id]) {
@@ -793,7 +705,8 @@ function CollectionBrowserPage() {
     }));
 
     setPlaylists(mapped);
-    localStorage.setItem('collection-playlists-backup-v2', JSON.stringify(mapped));
+    // This app no longer auto-restores playlists from browser storage.
+    clearPlaylistRecoveryStorage();
   }, []);
 
   useEffect(() => {
@@ -1701,8 +1614,11 @@ function CollectionBrowserPage() {
 	    if (selectedPlaylistId === playlistId) {
 	      setSelectedPlaylistId(null);
 	    }
+      if (playlists.length <= 1) {
+        clearPlaylistRecoveryStorage();
+      }
 	    await loadPlaylists();
-	  }, [loadPlaylists, selectedPlaylistId]);
+	  }, [loadPlaylists, playlists.length, selectedPlaylistId]);
 
 		  const handleDeleteAllPlaylists = useCallback(async () => {
 		    const { data: { session } } = await supabase.auth.getSession();
@@ -1716,6 +1632,7 @@ function CollectionBrowserPage() {
 		      throw new Error(payload?.error || `Failed to delete playlists (${res.status})`);
 		    }
 		    setSelectedPlaylistId(null);
+        clearPlaylistRecoveryStorage();
 		    await loadPlaylists();
 		  }, [loadPlaylists]);
 

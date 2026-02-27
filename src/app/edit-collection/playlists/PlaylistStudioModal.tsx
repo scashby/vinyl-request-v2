@@ -240,6 +240,22 @@ const dedupeTrackKeys = (keys: string[]) => {
   return out;
 };
 
+const formatTrackPositionLabel = (side: string | null, position: string | null) => {
+  const sideValue = String(side ?? '').trim();
+  const positionValue = String(position ?? '').trim();
+  if (!positionValue) return sideValue || null;
+  if (!sideValue) return positionValue;
+  const normalizedSide = sideValue.toUpperCase();
+  const normalizedPosition = positionValue.toUpperCase();
+  if (
+    normalizedPosition === normalizedSide ||
+    normalizedPosition.startsWith(normalizedSide)
+  ) {
+    return positionValue;
+  }
+  return `${sideValue}${positionValue}`;
+};
+
 const isBetweenValue = (
   value: SmartPlaylistRuleValue
 ): value is { min: string | number; max: string | number } => {
@@ -659,6 +675,14 @@ export function PlaylistStudioModal({
     const [item] = next.splice(index, 1);
     next.splice(target, 0, item);
     setManualTracks(next.map((row, idx) => ({ ...row, sort_order: idx })));
+  };
+
+  const removeManualTrack = (index: number) => {
+    setManualTracks((prev) =>
+      prev
+        .filter((_, itemIndex) => itemIndex !== index)
+        .map((item, itemIndex) => ({ ...item, sort_order: itemIndex }))
+    );
   };
 
   const saveManualPlaylist = async () => {
@@ -1480,7 +1504,7 @@ export function PlaylistStudioModal({
                             const subtitleParts = [
                               track.artist_name,
                               track.album_name,
-                              track.side && track.position ? `${track.side}${track.position}` : track.position,
+                              formatTrackPositionLabel(track.side, track.position),
                             ].filter(Boolean);
                             return (
                               <div
@@ -1510,6 +1534,13 @@ export function PlaylistStudioModal({
                                   >
                                     ▼
                                   </button>
+                                  <button
+                                    onClick={() => removeManualTrack(index)}
+                                    className="h-5 w-6 rounded border border-red-600/50 bg-red-800/25 text-[10px] text-red-100 hover:bg-red-800/40"
+                                    title="Remove track"
+                                  >
+                                    ✕
+                                  </button>
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <div className="truncate text-sm font-medium text-white">{track.track_title ?? track.track_key}</div>
@@ -1518,14 +1549,8 @@ export function PlaylistStudioModal({
                                   )}
                                 </div>
                                 <button
-                                  onClick={() => {
-                                    setManualTracks((prev) =>
-                                      prev
-                                        .filter((_, itemIndex) => itemIndex !== index)
-                                        .map((item, itemIndex) => ({ ...item, sort_order: itemIndex }))
-                                    );
-                                  }}
-                                  className="rounded-md border border-red-600/40 bg-red-800/20 px-2 py-1 text-xs text-red-100 hover:bg-red-800/35"
+                                  onClick={() => removeManualTrack(index)}
+                                  className="shrink-0 rounded-md border border-red-600/40 bg-red-800/20 px-2 py-1 text-xs text-red-100 hover:bg-red-800/35"
                                 >
                                   Remove
                                 </button>
