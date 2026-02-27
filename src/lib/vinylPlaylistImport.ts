@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
+import { supabaseServer } from "src/lib/supabaseServer";
 
 const PAGE_SIZE = 1000;
 
@@ -396,17 +397,36 @@ export const searchInventoryCandidates = async (
   const queryArtist = normalizeArtist(artistRaw);
   if (!queryTitle) return [];
 
-  return collectCandidates(queryTitle, queryArtist, resolvedIndex, 1000)
-    .map((track) => toCandidate(scoreSearchCandidate(queryTitle, queryArtist, track), track))
-    .filter((candidate) => !!candidate.track_key && candidate.score >= 0.25)
+  const merged = new Map<string, MatchCandidate>();
+  const addCandidate = (track: InventoryTrack) => {
+    const candidate = toCandidate(scoreSearchCandidate(queryTitle, queryArtist, track), track);
+    if (!candidate.track_key || candidate.score < 0.25) return;
+    const current = merged.get(candidate.track_key);
+    if (!current || candidate.score > current.score) {
+      merged.set(candidate.track_key, candidate);
+    }
+  };
+
+  // Always include exact normalized title hits so obvious matches are never dropped by token pooling.
+  const titleMatches = resolvedIndex.titleOnly.get(queryTitle) ?? [];
+  for (const track of titleMatches) {
+    addCandidate(track);
+  }
+
+  for (const track of collectCandidates(queryTitle, queryArtist, resolvedIndex, 1000)) {
+    addCandidate(track);
+  }
+
+  return Array.from(merged.values())
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 };
 
 export const fetchInventoryTracks = async (authHeaderOrLimit?: string | number, limitMaybe?: number) => {
   const tracks: InventoryTrack[] = [];
+  const authHeader = typeof authHeaderOrLimit === "string" ? authHeaderOrLimit : undefined;
   const limit = typeof authHeaderOrLimit === "number" ? authHeaderOrLimit : limitMaybe;
-  const supabase = supabaseAdmin;
+  const supabase = authHeader ? supabaseServer(authHeader) : supabaseAdmin;
 
   // Step 1: fetch inventory rows to determine the release ids in the library.
   // De-dupe by release_id so we don't create duplicate candidate tracks when multiple copies exist.
@@ -479,34 +499,45 @@ export const fetchInventoryTracks = async (authHeaderOrLimit?: string | number, 
       }
     }
 
-    const { data: releaseTracks, error: releaseTracksError } = await supabase
-      .from("release_tracks")
-      .select("release_id, position, side, title_override, recordings ( id, title, track_artist )")
-      .in("release_id", chunk);
+    let releaseTrackPage = 0;
+    while (true) {
+      const from = releaseTrackPage * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+      const { data: releaseTracks, error: releaseTracksError } = await supabase
+        .from("release_tracks")
+        .select("id, release_id, position, side, title_override, recordings ( id, title, track_artist )")
+        .in("release_id", chunk)
+        .order("id", { ascending: true })
+        .range(from, to);
 
-    if (releaseTracksError) {
-      throw new Error(`Failed loading release tracks: ${releaseTracksError.message}`);
-    }
-
-    for (const row of releaseTracks ?? []) {
-      const releaseId = row.release_id;
-      if (typeof releaseId !== "number") continue;
-      const recording = Array.isArray(row.recordings) ? row.recordings[0] : row.recordings;
-      const title = row.title_override || recording?.title;
-      if (!title) continue;
-      const albumArtist = releaseArtistById.get(releaseId) ?? null;
-      const trackArtist = recording?.track_artist?.trim?.() ? recording.track_artist : null;
-      const trackRow = {
-        recording_id: recording?.id ?? null,
-        title,
-        artist: trackArtist || albumArtist || "Unknown Artist",
-        side: row.side ?? null,
-        position: row.position ?? null,
-      };
-      if (!trackMap.has(releaseId)) {
-        trackMap.set(releaseId, []);
+      if (releaseTracksError) {
+        throw new Error(`Failed loading release tracks: ${releaseTracksError.message}`);
       }
-      trackMap.get(releaseId)!.push(trackRow);
+
+      const rows = releaseTracks ?? [];
+      for (const row of rows) {
+        const releaseId = row.release_id;
+        if (typeof releaseId !== "number") continue;
+        const recording = Array.isArray(row.recordings) ? row.recordings[0] : row.recordings;
+        const title = row.title_override || recording?.title;
+        if (!title) continue;
+        const albumArtist = releaseArtistById.get(releaseId) ?? null;
+        const trackArtist = recording?.track_artist?.trim?.() ? recording.track_artist : null;
+        const trackRow = {
+          recording_id: recording?.id ?? null,
+          title,
+          artist: trackArtist || albumArtist || "Unknown Artist",
+          side: row.side ?? null,
+          position: row.position ?? null,
+        };
+        if (!trackMap.has(releaseId)) {
+          trackMap.set(releaseId, []);
+        }
+        trackMap.get(releaseId)!.push(trackRow);
+      }
+
+      if (rows.length < PAGE_SIZE) break;
+      releaseTrackPage += 1;
     }
   }
 

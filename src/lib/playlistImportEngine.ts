@@ -634,8 +634,9 @@ const chooseLegacyAutoMatch = (
   const bestArtist = canonicalArtist(best.artist);
   const exactTitle = bestTitle.length > 0 && bestTitle === rowTitle;
   const exactArtist = rowArtist.length > 0 && bestArtist === rowArtist;
+  const unknownArtist = bestArtist === "unknown artist" || bestArtist === "unknown" || bestArtist === "various";
 
-  if (exactTitle && (!rowArtist || exactArtist)) return best.track_key;
+  if (exactTitle && (!rowArtist || exactArtist || unknownArtist)) return best.track_key;
 
   if (mode === "strict") {
     if (best.score >= 0.92 && margin >= 0.08) return best.track_key;
@@ -643,6 +644,7 @@ const chooseLegacyAutoMatch = (
   }
 
   if (mode === "aggressive") {
+    if (exactTitle && best.score >= 0.55) return best.track_key;
     if (best.score >= 0.8) return best.track_key;
     if (best.score >= 0.68 && margin >= 0.08) return best.track_key;
     if (exactArtist && best.score >= 0.58 && margin >= 0.04) return best.track_key;
