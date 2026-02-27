@@ -70,6 +70,8 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
   const [lastImportedPlaylistId, setLastImportedPlaylistId] = useState<number | null>(null);
   const [resume, setResume] = useState<ImportResume | null>(null);
   const [retryAfterSeconds, setRetryAfterSeconds] = useState<number | null>(null);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvImporting, setCsvImporting] = useState(false);
 
   const getSupabaseAuthHeaders = async (): Promise<Record<string, string>> => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -110,6 +112,48 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
         ? ((row as { candidates?: unknown }).candidates as MatchCandidate[])
         : undefined,
     }));
+  };
+
+  const inferPlaylistNameFromFile = (file: File) =>
+    file.name.replace(/\.[^.]+$/, "").trim() || "CSV Import";
+
+  const handleCsvImport = async (file: File) => {
+    setCsvImporting(true);
+    setError(null);
+    setLastResult(null);
+    setUnmatched([]);
+    setResume(null);
+    setRetryAfterSeconds(null);
+    try {
+      const csvText = await file.text();
+      if (!csvText.trim()) {
+        throw new Error("CSV file is empty");
+      }
+      const authHeaders = await getSupabaseAuthHeaders();
+      const inferredName = inferPlaylistNameFromFile(file);
+      const res = await fetch("/api/playlists/import-csv", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify({
+          playlistName: inferredName,
+          csvText,
+        }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(payload, res));
+      const fuzzyNote = payload?.fuzzyMatchedCount ? `, ${payload.fuzzyMatchedCount} fuzzy-matched` : "";
+      const dupNote = payload?.duplicatesSkipped ? `, ${payload.duplicatesSkipped} duplicates skipped` : "";
+      setLastResult(
+        `Imported CSV "${payload?.playlistName ?? inferredName}": ${payload?.matchedCount ?? 0} matched${fuzzyNote}, ${payload?.unmatchedCount ?? 0} unmatched${dupNote}`
+      );
+      setLastImportedPlaylistId(typeof payload?.playlistId === "number" ? payload.playlistId : null);
+      setUnmatched(decorateUnmatched(payload?.unmatchedSample));
+      await onImported();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "CSV import failed");
+    } finally {
+      setCsvImporting(false);
+    }
   };
 
   useEffect(() => {
@@ -365,6 +409,28 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
         <div className="p-6 flex-1 overflow-y-auto">
           {error && <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-700 rounded text-sm">{error}</div>}
           {lastResult && <div className="mb-3 p-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-sm">{lastResult}</div>}
+          <div className="mb-4 border border-slate-200 bg-slate-50 rounded p-3">
+            <div className="text-sm font-semibold text-slate-900">Import From CSV (Fallback)</div>
+            <div className="mt-1 text-xs text-slate-700">
+              Accepts `title,artist` columns, or first two columns as `title` and `artist`.
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(e) => setCsvFile(e.target.files?.[0] ?? null)}
+                className="text-xs text-gray-700"
+              />
+              <button
+                disabled={!csvFile || csvImporting}
+                onClick={() => csvFile && handleCsvImport(csvFile)}
+                className={`px-3 py-2 rounded text-xs font-medium text-white ${!csvFile || csvImporting ? 'bg-gray-400 cursor-not-allowed' : 'bg-slate-700 hover:bg-slate-800'}`}
+              >
+                {csvImporting ? 'Importing CSV...' : 'Import CSV'}
+              </button>
+            </div>
+            {csvFile && <div className="mt-2 text-xs text-slate-600">Selected: {csvFile.name}</div>}
+          </div>
           {!isConnected ? (
             <div className="text-sm text-gray-700">
               <p className="mb-3">Spotify is not connected.</p>
@@ -402,9 +468,7 @@ export function SpotifyImportModal({ isOpen, onClose, onImported }: SpotifyImpor
 	                        const waitMsg = wait !== null ? ` Retry after about ${Math.ceil(wait / 60)} minute(s).` : '';
                         throw new Error((payload?.error || 'Spotify rate limit reached.') + waitMsg);
                       }
-                      if (!res.ok) {
-                        throw new Error(payload?.error || `Failed to load playlists (${res.status})`);
-                      }
+                      if (!res.ok) throw new Error(formatApiError(payload, res));
                       const typedPayload = payload as PlaylistsPayload;
                       playlistsCache = {
                         expiresAt: Date.now() + PLAYLISTS_CACHE_TTL_MS,
