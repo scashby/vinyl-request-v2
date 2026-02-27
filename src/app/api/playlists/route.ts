@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
+import { requireSupabaseAdminServiceRole, supabaseAdmin, supabaseAdminJwtRole } from "src/lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 
@@ -16,6 +16,8 @@ const countRows = async (db: any, table: string, apply?: (q: any) => any) => {
 
 export async function DELETE(request: NextRequest) {
   try {
+    requireSupabaseAdminServiceRole();
+
     const url = new URL(request.url);
     const confirm = (url.searchParams.get("confirm") ?? "").trim().toLowerCase();
     if (confirm !== "yes") {
@@ -26,24 +28,13 @@ export async function DELETE(request: NextRequest) {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = supabaseServer(getAuthHeader(request)) as any;
-
-    const { data: visiblePlaylists, error: visibleError } = await db
-      .from("collection_playlists")
-      .select("id");
-    if (visibleError) {
-      return NextResponse.json({ error: visibleError.message }, { status: 500 });
-    }
-    const playlistIds = (visiblePlaylists ?? [])
-      .map((row: { id?: unknown }) => (typeof row?.id === "number" ? row.id : null))
-      .filter((id: number | null): id is number => typeof id === "number" && id > 0);
+    const db = supabaseAdmin as any;
 
     const before = {
       playlists: await countRows(db, "collection_playlists"),
       playlist_items: await countRows(db, "collection_playlist_items"),
       bingo_sessions_with_playlist: await countRows(db, "bingo_sessions", (q) => q.not("playlist_id", "is", null)),
-      supabase_mode: "publishable",
-      visible_playlist_ids: playlistIds.slice(0, 50),
+      supabase_admin_role: supabaseAdminJwtRole,
     };
 
     // Detach any foreign-key references that might block deletion.
@@ -62,7 +53,7 @@ export async function DELETE(request: NextRequest) {
     const { data: deletedItems, error: itemsError } = await db
       .from("collection_playlist_items")
       .delete()
-      .in("playlist_id", playlistIds)
+      .not("playlist_id", "is", null)
       .select("id");
     if (itemsError) {
       return NextResponse.json({ error: itemsError.message }, { status: 500 });
@@ -71,7 +62,7 @@ export async function DELETE(request: NextRequest) {
     const { data: deletedPlaylists, error: playlistsError } = await db
       .from("collection_playlists")
       .delete()
-      .in("id", playlistIds)
+      .not("id", "is", null)
       .select("id");
     if (playlistsError) {
       return NextResponse.json({ error: playlistsError.message }, { status: 500 });
@@ -88,15 +79,15 @@ export async function DELETE(request: NextRequest) {
     };
 
     const deletedPlaylistCount = Array.isArray(deletedPlaylists) ? deletedPlaylists.length : 0;
-    if (playlistIds.length > 0 && deletedPlaylistCount === 0) {
+    if (before.playlists > 0 && deletedPlaylistCount === 0) {
       return NextResponse.json(
         {
           error: "Delete All could not delete any playlists (0 rows affected).",
-          hint: "This is almost always a missing RLS DELETE policy on collection_playlists / collection_playlist_items.",
+          hint: "Check for foreign-key blockers or unexpected database permissions.",
           before,
           after,
         },
-        { status: 403 }
+        { status: 500 }
       );
     }
 

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireSupabaseAdminServiceRole, supabaseAdmin, supabaseAdminJwtRole } from 'src/lib/supabaseAdmin';
-import { getCachedInventoryIndex, matchTracks, sanitizePlaylistName } from '../../../../lib/vinylPlaylistImport';
-import { getSpotifyAccessTokenFromCookies, spotifyApiGet, spotifyApiGetByUrl, SpotifyApiError } from '../../../../lib/spotifyUser';
+import { importRowsIntoPlaylist, type ImportSourceRow } from 'src/lib/playlistImportCore';
+import { requireSupabaseAdminServiceRole, supabaseAdminJwtRole } from 'src/lib/supabaseAdmin';
+import { sanitizePlaylistName } from 'src/lib/vinylPlaylistImport';
+import { getSpotifyAccessTokenFromCookies, spotifyApiGet, SpotifyApiError } from '../../../../lib/spotifyUser';
 
 export const runtime = 'nodejs';
 
@@ -10,28 +11,27 @@ type SpotifyTrackItem = {
     type?: string;
     name?: string;
     artists?: Array<{ name?: string }>;
-  };
+  } | null;
   track?: {
     name?: string;
     artists?: Array<{ name?: string }>;
-  };
+  } | null;
 };
 
-type SpotifyPlaylistTracksResponse = {
+type SpotifyPlaylistItemsResponse = {
   items?: SpotifyTrackItem[];
   next?: string | null;
+  total?: number;
 };
 
 type SpotifyPlaylistMeta = {
   name?: string;
+  snapshot_id?: string;
   owner?: {
     id?: string;
   };
   tracks?: {
-    items?: SpotifyTrackItem[];
     total?: number;
-    href?: string;
-    next?: string | null;
   };
 };
 
@@ -39,20 +39,107 @@ type SpotifyMe = {
   id?: string;
 };
 
-function isForbiddenSpotifyError(message: string) {
+const isForbiddenSpotifyError = (message: string) => {
   const lowered = message.toLowerCase();
   return lowered.includes('failed (403)') || lowered.includes('forbidden');
-}
+};
 
-const getIndexStats = (index: Awaited<ReturnType<typeof getCachedInventoryIndex>>) => {
-  let trackCount = 0;
-  for (const list of index.titleOnly.values()) trackCount += list.length;
-  return {
-    trackCount,
-    exactKeys: index.exact.size,
-    titleKeys: index.titleOnly.size,
-    tokenKeys: index.byToken.size,
-  };
+const extractRows = (items: SpotifyTrackItem[] = []): ImportSourceRow[] => {
+  const rows: ImportSourceRow[] = [];
+  for (const item of items) {
+    const trackNode = item.track ?? (item.item?.type === 'track' ? item.item : undefined);
+    const title = typeof trackNode?.name === 'string' ? trackNode.name.trim() : '';
+    const artistRaw = (trackNode?.artists ?? [])[0]?.name;
+    const artist = typeof artistRaw === 'string' ? artistRaw.trim() : '';
+    if (!title) continue;
+    rows.push({ title, artist: artist || undefined });
+  }
+  return rows;
+};
+
+const fetchPlaylistMeta = async (
+  accessToken: string,
+  playlistId: string,
+  debugErrors: Array<{ path: string; error: string }>
+): Promise<SpotifyPlaylistMeta> => {
+  const paths = [
+    `/playlists/${playlistId}?fields=name,snapshot_id,owner(id),tracks(total)&market=from_token`,
+    `/playlists/${playlistId}?fields=name,snapshot_id,owner(id),tracks(total)`,
+    `/playlists/${playlistId}?market=from_token`,
+    `/playlists/${playlistId}`,
+  ];
+
+  let lastError: unknown = null;
+  for (const path of paths) {
+    try {
+      return await spotifyApiGet<SpotifyPlaylistMeta>(accessToken, path, { maxAttempts: 2 });
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      debugErrors.push({ path, error: message });
+
+      const status = error instanceof SpotifyApiError ? error.status : null;
+      if (status === 400 || status === 403 || isForbiddenSpotifyError(message)) {
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Failed to load Spotify playlist metadata');
+};
+
+const fetchPlaylistItemsPage = async (
+  accessToken: string,
+  playlistId: string,
+  offset: number,
+  debugErrors: Array<{ path: string; error: string }>
+): Promise<{ rows: ImportSourceRow[]; itemCount: number; next: string | null; total: number | null }> => {
+  const paths = [
+    `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&market=from_token&fields=items(track(name,artists(name)),item(type,name,artists(name))),next,total`,
+    `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&fields=items(track(name,artists(name)),item(type,name,artists(name))),next,total`,
+    `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&market=from_token`,
+    `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track`,
+  ];
+
+  let lastError: unknown = null;
+
+  for (const path of paths) {
+    try {
+      const page = await spotifyApiGet<SpotifyPlaylistItemsResponse>(accessToken, path, { maxAttempts: 2 });
+      const items = page.items ?? [];
+      const rows = extractRows(items);
+
+      if (items.length > 0 && rows.length === 0) {
+        debugErrors.push({
+          path,
+          error: 'Page had items but no parseable tracks; trying fallback shape',
+        });
+        continue;
+      }
+
+      return {
+        rows,
+        itemCount: items.length,
+        next: page.next ?? null,
+        total: typeof page.total === 'number' ? page.total : null,
+      };
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      debugErrors.push({ path, error: message });
+
+      const status = error instanceof SpotifyApiError ? error.status : null;
+      if (status === 400 || status === 403 || isForbiddenSpotifyError(message)) {
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Failed to load Spotify playlist tracks page');
 };
 
 export async function POST(req: Request) {
@@ -60,28 +147,27 @@ export async function POST(req: Request) {
   let spotifyScope = '';
   let spotifyUserId = '';
   let playlistOwnerId = '';
-  let resumeOffset = 0;
   let spotifyPlaylistId = '';
   let spotifySnapshotId = '';
+  let resumeOffset = 0;
   let localPlaylistId: number | null = null;
-  const trackFetchErrors: Array<{ path: string; error: string }> = [];
   const metaFetchErrors: Array<{ path: string; error: string }> = [];
-  let metaItemsRawCount = 0;
-  let metaItemsParsedCount = 0;
-  let attemptedTrackPageCalls = 0;
-  let inventoryIndexStats: ReturnType<typeof getIndexStats> | null = null;
+  const trackFetchErrors: Array<{ path: string; error: string }> = [];
+
   try {
     step = 'parse-body';
     const body = await req.json();
     const playlistId = String(body?.playlistId ?? '').trim();
-    const playlistName = sanitizePlaylistName(String(body?.playlistName ?? ''));
+    const requestedName = String(body?.playlistName ?? '').trim();
     const existingPlaylistId = Number(body?.existingPlaylistId ?? 0);
     const startOffset = Number(body?.offset ?? 0);
-    const maxPages = Math.min(5, Math.max(1, Number(body?.maxPages ?? 2)));
+    const maxPages = Math.min(8, Math.max(1, Number(body?.maxPages ?? 3)));
     const providedSnapshotId = String(body?.snapshotId ?? '').trim();
+
     if (!playlistId) {
       return NextResponse.json({ error: 'playlistId is required' }, { status: 400 });
     }
+
     spotifyPlaylistId = playlistId;
     resumeOffset = Number.isFinite(startOffset) && startOffset >= 0 ? startOffset : 0;
 
@@ -100,151 +186,55 @@ export async function POST(req: Request) {
     spotifyUserId = me.id ?? '';
 
     step = 'spotify-playlist-meta';
-    const rows: Array<{ title?: string; artist?: string }> = [];
-    let sourceTotal: number | null = null;
-    let partialImport = false;
-    let importSource: 'playlist_items' | 'playlist_fallback' = 'playlist_items';
-    let pagesFetched = 0;
-
-    const extractRows = (items: SpotifyTrackItem[] = []) => {
-      const parsed: Array<{ title?: string; artist?: string }> = [];
-      for (const item of items) {
-        const trackNode = item.track ?? (item.item?.type === 'track' ? item.item : undefined);
-        const title = trackNode?.name;
-        const artist = (trackNode?.artists ?? [])[0]?.name;
-        if (title) parsed.push({ title, artist });
-      }
-      return parsed;
-    };
-
-    let playlist: SpotifyPlaylistMeta | null = null;
-    const playlistMetaPaths = [
-      `/playlists/${playlistId}?fields=name,owner(id),tracks(total,next,items(item(type,name,artists(name)),track(name,artists(name))))&market=from_token`,
-      `/playlists/${playlistId}?fields=name,owner(id),snapshot_id,tracks(total,href)&market=from_token`,
-      `/playlists/${playlistId}?fields=name,owner(id),tracks(total,next,items(item(type,name,artists(name)),track(name,artists(name))))`,
-      `/playlists/${playlistId}?fields=name,owner(id),snapshot_id,tracks(total,href)`,
-      `/playlists/${playlistId}?market=from_token`,
-      `/playlists/${playlistId}`,
-    ];
-    let lastPlaylistMetaError: unknown = null;
-    for (const path of playlistMetaPaths) {
-      try {
-        playlist = await spotifyApiGet<SpotifyPlaylistMeta>(tokenData.accessToken, path);
-        break;
-      } catch (err) {
-        lastPlaylistMetaError = err;
-        const message = err instanceof Error ? err.message : String(err);
-        metaFetchErrors.push({ path, error: message });
-        if (!isForbiddenSpotifyError(message)) throw err;
-      }
-    }
-    if (!playlist) {
-      throw lastPlaylistMetaError instanceof Error ? lastPlaylistMetaError : new Error('Failed to fetch Spotify playlist metadata');
-    }
-
+    const playlist = await fetchPlaylistMeta(tokenData.accessToken, playlistId, metaFetchErrors);
     playlistOwnerId = playlist.owner?.id ?? '';
-    spotifySnapshotId = (playlist as unknown as { snapshot_id?: string }).snapshot_id ?? '';
-    sourceTotal =
-      typeof playlist.tracks?.total === 'number'
+    spotifySnapshotId = typeof playlist.snapshot_id === 'string' ? playlist.snapshot_id : '';
+
+    let sourceTotal =
+      playlist.tracks && typeof playlist.tracks.total === 'number'
         ? playlist.tracks.total
         : null;
-    const metaItems = playlist.tracks?.items ?? [];
-    const metaParsedRows = extractRows(metaItems);
-    metaItemsRawCount = metaItems.length;
-    metaItemsParsedCount = metaParsedRows.length;
-    rows.push(...metaParsedRows);
+
+    const inferredName =
+      requestedName && requestedName !== '(resume)'
+        ? requestedName
+        : String(playlist.name ?? 'Spotify Import');
+    const playlistName = sanitizePlaylistName(inferredName);
 
     step = 'spotify-tracks';
+    const rows: ImportSourceRow[] = [];
     let offset = resumeOffset;
-    let shouldProbeFirstPage = rows.length === 0;
-    const totalToFetch = sourceTotal ?? Number.MAX_SAFE_INTEGER;
-    while ((shouldProbeFirstPage || offset < totalToFetch) && pagesFetched < maxPages) {
-      shouldProbeFirstPage = false;
-      const trackPagePaths = [
-        `/playlists/${playlistId}/items?limit=50&offset=${offset}&market=from_token&additional_types=track&fields=items(item(type,name,artists(name)),track(name,artists(name))),next`,
-        `/playlists/${playlistId}/items?limit=50&offset=${offset}&market=from_token&fields=items(item(type,name,artists(name)),track(name,artists(name))),next`,
-        `/playlists/${playlistId}/items?limit=50&offset=${offset}&fields=items(item(type,name,artists(name)),track(name,artists(name))),next`,
-        `/playlists/${playlistId}/items?limit=50&offset=${offset}&market=from_token`,
-        `/playlists/${playlistId}/items?limit=50&offset=${offset}`,
-      ];
-      let pageLoaded = false;
-      let forbiddenOnAllVariants = true;
-      let lastTrackPageError: unknown = null;
+    let pagesFetched = 0;
+    let lastPageNext: string | null = null;
 
-      for (const path of trackPagePaths) {
-        try {
-          attemptedTrackPageCalls += 1;
-          const nextPage = await spotifyApiGet<SpotifyPlaylistTracksResponse>(tokenData.accessToken, path);
-          const pageItems = nextPage.items ?? [];
-          const parsedRows = extractRows(pageItems);
-
-          // Some field selections can return non-empty items with no usable track payload.
-          // In that case, try the next fallback shape for the same offset.
-          if (pageItems.length > 0 && parsedRows.length === 0) {
-            trackFetchErrors.push({
-              path,
-              error: 'Response contained items but no parseable track objects; trying fallback shape',
-            });
-            continue;
-          }
-
-          rows.push(...parsedRows);
-          pagesFetched += 1;
-          if (pageItems.length === 0 || parsedRows.length === 0) {
-            offset = totalToFetch;
-          } else {
-            offset += pageItems.length;
-          }
-          pageLoaded = true;
-          break;
-        } catch (tracksError) {
-          lastTrackPageError = tracksError;
-          const message = tracksError instanceof Error ? tracksError.message : String(tracksError);
-          trackFetchErrors.push({ path, error: message });
-          if (!isForbiddenSpotifyError(message)) {
-            throw tracksError;
-          }
-          forbiddenOnAllVariants = true;
-        }
+    while (pagesFetched < maxPages) {
+      const page = await fetchPlaylistItemsPage(tokenData.accessToken, playlistId, offset, trackFetchErrors);
+      rows.push(...page.rows);
+      pagesFetched += 1;
+      lastPageNext = page.next;
+      if (sourceTotal === null && page.total !== null) {
+        sourceTotal = page.total;
       }
 
-      if (pageLoaded) continue;
-      if (forbiddenOnAllVariants) {
-        // Keep the rows gathered so far instead of hard-failing the import.
-        partialImport = true;
-        importSource = 'playlist_fallback';
+      if (page.itemCount <= 0) {
         break;
       }
-      throw lastTrackPageError instanceof Error ? lastTrackPageError : new Error('Failed to fetch Spotify playlist tracks');
-    }
 
-    if (rows.length === 0 && playlist.tracks?.href) {
-      const hrefPaths = [
-        `${playlist.tracks.href}?limit=50&offset=0`,
-        playlist.tracks.href,
-      ];
-      for (const href of hrefPaths) {
-        try {
-          const page = await spotifyApiGetByUrl<SpotifyPlaylistTracksResponse>(tokenData.accessToken, href);
-          const parsedRows = extractRows(page.items ?? []);
-          rows.push(...parsedRows);
-          if (rows.length > 0) {
-            partialImport = true;
-            importSource = 'playlist_fallback';
-            break;
-          }
-        } catch (hrefError) {
-          const message = hrefError instanceof Error ? hrefError.message : String(hrefError);
-          trackFetchErrors.push({ path: href, error: message });
-        }
+      offset += page.itemCount;
+
+      if (sourceTotal !== null && offset >= sourceTotal) {
+        break;
+      }
+
+      if (!page.next) {
+        break;
       }
     }
 
-    if (rows.length === 0 && (sourceTotal === null || sourceTotal > 0)) {
+    if (rows.length === 0 && (sourceTotal === null || sourceTotal > resumeOffset)) {
       return NextResponse.json(
         {
-          error:
-            'Spotify returned no accessible track items for this playlist. This playlist cannot be imported through the current API permissions.',
+          error: 'Spotify returned no track rows that can be imported from this playlist.',
           scope: spotifyScope,
           spotifyUserId,
           playlistOwnerId,
@@ -258,9 +248,7 @@ export async function POST(req: Request) {
             maxPages,
           },
           debug: {
-            metaItemsRawCount,
-            metaItemsParsedCount,
-            attemptedTrackPageCalls,
+            supabase_admin_role: supabaseAdminJwtRole,
             metaFetchErrors: metaFetchErrors.slice(-10),
             trackFetchErrors: trackFetchErrors.slice(-20),
           },
@@ -269,94 +257,33 @@ export async function POST(req: Request) {
       );
     }
 
-    step = 'inventory-index';
-    const index = await getCachedInventoryIndex();
-    inventoryIndexStats = getIndexStats(index);
-    if (inventoryIndexStats.trackCount < 25) {
-      throw new Error(
-        `Inventory index unexpectedly small (${inventoryIndexStats.trackCount} tracks). Check service-role database access. (role=${supabaseAdminJwtRole})`
-      );
-    }
-    const { matched, missing, fuzzyMatchedCount } = matchTracks(rows, index);
+    const moreAvailable = sourceTotal !== null ? offset < sourceTotal : !!lastPageNext;
 
-    step = 'create-playlist';
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = supabaseAdmin as any;
-    if (Number.isFinite(existingPlaylistId) && existingPlaylistId > 0) {
-      localPlaylistId = existingPlaylistId;
-    } else {
-      const { data: maxSortRow } = await db
-        .from('collection_playlists')
-        .select('sort_order')
-        .order('sort_order', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      const maxSortOrder =
-        maxSortRow && typeof maxSortRow.sort_order === 'number' ? maxSortRow.sort_order : -1;
-      const nextSortOrder = maxSortOrder + 1;
-
-      const { data: inserted, error: insertError } = await db
-        .from('collection_playlists')
-        .insert({
-          name: playlistName,
-          icon: '🎵',
-          color: '#1db954',
-          sort_order: nextSortOrder,
-          is_smart: false,
-          smart_rules: null,
-          match_rules: 'all',
-          live_update: true,
-        })
-        .select('id')
-        .single();
-
-      if (insertError || !inserted) {
-        throw insertError || new Error('Failed to create local playlist');
-      }
-      localPlaylistId = inserted.id;
-    }
-
-    step = 'insert-playlist-items';
-    const trackKeys = matched
-      .filter((row) => row.inventory_id && row.position)
-      .map((row) => `${row.inventory_id}:${row.position}`);
-    const dedupedTrackKeys = Array.from(new Set(trackKeys));
-
-    if (dedupedTrackKeys.length > 0) {
-      const records = dedupedTrackKeys.map((trackKey, idx) => ({
-        playlist_id: localPlaylistId,
-        track_key: trackKey,
-        sort_order: idx,
-      }));
-      const { error: itemsError } = await db
-        .from('collection_playlist_items')
-        .insert(records);
-      if (itemsError) throw itemsError;
-    }
+    step = 'import';
+    const imported = await importRowsIntoPlaylist({
+      rows,
+      playlistName,
+      existingPlaylistId,
+      icon: '🎵',
+      color: '#1db954',
+    });
+    localPlaylistId = imported.playlistId;
 
     step = 'build-response';
-    const moreAvailable = sourceTotal !== null ? offset < sourceTotal : pagesFetched >= maxPages;
     const response = NextResponse.json({
       ok: true,
-      playlistId: localPlaylistId,
-      playlistName,
-      sourceCount: rows.length,
+      ...imported,
       sourceTotal,
-      importSource,
-      partialImport,
-      matchedCount: dedupedTrackKeys.length,
-      fuzzyMatchedCount,
-      unmatchedCount: missing.length,
-      unmatchedSample: missing.slice(0, 25),
-      debug: {
-        supabase_admin_role: supabaseAdminJwtRole,
-        inventoryIndex: inventoryIndexStats,
-      },
+      importSource: 'playlist_items',
+      partialImport: moreAvailable,
       resume: {
         spotifyPlaylistId,
         snapshotId: spotifySnapshotId || providedSnapshotId || null,
         nextOffset: moreAvailable ? offset : null,
         maxPages,
+      },
+      debug: {
+        supabase_admin_role: supabaseAdminJwtRole,
       },
     });
 
@@ -396,6 +323,7 @@ export async function POST(req: Request) {
     return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Spotify import failed';
+
     if (error instanceof SpotifyApiError && error.status === 429) {
       return NextResponse.json(
         {
@@ -406,26 +334,27 @@ export async function POST(req: Request) {
           spotifyUserId,
           playlistOwnerId,
           step,
-          debug: {
-            supabase_admin_role: supabaseAdminJwtRole,
-            inventoryIndex: inventoryIndexStats,
-          },
           resume: {
             spotifyPlaylistId,
             snapshotId: spotifySnapshotId || null,
             nextOffset: resumeOffset,
             existingPlaylistId: localPlaylistId,
           },
+          debug: {
+            supabase_admin_role: supabaseAdminJwtRole,
+            metaFetchErrors: metaFetchErrors.slice(-10),
+            trackFetchErrors: trackFetchErrors.slice(-20),
+          },
         },
         { status: 429 }
       );
     }
+
     const lowered = message.toLowerCase();
-    if (lowered.includes('failed (403)') || lowered.includes('insufficient') || lowered.includes('forbidden')) {
+    if (isForbiddenSpotifyError(lowered) || lowered.includes('insufficient')) {
       return NextResponse.json(
         {
-          error:
-            'Spotify denied access to playlist tracks (403). Reconnect Spotify to refresh permissions, then retry.',
+          error: 'Spotify denied access to this playlist. Reconnect Spotify and retry.',
           details: message,
           scope: spotifyScope,
           spotifyUserId,
@@ -433,10 +362,6 @@ export async function POST(req: Request) {
           step,
           debug: {
             supabase_admin_role: supabaseAdminJwtRole,
-            inventoryIndex: inventoryIndexStats,
-            metaItemsRawCount,
-            metaItemsParsedCount,
-            attemptedTrackPageCalls,
             metaFetchErrors: metaFetchErrors.slice(-10),
             trackFetchErrors: trackFetchErrors.slice(-20),
           },
@@ -444,13 +369,15 @@ export async function POST(req: Request) {
         { status: 403 }
       );
     }
+
     return NextResponse.json(
       {
         error: message,
         step,
         debug: {
           supabase_admin_role: supabaseAdminJwtRole,
-          inventoryIndex: inventoryIndexStats,
+          metaFetchErrors: metaFetchErrors.slice(-10),
+          trackFetchErrors: trackFetchErrors.slice(-20),
         },
       },
       { status: 500 }

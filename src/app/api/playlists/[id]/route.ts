@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
+import { requireSupabaseAdminServiceRole, supabaseAdmin, supabaseAdminJwtRole } from "src/lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 
@@ -16,7 +16,8 @@ const countRows = async (db: any, table: string, apply?: (q: any) => any) => {
 
 export async function DELETE(_req: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const req = _req as Request;
+    requireSupabaseAdminServiceRole();
+
     const { id } = await context.params;
     const playlistId = Number(id);
     if (!Number.isFinite(playlistId) || playlistId <= 0) {
@@ -24,22 +25,13 @@ export async function DELETE(_req: Request, context: { params: Promise<{ id: str
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = supabaseServer(getAuthHeader(req)) as any;
-
-    const { data: visible, error: visibleError } = await db
-      .from("collection_playlists")
-      .select("id")
-      .eq("id", playlistId)
-      .maybeSingle();
-    if (visibleError) {
-      return NextResponse.json({ error: visibleError.message }, { status: 500 });
-    }
+    const db = supabaseAdmin as any;
 
     const before = {
-      playlist_exists: !!visible,
+      playlist_exists: (await countRows(db, "collection_playlists", (q) => q.eq("id", playlistId))) > 0,
       playlist_items: await countRows(db, "collection_playlist_items", (q) => q.eq("playlist_id", playlistId)),
       bingo_sessions_with_playlist: await countRows(db, "bingo_sessions", (q) => q.eq("playlist_id", playlistId)),
-      supabase_mode: "publishable",
+      supabase_admin_role: supabaseAdminJwtRole,
     };
 
     // Detach any foreign-key references that might block deletion.
@@ -87,11 +79,11 @@ export async function DELETE(_req: Request, context: { params: Promise<{ id: str
       return NextResponse.json(
         {
           error: "Delete could not delete this playlist (0 rows affected).",
-          hint: "This is almost always a missing RLS DELETE policy on collection_playlists / collection_playlist_items.",
+          hint: "Check for foreign-key blockers or unexpected database permissions.",
           before,
           after,
         },
-        { status: 403 }
+        { status: 500 }
       );
     }
 
