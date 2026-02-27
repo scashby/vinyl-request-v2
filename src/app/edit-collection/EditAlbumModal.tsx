@@ -287,8 +287,10 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
   const [editedAlbum, setEditedAlbum] = useState<Album | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const mainTabRef = useRef<MainTabRef>(null);
   const tracksTabRef = useRef<TracksTabRef>(null);
+  const saveInFlightRef = useRef(false);
 
   // Location picker state (shared across all tabs)
   const [showLocationPicker, setShowLocationPicker] = useState(false);
@@ -334,11 +336,12 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
 
   // Navigation handlers
   const handlePrevious = async () => {
-    if (!hasPrevious) return;
+    if (!hasPrevious || isSaving) return;
     
     // Save current changes first (without closing)
     if (editedAlbum) {
-      await performSave();
+      const saved = await performSave();
+      if (!saved) return;
     }
     
     // Navigate to previous album
@@ -347,11 +350,12 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
   };
 
   const handleNext = async () => {
-    if (!hasNext) return;
+    if (!hasNext || isSaving) return;
     
     // Save current changes first (without closing)
     if (editedAlbum) {
-      await performSave();
+      const saved = await performSave();
+      if (!saved) return;
     }
     
     // Navigate to next album
@@ -645,8 +649,14 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
   };
 
   // Core save logic - can be called with or without closing modal
-  const performSave = async () => {
-    if (!editedAlbum) return;
+  const performSave = async (): Promise<boolean> => {
+    if (!editedAlbum) return false;
+    if (saveInFlightRef.current) {
+      console.log('⏳ Save already in progress, skipping duplicate request');
+      return false;
+    }
+    saveInFlightRef.current = true;
+    setIsSaving(true);
     
     try {
       console.log('💾 Starting save operation...');
@@ -685,7 +695,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         if (inventoryError) {
           console.error('❌ Failed to update inventory:', inventoryError);
           alert(`Failed to save album: ${inventoryError.message}`);
-          return;
+          return false;
         }
 
         const tracksData = tracksTabRef.current?.getTracksData();
@@ -743,7 +753,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           } catch (tracksError) {
             console.error('❌ Failed to save tracks via library endpoint:', tracksError);
             alert(`Failed to save tracks: ${tracksError instanceof Error ? tracksError.message : 'Unknown error'}`);
-            return;
+            return false;
           }
         }
 
@@ -804,7 +814,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           if (releaseError) {
             console.error('❌ Failed to update release:', releaseError);
             alert(`Failed to save album: ${releaseError.message}`);
-            return;
+            return false;
           }
         }
 
@@ -821,7 +831,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             if (artistLookupError) {
               console.error('❌ Failed to lookup artist:', artistLookupError);
               alert(`Failed to save artist: ${artistLookupError.message}`);
-              return;
+              return false;
             }
 
             if (existingArtist?.id) {
@@ -836,7 +846,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               if (artistCreateError) {
                 console.error('❌ Failed to create artist:', artistCreateError);
                 alert(`Failed to save artist: ${artistCreateError.message}`);
-                return;
+                return false;
               }
               mainArtistId = createdArtist?.id ?? null;
             }
@@ -921,7 +931,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           if (existingLinksError) {
             console.error('❌ Failed to load existing tags:', existingLinksError);
             alert(`Failed to save tags: ${existingLinksError.message}`);
-            return;
+            return false;
           }
 
           const existingByName = new Map(
@@ -952,7 +962,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             if (existingTagError) {
               console.error('❌ Failed to lookup tag:', existingTagError);
               alert(`Failed to save tag: ${existingTagError.message}`);
-              return;
+              return false;
             }
 
             let tagId = existingTag?.id;
@@ -966,7 +976,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               if (createError) {
                 console.error('❌ Failed to create tag:', createError);
                 alert(`Failed to save tag: ${createError.message}`);
-                return;
+                return false;
               }
 
               tagId = createdTag?.id;
@@ -980,7 +990,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               if (linkError) {
                 console.error('❌ Failed to link tag:', linkError);
                 alert(`Failed to save tag: ${linkError.message}`);
-                return;
+                return false;
               }
             }
           }
@@ -995,7 +1005,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             if (deleteError) {
               console.error('❌ Failed to remove tags:', deleteError);
               alert(`Failed to remove tags: ${deleteError.message}`);
-              return;
+              return false;
             }
           }
         }
@@ -1007,10 +1017,14 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
 
       console.log('✅ Save complete!');
       onRefresh();
+      return true;
     } catch (err) {
       console.error('❌ Save failed:', err);
       alert(`Failed to save: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      throw err; // Re-throw so navigation handlers know save failed
+      return false;
+    } finally {
+      saveInFlightRef.current = false;
+      setIsSaving(false);
     }
   };
 
@@ -1099,6 +1113,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             hasNext={hasNext}
             onCancel={onClose}
             onSave={handleSave}
+            isSaving={isSaving}
             onOpenLocationPicker={() => {
               setShowLocationPicker(true);
             }}

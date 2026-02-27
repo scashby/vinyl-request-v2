@@ -215,7 +215,32 @@ export async function POST(request: NextRequest, context: { params: Promise<{ re
             side: sideValue,
             title_override: null,
           });
-        if (insertRtError) throw new Error(insertRtError.message);
+        if (insertRtError) {
+          const message = String(insertRtError.message ?? "");
+          const isPositionConflict = message.includes("release_tracks_release_id_position_key");
+          if (!isPositionConflict) throw new Error(message || "Failed creating release track");
+
+          // Concurrent save can race on (release_id, position). Reuse winner row and drop this duplicate recording.
+          const { data: winnerRow, error: winnerError } = await db
+            .from("release_tracks")
+            .select("id, recording_id")
+            .eq("release_id", releaseIdNum)
+            .eq("position", t.canonicalPosition)
+            .maybeSingle();
+          if (winnerError || !winnerRow?.id) {
+            throw new Error(message || winnerError?.message || "Failed creating release track");
+          }
+
+          const { error: winnerUpdateError } = await db
+            .from("release_tracks")
+            .update({ side: sideValue })
+            .eq("id", winnerRow.id);
+          if (winnerUpdateError) throw new Error(winnerUpdateError.message);
+
+          await db.from("recordings").delete().eq("id", insertedRec.id);
+          updatedReleaseTrackCount += 1;
+          continue;
+        }
         insertedReleaseTrackCount += 1;
       }
     }

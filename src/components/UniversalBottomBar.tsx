@@ -12,6 +12,7 @@ interface UniversalBottomBarProps {
   hasNext?: boolean;
   onCancel: () => void;
   onSave: () => void;
+  isSaving?: boolean;
   onOpenLocationPicker?: () => void;
 }
 
@@ -24,6 +25,7 @@ export function UniversalBottomBar({
   hasNext = true,
   onCancel, 
   onSave,
+  isSaving = false,
   onOpenLocationPicker,
 }: UniversalBottomBarProps) {
   return (
@@ -110,9 +112,9 @@ export function UniversalBottomBar({
         <div className="flex gap-2">
           <button
             onClick={onPrevious}
-            disabled={!hasPrevious}
+            disabled={!hasPrevious || isSaving}
             className={`px-4 py-2 border-none rounded text-[13px] font-medium transition-colors ${
-              hasPrevious 
+              hasPrevious && !isSaving
                 ? 'bg-gray-500 text-white hover:bg-gray-600 cursor-pointer' 
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'
             }`}
@@ -121,9 +123,9 @@ export function UniversalBottomBar({
           </button>
           <button
             onClick={onNext}
-            disabled={!hasNext}
+            disabled={!hasNext || isSaving}
             className={`px-4 py-2 border-none rounded text-[13px] font-medium transition-colors ${
-              hasNext 
+              hasNext && !isSaving
                 ? 'bg-gray-500 text-white hover:bg-gray-600 cursor-pointer' 
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'
             }`}
@@ -136,15 +138,25 @@ export function UniversalBottomBar({
         <div className="flex gap-2">
           <button
             onClick={onCancel}
-            className="px-5 py-2 bg-gray-300 text-gray-800 border-none rounded text-[13px] font-medium cursor-pointer hover:bg-gray-400"
+            disabled={isSaving}
+            className={`px-5 py-2 border-none rounded text-[13px] font-medium ${
+              isSaving
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'
+                : 'bg-gray-300 text-gray-800 cursor-pointer hover:bg-gray-400'
+            }`}
           >
             Cancel
           </button>
           <button
             onClick={onSave}
-            className="px-5 py-2 bg-blue-500 text-white border-none rounded text-[13px] font-bold cursor-pointer hover:bg-blue-600"
+            disabled={isSaving}
+            className={`px-5 py-2 border-none rounded text-[13px] font-bold ${
+              isSaving
+                ? 'bg-blue-300 text-white cursor-not-allowed'
+                : 'bg-blue-500 text-white cursor-pointer hover:bg-blue-600'
+            }`}
           >
-            Save
+            {isSaving ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>
