@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthHeader } from 'src/lib/supabaseServer';
-import { importRowsToPlaylist, type SourceRow } from 'src/lib/playlistImportEngine';
+import { importRowsToPlaylist, type MatchingMode, type SourceRow } from 'src/lib/playlistImportEngine';
 import { getSpotifyAccessTokenFromCookies, spotifyApiGet, SpotifyApiError } from '../../../../lib/spotifyUser';
 
 export const runtime = 'nodejs';
@@ -128,7 +128,7 @@ const fetchPlaylistItemsPage = async (
   debugErrors: Array<{ path: string; error: string }>
 ): Promise<{ rows: SourceRow[]; itemCount: number; next: string | null; total: number | null }> => {
   const paths = [
-    `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&market=from_token&fields=items(item(type,id,uri,name,artists(name))),next,total`,
+    `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&market=from_token&fields=items(track(id,uri,name,artists(name)),item(type,id,uri,name,artists(name))),next,total`,
     `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&fields=items(track(id,uri,name,artists(name)),item(type,id,uri,name,artists(name))),next,total`,
     `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&market=from_token`,
     `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track`,
@@ -187,6 +187,11 @@ export async function POST(req: Request) {
     const startOffset = Number(body?.offset ?? 0);
     const maxPages = Math.min(8, Math.max(1, Number(body?.maxPages ?? 3)));
     const providedSnapshotId = String(body?.snapshotId ?? '').trim();
+    const matchingModeRaw = String(body?.matchingMode ?? 'balanced').trim().toLowerCase();
+    const matchingMode: MatchingMode =
+      matchingModeRaw === 'strict' || matchingModeRaw === 'aggressive' || matchingModeRaw === 'balanced'
+        ? (matchingModeRaw as MatchingMode)
+        : 'balanced';
 
     if (!playlistId) {
       return NextResponse.json({ error: 'playlistId is required' }, { status: 400 });
@@ -281,6 +286,7 @@ export async function POST(req: Request) {
       existingPlaylistId,
       icon: '🎵',
       color: '#1db954',
+      matchingMode,
     });
     localPlaylistId = imported.playlistId;
 

@@ -9,6 +9,8 @@ export type SourceRow = {
   spotifyTrackId?: string;
 };
 
+export type MatchingMode = "strict" | "balanced" | "aggressive";
+
 export type MatchCandidate = {
   track_key: string;
   inventory_id: number | null;
@@ -28,6 +30,7 @@ export type MissingRow = {
 export type ImportResult = {
   playlistId: number;
   playlistName: string;
+  matchingMode: MatchingMode;
   sourceCount: number;
   matchedCount: number;
   fuzzyMatchedCount: number;
@@ -43,6 +46,7 @@ type ImportOptions = {
   existingPlaylistId?: number;
   icon: string;
   color: string;
+  matchingMode?: MatchingMode;
 };
 
 type InventoryTrack = {
@@ -63,6 +67,7 @@ type InventoryIndex = {
   byIsrc: Map<string, InventoryTrack[]>;
   byExact: Map<string, InventoryTrack[]>;
   byTitle: Map<string, InventoryTrack[]>;
+  byArtist: Map<string, InventoryTrack[]>;
   byToken: Map<string, InventoryTrack[]>;
 };
 
@@ -168,6 +173,14 @@ const trackIdFromSpotifyUri = (value: unknown) => {
   return "";
 };
 
+const normalizeMatchingMode = (value: unknown): MatchingMode => {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (raw === "strict" || raw === "aggressive" || raw === "balanced") {
+    return raw;
+  }
+  return "balanced";
+};
+
 const normalizeSpaces = (value: string) =>
   value
     .replace(/&/g, " and ")
@@ -176,17 +189,17 @@ const normalizeSpaces = (value: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-const canonicalTitle = (value: string) => {
-  const lowered = normalizeSpaces(String(value ?? "").toLowerCase())
+const normalizedValue = (value: string) =>
+  normalizeSpaces(String(value ?? "").toLowerCase())
     .replace(/["'`]/g, "")
-    .replace(/\((feat|featuring|ft)\.?[^)]*\)/g, "")
-    .replace(/\[(feat|featuring|ft)\.?[^\]]*\]/g, "")
-    .replace(/\(([^)]*version|[^)]*mix|[^)]*edit|[^)]*remaster[^)]*)\)/g, "")
-    .replace(/\[([^\]]*version|[^\]]*mix|[^\]]*edit|[^\]]*remaster[^\]]*)\]/g, "")
-    .replace(/\b(feat|featuring|ft)\.?\b.*$/, "")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\[[^\]]*\]/g, " ")
     .replace(/[^a-z0-9\s]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+const canonicalTitle = (value: string) => {
+  const lowered = normalizedValue(value);
 
   const tokens = lowered
     .split(/\s+/)
@@ -202,20 +215,13 @@ const canonicalTitle = (value: string) => {
 };
 
 const canonicalArtist = (value: string) => {
-  const lowered = normalizeSpaces(String(value ?? "").toLowerCase())
-    .replace(/["'`]/g, "")
-    .replace(/\((feat|featuring|ft)\.?[^)]*\)/g, "")
-    .replace(/\[(feat|featuring|ft)\.?[^\]]*\]/g, "")
-    .replace(/\b(feat|featuring|ft)\.?\b.*$/, "")
-    .replace(/[^a-z0-9\s]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const lowered = normalizedValue(value);
 
   const tokens = lowered
     .split(/\s+/)
     .map((token) => token.trim())
     .filter(Boolean)
-    .filter((token) => token !== "the");
+    .filter((token) => token !== "the" && token !== "and");
 
   return tokens.join(" ").trim();
 };
@@ -279,12 +285,11 @@ const scoreCandidate = (rowTitle: string, rowArtist: string, track: InventoryTra
   const titleScore = similarity(rowTitle, track.canonTitle);
   const artistScore = rowArtist ? similarity(rowArtist, track.canonArtist) : 0;
 
-  const titleExact = rowTitle.length > 0 && rowTitle === track.canonTitle;
-  const artistExact = rowArtist.length > 0 && rowArtist === track.canonArtist;
-
-  let score = rowArtist ? titleScore * 0.72 + artistScore * 0.28 : titleScore;
-  if (titleExact) score += 0.12;
-  if (artistExact) score += 0.08;
+  const titleExact = rowTitle.length > 0 && rowTitle === track.canonTitle ? 0.15 : 0;
+  const artistExact = rowArtist.length > 0 && rowArtist === track.canonArtist ? 0.1 : 0;
+  const artistWeight = rowArtist ? 0.4 : 0;
+  const titleWeight = 1 - artistWeight;
+  let score = titleScore * titleWeight + artistScore * artistWeight + titleExact + artistExact;
 
   const titleTokenDelta = Math.abs(tokenSet(rowTitle).size - track.titleTokens.size);
   if (titleTokenDelta >= 5) score -= 0.06;
@@ -557,12 +562,14 @@ const buildIndex = (tracks: InventoryTrack[]): InventoryIndex => {
   const byIsrc = new Map<string, InventoryTrack[]>();
   const byExact = new Map<string, InventoryTrack[]>();
   const byTitle = new Map<string, InventoryTrack[]>();
+  const byArtist = new Map<string, InventoryTrack[]>();
   const byToken = new Map<string, InventoryTrack[]>();
 
   for (const track of tracks) {
     const exactKey = `${track.canonTitle}::${track.canonArtist}`;
     addMapList(byExact, exactKey, track);
     addMapList(byTitle, track.canonTitle, track);
+    addMapList(byArtist, track.canonArtist, track);
 
     for (const token of new Set([...track.titleTokens, ...track.artistTokens])) {
       addMapList(byToken, token, track);
@@ -573,15 +580,22 @@ const buildIndex = (tracks: InventoryTrack[]): InventoryIndex => {
     }
   }
 
-  return { byIsrc, byExact, byTitle, byToken };
+  return { byIsrc, byExact, byTitle, byArtist, byToken };
 };
 
 const collectCandidates = (rowTitle: string, rowArtist: string, index: InventoryIndex): InventoryTrack[] => {
   const pool = new Map<string, InventoryTrack>();
 
+  const artistMatches = rowArtist ? index.byArtist.get(rowArtist) ?? [] : [];
+  for (const track of artistMatches) {
+    pool.set(track.trackKey, track);
+    if (pool.size >= 900) break;
+  }
+
   const titleMatches = index.byTitle.get(rowTitle) ?? [];
   for (const track of titleMatches) {
     pool.set(track.trackKey, track);
+    if (pool.size >= 900) break;
   }
 
   const rowTokens = new Set([...tokenSet(rowTitle), ...tokenSet(rowArtist)]);
@@ -608,34 +622,67 @@ const collectCandidates = (rowTitle: string, rowArtist: string, index: Inventory
   return Array.from(pool.values());
 };
 
-const chooseFromTitleMatches = (rowTitle: string, rowArtist: string, titleMatches: InventoryTrack[]) => {
+const chooseFromTitleMatches = (
+  rowTitle: string,
+  rowArtist: string,
+  titleMatches: InventoryTrack[],
+  mode: MatchingMode
+) => {
   if (titleMatches.length === 0) return null;
   if (titleMatches.length === 1) return titleMatches[0];
 
-  const scored = titleMatches
-    .map((track) => scoreCandidate(rowTitle, rowArtist, track))
-    .sort((a, b) => b.artistScore - a.artistScore || b.score - a.score);
+  const scored = titleMatches.map((track) => scoreCandidate(rowTitle, rowArtist, track)).sort((a, b) => b.score - a.score);
 
   const best = scored[0];
   const second = scored[1];
-  const margin = second ? best.artistScore - second.artistScore : best.artistScore;
+  const margin = second ? best.score - second.score : best.score;
 
-  if (best.artistScore >= 0.72 && margin >= 0.08) {
+  if (mode === "strict" && (best.score >= 0.95 || (best.score >= 0.9 && margin >= 0.08))) {
+    return best.track;
+  }
+
+  if (mode === "balanced" && (best.score >= 0.92 || (best.score >= 0.86 && margin >= 0.06))) {
+    return best.track;
+  }
+
+  if (
+    mode === "aggressive" &&
+    (best.score >= 0.84 ||
+      (best.score >= 0.74 && margin >= 0.04) ||
+      (best.artistScore >= 0.93 && best.titleScore >= 0.36 && margin >= 0.02))
+  ) {
     return best.track;
   }
 
   return null;
 };
 
-const shouldAutoMatch = (best: ScoredTrack, second?: ScoredTrack) => {
+const shouldAutoMatch = (best: ScoredTrack, second: ScoredTrack | undefined, mode: MatchingMode) => {
   const margin = second ? best.score - second.score : best.score;
-  if (best.score >= 0.9) return true;
-  if (best.score >= 0.84 && margin >= 0.07) return true;
-  if (best.titleScore >= 0.96 && best.artistScore >= 0.62 && margin >= 0.09) return true;
+
+  if (mode === "strict") {
+    if (best.score >= 0.95) return true;
+    if (best.score >= 0.9 && margin >= 0.08) return true;
+    if (best.titleScore >= 0.97 && best.artistScore >= 0.7 && margin >= 0.1) return true;
+    return false;
+  }
+
+  if (mode === "aggressive") {
+    if (best.score >= 0.84) return true;
+    if (best.score >= 0.74 && margin >= 0.04) return true;
+    if (best.artistScore >= 0.93 && best.titleScore >= 0.36 && margin >= 0.02) return true;
+    if (best.artistScore >= 0.97 && best.titleScore >= 0.3) return true;
+    if (best.titleScore >= 0.93 && best.artistScore >= 0.34 && margin >= 0.04) return true;
+    return false;
+  }
+
+  if (best.score >= 0.92) return true;
+  if (best.score >= 0.86 && margin >= 0.06) return true;
+  if (best.titleScore >= 0.96 && best.artistScore >= 0.62 && margin >= 0.08) return true;
   return false;
 };
 
-const matchRows = (rows: SourceRow[], index: InventoryIndex) => {
+const matchRows = (rows: SourceRow[], index: InventoryIndex, mode: MatchingMode) => {
   const matchedTrackKeys: string[] = [];
   const missing: MissingRow[] = [];
   let fuzzyMatchedCount = 0;
@@ -664,20 +711,21 @@ const matchRows = (rows: SourceRow[], index: InventoryIndex) => {
     }
 
     const titleMatches = index.byTitle.get(normTitle) ?? [];
-    const chosenByTitle = chooseFromTitleMatches(normTitle, normArtist, titleMatches);
+    const chosenByTitle = chooseFromTitleMatches(normTitle, normArtist, titleMatches, mode);
     if (chosenByTitle) {
       matchedTrackKeys.push(chosenByTitle.trackKey);
       fuzzyMatchedCount += 1;
       continue;
     }
 
+    const minCandidateScore = mode === "strict" ? 0.38 : mode === "aggressive" ? 0.3 : 0.34;
     const scoredCandidates = collectCandidates(normTitle, normArtist, index)
       .map((track) => scoreCandidate(normTitle, normArtist, track))
-      .filter((scored) => scored.score >= 0.34)
+      .filter((scored) => scored.score >= minCandidateScore)
       .sort((a, b) => b.score - a.score)
       .slice(0, 10);
 
-    if (scoredCandidates.length > 0 && shouldAutoMatch(scoredCandidates[0], scoredCandidates[1])) {
+    if (scoredCandidates.length > 0 && shouldAutoMatch(scoredCandidates[0], scoredCandidates[1], mode)) {
       matchedTrackKeys.push(scoredCandidates[0].track.trackKey);
       fuzzyMatchedCount += 1;
       continue;
@@ -693,7 +741,12 @@ const matchRows = (rows: SourceRow[], index: InventoryIndex) => {
   return { matchedTrackKeys, missing, fuzzyMatchedCount };
 };
 
-const getPlaylistId = async (db: any, options: ImportOptions, playlistName: string): Promise<number> => {
+const getPlaylistId = async (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any,
+  options: ImportOptions,
+  playlistName: string
+): Promise<number> => {
   const requestedId = Number(options.existingPlaylistId ?? 0);
 
   if (Number.isFinite(requestedId) && requestedId > 0) {
@@ -759,11 +812,12 @@ export const importRowsToPlaylist = async (options: ImportOptions): Promise<Impo
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabaseServer(options.authHeader) as any;
   const playlistName = sanitizePlaylistName(options.playlistName);
+  const matchingMode = normalizeMatchingMode(options.matchingMode);
 
   const inventoryTracks = await loadInventoryTracks(options.authHeader);
   const index = buildIndex(inventoryTracks);
 
-  const { matchedTrackKeys, missing, fuzzyMatchedCount } = matchRows(rows, index);
+  const { matchedTrackKeys, missing, fuzzyMatchedCount } = matchRows(rows, index, matchingMode);
   const dedupedMatched = Array.from(new Set(matchedTrackKeys));
 
   const playlistId = await getPlaylistId(db, options, playlistName);
@@ -809,11 +863,12 @@ export const importRowsToPlaylist = async (options: ImportOptions): Promise<Impo
   return {
     playlistId,
     playlistName,
+    matchingMode,
     sourceCount: rows.length,
     matchedCount: newTrackKeys.length,
     fuzzyMatchedCount,
     unmatchedCount: missing.length,
-    unmatchedSample: missing.slice(0, 25),
+    unmatchedSample: missing.slice(0, 100),
     duplicatesSkipped: dedupedMatched.length - newTrackKeys.length,
   };
 };

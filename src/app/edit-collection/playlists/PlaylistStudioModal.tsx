@@ -16,6 +16,7 @@ import { SHARED_COLOR_PRESETS, SHARED_ICON_PRESETS } from '../iconPresets';
 const supabase = supabaseTyped as any;
 
 export type PlaylistStudioView = 'library' | 'manual' | 'smart' | 'import';
+type PlaylistMatchingMode = 'strict' | 'balanced' | 'aggressive';
 
 type PlaylistTrackItem = {
   track_key: string;
@@ -312,6 +313,7 @@ export function PlaylistStudioModal({
   const [importMode, setImportMode] = useState<'spotify' | 'csv'>('spotify');
   const [destinationMode, setDestinationMode] = useState<'new' | 'existing'>('new');
   const [destinationPlaylistId, setDestinationPlaylistId] = useState<number | null>(null);
+  const [matchingMode, setMatchingMode] = useState<PlaylistMatchingMode>('aggressive');
   const [spotifyLoading, setSpotifyLoading] = useState(false);
   const [spotifyConnected, setSpotifyConnected] = useState(true);
   const [spotifyPlaylists, setSpotifyPlaylists] = useState<SpotifyPlaylist[]>([]);
@@ -867,6 +869,7 @@ export function PlaylistStudioModal({
           : '(append)',
       snapshotId: isResume ? resume?.snapshotId ?? null : playlist.snapshotId ?? null,
       maxPages: resume?.maxPages ?? 3,
+      matchingMode,
     };
 
     if (destinationMode === 'existing' && destinationPlaylistId) {
@@ -901,9 +904,10 @@ export function PlaylistStudioModal({
       const fuzzyNote = payload?.fuzzyMatchedCount ? `, ${payload.fuzzyMatchedCount} fuzzy-matched` : '';
       const duplicateNote = payload?.duplicatesSkipped ? `, ${payload.duplicatesSkipped} duplicates skipped` : '';
       const partialNote = payload?.partialImport ? ' (partial import, continue below)' : '';
+      const modeNote = payload?.matchingMode ? ` [mode: ${payload.matchingMode}]` : '';
 
       setImportSummary(
-        `Imported "${playlist.name}": ${payload.matchedCount ?? 0} matched${fuzzyNote}, ${payload.unmatchedCount ?? 0} unmatched${duplicateNote}${partialNote}`
+        `Imported "${playlist.name}": ${payload.matchedCount ?? 0} matched${fuzzyNote}, ${payload.unmatchedCount ?? 0} unmatched${duplicateNote}${partialNote}${modeNote}`
       );
 
       setLastImportedPlaylistId(
@@ -956,6 +960,7 @@ export function PlaylistStudioModal({
           playlistName,
           csvText,
           existingPlaylistId: destinationMode === 'existing' ? destinationPlaylistId : undefined,
+          matchingMode,
         }),
       });
 
@@ -966,9 +971,10 @@ export function PlaylistStudioModal({
 
       const fuzzyNote = payload?.fuzzyMatchedCount ? `, ${payload.fuzzyMatchedCount} fuzzy-matched` : '';
       const duplicateNote = payload?.duplicatesSkipped ? `, ${payload.duplicatesSkipped} duplicates skipped` : '';
+      const modeNote = payload?.matchingMode ? ` [mode: ${payload.matchingMode}]` : '';
 
       setImportSummary(
-        `Imported CSV: ${payload?.matchedCount ?? 0} matched${fuzzyNote}, ${payload?.unmatchedCount ?? 0} unmatched${duplicateNote}`
+        `Imported CSV: ${payload?.matchedCount ?? 0} matched${fuzzyNote}, ${payload?.unmatchedCount ?? 0} unmatched${duplicateNote}${modeNote}`
       );
 
       setLastImportedPlaylistId(
@@ -1922,6 +1928,22 @@ export function PlaylistStudioModal({
                         </select>
                       </div>
                     )}
+
+                    <div className="mt-3">
+                      <label className="mb-1 block text-xs text-[#9bb0d8]">Matching mode</label>
+                      <select
+                        value={matchingMode}
+                        onChange={(event) => setMatchingMode(event.target.value as PlaylistMatchingMode)}
+                        className="w-full max-w-[320px] rounded-lg border border-[#30466b] bg-[#0f182a] px-3 py-2 text-sm text-white"
+                      >
+                        <option value="strict">Strict (lowest false positives)</option>
+                        <option value="balanced">Balanced</option>
+                        <option value="aggressive">Aggressive (more auto-matches)</option>
+                      </select>
+                      <div className="mt-1 text-[11px] text-[#8fa8d4]">
+                        Aggressive increases auto-match rate but may require more review in unmatched suggestions.
+                      </div>
+                    </div>
                   </div>
 
                   <div className="grid gap-4 xl:grid-cols-2">
