@@ -1,4 +1,4 @@
-import { supabaseServer } from "src/lib/supabaseServer";
+import { supabaseAdmin } from "src/lib/supabaseAdmin";
 
 const PAGE_SIZE = 1000;
 
@@ -405,9 +405,8 @@ export const searchInventoryCandidates = async (
 
 export const fetchInventoryTracks = async (authHeaderOrLimit?: string | number, limitMaybe?: number) => {
   const tracks: InventoryTrack[] = [];
-  const authHeader = typeof authHeaderOrLimit === "string" ? authHeaderOrLimit : undefined;
   const limit = typeof authHeaderOrLimit === "number" ? authHeaderOrLimit : limitMaybe;
-  const supabase = supabaseServer(authHeader);
+  const supabase = supabaseAdmin;
 
   // Step 1: fetch inventory rows to determine the release ids in the library.
   // De-dupe by release_id so we don't create duplicate candidate tracks when multiple copies exist.

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Papa from "papaparse";
-import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
+import { requireSupabaseAdminServiceRole, supabaseAdmin } from "src/lib/supabaseAdmin";
 import { getCachedInventoryIndex, matchTracks, sanitizePlaylistName } from "src/lib/vinylPlaylistImport";
 
 export const runtime = "nodejs";
@@ -85,6 +85,9 @@ export async function POST(req: Request) {
     const existingPlaylistId = Number(body?.existingPlaylistId ?? 0);
     const playlistName = sanitizePlaylistName(String(body?.playlistName ?? "CSV Import"));
 
+    step = "supabase-admin-check";
+    requireSupabaseAdminServiceRole();
+
     if (!csvText) {
       return NextResponse.json({ error: "csvText is required" }, { status: 400 });
     }
@@ -96,13 +99,12 @@ export async function POST(req: Request) {
     }
 
     step = "inventory-index";
-    const authHeader = getAuthHeader(req);
-    const index = await getCachedInventoryIndex(authHeader);
+    const index = await getCachedInventoryIndex();
     const { matched, missing, fuzzyMatchedCount } = matchTracks(rows, index);
 
     step = "playlist-upsert";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = supabaseServer(authHeader) as any;
+    const db = supabaseAdmin as any;
 
     let playlistId: number;
     if (Number.isFinite(existingPlaylistId) && existingPlaylistId > 0) {

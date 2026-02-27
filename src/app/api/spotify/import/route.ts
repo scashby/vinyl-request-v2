@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthHeader, supabaseServer } from 'src/lib/supabaseServer';
+import { requireSupabaseAdminServiceRole, supabaseAdmin, supabaseAdminJwtRole } from 'src/lib/supabaseAdmin';
 import { getCachedInventoryIndex, matchTracks, sanitizePlaylistName } from '../../../../lib/vinylPlaylistImport';
 import { getSpotifyAccessTokenFromCookies, spotifyApiGet, spotifyApiGetByUrl, SpotifyApiError } from '../../../../lib/spotifyUser';
 
@@ -84,6 +84,9 @@ export async function POST(req: Request) {
     }
     spotifyPlaylistId = playlistId;
     resumeOffset = Number.isFinite(startOffset) && startOffset >= 0 ? startOffset : 0;
+
+    step = 'supabase-admin-check';
+    requireSupabaseAdminServiceRole();
 
     step = 'spotify-token';
     const tokenData = await getSpotifyAccessTokenFromCookies();
@@ -267,18 +270,18 @@ export async function POST(req: Request) {
     }
 
     step = 'inventory-index';
-    const index = await getCachedInventoryIndex(getAuthHeader(req));
+    const index = await getCachedInventoryIndex();
     inventoryIndexStats = getIndexStats(index);
     if (inventoryIndexStats.trackCount < 25) {
       throw new Error(
-        `Inventory index unexpectedly small (${inventoryIndexStats.trackCount} tracks). Check Supabase publishable key permissions / RLS.`
+        `Inventory index unexpectedly small (${inventoryIndexStats.trackCount} tracks). Check service-role database access. (role=${supabaseAdminJwtRole})`
       );
     }
     const { matched, missing, fuzzyMatchedCount } = matchTracks(rows, index);
 
     step = 'create-playlist';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = supabaseServer(getAuthHeader(req)) as any;
+    const db = supabaseAdmin as any;
     if (Number.isFinite(existingPlaylistId) && existingPlaylistId > 0) {
       localPlaylistId = existingPlaylistId;
     } else {
@@ -346,7 +349,7 @@ export async function POST(req: Request) {
       unmatchedCount: missing.length,
       unmatchedSample: missing.slice(0, 25),
       debug: {
-        supabase_mode: 'publishable',
+        supabase_admin_role: supabaseAdminJwtRole,
         inventoryIndex: inventoryIndexStats,
       },
       resume: {
@@ -404,7 +407,7 @@ export async function POST(req: Request) {
           playlistOwnerId,
           step,
           debug: {
-            supabase_mode: 'publishable',
+            supabase_admin_role: supabaseAdminJwtRole,
             inventoryIndex: inventoryIndexStats,
           },
           resume: {
@@ -429,7 +432,7 @@ export async function POST(req: Request) {
           playlistOwnerId,
           step,
           debug: {
-            supabase_mode: 'publishable',
+            supabase_admin_role: supabaseAdminJwtRole,
             inventoryIndex: inventoryIndexStats,
             metaItemsRawCount,
             metaItemsParsedCount,
@@ -446,7 +449,7 @@ export async function POST(req: Request) {
         error: message,
         step,
         debug: {
-          supabase_mode: 'publishable',
+          supabase_admin_role: supabaseAdminJwtRole,
           inventoryIndex: inventoryIndexStats,
         },
       },

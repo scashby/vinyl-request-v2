@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthHeader, supabaseServer } from 'src/lib/supabaseServer';
+import { requireSupabaseAdminServiceRole, supabaseAdmin } from 'src/lib/supabaseAdmin';
 
 export const runtime = 'nodejs';
 
@@ -18,8 +18,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'trackKey is required' }, { status: 400 });
     }
 
+    requireSupabaseAdminServiceRole();
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = supabaseServer(getAuthHeader(req)) as any;
+    const db = supabaseAdmin as any;
 
     const { data: existing } = await db
       .from('collection_playlist_items')
