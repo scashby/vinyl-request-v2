@@ -8,11 +8,21 @@ export const runtime = 'nodejs';
 type SpotifyTrackItem = {
   item?: {
     type?: string;
+    id?: string;
+    uri?: string;
     name?: string;
+    external_ids?: {
+      isrc?: string;
+    };
     artists?: Array<{ name?: string }>;
   } | null;
   track?: {
+    id?: string;
+    uri?: string;
     name?: string;
+    external_ids?: {
+      isrc?: string;
+    };
     artists?: Array<{ name?: string }>;
   } | null;
 };
@@ -49,15 +59,31 @@ const sanitizePlaylistName = (value?: string) => {
   return cleaned.slice(0, 80);
 };
 
+const normalizeIsrc = (value: unknown) => {
+  const raw = String(value ?? '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+  return raw.length >= 10 ? raw : '';
+};
+
 const extractRows = (items: SpotifyTrackItem[] = []): SourceRow[] => {
   const rows: SourceRow[] = [];
   for (const item of items) {
     const trackNode = item.track ?? (item.item?.type === 'track' ? item.item : undefined);
     const title = typeof trackNode?.name === 'string' ? trackNode.name.trim() : '';
-    const artistRaw = (trackNode?.artists ?? [])[0]?.name;
-    const artist = typeof artistRaw === 'string' ? artistRaw.trim() : '';
+    const artistRaw = (trackNode?.artists ?? []).map((artist) => String(artist?.name ?? '').trim()).filter(Boolean);
+    const artist = artistRaw[0] ?? '';
+    const isrc = normalizeIsrc(trackNode?.external_ids?.isrc);
+    const spotifyTrackId = typeof trackNode?.id === 'string' ? trackNode.id.trim() : '';
+    const spotifyUri = typeof trackNode?.uri === 'string' ? trackNode.uri.trim() : '';
     if (!title) continue;
-    rows.push({ title, artist: artist || undefined });
+    rows.push({
+      title,
+      artist: artist || undefined,
+      isrc: isrc || undefined,
+      spotifyTrackId: spotifyTrackId || undefined,
+      spotifyUri: spotifyUri || undefined,
+    });
   }
   return rows;
 };
@@ -99,8 +125,8 @@ const fetchPlaylistItemsPage = async (
   debugErrors: Array<{ path: string; error: string }>
 ): Promise<{ rows: SourceRow[]; itemCount: number; next: string | null; total: number | null }> => {
   const paths = [
-    `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&market=from_token&fields=items(track(name,artists(name)),item(type,name,artists(name))),next,total`,
-    `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&fields=items(track(name,artists(name)),item(type,name,artists(name))),next,total`,
+    `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&market=from_token&fields=items(track(id,uri,name,artists(name),external_ids(isrc)),item(type,id,uri,name,artists(name),external_ids(isrc))),next,total`,
+    `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&fields=items(track(id,uri,name,artists(name),external_ids(isrc)),item(type,id,uri,name,artists(name),external_ids(isrc))),next,total`,
     `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&market=from_token`,
     `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track`,
   ];

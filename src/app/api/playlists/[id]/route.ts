@@ -3,21 +3,11 @@ import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 
 export const runtime = "nodejs";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const countRows = async (db: any, table: string, apply?: (q: any) => any) => {
-  let query = db.from(table).select("*", { head: true, count: "exact" });
-  if (apply) query = apply(query);
-  const { count, error } = await query;
-  if (error) {
-    throw new Error(`Failed to count ${table}: ${error.message}`);
-  }
-  return typeof count === "number" ? count : 0;
-};
-
 export async function DELETE(req: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
     const playlistId = Number(id);
+
     if (!Number.isFinite(playlistId) || playlistId <= 0) {
       return NextResponse.json({ error: "Invalid playlist id" }, { status: 400 });
     }
@@ -25,53 +15,71 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = supabaseServer(getAuthHeader(req)) as any;
 
-    const before = {
-      playlist_exists: (await countRows(db, "collection_playlists", (q) => q.eq("id", playlistId))) > 0,
-      playlist_items: await countRows(db, "collection_playlist_items", (q) => q.eq("playlist_id", playlistId)),
-      bingo_sessions_with_playlist: await countRows(db, "bingo_sessions", (q) => q.eq("playlist_id", playlistId)),
-      mode: "publishable",
-    };
+    const { data: beforeRow, error: beforeError } = await db
+      .from("collection_playlists")
+      .select("id")
+      .eq("id", playlistId)
+      .maybeSingle();
 
-    const detachRes = await db.from("bingo_sessions").update({ playlist_id: null }).eq("playlist_id", playlistId);
-    if (detachRes?.error) {
-      const deleteSessionsRes = await db.from("bingo_sessions").delete().eq("playlist_id", playlistId);
-      if (deleteSessionsRes?.error) {
-        return NextResponse.json(
-          { error: `Failed to detach/delete Bingo sessions referencing this playlist: ${deleteSessionsRes.error.message}` },
-          { status: 500 }
-        );
-      }
+    if (beforeError) {
+      return NextResponse.json({ error: beforeError.message }, { status: 500 });
     }
 
-    const { data: deletedItems, error: itemsError } = await db
-      .from("collection_playlist_items")
-      .delete()
-      .eq("playlist_id", playlistId)
-      .select("id");
-    if (itemsError) {
-      return NextResponse.json({ error: itemsError.message }, { status: 500 });
-    }
+    const existedBefore = !!beforeRow?.id;
 
-    const { data: deletedPlaylist, error: deleteError } = await db
+    const { data: deletedRows, error: deleteError } = await db
       .from("collection_playlists")
       .delete()
       .eq("id", playlistId)
       .select("id");
+
     if (deleteError) {
       return NextResponse.json({ error: deleteError.message }, { status: 500 });
     }
 
-    const after = {
-      playlist_exists: (await countRows(db, "collection_playlists", (q) => q.eq("id", playlistId))) > 0,
-      playlist_items: await countRows(db, "collection_playlist_items", (q) => q.eq("playlist_id", playlistId)),
-      bingo_sessions_with_playlist: await countRows(db, "bingo_sessions", (q) => q.eq("playlist_id", playlistId)),
-      deleted: {
-        playlists: Array.isArray(deletedPlaylist) ? deletedPlaylist.length : 0,
-        playlist_items: Array.isArray(deletedItems) ? deletedItems.length : 0,
-      },
-    };
+    const deletedCount = Array.isArray(deletedRows) ? deletedRows.length : 0;
 
-    return NextResponse.json({ ok: true, before, after }, { status: 200 });
+    const { data: afterRow, error: afterError } = await db
+      .from("collection_playlists")
+      .select("id")
+      .eq("id", playlistId)
+      .maybeSingle();
+
+    if (afterError) {
+      return NextResponse.json({ error: afterError.message }, { status: 500 });
+    }
+
+    const existsAfter = !!afterRow?.id;
+
+    if (existedBefore && deletedCount === 0) {
+      return NextResponse.json(
+        {
+          error: "Playlist delete was blocked (0 rows deleted).",
+          hint: "RLS delete policy on collection_playlists is likely missing for this user/role.",
+          details: { playlistId, existedBefore, deletedCount, existsAfter },
+        },
+        { status: 403 }
+      );
+    }
+
+    if (existedBefore && existsAfter) {
+      return NextResponse.json(
+        {
+          error: "Playlist still exists after delete.",
+          details: { playlistId, existedBefore, deletedCount, existsAfter },
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        ok: true,
+        deletedCount,
+        playlistId,
+      },
+      { status: 200 }
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to delete playlist";
     return NextResponse.json({ error: message }, { status: 500 });
