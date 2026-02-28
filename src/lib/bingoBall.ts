@@ -9,7 +9,7 @@ export function getColumnLetterForBallNumber(ballNumber: number): BingoColumn {
 
 export function getColumnNumberForBallNumber(ballNumber: number): number {
   if (!Number.isFinite(ballNumber) || ballNumber < 1 || ballNumber > 75) return 1;
-  return ((ballNumber - 1) % 15) + 1;
+  return ballNumber;
 }
 
 export function formatBallLabel(ballNumber: number | null | undefined, columnLetter?: string | null): string {
@@ -21,4 +21,3 @@ export function formatBallLabel(ballNumber: number | null | undefined, columnLet
   if (columnLetter) return columnLetter;
   return "?";
 }
-

@@ -4,29 +4,20 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { formatBallLabel } from "src/lib/bingoBall";
+import BingoTransportLane, { type BingoTransportCall } from "../_components/BingoTransportLane";
 
 type Session = {
   id: number;
   session_code: string;
   playlist_name: string;
-  game_mode: string;
   current_call_index: number;
   current_round: number;
   round_count: number;
   status: string;
-  seconds_to_next_call: number;
+  pull_call_id: number | null;
 };
 
-type Call = {
-  id: number;
-  call_index: number;
-  ball_number: number | null;
-  column_letter: string;
-  track_title: string;
-  artist_name: string;
-  album_name: string | null;
-  status: string;
-};
+type Call = BingoTransportCall;
 
 export default function BingoHostPage() {
   const searchParams = useSearchParams();
@@ -55,33 +46,21 @@ export default function BingoHostPage() {
     return () => clearInterval(timer);
   }, [load]);
 
-  const activeCall = useMemo(
-    () => calls.find((call) => call.call_index === (session?.current_call_index ?? 0)),
-    [calls, session?.current_call_index]
+  const called = useMemo(
+    () =>
+      calls
+        .filter((call) => ["called", "completed", "skipped"].includes(call.status))
+        .sort((a, b) => a.call_index - b.call_index),
+    [calls]
   );
-  const nextPendingCall = useMemo(
-    () => calls.find((call) => call.call_index === (session?.current_call_index ?? 0) + 1),
-    [calls, session?.current_call_index]
-  );
-  const called = useMemo(() => calls.filter((call) => ["called", "completed", "skipped"].includes(call.status)), [calls]);
+
+  const currentCall = useMemo(() => {
+    const byCurrentIndex = calls.find((call) => call.call_index === (session?.current_call_index ?? 0) && call.status === "called");
+    if (byCurrentIndex) return byCurrentIndex;
+    return [...calls].reverse().find((call) => call.status === "called") ?? null;
+  }, [calls, session?.current_call_index]);
+
   const previous = useMemo(() => called.slice(Math.max(0, called.length - 5), called.length - 1), [called]);
-  const callForControls = activeCall ?? nextPendingCall;
-
-  const advance = async () => {
-    await fetch(`/api/games/bingo/sessions/${sessionId}/advance`, { method: "POST" });
-    load();
-  };
-
-  const setCallStatus = async (status: "prep_started" | "called" | "completed" | "skipped") => {
-    const target = callForControls ?? calls.find((c) => c.call_index === (session?.current_round ?? 1));
-    if (!target) return;
-    await fetch(`/api/games/bingo/calls/${target.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    load();
-  };
 
   const pause = async () => {
     await fetch(`/api/games/bingo/sessions/${sessionId}/pause`, { method: "POST" });
@@ -111,12 +90,20 @@ export default function BingoHostPage() {
             <div>
               <p className="text-xs uppercase tracking-[0.25em] text-amber-300">Host Console</p>
               <h1 className="text-3xl font-black uppercase">Music Bingo Host</h1>
-              <p className="text-sm text-stone-400">{session?.playlist_name} · {session?.session_code} · Round {session?.current_round} of {session?.round_count}</p>
+              <p className="text-sm text-stone-400">
+                {session?.playlist_name} · {session?.session_code} · Round {session?.current_round} of {session?.round_count}
+              </p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
-              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/bingo/assistant?sessionId=${sessionId}`}>Assistant</Link>
-              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/bingo/jumbotron?sessionId=${sessionId}`}>Jumbotron</Link>
-              <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/bingo/history">History</Link>
+              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/bingo/assistant?sessionId=${sessionId}`}>
+                Assistant
+              </Link>
+              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/bingo/jumbotron?sessionId=${sessionId}`}>
+                Jumbotron
+              </Link>
+              <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/bingo/history">
+                History
+              </Link>
             </div>
           </div>
         </header>
@@ -128,7 +115,11 @@ export default function BingoHostPage() {
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="text-stone-300">
-                    <th className="pb-2">Draw</th><th className="pb-2">Ball</th><th className="pb-2">Track</th><th className="pb-2">Artist</th><th className="pb-2">Album</th>
+                    <th className="pb-2">Draw</th>
+                    <th className="pb-2">Ball</th>
+                    <th className="pb-2">Track</th>
+                    <th className="pb-2">Artist</th>
+                    <th className="pb-2">Album</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -152,39 +143,57 @@ export default function BingoHostPage() {
               <div className="mt-3 rounded border border-red-700/50 bg-red-950/30 p-3">
                 <p className="text-xs uppercase text-red-300">Current</p>
                 <p className="text-lg font-black">
-                  {callForControls ? `${formatBallLabel(callForControls.ball_number, callForControls.column_letter)} - ${callForControls.track_title}` : "No call yet"}
+                  {currentCall ? `${formatBallLabel(currentCall.ball_number, currentCall.column_letter)} - ${currentCall.track_title}` : "No call yet"}
                 </p>
-                <p className="text-sm text-stone-300">{callForControls ? `${callForControls.artist_name} · ${callForControls.album_name ?? ""}` : ""}</p>
+                <p className="text-sm text-stone-300">{currentCall ? `${currentCall.artist_name} · ${currentCall.album_name ?? ""}` : ""}</p>
               </div>
               <div className="mt-3 text-xs">
                 <p className="font-semibold text-stone-300">Previous Calls</p>
                 <ul className="mt-1 space-y-1 text-stone-400">
-                  {previous.map((call) => <li key={call.id}>{formatBallLabel(call.ball_number, call.column_letter)} - {call.track_title}</li>)}
+                  {previous.map((call) => (
+                    <li key={call.id}>
+                      {formatBallLabel(call.ball_number, call.column_letter)} - {call.track_title}
+                    </li>
+                  ))}
                 </ul>
               </div>
               <div className="mt-3 text-xs">
                 <p className="font-semibold text-stone-300">Full Called Order</p>
                 <div className="mt-1 max-h-24 overflow-auto text-stone-400">
                   {called.map((call) => (
-                    <div key={call.id}>{call.call_index}. {formatBallLabel(call.ball_number, call.column_letter)} - {call.track_title}</div>
+                    <div key={call.id}>
+                      {call.call_index}. {formatBallLabel(call.ball_number, call.column_letter)} - {call.track_title}
+                    </div>
                   ))}
                 </div>
               </div>
             </div>
 
+            <BingoTransportLane
+              sessionId={sessionId}
+              calls={calls}
+              currentCallIndex={session?.current_call_index ?? 0}
+              pullCallId={session?.pull_call_id ?? null}
+              onChanged={load}
+              accent="host"
+              maxRows={6}
+            />
+
             <div className="rounded-2xl border border-stone-700 bg-black/50 p-4">
-              <p className="text-xs uppercase text-amber-300">Controls</p>
+              <p className="text-xs uppercase text-amber-300">Session Controls</p>
               <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                <button onClick={() => setCallStatus("prep_started")} className="rounded bg-amber-700 px-2 py-1">Prep Started</button>
-                <button onClick={() => setCallStatus("called")} className="rounded bg-blue-700 px-2 py-1">Called</button>
-                <button onClick={() => setCallStatus("completed")} className="rounded bg-emerald-700 px-2 py-1">Completed</button>
-                <button onClick={advance} className="rounded bg-red-700 px-2 py-1">Advance</button>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                <button onClick={pause} className="rounded border border-stone-600 px-2 py-1">Pause</button>
-                <button onClick={resume} className="rounded border border-stone-600 px-2 py-1">Resume</button>
-                <button onClick={skip} className="rounded border border-stone-600 px-2 py-1">Skip</button>
-                <button onClick={replace} className="rounded border border-stone-600 px-2 py-1">Replace with Next</button>
+                <button onClick={pause} className="rounded border border-stone-600 px-2 py-1">
+                  Pause
+                </button>
+                <button onClick={resume} className="rounded border border-stone-600 px-2 py-1">
+                  Resume
+                </button>
+                <button onClick={skip} className="rounded border border-stone-600 px-2 py-1">
+                  Skip
+                </button>
+                <button onClick={replace} className="rounded border border-stone-600 px-2 py-1">
+                  Replace with Next
+                </button>
               </div>
             </div>
           </section>

@@ -40,6 +40,10 @@ type SessionRow = {
   ended_at: string | null;
 };
 
+type SessionEventRow = {
+  payload: { call_id?: unknown } | null;
+};
+
 function parseSessionId(id: string) {
   const sessionId = Number(id);
   if (!Number.isFinite(sessionId)) return null;
@@ -68,11 +72,25 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     .eq("id", session.playlist_id)
     .maybeSingle();
 
+  const { data: pullEvent } = await db
+    .from("bingo_session_events")
+    .select("payload")
+    .eq("session_id", sessionId)
+    .eq("event_type", "pull_set")
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const typedPullEvent = (pullEvent ?? null) as SessionEventRow | null;
+  const pullCallIdRaw = typedPullEvent?.payload?.call_id;
+  const pullCallId = typeof pullCallIdRaw === "number" && Number.isFinite(pullCallIdRaw) ? pullCallIdRaw : null;
+
   return NextResponse.json(
     {
       ...session,
       playlist_name: playlist?.name ?? "Unknown Playlist",
       seconds_to_next_call: computeRemainingSeconds(session),
+      pull_call_id: pullCallId,
     },
     { status: 200 }
   );

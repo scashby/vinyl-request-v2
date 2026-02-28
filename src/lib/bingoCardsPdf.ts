@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+import { BINGO_COLUMNS } from "src/lib/bingoBall";
 
 type Card = {
   card_number: number;
@@ -25,6 +26,8 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
 
   const headerH = layout === "4-up" ? 14 : 16;
   const headerGap = layout === "4-up" ? 6 : 8;
+  const columnHeaderH = layout === "4-up" ? 12 : 14;
+  const columnHeaderGap = layout === "4-up" ? 4 : 6;
 
   const cellPaddingX = layout === "4-up" ? 2.5 : 3.0;
   const cellPaddingY = layout === "4-up" ? 2.5 : 3.0;
@@ -220,12 +223,20 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
     doc.rect(baseX, baseY, cardWidth, cardHeight);
 
     const gridX = baseX;
-    const gridY = baseY + headerH + headerGap;
+    const gridY = baseY + headerH + headerGap + columnHeaderH + columnHeaderGap;
     const gridW = cardWidth;
-    const gridH = cardHeight - (headerH + headerGap);
+    const gridH = cardHeight - (headerH + headerGap + columnHeaderH + columnHeaderGap);
 
     const cellW = gridW / 5;
     const cellH = gridH / 5;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(layout === "4-up" ? 12 : 14);
+    const columnHeaderY = baseY + headerH + headerGap + columnHeaderH / 2;
+    for (let c = 0; c < 5; c += 1) {
+      const letter = BINGO_COLUMNS[c];
+      doc.text(letter, gridX + c * cellW + cellW / 2, columnHeaderY, { align: "center", baseline: "middle" });
+    }
 
     for (let r = 0; r < 5; r += 1) {
       for (let c = 0; c < 5; c += 1) {
