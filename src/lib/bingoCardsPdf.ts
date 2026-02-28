@@ -33,8 +33,18 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", _t
   const cellPaddingX = layout === "4-up" ? 2.5 : 3.0;
   const cellPaddingY = layout === "4-up" ? 2.5 : 3.0;
 
+  const normalizePdfText = (value: string) =>
+    String(value ?? "")
+      .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+      .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
+      .replace(/[\u2010\u2011\u2012\u2013\u2014\u2212]/g, "-")
+      .replace(/[\u00A0\u202F]/g, " ")
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
   const splitLabel = (value: string) => {
-    const text = value.trim();
+    const text = normalizePdfText(value);
     const idx = text.lastIndexOf(" - ");
     if (idx === -1) return { title: text, artist: "" };
     return { title: text.slice(0, idx).trim(), artist: text.slice(idx + 3).trim() };
@@ -50,10 +60,7 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", _t
   }
 
   function wrapTextToWidth(text: string, maxWidth: number): string[] {
-    const cleaned = String(text ?? "")
-      .replace(/\s+/g, " ")
-      .replace(/\s*-\s*/g, " - ")
-      .trim();
+    const cleaned = normalizePdfText(text);
     if (!cleaned) return [];
 
     const words = cleaned.split(" ");
@@ -95,7 +102,7 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", _t
     const availableW = Math.max(1, cellW - cellPaddingX * 2);
     const availableH = Math.max(1, cellH - cellPaddingY * 2);
 
-    const cleaned = String(label ?? "").replace(/\s+/g, " ").trim();
+    const cleaned = normalizePdfText(label);
     if (!cleaned) return { lines: [] as string[], fontSize: layout === "4-up" ? 8 : 10 };
 
     const { title: rawTitle, artist: rawArtist } = splitLabel(cleaned);
@@ -147,7 +154,7 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", _t
   }
 
   function renderCellText(label: string, cellX: number, cellY: number, cellW: number, cellH: number) {
-    const baseLabel = String(label ?? "").trim();
+    const baseLabel = normalizePdfText(label);
     if (!baseLabel) return;
 
     const innerX = cellX + cellPaddingX;
