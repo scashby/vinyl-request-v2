@@ -189,12 +189,6 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", _t
     const centerY = innerY + innerH / 2;
     const startY = centerY - totalH / 2;
 
-    // Clip drawing to the current cell so no label can bleed into neighboring cells.
-    doc.saveGraphicsState();
-    doc.rect(innerX, innerY, innerW, innerH);
-    doc.clip();
-    doc.discardPath();
-
     // Title (top block)
     titleLines.forEach((line, index) => {
       doc.text(line, centerX, startY + titleLineH * index, { align: "center", baseline: "top" });
@@ -216,8 +210,6 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", _t
         doc.text(line, centerX, cursorY + artistLineH * index, { align: "center", baseline: "top" });
       });
     }
-
-    doc.restoreGraphicsState();
   }
 
   cards.forEach((card, index) => {
