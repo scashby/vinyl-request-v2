@@ -6,7 +6,7 @@ type Card = {
   grid: Array<{ row: number; col: number; label: string }>;
 };
 
-export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", title: string) {
+export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", _title: string) {
   // Use US Letter landscape for predictable printing in the US.
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "letter" });
 
@@ -24,8 +24,9 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
   const cardWidth = (pageW - marginX * 2 - gutterX * (columns - 1)) / columns;
   const cardHeight = (pageH - marginY * 2 - gutterY * (rows - 1)) / rows;
 
-  const headerH = layout === "4-up" ? 14 : 16;
-  const headerGap = layout === "4-up" ? 6 : 8;
+  // Printed card title line is intentionally removed for cleaner physical handouts.
+  const headerH = 0;
+  const headerGap = 0;
   const columnHeaderH = layout === "4-up" ? 12 : 14;
   const columnHeaderGap = layout === "4-up" ? 4 : 6;
 
@@ -154,6 +155,8 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
     const innerW = Math.max(1, cellW - cellPaddingX * 2);
     const innerH = Math.max(1, cellH - cellPaddingY * 2);
 
+    doc.setFont("helvetica", "normal");
+
     const best = fitTextToCell(baseLabel, innerW, innerH) as {
       lines: string[];
       fontSize: number;
@@ -167,7 +170,6 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
       };
     };
 
-    doc.setFont("helvetica", "normal");
     doc.setFontSize(best.fontSize);
 
     const meta = best._meta;
@@ -186,6 +188,12 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
     const centerX = innerX + innerW / 2;
     const centerY = innerY + innerH / 2;
     const startY = centerY - totalH / 2;
+
+    // Clip drawing to the current cell so no label can bleed into neighboring cells.
+    doc.saveGraphicsState();
+    doc.rect(innerX, innerY, innerW, innerH);
+    doc.clip();
+    doc.discardPath();
 
     // Title (top block)
     titleLines.forEach((line, index) => {
@@ -208,6 +216,8 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
         doc.text(line, centerX, cursorY + artistLineH * index, { align: "center", baseline: "top" });
       });
     }
+
+    doc.restoreGraphicsState();
   }
 
   cards.forEach((card, index) => {
@@ -217,9 +227,6 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
     const baseX = xOffsets[slot] ?? 10;
     const baseY = yOffsets[slot] ?? 20;
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(layout === "4-up" ? 10 : 11);
-    doc.text(`${title} · Card ${card.card_number}`, baseX, baseY + headerH);
     doc.rect(baseX, baseY, cardWidth, cardHeight);
 
     const gridX = baseX;
