@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
+import type { BingoDatabase } from "src/lib/bingoDb";
 
 export const runtime = "nodejs";
 
@@ -23,7 +24,11 @@ type CallRow = {
   status: string;
 };
 
-async function insertEvent(sessionId: number, eventType: string, payload: Record<string, unknown>) {
+type BingoSessionEventPayload = NonNullable<
+  BingoDatabase["public"]["Tables"]["bingo_session_events"]["Insert"]["payload"]
+>;
+
+async function insertEvent(sessionId: number, eventType: string, payload: BingoSessionEventPayload) {
   const db = getBingoDb();
   const { error } = await db.from("bingo_session_events").insert({
     session_id: sessionId,
