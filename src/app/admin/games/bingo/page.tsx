@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { generateBingoCardsPdf } from "src/lib/bingoCardsPdf";
 import { generateBingoCallSheetPdf } from "src/lib/bingoCallSheetPdf";
+import EditEventForm from "src/components/EditEventForm";
 
 type Playlist = { id: number; name: string; track_count: number };
 type EventRow = {
@@ -34,6 +35,8 @@ const GAME_MODE_OPTIONS = [
   { value: "death", label: "Death" },
 ] as const;
 
+const CREATE_EVENT_OPTION = "__create_new_event__";
+
 export default function BingoSetupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -43,6 +46,7 @@ export default function BingoSetupPage() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [eventId, setEventId] = useState<number | null>(Number.isFinite(eventIdFromUrl) ? eventIdFromUrl : null);
+  const [showCreateEventModal, setShowCreateEventModal] = useState(false);
 
   const [playlistId, setPlaylistId] = useState<number | null>(null);
   const [gameMode, setGameMode] = useState("single_line");
@@ -90,6 +94,13 @@ export default function BingoSetupPage() {
       setSessions(payload.data ?? []);
     }
   }, [eventId]);
+
+  const refreshEvents = useCallback(async () => {
+    const res = await fetch("/api/games/bingo/events");
+    if (!res.ok) return;
+    const payload = await res.json();
+    setEvents(payload.data ?? []);
+  }, []);
 
   useEffect(() => {
     load();
@@ -172,8 +183,20 @@ export default function BingoSetupPage() {
           </p>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <label className="text-sm">Event (optional)
-              <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={eventId ?? ""} onChange={(e) => setEventId(Number(e.target.value) || null)}>
+              <select
+                className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                value={eventId ?? ""}
+                onChange={(e) => {
+                  const selected = e.target.value;
+                  if (selected === CREATE_EVENT_OPTION) {
+                    setShowCreateEventModal(true);
+                    return;
+                  }
+                  setEventId(Number(selected) || null);
+                }}
+              >
                 <option value="">No linked event</option>
+                <option value={CREATE_EVENT_OPTION}>+ Create New Event...</option>
                 {events.map((event) => (
                   <option key={event.id} value={event.id}>{event.date} - {event.title}</option>
                 ))}
@@ -265,6 +288,28 @@ export default function BingoSetupPage() {
           )}
         </section>
       </div>
+
+      {showCreateEventModal ? (
+        <>
+          <div
+            className="fixed inset-0 z-[60000] bg-black/70"
+            onClick={() => setShowCreateEventModal(false)}
+          />
+          <div className="fixed inset-0 z-[60001] flex items-center justify-center p-4">
+            <div className="w-full max-w-6xl">
+              <EditEventForm
+                mode="modal"
+                onCancel={() => setShowCreateEventModal(false)}
+                onSaved={(createdEvent) => {
+                  setEventId(createdEvent.id);
+                  setShowCreateEventModal(false);
+                  void refreshEvents();
+                }}
+              />
+            </div>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

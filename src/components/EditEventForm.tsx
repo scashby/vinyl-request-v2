@@ -115,6 +115,36 @@ type DbEvent = Database['public']['Tables']['events']['Row'] & {
 };
 type EventInsert = Database['public']['Tables']['events']['Insert'];
 type EventUpdate = Database['public']['Tables']['events']['Update'];
+type SavedEventSummary = {
+  id: number;
+  title: string;
+  date: string | null;
+};
+
+type EditEventFormProps = {
+  id?: number | null;
+  mode?: 'page' | 'modal';
+  onSaved?: (event: SavedEventSummary) => void;
+  onCancel?: () => void;
+};
+
+const EVENT_GAME_OPTIONS = [
+  { slug: 'bingo', label: 'Music Bingo' },
+  { slug: 'music-trivia', label: 'Music Trivia' },
+  { slug: 'name-that-tune', label: 'Name That Tune' },
+  { slug: 'bracket-battle', label: 'Bracket Battle' },
+  { slug: 'needle-drop-roulette', label: 'Needle Drop Roulette' },
+  { slug: 'cover-art-clue-chase', label: 'Cover Art Clue Chase' },
+  { slug: 'crate-categories', label: 'Crate Categories' },
+  { slug: 'decade-dash', label: 'Decade Dash' },
+  { slug: 'genre-imposter', label: 'Genre Imposter' },
+  { slug: 'sample-detective', label: 'Sample Detective' },
+  { slug: 'lyric-gap-relay', label: 'Lyric Gap Relay' },
+  { slug: 'wrong-lyric-challenge', label: 'Wrong Lyric Challenge' },
+  { slug: 'artist-alias', label: 'Artist Alias' },
+  { slug: 'original-or-cover', label: 'Original or Cover' },
+  { slug: 'back-to-back-connection', label: 'Back-to-Back Connection' },
+] as const;
 
 // Utility function to generate recurring events
 function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<EventData, 'id'>[] {
@@ -250,9 +280,21 @@ function formatDiffValue(value: unknown): string {
   return String(value);
 }
 
-export default function EditEventForm() {
+export default function EditEventForm({
+  id: idProp = null,
+  mode = 'page',
+  onSaved,
+  onCancel,
+}: EditEventFormProps = {}) {
   const searchParams = useSearchParams();
-  const id = searchParams.get('id');
+  const idFromQuery = searchParams.get('id');
+  const parsedQueryId = idFromQuery ? Number.parseInt(idFromQuery, 10) : NaN;
+  const editEventId =
+    typeof idProp === 'number' && Number.isFinite(idProp)
+      ? idProp
+      : Number.isFinite(parsedQueryId)
+        ? parsedQueryId
+        : null;
   const router = useRouter();
   
   const [crates, setCrates] = useState<Crate[]>([]);
@@ -276,6 +318,7 @@ export default function EditEventForm() {
   } | null>(null);
   const [isRegeneratingChildren, setIsRegeneratingChildren] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [selectedGameSlug, setSelectedGameSlug] = useState<string>(EVENT_GAME_OPTIONS[0]?.slug ?? 'bingo');
   const [eventTypeConfig, setEventTypeConfig] = useState<EventTypeConfigState>(() =>
     normalizeEventTypeConfig(defaultEventTypeConfig)
   );
@@ -473,11 +516,11 @@ export default function EditEventForm() {
           title: copiedEvent?.title ? `${copiedEvent.title} (Copy)` : '',
           is_recurring: false
         }));
-      } else if (id) {
+      } else if (editEventId) {
         const { data, error } = await supabase
           .from('events')
           .select('*')
-          .eq('id', Number(id))
+          .eq('id', editEventId)
           .single();
 
         if (error) {
@@ -520,7 +563,7 @@ export default function EditEventForm() {
     };
     fetchEvent();
     // eslint-disable-next-line
-  }, [id]);
+  }, [editEventId]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -619,6 +662,18 @@ export default function EditEventForm() {
 
     setShowOverrideModal(false);
     setPendingBulkUpdate(null);
+    const savedEventId = selectedSeriesEventId ?? editEventId;
+    if (onSaved && savedEventId) {
+      onSaved({
+        id: savedEventId,
+        title: eventData.title,
+        date: eventData.date || null,
+      });
+    }
+    if (mode === 'modal') {
+      onCancel?.();
+      return;
+    }
     router.push('/admin/manage-events');
   };
 
@@ -826,6 +881,18 @@ export default function EditEventForm() {
     input.click();
   };
 
+  const linkableEventId = selectedSeriesEventId ?? editEventId;
+  const canOpenGameSetup = Number.isFinite(linkableEventId ?? NaN);
+
+  const handleOpenGameSetup = () => {
+    if (!canOpenGameSetup || !linkableEventId) {
+      alert('Save this event first, then open game setup.');
+      return;
+    }
+    const targetUrl = `/admin/games/${selectedGameSlug}?eventId=${linkableEventId}`;
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -865,16 +932,22 @@ export default function EditEventForm() {
         is_featured_upnext: !!eventData.is_featured_upnext,
         featured_priority: eventData.featured_priority ?? null,
       };
+      let savedEventSummary: SavedEventSummary | null = null;
 
       console.log('Submitting payload:', payload);
 
       // Handle Updates (Single, Future, Series)
-      const targetEventId = selectedSeriesEventId ?? (id ? Number.parseInt(id, 10) : null);
-      if (id && (isParentEvent || isPartOfSeries)) {
+      const targetEventId = selectedSeriesEventId ?? editEventId;
+      if (editEventId && (isParentEvent || isPartOfSeries)) {
         if (editMode === 'single') {
            if (!targetEventId) throw new Error('Missing target event ID.');
            const singlePayload: EventUpdate = { ...payload, is_recurring: false, parent_event_id: null };
            await supabase.from('events').update(singlePayload).eq('id', targetEventId);
+           savedEventSummary = {
+             id: targetEventId,
+             title: eventData.title,
+             date: eventData.date || null,
+           };
         } else if (editMode === 'future') {
            if (!targetEventId) throw new Error('Missing target event ID.');
            const parentId = (seriesParentId ?? eventData.parent_event_id) || targetEventId;
@@ -930,6 +1003,11 @@ export default function EditEventForm() {
              .update(payload)
              .or(`id.eq.${targetEventId},parent_event_id.eq.${parentId}`)
              .gte('date', eventData.date);
+           savedEventSummary = {
+             id: targetEventId,
+             title: eventData.title,
+             date: eventData.date || null,
+           };
         } else {
            const parentId = (seriesParentId ?? eventData.parent_event_id) || targetEventId;
            if (!parentId) throw new Error('Missing parent event ID.');
@@ -981,8 +1059,13 @@ export default function EditEventForm() {
              }
            }
            await supabase.from('events').update(payload as EventUpdate).or(`id.eq.${parentId},parent_event_id.eq.${parentId}`);
+           savedEventSummary = {
+             id: parentId,
+             title: eventData.title,
+             date: eventData.date || null,
+           };
         }
-      } else if (!isTBA && eventData.is_recurring && !id) {
+      } else if (!isTBA && eventData.is_recurring && !editEventId) {
         if (!eventData.recurrence_end_date) {
           alert('Please choose a series end date before creating recurring events.');
           return;
@@ -994,8 +1077,17 @@ export default function EditEventForm() {
           return;
         }
         // Create Recurring
-        const { data: savedEvent, error } = await supabase.from('events').insert([payload]).select().single();
+        const { data: savedEvent, error } = await supabase
+          .from('events')
+          .insert([payload])
+          .select('id, title, date')
+          .single();
         if (error) throw error;
+        savedEventSummary = {
+          id: savedEvent.id,
+          title: savedEvent.title ?? eventData.title,
+          date: savedEvent.date ?? null,
+        };
         
         const recurringEvents = generateRecurringEvents({ ...eventData, id: savedEvent.id });
         const eventsToInsert: EventInsert[] = recurringEvents.slice(1).map((event) => ({
@@ -1026,15 +1118,45 @@ export default function EditEventForm() {
         }
       } else {
         // Create/Update Single
-        if (id) {
-          const { error } = await supabase.from('events').update(payload as EventUpdate).eq('id', Number(id));
+        if (editEventId) {
+          const { error } = await supabase.from('events').update(payload as EventUpdate).eq('id', editEventId);
           if (error) throw error;
+          savedEventSummary = {
+            id: editEventId,
+            title: eventData.title,
+            date: eventData.date || null,
+          };
         } else {
-          const { error } = await supabase.from('events').insert([payload]);
+          const { data: createdEvent, error } = await supabase
+            .from('events')
+            .insert([payload])
+            .select('id, title, date')
+            .single();
           if (error) throw error;
+          savedEventSummary = {
+            id: createdEvent.id,
+            title: createdEvent.title ?? eventData.title,
+            date: createdEvent.date ?? null,
+          };
         }
       }
 
+      if (!savedEventSummary && editEventId) {
+        savedEventSummary = {
+          id: editEventId,
+          title: eventData.title,
+          date: eventData.date || null,
+        };
+      }
+
+      if (onSaved && savedEventSummary) {
+        onSaved(savedEventSummary);
+      }
+
+      if (mode === 'modal') {
+        onCancel?.();
+        return;
+      }
       router.push('/admin/manage-events');
     } catch (error: unknown) {
       console.error('Save error:', error);
@@ -1042,11 +1164,22 @@ export default function EditEventForm() {
     }
   };
 
+  const wrapperClassName =
+    mode === 'modal'
+      ? 'max-h-[90vh] overflow-y-auto p-6 md:p-8 bg-white text-black border border-gray-200 rounded-2xl shadow-2xl'
+      : 'max-w-5xl mx-auto my-8 p-6 md:p-10 bg-white text-black border border-gray-200 rounded-2xl shadow-sm';
+  const overrideBackdropClassName =
+    mode === 'modal' ? 'fixed inset-0 bg-black/50 z-[70000]' : 'fixed inset-0 bg-black/50 z-[50000]';
+  const overridePanelClassName =
+    mode === 'modal'
+      ? 'fixed inset-0 z-[70001] flex items-center justify-center p-4'
+      : 'fixed inset-0 z-[50001] flex items-center justify-center p-4';
+
   return (
-    <div className="max-w-5xl mx-auto my-8 p-6 md:p-10 bg-white text-black border border-gray-200 rounded-2xl shadow-sm">
+    <div className={wrapperClassName}>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <div>
-          <h2 className="text-3xl font-bold">{id ? 'Edit Event' : 'Create Event'}</h2>
+          <h2 className="text-3xl font-bold">{editEventId ? 'Edit Event' : 'Create Event'}</h2>
           <p className="text-sm text-gray-500 mt-1">
             Build events with richer details, featured placement, and queue settings.
           </p>
@@ -1056,8 +1189,56 @@ export default function EditEventForm() {
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
             Drafting
           </span>
+          {mode === 'modal' && onCancel ? (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              Close
+            </button>
+          ) : null}
         </div>
       </div>
+
+      {mode === 'page' ? (
+        <section className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-emerald-900">Add Game Sessions To This Event</h3>
+              <p className="text-xs text-emerald-800/90 mt-1">
+                Open a game setup page with this event pre-selected.
+              </p>
+            </div>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              <select
+                value={selectedGameSlug}
+                onChange={(e) => setSelectedGameSlug(e.target.value)}
+                className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm shadow-sm sm:w-64"
+              >
+                {EVENT_GAME_OPTIONS.map((game) => (
+                  <option key={game.slug} value={game.slug}>
+                    {game.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleOpenGameSetup}
+                disabled={!canOpenGameSetup}
+                className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Open Game Setup
+              </button>
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-emerald-800/80">
+            {canOpenGameSetup
+              ? `Using event ID ${linkableEventId}. Opens in a new tab so this form stays intact.`
+              : 'Save this event first to unlock game setup links.'}
+          </p>
+        </section>
+      ) : null}
 
       {/* Series Editing Options */}
       {(isParentEvent || isPartOfSeries) && (
@@ -1534,17 +1715,17 @@ export default function EditEventForm() {
           type="submit"
           className="w-full rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white font-bold py-3 px-4 shadow-lg hover:from-blue-700 hover:to-indigo-800 transition-colors"
         >
-          {eventData.date && eventData.date !== '9999-12-31' && eventData.is_recurring && !id ? 'Create Recurring Events' : 'Save Event'}
+          {eventData.date && eventData.date !== '9999-12-31' && eventData.is_recurring && !editEventId ? 'Create Recurring Events' : 'Save Event'}
         </button>
       </form>
 
       {showOverrideModal && (
         <>
           <div
-            className="fixed inset-0 bg-black/50 z-[50000]"
+            className={overrideBackdropClassName}
             onClick={handleCloseOverrideModal}
           />
-          <div className="fixed inset-0 z-[50001] flex items-center justify-center p-4">
+          <div className={overridePanelClassName}>
             <div className="w-full max-w-3xl rounded-2xl bg-white shadow-xl border border-gray-200 max-h-[80vh] overflow-hidden flex flex-col">
               <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-4">
                 <div>
