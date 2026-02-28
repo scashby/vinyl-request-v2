@@ -1,3 +1,7 @@
+-- WARNING: DESTRUCTIVE SCRIPT
+-- This script rewires artist foreign keys and deletes artist rows.
+-- Do not run without a verified backup / PITR plan.
+
 BEGIN;
 
 SELECT

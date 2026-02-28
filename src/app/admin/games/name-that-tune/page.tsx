@@ -85,6 +85,7 @@ export default function NameThatTuneSetupPage() {
 
   const [preflight, setPreflight] = useState({
     snippetsPreCue: false,
+    cratePullStaged: false,
     spareNeedleReady: false,
     tieBreakSnippetReady: false,
   });
@@ -108,6 +109,8 @@ export default function NameThatTuneSetupPage() {
     () => removeResleeveSeconds + findRecordSeconds + cueSeconds + hostBufferSeconds,
     [cueSeconds, findRecordSeconds, hostBufferSeconds, removeResleeveSeconds]
   );
+  const backupSnippetCount = useMemo(() => Math.max(2, Math.ceil(roundCount * 0.2)), [roundCount]);
+  const recommendedPullSize = useMemo(() => roundCount + backupSnippetCount, [backupSnippetCount, roundCount]);
 
   const load = useCallback(async () => {
     const [eventRes, sessionRes] = await Promise.all([
@@ -167,6 +170,7 @@ export default function NameThatTuneSetupPage() {
   };
 
   const roundCountWarning = snippets.length < roundCount;
+  const recommendedPullWarning = snippets.length < recommendedPullSize;
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,#3f1722,transparent_45%),linear-gradient(180deg,#111,#070707)] p-6 text-stone-100">
@@ -247,6 +251,9 @@ export default function NameThatTuneSetupPage() {
               <p className={`mt-1 text-xs ${roundCountWarning ? "text-amber-300" : "text-stone-400"}`}>
                 Valid snippets: {snippets.length}. Minimum required for current rounds: {roundCount}.
               </p>
+              <p className={`mt-1 text-xs ${recommendedPullWarning ? "text-amber-300" : "text-emerald-300"}`}>
+                Recommended playlist/crate pull: {recommendedPullSize} ({roundCount} primary + {backupSnippetCount} backup).
+              </p>
             </label>
           </div>
 
@@ -254,6 +261,7 @@ export default function NameThatTuneSetupPage() {
             <p className="font-semibold uppercase tracking-wide text-rose-200">Preflight Checklist</p>
             <div className="mt-2 grid gap-2 md:grid-cols-2">
               <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.snippetsPreCue} onChange={(e) => setPreflight((p) => ({ ...p, snippetsPreCue: e.target.checked }))} /> Snippets pre-cued by round</label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.cratePullStaged} onChange={(e) => setPreflight((p) => ({ ...p, cratePullStaged: e.target.checked }))} /> Crate/playlist pull staged ({recommendedPullSize} snippets)</label>
               <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.spareNeedleReady} onChange={(e) => setPreflight((p) => ({ ...p, spareNeedleReady: e.target.checked }))} /> Needle/backup cart ready</label>
               <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.tieBreakSnippetReady} onChange={(e) => setPreflight((p) => ({ ...p, tieBreakSnippetReady: e.target.checked }))} /> Tie-break snippet staged</label>
             </div>

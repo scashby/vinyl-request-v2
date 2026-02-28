@@ -123,18 +123,32 @@ export async function fetchLocations(): Promise<PickerDataItem[]> {
 
 export async function fetchArtists(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase
-      .from('artists')
-      .select('name')
-      .not('name', 'is', null)
-      .not('name', 'eq', '');
-    if (error) return [];
     const artistMap = new Map<string, number>();
-    data?.forEach(row => {
-      if (row.name) {
-        artistMap.set(row.name, (artistMap.get(row.name) || 0) + 1);
-      }
-    });
+    const pageSize = 1000;
+    let from = 0;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('artists')
+        .select('name')
+        .not('name', 'is', null)
+        .not('name', 'eq', '')
+        .order('name', { ascending: true })
+        .range(from, from + pageSize - 1);
+
+      if (error) return [];
+
+      const rows = data ?? [];
+      rows.forEach((row) => {
+        if (row.name) {
+          artistMap.set(row.name, (artistMap.get(row.name) || 0) + 1);
+        }
+      });
+
+      if (rows.length < pageSize) break;
+      from += pageSize;
+    }
+
     return Array.from(artistMap.entries())
       .map(([name, count]) => ({ id: name, name, count }))
       .sort((a, b) => a.name.localeCompare(b.name));

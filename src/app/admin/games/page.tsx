@@ -21,6 +21,7 @@ export default function GamesHomePage() {
       slug: game.slug,
       title: game.title,
       description: game.setup,
+      pullSizeGuidance: game.pullSizeGuidance,
     }));
   const needsWorkshop = resolvedGames.filter((game) => game.status === "needs_workshopping");
   const undeveloped = resolvedGames.filter((game) => game.status === "undeveloped");
@@ -56,6 +57,7 @@ export default function GamesHomePage() {
                   </Link>
                 </div>
                 <p className="mt-3 text-sm text-amber-100/90">{module.description}</p>
+                <p className="mt-2 text-xs text-amber-200/90">Pull target: {module.pullSizeGuidance}</p>
               </section>
             ))}
           </div>
@@ -75,6 +77,7 @@ export default function GamesHomePage() {
                 </div>
 
                 <p className="mt-3 text-sm text-stone-300">{game.coreMechanic}</p>
+                <p className="mt-2 text-xs text-stone-400">Pull target: {game.pullSizeGuidance}</p>
 
                 <details className="mt-4 rounded border border-stone-700 bg-black/40 p-3">
                   <summary className="cursor-pointer text-sm font-semibold text-amber-200">Prompt for Build/Plan</summary>
@@ -104,6 +107,7 @@ export default function GamesHomePage() {
                 </div>
 
                 <p className="mt-3 text-sm text-amber-100/90">{game.coreMechanic}</p>
+                <p className="mt-2 text-xs text-amber-200/90">Pull target: {game.pullSizeGuidance}</p>
 
                 <details className="mt-4 rounded border border-amber-800/70 bg-black/30 p-3">
                   <summary className="cursor-pointer text-sm font-semibold text-amber-200">Prompt for Build/Plan</summary>

@@ -5,6 +5,11 @@
 - Assistant: Defer past MVP for solo-host operation. Keep as optional scorer-only aid in a later phase.
 - Jumbotron: Include in MVP-lite form. Show round/call/timer/status only, with no answers until reveal.
 
+## Playlist/Crate Pull Size
+- Baseline pull target: `round_count` snippets.
+- Recommended pull target: `round_count + max(2, ceil(round_count * 0.2))`.
+- Rationale: covers tie-breakers, damaged records, and replay requests without derailing pacing.
+
 ## Data Model Proposal
 - Sessions: `ntt_sessions` with `event_id` (`public.events(id)`, nullable, `ON DELETE SET NULL`), pacing fields, lock-in settings, and display toggles.
 - Rounds/Calls: `ntt_session_calls` stores one cue per round (or more if expanded), answer key (`artist_answer`, `title_answer`), snippet metadata, status progression.

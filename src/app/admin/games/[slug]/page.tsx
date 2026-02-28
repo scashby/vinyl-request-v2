@@ -43,6 +43,10 @@ export default async function GameSkeletonPage({ params }: GameSkeletonPageProps
             <p className="mt-2 text-sm text-stone-100">{game.setup}</p>
           </section>
           <section className="rounded-xl border border-stone-700 bg-stone-950/70 p-4">
+            <h2 className="text-xs uppercase tracking-[0.2em] text-stone-400">Playlist/Crate Pull</h2>
+            <p className="mt-2 text-sm text-stone-100">{game.pullSizeGuidance}</p>
+          </section>
+          <section className="rounded-xl border border-stone-700 bg-stone-950/70 p-4">
             <h2 className="text-xs uppercase tracking-[0.2em] text-stone-400">Scoring</h2>
             <p className="mt-2 text-sm text-stone-100">{game.scoring}</p>
           </section>
