@@ -5,6 +5,7 @@ import { hasValidDiscogsId } from 'lib/discogs-validation';
 import { parseDiscogsFormat } from "src/utils/formatUtils";
 import type { Database } from "src/types/supabase";
 import { discogsHeaders, discogsUrl, hasDiscogsCredentials } from "src/lib/discogsAuth";
+import { stripDiscogsDisambiguationSuffix } from "src/lib/artistName";
 
 type DiscogsResponse = {
   master_id?: number;
@@ -145,8 +146,9 @@ async function fetchDiscogsRelease(releaseId: string): Promise<DiscogsResponse> 
 }
 
 async function searchDiscogsForRelease(artist: string, title: string, year?: string): Promise<string | null> {
+  const searchArtist = stripDiscogsDisambiguationSuffix(artist) || artist;
   const params = new URLSearchParams({
-    artist,
+    artist: searchArtist,
     release_title: title,
     type: 'release',
     per_page: '1'

@@ -4,6 +4,7 @@ import * as GeniusModule from 'genius-lyrics';
 import { parseDiscogsFormat } from './formatParser';
 import { fetchDiscogsJson, type DiscogsOAuthCredentials } from './discogsAuth';
 import { getWikimediaAppAccessToken } from './wikimediaAuth';
+import { stripDiscogsDisambiguationSuffix } from './artistName';
 
 const getEnv = (...keys: string[]): string | undefined => {
   for (const key of keys) {
@@ -222,7 +223,7 @@ const buildTitleVariants = (title: string): string[] => {
 
 const buildArtistVariants = (artist: string): string[] => {
   const clean = (value: string) => value.replace(/\s+/g, ' ').trim();
-  const base = clean(artist);
+  const base = clean(stripDiscogsDisambiguationSuffix(artist) || artist);
   const variants = new Set<string>([base]);
   variants.add(clean(base.split('&')[0] || base));
   variants.add(clean(base.split(',')[0] || base));
@@ -1187,10 +1188,11 @@ const AM_TOKEN = getEnv('APPLE_MUSIC_TOKEN');
 export async function fetchAppleMusicData(album: { artist: string, title: string, apple_music_id?: string }): Promise<EnrichmentResult> {
   try {
     if (!AM_TOKEN) return { success: false, source: 'appleMusic', error: 'No Token' };
+    const searchArtist = stripDiscogsDisambiguationSuffix(album.artist) || album.artist;
     
     let amId = album.apple_music_id;
     if (!amId) {
-        const q = `${album.artist} ${album.title}`;
+        const q = `${searchArtist} ${album.title}`;
         const searchRes = await fetch(`https://api.music.apple.com/v1/catalog/us/search?term=${encodeURIComponent(q)}&types=albums&limit=1`, {
             headers: { 'Authorization': `Bearer ${AM_TOKEN}` }
         });
@@ -1262,9 +1264,10 @@ export async function fetchDiscogsData(
       };
     }
     let releaseId = album.discogs_release_id;
+    const searchArtist = stripDiscogsDisambiguationSuffix(album.artist) || album.artist;
 
     if (!releaseId) {
-      const q = `${album.artist} - ${album.title}`;
+      const q = `${searchArtist} - ${album.title}`;
       const searchData = await fetchDiscogsJson<{ results?: Array<{ id?: string | number }> }>(
         `https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release`,
         USER_AGENT,
@@ -1420,7 +1423,8 @@ export async function fetchLastFmData(album: { artist: string, title: string }):
     if (!LFM_KEY) {
       return { success: false, source: 'lastfm', error: 'Missing Last.fm API key (LASTFM_API_KEY)' };
     }
-    const url = `${LFM_BASE}?method=album.getinfo&artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.title)}&api_key=${LFM_KEY}&format=json`;
+    const searchArtist = stripDiscogsDisambiguationSuffix(album.artist) || album.artist;
+    const url = `${LFM_BASE}?method=album.getinfo&artist=${encodeURIComponent(searchArtist)}&album=${encodeURIComponent(album.title)}&api_key=${LFM_KEY}&format=json`;
     const res = await fetch(url);
     const data = await res.json();
     
@@ -1451,7 +1455,7 @@ export async function fetchLastFmData(album: { artist: string, title: string }):
     };
 
     try {
-      const similarUrl = `${LFM_BASE}?method=artist.getsimilar&artist=${encodeURIComponent(album.artist)}&limit=12&api_key=${LFM_KEY}&format=json`;
+      const similarUrl = `${LFM_BASE}?method=artist.getsimilar&artist=${encodeURIComponent(searchArtist)}&limit=12&api_key=${LFM_KEY}&format=json`;
       const similarRes = await fetch(similarUrl);
       if (similarRes.ok) {
         const similarData = await similarRes.json();
@@ -1529,6 +1533,7 @@ export async function fetchCoverArtData(album: { musicbrainz_id?: string }): Pro
 export async function fetchGeniusData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
     try {
         if (!geniusClient) return { success: false, source: 'genius', error: 'No Token' };
+        const searchArtist = stripDiscogsDisambiguationSuffix(album.artist) || album.artist;
 
         const norm = (value: string) =>
           value
@@ -1540,8 +1545,8 @@ export async function fetchGeniusData(album: { artist: string, title: string }):
         const titleVariants = buildTitleVariants(album.title).map(norm);
         const seen = new Set<string>();
         const queries = [
-          `${album.artist} ${album.title}`,
-          `${album.title} ${album.artist}`,
+          `${searchArtist} ${album.title}`,
+          `${album.title} ${searchArtist}`,
           album.title,
         ];
 
@@ -1717,8 +1722,9 @@ export async function fetchSecondHandSongsData(album: { artist: string, title: s
     const apiKey = getEnv('SHS_API_KEY');
 
     try {
+        const searchArtist = stripDiscogsDisambiguationSuffix(album.artist) || album.artist;
         // 1. Search for the Work (Song/Album)
-        const url = `https://secondhandsongs.com/search/object?q=${encodeURIComponent(album.title)}&performer=${encodeURIComponent(album.artist)}`;
+        const url = `https://secondhandsongs.com/search/object?q=${encodeURIComponent(album.title)}&performer=${encodeURIComponent(searchArtist)}`;
         const tryRequest = async (headers: HeadersInit) => {
           const res = await fetch(url, { headers });
           const text = await res.text();
@@ -1802,7 +1808,8 @@ export async function fetchTheAudioDBData(album: { artist: string, title: string
     try {
         // Use '1' for test API key or env variable
         const apiKey = process.env.THEAUDIODB_API_KEY || '1'; 
-        const url = `https://www.theaudiodb.com/api/v1/json/${apiKey}/searchalbum.php?s=${encodeURIComponent(album.artist)}&a=${encodeURIComponent(album.title)}`;
+        const searchArtist = stripDiscogsDisambiguationSuffix(album.artist) || album.artist;
+        const url = `https://www.theaudiodb.com/api/v1/json/${apiKey}/searchalbum.php?s=${encodeURIComponent(searchArtist)}&a=${encodeURIComponent(album.title)}`;
         
         const res = await fetch(url);
         const data = await res.json();
@@ -1840,6 +1847,7 @@ export async function fetchTheAudioDBData(album: { artist: string, title: string
 export async function fetchWikidataData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
     try {
         const wikiHeaders = await getWikimediaRequestHeaders();
+        const searchArtist = stripDiscogsDisambiguationSuffix(album.artist) || album.artist;
         // SPARQL Query to find album by Title AND Artist Label
         const sparql = `
             SELECT ?item ?itemLabel ?date ?producerLabel WHERE {
@@ -1849,7 +1857,7 @@ export async function fetchWikidataData(album: { artist: string, title: string }
               
               ?item wdt:P175 ?artist. # Performer
               ?artist rdfs:label ?artistLabel.
-              FILTER(REGEX(?artistLabel, "^${album.artist}$", "i"))
+              FILTER(REGEX(?artistLabel, "^${searchArtist}$", "i"))
               
               OPTIONAL { ?item wdt:P577 ?date. }
               OPTIONAL { ?item wdt:P162 ?producer. }
@@ -1897,19 +1905,20 @@ export async function fetchWikidataData(album: { artist: string, title: string }
 // ============================================================================
 export async function fetchSetlistFmData(album: { artist: string, musicbrainz_id?: string }): Promise<EnrichmentResult> {
     const apiKey = process.env.SETLIST_FM_API_KEY;
+    const searchArtist = stripDiscogsDisambiguationSuffix(album.artist) || album.artist;
     
     // Fallback if no key
     if (!apiKey) {
         return {
             success: true,
             source: 'setlistfm',
-            data: { notes: `Setlist.fm Search: https://www.setlist.fm/search?query=${encodeURIComponent(album.artist)}` }
+            data: { notes: `Setlist.fm Search: https://www.setlist.fm/search?query=${encodeURIComponent(searchArtist)}` }
         };
     }
 
     try {
         // Perform a quick search for the Artist to get their stats and URL
-        const artistSearchUrl = `https://api.setlist.fm/rest/1.0/search/artists?artistName=${encodeURIComponent(album.artist)}&sort=relevance`;
+        const artistSearchUrl = `https://api.setlist.fm/rest/1.0/search/artists?artistName=${encodeURIComponent(searchArtist)}&sort=relevance`;
         const res = await fetch(artistSearchUrl, { 
             headers: { 'x-api-key': apiKey, 'Accept': 'application/json' } 
         });
@@ -1934,7 +1943,7 @@ export async function fetchSetlistFmData(album: { artist: string, musicbrainz_id
         return {
             success: true,
             source: 'setlistfm',
-            data: { enrichment_summary: { setlistfm: `Setlist.fm Search: https://www.setlist.fm/search?query=${encodeURIComponent(album.artist)}` } }
+            data: { enrichment_summary: { setlistfm: `Setlist.fm Search: https://www.setlist.fm/search?query=${encodeURIComponent(searchArtist)}` } }
         };
     }
 }
@@ -1944,7 +1953,8 @@ export async function fetchSetlistFmData(album: { artist: string, musicbrainz_id
 // ============================================================================
 export async function fetchRateYourMusicData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
     // Scraping is blocked by Cloudflare. Provide Smart Search Link.
-    const url = `https://rateyourmusic.com/search?searchtype=l&searchterm=${encodeURIComponent(album.artist + ' ' + album.title)}`;
+    const searchArtist = stripDiscogsDisambiguationSuffix(album.artist) || album.artist;
+    const url = `https://rateyourmusic.com/search?searchtype=l&searchterm=${encodeURIComponent(searchArtist + ' ' + album.title)}`;
     return {
         success: true,
         source: 'rateyourmusic',
@@ -1995,7 +2005,8 @@ export async function fetchFanartTvData(album: { musicbrainz_id?: string }): Pro
 // ============================================================================
 export async function fetchDeezerData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
     try {
-        const query = `artist:"${album.artist}" album:"${album.title}"`;
+        const searchArtist = stripDiscogsDisambiguationSuffix(album.artist) || album.artist;
+        const query = `artist:"${searchArtist}" album:"${album.title}"`;
         const res = await fetch(`https://api.deezer.com/search/album?q=${encodeURIComponent(query)}&limit=1`);
         const data = await res.json();
         
@@ -2029,7 +2040,8 @@ export async function fetchDeezerData(album: { artist: string, title: string }):
 // ============================================================================
 export async function fetchMusixmatchData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
     // Smart Search Link
-    const url = `https://www.musixmatch.com/search/${encodeURIComponent(album.artist + ' ' + album.title)}`;
+    const searchArtist = stripDiscogsDisambiguationSuffix(album.artist) || album.artist;
+    const url = `https://www.musixmatch.com/search/${encodeURIComponent(searchArtist + ' ' + album.title)}`;
     return {
         success: true,
         source: 'musixmatch',
@@ -2043,7 +2055,8 @@ export async function fetchMusixmatchData(album: { artist: string, title: string
 // 18. POPSIKE (Vinyl Valuation)
 // ============================================================================
 export async function fetchPopsikeData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
-    const url = `https://www.popsike.com/php/quicksearch.php?searchtext=${encodeURIComponent(album.artist + ' ' + album.title)}&sortord=dprice&category=25`;
+    const searchArtist = stripDiscogsDisambiguationSuffix(album.artist) || album.artist;
+    const url = `https://www.popsike.com/php/quicksearch.php?searchtext=${encodeURIComponent(searchArtist + ' ' + album.title)}&sortord=dprice&category=25`;
     return {
         success: true,
         source: 'popsike',
@@ -2058,7 +2071,8 @@ export async function fetchPopsikeData(album: { artist: string, title: string })
 // ============================================================================
 export async function fetchPitchforkData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
     try {
-        const searchUrl = `https://pitchfork.com/search/?query=${encodeURIComponent(album.artist + ' ' + album.title)}`;
+        const searchArtist = stripDiscogsDisambiguationSuffix(album.artist) || album.artist;
+        const searchUrl = `https://pitchfork.com/search/?query=${encodeURIComponent(searchArtist + ' ' + album.title)}`;
         let reviewUrl: string | undefined;
         let score: string | undefined;
 

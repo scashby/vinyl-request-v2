@@ -1,6 +1,7 @@
 // src/app/api/enrich-sources/spotify/route.ts - WITH COMPREHENSIVE LOGGING
 import { NextResponse } from "next/server";
 import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
+import { stripDiscogsDisambiguationSuffix } from "src/lib/artistName";
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 
@@ -46,9 +47,10 @@ async function getSpotifyToken(): Promise<string> {
 
 async function searchSpotify(artist: string, title: string) {
   const token = await getSpotifyToken();
-  const query = encodeURIComponent(`artist:${artist} album:${title}`);
+  const searchArtist = stripDiscogsDisambiguationSuffix(artist) || artist;
+  const query = encodeURIComponent(`artist:${searchArtist} album:${title}`);
   
-  console.log(`  → Searching Spotify: "${artist}" - "${title}"`);
+  console.log(`  → Searching Spotify: "${searchArtist}" - "${title}"`);
   
   const res = await fetch(`https://api.spotify.com/v1/search?type=album&limit=1&q=${query}`, {
     headers: { 'Authorization': `Bearer ${token}` }

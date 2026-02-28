@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import { parseDiscogsFormat } from '../../../lib/formatParser';
 import type { Database } from '../../../types/supabase';
 import { normalizeArtist, normalizeTitle, normalizeArtistAlbum } from '../../../lib/importUtils';
+import { stripDiscogsDisambiguationSuffix } from '../../../lib/artistName';
 
 type SyncMode = 'full_replacement' | 'full_sync' | 'partial_sync' | 'new_only';
 type ImportStage = 'select_mode' | 'fetching_definitions' | 'fetching' | 'preview' | 'importing' | 'complete';
@@ -185,17 +186,18 @@ const applyArtworkToReleaseRecordings = async (
 };
 
 const getOrCreateArtist = async (name: string) => {
+  const cleanName = stripDiscogsDisambiguationSuffix(name) || 'Unknown Artist';
   const { data: existing } = await supabase
     .from('artists')
     .select('id')
-    .ilike('name', name)
+    .ilike('name', cleanName)
     .maybeSingle();
 
   if (existing) return existing;
 
   const { data: created, error } = await supabase
     .from('artists')
-    .insert({ name })
+    .insert({ name: cleanName })
     .select('id')
     .single();
 
@@ -1149,7 +1151,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
             for (const item of items) {
                 const info = item.basic_information;
-                const artist = info.artists?.[0]?.name || 'Unknown';
+                const artistRaw = info.artists?.[0]?.name || 'Unknown';
+                const artist = stripDiscogsDisambiguationSuffix(artistRaw) || 'Unknown';
                 const title = info.title || 'Unknown';
                 const year = info.year?.toString() || null;
                 const yearInt = year ? parseInt(year) : null;
@@ -1292,7 +1295,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               } | null;
               const master = release?.master;
               const formatLabel = buildFormatLabel(release);
-              const artistName = master?.artist?.name ?? 'Unknown Artist';
+              const artistName = stripDiscogsDisambiguationSuffix(master?.artist?.name) || 'Unknown Artist';
               const title = master?.title ?? 'Untitled';
               return {
                 id: row.id as number,

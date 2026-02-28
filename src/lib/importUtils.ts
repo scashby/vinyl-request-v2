@@ -1,5 +1,6 @@
 // src/lib/importUtils.ts
 import { supabase } from './supabaseClient';
+import { stripDiscogsDisambiguationSuffix } from './artistName';
 
 // ============================================================================
 // 1. STRING NORMALIZATION (Synchronous)
@@ -11,8 +12,8 @@ import { supabase } from './supabaseClient';
  */
 export function cleanArtistName(rawName: string): string {
   if (!rawName) return '';
-  // 1. Regex to strip " (2)", " (12)", etc. at the end of the string
-  let cleaned = rawName.replace(/\s\(\d+\)$/, '');
+  // 1. Strip Discogs disambiguation suffixes like " (2)"
+  let cleaned = stripDiscogsDisambiguationSuffix(rawName);
   
   // 2. Normalize " and " to " & " for consistency
   cleaned = cleaned.replace(/\s+and\s+/gi, ' & ');

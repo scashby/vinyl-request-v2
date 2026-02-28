@@ -1,5 +1,6 @@
 import Papa from "papaparse";
 import { supabaseServer } from "src/lib/supabaseServer";
+import { stripDiscogsDisambiguationSuffix } from "src/lib/artistName";
 import {
   fetchInventoryTracks as fetchLegacyInventoryTracks,
   getCachedInventoryIndex as getLegacyInventoryIndex,
@@ -194,7 +195,7 @@ const normalizeSpaces = (value: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-const normalizedValue = (value: string) =>
+const normalizedTitleValue = (value: string) =>
   normalizeSpaces(String(value ?? "").toLowerCase())
     .replace(/["'`]/g, "")
     .replace(/\([^)]*\)/g, " ")
@@ -203,8 +204,16 @@ const normalizedValue = (value: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
+const normalizedArtistValue = (value: string) =>
+  normalizeSpaces(stripDiscogsDisambiguationSuffix(String(value ?? "").toLowerCase()))
+    .replace(/["'`]/g, "")
+    .replace(/\[[^\]]*\]/g, " ")
+    .replace(/[^a-z0-9\s]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 const canonicalTitle = (value: string) => {
-  const lowered = normalizedValue(value);
+  const lowered = normalizedTitleValue(value);
 
   const tokens = lowered
     .split(/\s+/)
@@ -220,7 +229,7 @@ const canonicalTitle = (value: string) => {
 };
 
 const canonicalArtist = (value: string) => {
-  const lowered = normalizedValue(value);
+  const lowered = normalizedArtistValue(value);
 
   const tokens = lowered
     .split(/\s+/)

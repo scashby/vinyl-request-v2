@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
 import { supabaseServer } from "src/lib/supabaseServer";
+import { stripDiscogsDisambiguationSuffix } from "src/lib/artistName";
 
 const PAGE_SIZE = 1000;
 
@@ -77,11 +78,19 @@ const getCacheKeyForAuthHeader = (authHeader?: string) => {
   return "auth:unknown";
 };
 
-const normalizeValue = (value: string) =>
+const normalizeTitleValue = (value: string) =>
   value
     .toLowerCase()
     .replace(/["'`]/g, "")
     .replace(/\([^)]*\)/g, "")
+    .replace(/\[[^\]]*\]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const normalizeArtistValue = (value: string) =>
+  stripDiscogsDisambiguationSuffix(value)
+    .toLowerCase()
+    .replace(/["'`]/g, "")
     .replace(/\[[^\]]*\]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
@@ -132,18 +141,18 @@ const stripTitleNoiseTokens = (value: string) => {
   return filtered.join(" ").trim();
 };
 
-const normalizeTitle = (value: string) => stripTitleNoiseTokens(normalizeValue(value));
+const normalizeTitle = (value: string) => stripTitleNoiseTokens(normalizeTitleValue(value));
 
 const normalizeArtist = (value: string) => {
-  const normalized = normalizeValue(value);
+  const normalized = normalizeArtistValue(value);
   if (!normalized) return normalized;
   const tokens = normalized.split(/\s+/).map((t) => t.trim()).filter(Boolean);
   const filtered = tokens.filter((t) => t !== "the" && t !== "and");
   return filtered.join(" ").trim();
 };
 
-const tokenize = (value: string) =>
-  normalizeValue(value)
+const tokenize = (value: string, kind: "title" | "artist" = "title") =>
+  (kind === "artist" ? normalizeArtistValue(value) : normalizeTitleValue(value))
     .split(/\s+/)
     .map((v) => v.trim())
     .filter(Boolean);
@@ -213,8 +222,8 @@ const scoreSearchCandidate = (queryTitle: string, queryArtist: string, track: In
   const fielded = Math.min(1, titleScore * titleWeight + artistScore * artistWeight + exactTitleBoost + exactArtistBoost);
 
   // If the user types "title + artist" into the title box, this catches it.
-  const combinedQuery = normalizeValue(`${queryTitle} ${queryArtist}`.trim());
-  const combinedTrack = normalizeValue(`${track.title} ${track.artist}`.trim());
+  const combinedQuery = `${normalizeTitleValue(queryTitle)} ${normalizeArtistValue(queryArtist)}`.trim();
+  const combinedTrack = `${normalizeTitleValue(track.title)} ${normalizeArtistValue(track.artist)}`.trim();
   const combined = combinedQuery ? diceCoefficient(combinedQuery, combinedTrack) : 0;
 
   return Math.max(fielded, combined);
@@ -222,7 +231,7 @@ const scoreSearchCandidate = (queryTitle: string, queryArtist: string, track: In
 
 const collectCandidates = (rowTitle: string, rowArtist: string, index: InventoryIndex, maxPoolSize = 500): InventoryTrack[] => {
   const pool = new Map<string, InventoryTrack>();
-  for (const token of new Set([...tokenize(rowTitle), ...tokenize(rowArtist)])) {
+  for (const token of new Set([...tokenize(rowTitle, "title"), ...tokenize(rowArtist, "artist")])) {
     const tracks = index.byToken.get(token) ?? [];
     for (const track of tracks) {
       const key = getTrackKey(track);
@@ -253,8 +262,8 @@ const fuzzyCandidates = (
   index: InventoryIndex,
   opts?: { maxCandidates?: number; minScore?: number; maxPoolSize?: number }
 ): MatchCandidate[] => {
-  const rowTitle = normalizeValue(row.title ?? "");
-  const rowArtist = normalizeValue(row.artist ?? "");
+  const rowTitle = normalizeTitleValue(row.title ?? "");
+  const rowArtist = normalizeArtistValue(row.artist ?? "");
   if (!rowTitle) return [];
   const maxCandidates = opts?.maxCandidates ?? 8;
   const minScore = opts?.minScore ?? 0.5;
@@ -293,7 +302,7 @@ export const buildInventoryIndex = (tracks: InventoryTrack[]): InventoryIndex =>
 
     addToListMap(titleOnly, titleKey, track);
 
-    for (const token of new Set([...tokenize(track.title), ...tokenize(track.artist)])) {
+    for (const token of new Set([...tokenize(track.title, "title"), ...tokenize(track.artist, "artist")])) {
       addToListMap(byToken, token, track);
     }
   }
@@ -368,8 +377,8 @@ export const matchTracks = (
       // Only auto-match very high confidence + separation.
       if (best.score >= 0.93 && delta >= 0.08) {
         const bestTrack =
-          (index.titleOnly.get(normalizeValue(best.title)) ?? []).find((t) => getTrackKey(t) === best.track_key) ??
-          index.exact.get(`${normalizeValue(best.title)}::${normalizeValue(best.artist)}`);
+          (index.titleOnly.get(normalizeTitle(best.title)) ?? []).find((t) => getTrackKey(t) === best.track_key) ??
+          index.exact.get(`${normalizeTitle(best.title)}::${normalizeArtist(best.artist)}`);
         if (bestTrack) {
           matched.push(bestTrack);
           fuzzyMatchedCount += 1;

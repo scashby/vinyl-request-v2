@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthHeader, supabaseServer } from 'src/lib/supabaseServer';
+import { stripDiscogsDisambiguationSuffix } from 'src/lib/artistName';
 
 const APPLE_MUSIC_TOKEN = process.env.APPLE_MUSIC_TOKEN;
 
@@ -80,7 +81,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: 'artist and title required' }, { status: 400 });
   }
 
-  const term = encodeURIComponent(`${artist} ${title}`);
+  const searchArtist = stripDiscogsDisambiguationSuffix(artist) || artist;
+  const term = encodeURIComponent(`${searchArtist} ${title}`);
   const searchUrl = `https://api.music.apple.com/v1/catalog/${storefront}/search?types=albums&limit=5&term=${term}`;
   const searchRes = await fetch(searchUrl, { headers: getHeaders() });
 
@@ -232,7 +234,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     success: true,
-    query: { artist, title, storefront },
+    query: { artist: searchArtist, title, storefront },
     albums,
     tracks,
     persisted,
