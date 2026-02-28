@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
+import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 
 type EventRow = {
   id: number;
@@ -182,22 +183,23 @@ export default function OriginalOrCoverSetupPage() {
   const roundCountWarning = calls.length < roundCount;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,#37210f,transparent_45%),linear-gradient(180deg,#111,#070707)] p-6 text-stone-100">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,#4a3b0b,transparent_45%),linear-gradient(180deg,#111,#070707)] p-6 text-stone-100">
       <div className="mx-auto max-w-6xl space-y-6">
-        <header className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-          <p className="text-xs uppercase tracking-[0.28em] text-amber-300">Brewery Floor Mode</p>
+        <header className="rounded-3xl border border-yellow-900/40 bg-black/45 p-6">
+          <p className="text-xs uppercase tracking-[0.28em] text-yellow-300">Brewery Floor Mode</p>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-4xl font-black uppercase text-amber-100">Original or Cover Setup</h1>
+            <h1 className="text-4xl font-black uppercase text-yellow-100">Original or Cover Setup</h1>
             <div className="flex gap-2">
               <Link href="/admin/games/original-or-cover/history" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">History</Link>
               <Link href="/admin/games/original-or-cover/jumbotron" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron Scope</Link>
             </div>
           </div>
           <p className="mt-2 text-sm text-stone-300">Spin a track, teams call original vs cover, then bonus for naming the original artist.</p>
+          <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="original-or-cover" /></div>
         </header>
 
-        <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-amber-100">Session Config</h2>
+        <section className="rounded-3xl border border-yellow-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-yellow-100">Session Config</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
 
@@ -226,8 +228,8 @@ export default function OriginalOrCoverSetupPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-amber-100">Pacing Budget</h2>
+        <section className="rounded-3xl border border-yellow-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-yellow-100">Pacing Budget</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <label className="text-sm">Remove + Resleeve (sec)
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={removeResleeveSeconds} onChange={(e) => setRemoveResleeveSeconds(Math.max(0, Number(e.target.value) || 0))} />
@@ -242,28 +244,28 @@ export default function OriginalOrCoverSetupPage() {
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={hostBufferSeconds} onChange={(e) => setHostBufferSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
           </div>
-          <p className="mt-3 text-sm text-stone-300">Target gap between rounds: <span className="font-semibold text-amber-200">{targetGapSeconds}s</span></p>
+          <p className="mt-3 text-sm text-stone-300">Target gap between rounds: <span className="font-semibold text-yellow-200">{targetGapSeconds}s</span></p>
         </section>
 
         <section className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-            <h2 className="text-xl font-black uppercase text-amber-100">Teams</h2>
+          <div className="rounded-3xl border border-yellow-900/40 bg-black/45 p-6">
+            <h2 className="text-xl font-black uppercase text-yellow-100">Teams</h2>
             <p className="mt-2 text-sm text-stone-300">One team per line. Minimum 2 teams.</p>
             <textarea className="mt-3 min-h-[140px] w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm" value={teamNamesText} onChange={(e) => setTeamNamesText(e.target.value)} />
             <p className="mt-2 text-xs text-stone-400">Parsed teams: {teamNames.length}</p>
           </div>
 
-          <div className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-            <h2 className="text-xl font-black uppercase text-amber-100">Pair Deck</h2>
+          <div className="rounded-3xl border border-yellow-900/40 bg-black/45 p-6">
+            <h2 className="text-xl font-black uppercase text-yellow-100">Pair Deck</h2>
             <p className="mt-2 text-xs text-stone-300">Format: <code>Spin Artist - Track | cover|original | Original Artist | Year | Source Label | Host Notes</code></p>
             <textarea className="mt-3 min-h-[220px] w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs" value={callListText} onChange={(e) => setCallListText(e.target.value)} />
             <p className="mt-2 text-xs text-stone-400">Parsed calls: {calls.length}</p>
-            {roundCountWarning ? <p className="mt-2 text-xs text-amber-300">Need at least {roundCount} parsed calls for selected round count.</p> : null}
+            {roundCountWarning ? <p className="mt-2 text-xs text-yellow-300">Need at least {roundCount} parsed calls for selected round count.</p> : null}
           </div>
         </section>
 
-        <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-amber-100">Preflight</h2>
+        <section className="rounded-3xl border border-yellow-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-yellow-100">Preflight</h2>
           <div className="mt-4 grid gap-2 text-sm">
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.pairKeyVerified} onChange={(e) => setPreflight((prev) => ({ ...prev, pairKeyVerified: e.target.checked }))} /> Pair list order and answer key verified</label>
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.originalArtistSpellingsChecked} onChange={(e) => setPreflight((prev) => ({ ...prev, originalArtistSpellingsChecked: e.target.checked }))} /> Original artist spellings checked for scoring bonus</label>
@@ -274,7 +276,7 @@ export default function OriginalOrCoverSetupPage() {
             <button
               disabled={creating || !preflightComplete || teamNames.length < 2 || roundCountWarning}
               onClick={createSession}
-              className="rounded border border-amber-700 px-4 py-2 text-sm font-semibold uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded border border-yellow-700 px-4 py-2 text-sm font-semibold uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {creating ? "Creating..." : "Create Session"}
             </button>
@@ -283,8 +285,8 @@ export default function OriginalOrCoverSetupPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-amber-100">Recent Sessions {eventId ? "(filtered by event)" : ""}</h2>
+        <section className="rounded-3xl border border-yellow-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-yellow-100">Recent Sessions {eventId ? "(filtered by event)" : ""}</h2>
           <div className="mt-4 space-y-2 text-sm">
             {sessions.length === 0 ? (
               <p className="text-stone-400">No sessions yet.</p>

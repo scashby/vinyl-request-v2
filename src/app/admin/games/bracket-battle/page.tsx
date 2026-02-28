@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
+import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 
 type EventRow = {
   id: number;
@@ -178,14 +179,15 @@ export default function BracketBattleSetupPage() {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,#1f2f50,transparent_45%),linear-gradient(180deg,#111,#070707)] p-6 text-stone-100">
       <div className="mx-auto max-w-6xl space-y-6">
-        <header className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
-          <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">Brewery Floor Mode</p>
-          <h1 className="mt-1 text-4xl font-black uppercase text-cyan-100">Bracket Battle Setup</h1>
+        <header className="rounded-3xl border border-blue-900/40 bg-black/45 p-6">
+          <p className="text-xs uppercase tracking-[0.28em] text-blue-300">Brewery Floor Mode</p>
+          <h1 className="mt-1 text-4xl font-black uppercase text-blue-100">Bracket Battle Setup</h1>
           <p className="mt-2 text-sm text-stone-300">Seeded tournament flow with paper/hands voting and solo-DJ pacing controls.</p>
+          <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="bracket-battle" /></div>
         </header>
 
-        <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-cyan-100">Session Config</h2>
+        <section className="rounded-3xl border border-blue-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-blue-100">Session Config</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
 
@@ -237,8 +239,8 @@ export default function BracketBattleSetupPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-cyan-100">Pacing Budget</h2>
+        <section className="rounded-3xl border border-blue-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-blue-100">Pacing Budget</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <label className="text-sm">Remove + Resleeve (sec)
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={removeResleeveSeconds} onChange={(e) => setRemoveResleeveSeconds(Math.max(0, Number(e.target.value) || 0))} />
@@ -253,11 +255,11 @@ export default function BracketBattleSetupPage() {
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={hostBufferSeconds} onChange={(e) => setHostBufferSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
           </div>
-          <p className="mt-3 text-sm text-stone-300">Derived target gap: <span className="font-semibold text-cyan-300">{targetGapSeconds}s</span></p>
+          <p className="mt-3 text-sm text-stone-300">Derived target gap: <span className="font-semibold text-blue-300">{targetGapSeconds}s</span></p>
         </section>
 
-        <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-cyan-100">Teams + Bracket Deck</h2>
+        <section className="rounded-3xl border border-blue-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-blue-100">Teams + Bracket Deck</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <label className="text-sm">Teams (one per line)
               <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={teamNamesText} onChange={(e) => setTeamNamesText(e.target.value)} />
@@ -273,7 +275,7 @@ export default function BracketBattleSetupPage() {
           </div>
 
           <div className="mt-4 rounded-xl border border-stone-700 bg-stone-950/80 p-3 text-sm">
-            <p className="font-semibold uppercase tracking-wide text-cyan-200">Preflight Checklist</p>
+            <p className="font-semibold uppercase tracking-wide text-blue-200">Preflight Checklist</p>
             <div className="mt-2 grid gap-2 md:grid-cols-2">
               <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.bracketPrinted} onChange={(e) => setPreflight((p) => ({ ...p, bracketPrinted: e.target.checked }))} /> Printed bracket sheets staged</label>
               <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.slipsOrPaddlesReady} onChange={(e) => setPreflight((p) => ({ ...p, slipsOrPaddlesReady: e.target.checked }))} /> Vote slips/paddles at tables</label>
@@ -281,14 +283,14 @@ export default function BracketBattleSetupPage() {
             </div>
           </div>
 
-          <button disabled={!preflightComplete || teamNames.length < 2 || entryWarning || creating} onClick={createSession} className="mt-5 rounded bg-cyan-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+          <button disabled={!preflightComplete || teamNames.length < 2 || entryWarning || creating} onClick={createSession} className="mt-5 rounded bg-blue-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
             {creating ? "Creating..." : "Create Session"}
           </button>
         </section>
 
-        <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
+        <section className="rounded-3xl border border-blue-900/40 bg-black/45 p-6">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-xl font-black uppercase text-cyan-100">Existing Sessions</h2>
+            <h2 className="text-xl font-black uppercase text-blue-100">Existing Sessions</h2>
             <button onClick={load} className="rounded border border-stone-700 px-3 py-1 text-sm">Refresh</button>
           </div>
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
+import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 
 type EventRow = {
   id: number;
@@ -190,6 +191,7 @@ export default function BackToBackConnectionSetupPage() {
             </div>
           </div>
           <p className="mt-2 text-sm text-stone-300">Play two tracks, teams identify one accepted connection, then optionally name a specific detail.</p>
+          <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="back-to-back-connection" /></div>
         </header>
 
         <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">

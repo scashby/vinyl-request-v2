@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
+import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 
 type EventRow = {
   id: number;
@@ -199,6 +200,7 @@ export default function LyricGapRelaySetupPage() {
             </div>
           </div>
           <p className="mt-2 text-sm text-stone-300">Play to a lyric, stop, and teams fill the next line. Scoring is 2 exact, 1 close-enough, 0 miss.</p>
+          <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="lyric-gap-relay" /></div>
         </header>
 
         <section className="rounded-3xl border border-fuchsia-900/40 bg-black/45 p-6">

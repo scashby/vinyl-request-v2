@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
+import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 
 type EventRow = {
   id: number;
@@ -219,22 +220,23 @@ export default function CrateCategoriesSetupPage() {
   const roundCountWarning = rounds.length < roundCount;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,#3a1f14,transparent_42%),linear-gradient(180deg,#111,#070707)] p-6 text-stone-100">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,#243d14,transparent_42%),linear-gradient(180deg,#111,#070707)] p-6 text-stone-100">
       <div className="mx-auto max-w-6xl space-y-6">
-        <header className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-          <p className="text-xs uppercase tracking-[0.28em] text-amber-300">Brewery Floor Mode</p>
+        <header className="rounded-3xl border border-lime-900/40 bg-black/45 p-6">
+          <p className="text-xs uppercase tracking-[0.28em] text-lime-300">Brewery Floor Mode</p>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-4xl font-black uppercase text-amber-100">Crate Categories Setup</h1>
+            <h1 className="text-4xl font-black uppercase text-lime-100">Crate Categories Setup</h1>
             <div className="flex gap-2">
               <Link href="/admin/games/crate-categories/history" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">History</Link>
               <Link href="/admin/games/crate-categories/jumbotron" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron Scope</Link>
             </div>
           </div>
           <p className="mt-2 text-sm text-stone-300">Category-led rounds from your crates and tags, with pacing controls for solo-host vinyl flow.</p>
+          <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="crate-categories" /></div>
         </header>
 
-        <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-amber-100">Session Config</h2>
+        <section className="rounded-3xl border border-lime-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-lime-100">Session Config</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
 
@@ -259,8 +261,8 @@ export default function CrateCategoriesSetupPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-amber-100">Pacing Budget</h2>
+        <section className="rounded-3xl border border-lime-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-lime-100">Pacing Budget</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <label className="text-sm">Remove + Resleeve (sec)
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={removeResleeveSeconds} onChange={(e) => setRemoveResleeveSeconds(Math.max(0, Number(e.target.value) || 0))} />
@@ -275,11 +277,11 @@ export default function CrateCategoriesSetupPage() {
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={hostBufferSeconds} onChange={(e) => setHostBufferSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
           </div>
-          <p className="mt-3 text-sm text-stone-300">Target reset gap per spin: <span className="font-semibold text-amber-200">{targetGapSeconds}s</span></p>
+          <p className="mt-3 text-sm text-stone-300">Target reset gap per spin: <span className="font-semibold text-lime-200">{targetGapSeconds}s</span></p>
         </section>
 
-        <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-amber-100">Teams + Round Plan</h2>
+        <section className="rounded-3xl border border-lime-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-lime-100">Teams + Round Plan</h2>
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <label className="text-sm">Team names (one per line)
               <textarea className="mt-1 h-40 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 font-mono text-xs" value={teamNamesText} onChange={(e) => setTeamNamesText(e.target.value)} />
@@ -296,11 +298,11 @@ export default function CrateCategoriesSetupPage() {
           <div className="mt-4 rounded border border-stone-700 bg-stone-950/60 p-3 text-sm text-stone-300">
             Parsed: {teamNames.length} teams · {rounds.length} rounds · {calls.length} calls
           </div>
-          {roundCountWarning ? <p className="mt-2 text-sm text-amber-300">Round list has fewer rows than selected round count. Missing rounds auto-fill on create.</p> : null}
+          {roundCountWarning ? <p className="mt-2 text-sm text-lime-300">Round list has fewer rows than selected round count. Missing rounds auto-fill on create.</p> : null}
         </section>
 
-        <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-amber-100">Preflight</h2>
+        <section className="rounded-3xl border border-lime-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-lime-100">Preflight</h2>
           <div className="mt-3 grid gap-2 text-sm md:grid-cols-3">
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.categoryCardsPrinted} onChange={(e) => setPreflight((current) => ({ ...current, categoryCardsPrinted: e.target.checked }))} /> Category cards/prompt sheet ready</label>
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.crateOrderMarked} onChange={(e) => setPreflight((current) => ({ ...current, crateOrderMarked: e.target.checked }))} /> Crate pull order marked</label>
@@ -308,7 +310,7 @@ export default function CrateCategoriesSetupPage() {
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button className="rounded bg-amber-500 px-4 py-2 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-50" disabled={creating || !preflightComplete} onClick={createSession}>
+            <button className="rounded bg-lime-500 px-4 py-2 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-50" disabled={creating || !preflightComplete} onClick={createSession}>
               {creating ? "Creating..." : "Create Session"}
             </button>
             <Link href="/admin/games/crate-categories/host" className="rounded border border-stone-600 px-3 py-2 text-sm">Open Host Scope</Link>
@@ -316,8 +318,8 @@ export default function CrateCategoriesSetupPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-amber-100">Recent Sessions</h2>
+        <section className="rounded-3xl border border-lime-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-lime-100">Recent Sessions</h2>
           {sessions.length === 0 ? (
             <p className="mt-3 text-sm text-stone-400">No sessions yet.</p>
           ) : (

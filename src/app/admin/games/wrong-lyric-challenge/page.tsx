@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
+import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 
 type EventRow = {
   id: number;
@@ -195,22 +196,23 @@ export default function WrongLyricChallengeSetupPage() {
   const roundCountWarning = usableCalls.length < roundCount;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,#3a2b1b,transparent_45%),linear-gradient(180deg,#111,#070707)] p-6 text-stone-100">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,#3f1515,transparent_45%),linear-gradient(180deg,#111,#070707)] p-6 text-stone-100">
       <div className="mx-auto max-w-6xl space-y-6">
-        <header className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-          <p className="text-xs uppercase tracking-[0.28em] text-amber-300">Co-Host Vinyl Mode</p>
+        <header className="rounded-3xl border border-red-900/40 bg-black/45 p-6">
+          <p className="text-xs uppercase tracking-[0.28em] text-red-300">Co-Host Vinyl Mode</p>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-4xl font-black uppercase text-amber-100">Wrong Lyric Challenge Setup</h1>
+            <h1 className="text-4xl font-black uppercase text-red-100">Wrong Lyric Challenge Setup</h1>
             <div className="flex gap-2">
               <Link href="/admin/games/wrong-lyric-challenge/history" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">History</Link>
               <Link href="/admin/games/wrong-lyric-challenge/jumbotron" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron Scope</Link>
             </div>
           </div>
           <p className="mt-2 text-sm text-stone-300">Host reads lyric options while DJ cues track. Teams choose the real lyric. Score 2 for correct lyric, optional +1 for naming song.</p>
+          <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="wrong-lyric-challenge" /></div>
         </header>
 
-        <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-amber-100">Session Config</h2>
+        <section className="rounded-3xl border border-red-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-red-100">Session Config</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
 
@@ -260,8 +262,8 @@ export default function WrongLyricChallengeSetupPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-amber-100">Pacing Budget</h2>
+        <section className="rounded-3xl border border-red-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-red-100">Pacing Budget</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <label className="text-sm">Remove + Resleeve (sec)
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={removeResleeveSeconds} onChange={(e) => setRemoveResleeveSeconds(Math.max(0, Number(e.target.value) || 0))} />
@@ -276,11 +278,11 @@ export default function WrongLyricChallengeSetupPage() {
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={hostBufferSeconds} onChange={(e) => setHostBufferSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
           </div>
-          <p className="mt-3 text-sm text-stone-300">Derived target gap: <span className="font-semibold text-amber-300">{targetGapSeconds}s</span></p>
+          <p className="mt-3 text-sm text-stone-300">Derived target gap: <span className="font-semibold text-red-300">{targetGapSeconds}s</span></p>
         </section>
 
-        <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-amber-100">Teams + Lyric Option Deck</h2>
+        <section className="rounded-3xl border border-red-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-red-100">Teams + Lyric Option Deck</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <label className="text-sm">Teams (one per line)
               <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={teamNamesText} onChange={(e) => setTeamNamesText(e.target.value)} />
@@ -289,7 +291,7 @@ export default function WrongLyricChallengeSetupPage() {
 
             <label className="text-sm">Calls (Artist - Title | correct lyric | decoy1;;decoy2[;;decoy3][;;slot=1..4] | source | dj cue hint)
               <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={callListText} onChange={(e) => setCallListText(e.target.value)} />
-              <p className={`mt-1 text-xs ${roundCountWarning ? "text-amber-300" : "text-stone-400"}`}>
+              <p className={`mt-1 text-xs ${roundCountWarning ? "text-red-300" : "text-stone-400"}`}>
                 Valid calls for current option count: {usableCalls.length}. Minimum required for rounds: {roundCount}.
               </p>
             </label>
@@ -297,7 +299,7 @@ export default function WrongLyricChallengeSetupPage() {
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
-              className="rounded bg-amber-500 px-4 py-2 text-sm font-semibold text-stone-950 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded bg-red-500 px-4 py-2 text-sm font-semibold text-stone-950 disabled:cursor-not-allowed disabled:opacity-50"
               onClick={createSession}
               disabled={creating || roundCountWarning || teamNames.length < 2}
             >

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { generateBingoCardsPdf } from "src/lib/bingoCardsPdf";
 import { generateBingoCallSheetPdf } from "src/lib/bingoCallSheetPdf";
 import EditEventForm from "src/components/EditEventForm";
+import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 
 type Playlist = { id: number; name: string; track_count: number };
 type EventRow = {
@@ -174,6 +175,7 @@ export default function BingoSetupPage() {
           <p className="text-xs uppercase tracking-[0.28em] text-amber-300">Dive Bar Console</p>
           <h1 className="mt-1 text-4xl font-black uppercase text-amber-100">Vinyl Bingo Setup</h1>
           <p className="mt-2 text-sm text-stone-300">Playlist-first, analog-first, host controlled.</p>
+          <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="bingo" /></div>
         </header>
 
         <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">

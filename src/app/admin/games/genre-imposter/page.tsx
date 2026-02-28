@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
+import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 
 type EventRow = {
   id: number;
@@ -204,6 +205,7 @@ export default function GenreImposterSetupPage() {
           <p className="text-xs uppercase tracking-[0.28em] text-emerald-300">Brewery Floor Mode</p>
           <h1 className="mt-1 text-4xl font-black uppercase text-emerald-100">Genre Imposter Setup</h1>
           <p className="mt-2 text-sm text-stone-300">3-song category rounds with one imposter and debate-driven table play.</p>
+          <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="genre-imposter" /></div>
         </header>
 
         <section className="rounded-3xl border border-emerald-900/40 bg-black/45 p-6">

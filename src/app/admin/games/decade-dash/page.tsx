@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
+import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 
 type EventRow = {
   id: number;
@@ -191,6 +192,7 @@ export default function DecadeDashSetupPage() {
             </div>
           </div>
           <p className="mt-2 text-sm text-stone-300">Spin track, teams pick decade card. 12-20 quick rounds with optional adjacent-decade scoring.</p>
+          <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="decade-dash" /></div>
         </header>
 
         <section className="rounded-3xl border border-sky-900/40 bg-black/45 p-6">

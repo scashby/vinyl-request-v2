@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
+import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 
 type EventRow = {
   id: number;
@@ -188,20 +189,21 @@ export default function CoverArtClueChaseSetupPage() {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,#173a3d,transparent_45%),linear-gradient(180deg,#111,#070707)] p-6 text-stone-100">
       <div className="mx-auto max-w-6xl space-y-6">
-        <header className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
-          <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">Brewery Floor Mode</p>
+        <header className="rounded-3xl border border-teal-900/40 bg-black/45 p-6">
+          <p className="text-xs uppercase tracking-[0.28em] text-teal-300">Brewery Floor Mode</p>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-4xl font-black uppercase text-cyan-100">Cover Art Clue Chase Setup</h1>
+            <h1 className="text-4xl font-black uppercase text-teal-100">Cover Art Clue Chase Setup</h1>
             <div className="flex gap-2">
               <Link href="/admin/games/cover-art-clue-chase/history" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">History</Link>
               <Link href="/admin/games/cover-art-clue-chase/jumbotron" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron Scope</Link>
             </div>
           </div>
           <p className="mt-2 text-sm text-stone-300">Reveal album art in 3 stages with optional audio clue fallback. Solo-host-safe by design.</p>
+          <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="cover-art-clue-chase" /></div>
         </header>
 
-        <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-cyan-100">Session Config</h2>
+        <section className="rounded-3xl border border-teal-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-teal-100">Session Config</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
 
@@ -239,8 +241,8 @@ export default function CoverArtClueChaseSetupPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-cyan-100">Pacing Budget</h2>
+        <section className="rounded-3xl border border-teal-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-teal-100">Pacing Budget</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <label className="text-sm">Remove + Resleeve (sec)
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={removeResleeveSeconds} onChange={(e) => setRemoveResleeveSeconds(Math.max(0, Number(e.target.value) || 0))} />
@@ -255,11 +257,11 @@ export default function CoverArtClueChaseSetupPage() {
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={hostBufferSeconds} onChange={(e) => setHostBufferSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
           </div>
-          <p className="mt-3 text-sm text-stone-300">Derived target gap: <span className="font-semibold text-cyan-300">{targetGapSeconds}s</span></p>
+          <p className="mt-3 text-sm text-stone-300">Derived target gap: <span className="font-semibold text-teal-300">{targetGapSeconds}s</span></p>
         </section>
 
-        <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-cyan-100">Teams + Cover Art Calls</h2>
+        <section className="rounded-3xl border border-teal-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-teal-100">Teams + Cover Art Calls</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <label className="text-sm">Teams (one per line)
               <textarea className="mt-1 h-32 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={teamNamesText} onChange={(e) => setTeamNamesText(e.target.value)} />
@@ -276,22 +278,22 @@ export default function CoverArtClueChaseSetupPage() {
           </div>
 
           <div className="mt-4 rounded border border-stone-700 bg-stone-950/60 p-3 text-sm">
-            <p className="font-semibold text-cyan-200">Preflight checklist</p>
+            <p className="font-semibold text-teal-200">Preflight checklist</p>
             <label className="mt-2 block"><input type="checkbox" checked={preflight.imageDeckPrepared} onChange={(e) => setPreflight((prev) => ({ ...prev, imageDeckPrepared: e.target.checked }))} /> <span className="ml-2">Three reveal assets are prepared for every round.</span></label>
             <label className="mt-1 block"><input type="checkbox" checked={preflight.revealOrderVerified} onChange={(e) => setPreflight((prev) => ({ ...prev, revealOrderVerified: e.target.checked }))} /> <span className="ml-2">Reveal order is verified (stage 1 hardest to stage 3 easiest).</span></label>
             <label className="mt-1 block"><input type="checkbox" checked={preflight.audioCluesOptionalReady} onChange={(e) => setPreflight((prev) => ({ ...prev, audioCluesOptionalReady: e.target.checked }))} /> <span className="ml-2">Optional audio clues are cued for stall recovery.</span></label>
           </div>
 
           <div className="mt-4 flex flex-wrap gap-3">
-            <button className="rounded bg-cyan-600 px-4 py-2 font-semibold text-black disabled:opacity-40" disabled={creating || !preflightComplete || roundCountWarning} onClick={createSession}>
+            <button className="rounded bg-teal-600 px-4 py-2 font-semibold text-black disabled:opacity-40" disabled={creating || !preflightComplete || roundCountWarning} onClick={createSession}>
               {creating ? "Creating..." : "Create Session"}
             </button>
             <button className="rounded border border-stone-600 px-4 py-2" onClick={load}>Refresh</button>
           </div>
         </section>
 
-        <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-cyan-100">Recent Sessions</h2>
+        <section className="rounded-3xl border border-teal-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-teal-100">Recent Sessions</h2>
           {sessions.length === 0 ? (
             <p className="mt-3 text-sm text-stone-400">No sessions yet for this filter.</p>
           ) : (
