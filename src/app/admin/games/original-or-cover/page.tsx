@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import GameEventSelect from "src/components/GameEventSelect";
 
 type EventRow = {
   id: number;
@@ -198,14 +199,7 @@ export default function OriginalOrCoverSetupPage() {
         <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-amber-100">Session Config</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <label className="text-sm">Event (optional)
-              <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={eventId ?? ""} onChange={(e) => setEventId(Number(e.target.value) || null)}>
-                <option value="">No linked event</option>
-                {events.map((event) => (
-                  <option key={event.id} value={event.id}>{event.date} - {event.title}</option>
-                ))}
-              </select>
-            </label>
+            <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
 
             <label className="text-sm">Session Title
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} />
