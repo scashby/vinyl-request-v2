@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
+import InlineFieldHelp from "src/components/InlineFieldHelp";
 
 type EventRow = {
   id: number;
@@ -185,45 +186,45 @@ export default function NeedleDropRouletteSetupPage() {
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
 
-            <label className="text-sm">Session Title
+            <label className="text-sm">Session Title <InlineFieldHelp label="Session Title" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} />
             </label>
 
-            <label className="text-sm">Rounds (8-12)
+            <label className="text-sm">Rounds (8-12) <InlineFieldHelp label="Rounds (8-12)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={8} max={12} value={roundCount} onChange={(e) => setRoundCount(Math.max(8, Math.min(12, Number(e.target.value) || 8)))} />
             </label>
 
-            <label className="text-sm">Answer Mode
+            <label className="text-sm">Answer Mode <InlineFieldHelp label="Answer Mode" />
               <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={answerMode} onChange={(e) => setAnswerMode((e.target.value as "slips" | "whiteboard" | "mixed") ?? "slips")}>
                 {ANSWER_MODE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
 
-            <label className="text-sm">Snippet Seconds (5-10)
+            <label className="text-sm">Snippet Seconds (5-10) <InlineFieldHelp label="Snippet Seconds (5-10)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={5} max={10} value={snippetSeconds} onChange={(e) => setSnippetSeconds(Math.max(5, Math.min(10, Number(e.target.value) || 5)))} />
             </label>
           </div>
 
           <div className="mt-4 grid gap-2 text-sm md:grid-cols-3">
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> Jumbotron title</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showRound} onChange={(e) => setShowRound(e.target.checked)} /> Jumbotron round</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showScoreboard} onChange={(e) => setShowScoreboard(e.target.checked)} /> Jumbotron scoreboard</label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> <span>Jumbotron title <InlineFieldHelp label="Jumbotron title" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showRound} onChange={(e) => setShowRound(e.target.checked)} /> <span>Jumbotron round <InlineFieldHelp label="Jumbotron round" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showScoreboard} onChange={(e) => setShowScoreboard(e.target.checked)} /> <span>Jumbotron scoreboard <InlineFieldHelp label="Jumbotron scoreboard" /></span></label>
           </div>
         </section>
 
         <section className="rounded-3xl border border-orange-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-orange-100">Pacing Budget</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <label className="text-sm">Remove + Resleeve (sec)
+            <label className="text-sm">Remove + Resleeve (sec) <InlineFieldHelp label="Remove + Resleeve (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={removeResleeveSeconds} onChange={(e) => setRemoveResleeveSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Find Record (sec)
+            <label className="text-sm">Find Record (sec) <InlineFieldHelp label="Find Record (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={findRecordSeconds} onChange={(e) => setFindRecordSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Cue (sec)
+            <label className="text-sm">Cue (sec) <InlineFieldHelp label="Cue (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={cueSeconds} onChange={(e) => setCueSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Host Buffer (sec)
+            <label className="text-sm">Host Buffer (sec) <InlineFieldHelp label="Host Buffer (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={hostBufferSeconds} onChange={(e) => setHostBufferSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
           </div>
@@ -233,12 +234,12 @@ export default function NeedleDropRouletteSetupPage() {
         <section className="rounded-3xl border border-orange-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-orange-100">Teams + Needle Drop Deck</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <label className="text-sm">Teams (one per line)
+            <label className="text-sm">Teams (one per line) <InlineFieldHelp label="Teams (one per line)" />
               <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={teamNamesText} onChange={(e) => setTeamNamesText(e.target.value)} />
               <p className="mt-1 text-xs text-stone-400">Detected teams: {teamNames.length}</p>
             </label>
 
-            <label className="text-sm">Needle drops (one per line: Artist - Title | optional source)
+            <label className="text-sm">Needle drops (one per line: Artist - Title | optional source) <InlineFieldHelp label="Needle drops (one per line: Artist - Title | optional source)" />
               <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={callListText} onChange={(e) => setCallListText(e.target.value)} />
               <p className={`mt-1 text-xs ${roundCountWarning ? "text-amber-300" : "text-stone-400"}`}>
                 Valid calls: {calls.length}. Minimum required for current rounds: {roundCount}.
@@ -249,9 +250,9 @@ export default function NeedleDropRouletteSetupPage() {
           <div className="mt-4 rounded-xl border border-stone-700 bg-stone-950/80 p-3 text-sm">
             <p className="font-semibold uppercase tracking-wide text-orange-200">Preflight Checklist</p>
             <div className="mt-2 grid gap-2 md:grid-cols-2">
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.slipsOrBoardsReady} onChange={(e) => setPreflight((p) => ({ ...p, slipsOrBoardsReady: e.target.checked }))} /> Slips/whiteboards staged by table</label>
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.backupNeedleReady} onChange={(e) => setPreflight((p) => ({ ...p, backupNeedleReady: e.target.checked }))} /> Backup stylus and cleaning kit ready</label>
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.tieBreakDropReady} onChange={(e) => setPreflight((p) => ({ ...p, tieBreakDropReady: e.target.checked }))} /> Tie-break drop staged</label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.slipsOrBoardsReady} onChange={(e) => setPreflight((p) => ({ ...p, slipsOrBoardsReady: e.target.checked }))} /> <span>Slips/whiteboards staged by table <InlineFieldHelp label="Slips/whiteboards staged by table" /></span></label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.backupNeedleReady} onChange={(e) => setPreflight((p) => ({ ...p, backupNeedleReady: e.target.checked }))} /> <span>Backup stylus and cleaning kit ready <InlineFieldHelp label="Backup stylus and cleaning kit ready" /></span></label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.tieBreakDropReady} onChange={(e) => setPreflight((p) => ({ ...p, tieBreakDropReady: e.target.checked }))} /> <span>Tie-break drop staged <InlineFieldHelp label="Tie-break drop staged" /></span></label>
             </div>
           </div>
 

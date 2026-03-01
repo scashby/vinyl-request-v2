@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
+import InlineFieldHelp from "src/components/InlineFieldHelp";
 
 type EventRow = {
   id: number;
@@ -208,21 +209,21 @@ export default function LyricGapRelaySetupPage() {
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
 
-            <label className="text-sm">Session Title
+            <label className="text-sm">Session Title <InlineFieldHelp label="Session Title" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} />
             </label>
 
-            <label className="text-sm">Rounds (10-15)
+            <label className="text-sm">Rounds (10-15) <InlineFieldHelp label="Rounds (10-15)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={10} max={15} value={roundCount} onChange={(e) => setRoundCount(Math.max(10, Math.min(15, Number(e.target.value) || 10)))} />
             </label>
 
-            <label className="text-sm">Judge Mode
+            <label className="text-sm">Judge Mode <InlineFieldHelp label="Judge Mode" />
               <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={judgeMode} onChange={(e) => setJudgeMode((e.target.value as "official_key" | "crowd_check") ?? "official_key")}>
                 {JUDGE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
 
-            <label className="text-sm">Close-Match Policy
+            <label className="text-sm">Close-Match Policy <InlineFieldHelp label="Close-Match Policy" />
               <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={closeMatchPolicy} onChange={(e) => setCloseMatchPolicy((e.target.value as "host_discretion" | "strict_key") ?? "host_discretion")}>
                 {CLOSE_MATCH_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
@@ -230,26 +231,26 @@ export default function LyricGapRelaySetupPage() {
           </div>
 
           <div className="mt-4 grid gap-2 text-sm md:grid-cols-4">
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> Jumbotron title</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showRound} onChange={(e) => setShowRound(e.target.checked)} /> Jumbotron round</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showScoreboard} onChange={(e) => setShowScoreboard(e.target.checked)} /> Jumbotron scoreboard</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showAnswerMode} onChange={(e) => setShowAnswerMode(e.target.checked)} /> Show scoring mode</label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> <span>Jumbotron title <InlineFieldHelp label="Jumbotron title" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showRound} onChange={(e) => setShowRound(e.target.checked)} /> <span>Jumbotron round <InlineFieldHelp label="Jumbotron round" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showScoreboard} onChange={(e) => setShowScoreboard(e.target.checked)} /> <span>Jumbotron scoreboard <InlineFieldHelp label="Jumbotron scoreboard" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showAnswerMode} onChange={(e) => setShowAnswerMode(e.target.checked)} /> <span>Show scoring mode <InlineFieldHelp label="Show scoring mode" /></span></label>
           </div>
         </section>
 
         <section className="rounded-3xl border border-fuchsia-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-fuchsia-100">Pacing Budget</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <label className="text-sm">Remove + Resleeve (sec)
+            <label className="text-sm">Remove + Resleeve (sec) <InlineFieldHelp label="Remove + Resleeve (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={removeResleeveSeconds} onChange={(e) => setRemoveResleeveSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Find Record (sec)
+            <label className="text-sm">Find Record (sec) <InlineFieldHelp label="Find Record (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={findRecordSeconds} onChange={(e) => setFindRecordSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Cue (sec)
+            <label className="text-sm">Cue (sec) <InlineFieldHelp label="Cue (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={cueSeconds} onChange={(e) => setCueSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Host Buffer (sec)
+            <label className="text-sm">Host Buffer (sec) <InlineFieldHelp label="Host Buffer (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={hostBufferSeconds} onChange={(e) => setHostBufferSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
           </div>
@@ -259,12 +260,12 @@ export default function LyricGapRelaySetupPage() {
         <section className="rounded-3xl border border-fuchsia-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-fuchsia-100">Teams + Lyric Gap Deck</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <label className="text-sm">Teams (one per line)
+            <label className="text-sm">Teams (one per line) <InlineFieldHelp label="Teams (one per line)" />
               <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={teamNamesText} onChange={(e) => setTeamNamesText(e.target.value)} />
               <p className="mt-1 text-xs text-stone-400">Detected teams: {teamNames.length}</p>
             </label>
 
-            <label className="text-sm">Lyric gaps (Artist - Title | cue lyric {'>>>'} accepted answers separated by ;; | source)
+            <label className="text-sm">Lyric gaps (Artist - Title | cue lyric {'>>>'} accepted answers separated by ;; | source) <InlineFieldHelp label="Lyric gaps call list format" />
               <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={callListText} onChange={(e) => setCallListText(e.target.value)} />
               <p className={`mt-1 text-xs ${roundCountWarning ? "text-amber-300" : "text-stone-400"}`}>
                 Valid lyric gaps: {calls.length}. Minimum required for current rounds: {roundCount}.
@@ -275,9 +276,9 @@ export default function LyricGapRelaySetupPage() {
           <div className="mt-4 rounded-xl border border-stone-700 bg-stone-950/80 p-3 text-sm">
             <p className="font-semibold uppercase tracking-wide text-fuchsia-200">Preflight Checklist</p>
             <div className="mt-2 grid gap-2 md:grid-cols-2">
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.answerKeyPrinted} onChange={(e) => setPreflight((p) => ({ ...p, answerKeyPrinted: e.target.checked }))} /> Official answer key printed and marked</label>
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.gapsPreCueByRound} onChange={(e) => setPreflight((p) => ({ ...p, gapsPreCueByRound: e.target.checked }))} /> Gap moments pre-cued by round order</label>
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.tieBreakGapReady} onChange={(e) => setPreflight((p) => ({ ...p, tieBreakGapReady: e.target.checked }))} /> Tie-break lyric gap staged</label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.answerKeyPrinted} onChange={(e) => setPreflight((p) => ({ ...p, answerKeyPrinted: e.target.checked }))} /> <span>Official answer key printed and marked <InlineFieldHelp label="Official answer key printed and marked" /></span></label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.gapsPreCueByRound} onChange={(e) => setPreflight((p) => ({ ...p, gapsPreCueByRound: e.target.checked }))} /> <span>Gap moments pre-cued by round order <InlineFieldHelp label="Gap moments pre-cued by round order" /></span></label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.tieBreakGapReady} onChange={(e) => setPreflight((p) => ({ ...p, tieBreakGapReady: e.target.checked }))} /> <span>Tie-break lyric gap staged <InlineFieldHelp label="Tie-break lyric gap staged" /></span></label>
             </div>
           </div>
 

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
+import InlineFieldHelp from "src/components/InlineFieldHelp";
 
 type EventRow = {
   id: number;
@@ -216,37 +217,37 @@ export default function WrongLyricChallengeSetupPage() {
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
 
-            <label className="text-sm">Session Title
+            <label className="text-sm">Session Title <InlineFieldHelp label="Session Title" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} />
             </label>
 
-            <label className="text-sm">Rounds (8-14)
+            <label className="text-sm">Rounds (8-14) <InlineFieldHelp label="Rounds (8-14)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={8} max={14} value={roundCount} onChange={(e) => setRoundCount(Math.max(8, Math.min(14, Number(e.target.value) || 8)))} />
             </label>
 
-            <label className="text-sm">Lyric Points
+            <label className="text-sm">Lyric Points <InlineFieldHelp label="Lyric Points" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} max={5} value={lyricPoints} onChange={(e) => setLyricPoints(Math.max(0, Math.min(5, Number(e.target.value) || 0)))} />
             </label>
 
-            <label className="text-sm">Song Bonus
+            <label className="text-sm">Song Bonus <InlineFieldHelp label="Song Bonus" />
               <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={songBonusEnabled ? "on" : "off"} onChange={(e) => setSongBonusEnabled(e.target.value === "on")}>
                 <option value="on">Enabled</option>
                 <option value="off">Disabled</option>
               </select>
             </label>
 
-            <label className="text-sm">Song Bonus Points
+            <label className="text-sm">Song Bonus Points <InlineFieldHelp label="Song Bonus Points" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} max={3} value={songBonusPoints} onChange={(e) => setSongBonusPoints(Math.max(0, Math.min(3, Number(e.target.value) || 0)))} disabled={!songBonusEnabled} />
             </label>
 
-            <label className="text-sm">Option Count
+            <label className="text-sm">Option Count <InlineFieldHelp label="Option Count" />
               <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={optionCount} onChange={(e) => setOptionCount(Number(e.target.value) === 4 ? 4 : 3)}>
                 <option value={3}>3 options (1 real + 2 wrong)</option>
                 <option value={4}>4 options (1 real + 3 wrong)</option>
               </select>
             </label>
 
-            <label className="text-sm">Reveal Mode
+            <label className="text-sm">Reveal Mode <InlineFieldHelp label="Reveal Mode" />
               <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={revealMode} onChange={(e) => setRevealMode((e.target.value as "host_reads" | "jumbotron_choices") ?? "host_reads")}>
                 <option value="host_reads">Host Reads (recommended)</option>
                 <option value="jumbotron_choices">Jumbotron Choices</option>
@@ -255,26 +256,26 @@ export default function WrongLyricChallengeSetupPage() {
           </div>
 
           <div className="mt-4 grid gap-2 text-sm md:grid-cols-4">
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> Jumbotron title</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showRound} onChange={(e) => setShowRound(e.target.checked)} /> Jumbotron round</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showScoreboard} onChange={(e) => setShowScoreboard(e.target.checked)} /> Jumbotron scoreboard</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showOptions} onChange={(e) => setShowOptions(e.target.checked)} /> Show options on board</label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> <span>Jumbotron title <InlineFieldHelp label="Jumbotron title" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showRound} onChange={(e) => setShowRound(e.target.checked)} /> <span>Jumbotron round <InlineFieldHelp label="Jumbotron round" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showScoreboard} onChange={(e) => setShowScoreboard(e.target.checked)} /> <span>Jumbotron scoreboard <InlineFieldHelp label="Jumbotron scoreboard" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showOptions} onChange={(e) => setShowOptions(e.target.checked)} /> <span>Show options on board <InlineFieldHelp label="Show options on board" /></span></label>
           </div>
         </section>
 
         <section className="rounded-3xl border border-red-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-red-100">Pacing Budget</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <label className="text-sm">Remove + Resleeve (sec)
+            <label className="text-sm">Remove + Resleeve (sec) <InlineFieldHelp label="Remove + Resleeve (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={removeResleeveSeconds} onChange={(e) => setRemoveResleeveSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Find Record (sec)
+            <label className="text-sm">Find Record (sec) <InlineFieldHelp label="Find Record (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={findRecordSeconds} onChange={(e) => setFindRecordSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Cue (sec)
+            <label className="text-sm">Cue (sec) <InlineFieldHelp label="Cue (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={cueSeconds} onChange={(e) => setCueSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Host Buffer (sec)
+            <label className="text-sm">Host Buffer (sec) <InlineFieldHelp label="Host Buffer (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={hostBufferSeconds} onChange={(e) => setHostBufferSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
           </div>
@@ -284,12 +285,12 @@ export default function WrongLyricChallengeSetupPage() {
         <section className="rounded-3xl border border-red-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-red-100">Teams + Lyric Option Deck</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <label className="text-sm">Teams (one per line)
+            <label className="text-sm">Teams (one per line) <InlineFieldHelp label="Teams (one per line)" />
               <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={teamNamesText} onChange={(e) => setTeamNamesText(e.target.value)} />
               <p className="mt-1 text-xs text-stone-400">Detected teams: {teamNames.length}</p>
             </label>
 
-            <label className="text-sm">Calls (Artist - Title | correct lyric | decoy1;;decoy2[;;decoy3][;;slot=1..4] | source | dj cue hint)
+            <label className="text-sm">Calls (Artist - Title | correct lyric | decoy1;;decoy2[;;decoy3][;;slot=1..4] | source | dj cue hint) <InlineFieldHelp label="Calls (Artist - Title | correct lyric | decoy1;;decoy2[;;decoy3][;;slot=1..4] | source | dj cue hint)" />
               <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={callListText} onChange={(e) => setCallListText(e.target.value)} />
               <p className={`mt-1 text-xs ${roundCountWarning ? "text-red-300" : "text-stone-400"}`}>
                 Valid calls for current option count: {usableCalls.length}. Minimum required for rounds: {roundCount}.

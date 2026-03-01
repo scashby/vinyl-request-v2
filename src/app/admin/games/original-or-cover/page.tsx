@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
+import InlineFieldHelp from "src/components/InlineFieldHelp";
 
 type EventRow = {
   id: number;
@@ -203,44 +204,44 @@ export default function OriginalOrCoverSetupPage() {
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
 
-            <label className="text-sm">Session Title
+            <label className="text-sm">Session Title <InlineFieldHelp label="Session Title" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} />
             </label>
 
-            <label className="text-sm">Rounds (8-12)
+            <label className="text-sm">Rounds (8-12) <InlineFieldHelp label="Rounds (8-12)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={8} max={12} value={roundCount} onChange={(e) => setRoundCount(Math.max(8, Math.min(12, Number(e.target.value) || 8)))} />
             </label>
 
-            <label className="text-sm">Points: Correct Call
+            <label className="text-sm">Points: Correct Call <InlineFieldHelp label="Points: Correct Call" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} max={5} value={pointsCorrectCall} onChange={(e) => setPointsCorrectCall(Math.max(0, Math.min(5, Number(e.target.value) || 0)))} />
             </label>
 
-            <label className="text-sm">Bonus: Name Original Artist
+            <label className="text-sm">Bonus: Name Original Artist <InlineFieldHelp label="Bonus: Name Original Artist" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} max={3} value={bonusOriginalArtistPoints} onChange={(e) => setBonusOriginalArtistPoints(Math.max(0, Math.min(3, Number(e.target.value) || 0)))} />
             </label>
           </div>
 
           <div className="mt-4 grid gap-2 text-sm md:grid-cols-4">
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> Jumbotron title</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showRound} onChange={(e) => setShowRound(e.target.checked)} /> Jumbotron round</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showScoreboard} onChange={(e) => setShowScoreboard(e.target.checked)} /> Jumbotron scoreboard</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showPrompt} onChange={(e) => setShowPrompt(e.target.checked)} /> Show guess prompt</label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> <span>Jumbotron title <InlineFieldHelp label="Jumbotron title" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showRound} onChange={(e) => setShowRound(e.target.checked)} /> <span>Jumbotron round <InlineFieldHelp label="Jumbotron round" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showScoreboard} onChange={(e) => setShowScoreboard(e.target.checked)} /> <span>Jumbotron scoreboard <InlineFieldHelp label="Jumbotron scoreboard" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showPrompt} onChange={(e) => setShowPrompt(e.target.checked)} /> <span>Show guess prompt <InlineFieldHelp label="Show guess prompt" /></span></label>
           </div>
         </section>
 
         <section className="rounded-3xl border border-yellow-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-yellow-100">Pacing Budget</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <label className="text-sm">Remove + Resleeve (sec)
+            <label className="text-sm">Remove + Resleeve (sec) <InlineFieldHelp label="Remove + Resleeve (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={removeResleeveSeconds} onChange={(e) => setRemoveResleeveSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Find Record (sec)
+            <label className="text-sm">Find Record (sec) <InlineFieldHelp label="Find Record (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={findRecordSeconds} onChange={(e) => setFindRecordSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Cue (sec)
+            <label className="text-sm">Cue (sec) <InlineFieldHelp label="Cue (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={cueSeconds} onChange={(e) => setCueSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Host Buffer (sec)
+            <label className="text-sm">Host Buffer (sec) <InlineFieldHelp label="Host Buffer (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={hostBufferSeconds} onChange={(e) => setHostBufferSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
           </div>
@@ -267,9 +268,9 @@ export default function OriginalOrCoverSetupPage() {
         <section className="rounded-3xl border border-yellow-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-yellow-100">Preflight</h2>
           <div className="mt-4 grid gap-2 text-sm">
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.pairKeyVerified} onChange={(e) => setPreflight((prev) => ({ ...prev, pairKeyVerified: e.target.checked }))} /> Pair list order and answer key verified</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.originalArtistSpellingsChecked} onChange={(e) => setPreflight((prev) => ({ ...prev, originalArtistSpellingsChecked: e.target.checked }))} /> Original artist spellings checked for scoring bonus</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.backupQuickSwapPairsReady} onChange={(e) => setPreflight((prev) => ({ ...prev, backupQuickSwapPairsReady: e.target.checked }))} /> Backup quick-swap pair crate prepared</label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.pairKeyVerified} onChange={(e) => setPreflight((prev) => ({ ...prev, pairKeyVerified: e.target.checked }))} /> <span>Pair list order and answer key verified <InlineFieldHelp label="Pair list order and answer key verified" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.originalArtistSpellingsChecked} onChange={(e) => setPreflight((prev) => ({ ...prev, originalArtistSpellingsChecked: e.target.checked }))} /> <span>Original artist spellings checked for scoring bonus <InlineFieldHelp label="Original artist spellings checked for scoring bonus" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.backupQuickSwapPairsReady} onChange={(e) => setPreflight((prev) => ({ ...prev, backupQuickSwapPairsReady: e.target.checked }))} /> <span>Backup quick-swap pair crate prepared <InlineFieldHelp label="Backup quick-swap pair crate prepared" /></span></label>
           </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">

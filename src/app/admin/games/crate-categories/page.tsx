@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
+import InlineFieldHelp from "src/components/InlineFieldHelp";
 
 type EventRow = {
   id: number;
@@ -240,40 +241,40 @@ export default function CrateCategoriesSetupPage() {
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
 
-            <label className="text-sm">Session Title
+            <label className="text-sm">Session Title <InlineFieldHelp label="Session Title" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} />
             </label>
 
-            <label className="text-sm">Rounds (3-8)
+            <label className="text-sm">Rounds (3-8) <InlineFieldHelp label="Rounds (3-8)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={3} max={8} value={roundCount} onChange={(e) => setRoundCount(Math.max(3, Math.min(8, Number(e.target.value) || 3)))} />
             </label>
 
-            <label className="text-sm">Default tracks/round (3-5)
+            <label className="text-sm">Default tracks/round (3-5) <InlineFieldHelp label="Default tracks/round (3-5)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={3} max={5} value={defaultTracksPerRound} onChange={(e) => setDefaultTracksPerRound(Math.max(3, Math.min(5, Number(e.target.value) || 3)))} />
             </label>
           </div>
 
           <div className="mt-4 grid gap-2 text-sm md:grid-cols-4">
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> Jumbotron title</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showRound} onChange={(e) => setShowRound(e.target.checked)} /> Jumbotron round</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showPrompt} onChange={(e) => setShowPrompt(e.target.checked)} /> Jumbotron prompt</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showScoreboard} onChange={(e) => setShowScoreboard(e.target.checked)} /> Jumbotron scoreboard</label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> <span>Jumbotron title <InlineFieldHelp label="Jumbotron title" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showRound} onChange={(e) => setShowRound(e.target.checked)} /> <span>Jumbotron round <InlineFieldHelp label="Jumbotron round" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showPrompt} onChange={(e) => setShowPrompt(e.target.checked)} /> <span>Jumbotron prompt <InlineFieldHelp label="Jumbotron prompt" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showScoreboard} onChange={(e) => setShowScoreboard(e.target.checked)} /> <span>Jumbotron scoreboard <InlineFieldHelp label="Jumbotron scoreboard" /></span></label>
           </div>
         </section>
 
         <section className="rounded-3xl border border-lime-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-lime-100">Pacing Budget</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <label className="text-sm">Remove + Resleeve (sec)
+            <label className="text-sm">Remove + Resleeve (sec) <InlineFieldHelp label="Remove + Resleeve (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={removeResleeveSeconds} onChange={(e) => setRemoveResleeveSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Find Record (sec)
+            <label className="text-sm">Find Record (sec) <InlineFieldHelp label="Find Record (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={findRecordSeconds} onChange={(e) => setFindRecordSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Cue (sec)
+            <label className="text-sm">Cue (sec) <InlineFieldHelp label="Cue (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={cueSeconds} onChange={(e) => setCueSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Host Buffer (sec)
+            <label className="text-sm">Host Buffer (sec) <InlineFieldHelp label="Host Buffer (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={hostBufferSeconds} onChange={(e) => setHostBufferSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
           </div>
@@ -283,15 +284,15 @@ export default function CrateCategoriesSetupPage() {
         <section className="rounded-3xl border border-lime-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-lime-100">Teams + Round Plan</h2>
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <label className="text-sm">Team names (one per line)
+            <label className="text-sm">Team names (one per line) <InlineFieldHelp label="Team names (one per line)" />
               <textarea className="mt-1 h-40 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 font-mono text-xs" value={teamNamesText} onChange={(e) => setTeamNamesText(e.target.value)} />
             </label>
-            <label className="text-sm">Rounds (`category | prompt | tracks | points_correct | points_bonus`)
+            <label className="text-sm">Rounds (`category | prompt | tracks | points_correct | points_bonus`) <InlineFieldHelp label="Rounds (`category | prompt | tracks | points_correct | points_bonus`)" />
               <textarea className="mt-1 h-40 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 font-mono text-xs" value={roundListText} onChange={(e) => setRoundListText(e.target.value)} />
             </label>
           </div>
 
-          <label className="mt-4 block text-sm">Calls (`round | track_slot | artist - title | year | source_label | crate_tag`)
+          <label className="mt-4 block text-sm">Calls (`round | track_slot | artist - title | year | source_label | crate_tag`) <InlineFieldHelp label="Calls (`round | track_slot | artist - title | year | source_label | crate_tag`)" />
             <textarea className="mt-1 h-48 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 font-mono text-xs" value={callListText} onChange={(e) => setCallListText(e.target.value)} />
           </label>
 
@@ -304,9 +305,9 @@ export default function CrateCategoriesSetupPage() {
         <section className="rounded-3xl border border-lime-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-lime-100">Preflight</h2>
           <div className="mt-3 grid gap-2 text-sm md:grid-cols-3">
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.categoryCardsPrinted} onChange={(e) => setPreflight((current) => ({ ...current, categoryCardsPrinted: e.target.checked }))} /> Category cards/prompt sheet ready</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.crateOrderMarked} onChange={(e) => setPreflight((current) => ({ ...current, crateOrderMarked: e.target.checked }))} /> Crate pull order marked</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.resetBufferValidated} onChange={(e) => setPreflight((current) => ({ ...current, resetBufferValidated: e.target.checked }))} /> Reset buffer validated live</label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.categoryCardsPrinted} onChange={(e) => setPreflight((current) => ({ ...current, categoryCardsPrinted: e.target.checked }))} /> <span>Category cards/prompt sheet ready <InlineFieldHelp label="Category cards/prompt sheet ready" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.crateOrderMarked} onChange={(e) => setPreflight((current) => ({ ...current, crateOrderMarked: e.target.checked }))} /> <span>Crate pull order marked <InlineFieldHelp label="Crate pull order marked" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.resetBufferValidated} onChange={(e) => setPreflight((current) => ({ ...current, resetBufferValidated: e.target.checked }))} /> <span>Reset buffer validated live <InlineFieldHelp label="Reset buffer validated live" /></span></label>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">

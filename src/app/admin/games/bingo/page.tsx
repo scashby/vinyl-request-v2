@@ -6,6 +6,7 @@ import { generateBingoCardsPdf } from "src/lib/bingoCardsPdf";
 import { generateBingoCallSheetPdf } from "src/lib/bingoCallSheetPdf";
 import EditEventForm from "src/components/EditEventForm";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
+import InlineFieldHelp from "src/components/InlineFieldHelp";
 
 type Playlist = { id: number; name: string; track_count: number };
 type EventRow = {
@@ -184,7 +185,7 @@ export default function BingoSetupPage() {
             Minimum playlist size: <span className="font-semibold text-amber-300">{minTracksForMode}</span> tracks for this game.
           </p>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <label className="text-sm">Event (optional)
+            <label className="text-sm">Event (optional) <InlineFieldHelp label="Event (optional)" />
               <select
                 className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
                 value={eventId ?? ""}
@@ -205,48 +206,48 @@ export default function BingoSetupPage() {
               </select>
             </label>
 
-            <label className="text-sm">Playlist
+            <label className="text-sm">Playlist <InlineFieldHelp label="Playlist" />
               <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={playlistId ?? ""} onChange={(e) => setPlaylistId(Number(e.target.value) || null)}>
                 <option value="">Select playlist</option>
                 {playlists.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.track_count})</option>)}
               </select>
             </label>
 
-            <label className="text-sm">Game Mode
+            <label className="text-sm">Game Mode <InlineFieldHelp label="Game Mode" />
               <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={gameMode} onChange={(e) => setGameMode(e.target.value)}>
                 {GAME_MODE_OPTIONS.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}
               </select>
             </label>
 
-            <label className="text-sm">Card Count
+            <label className="text-sm">Card Count <InlineFieldHelp label="Card Count" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={1} value={cardCount} onChange={(e) => setCardCount(Number(e.target.value) || 1)} />
             </label>
 
-            <label className="text-sm">Rounds
+            <label className="text-sm">Rounds <InlineFieldHelp label="Rounds" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={1} value={roundCount} onChange={(e) => setRoundCount(Number(e.target.value) || 1)} />
             </label>
 
-            <label className="text-sm">Remove + Resleeve (sec)
+            <label className="text-sm">Remove + Resleeve (sec) <InlineFieldHelp label="Remove + Resleeve (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={removeResleeveSeconds} onChange={(e) => setRemoveResleeveSeconds(Number(e.target.value) || 0)} />
             </label>
 
-            <label className="text-sm">Place New Vinyl (sec)
+            <label className="text-sm">Place New Vinyl (sec) <InlineFieldHelp label="Place New Vinyl (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={placeVinylSeconds} onChange={(e) => setPlaceVinylSeconds(Number(e.target.value) || 0)} />
             </label>
 
-            <label className="text-sm">Cue Track (sec)
+            <label className="text-sm">Cue Track (sec) <InlineFieldHelp label="Cue Track (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={cueSeconds} onChange={(e) => setCueSeconds(Number(e.target.value) || 0)} />
             </label>
 
-            <label className="text-sm">Press Start + Slide (sec)
+            <label className="text-sm">Press Start + Slide (sec) <InlineFieldHelp label="Press Start + Slide (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={startSlideSeconds} onChange={(e) => setStartSlideSeconds(Number(e.target.value) || 0)} />
             </label>
 
-            <label className="text-sm">Host Buffer (sec)
+            <label className="text-sm">Host Buffer (sec) <InlineFieldHelp label="Host Buffer (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={hostBufferSeconds} onChange={(e) => setHostBufferSeconds(Number(e.target.value) || 0)} />
             </label>
 
-            <label className="text-sm">Sonos Output Delay (ms)
+            <label className="text-sm">Sonos Output Delay (ms) <InlineFieldHelp label="Sonos Output Delay (ms)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={sonosDelayMs} onChange={(e) => setSonosDelayMs(Number(e.target.value) || 0)} />
             </label>
           </div>

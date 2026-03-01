@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
+import InlineFieldHelp from "src/components/InlineFieldHelp";
 
 type EventRow = {
   id: number;
@@ -188,47 +189,47 @@ export default function MusicTriviaSetupPage() {
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
 
-            <label className="text-sm">Session Title
+            <label className="text-sm">Session Title <InlineFieldHelp label="Session Title" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} />
             </label>
 
-            <label className="text-sm">Score Mode
+            <label className="text-sm">Score Mode <InlineFieldHelp label="Score Mode" />
               <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={scoreMode} onChange={(e) => setScoreMode((e.target.value as "standard" | "difficulty_bonus_static") ?? "difficulty_bonus_static")}>
                 <option value="difficulty_bonus_static">Difficulty Bonus (Static)</option>
                 <option value="standard">Standard</option>
               </select>
             </label>
 
-            <label className="text-sm">Rounds
+            <label className="text-sm">Rounds <InlineFieldHelp label="Rounds" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={1} value={roundCount} onChange={(e) => setRoundCount(Math.max(1, Number(e.target.value) || 1))} />
             </label>
 
-            <label className="text-sm">Questions / Round
+            <label className="text-sm">Questions / Round <InlineFieldHelp label="Questions / Round" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={1} value={questionsPerRound} onChange={(e) => setQuestionsPerRound(Math.max(1, Number(e.target.value) || 1))} />
             </label>
           </div>
 
           <div className="mt-4 grid gap-2 text-sm md:grid-cols-2">
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> Jumbotron title</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showRounds} onChange={(e) => setShowRounds(e.target.checked)} /> Jumbotron round status</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showQuestionCounter} onChange={(e) => setShowQuestionCounter(e.target.checked)} /> Jumbotron question counter</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showLeaderboard} onChange={(e) => setShowLeaderboard(e.target.checked)} /> Jumbotron leaderboard</label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> <span>Jumbotron title <InlineFieldHelp label="Jumbotron title" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showRounds} onChange={(e) => setShowRounds(e.target.checked)} /> <span>Jumbotron round status <InlineFieldHelp label="Jumbotron round status" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showQuestionCounter} onChange={(e) => setShowQuestionCounter(e.target.checked)} /> <span>Jumbotron question counter <InlineFieldHelp label="Jumbotron question counter" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showLeaderboard} onChange={(e) => setShowLeaderboard(e.target.checked)} /> <span>Jumbotron leaderboard <InlineFieldHelp label="Jumbotron leaderboard" /></span></label>
           </div>
         </section>
 
         <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-cyan-100">Pacing Budget</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <label className="text-sm">Remove + Resleeve (sec)
+            <label className="text-sm">Remove + Resleeve (sec) <InlineFieldHelp label="Remove + Resleeve (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={removeResleeveSeconds} onChange={(e) => setRemoveResleeveSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Find Record (sec)
+            <label className="text-sm">Find Record (sec) <InlineFieldHelp label="Find Record (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={findRecordSeconds} onChange={(e) => setFindRecordSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Cue (sec)
+            <label className="text-sm">Cue (sec) <InlineFieldHelp label="Cue (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={cueSeconds} onChange={(e) => setCueSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Host Buffer (sec)
+            <label className="text-sm">Host Buffer (sec) <InlineFieldHelp label="Host Buffer (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={hostBufferSeconds} onChange={(e) => setHostBufferSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
           </div>
@@ -249,13 +250,13 @@ export default function MusicTriviaSetupPage() {
           </div>
 
           <div className="mt-4 grid gap-4 md:grid-cols-3">
-            <label className="text-sm">Easy target
+            <label className="text-sm">Easy target <InlineFieldHelp label="Easy target" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={difficultyEasy} onChange={(e) => setDifficultyEasy(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Medium target
+            <label className="text-sm">Medium target <InlineFieldHelp label="Medium target" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={difficultyMedium} onChange={(e) => setDifficultyMedium(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Hard target
+            <label className="text-sm">Hard target <InlineFieldHelp label="Hard target" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={difficultyHard} onChange={(e) => setDifficultyHard(Math.max(0, Number(e.target.value) || 0))} />
             </label>
           </div>
@@ -264,16 +265,16 @@ export default function MusicTriviaSetupPage() {
         <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-cyan-100">Team Setup</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <label className="text-sm">Teams (one per line)
+            <label className="text-sm">Teams (one per line) <InlineFieldHelp label="Teams (one per line)" />
               <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={teamNamesText} onChange={(e) => setTeamNamesText(e.target.value)} />
               <p className="mt-1 text-xs text-stone-400">Detected teams: {teamNames.length}</p>
             </label>
 
             <div className="grid gap-4">
-              <label className="text-sm">Max teams (optional)
+              <label className="text-sm">Max teams (optional) <InlineFieldHelp label="Max teams (optional)" />
                 <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={maxTeams} onChange={(e) => setMaxTeams(Math.max(0, Number(e.target.value) || 0))} />
               </label>
-              <label className="text-sm">Slips batch size (optional)
+              <label className="text-sm">Slips batch size (optional) <InlineFieldHelp label="Slips batch size (optional)" />
                 <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={slipsBatchSize} onChange={(e) => setSlipsBatchSize(Math.max(0, Number(e.target.value) || 0))} />
               </label>
             </div>
@@ -282,10 +283,10 @@ export default function MusicTriviaSetupPage() {
           <div className="mt-4 rounded-xl border border-stone-700 bg-stone-950/80 p-3 text-sm">
             <p className="font-semibold uppercase tracking-wide text-cyan-200">Preflight Checklist</p>
             <div className="mt-2 grid gap-2 md:grid-cols-2">
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.backupQuestions} onChange={(e) => setPreflight((p) => ({ ...p, backupQuestions: e.target.checked }))} /> Backup questions ready</label>
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.answerSlips} onChange={(e) => setPreflight((p) => ({ ...p, answerSlips: e.target.checked }))} /> Answer slips ready</label>
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.pencilsMarkers} onChange={(e) => setPreflight((p) => ({ ...p, pencilsMarkers: e.target.checked }))} /> Pencils/markers ready</label>
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.tieBreaker} onChange={(e) => setPreflight((p) => ({ ...p, tieBreaker: e.target.checked }))} /> Tie-breaker ready</label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.backupQuestions} onChange={(e) => setPreflight((p) => ({ ...p, backupQuestions: e.target.checked }))} /> <span>Backup questions ready <InlineFieldHelp label="Backup questions ready" /></span></label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.answerSlips} onChange={(e) => setPreflight((p) => ({ ...p, answerSlips: e.target.checked }))} /> <span>Answer slips ready <InlineFieldHelp label="Answer slips ready" /></span></label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.pencilsMarkers} onChange={(e) => setPreflight((p) => ({ ...p, pencilsMarkers: e.target.checked }))} /> <span>Pencils/markers ready <InlineFieldHelp label="Pencils/markers ready" /></span></label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.tieBreaker} onChange={(e) => setPreflight((p) => ({ ...p, tieBreaker: e.target.checked }))} /> <span>Tie-breaker ready <InlineFieldHelp label="Tie-breaker ready" /></span></label>
             </div>
           </div>
 

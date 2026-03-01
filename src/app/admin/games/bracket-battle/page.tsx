@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
+import InlineFieldHelp from "src/components/InlineFieldHelp";
 
 type EventRow = {
   id: number;
@@ -192,7 +193,7 @@ export default function BracketBattleSetupPage() {
             <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
 
             <label className="text-sm">
-              Session Title
+              Session Title <InlineFieldHelp label="Session Title" />
               <input
                 className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
                 value={title}
@@ -201,7 +202,7 @@ export default function BracketBattleSetupPage() {
             </label>
 
             <label className="text-sm">
-              Bracket Size
+              Bracket Size <InlineFieldHelp label="Bracket Size" />
               <select
                 className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
                 value={bracketSize}
@@ -216,7 +217,7 @@ export default function BracketBattleSetupPage() {
             </label>
 
             <label className="text-sm">
-              Vote Method
+              Vote Method <InlineFieldHelp label="Vote Method" />
               <select
                 className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
                 value={voteMethod}
@@ -232,26 +233,26 @@ export default function BracketBattleSetupPage() {
           </div>
 
           <div className="mt-4 grid gap-2 text-sm md:grid-cols-4">
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> Jumbotron title</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showRound} onChange={(e) => setShowRound(e.target.checked)} /> Jumbotron round</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showBracket} onChange={(e) => setShowBracket(e.target.checked)} /> Jumbotron bracket</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showScoreboard} onChange={(e) => setShowScoreboard(e.target.checked)} /> Jumbotron scoreboard</label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> <span>Jumbotron title <InlineFieldHelp label="Jumbotron title" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showRound} onChange={(e) => setShowRound(e.target.checked)} /> <span>Jumbotron round <InlineFieldHelp label="Jumbotron round" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showBracket} onChange={(e) => setShowBracket(e.target.checked)} /> <span>Jumbotron bracket <InlineFieldHelp label="Jumbotron bracket" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showScoreboard} onChange={(e) => setShowScoreboard(e.target.checked)} /> <span>Jumbotron scoreboard <InlineFieldHelp label="Jumbotron scoreboard" /></span></label>
           </div>
         </section>
 
         <section className="rounded-3xl border border-blue-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-blue-100">Pacing Budget</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <label className="text-sm">Remove + Resleeve (sec)
+            <label className="text-sm">Remove + Resleeve (sec) <InlineFieldHelp label="Remove + Resleeve (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={removeResleeveSeconds} onChange={(e) => setRemoveResleeveSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Find Record (sec)
+            <label className="text-sm">Find Record (sec) <InlineFieldHelp label="Find Record (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={findRecordSeconds} onChange={(e) => setFindRecordSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Cue (sec)
+            <label className="text-sm">Cue (sec) <InlineFieldHelp label="Cue (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={cueSeconds} onChange={(e) => setCueSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
-            <label className="text-sm">Host Buffer (sec)
+            <label className="text-sm">Host Buffer (sec) <InlineFieldHelp label="Host Buffer (sec)" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={hostBufferSeconds} onChange={(e) => setHostBufferSeconds(Math.max(0, Number(e.target.value) || 0))} />
             </label>
           </div>
@@ -261,12 +262,12 @@ export default function BracketBattleSetupPage() {
         <section className="rounded-3xl border border-blue-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-blue-100">Teams + Bracket Deck</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <label className="text-sm">Teams (one per line)
+            <label className="text-sm">Teams (one per line) <InlineFieldHelp label="Teams (one per line)" />
               <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={teamNamesText} onChange={(e) => setTeamNamesText(e.target.value)} />
               <p className="mt-1 text-xs text-stone-400">Detected teams: {teamNames.length}</p>
             </label>
 
-            <label className="text-sm">Bracket entries (one per line: <code>seed. Artist - Title | optional source</code>)
+            <label className="text-sm">Bracket entries <InlineFieldHelp label="Bracket entries" /> (one per line: <code>seed. Artist - Title | optional source</code>)
               <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={entryListText} onChange={(e) => setEntryListText(e.target.value)} />
               <p className={`mt-1 text-xs ${entryWarning ? "text-amber-300" : "text-stone-400"}`}>
                 Valid entries: {entries.length}. Minimum required for current bracket size: {bracketSize}.
@@ -277,9 +278,9 @@ export default function BracketBattleSetupPage() {
           <div className="mt-4 rounded-xl border border-stone-700 bg-stone-950/80 p-3 text-sm">
             <p className="font-semibold uppercase tracking-wide text-blue-200">Preflight Checklist</p>
             <div className="mt-2 grid gap-2 md:grid-cols-2">
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.bracketPrinted} onChange={(e) => setPreflight((p) => ({ ...p, bracketPrinted: e.target.checked }))} /> Printed bracket sheets staged</label>
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.slipsOrPaddlesReady} onChange={(e) => setPreflight((p) => ({ ...p, slipsOrPaddlesReady: e.target.checked }))} /> Vote slips/paddles at tables</label>
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.tieBreakerReady} onChange={(e) => setPreflight((p) => ({ ...p, tieBreakerReady: e.target.checked }))} /> Tie-breaker matchup prepped</label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.bracketPrinted} onChange={(e) => setPreflight((p) => ({ ...p, bracketPrinted: e.target.checked }))} /> <span>Printed bracket sheets staged <InlineFieldHelp label="Printed bracket sheets staged" /></span></label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.slipsOrPaddlesReady} onChange={(e) => setPreflight((p) => ({ ...p, slipsOrPaddlesReady: e.target.checked }))} /> <span>Vote slips/paddles at tables <InlineFieldHelp label="Vote slips/paddles at tables" /></span></label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.tieBreakerReady} onChange={(e) => setPreflight((p) => ({ ...p, tieBreakerReady: e.target.checked }))} /> <span>Tie-breaker matchup prepped <InlineFieldHelp label="Tie-breaker matchup prepped" /></span></label>
             </div>
           </div>
 

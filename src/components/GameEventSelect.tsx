@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import EditEventForm from "src/components/EditEventForm";
+import InlineFieldHelp from "src/components/InlineFieldHelp";
 
 type EventRow = {
   id: number;
@@ -46,7 +47,7 @@ export default function GameEventSelect(props: GameEventSelectProps) {
   return (
     <>
       <label className="text-sm">
-        {label}
+        {label} <InlineFieldHelp label={label} />
         <select
           className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
           value={eventId ?? ""}
