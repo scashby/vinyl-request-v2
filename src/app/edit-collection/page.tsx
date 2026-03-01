@@ -1851,7 +1851,6 @@ function CollectionBrowserPage() {
   }, [crates, albums, crateItemCounts]);
 
   const allTrackRows = useMemo<CollectionTrackRow[]>(() => {
-    if (!tracksHydrated) return [];
     const rows: CollectionTrackRow[] = [];
 
     albums.forEach((album) => {
@@ -1918,7 +1917,7 @@ function CollectionBrowserPage() {
     });
 
     return rows;
-  }, [albums, collectionFilter, tracksHydrated]);
+  }, [albums, collectionFilter]);
 
   const trackFormatCounts = useMemo(() => {
     return allTrackRows.reduce((acc, row) => {
@@ -3400,7 +3399,7 @@ function CollectionBrowserPage() {
             <div className="flex-1 overflow-hidden bg-white min-h-0">
               {loading ? (
                 <div className="p-10 text-center text-[#666]">Loading albums...</div>
-              ) : viewMode !== 'collection' && !tracksHydrated ? (
+              ) : viewMode !== 'collection' && !tracksHydrated && allTrackRows.length === 0 ? (
                 <div className="p-10 text-center text-[#666]">Loading track data...</div>
               ) : (
                 viewMode === 'collection' ? (
