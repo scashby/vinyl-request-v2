@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
+import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
 
@@ -13,6 +14,12 @@ type EventRow = {
   date: string;
   time: string | null;
   location: string | null;
+};
+
+type PlaylistRow = {
+  id: number;
+  name: string;
+  track_count: number;
 };
 
 type SessionRow = {
@@ -107,9 +114,11 @@ export default function CrateCategoriesSetupPage() {
   const eventIdFromUrl = Number(searchParams.get("eventId"));
 
   const [events, setEvents] = useState<EventRow[]>([]);
+  const [playlists, setPlaylists] = useState<PlaylistRow[]>([]);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
 
   const [eventId, setEventId] = useState<number | null>(Number.isFinite(eventIdFromUrl) ? eventIdFromUrl : null);
+  const [playlistId, setPlaylistId] = useState<number | null>(null);
   const [title, setTitle] = useState("Crate Categories Session");
   const [roundCount, setRoundCount] = useState(4);
   const [defaultTracksPerRound, setDefaultTracksPerRound] = useState(4);
@@ -160,15 +169,34 @@ export default function CrateCategoriesSetupPage() {
     [cueSeconds, findRecordSeconds, hostBufferSeconds, removeResleeveSeconds]
   );
 
+  const minimumPlaylistTracks = useMemo(
+    () => Math.max(roundCount * defaultTracksPerRound + defaultTracksPerRound, calls.length),
+    [roundCount, defaultTracksPerRound, calls.length]
+  );
+  const selectedPlaylist = useMemo(
+    () => playlists.find((playlist) => playlist.id === playlistId) ?? null,
+    [playlists, playlistId]
+  );
+  const playlistTooSmall = useMemo(
+    () => (selectedPlaylist ? selectedPlaylist.track_count < minimumPlaylistTracks : false),
+    [minimumPlaylistTracks, selectedPlaylist]
+  );
+
   const load = useCallback(async () => {
-    const [eventRes, sessionRes] = await Promise.all([
+    const [eventRes, playlistRes, sessionRes] = await Promise.all([
       fetch("/api/games/crate-categories/events"),
+      fetch("/api/games/playlists"),
       fetch(`/api/games/crate-categories/sessions${eventId ? `?eventId=${eventId}` : ""}`),
     ]);
 
     if (eventRes.ok) {
       const payload = await eventRes.json();
       setEvents(payload.data ?? []);
+    }
+
+    if (playlistRes.ok) {
+      const payload = await playlistRes.json();
+      setPlaylists(payload.data ?? []);
     }
 
     if (sessionRes.ok) {
@@ -182,6 +210,14 @@ export default function CrateCategoriesSetupPage() {
   }, [load]);
 
   const createSession = async () => {
+    if (!playlistId) {
+      alert("Select a playlist bank first");
+      return;
+    }
+    if (playlistTooSmall && selectedPlaylist) {
+      alert(`Selected playlist has ${selectedPlaylist.track_count} tracks. This setup needs at least ${minimumPlaylistTracks}.`);
+      return;
+    }
     setCreating(true);
     try {
       const res = await fetch("/api/games/crate-categories/sessions", {
@@ -189,6 +225,7 @@ export default function CrateCategoriesSetupPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           event_id: eventId,
+          playlist_id: playlistId,
           title,
           round_count: roundCount,
           default_tracks_per_round: defaultTracksPerRound,
@@ -240,6 +277,7 @@ export default function CrateCategoriesSetupPage() {
           <h2 className="text-xl font-black uppercase text-lime-100">Session Config</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
+            <GamePlaylistSelect playlists={playlists} playlistId={playlistId} setPlaylistId={setPlaylistId} />
 
             <label className="text-sm">Session Title <InlineFieldHelp label="Session Title" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -253,6 +291,19 @@ export default function CrateCategoriesSetupPage() {
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={3} max={5} value={defaultTracksPerRound} onChange={(e) => setDefaultTracksPerRound(Math.max(3, Math.min(5, Number(e.target.value) || 3)))} />
             </label>
           </div>
+
+          <p className="mt-2 text-xs text-stone-300">
+            Minimum playlist size for current setup:{" "}
+            <span className="font-semibold text-emerald-300">{minimumPlaylistTracks}</span> tracks.
+          </p>
+          {selectedPlaylist ? (
+            <p className={`mt-1 text-xs ${playlistTooSmall ? "text-red-300" : "text-emerald-300"}`}>
+              Selected bank: {selectedPlaylist.name} ({selectedPlaylist.track_count} tracks)
+              {playlistTooSmall ? ` · add ${minimumPlaylistTracks - selectedPlaylist.track_count} tracks or lower setup requirements.` : " · meets minimum."}
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-amber-300">Select a playlist bank to validate minimum track requirement.</p>
+          )}
 
           <div className="mt-4 grid gap-2 text-sm md:grid-cols-4">
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> <span>Jumbotron title <InlineFieldHelp label="Jumbotron title" /></span></label>
@@ -311,7 +362,7 @@ export default function CrateCategoriesSetupPage() {
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button className="rounded bg-lime-500 px-4 py-2 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-50" disabled={creating || !preflightComplete} onClick={createSession}>
+            <button className="rounded bg-lime-500 px-4 py-2 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-50" disabled={!playlistId || playlistTooSmall || creating || !preflightComplete} onClick={createSession}>
               {creating ? "Creating..." : "Create Session"}
             </button>
             <Link href="/admin/games/crate-categories/host" className="rounded border border-stone-600 px-3 py-2 text-sm">Open Host Scope</Link>

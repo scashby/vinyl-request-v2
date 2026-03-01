@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { generateNameThatTunePullListPdf } from "src/lib/nameThatTunePullListPdf";
 import GameEventSelect from "src/components/GameEventSelect";
+import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
 
@@ -12,6 +14,12 @@ type EventRow = {
   date: string;
   time: string | null;
   location: string | null;
+};
+
+type PlaylistRow = {
+  id: number;
+  name: string;
+  track_count: number;
 };
 
 type SessionRow = {
@@ -33,6 +41,17 @@ type SnippetDraft = {
   snippet_start_seconds?: number;
   snippet_duration_seconds?: number;
   host_notes?: string;
+};
+
+type PullListApiRow = {
+  call_index: number;
+  round_number: number;
+  artist_answer: string;
+  title_answer: string;
+  source_label?: string | null;
+  snippet_start_seconds?: number | null;
+  snippet_duration_seconds?: number | null;
+  host_notes?: string | null;
 };
 
 const LOCK_IN_OPTIONS = [
@@ -64,9 +83,11 @@ export default function NameThatTuneSetupPage() {
   const eventIdFromUrl = Number(searchParams.get("eventId"));
 
   const [events, setEvents] = useState<EventRow[]>([]);
+  const [playlists, setPlaylists] = useState<PlaylistRow[]>([]);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
 
   const [eventId, setEventId] = useState<number | null>(Number.isFinite(eventIdFromUrl) ? eventIdFromUrl : null);
+  const [playlistId, setPlaylistId] = useState<number | null>(null);
   const [title, setTitle] = useState("Name That Tune Session");
   const [roundCount, setRoundCount] = useState(10);
   const [lockInRule, setLockInRule] = useState<"time_window" | "first_sheet_wins" | "hand_raise">("time_window");
@@ -114,16 +135,34 @@ export default function NameThatTuneSetupPage() {
   );
   const backupSnippetCount = useMemo(() => Math.max(2, Math.ceil(roundCount * 0.2)), [roundCount]);
   const recommendedPullSize = useMemo(() => roundCount + backupSnippetCount, [backupSnippetCount, roundCount]);
+  const minimumPlaylistTracks = useMemo(
+    () => Math.max(recommendedPullSize, snippets.length),
+    [recommendedPullSize, snippets.length]
+  );
+  const selectedPlaylist = useMemo(
+    () => playlists.find((playlist) => playlist.id === playlistId) ?? null,
+    [playlists, playlistId]
+  );
+  const playlistTooSmall = useMemo(
+    () => (selectedPlaylist ? selectedPlaylist.track_count < minimumPlaylistTracks : false),
+    [minimumPlaylistTracks, selectedPlaylist]
+  );
 
   const load = useCallback(async () => {
-    const [eventRes, sessionRes] = await Promise.all([
+    const [eventRes, playlistRes, sessionRes] = await Promise.all([
       fetch("/api/games/name-that-tune/events"),
+      fetch("/api/games/playlists"),
       fetch(`/api/games/name-that-tune/sessions${eventId ? `?eventId=${eventId}` : ""}`),
     ]);
 
     if (eventRes.ok) {
       const payload = await eventRes.json();
       setEvents(payload.data ?? []);
+    }
+
+    if (playlistRes.ok) {
+      const payload = await playlistRes.json();
+      setPlaylists(payload.data ?? []);
     }
 
     if (sessionRes.ok) {
@@ -137,6 +176,16 @@ export default function NameThatTuneSetupPage() {
   }, [load]);
 
   const createSession = async () => {
+    if (!playlistId) {
+      alert("Select a playlist bank first");
+      return;
+    }
+    if (playlistTooSmall && selectedPlaylist) {
+      alert(
+        `Selected playlist has ${selectedPlaylist.track_count} tracks. This setup needs at least ${minimumPlaylistTracks}.`
+      );
+      return;
+    }
     setCreating(true);
     try {
       const res = await fetch("/api/games/name-that-tune/sessions", {
@@ -144,6 +193,7 @@ export default function NameThatTuneSetupPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           event_id: eventId,
+          playlist_id: playlistId,
           title,
           round_count: roundCount,
           lock_in_rule: lockInRule,
@@ -172,6 +222,24 @@ export default function NameThatTuneSetupPage() {
     }
   };
 
+  const downloadPullList = async (sessionId: number, sessionCode: string) => {
+    const res = await fetch(`/api/games/name-that-tune/sessions/${sessionId}/calls`);
+    if (!res.ok) {
+      alert("Failed to load pull list for PDF");
+      return;
+    }
+
+    const payload = (await res.json()) as { data?: PullListApiRow[] };
+    const rows = payload.data ?? [];
+    if (!rows.length) {
+      alert("No pull list rows found for this session");
+      return;
+    }
+
+    const doc = generateNameThatTunePullListPdf(rows, `Name That Tune Pull List · ${sessionCode}`);
+    doc.save(`ntt-${sessionCode.toLowerCase()}-pull-list.pdf`);
+  };
+
   const roundCountWarning = snippets.length < roundCount;
   const recommendedPullWarning = snippets.length < recommendedPullSize;
 
@@ -189,6 +257,7 @@ export default function NameThatTuneSetupPage() {
           <h2 className="text-xl font-black uppercase text-rose-100">Session Config</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
+            <GamePlaylistSelect playlists={playlists} playlistId={playlistId} setPlaylistId={setPlaylistId} />
 
             <label className="text-sm">Session Title <InlineFieldHelp label="Session Title" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -208,6 +277,20 @@ export default function NameThatTuneSetupPage() {
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={5} value={lockInWindowSeconds} onChange={(e) => setLockInWindowSeconds(Math.max(5, Number(e.target.value) || 5))} />
             </label>
           </div>
+
+          <p className="mt-2 text-xs text-stone-300">
+            Minimum playlist size for current setup:{" "}
+            <span className="font-semibold text-rose-300">{minimumPlaylistTracks}</span>{" "}
+            tracks (max of snippet deck {snippets.length} and pull target {recommendedPullSize}).
+          </p>
+          {selectedPlaylist ? (
+            <p className={`mt-1 text-xs ${playlistTooSmall ? "text-red-300" : "text-emerald-300"}`}>
+              Selected bank: {selectedPlaylist.name} ({selectedPlaylist.track_count} tracks)
+              {playlistTooSmall ? ` · add ${minimumPlaylistTracks - selectedPlaylist.track_count} tracks or reduce rounds.` : " · meets minimum."}
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-amber-300">Select a playlist bank to validate minimum track requirement.</p>
+          )}
 
           <div className="mt-4 grid gap-2 text-sm md:grid-cols-3">
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> <span>Jumbotron title <InlineFieldHelp label="Jumbotron title" /></span></label>
@@ -264,7 +347,7 @@ export default function NameThatTuneSetupPage() {
             </div>
           </div>
 
-          <button disabled={!preflightComplete || teamNames.length < 2 || roundCountWarning || creating} onClick={createSession} className="mt-5 rounded bg-rose-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+          <button disabled={!playlistId || playlistTooSmall || !preflightComplete || teamNames.length < 2 || roundCountWarning || creating} onClick={createSession} className="mt-5 rounded bg-rose-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
             {creating ? "Creating..." : "Create Session"}
           </button>
         </section>
@@ -287,6 +370,7 @@ export default function NameThatTuneSetupPage() {
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/name-that-tune/host?sessionId=${session.id}`)}>Host</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/name-that-tune/assistant?sessionId=${session.id}`)}>Assistant</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/name-that-tune/jumbotron?sessionId=${session.id}`)}>Jumbotron</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadPullList(session.id, session.session_code)}>Pull List PDF</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push("/admin/games/name-that-tune/history")}>History</button>
                   </div>
                 </div>

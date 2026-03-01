@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
+import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
 
@@ -13,6 +14,12 @@ type EventRow = {
   date: string;
   time: string | null;
   location: string | null;
+};
+
+type PlaylistRow = {
+  id: number;
+  name: string;
+  track_count: number;
 };
 
 type SessionRow = {
@@ -67,9 +74,11 @@ export default function BackToBackConnectionSetupPage() {
   const eventIdFromUrl = Number(searchParams.get("eventId"));
 
   const [events, setEvents] = useState<EventRow[]>([]);
+  const [playlists, setPlaylists] = useState<PlaylistRow[]>([]);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
 
   const [eventId, setEventId] = useState<number | null>(Number.isFinite(eventIdFromUrl) ? eventIdFromUrl : null);
+  const [playlistId, setPlaylistId] = useState<number | null>(null);
   const [title, setTitle] = useState("Back-to-Back Connection Session");
   const [roundCount, setRoundCount] = useState(10);
   const [connectionPoints, setConnectionPoints] = useState(2);
@@ -117,15 +126,34 @@ export default function BackToBackConnectionSetupPage() {
     [cueSeconds, findRecordSeconds, hostBufferSeconds, removeResleeveSeconds]
   );
 
+  const minimumPlaylistTracks = useMemo(
+    () => Math.max((roundCount + 1) * 2, calls.length * 2),
+    [roundCount, calls.length]
+  );
+  const selectedPlaylist = useMemo(
+    () => playlists.find((playlist) => playlist.id === playlistId) ?? null,
+    [playlists, playlistId]
+  );
+  const playlistTooSmall = useMemo(
+    () => (selectedPlaylist ? selectedPlaylist.track_count < minimumPlaylistTracks : false),
+    [minimumPlaylistTracks, selectedPlaylist]
+  );
+
   const load = useCallback(async () => {
-    const [eventRes, sessionRes] = await Promise.all([
+    const [eventRes, playlistRes, sessionRes] = await Promise.all([
       fetch("/api/games/back-to-back-connection/events"),
+      fetch("/api/games/playlists"),
       fetch(`/api/games/back-to-back-connection/sessions${eventId ? `?eventId=${eventId}` : ""}`),
     ]);
 
     if (eventRes.ok) {
       const payload = await eventRes.json();
       setEvents(payload.data ?? []);
+    }
+
+    if (playlistRes.ok) {
+      const payload = await playlistRes.json();
+      setPlaylists(payload.data ?? []);
     }
 
     if (sessionRes.ok) {
@@ -139,6 +167,14 @@ export default function BackToBackConnectionSetupPage() {
   }, [load]);
 
   const createSession = async () => {
+    if (!playlistId) {
+      alert("Select a playlist bank first");
+      return;
+    }
+    if (playlistTooSmall && selectedPlaylist) {
+      alert(`Selected playlist has ${selectedPlaylist.track_count} tracks. This setup needs at least ${minimumPlaylistTracks}.`);
+      return;
+    }
     setCreating(true);
     try {
       const res = await fetch("/api/games/back-to-back-connection/sessions", {
@@ -146,6 +182,7 @@ export default function BackToBackConnectionSetupPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           event_id: eventId,
+          playlist_id: playlistId,
           title,
           round_count: roundCount,
           connection_points: connectionPoints,
@@ -199,6 +236,7 @@ export default function BackToBackConnectionSetupPage() {
           <h2 className="text-xl font-black uppercase text-amber-100">Session Config</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
+            <GamePlaylistSelect playlists={playlists} playlistId={playlistId} setPlaylistId={setPlaylistId} />
 
             <label className="text-sm">Session Title <InlineFieldHelp label="Session Title" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -216,6 +254,19 @@ export default function BackToBackConnectionSetupPage() {
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} max={2} value={detailBonusPoints} onChange={(e) => setDetailBonusPoints(Math.max(0, Math.min(2, Number(e.target.value) || 0)))} />
             </label>
           </div>
+
+          <p className="mt-2 text-xs text-stone-300">
+            Minimum playlist size for current setup:{" "}
+            <span className="font-semibold text-emerald-300">{minimumPlaylistTracks}</span> tracks.
+          </p>
+          {selectedPlaylist ? (
+            <p className={`mt-1 text-xs ${playlistTooSmall ? "text-red-300" : "text-emerald-300"}`}>
+              Selected bank: {selectedPlaylist.name} ({selectedPlaylist.track_count} tracks)
+              {playlistTooSmall ? ` · add ${minimumPlaylistTracks - selectedPlaylist.track_count} tracks or lower setup requirements.` : " · meets minimum."}
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-amber-300">Select a playlist bank to validate minimum track requirement.</p>
+          )}
 
           <div className="mt-4 grid gap-2 text-sm md:grid-cols-4">
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> <span>Jumbotron title <InlineFieldHelp label="Jumbotron title" /></span></label>
@@ -270,7 +321,7 @@ export default function BackToBackConnectionSetupPage() {
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button disabled={creating || !preflightComplete || roundCountWarning || teamNames.length < 2} onClick={createSession} className="rounded bg-amber-600 px-4 py-2 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:bg-stone-700 disabled:text-stone-300">
+            <button disabled={!playlistId || playlistTooSmall || creating || !preflightComplete || roundCountWarning || teamNames.length < 2} onClick={createSession} className="rounded bg-amber-600 px-4 py-2 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:bg-stone-700 disabled:text-stone-300">
               {creating ? "Creating..." : "Create Session"}
             </button>
             {!preflightComplete ? <p className="text-xs text-amber-300">Complete preflight before creating session.</p> : null}

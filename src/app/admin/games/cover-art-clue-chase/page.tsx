@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
+import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
 
@@ -13,6 +14,12 @@ type EventRow = {
   date: string;
   time: string | null;
   location: string | null;
+};
+
+type PlaylistRow = {
+  id: number;
+  name: string;
+  track_count: number;
 };
 
 type SessionRow = {
@@ -73,9 +80,11 @@ export default function CoverArtClueChaseSetupPage() {
   const eventIdFromUrl = Number(searchParams.get("eventId"));
 
   const [events, setEvents] = useState<EventRow[]>([]);
+  const [playlists, setPlaylists] = useState<PlaylistRow[]>([]);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
 
   const [eventId, setEventId] = useState<number | null>(Number.isFinite(eventIdFromUrl) ? eventIdFromUrl : null);
+  const [playlistId, setPlaylistId] = useState<number | null>(null);
   const [title, setTitle] = useState("Cover Art Clue Chase Session");
   const [roundCount, setRoundCount] = useState(10);
   const [stageOnePoints, setStageOnePoints] = useState(3);
@@ -125,15 +134,34 @@ export default function CoverArtClueChaseSetupPage() {
     [cueSeconds, findRecordSeconds, hostBufferSeconds, removeResleeveSeconds]
   );
 
+  const minimumPlaylistTracks = useMemo(
+    () => Math.max(roundCount + 2, calls.length),
+    [roundCount, calls.length]
+  );
+  const selectedPlaylist = useMemo(
+    () => playlists.find((playlist) => playlist.id === playlistId) ?? null,
+    [playlists, playlistId]
+  );
+  const playlistTooSmall = useMemo(
+    () => (selectedPlaylist ? selectedPlaylist.track_count < minimumPlaylistTracks : false),
+    [minimumPlaylistTracks, selectedPlaylist]
+  );
+
   const load = useCallback(async () => {
-    const [eventRes, sessionRes] = await Promise.all([
+    const [eventRes, playlistRes, sessionRes] = await Promise.all([
       fetch("/api/games/cover-art-clue-chase/events"),
+      fetch("/api/games/playlists"),
       fetch(`/api/games/cover-art-clue-chase/sessions${eventId ? `?eventId=${eventId}` : ""}`),
     ]);
 
     if (eventRes.ok) {
       const payload = await eventRes.json();
       setEvents(payload.data ?? []);
+    }
+
+    if (playlistRes.ok) {
+      const payload = await playlistRes.json();
+      setPlaylists(payload.data ?? []);
     }
 
     if (sessionRes.ok) {
@@ -147,6 +175,14 @@ export default function CoverArtClueChaseSetupPage() {
   }, [load]);
 
   const createSession = async () => {
+    if (!playlistId) {
+      alert("Select a playlist bank first");
+      return;
+    }
+    if (playlistTooSmall && selectedPlaylist) {
+      alert(`Selected playlist has ${selectedPlaylist.track_count} tracks. This setup needs at least ${minimumPlaylistTracks}.`);
+      return;
+    }
     setCreating(true);
     try {
       const res = await fetch("/api/games/cover-art-clue-chase/sessions", {
@@ -154,6 +190,7 @@ export default function CoverArtClueChaseSetupPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           event_id: eventId,
+          playlist_id: playlistId,
           title,
           round_count: roundCount,
           stage_one_points: stageOnePoints,
@@ -207,6 +244,7 @@ export default function CoverArtClueChaseSetupPage() {
           <h2 className="text-xl font-black uppercase text-teal-100">Session Config</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
+            <GamePlaylistSelect playlists={playlists} playlistId={playlistId} setPlaylistId={setPlaylistId} />
 
             <label className="text-sm">Session Title <InlineFieldHelp label="Session Title" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -233,6 +271,19 @@ export default function CoverArtClueChaseSetupPage() {
               <span>Audio clue fallback enabled <InlineFieldHelp label="Audio clue fallback enabled" /></span>
             </label>
           </div>
+
+          <p className="mt-2 text-xs text-stone-300">
+            Minimum playlist size for current setup:{" "}
+            <span className="font-semibold text-emerald-300">{minimumPlaylistTracks}</span> tracks.
+          </p>
+          {selectedPlaylist ? (
+            <p className={`mt-1 text-xs ${playlistTooSmall ? "text-red-300" : "text-emerald-300"}`}>
+              Selected bank: {selectedPlaylist.name} ({selectedPlaylist.track_count} tracks)
+              {playlistTooSmall ? ` · add ${minimumPlaylistTracks - selectedPlaylist.track_count} tracks or lower setup requirements.` : " · meets minimum."}
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-amber-300">Select a playlist bank to validate minimum track requirement.</p>
+          )}
 
           <div className="mt-4 grid gap-2 text-sm md:grid-cols-4">
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> <span>Jumbotron title <InlineFieldHelp label="Jumbotron title" /></span></label>
@@ -286,7 +337,7 @@ export default function CoverArtClueChaseSetupPage() {
           </div>
 
           <div className="mt-4 flex flex-wrap gap-3">
-            <button className="rounded bg-teal-600 px-4 py-2 font-semibold text-black disabled:opacity-40" disabled={creating || !preflightComplete || roundCountWarning} onClick={createSession}>
+            <button className="rounded bg-teal-600 px-4 py-2 font-semibold text-black disabled:opacity-40" disabled={!playlistId || playlistTooSmall || creating || !preflightComplete || roundCountWarning} onClick={createSession}>
               {creating ? "Creating..." : "Create Session"}
             </button>
             <button className="rounded border border-stone-600 px-4 py-2" onClick={load}>Refresh</button>

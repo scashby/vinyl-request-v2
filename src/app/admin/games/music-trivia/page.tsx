@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
+import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
 
@@ -12,6 +13,12 @@ type EventRow = {
   date: string;
   time: string | null;
   location: string | null;
+};
+
+type PlaylistRow = {
+  id: number;
+  name: string;
+  track_count: number;
 };
 
 type SessionRow = {
@@ -44,9 +51,11 @@ export default function MusicTriviaSetupPage() {
   const eventIdFromUrl = Number(searchParams.get("eventId"));
 
   const [events, setEvents] = useState<EventRow[]>([]);
+  const [playlists, setPlaylists] = useState<PlaylistRow[]>([]);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
 
   const [eventId, setEventId] = useState<number | null>(Number.isFinite(eventIdFromUrl) ? eventIdFromUrl : null);
+  const [playlistId, setPlaylistId] = useState<number | null>(null);
   const [title, setTitle] = useState("Music Trivia Session");
   const [roundCount, setRoundCount] = useState(3);
   const [questionsPerRound, setQuestionsPerRound] = useState(5);
@@ -99,17 +108,40 @@ export default function MusicTriviaSetupPage() {
   );
 
   const callStackPreview = Math.max(1, roundCount) * Math.max(1, questionsPerRound);
+  const backupQuestionTracks = useMemo(() => Math.max(3, Math.ceil(callStackPreview * 0.15)), [callStackPreview]);
+  const recommendedPullSize = useMemo(
+    () => callStackPreview + backupQuestionTracks,
+    [backupQuestionTracks, callStackPreview]
+  );
+  const minimumPlaylistTracks = useMemo(
+    () => Math.max(recommendedPullSize, callStackPreview),
+    [recommendedPullSize, callStackPreview]
+  );
+  const selectedPlaylist = useMemo(
+    () => playlists.find((playlist) => playlist.id === playlistId) ?? null,
+    [playlistId, playlists]
+  );
+  const playlistTooSmall = useMemo(
+    () => (selectedPlaylist ? selectedPlaylist.track_count < minimumPlaylistTracks : false),
+    [minimumPlaylistTracks, selectedPlaylist]
+  );
   const preflightComplete = Object.values(preflight).every(Boolean);
 
   const load = useCallback(async () => {
-    const [eventRes, sessionRes] = await Promise.all([
+    const [eventRes, playlistRes, sessionRes] = await Promise.all([
       fetch("/api/games/trivia/events"),
+      fetch("/api/games/playlists"),
       fetch(`/api/games/trivia/sessions${eventId ? `?eventId=${eventId}` : ""}`),
     ]);
 
     if (eventRes.ok) {
       const payload = await eventRes.json();
       setEvents(payload.data ?? []);
+    }
+
+    if (playlistRes.ok) {
+      const payload = await playlistRes.json();
+      setPlaylists(payload.data ?? []);
     }
 
     if (sessionRes.ok) {
@@ -130,6 +162,14 @@ export default function MusicTriviaSetupPage() {
   };
 
   const createSession = async () => {
+    if (!playlistId) {
+      alert("Select a playlist bank first");
+      return;
+    }
+    if (playlistTooSmall && selectedPlaylist) {
+      alert(`Selected playlist has ${selectedPlaylist.track_count} tracks. This setup needs at least ${minimumPlaylistTracks}.`);
+      return;
+    }
     if (teamNames.length < 2) return;
     setCreating(true);
     try {
@@ -138,6 +178,7 @@ export default function MusicTriviaSetupPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           event_id: eventId,
+          playlist_id: playlistId,
           title,
           round_count: roundCount,
           questions_per_round: questionsPerRound,
@@ -188,6 +229,7 @@ export default function MusicTriviaSetupPage() {
           <h2 className="text-xl font-black uppercase text-cyan-100">Session Config</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
+            <GamePlaylistSelect playlists={playlists} playlistId={playlistId} setPlaylistId={setPlaylistId} />
 
             <label className="text-sm">Session Title <InlineFieldHelp label="Session Title" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -208,6 +250,22 @@ export default function MusicTriviaSetupPage() {
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={1} value={questionsPerRound} onChange={(e) => setQuestionsPerRound(Math.max(1, Number(e.target.value) || 1))} />
             </label>
           </div>
+
+          <p className="mt-2 text-xs text-stone-300">
+            Minimum playlist size for current setup:{" "}
+            <span className="font-semibold text-emerald-300">{minimumPlaylistTracks}</span> tracks.
+          </p>
+          <p className="mt-1 text-xs text-cyan-300">
+            Recommended playlist/crate pull: {recommendedPullSize} ({callStackPreview} primary + {backupQuestionTracks} backup).
+          </p>
+          {selectedPlaylist ? (
+            <p className={`mt-1 text-xs ${playlistTooSmall ? "text-red-300" : "text-emerald-300"}`}>
+              Selected bank: {selectedPlaylist.name} ({selectedPlaylist.track_count} tracks)
+              {playlistTooSmall ? ` · add ${minimumPlaylistTracks - selectedPlaylist.track_count} tracks or lower setup requirements.` : " · meets minimum."}
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-amber-300">Select a playlist bank to validate minimum track requirement.</p>
+          )}
 
           <div className="mt-4 grid gap-2 text-sm md:grid-cols-2">
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> <span>Jumbotron title <InlineFieldHelp label="Jumbotron title" /></span></label>
@@ -290,7 +348,7 @@ export default function MusicTriviaSetupPage() {
             </div>
           </div>
 
-          <button disabled={!preflightComplete || teamNames.length < 2 || creating} onClick={createSession} className="mt-5 rounded bg-cyan-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+          <button disabled={!playlistId || playlistTooSmall || !preflightComplete || teamNames.length < 2 || creating} onClick={createSession} className="mt-5 rounded bg-cyan-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
             {creating ? "Creating..." : "Create Session"}
           </button>
         </section>

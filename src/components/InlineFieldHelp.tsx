@@ -43,6 +43,15 @@ function resolveHelp(label: string): HelpContent {
         "Avoid duplicate-heavy lists unless the format expects repeats.",
       ]
     ),
+    "playlist bank": content(
+      "Playlist Bank",
+      "Choose the playlist that serves as the source bank for this game session.",
+      [
+        "Treat this as your canonical source before preparing pull rows.",
+        "Pick a bank with enough tracks for rounds plus backup/tie-break pulls.",
+        "Keep one bank per session to avoid host confusion mid-game.",
+      ]
+    ),
     "playlist pull calls": content(
       "Playlist Pull Calls",
       "This is your structured pull sheet built from a playlist/crate source, not manual song ideation from scratch.",
