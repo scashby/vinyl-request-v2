@@ -76,7 +76,16 @@ const LOCK_IN_OPTIONS = [
 ] as const;
 
 function toSnippet(item: PlaylistTrackApiItem, index: number): SnippetDraft {
-  const sideAndPosition = [item.side?.trim(), item.position?.trim()].filter(Boolean).join(" ");
+  const side = item.side?.trim() || "";
+  const position = item.position?.trim() || "";
+  let sideAndPosition = "";
+  if (side && position) {
+    const upperSide = side.toUpperCase();
+    const upperPosition = position.toUpperCase();
+    sideAndPosition = upperPosition.startsWith(upperSide) ? position : `${side} ${position}`;
+  } else {
+    sideAndPosition = position || side;
+  }
   const sourceLabel = [item.album_name?.trim() || null, sideAndPosition || null].filter(Boolean).join(" | ");
   return {
     artist: item.artist_name?.trim() || "Unknown Artist",

@@ -1,7 +1,7 @@
 // src/app/edit-collection/page.tsx
 'use client';
 
-import { useCallback, useEffect, useState, useMemo, Suspense, Fragment } from 'react';
+import { useCallback, useEffect, useState, useMemo, Suspense, Fragment, type ReactNode } from 'react';
 import { supabase as supabaseTyped } from '../../lib/supabaseClient';
 import CollectionTable from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
@@ -152,6 +152,58 @@ const normalizeTrackPosition = (position: string | null | undefined, fallback: n
   const raw = (position ?? '').trim();
   if (raw) return raw;
   return String(fallback);
+};
+
+const DEFAULT_PLAYLIST_VISIBLE_COLUMNS: ColumnId[] = [
+  'checkbox',
+  'title',
+  'artist',
+  'sort_title',
+  'subtitle',
+  'length',
+  'my_rating',
+];
+
+const formatDisplayDate = (value: string | null | undefined): string => {
+  if (!value) return '—';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '—';
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const formatDisplayCurrency = (value: number | null | undefined): string => {
+  if (value == null) return '—';
+  return `$${value.toFixed(2)}`;
+};
+
+const formatTrackStatus = (status: string | null | undefined): string => {
+  if (!status) return '—';
+  switch (status) {
+    case 'wishlist':
+    case 'wish_list':
+      return 'Wish List';
+    case 'incoming':
+    case 'on_order':
+      return 'On Order';
+    case 'sold':
+      return 'Sold';
+    case 'active':
+      return 'In Collection';
+    case 'for_sale':
+      return 'For Sale';
+    default:
+      return status;
+  }
+};
+
+const formatTrackArrayValues = (values: string[] | null | undefined): string => {
+  if (!values || values.length === 0) return '—';
+  return values.join(' | ');
+};
+
+const getTrackPositionLabel = (row: CollectionTrackRow): string => {
+  const positionNumber = (row.position.match(/\d+/g) ?? [row.position]).slice(-1)[0];
+  return row.side ? `${row.side}${positionNumber}` : row.position;
 };
 
 const pickSmartPlaylistMix = (
@@ -1696,6 +1748,150 @@ function CollectionBrowserPage() {
     }
   }, [loadPlaylists, playlists, selectedTrackKeys]);
 
+  const playlistVisibleColumns = useMemo<ColumnId[]>(() => {
+    if (visibleColumns.length === 0) {
+      return [...DEFAULT_PLAYLIST_VISIBLE_COLUMNS];
+    }
+    const deduped = visibleColumns.filter((id, index, arr) => arr.indexOf(id) === index);
+    return deduped.length > 0 ? deduped : [...DEFAULT_PLAYLIST_VISIBLE_COLUMNS];
+  }, [visibleColumns]);
+
+  const getPlaylistColumnLabel = useCallback((columnId: ColumnId): string => {
+    switch (columnId) {
+      case 'title':
+        return 'Track';
+      case 'artist':
+        return 'Artist';
+      case 'sort_title':
+        return 'Album';
+      case 'subtitle':
+      case 'sides':
+        return 'Pos';
+      case 'labels':
+        return 'Label';
+      default:
+        return COLUMN_DEFINITIONS[columnId]?.label || columnId;
+    }
+  }, []);
+
+  const renderPlaylistCell = useCallback((row: CollectionTrackRow, columnId: ColumnId): ReactNode => {
+    switch (columnId) {
+      case 'checkbox': {
+        const isChecked = selectedTrackKeys.has(row.key);
+        return (
+          <input
+            type="checkbox"
+            checked={isChecked}
+            onChange={() => toggleTrackSelection(row.key)}
+            onClick={(e) => e.stopPropagation()}
+          />
+        );
+      }
+      case 'owned':
+        return <span className="text-green-600">✓</span>;
+      case 'for_sale_indicator':
+        return row.forSale ? '$' : '';
+      case 'menu':
+        return (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEditAlbum(row.inventoryId);
+            }}
+            className="text-blue-600 hover:underline"
+            title="Edit album"
+          >
+            ✏
+          </button>
+        );
+      case 'artist':
+        return row.trackArtist || row.albumArtist || '—';
+      case 'title':
+        return row.trackTitle || '—';
+      case 'year':
+        return row.yearInt ?? '—';
+      case 'barcode':
+        return row.barcode || '—';
+      case 'cat_no':
+        return row.catalogNumber || '—';
+      case 'sort_title':
+        return row.albumTitle || '—';
+      case 'subtitle':
+        return getTrackPositionLabel(row);
+      case 'format':
+        return row.trackFormatFacets.join(' | ') || row.albumMediaType || '—';
+      case 'discs':
+        return row.discs ?? '—';
+      case 'sides':
+        return getTrackPositionLabel(row);
+      case 'tracks':
+        return row.position || '—';
+      case 'length':
+        return row.durationLabel || '—';
+      case 'location':
+        return row.location || '—';
+      case 'country':
+        return row.country || '—';
+      case 'extra':
+        return row.packaging || row.notes || '—';
+      case 'media_condition':
+        return row.mediaCondition || '—';
+      case 'package_sleeve_condition':
+        return row.packageSleeveCondition || row.sleeveCondition || '—';
+      case 'rpm':
+        return row.rpm || '—';
+      case 'vinyl_color':
+        return '—';
+      case 'vinyl_weight':
+        return row.vinylWeight || '—';
+      case 'genres':
+        return formatTrackArrayValues(row.genres);
+      case 'styles':
+        return '—';
+      case 'labels':
+        return formatTrackArrayValues(row.labels ?? (row.label ? [row.label] : []));
+      case 'engineers':
+        return formatTrackArrayValues(row.engineers);
+      case 'musicians':
+        return formatTrackArrayValues(row.musicians);
+      case 'producers':
+        return formatTrackArrayValues(row.producers);
+      case 'songwriters':
+        return formatTrackArrayValues(row.songwriters);
+      case 'secondary_artists':
+        return row.trackArtist !== row.albumArtist ? row.trackArtist : '—';
+      case 'added_date':
+        return formatDisplayDate(row.dateAdded);
+      case 'collection_status':
+        return formatTrackStatus(row.status);
+      case 'my_rating':
+        return row.myRating ?? '—';
+      case 'personal_notes':
+        return row.personalNotes || '—';
+      case 'release_notes':
+        return row.releaseNotes || '—';
+      case 'master_notes':
+        return row.masterNotes || '—';
+      case 'owner':
+        return row.owner || '—';
+      case 'custom_tags':
+        return formatTrackArrayValues(row.customTags);
+      case 'modified_date':
+        return formatDisplayDate(row.lastPlayedAt);
+      case 'for_sale':
+        return row.forSale ? 'Yes' : 'No';
+      case 'purchase_price':
+        return formatDisplayCurrency(row.purchasePrice);
+      case 'current_value':
+        return formatDisplayCurrency(row.currentValue);
+      case 'sale_price':
+        return '—';
+      default:
+        return '—';
+    }
+  }, [handleEditAlbum, selectedTrackKeys, toggleTrackSelection]);
+
   return (
     <>
       <style>{`
@@ -2240,52 +2436,55 @@ function CollectionBrowserPage() {
                     <table className="w-full border-collapse text-sm">
                       <thead className="sticky top-0 z-10 bg-[#f5f5f5] border-b border-[#ddd]">
                         <tr>
-                          <th className="w-[42px] px-2 py-2 text-left font-semibold text-[#666]">
-                            <input
-                              type="checkbox"
-                              checked={filteredTrackRows.length > 0 && selectedTrackKeys.size === filteredTrackRows.length}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedTrackKeys(new Set(filteredTrackRows.map((row) => row.key)));
-                                } else {
-                                  setSelectedTrackKeys(new Set());
-                                }
-                              }}
-                            />
-                          </th>
-                          <th className="px-2 py-2 text-left font-semibold text-[#666]">Track</th>
-                          <th className="px-2 py-2 text-left font-semibold text-[#666]">Artist</th>
-                          <th className="px-2 py-2 text-left font-semibold text-[#666]">Album</th>
-                          <th className="px-2 py-2 text-left font-semibold text-[#666]">Pos</th>
-                          <th className="px-2 py-2 text-right font-semibold text-[#666]">Length</th>
-                          <th className="px-2 py-2 text-right font-semibold text-[#666]">Rating</th>
+                          {playlistVisibleColumns.map((columnId) => {
+                            const isControlCol = ['checkbox', 'owned', 'for_sale_indicator', 'menu'].includes(columnId);
+                            const isRightAligned = ['length', 'my_rating', 'purchase_price', 'current_value', 'sale_price'].includes(columnId);
+                            return (
+                              <th
+                                key={`playlist-header-${columnId}`}
+                                className={`${isControlCol ? 'w-[42px]' : ''} px-2 py-2 ${isControlCol ? 'text-center' : isRightAligned ? 'text-right' : 'text-left'} font-semibold text-[#666]`}
+                              >
+                                {columnId === 'checkbox' ? (
+                                  <input
+                                    type="checkbox"
+                                    checked={filteredTrackRows.length > 0 && selectedTrackKeys.size === filteredTrackRows.length}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedTrackKeys(new Set(filteredTrackRows.map((row) => row.key)));
+                                      } else {
+                                        setSelectedTrackKeys(new Set());
+                                      }
+                                    }}
+                                  />
+                                ) : (
+                                  getPlaylistColumnLabel(columnId)
+                                )}
+                              </th>
+                            );
+                          })}
                         </tr>
                       </thead>
                       <tbody>
                         {filteredTrackRows.map((row) => {
-                          const isChecked = selectedTrackKeys.has(row.key);
-                          const positionNumber = (row.position.match(/\d+/g) ?? [row.position]).slice(-1)[0];
-                          const positionLabel = row.side ? `${row.side}${positionNumber}` : row.position;
                           return (
                             <tr
                               key={row.key}
                               onClick={() => setSelectedAlbumId(row.inventoryId)}
                               className={`border-b border-[#eee] cursor-pointer ${selectedAlbumId === row.inventoryId ? 'bg-[#f8fbff]' : 'hover:bg-[#fafafa]'}`}
                             >
-                              <td className="px-2 py-2">
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={() => toggleTrackSelection(row.key)}
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              </td>
-                              <td className="px-2 py-2 text-[#1f2937]">{row.trackTitle}</td>
-                              <td className="px-2 py-2 text-[#374151]">{row.trackArtist}</td>
-                              <td className="px-2 py-2 text-[#6b7280]">{row.albumTitle}</td>
-                              <td className="px-2 py-2 text-[#4b5563]">{positionLabel}</td>
-                              <td className="px-2 py-2 text-right text-[#4b5563]">{row.durationLabel}</td>
-                              <td className="px-2 py-2 text-right text-[#4b5563]">{row.myRating ?? '—'}</td>
+                              {playlistVisibleColumns.map((columnId) => {
+                                const isControlCol = ['checkbox', 'owned', 'for_sale_indicator', 'menu'].includes(columnId);
+                                const isRightAligned = ['length', 'my_rating', 'purchase_price', 'current_value', 'sale_price'].includes(columnId);
+                                const textColor = isControlCol ? 'text-[#4b5563]' : columnId === 'title' ? 'text-[#1f2937]' : columnId === 'artist' ? 'text-[#374151]' : 'text-[#4b5563]';
+                                return (
+                                  <td
+                                    key={`${row.key}-${columnId}`}
+                                    className={`px-2 py-2 ${isControlCol ? 'text-center' : isRightAligned ? 'text-right' : 'text-left'} ${textColor}`}
+                                  >
+                                    {renderPlaylistCell(row, columnId)}
+                                  </td>
+                                );
+                              })}
                             </tr>
                           );
                         })}

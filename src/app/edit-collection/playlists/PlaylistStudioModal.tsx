@@ -319,7 +319,7 @@ export function PlaylistStudioModal({
   const [importMode, setImportMode] = useState<'spotify' | 'csv'>('spotify');
   const [destinationMode, setDestinationMode] = useState<'new' | 'existing'>('new');
   const [destinationPlaylistId, setDestinationPlaylistId] = useState<number | null>(null);
-  const [matchingMode, setMatchingMode] = useState<PlaylistMatchingMode>('aggressive');
+  const [matchingMode, setMatchingMode] = useState<PlaylistMatchingMode>('balanced');
   const [spotifyLoading, setSpotifyLoading] = useState(false);
   const [spotifyConnected, setSpotifyConnected] = useState(true);
   const [spotifyPlaylists, setSpotifyPlaylists] = useState<SpotifyPlaylist[]>([]);

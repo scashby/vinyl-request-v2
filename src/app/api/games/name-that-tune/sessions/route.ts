@@ -80,7 +80,16 @@ async function buildSnippetsFromPlaylist(
 
   return tracks
     .map((track, index) => {
-      const sideAndPosition = [track.side?.trim(), track.position?.trim()].filter(Boolean).join(" ");
+      const side = track.side?.trim() || "";
+      const position = track.position?.trim() || "";
+      let sideAndPosition = "";
+      if (side && position) {
+        const upperSide = side.toUpperCase();
+        const upperPosition = position.toUpperCase();
+        sideAndPosition = upperPosition.startsWith(upperSide) ? position : `${side} ${position}`;
+      } else {
+        sideAndPosition = position || side;
+      }
       const sourceLabel = [track.albumName?.trim() || null, sideAndPosition || null].filter(Boolean).join(" | ");
       return {
         artist: track.artistName?.trim() || "Unknown Artist",
