@@ -3259,29 +3259,29 @@ function CollectionBrowserPage() {
                   )}
                 </div>
                 
-                <div className="relative flex overflow-hidden rounded border border-[#555]">
-                  <button
-                    onClick={() => {
-                      setShowSortFavoritesDropdown(false);
-                      setShowColumnFavoritesDropdown(false);
-                      setShowSortSelector(true);
-                    }}
-                    title="Change Sorting"
-                    className="bg-[#3a3a3a] px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444] border-none"
-                  >
-                    <span>↕️</span>
-                  </button>
+                <button
+                  onClick={() => {
+                    setShowSortFavoritesDropdown(false);
+                    setShowColumnFavoritesDropdown(false);
+                    setShowSortSelector(true);
+                  }}
+                  title="Change Sorting"
+                  className="bg-[#3a3a3a] border border-[#555] rounded px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444]"
+                >
+                  <span>↕️</span>
+                </button>
+
+                <div className="relative">
                   <button
                     onClick={() => {
                       setShowColumnFavoritesDropdown(false);
                       setShowSortFavoritesDropdown(!showSortFavoritesDropdown);
                     }}
                     title="Sorting Favorites"
-                    className="bg-[#3a3a3a] px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444] border-none border-l border-l-[#555]"
+                    className="bg-[#3a3a3a] border border-[#555] rounded px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444]"
                   >
                     <span className="text-[11px]">▼</span>
                   </button>
-
                   {showSortFavoritesDropdown && (
                     <>
                       <div onClick={() => setShowSortFavoritesDropdown(false)} className="fixed inset-0 z-[99]" />
@@ -3313,30 +3313,30 @@ function CollectionBrowserPage() {
                   )}
                 </div>
 
-                <div className="relative flex overflow-hidden rounded border border-[#555]">
-                  <button
-                    onClick={() => {
-                      setShowSortFavoritesDropdown(false);
-                      setShowColumnFavoritesDropdown(false);
-                      setColumnSelectorMode(viewMode);
-                      setShowColumnSelector(true);
-                    }}
-                    title="Change Columns"
-                    className="bg-[#3a3a3a] px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444] border-none"
-                  >
-                    <span>⊞</span>
-                  </button>
+                <button
+                  onClick={() => {
+                    setShowSortFavoritesDropdown(false);
+                    setShowColumnFavoritesDropdown(false);
+                    setColumnSelectorMode(viewMode);
+                    setShowColumnSelector(true);
+                  }}
+                  title="Change Columns"
+                  className="bg-[#3a3a3a] border border-[#555] rounded px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444]"
+                >
+                  <span>⊞</span>
+                </button>
+
+                <div className="relative">
                   <button
                     onClick={() => {
                       setShowSortFavoritesDropdown(false);
                       setShowColumnFavoritesDropdown(!showColumnFavoritesDropdown);
                     }}
                     title="Column Favorites"
-                    className="bg-[#3a3a3a] px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444] border-none border-l border-l-[#555]"
+                    className="bg-[#3a3a3a] border border-[#555] rounded px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444]"
                   >
                     <span className="text-[11px]">▼</span>
                   </button>
-
                   {showColumnFavoritesDropdown && (
                     <>
                       <div onClick={() => setShowColumnFavoritesDropdown(false)} className="fixed inset-0 z-[99]" />
