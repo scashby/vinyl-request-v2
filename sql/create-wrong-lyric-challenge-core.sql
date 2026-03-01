@@ -3,6 +3,7 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS public.wlc_sessions (
   id bigserial PRIMARY KEY,
   event_id bigint REFERENCES public.events(id) ON DELETE SET NULL,
+  playlist_id bigint REFERENCES public.collection_playlists(id) ON DELETE SET NULL,
   session_code text NOT NULL UNIQUE,
   title text NOT NULL,
   round_count integer NOT NULL DEFAULT 10,
@@ -18,6 +19,9 @@ CREATE TABLE IF NOT EXISTS public.wlc_sessions (
   target_gap_seconds integer NOT NULL DEFAULT 54,
   current_round integer NOT NULL DEFAULT 1,
   current_call_index integer NOT NULL DEFAULT 0,
+  countdown_started_at timestamptz,
+  paused_remaining_seconds integer,
+  paused_at timestamptz,
   show_title boolean NOT NULL DEFAULT true,
   show_round boolean NOT NULL DEFAULT true,
   show_scoreboard boolean NOT NULL DEFAULT true,
@@ -32,8 +36,29 @@ CREATE TABLE IF NOT EXISTS public.wlc_sessions (
   CONSTRAINT wlc_sessions_lyric_points_chk CHECK (lyric_points BETWEEN 0 AND 5),
   CONSTRAINT wlc_sessions_song_bonus_points_chk CHECK (song_bonus_points BETWEEN 0 AND 3),
   CONSTRAINT wlc_sessions_option_count_chk CHECK (option_count BETWEEN 3 AND 4),
+  CONSTRAINT wlc_sessions_paused_remaining_seconds_chk CHECK (
+    paused_remaining_seconds IS NULL OR paused_remaining_seconds >= 0
+  ),
   CONSTRAINT wlc_sessions_target_gap_seconds_chk CHECK (target_gap_seconds > 0)
 );
+
+-- Backfill/upgrade for existing installs that ran an older version of this script
+-- (CREATE TABLE IF NOT EXISTS won't add new columns).
+ALTER TABLE public.wlc_sessions
+  ADD COLUMN IF NOT EXISTS playlist_id bigint,
+  ADD COLUMN IF NOT EXISTS countdown_started_at timestamptz,
+  ADD COLUMN IF NOT EXISTS paused_remaining_seconds integer,
+  ADD COLUMN IF NOT EXISTS paused_at timestamptz;
+
+ALTER TABLE public.wlc_sessions
+  DROP CONSTRAINT IF EXISTS wlc_sessions_playlist_id_fkey;
+
+ALTER TABLE public.wlc_sessions
+  ALTER COLUMN playlist_id DROP NOT NULL;
+
+ALTER TABLE public.wlc_sessions
+  ADD CONSTRAINT wlc_sessions_playlist_id_fkey
+  FOREIGN KEY (playlist_id) REFERENCES public.collection_playlists(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS public.wlc_session_teams (
   id bigserial PRIMARY KEY,
@@ -112,6 +137,7 @@ CREATE TABLE IF NOT EXISTS public.wlc_session_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_wlc_sessions_event_id ON public.wlc_sessions(event_id);
+CREATE INDEX IF NOT EXISTS idx_wlc_sessions_playlist_id ON public.wlc_sessions(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_wlc_sessions_status ON public.wlc_sessions(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_wlc_teams_session_id ON public.wlc_session_teams(session_id);
 CREATE INDEX IF NOT EXISTS idx_wlc_rounds_session_id ON public.wlc_session_rounds(session_id);

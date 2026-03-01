@@ -16,7 +16,7 @@ import { SHARED_COLOR_PRESETS, SHARED_ICON_PRESETS } from '../iconPresets';
 const supabase = supabaseTyped as any;
 
 export type PlaylistStudioView = 'library' | 'manual' | 'smart' | 'import';
-type PlaylistMatchingMode = 'strict' | 'balanced' | 'aggressive';
+type PlaylistMatchingMode = 'review' | 'strict' | 'balanced' | 'aggressive';
 
 type PlaylistTrackItem = {
   track_key: string;
@@ -319,7 +319,9 @@ export function PlaylistStudioModal({
   const [importMode, setImportMode] = useState<'spotify' | 'csv'>('spotify');
   const [destinationMode, setDestinationMode] = useState<'new' | 'existing'>('new');
   const [destinationPlaylistId, setDestinationPlaylistId] = useState<number | null>(null);
-  const [matchingMode, setMatchingMode] = useState<PlaylistMatchingMode>('balanced');
+  const [matchingMode, setMatchingMode] = useState<PlaylistMatchingMode>('review');
+  const [matchVinylOnly, setMatchVinylOnly] = useState(false);
+  const [matchFortyFiveOnly, setMatchFortyFiveOnly] = useState(false);
   const [spotifyLoading, setSpotifyLoading] = useState(false);
   const [spotifyConnected, setSpotifyConnected] = useState(true);
   const [spotifyPlaylists, setSpotifyPlaylists] = useState<SpotifyPlaylist[]>([]);
@@ -385,6 +387,13 @@ export function PlaylistStudioModal({
     const token = session?.access_token;
     return token ? { Authorization: `Bearer ${token}` } : {};
   }, []);
+
+  const buildImportMatchFilters = useCallback(() => {
+    return {
+      mediaTypes: matchVinylOnly ? ['vinyl'] : [],
+      formatDetails: matchFortyFiveOnly ? ['45 rpm', '7"'] : [],
+    };
+  }, [matchFortyFiveOnly, matchVinylOnly]);
 
   const formatApiError = (payload: unknown, res: Response) => {
     const typedPayload = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
@@ -891,6 +900,7 @@ export function PlaylistStudioModal({
       snapshotId: isResume ? resume?.snapshotId ?? null : playlist.snapshotId ?? null,
       maxPages: resume?.maxPages ?? 3,
       matchingMode,
+      matchFilters: buildImportMatchFilters(),
     };
 
     if (destinationMode === 'existing' && destinationPlaylistId) {
@@ -989,6 +999,7 @@ export function PlaylistStudioModal({
           csvText,
           existingPlaylistId: destinationMode === 'existing' ? destinationPlaylistId : undefined,
           matchingMode,
+          matchFilters: buildImportMatchFilters(),
         }),
       });
 
@@ -1041,6 +1052,13 @@ export function PlaylistStudioModal({
       url.searchParams.set('q', query);
       if (row.artist?.trim()) {
         url.searchParams.set('artist', row.artist.trim());
+      }
+      if (matchVinylOnly) {
+        url.searchParams.append('mediaType', 'vinyl');
+      }
+      if (matchFortyFiveOnly) {
+        url.searchParams.append('formatDetail', '45 rpm');
+        url.searchParams.append('formatDetail', '7"');
       }
       url.searchParams.set('limit', '8');
 
@@ -1095,6 +1113,7 @@ export function PlaylistStudioModal({
           csvText,
           existingPlaylistId: lastImportedPlaylistId,
           matchingMode,
+          matchFilters: buildImportMatchFilters(),
         }),
       });
 
@@ -2077,13 +2096,39 @@ export function PlaylistStudioModal({
                         onChange={(event) => setMatchingMode(event.target.value as PlaylistMatchingMode)}
                         className="w-full max-w-[320px] rounded-lg border border-[#30466b] bg-[#0f182a] px-3 py-2 text-sm text-white"
                       >
+                        <option value="review">Review-first (exact only auto-match)</option>
                         <option value="strict">Strict (lowest false positives)</option>
                         <option value="balanced">Balanced</option>
                         <option value="aggressive">Aggressive (more auto-matches)</option>
                       </select>
                       <div className="mt-1 text-[11px] text-[#8fa8d4]">
-                        Aggressive increases auto-match rate but may require more review in unmatched suggestions.
+                        Review-first leaves fuzzy/ambiguous rows in Unmatched so you can choose the right track manually.
                       </div>
+                    </div>
+
+                    <div className="mt-3">
+                      <label className="mb-1 block text-xs text-[#9bb0d8]">Match restrictions (optional)</label>
+                      <div className="flex flex-wrap gap-2">
+                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-[#30466b] bg-[#0f182a] px-3 py-2 text-xs text-[#d8e8ff]">
+                          <input
+                            type="checkbox"
+                            checked={matchVinylOnly}
+                            onChange={(event) => setMatchVinylOnly(event.target.checked)}
+                            className="h-3.5 w-3.5 rounded border-[#4b6590] bg-[#0b1220]"
+                          />
+                          Vinyl only
+                        </label>
+                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-[#30466b] bg-[#0f182a] px-3 py-2 text-xs text-[#d8e8ff]">
+                          <input
+                            type="checkbox"
+                            checked={matchFortyFiveOnly}
+                            onChange={(event) => setMatchFortyFiveOnly(event.target.checked)}
+                            className="h-3.5 w-3.5 rounded border-[#4b6590] bg-[#0b1220]"
+                          />
+                          45 RPM / 7&quot; only
+                        </label>
+                      </div>
+                      <div className="mt-1 text-[11px] text-[#8fa8d4]">Filters apply to Spotify, CSV, retry matching, and manual unmatched search.</div>
                     </div>
                   </div>
 

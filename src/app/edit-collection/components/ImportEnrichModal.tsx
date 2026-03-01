@@ -1067,12 +1067,35 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     statsRefreshInFlightRef.current = true;
     if (!background) setLoading(true);
     try {
-      const res = await fetch('/api/enrich-sources/stats');
-      const data = await res.json();
-      if (data.success) {
-        setStats(data.stats);
-        setFolders(data.folders || []);
+      let data: { success: boolean; stats?: EnrichmentStats | null; folders?: string[]; error?: string } | null = null;
+      const attempts = 2;
+      let lastError: unknown = null;
+
+      for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+          const res = await fetch('/api/enrich-sources/stats', { cache: 'no-store' });
+          const payload = await res.json().catch(() => null);
+          if (!res.ok || !payload?.success) {
+            throw new Error(payload?.error || `Failed to load stats (${res.status})`);
+          }
+          data = payload;
+          break;
+        } catch (error) {
+          lastError = error;
+          if (attempt < attempts && isTransientFetchError(error)) {
+            await wait(300 * attempt);
+            continue;
+          }
+          throw error;
+        }
       }
+
+      if (!data) {
+        throw (lastError instanceof Error ? lastError : new Error('Stats response missing data'));
+      }
+
+      setStats(data.stats ?? null);
+      setFolders(Array.isArray(data.folders) ? data.folders : []);
     } catch (error) {
       console.error('Failed to load stats:', error);
     } finally {

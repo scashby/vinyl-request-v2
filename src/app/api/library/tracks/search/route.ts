@@ -14,6 +14,18 @@ export async function GET(request: NextRequest) {
     const q = (url.searchParams.get("q") ?? "").trim();
     const artist = (url.searchParams.get("artist") ?? "").trim();
     const limit = Math.min(25, Math.max(1, Number(url.searchParams.get("limit") ?? 10)));
+    const mediaTypes = [
+      ...url.searchParams.getAll("mediaType"),
+      ...url.searchParams.getAll("mediaTypes"),
+    ]
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const formatDetails = [
+      ...url.searchParams.getAll("formatDetail"),
+      ...url.searchParams.getAll("formatDetails"),
+    ]
+      .map((value) => value.trim())
+      .filter(Boolean);
 
     if (!q) {
       return NextResponse.json({ error: "q is required" }, { status: 400 });
@@ -21,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     const authHeader = getAuthHeader(request);
     const index = await getCachedInventoryIndex(authHeader);
-    const candidates = await searchInventoryCandidates({ title: q, artist, limit }, index);
+    const candidates = await searchInventoryCandidates({ title: q, artist, limit, mediaTypes, formatDetails }, index);
 
     const db = getBingoDb();
     const keys = candidates

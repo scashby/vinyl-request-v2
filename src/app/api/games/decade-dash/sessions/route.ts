@@ -178,8 +178,8 @@ export async function POST(request: NextRequest) {
     const targetGapSeconds = removeResleeveSeconds + findRecordSeconds + cueSeconds + hostBufferSeconds;
 
     const adjacentScoringEnabled = body.adjacent_scoring_enabled ?? true;
-    const exactPoints = Math.min(3, Math.max(0, Number(body.exact_points ?? 2)));
-    const adjacentPoints = Math.min(2, Math.max(0, Number(body.adjacent_points ?? 1)));
+    const exactPoints = Math.min(2, Math.max(0, Number(body.exact_points ?? 2)));
+    const adjacentPoints = Math.min(1, Math.max(0, Number(body.adjacent_points ?? 1)));
 
     const teamNames = normalizeTeamNames(body.team_names);
     if (teamNames.length < 2) {

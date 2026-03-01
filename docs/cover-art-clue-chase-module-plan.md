@@ -37,6 +37,22 @@
 - Returns session + linked event payload + call totals.
 - `PATCH /api/games/cover-art-clue-chase/sessions/[id]`
 - Runtime updates for title, event linkage, display flags, and status.
+- `GET /api/games/cover-art-clue-chase/sessions/[id]/calls`
+- Full call deck for host/pull-list PDF.
+- `GET /api/games/cover-art-clue-chase/sessions/[id]/leaderboard`
+- Team totals and exact/audio hit metrics.
+- `POST /api/games/cover-art-clue-chase/sessions/[id]/start`
+- Starts session at call 1 and opens stage 1.
+- `POST /api/games/cover-art-clue-chase/sessions/[id]/pause`
+- Pauses session status.
+- `POST /api/games/cover-art-clue-chase/sessions/[id]/resume`
+- Resumes session status.
+- `POST /api/games/cover-art-clue-chase/sessions/[id]/advance`
+- Advances to next call or completes session at end of deck.
+- `POST /api/games/cover-art-clue-chase/sessions/[id]/reveal`
+- Moves call reveal stage (1/2/final).
+- `POST /api/games/cover-art-clue-chase/sessions/[id]/score`
+- Upserts per-team call scoring and marks call as scored.
 - `GET /api/games/cover-art-clue-chase/sessions/history?eventId=`
 - Event-filtered admin history metrics.
 
@@ -70,3 +86,8 @@
 - Setup includes event selector and event-filtered session list.
 - History view includes event filter.
 - Create/list/get/history APIs expose event-aware behavior.
+
+## Help + Instruction Files
+- `docs/cover-art-clue-chase-smoke-test.md`
+- `docs/cover-art-clue-chase-host-runbook.md`
+- `src/app/admin/games/cover-art-clue-chase/help/page.tsx`

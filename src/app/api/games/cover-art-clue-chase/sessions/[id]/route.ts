@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 type SessionRow = {
   id: number;
   event_id: number | null;
+  playlist_id: number | null;
   session_code: string;
   title: string;
   round_count: number;
@@ -31,6 +32,7 @@ type SessionRow = {
 };
 
 type EventRow = { id: number; title: string; date: string; time: string | null; location: string | null };
+type PlaylistRow = { id: number; name: string };
 
 function parseSessionId(id: string) {
   const sessionId = Number(id);
@@ -53,13 +55,21 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const { data: event } = session.event_id
     ? await db.from("events").select("id, title, date, time, location").eq("id", session.event_id).maybeSingle()
     : { data: null };
+  const { data: playlist } = session.playlist_id
+    ? await db.from("collection_playlists").select("id, name").eq("id", session.playlist_id).maybeSingle()
+    : { data: null };
 
-  const { data: calls } = await db.from("cacc_session_calls").select("id").eq("session_id", sessionId);
+  const [{ data: calls }, { data: teams }] = await Promise.all([
+    db.from("cacc_session_calls").select("id").eq("session_id", sessionId),
+    db.from("cacc_session_teams").select("id, team_name, table_label, active").eq("session_id", sessionId).order("id", { ascending: true }),
+  ]);
 
   return NextResponse.json(
     {
       ...session,
       event: (event ?? null) as EventRow | null,
+      playlist: (playlist ?? null) as PlaylistRow | null,
+      teams: teams ?? [],
       calls_total: (calls ?? []).length,
     },
     { status: 200 }
@@ -76,6 +86,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const allowedFields = new Set([
     "title",
     "event_id",
+    "playlist_id",
     "current_round",
     "current_call_index",
     "show_title",

@@ -254,11 +254,11 @@ export default function DecadeDashSetupPage() {
             </label>
 
             <label className="text-sm">Exact Points <InlineFieldHelp label="Exact Points" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} max={3} value={exactPoints} onChange={(e) => setExactPoints(Math.max(0, Math.min(3, Number(e.target.value) || 0)))} />
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} max={2} value={exactPoints} onChange={(e) => setExactPoints(Math.max(0, Math.min(2, Number(e.target.value) || 0)))} />
             </label>
 
             <label className="text-sm">Adjacent Points <InlineFieldHelp label="Adjacent Points" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} max={2} disabled={!adjacentScoringEnabled} value={adjacentPoints} onChange={(e) => setAdjacentPoints(Math.max(0, Math.min(2, Number(e.target.value) || 0)))} />
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} max={1} disabled={!adjacentScoringEnabled} value={adjacentPoints} onChange={(e) => setAdjacentPoints(Math.max(0, Math.min(1, Number(e.target.value) || 0)))} />
             </label>
           </div>
 

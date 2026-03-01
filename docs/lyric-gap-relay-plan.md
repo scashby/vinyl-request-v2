@@ -47,6 +47,9 @@ Future host runtime endpoints
 - Host: `src/app/admin/games/lyric-gap-relay/host/page.tsx`
 - Assistant: `src/app/admin/games/lyric-gap-relay/assistant/page.tsx`
 - Jumbotron: `src/app/admin/games/lyric-gap-relay/jumbotron/page.tsx`
+- Help: `src/app/admin/games/lyric-gap-relay/help/page.tsx`
+- Operator docs: `docs/lyric-gap-relay-instructions.md`
+- Test checklist: `docs/lyric-gap-relay-smoke-test.md`
 
 ## Development phases
 1. MVP

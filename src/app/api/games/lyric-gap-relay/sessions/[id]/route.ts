@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLyricGapRelayDb } from "src/lib/lyricGapRelayDb";
+import { computeLyricGapRelayRemainingSeconds } from "src/lib/lyricGapRelayEngine";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,9 @@ type SessionRow = {
   target_gap_seconds: number;
   current_round: number;
   current_call_index: number;
+  countdown_started_at: string | null;
+  paused_remaining_seconds: number | null;
+  paused_at: string | null;
   show_title: boolean;
   show_round: boolean;
   show_scoreboard: boolean;
@@ -58,6 +62,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     {
       ...session,
       event: (event ?? null) as EventRow | null,
+      remaining_seconds: computeLyricGapRelayRemainingSeconds(session),
       calls_total: (calls ?? []).length,
     },
     { status: 200 }
@@ -80,6 +85,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "show_scoreboard",
     "show_answer_mode",
     "status",
+    "countdown_started_at",
+    "paused_remaining_seconds",
+    "paused_at",
     "started_at",
     "ended_at",
   ]);

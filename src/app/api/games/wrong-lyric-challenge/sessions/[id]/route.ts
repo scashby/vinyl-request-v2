@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWrongLyricChallengeDb } from "src/lib/wrongLyricChallengeDb";
+import { computeWrongLyricChallengeRemainingSeconds } from "src/lib/wrongLyricChallengeEngine";
 
 export const runtime = "nodejs";
 
 type SessionRow = {
   id: number;
   event_id: number | null;
+  playlist_id: number | null;
   session_code: string;
   title: string;
   round_count: number;
@@ -21,6 +23,9 @@ type SessionRow = {
   target_gap_seconds: number;
   current_round: number;
   current_call_index: number;
+  countdown_started_at: string | null;
+  paused_remaining_seconds: number | null;
+  paused_at: string | null;
   show_title: boolean;
   show_round: boolean;
   show_scoreboard: boolean;
@@ -61,6 +66,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     {
       ...session,
       event: (event ?? null) as EventRow | null,
+      remaining_seconds: computeWrongLyricChallengeRemainingSeconds(session),
       calls_total: (calls ?? []).length,
     },
     { status: 200 }
@@ -83,6 +89,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "show_scoreboard",
     "show_options",
     "status",
+    "countdown_started_at",
+    "paused_remaining_seconds",
+    "paused_at",
     "started_at",
     "ended_at",
   ]);

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState, useMemo, Suspense, Fragment, type Rea
 import { supabase as supabaseTyped } from '../../lib/supabaseClient';
 import CollectionTable from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
-import { ColumnId, COLUMN_DEFINITIONS, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
+import { ColumnId, COLUMN_DEFINITIONS, COLUMN_GROUPS, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
 import type { Album } from '../../types/album';
 import { toSafeStringArray, toSafeSearchString } from '../../types/album';
 import EditAlbumModal from './EditAlbumModal';
@@ -16,6 +16,7 @@ import AddToPlaylistModal from './playlists/AddToPlaylistModal';
 import PlaylistStudioModal, { type PlaylistStudioView } from './playlists/PlaylistStudioModal';
 import Header from './Header';
 import { ManageColumnFavoritesModal, type ColumnFavorite } from './ManageColumnFavoritesModal';
+import { ManageSortFavoritesModal, type SortFavorite, type SortField } from './ManageSortFavoritesModal';
 import type { Crate } from '../../types/crate';
 import type { CollectionPlaylist } from '../../types/collectionPlaylist';
 import type { SmartPlaylistRules } from '../../types/collectionPlaylist';
@@ -94,6 +95,24 @@ const TRACK_SORT_OPTIONS: { value: TrackSortOption; label: string; category: str
 type AppViewMode = 'collection' | 'album-track' | 'playlist';
 type SidebarMode = 'format' | 'crates' | 'playlists';
 type TrackListSource = 'crates' | 'playlists';
+type ColumnSelectorMode = AppViewMode;
+type TrackViewColumnId =
+  | 'checkbox'
+  | 'track_title'
+  | 'track_artist'
+  | 'album_title'
+  | 'album_artist'
+  | 'position'
+  | 'length'
+  | 'my_rating'
+  | 'format'
+  | 'genre'
+  | 'label'
+  | 'year'
+  | 'added_date'
+  | 'location'
+  | 'collection_status'
+  | 'personal_notes';
 
 type Playlist = CollectionPlaylist;
 
@@ -154,14 +173,112 @@ const normalizeTrackPosition = (position: string | null | undefined, fallback: n
   return String(fallback);
 };
 
-const DEFAULT_PLAYLIST_VISIBLE_COLUMNS: ColumnId[] = [
+const TRACK_VIEW_COLUMN_DEFINITIONS: Record<TrackViewColumnId, { id: TrackViewColumnId; label: string }> = {
+  checkbox: { id: 'checkbox', label: '' },
+  track_title: { id: 'track_title', label: 'Track' },
+  track_artist: { id: 'track_artist', label: 'Track Artist' },
+  album_title: { id: 'album_title', label: 'Album' },
+  album_artist: { id: 'album_artist', label: 'Album Artist' },
+  position: { id: 'position', label: 'Pos' },
+  length: { id: 'length', label: 'Length' },
+  my_rating: { id: 'my_rating', label: 'Rating' },
+  format: { id: 'format', label: 'Format' },
+  genre: { id: 'genre', label: 'Genre' },
+  label: { id: 'label', label: 'Label' },
+  year: { id: 'year', label: 'Year' },
+  added_date: { id: 'added_date', label: 'Added' },
+  location: { id: 'location', label: 'Location' },
+  collection_status: { id: 'collection_status', label: 'Status' },
+  personal_notes: { id: 'personal_notes', label: 'Notes' },
+};
+
+const TRACK_VIEW_COLUMN_GROUPS: Array<{ id: string; label: string; icon: string; columns: TrackViewColumnId[] }> = [
+  {
+    id: 'track-main',
+    label: 'Main',
+    icon: '🎵',
+    columns: ['checkbox', 'track_title', 'track_artist', 'album_title', 'album_artist', 'position', 'length', 'my_rating'],
+  },
+  {
+    id: 'track-edition',
+    label: 'Edition',
+    icon: '💿',
+    columns: ['format', 'year', 'added_date'],
+  },
+  {
+    id: 'track-metadata',
+    label: 'Metadata',
+    icon: '🏷️',
+    columns: ['genre', 'label'],
+  },
+  {
+    id: 'track-personal',
+    label: 'Personal',
+    icon: '📝',
+    columns: ['location', 'collection_status', 'personal_notes'],
+  },
+];
+
+const DEFAULT_ALBUM_TRACK_VISIBLE_COLUMNS: TrackViewColumnId[] = [
   'checkbox',
-  'title',
-  'artist',
-  'sort_title',
-  'subtitle',
+  'track_title',
+  'track_artist',
+  'album_title',
+  'position',
+  'length',
+];
+
+const DEFAULT_PLAYLIST_VISIBLE_COLUMNS: TrackViewColumnId[] = [
+  'checkbox',
+  'track_title',
+  'track_artist',
+  'album_title',
+  'position',
   'length',
   'my_rating',
+];
+
+const TRACK_COLUMN_CONTROL_IDS = new Set<TrackViewColumnId>(['checkbox']);
+const TRACK_COLUMN_RIGHT_ALIGN_IDS = new Set<TrackViewColumnId>(['length', 'my_rating']);
+const COLLECTION_CONTROL_COLUMNS: ColumnId[] = ['checkbox', 'owned', 'for_sale_indicator', 'menu'];
+
+const DEFAULT_COLLECTION_COLUMN_FAVORITES: ColumnFavorite[] = [
+  {
+    id: 'collection-favorite-my-list',
+    name: 'My List View columns',
+    columns: ['Artist', 'Title', 'Format', 'My Notes', 'Genre', 'Added'],
+  },
+  {
+    id: 'collection-favorite-duplicates',
+    name: 'My Find Duplicates columns',
+    columns: ['Artist', 'Title', 'Year', 'Label', 'Discs', 'Tracks', 'Added'],
+  },
+];
+
+const DEFAULT_COLLECTION_SORT_FAVORITES: SortFavorite[] = [
+  {
+    id: 'collection-sort-artist-title',
+    name: 'Artist | Title',
+    fields: [
+      { field: 'Artist', direction: 'asc' },
+      { field: 'Title', direction: 'asc' },
+    ],
+  },
+  {
+    id: 'collection-sort-added',
+    name: 'Added Date/Time',
+    fields: [
+      { field: 'Added Date', direction: 'desc' },
+    ],
+  },
+  {
+    id: 'collection-sort-format-artist',
+    name: 'Format | Artist',
+    fields: [
+      { field: 'Format', direction: 'asc' },
+      { field: 'Artist', direction: 'asc' },
+    ],
+  },
 ];
 
 const formatDisplayDate = (value: string | null | undefined): string => {
@@ -169,11 +286,6 @@ const formatDisplayDate = (value: string | null | undefined): string => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '—';
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-};
-
-const formatDisplayCurrency = (value: number | null | undefined): string => {
-  if (value == null) return '—';
-  return `$${value.toFixed(2)}`;
 };
 
 const formatTrackStatus = (status: string | null | undefined): string => {
@@ -204,6 +316,142 @@ const formatTrackArrayValues = (values: string[] | null | undefined): string => 
 const getTrackPositionLabel = (row: CollectionTrackRow): string => {
   const positionNumber = (row.position.match(/\d+/g) ?? [row.position]).slice(-1)[0];
   return row.side ? `${row.side}${positionNumber}` : row.position;
+};
+
+const isCollectionColumnId = (value: string): value is ColumnId =>
+  Object.prototype.hasOwnProperty.call(COLUMN_DEFINITIONS, value);
+
+const isTrackViewColumnId = (value: string): value is TrackViewColumnId =>
+  Object.prototype.hasOwnProperty.call(TRACK_VIEW_COLUMN_DEFINITIONS, value);
+
+const mapFavoriteColumnsToCollectionColumns = (favorite: ColumnFavorite | null): ColumnId[] => {
+  if (!favorite) return [];
+
+  const byLabel = Object.values(COLUMN_DEFINITIONS).reduce((acc, definition) => {
+    acc[definition.label.toLowerCase()] = definition.id;
+    return acc;
+  }, {} as Record<string, ColumnId>);
+
+  const aliases: Record<string, ColumnId> = {
+    genre: 'genres',
+    genres: 'genres',
+    style: 'styles',
+    styles: 'styles',
+    label: 'labels',
+    labels: 'labels',
+    'my notes': 'personal_notes',
+    notes: 'personal_notes',
+    owner: 'owner',
+    location: 'location',
+    format: 'format',
+    artist: 'artist',
+    title: 'title',
+    year: 'year',
+    barcode: 'barcode',
+    'cat no': 'cat_no',
+    'cat no.': 'cat_no',
+    discs: 'discs',
+    tracks: 'tracks',
+    length: 'length',
+    added: 'added_date',
+    'added date': 'added_date',
+    status: 'collection_status',
+    rating: 'my_rating',
+  };
+
+  return favorite.columns
+    .map((column) => {
+      const key = column.toLowerCase().trim();
+      return byLabel[key] ?? aliases[key] ?? null;
+    })
+    .filter((columnId): columnId is ColumnId => Boolean(columnId))
+    .filter((columnId, index, arr) => arr.indexOf(columnId) === index);
+};
+
+const getAlbumSortMetric = (album: Album, fieldName: string): string | number | null => {
+  const field = fieldName.toLowerCase().trim();
+
+  if (field === 'artist') return getAlbumArtist(album);
+  if (field === 'title') return getAlbumTitle(album);
+  if (field === 'sort title') return album.sort_title ?? getAlbumTitle(album);
+  if (field === 'format') return getDisplayFormat(getAlbumFormat(album));
+  if (field === 'genre') return toSafeStringArray(getAlbumGenres(album)).join(' | ');
+  if (field === 'label') return album.release?.label ?? album.label ?? '';
+  if (field === 'cat no' || field === 'cat no.') return album.cat_no ?? album.catalog_number ?? album.release?.catalog_number ?? '';
+  if (field === 'barcode') return album.barcode ?? album.release?.barcode ?? '';
+  if (field === 'location') return album.location ?? '';
+  if (field === 'collection status') return album.collection_status ?? album.status ?? '';
+  if (field === 'my rating') return album.my_rating ?? 0;
+  if (field === 'purchase price') return album.purchase_price ?? 0;
+  if (field === 'current value') return album.current_value ?? 0;
+  if (field === 'play count') return album.play_count ?? 0;
+  if (field === 'tracks') return album.release?.release_tracks?.length ?? album.tracks?.length ?? 0;
+  if (field === 'discs') return album.discs ?? album.release?.qty ?? 0;
+  if (field === 'index' || field === 'core albumid') return album.index_number ?? album.id ?? 0;
+  if (field === 'added year') return new Date(album.date_added ?? '').getFullYear() || 0;
+  if (field === 'release year' || field === 'original release year' || field === 'recording year') return getAlbumYearInt(album) ?? 0;
+  if (field === 'decade') return getAlbumDecade(album) ?? 0;
+
+  if (
+    field === 'added date' ||
+    field === 'added date/time' ||
+    field === 'release date' ||
+    field === 'original release date' ||
+    field === 'recording date' ||
+    field === 'purchase date' ||
+    field === 'modified date' ||
+    field === 'last played date'
+  ) {
+    const source =
+      field === 'purchase date' ? album.purchase_date :
+      field === 'modified date' || field === 'last played date' ? album.last_played_at :
+      field === 'release date' || field === 'original release date' || field === 'recording date' ? album.master_release_date :
+      album.date_added;
+    const parsed = Date.parse(source ?? '');
+    return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed;
+  }
+
+  if (field === 'media condition') return album.media_condition ?? '';
+  if (field === 'package/sleeve condition') return album.package_sleeve_condition ?? album.sleeve_condition ?? '';
+  if (field === 'tags') return toSafeStringArray(album.custom_tags ?? getAlbumTags(album)).join(' | ');
+
+  return null;
+};
+
+const compareAlbumSortMetric = (
+  aValue: string | number | null,
+  bValue: string | number | null,
+  direction: 'asc' | 'desc'
+): number => {
+  const multiplier = direction === 'asc' ? 1 : -1;
+  const aNull = aValue == null || aValue === '';
+  const bNull = bValue == null || bValue === '';
+  if (aNull && bNull) return 0;
+  if (aNull) return 1 * multiplier;
+  if (bNull) return -1 * multiplier;
+
+  if (typeof aValue === 'number' && typeof bValue === 'number') {
+    return (aValue - bValue) * multiplier;
+  }
+
+  return String(aValue).localeCompare(String(bValue), undefined, { sensitivity: 'base', numeric: true }) * multiplier;
+};
+
+const sortAlbumsByFavoriteFields = (albums: Album[], fields: SortField[]): Album[] => {
+  if (fields.length === 0) return albums;
+  const sortable = [...albums];
+  sortable.sort((a, b) => {
+    for (const field of fields) {
+      const cmp = compareAlbumSortMetric(
+        getAlbumSortMetric(a, field.field),
+        getAlbumSortMetric(b, field.field),
+        field.direction
+      );
+      if (cmp !== 0) return cmp;
+    }
+    return 0;
+  });
+  return sortable;
 };
 
 const pickSmartPlaylistMix = (
@@ -518,7 +766,9 @@ function CollectionBrowserPage() {
   const [trackFormatFilters, setTrackFormatFilters] = useState<Set<string>>(new Set());
   
   const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [showSortFavoritesDropdown, setShowSortFavoritesDropdown] = useState(false);
   const [showViewModeDropdown, setShowViewModeDropdown] = useState(false);
+  const [showColumnFavoritesDropdown, setShowColumnFavoritesDropdown] = useState(false);
   const [showTrackFormatDropdown, setShowTrackFormatDropdown] = useState(false);
   const [, setSmartPlaylistMixNonce] = useState(0);
 
@@ -527,9 +777,21 @@ function CollectionBrowserPage() {
     direction: null
   });
 
-  const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
+  const [collectionVisibleColumns, setCollectionVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
+  const [albumTrackVisibleColumns, setAlbumTrackVisibleColumns] = useState<TrackViewColumnId[]>(DEFAULT_ALBUM_TRACK_VISIBLE_COLUMNS);
+  const [playlistVisibleColumns, setPlaylistVisibleColumns] = useState<TrackViewColumnId[]>(DEFAULT_PLAYLIST_VISIBLE_COLUMNS);
   const [lockedColumns, setLockedColumns] = useState<ColumnId[]>(DEFAULT_LOCKED_COLUMNS);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
+  const [columnSelectorMode, setColumnSelectorMode] = useState<ColumnSelectorMode>('collection');
+  const [showManageColumnFavoritesModal, setShowManageColumnFavoritesModal] = useState(false);
+  const [showManageSortFavoritesModal, setShowManageSortFavoritesModal] = useState(false);
+  const [columnFavorites, setColumnFavorites] = useState<ColumnFavorite[]>(DEFAULT_COLLECTION_COLUMN_FAVORITES);
+  const [selectedColumnFavoriteId, setSelectedColumnFavoriteId] = useState<string>(DEFAULT_COLLECTION_COLUMN_FAVORITES[0]?.id ?? '');
+  const [sortFavorites, setSortFavorites] = useState<SortFavorite[]>(DEFAULT_COLLECTION_SORT_FAVORITES);
+  const [selectedSortFavoriteId, setSelectedSortFavoriteId] = useState<string>(DEFAULT_COLLECTION_SORT_FAVORITES[0]?.id ?? '');
+  const [activeCollectionSortFields, setActiveCollectionSortFields] = useState<SortField[]>(
+    DEFAULT_COLLECTION_SORT_FAVORITES[0]?.fields ?? []
+  );
 
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
@@ -541,10 +803,42 @@ function CollectionBrowserPage() {
     const stored = localStorage.getItem('collection-visible-columns');
     if (stored) {
       try {
-        setVisibleColumns(JSON.parse(stored));
+        const parsed = JSON.parse(stored) as string[];
+        const filtered = parsed.filter(isCollectionColumnId);
+        if (filtered.length > 0) {
+          setCollectionVisibleColumns(filtered);
+        }
       } catch {
         // Invalid JSON, use defaults
       }
+    }
+  }, []);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('collection-album-track-visible-columns');
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored) as string[];
+      const filtered = parsed.filter(isTrackViewColumnId);
+      if (filtered.length > 0) {
+        setAlbumTrackVisibleColumns(filtered);
+      }
+    } catch {
+      // Invalid JSON, use defaults
+    }
+  }, []);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('collection-playlist-visible-columns');
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored) as string[];
+      const filtered = parsed.filter(isTrackViewColumnId);
+      if (filtered.length > 0) {
+        setPlaylistVisibleColumns(filtered);
+      }
+    } catch {
+      // Invalid JSON, use defaults
     }
   }, []);
 
@@ -566,9 +860,59 @@ function CollectionBrowserPage() {
     }
   }, []);
 
-  const handleColumnsChange = useCallback((columns: ColumnId[]) => {
-    setVisibleColumns(columns);
+  useEffect(() => {
+    const storedFavorites = localStorage.getItem('collection-column-favorites');
+    if (storedFavorites) {
+      try {
+        const parsed = JSON.parse(storedFavorites) as ColumnFavorite[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setColumnFavorites(parsed);
+          setSelectedColumnFavoriteId(parsed[0].id);
+        }
+      } catch {
+        // ignore invalid local storage
+      }
+    }
+
+    const storedSelectedFavorite = localStorage.getItem('collection-selected-column-favorite-id');
+    if (storedSelectedFavorite) {
+      setSelectedColumnFavoriteId(storedSelectedFavorite);
+    }
+  }, []);
+
+  useEffect(() => {
+    const storedFavorites = localStorage.getItem('collection-sort-favorites');
+    if (storedFavorites) {
+      try {
+        const parsed = JSON.parse(storedFavorites) as SortFavorite[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSortFavorites(parsed);
+          setSelectedSortFavoriteId(parsed[0].id);
+        }
+      } catch {
+        // ignore invalid local storage
+      }
+    }
+
+    const storedSelectedFavorite = localStorage.getItem('collection-selected-sort-favorite-id');
+    if (storedSelectedFavorite) {
+      setSelectedSortFavoriteId(storedSelectedFavorite);
+    }
+  }, []);
+
+  const handleCollectionColumnsChange = useCallback((columns: ColumnId[]) => {
+    setCollectionVisibleColumns(columns);
     localStorage.setItem('collection-visible-columns', JSON.stringify(columns));
+  }, []);
+
+  const handleAlbumTrackColumnsChange = useCallback((columns: TrackViewColumnId[]) => {
+    setAlbumTrackVisibleColumns(columns);
+    localStorage.setItem('collection-album-track-visible-columns', JSON.stringify(columns));
+  }, []);
+
+  const handlePlaylistColumnsChange = useCallback((columns: TrackViewColumnId[]) => {
+    setPlaylistVisibleColumns(columns);
+    localStorage.setItem('collection-playlist-visible-columns', JSON.stringify(columns));
   }, []);
 
   useEffect(() => {
@@ -603,6 +947,30 @@ function CollectionBrowserPage() {
   }, [viewMode]);
 
   useEffect(() => {
+    localStorage.setItem('collection-column-favorites', JSON.stringify(columnFavorites));
+  }, [columnFavorites]);
+
+  useEffect(() => {
+    localStorage.setItem('collection-selected-column-favorite-id', selectedColumnFavoriteId);
+  }, [selectedColumnFavoriteId]);
+
+  useEffect(() => {
+    localStorage.setItem('collection-sort-favorites', JSON.stringify(sortFavorites));
+  }, [sortFavorites]);
+
+  useEffect(() => {
+    localStorage.setItem('collection-selected-sort-favorite-id', selectedSortFavoriteId);
+  }, [selectedSortFavoriteId]);
+
+  useEffect(() => {
+    if (!selectedSortFavoriteId) return;
+    const selected = sortFavorites.find((favorite) => favorite.id === selectedSortFavoriteId);
+    if (selected) {
+      setActiveCollectionSortFields(selected.fields);
+    }
+  }, [selectedSortFavoriteId, sortFavorites]);
+
+  useEffect(() => {
     localStorage.setItem('collection-track-sort-preference', trackSortBy);
   }, [trackSortBy]);
 
@@ -616,10 +984,34 @@ function CollectionBrowserPage() {
 
   const handleSortChange = useCallback((newSort: SortOption) => {
     setSortBy(newSort);
+    setSelectedSortFavoriteId('');
+    setActiveCollectionSortFields([]);
     localStorage.setItem('collection-sort-preference', newSort);
     setShowSortDropdown(false);
     setTableSortState({ column: null, direction: null });
   }, []);
+
+  const handleApplyColumnFavorite = useCallback((favoriteId: string) => {
+    setSelectedColumnFavoriteId(favoriteId);
+    setShowColumnFavoritesDropdown(false);
+
+    const favorite = columnFavorites.find((item) => item.id === favoriteId) ?? null;
+    const mapped = mapFavoriteColumnsToCollectionColumns(favorite);
+    if (mapped.length === 0) return;
+
+    const nextColumns = [...new Set([...COLLECTION_CONTROL_COLUMNS, ...mapped])];
+    handleCollectionColumnsChange(nextColumns);
+  }, [columnFavorites, handleCollectionColumnsChange]);
+
+  const handleApplySortFavorite = useCallback((favoriteId: string) => {
+    setSelectedSortFavoriteId(favoriteId);
+    setShowSortFavoritesDropdown(false);
+
+    const favorite = sortFavorites.find((item) => item.id === favoriteId) ?? null;
+    if (!favorite || favorite.fields.length === 0) return;
+    setActiveCollectionSortFields(favorite.fields);
+    setTableSortState({ column: null, direction: null });
+  }, [sortFavorites]);
 
   const handleTrackSortChange = useCallback((newSort: TrackSortOption) => {
     setTrackSortBy(newSort);
@@ -627,6 +1019,8 @@ function CollectionBrowserPage() {
   }, []);
 
   const handleTableSortChange = useCallback((column: ColumnId) => {
+    setSelectedSortFavoriteId('');
+    setActiveCollectionSortFields([]);
     setTableSortState(prev => {
       if (prev.column === column) {
         if (prev.direction === 'asc') {
@@ -831,6 +1225,8 @@ function CollectionBrowserPage() {
         }
         return 0;
       });
+    } else if (viewMode === 'collection' && activeCollectionSortFields.length > 0) {
+      filtered = sortAlbumsByFavoriteFields(filtered, activeCollectionSortFields);
     } else {
       filtered = [...filtered].sort((a, b) => {
         switch (sortBy) {
@@ -860,7 +1256,7 @@ function CollectionBrowserPage() {
     }
 
     return filtered;
-  }, [albums, collectionFilter, selectedLetter, selectedFolderValue, selectedCrateId, folderMode, crates, searchQuery, sortBy, tableSortState, crateItemsByCrate, viewMode]);
+  }, [activeCollectionSortFields, albums, collectionFilter, selectedLetter, selectedFolderValue, selectedCrateId, folderMode, crates, searchQuery, sortBy, tableSortState, crateItemsByCrate, viewMode]);
 
   const folderCounts = useMemo(() => {
     return albums.reduce((acc, album) => {
@@ -1348,6 +1744,8 @@ function CollectionBrowserPage() {
     }
     setSelectedAlbumIds(new Set());
     setSelectedTrackKeys(new Set());
+    setShowColumnFavoritesDropdown(false);
+    setShowSortFavoritesDropdown(false);
     if (viewMode === 'collection') {
       setExpandedAlbumIds(new Set());
       setShowTrackFormatDropdown(false);
@@ -1748,33 +2146,25 @@ function CollectionBrowserPage() {
     }
   }, [loadPlaylists, playlists, selectedTrackKeys]);
 
-  const playlistVisibleColumns = useMemo<ColumnId[]>(() => {
-    if (visibleColumns.length === 0) {
-      return [...DEFAULT_PLAYLIST_VISIBLE_COLUMNS];
-    }
-    const deduped = visibleColumns.filter((id, index, arr) => arr.indexOf(id) === index);
-    return deduped.length > 0 ? deduped : [...DEFAULT_PLAYLIST_VISIBLE_COLUMNS];
-  }, [visibleColumns]);
+  const resolvedAlbumTrackColumns = useMemo<TrackViewColumnId[]>(() => {
+    const deduped = albumTrackVisibleColumns
+      .filter((id, index, arr) => arr.indexOf(id) === index)
+      .filter(isTrackViewColumnId);
+    return deduped.length > 0 ? deduped : [...DEFAULT_ALBUM_TRACK_VISIBLE_COLUMNS];
+  }, [albumTrackVisibleColumns]);
 
-  const getPlaylistColumnLabel = useCallback((columnId: ColumnId): string => {
-    switch (columnId) {
-      case 'title':
-        return 'Track';
-      case 'artist':
-        return 'Artist';
-      case 'sort_title':
-        return 'Album';
-      case 'subtitle':
-      case 'sides':
-        return 'Pos';
-      case 'labels':
-        return 'Label';
-      default:
-        return COLUMN_DEFINITIONS[columnId]?.label || columnId;
-    }
+  const resolvedPlaylistColumns = useMemo<TrackViewColumnId[]>(() => {
+    const deduped = playlistVisibleColumns
+      .filter((id, index, arr) => arr.indexOf(id) === index)
+      .filter(isTrackViewColumnId);
+    return deduped.length > 0 ? deduped : [...DEFAULT_PLAYLIST_VISIBLE_COLUMNS];
+  }, [playlistVisibleColumns]);
+
+  const getTrackColumnLabel = useCallback((columnId: TrackViewColumnId): string => {
+    return TRACK_VIEW_COLUMN_DEFINITIONS[columnId]?.label || columnId;
   }, []);
 
-  const renderPlaylistCell = useCallback((row: CollectionTrackRow, columnId: ColumnId): ReactNode => {
+  const renderTrackCell = useCallback((row: CollectionTrackRow, columnId: TrackViewColumnId): ReactNode => {
     switch (columnId) {
       case 'checkbox': {
         const isChecked = selectedTrackKeys.has(row.key);
@@ -1787,110 +2177,162 @@ function CollectionBrowserPage() {
           />
         );
       }
-      case 'owned':
-        return <span className="text-green-600">✓</span>;
-      case 'for_sale_indicator':
-        return row.forSale ? '$' : '';
-      case 'menu':
-        return (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleEditAlbum(row.inventoryId);
-            }}
-            className="text-blue-600 hover:underline"
-            title="Edit album"
-          >
-            ✏
-          </button>
-        );
-      case 'artist':
-        return row.trackArtist || row.albumArtist || '—';
-      case 'title':
+      case 'track_title':
         return row.trackTitle || '—';
-      case 'year':
-        return row.yearInt ?? '—';
-      case 'barcode':
-        return row.barcode || '—';
-      case 'cat_no':
-        return row.catalogNumber || '—';
-      case 'sort_title':
+      case 'track_artist':
+        return row.trackArtist || row.albumArtist || '—';
+      case 'album_title':
         return row.albumTitle || '—';
-      case 'subtitle':
+      case 'album_artist':
+        return row.albumArtist || '—';
+      case 'position':
         return getTrackPositionLabel(row);
-      case 'format':
-        return row.trackFormatFacets.join(' | ') || row.albumMediaType || '—';
-      case 'discs':
-        return row.discs ?? '—';
-      case 'sides':
-        return getTrackPositionLabel(row);
-      case 'tracks':
-        return row.position || '—';
       case 'length':
         return row.durationLabel || '—';
-      case 'location':
-        return row.location || '—';
-      case 'country':
-        return row.country || '—';
-      case 'extra':
-        return row.packaging || row.notes || '—';
-      case 'media_condition':
-        return row.mediaCondition || '—';
-      case 'package_sleeve_condition':
-        return row.packageSleeveCondition || row.sleeveCondition || '—';
-      case 'rpm':
-        return row.rpm || '—';
-      case 'vinyl_color':
-        return '—';
-      case 'vinyl_weight':
-        return row.vinylWeight || '—';
-      case 'genres':
-        return formatTrackArrayValues(row.genres);
-      case 'styles':
-        return '—';
-      case 'labels':
-        return formatTrackArrayValues(row.labels ?? (row.label ? [row.label] : []));
-      case 'engineers':
-        return formatTrackArrayValues(row.engineers);
-      case 'musicians':
-        return formatTrackArrayValues(row.musicians);
-      case 'producers':
-        return formatTrackArrayValues(row.producers);
-      case 'songwriters':
-        return formatTrackArrayValues(row.songwriters);
-      case 'secondary_artists':
-        return row.trackArtist !== row.albumArtist ? row.trackArtist : '—';
-      case 'added_date':
-        return formatDisplayDate(row.dateAdded);
-      case 'collection_status':
-        return formatTrackStatus(row.status);
       case 'my_rating':
         return row.myRating ?? '—';
+      case 'format':
+        return row.trackFormatFacets.join(' | ') || row.albumMediaType || '—';
+      case 'genre':
+        return formatTrackArrayValues(row.genres);
+      case 'label':
+        return formatTrackArrayValues(row.labels ?? (row.label ? [row.label] : []));
+      case 'year':
+        return row.yearInt ?? '—';
+      case 'added_date':
+        return formatDisplayDate(row.dateAdded);
+      case 'location':
+        return row.location || '—';
+      case 'collection_status':
+        return formatTrackStatus(row.status);
       case 'personal_notes':
         return row.personalNotes || '—';
-      case 'release_notes':
-        return row.releaseNotes || '—';
-      case 'master_notes':
-        return row.masterNotes || '—';
-      case 'owner':
-        return row.owner || '—';
-      case 'custom_tags':
-        return formatTrackArrayValues(row.customTags);
-      case 'modified_date':
-        return formatDisplayDate(row.lastPlayedAt);
-      case 'for_sale':
-        return row.forSale ? 'Yes' : 'No';
-      case 'purchase_price':
-        return formatDisplayCurrency(row.purchasePrice);
-      case 'current_value':
-        return formatDisplayCurrency(row.currentValue);
-      case 'sale_price':
-        return '—';
       default:
         return '—';
     }
-  }, [handleEditAlbum, selectedTrackKeys, toggleTrackSelection]);
+  }, [selectedTrackKeys, toggleTrackSelection]);
+
+  const renderAlbumGroupCell = useCallback((
+    group: TrackAlbumGroup,
+    columnId: TrackViewColumnId,
+    isExpanded: boolean,
+    allTracksSelected: boolean
+  ): ReactNode => {
+    const firstTrack = group.tracks[0] ?? null;
+
+    switch (columnId) {
+      case 'checkbox':
+        return (
+          <input
+            type="checkbox"
+            checked={allTracksSelected}
+            onChange={(e) => {
+              e.stopPropagation();
+              const keys = group.tracks.map((track) => track.key);
+              setSelectedTrackKeys((prev) => {
+                const next = new Set(prev);
+                if (allTracksSelected) {
+                  keys.forEach((key) => next.delete(key));
+                } else {
+                  keys.forEach((key) => next.add(key));
+                }
+                return next;
+              });
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        );
+      case 'track_title':
+        return (
+          <>
+            <span className="mr-2 text-[#4b5563]">{isExpanded ? '▾' : '▸'}</span>
+            {group.albumTitle}
+          </>
+        );
+      case 'track_artist':
+      case 'album_artist':
+        return group.albumArtist;
+      case 'album_title':
+        return (
+          <>
+            {group.trackCount} tracks
+            {group.sideTotals.length > 0 && (
+              <span className="ml-2 text-[#6b7280] text-xs">
+                {group.sideTotals.map((side) => `Side ${side.side}: ${formatTrackDuration(side.totalSeconds)}`).join(' | ')}
+              </span>
+            )}
+          </>
+        );
+      case 'position':
+        return '—';
+      case 'length':
+        return group.totalSeconds > 0 ? formatTrackDuration(group.totalSeconds) : '—';
+      case 'my_rating':
+        return '—';
+      case 'format':
+        return firstTrack ? (firstTrack.trackFormatFacets.join(' | ') || firstTrack.albumMediaType || '—') : '—';
+      case 'genre':
+        return firstTrack ? formatTrackArrayValues(firstTrack.genres) : '—';
+      case 'label':
+        return firstTrack ? formatTrackArrayValues(firstTrack.labels ?? (firstTrack.label ? [firstTrack.label] : [])) : '—';
+      case 'year':
+        return firstTrack?.yearInt ?? '—';
+      case 'added_date':
+        return firstTrack ? formatDisplayDate(firstTrack.dateAdded) : '—';
+      case 'location':
+        return firstTrack?.location || '—';
+      case 'collection_status':
+        return formatTrackStatus(firstTrack?.status);
+      case 'personal_notes':
+        return firstTrack?.personalNotes || '—';
+      default:
+        return '—';
+    }
+  }, []);
+
+  const activeColumnSelectorConfig = useMemo(() => {
+    if (columnSelectorMode === 'collection') {
+      return {
+        visibleColumns: collectionVisibleColumns as string[],
+        columnDefinitions: COLUMN_DEFINITIONS as unknown as Record<string, { id: string; label: string }>,
+        columnGroups: COLUMN_GROUPS as unknown as Array<{ id: string; label: string; icon: string; columns: string[] }>,
+        defaultVisibleColumns: DEFAULT_VISIBLE_COLUMNS as string[],
+        selectedColumnsTitle: 'My Collection columns',
+      };
+    }
+
+    if (columnSelectorMode === 'album-track') {
+      return {
+        visibleColumns: resolvedAlbumTrackColumns as string[],
+        columnDefinitions: TRACK_VIEW_COLUMN_DEFINITIONS as unknown as Record<string, { id: string; label: string }>,
+        columnGroups: TRACK_VIEW_COLUMN_GROUPS as Array<{ id: string; label: string; icon: string; columns: string[] }>,
+        defaultVisibleColumns: DEFAULT_ALBUM_TRACK_VISIBLE_COLUMNS as string[],
+        selectedColumnsTitle: 'My Album / Track columns',
+      };
+    }
+
+    return {
+      visibleColumns: resolvedPlaylistColumns as string[],
+      columnDefinitions: TRACK_VIEW_COLUMN_DEFINITIONS as unknown as Record<string, { id: string; label: string }>,
+      columnGroups: TRACK_VIEW_COLUMN_GROUPS as Array<{ id: string; label: string; icon: string; columns: string[] }>,
+      defaultVisibleColumns: DEFAULT_PLAYLIST_VISIBLE_COLUMNS as string[],
+      selectedColumnsTitle: 'My Playlist columns',
+    };
+  }, [collectionVisibleColumns, columnSelectorMode, resolvedAlbumTrackColumns, resolvedPlaylistColumns]);
+
+  const handleActiveColumnsChange = useCallback((columns: string[]) => {
+    if (columnSelectorMode === 'collection') {
+      handleCollectionColumnsChange(columns.filter(isCollectionColumnId));
+      return;
+    }
+
+    if (columnSelectorMode === 'album-track') {
+      handleAlbumTrackColumnsChange(columns.filter(isTrackViewColumnId));
+      return;
+    }
+
+    handlePlaylistColumnsChange(columns.filter(isTrackViewColumnId));
+  }, [columnSelectorMode, handleAlbumTrackColumnsChange, handleCollectionColumnsChange, handlePlaylistColumnsChange]);
 
   return (
     <>
@@ -2227,7 +2669,15 @@ function CollectionBrowserPage() {
                 </div>
                 
                 <div className="relative">
-                  <button onClick={() => setShowSortDropdown(!showSortDropdown)} title="Change sort order" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      setShowSortFavoritesDropdown(false);
+                      setShowColumnFavoritesDropdown(false);
+                      setShowSortDropdown(!showSortDropdown);
+                    }}
+                    title="Change sort order"
+                    className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1"
+                  >
                     <span>↕️</span>
                     <span className="text-[9px]">▼</span>
                   </button>
@@ -2263,8 +2713,110 @@ function CollectionBrowserPage() {
                     </>
                   )}
                 </div>
+
+                {viewMode === 'collection' && (
+                  <div className="relative">
+                    <button
+                      onClick={() => {
+                        setShowSortDropdown(false);
+                        setShowColumnFavoritesDropdown(false);
+                        setShowSortFavoritesDropdown(!showSortFavoritesDropdown);
+                      }}
+                      title="Sorting favorites"
+                      className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1"
+                    >
+                      <span>✓</span>
+                      <span className="text-[9px]">▼</span>
+                    </button>
+                    {showSortFavoritesDropdown && (
+                      <>
+                        <div onClick={() => setShowSortFavoritesDropdown(false)} className="fixed inset-0 z-[99]" />
+                        <div className="absolute top-full left-0 mt-1 bg-white border border-[#ddd] rounded shadow-lg z-[100] min-w-[260px]">
+                          <button
+                            onClick={() => {
+                              setShowSortFavoritesDropdown(false);
+                              setShowManageSortFavoritesModal(true);
+                            }}
+                            className="w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] font-semibold hover:bg-[#f5f5f5]"
+                          >
+                            Manage Favorites
+                          </button>
+                          <div className="px-3 py-1 text-[10px] font-semibold text-[#999] uppercase tracking-wider border-t border-[#eee] bg-[#fafafa]">
+                            Favorites
+                          </div>
+                          {sortFavorites.map((favorite) => (
+                            <button
+                              key={favorite.id}
+                              onClick={() => handleApplySortFavorite(favorite.id)}
+                              className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${selectedSortFavoriteId === favorite.id ? 'bg-[#e3f2fd]' : ''}`}
+                            >
+                              <span>{favorite.name}</span>
+                              {selectedSortFavoriteId === favorite.id && <span className="text-[#2196F3]">✓</span>}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
                 
-                <button onClick={() => setShowColumnSelector(true)} title="Select visible columns" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
+                {viewMode === 'collection' && (
+                  <div className="relative">
+                    <button
+                      onClick={() => {
+                        setShowSortDropdown(false);
+                        setShowSortFavoritesDropdown(false);
+                        setShowColumnFavoritesDropdown(!showColumnFavoritesDropdown);
+                      }}
+                      title="Column favorites"
+                      className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1"
+                    >
+                      <span>★</span>
+                      <span className="text-[9px]">▼</span>
+                    </button>
+                    {showColumnFavoritesDropdown && (
+                      <>
+                        <div onClick={() => setShowColumnFavoritesDropdown(false)} className="fixed inset-0 z-[99]" />
+                        <div className="absolute top-full left-0 mt-1 bg-white border border-[#ddd] rounded shadow-lg z-[100] min-w-[260px]">
+                          <button
+                            onClick={() => {
+                              setShowColumnFavoritesDropdown(false);
+                              setShowManageColumnFavoritesModal(true);
+                            }}
+                            className="w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] font-semibold hover:bg-[#f5f5f5]"
+                          >
+                            Manage Favorites
+                          </button>
+                          <div className="px-3 py-1 text-[10px] font-semibold text-[#999] uppercase tracking-wider border-t border-[#eee] bg-[#fafafa]">
+                            Favorites
+                          </div>
+                          {columnFavorites.map((favorite) => (
+                            <button
+                              key={favorite.id}
+                              onClick={() => handleApplyColumnFavorite(favorite.id)}
+                              className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${selectedColumnFavoriteId === favorite.id ? 'bg-[#e3f2fd]' : ''}`}
+                            >
+                              <span>{favorite.name}</span>
+                              {selectedColumnFavoriteId === favorite.id && <span className="text-[#2196F3]">✓</span>}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                <button
+                  onClick={() => {
+                    setShowSortDropdown(false);
+                    setShowSortFavoritesDropdown(false);
+                    setShowColumnFavoritesDropdown(false);
+                    setColumnSelectorMode(viewMode);
+                    setShowColumnSelector(true);
+                  }}
+                  title="Select visible columns"
+                  className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1"
+                >
                   <span>⊞</span>
                   <span className="text-[9px]">▼</span>
                 </button>
@@ -2317,30 +2869,38 @@ function CollectionBrowserPage() {
                 <div className="p-10 text-center text-[#666]">Loading albums...</div>
               ) : (
                 viewMode === 'collection' ? (
-                  <CollectionTable albums={filteredAndSortedAlbums} visibleColumns={visibleColumns} lockedColumns={lockedColumns} onAlbumClick={handleAlbumClick} selectedAlbums={selectedAlbumsAsStrings} onSelectionChange={handleSelectionChange} sortState={tableSortState} onSortChange={handleTableSortChange} onEditAlbum={handleEditAlbum} />
+                  <CollectionTable albums={filteredAndSortedAlbums} visibleColumns={collectionVisibleColumns} lockedColumns={lockedColumns} onAlbumClick={handleAlbumClick} selectedAlbums={selectedAlbumsAsStrings} onSelectionChange={handleSelectionChange} sortState={tableSortState} onSortChange={handleTableSortChange} onEditAlbum={handleEditAlbum} />
                 ) : viewMode === 'album-track' ? (
                   <div className="h-full overflow-auto">
                     <table className="w-full border-collapse text-sm">
                       <thead className="sticky top-0 z-10 bg-[#f5f5f5] border-b border-[#ddd]">
                         <tr>
-                          <th className="w-[42px] px-2 py-2 text-left font-semibold text-[#666]">
-                            <input
-                              type="checkbox"
-                              checked={filteredTrackRows.length > 0 && selectedTrackKeys.size === filteredTrackRows.length}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedTrackKeys(new Set(filteredTrackRows.map((row) => row.key)));
-                                } else {
-                                  setSelectedTrackKeys(new Set());
-                                }
-                              }}
-                            />
-                          </th>
-                          <th className="px-2 py-2 text-left font-semibold text-[#666]">Track</th>
-                          <th className="px-2 py-2 text-left font-semibold text-[#666]">Artist</th>
-                          <th className="px-2 py-2 text-left font-semibold text-[#666]">Album</th>
-                          <th className="px-2 py-2 text-left font-semibold text-[#666]">Pos</th>
-                          <th className="px-2 py-2 text-right font-semibold text-[#666]">Length</th>
+                          {resolvedAlbumTrackColumns.map((columnId) => {
+                            const isControlCol = TRACK_COLUMN_CONTROL_IDS.has(columnId);
+                            const isRightAligned = TRACK_COLUMN_RIGHT_ALIGN_IDS.has(columnId);
+                            return (
+                              <th
+                                key={`album-track-header-${columnId}`}
+                                className={`${isControlCol ? 'w-[42px]' : ''} px-2 py-2 ${isControlCol ? 'text-center' : isRightAligned ? 'text-right' : 'text-left'} font-semibold text-[#666]`}
+                              >
+                                {columnId === 'checkbox' ? (
+                                  <input
+                                    type="checkbox"
+                                    checked={filteredTrackRows.length > 0 && selectedTrackKeys.size === filteredTrackRows.length}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedTrackKeys(new Set(filteredTrackRows.map((row) => row.key)));
+                                      } else {
+                                        setSelectedTrackKeys(new Set());
+                                      }
+                                    }}
+                                  />
+                                ) : (
+                                  getTrackColumnLabel(columnId)
+                                )}
+                              </th>
+                            );
+                          })}
                         </tr>
                       </thead>
                       <tbody>
@@ -2357,71 +2917,43 @@ function CollectionBrowserPage() {
                                 }}
                                 className={`border-b border-[#ddd] cursor-pointer ${selectedAlbumId === group.inventoryId ? 'bg-[#eef6ff]' : 'bg-[#f8fafc] hover:bg-[#f1f5f9]'}`}
                               >
-                                <td className="px-2 py-2">
-                                  <input
-                                    type="checkbox"
-                                    checked={allTracksSelected}
-                                    onChange={(e) => {
-                                      e.stopPropagation();
-                                      const keys = group.tracks.map((track) => track.key);
-                                      setSelectedTrackKeys((prev) => {
-                                        const next = new Set(prev);
-                                        if (allTracksSelected) {
-                                          keys.forEach((key) => next.delete(key));
-                                        } else {
-                                          keys.forEach((key) => next.add(key));
-                                        }
-                                        return next;
-                                      });
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                </td>
-                                <td className="px-2 py-2 text-[#111827] font-semibold">
-                                  <span className="mr-2 text-[#4b5563]">{isExpanded ? '▾' : '▸'}</span>
-                                  {group.albumTitle}
-                                </td>
-                                <td className="px-2 py-2 text-[#1f2937]">{group.albumArtist}</td>
-                                <td className="px-2 py-2 text-[#4b5563]">
-                                  {group.trackCount} tracks
-                                  {group.sideTotals.length > 0 && (
-                                    <span className="ml-2 text-[#6b7280] text-xs">
-                                      {group.sideTotals.map((side) => `Side ${side.side}: ${formatTrackDuration(side.totalSeconds)}`).join(' | ')}
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-2 py-2 text-[#4b5563]">—</td>
-                                <td className="px-2 py-2 text-right text-[#4b5563]">
-                                  {group.totalSeconds > 0 ? formatTrackDuration(group.totalSeconds) : '—'}
-                                </td>
-                              </tr>
-                              {isExpanded &&
-                                group.tracks.map((row) => {
-                                  const isChecked = selectedTrackKeys.has(row.key);
-                                  const positionNumber = (row.position.match(/\d+/g) ?? [row.position]).slice(-1)[0];
-                                  const positionLabel = row.side ? `${row.side}${positionNumber}` : row.position;
+                                {resolvedAlbumTrackColumns.map((columnId) => {
+                                  const isControlCol = TRACK_COLUMN_CONTROL_IDS.has(columnId);
+                                  const isRightAligned = TRACK_COLUMN_RIGHT_ALIGN_IDS.has(columnId);
+                                  const textColor = isControlCol ? 'text-[#4b5563]' : columnId === 'track_title' ? 'text-[#111827] font-semibold' : columnId === 'track_artist' ? 'text-[#1f2937]' : 'text-[#4b5563]';
                                   return (
-                                    <tr
-                                      key={row.key}
-                                      onClick={() => setSelectedAlbumId(row.inventoryId)}
-                                      className={`border-b border-[#eee] cursor-pointer ${selectedAlbumId === row.inventoryId ? 'bg-[#f8fbff]' : 'hover:bg-[#fafafa]'}`}
+                                    <td
+                                      key={`${group.inventoryId}-${columnId}`}
+                                      className={`px-2 py-2 ${isControlCol ? 'text-center' : isRightAligned ? 'text-right' : 'text-left'} ${textColor}`}
                                     >
-                                      <td className="px-2 py-2">
-                                        <input
-                                          type="checkbox"
-                                          checked={isChecked}
-                                          onChange={() => toggleTrackSelection(row.key)}
-                                          onClick={(e) => e.stopPropagation()}
-                                        />
-                                      </td>
-                                      <td className="px-2 py-2 text-[#1f2937] pl-7">{row.trackTitle}</td>
-                                      <td className="px-2 py-2 text-[#374151]">{row.trackArtist}</td>
-                                      <td className="px-2 py-2 text-[#6b7280]">{row.albumTitle}</td>
-                                      <td className="px-2 py-2 text-[#4b5563]">{positionLabel}</td>
-                                      <td className="px-2 py-2 text-right text-[#4b5563]">{row.durationLabel}</td>
-                                    </tr>
+                                      {renderAlbumGroupCell(group, columnId, isExpanded, allTracksSelected)}
+                                    </td>
                                   );
                                 })}
+                              </tr>
+                              {isExpanded &&
+                                group.tracks.map((row) => (
+                                  <tr
+                                    key={row.key}
+                                    onClick={() => setSelectedAlbumId(row.inventoryId)}
+                                    className={`border-b border-[#eee] cursor-pointer ${selectedAlbumId === row.inventoryId ? 'bg-[#f8fbff]' : 'hover:bg-[#fafafa]'}`}
+                                  >
+                                    {resolvedAlbumTrackColumns.map((columnId) => {
+                                      const isControlCol = TRACK_COLUMN_CONTROL_IDS.has(columnId);
+                                      const isRightAligned = TRACK_COLUMN_RIGHT_ALIGN_IDS.has(columnId);
+                                      const textColor = isControlCol ? 'text-[#4b5563]' : columnId === 'track_title' ? 'text-[#1f2937]' : columnId === 'track_artist' ? 'text-[#374151]' : 'text-[#4b5563]';
+                                      const titleIndent = columnId === 'track_title' ? 'pl-7' : '';
+                                      return (
+                                        <td
+                                          key={`${row.key}-${columnId}`}
+                                          className={`px-2 py-2 ${titleIndent} ${isControlCol ? 'text-center' : isRightAligned ? 'text-right' : 'text-left'} ${textColor}`}
+                                        >
+                                          {renderTrackCell(row, columnId)}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                ))}
                             </Fragment>
                           );
                         })}
@@ -2436,9 +2968,9 @@ function CollectionBrowserPage() {
                     <table className="w-full border-collapse text-sm">
                       <thead className="sticky top-0 z-10 bg-[#f5f5f5] border-b border-[#ddd]">
                         <tr>
-                          {playlistVisibleColumns.map((columnId) => {
-                            const isControlCol = ['checkbox', 'owned', 'for_sale_indicator', 'menu'].includes(columnId);
-                            const isRightAligned = ['length', 'my_rating', 'purchase_price', 'current_value', 'sale_price'].includes(columnId);
+                          {resolvedPlaylistColumns.map((columnId) => {
+                            const isControlCol = TRACK_COLUMN_CONTROL_IDS.has(columnId);
+                            const isRightAligned = TRACK_COLUMN_RIGHT_ALIGN_IDS.has(columnId);
                             return (
                               <th
                                 key={`playlist-header-${columnId}`}
@@ -2457,7 +2989,7 @@ function CollectionBrowserPage() {
                                     }}
                                   />
                                 ) : (
-                                  getPlaylistColumnLabel(columnId)
+                                  getTrackColumnLabel(columnId)
                                 )}
                               </th>
                             );
@@ -2465,29 +2997,27 @@ function CollectionBrowserPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredTrackRows.map((row) => {
-                          return (
-                            <tr
-                              key={row.key}
-                              onClick={() => setSelectedAlbumId(row.inventoryId)}
-                              className={`border-b border-[#eee] cursor-pointer ${selectedAlbumId === row.inventoryId ? 'bg-[#f8fbff]' : 'hover:bg-[#fafafa]'}`}
-                            >
-                              {playlistVisibleColumns.map((columnId) => {
-                                const isControlCol = ['checkbox', 'owned', 'for_sale_indicator', 'menu'].includes(columnId);
-                                const isRightAligned = ['length', 'my_rating', 'purchase_price', 'current_value', 'sale_price'].includes(columnId);
-                                const textColor = isControlCol ? 'text-[#4b5563]' : columnId === 'title' ? 'text-[#1f2937]' : columnId === 'artist' ? 'text-[#374151]' : 'text-[#4b5563]';
-                                return (
-                                  <td
-                                    key={`${row.key}-${columnId}`}
-                                    className={`px-2 py-2 ${isControlCol ? 'text-center' : isRightAligned ? 'text-right' : 'text-left'} ${textColor}`}
-                                  >
-                                    {renderPlaylistCell(row, columnId)}
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          );
-                        })}
+                        {filteredTrackRows.map((row) => (
+                          <tr
+                            key={row.key}
+                            onClick={() => setSelectedAlbumId(row.inventoryId)}
+                            className={`border-b border-[#eee] cursor-pointer ${selectedAlbumId === row.inventoryId ? 'bg-[#f8fbff]' : 'hover:bg-[#fafafa]'}`}
+                          >
+                            {resolvedPlaylistColumns.map((columnId) => {
+                              const isControlCol = TRACK_COLUMN_CONTROL_IDS.has(columnId);
+                              const isRightAligned = TRACK_COLUMN_RIGHT_ALIGN_IDS.has(columnId);
+                              const textColor = isControlCol ? 'text-[#4b5563]' : columnId === 'track_title' ? 'text-[#1f2937]' : columnId === 'track_artist' ? 'text-[#374151]' : 'text-[#4b5563]';
+                              return (
+                                <td
+                                  key={`${row.key}-${columnId}`}
+                                  className={`px-2 py-2 ${isControlCol ? 'text-center' : isRightAligned ? 'text-right' : 'text-left'} ${textColor}`}
+                                >
+                                  {renderTrackCell(row, columnId)}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                     {filteredTrackRows.length === 0 && (
@@ -2523,7 +3053,59 @@ function CollectionBrowserPage() {
         </div>
       </div>
 
-      {showColumnSelector && <ColumnSelector visibleColumns={visibleColumns} onColumnsChange={handleColumnsChange} onClose={() => setShowColumnSelector(false)} />}
+      {showColumnSelector && (
+        <ColumnSelector
+          visibleColumns={activeColumnSelectorConfig.visibleColumns}
+          onColumnsChange={handleActiveColumnsChange}
+          onClose={() => setShowColumnSelector(false)}
+          columnDefinitions={activeColumnSelectorConfig.columnDefinitions}
+          columnGroups={activeColumnSelectorConfig.columnGroups}
+          defaultVisibleColumns={activeColumnSelectorConfig.defaultVisibleColumns}
+          selectedColumnsTitle={activeColumnSelectorConfig.selectedColumnsTitle}
+        />
+      )}
+      <ManageColumnFavoritesModal
+        isOpen={showManageColumnFavoritesModal}
+        onClose={() => setShowManageColumnFavoritesModal(false)}
+        favorites={columnFavorites}
+        onSave={(favorites) => {
+          setColumnFavorites(favorites);
+          if (!favorites.some((item) => item.id === selectedColumnFavoriteId)) {
+            setSelectedColumnFavoriteId(favorites[0]?.id ?? '');
+          }
+          setShowManageColumnFavoritesModal(false);
+        }}
+        selectedId={selectedColumnFavoriteId}
+        onSelect={(id) => {
+          setSelectedColumnFavoriteId(id);
+          const favorite = columnFavorites.find((item) => item.id === id) ?? null;
+          const mapped = mapFavoriteColumnsToCollectionColumns(favorite);
+          if (mapped.length > 0) {
+            handleCollectionColumnsChange([...new Set([...COLLECTION_CONTROL_COLUMNS, ...mapped])]);
+          }
+        }}
+      />
+      <ManageSortFavoritesModal
+        isOpen={showManageSortFavoritesModal}
+        onClose={() => setShowManageSortFavoritesModal(false)}
+        favorites={sortFavorites}
+        onSave={(favorites) => {
+          setSortFavorites(favorites);
+          if (!favorites.some((item) => item.id === selectedSortFavoriteId)) {
+            setSelectedSortFavoriteId(favorites[0]?.id ?? '');
+          }
+          setShowManageSortFavoritesModal(false);
+        }}
+        selectedId={selectedSortFavoriteId}
+        onSelect={(id) => {
+          setSelectedSortFavoriteId(id);
+          const favorite = sortFavorites.find((item) => item.id === id) ?? null;
+          if (favorite && favorite.fields.length > 0) {
+            setActiveCollectionSortFields(favorite.fields);
+            setTableSortState({ column: null, direction: null });
+          }
+        }}
+      />
       {editingAlbumId && <EditAlbumModal albumId={editingAlbumId} onClose={() => setEditingAlbumId(null)} onRefresh={loadAlbums} onNavigate={(newAlbumId) => setEditingAlbumId(newAlbumId)} allAlbumIds={filteredAndSortedAlbums.map(a => a.id)} />}
       {showNewCrateModal && <NewCrateModal isOpen={showNewCrateModal} onClose={() => { setShowNewCrateModal(false); setEditingCrate(null); if (returnToAddToCrate) { setReturnToAddToCrate(false); setNewlyCreatedCrateId(null); }}} onCrateCreated={async (newCrateId) => { await loadCrates(); setEditingCrate(null); if (returnToAddToCrate) { setNewlyCreatedCrateId(newCrateId); setShowNewCrateModal(false); setShowAddToCrateModal(true); } else { setShowNewCrateModal(false); }}} editingCrate={editingCrate} />}
       {showNewSmartCrateModal && <NewSmartCrateModal isOpen={showNewSmartCrateModal} onClose={() => { setShowNewSmartCrateModal(false); setEditingCrate(null); }} onCrateCreated={() => { loadCrates(); setShowNewSmartCrateModal(false); setEditingCrate(null); }} editingCrate={editingCrate} />}
@@ -2571,7 +3153,7 @@ function CollectionBrowserPage() {
           selectedTrackKeys={selectedTrackKeys}
           playlists={playlists}
           selectedPlaylistId={selectedPlaylistId}
-          visibleColumns={visibleColumns}
+          visibleColumns={collectionVisibleColumns}
         />
       )}
     </>

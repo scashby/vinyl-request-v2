@@ -30,6 +30,7 @@ type SessionRow = {
   status: string;
   current_round: number;
   round_count: number;
+  playlist_name: string | null;
   stage_one_points: number;
   stage_two_points: number;
   final_reveal_points: number;
@@ -233,6 +234,7 @@ export default function CoverArtClueChaseSetupPage() {
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-4xl font-black uppercase text-teal-100">Cover Art Clue Chase Setup</h1>
             <div className="flex gap-2">
+              <Link href="/admin/games/cover-art-clue-chase/help" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Help</Link>
               <Link href="/admin/games/cover-art-clue-chase/history" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">History</Link>
               <Link href="/admin/games/cover-art-clue-chase/jumbotron" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron Scope</Link>
             </div>
@@ -354,7 +356,7 @@ export default function CoverArtClueChaseSetupPage() {
               {sessions.map((session) => (
                 <div key={session.id} className="rounded border border-stone-700 bg-stone-950/70 p-3">
                   <p>{session.session_code} · {session.title} · Round {session.current_round}/{session.round_count}</p>
-                  <p className="text-stone-400">Event: {session.event_title ?? "(none)"} · Score model: {session.stage_one_points}/{session.stage_two_points}/{session.final_reveal_points} · Calls: {session.calls_scored}/{session.calls_total} · Status: {session.status}</p>
+                  <p className="text-stone-400">Event: {session.event_title ?? "(none)"} · Playlist: {session.playlist_name ?? "(none)"} · Score model: {session.stage_one_points}/{session.stage_two_points}/{session.final_reveal_points} · Calls: {session.calls_scored}/{session.calls_total} · Status: {session.status}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/cover-art-clue-chase/host?sessionId=${session.id}`)}>Host</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/cover-art-clue-chase/assistant?sessionId=${session.id}`)}>Assistant</button>

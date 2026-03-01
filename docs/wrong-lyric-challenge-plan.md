@@ -33,13 +33,13 @@ SQL schema file: `sql/create-wrong-lyric-challenge-core.sql`
 - `GET /api/games/wrong-lyric-challenge/sessions/[id]`
 - `PATCH /api/games/wrong-lyric-challenge/sessions/[id]`
 - `GET /api/games/wrong-lyric-challenge/sessions/history?eventId=`
-
-Future host runtime endpoints
-1. `POST /api/games/wrong-lyric-challenge/sessions/[id]/advance`
-2. `POST /api/games/wrong-lyric-challenge/sessions/[id]/pause`
-3. `POST /api/games/wrong-lyric-challenge/sessions/[id]/resume`
-4. `POST /api/games/wrong-lyric-challenge/sessions/[id]/score`
-5. `PATCH /api/games/wrong-lyric-challenge/calls/[id]`
+- `GET /api/games/wrong-lyric-challenge/sessions/[id]/calls`
+- `GET /api/games/wrong-lyric-challenge/sessions/[id]/leaderboard`
+- `POST /api/games/wrong-lyric-challenge/sessions/[id]/advance`
+- `POST /api/games/wrong-lyric-challenge/sessions/[id]/pause`
+- `POST /api/games/wrong-lyric-challenge/sessions/[id]/resume`
+- `POST /api/games/wrong-lyric-challenge/sessions/[id]/score`
+- `PATCH /api/games/wrong-lyric-challenge/calls/[id]`
 
 ## Admin UI skeleton
 - Setup: `src/app/admin/games/wrong-lyric-challenge/page.tsx`
@@ -47,6 +47,8 @@ Future host runtime endpoints
 - Host: `src/app/admin/games/wrong-lyric-challenge/host/page.tsx`
 - Assistant: `src/app/admin/games/wrong-lyric-challenge/assistant/page.tsx`
 - Jumbotron: `src/app/admin/games/wrong-lyric-challenge/jumbotron/page.tsx`
+- Test docs: `docs/wrong-lyric-challenge-smoke-test.md`
+- Runbook: `docs/wrong-lyric-challenge-host-instructions.md`
 
 ## Development phases
 1. MVP

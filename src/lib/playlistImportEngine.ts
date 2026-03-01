@@ -15,7 +15,12 @@ export type SourceRow = {
   spotifyTrackId?: string;
 };
 
-export type MatchingMode = "strict" | "balanced" | "aggressive";
+export type MatchingMode = "review" | "strict" | "balanced" | "aggressive";
+
+export type ImportMatchFilters = {
+  mediaTypes?: string[];
+  formatDetails?: string[];
+};
 
 export type MatchCandidate = {
   track_key: string;
@@ -53,6 +58,7 @@ type ImportOptions = {
   icon: string;
   color: string;
   matchingMode?: MatchingMode;
+  matchFilters?: ImportMatchFilters;
 };
 
 type InventoryTrack = {
@@ -63,10 +69,18 @@ type InventoryTrack = {
   side: string | null;
   position: string | null;
   isrc: string | null;
+  albumFormat: string | null;
+  formatDetails: string[];
   canonTitle: string;
   canonArtist: string;
   titleTokens: Set<string>;
   artistTokens: Set<string>;
+};
+
+type NormalizedImportMatchFilters = {
+  mediaTypes: Set<string>;
+  formatDetails: Set<string>;
+  active: boolean;
 };
 
 type InventoryIndex = {
@@ -181,10 +195,93 @@ const trackIdFromSpotifyUri = (value: unknown) => {
 
 const normalizeMatchingMode = (value: unknown): MatchingMode => {
   const raw = String(value ?? "").trim().toLowerCase();
-  if (raw === "strict" || raw === "aggressive" || raw === "balanced") {
+  if (raw === "review" || raw === "strict" || raw === "aggressive" || raw === "balanced") {
     return raw;
   }
-  return "balanced";
+  return "review";
+};
+
+const normalizeFormatToken = (value: unknown) => {
+  const raw = String(value ?? "")
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!raw) return "";
+  if (raw === "45" || raw === "45rpm") return "45 rpm";
+  if (/^45\s*rpm$/.test(raw)) return "45 rpm";
+  if (raw === '7"' || raw === "7" || raw === "7 inch" || raw === "7in") return '7"';
+  if (raw === '12"' || raw === "12" || raw === "12 inch" || raw === "12in") return '12"';
+  if (/^33 ?1\/3 rpm$|^33⅓ rpm$|^33 rpm$/.test(raw)) return "33 rpm";
+  return raw;
+};
+
+const normalizeImportMatchFilters = (filters?: ImportMatchFilters): NormalizedImportMatchFilters => {
+  const mediaTypes = new Set(
+    (Array.isArray(filters?.mediaTypes) ? filters.mediaTypes : [])
+      .map((token) => normalizeFormatToken(token))
+      .filter(Boolean)
+  );
+  const formatDetails = new Set(
+    (Array.isArray(filters?.formatDetails) ? filters.formatDetails : [])
+      .map((token) => normalizeFormatToken(token))
+      .filter(Boolean)
+  );
+  return {
+    mediaTypes,
+    formatDetails,
+    active: mediaTypes.size > 0 || formatDetails.size > 0,
+  };
+};
+
+const buildTrackFormatTokens = (track: InventoryTrack) => {
+  const tokens = new Set<string>();
+  const addToken = (value: string) => {
+    const normalized = normalizeFormatToken(value);
+    if (normalized) tokens.add(normalized);
+  };
+
+  if (track.albumFormat) addToken(track.albumFormat);
+  for (const detail of track.formatDetails) {
+    addToken(detail);
+    for (const part of detail.split(/[,/|]/)) {
+      const candidate = part.trim();
+      if (!candidate) continue;
+      addToken(candidate);
+    }
+  }
+  return tokens;
+};
+
+const matchesImportFilters = (track: InventoryTrack, filters: NormalizedImportMatchFilters) => {
+  if (!filters.active) return true;
+  const tokens = buildTrackFormatTokens(track);
+
+  if (filters.mediaTypes.size > 0) {
+    let mediaMatch = false;
+    for (const token of filters.mediaTypes) {
+      if (tokens.has(token)) {
+        mediaMatch = true;
+        break;
+      }
+    }
+    if (!mediaMatch) return false;
+  }
+
+  if (filters.formatDetails.size > 0) {
+    let detailMatch = false;
+    for (const token of filters.formatDetails) {
+      if (tokens.has(token)) {
+        detailMatch = true;
+        break;
+      }
+    }
+    if (!detailMatch) return false;
+  }
+
+  return true;
 };
 
 const normalizeSpaces = (value: string) =>
@@ -479,6 +576,12 @@ const loadInventoryTracks = async (authHeader?: string): Promise<InventoryTrack[
       side: typeof row.side === "string" ? row.side.trim() || null : null,
       position: positionRaw,
       isrc: null,
+      albumFormat: typeof row.album_format === "string" ? row.album_format.trim() || null : null,
+      formatDetails: Array.isArray(row.format_details)
+        ? row.format_details
+            .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+            .filter((entry): entry is string => entry.length > 0)
+        : [],
       canonTitle,
       canonArtist,
       titleTokens: tokenSet(canonTitle),
@@ -569,7 +672,18 @@ const chooseFromTitleMatches = (
   mode: MatchingMode
 ) => {
   if (titleMatches.length === 0) return null;
-  if (titleMatches.length === 1) return titleMatches[0];
+  if (titleMatches.length === 1) {
+    const only = titleMatches[0];
+    if (mode !== "review") return only;
+    if (!rowArtist) return only;
+    const candidateArtist = only.canonArtist;
+    const unknownArtist =
+      candidateArtist === "unknown artist" || candidateArtist === "unknown" || candidateArtist === "various";
+    if (candidateArtist === rowArtist || unknownArtist) return only;
+    return null;
+  }
+
+  if (mode === "review") return null;
 
   const scored = titleMatches.map((track) => scoreCandidate(rowTitle, rowArtist, track)).sort((a, b) => b.score - a.score);
 
@@ -602,6 +716,7 @@ const chooseFromTitleMatches = (
 };
 
 const shouldAutoMatch = (best: ScoredTrack, second: ScoredTrack | undefined, mode: MatchingMode) => {
+  if (mode === "review") return false;
   const margin = second ? best.score - second.score : best.score;
   if (best.artistScore >= 0.95 && best.titleTokenOverlap < 0.16 && best.titleScore < 0.45) {
     return false;
@@ -635,6 +750,7 @@ const chooseLegacyAutoMatch = (
   candidates: MatchCandidate[],
   mode: MatchingMode
 ) => {
+  if (mode === "review") return null;
   if (candidates.length === 0) return null;
   const best = candidates[0];
   const second = candidates[1];
@@ -691,12 +807,14 @@ const matchRows = async (
   rows: SourceRow[],
   index: InventoryIndex,
   mode: MatchingMode,
-  authHeader?: string
+  authHeader?: string,
+  filters?: NormalizedImportMatchFilters
 ) => {
   const matchedTrackKeys: string[] = [];
   const missing: MissingRow[] = [];
   let fuzzyMatchedCount = 0;
   const legacyIndex = await getLegacyInventoryIndex(authHeader);
+  const hasActiveFilters = Boolean(filters?.active);
 
   for (const row of rows) {
     const rawTitle = strip(row.title);
@@ -755,6 +873,7 @@ const matchRows = async (
           const rescored = scoreCandidate(normTitle, normArtist, mappedTrack);
           return toCandidate(rescored);
         }
+        if (hasActiveFilters) return null;
         return {
           track_key: key,
           inventory_id: candidate.inventory_id ?? null,
@@ -858,11 +977,26 @@ export const importRowsToPlaylist = async (options: ImportOptions): Promise<Impo
   const db = supabaseServer(options.authHeader) as any;
   const playlistName = sanitizePlaylistName(options.playlistName);
   const matchingMode = normalizeMatchingMode(options.matchingMode);
+  const matchFilters = normalizeImportMatchFilters(options.matchFilters);
 
   const inventoryTracks = await loadInventoryTracks(options.authHeader);
-  const index = buildIndex(inventoryTracks);
+  const filteredInventoryTracks = matchFilters.active
+    ? inventoryTracks.filter((track) => matchesImportFilters(track, matchFilters))
+    : inventoryTracks;
 
-  const { matchedTrackKeys, missing, fuzzyMatchedCount } = await matchRows(rows, index, matchingMode, options.authHeader);
+  if (filteredInventoryTracks.length === 0) {
+    throw new Error("No inventory tracks match the selected import restrictions");
+  }
+
+  const index = buildIndex(filteredInventoryTracks);
+
+  const { matchedTrackKeys, missing, fuzzyMatchedCount } = await matchRows(
+    rows,
+    index,
+    matchingMode,
+    options.authHeader,
+    matchFilters
+  );
   const dedupedMatched = Array.from(new Set(matchedTrackKeys));
 
   const playlistId = await getPlaylistId(db, options, playlistName);

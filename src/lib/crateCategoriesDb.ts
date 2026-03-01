@@ -38,10 +38,29 @@ type CrateCategoriesDatabase = {
         };
         Relationships: [];
       };
+      collection_playlists: {
+        Row: {
+          id: number;
+          name: string;
+          is_smart: boolean;
+        };
+        Insert: {
+          id?: number;
+          name: string;
+          is_smart?: boolean;
+        };
+        Update: {
+          id?: number;
+          name?: string;
+          is_smart?: boolean;
+        };
+        Relationships: [];
+      };
       ccat_sessions: {
         Row: {
           id: number;
           event_id: number | null;
+          playlist_id: number | null;
           session_code: string;
           title: string;
           round_count: number;
@@ -53,6 +72,9 @@ type CrateCategoriesDatabase = {
           target_gap_seconds: number;
           current_round: number;
           current_call_index: number;
+          countdown_started_at: string | null;
+          paused_remaining_seconds: number | null;
+          paused_at: string | null;
           show_title: boolean;
           show_round: boolean;
           show_prompt: boolean;
@@ -65,6 +87,7 @@ type CrateCategoriesDatabase = {
         Insert: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code: string;
           title: string;
           round_count?: number;
@@ -76,6 +99,9 @@ type CrateCategoriesDatabase = {
           target_gap_seconds?: number;
           current_round?: number;
           current_call_index?: number;
+          countdown_started_at?: string | null;
+          paused_remaining_seconds?: number | null;
+          paused_at?: string | null;
           show_title?: boolean;
           show_round?: boolean;
           show_prompt?: boolean;
@@ -87,9 +113,13 @@ type CrateCategoriesDatabase = {
         };
         Update: {
           event_id?: number | null;
+          playlist_id?: number | null;
           title?: string;
           current_round?: number;
           current_call_index?: number;
+          countdown_started_at?: string | null;
+          paused_remaining_seconds?: number | null;
+          paused_at?: string | null;
           show_title?: boolean;
           show_round?: boolean;
           show_prompt?: boolean;

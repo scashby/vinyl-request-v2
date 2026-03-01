@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 
 type CreateSessionBody = {
   event_id?: number | null;
+  playlist_id?: number | null;
   title?: string;
   round_count?: number;
   points_correct_call?: number;
@@ -34,6 +35,7 @@ type CreateSessionBody = {
 type SessionListRow = {
   id: number;
   event_id: number | null;
+  playlist_id: number | null;
   session_code: string;
   title: string;
   round_count: number;
@@ -45,6 +47,7 @@ type SessionListRow = {
 };
 
 type EventRow = { id: number; title: string };
+type PlaylistRow = { id: number; name: string };
 
 function normalizeTeamNames(teamNames: string[] | undefined): string[] {
   const names = (teamNames ?? []).map((name) => name.trim()).filter(Boolean);
@@ -90,7 +93,7 @@ export async function GET(request: NextRequest) {
   let query = db
     .from("ooc_sessions")
     .select(
-      "id, event_id, session_code, title, round_count, points_correct_call, bonus_original_artist_points, status, current_round, created_at"
+      "id, event_id, playlist_id, session_code, title, round_count, points_correct_call, bonus_original_artist_points, status, current_round, created_at"
     )
     .order("created_at", { ascending: false });
 
@@ -103,12 +106,21 @@ export async function GET(request: NextRequest) {
   const eventIds = Array.from(
     new Set(sessions.map((row) => row.event_id).filter((value): value is number => Number.isFinite(value)))
   );
+  const playlistIds = Array.from(
+    new Set(sessions.map((row) => row.playlist_id).filter((value): value is number => Number.isFinite(value)))
+  );
 
   const { data: events } = eventIds.length
     ? await db.from("events").select("id, title").in("id", eventIds)
     : { data: [] as EventRow[] };
+  const { data: playlists } = playlistIds.length
+    ? await db.from("collection_playlists").select("id, name").in("id", playlistIds)
+    : { data: [] as PlaylistRow[] };
 
   const eventsById = new Map<number, EventRow>(((events ?? []) as EventRow[]).map((row) => [row.id, row]));
+  const playlistsById = new Map<number, PlaylistRow>(
+    ((playlists ?? []) as PlaylistRow[]).map((row) => [row.id, row])
+  );
 
   const sessionIds = sessions.map((session) => session.id);
   const [{ data: calls }, { data: scores }] = await Promise.all([
@@ -137,6 +149,7 @@ export async function GET(request: NextRequest) {
       data: sessions.map((row) => ({
         ...row,
         event_title: row.event_id ? eventsById.get(row.event_id)?.title ?? null : null,
+        playlist_name: row.playlist_id ? playlistsById.get(row.playlist_id)?.name ?? null : null,
         calls_total: callCountBySession.get(row.id) ?? 0,
         calls_scored: scoredCallsBySession.get(row.id)?.size ?? 0,
       })),
@@ -151,6 +164,10 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as CreateSessionBody;
 
     const roundCount = normalizeRoundCount(body.round_count);
+    const playlistId = Number(body.playlist_id);
+    if (!Number.isFinite(playlistId)) {
+      return NextResponse.json({ error: "playlist_id is required" }, { status: 400 });
+    }
     const removeResleeveSeconds = Math.max(0, Number(body.remove_resleeve_seconds ?? 20));
     const findRecordSeconds = Math.max(0, Number(body.find_record_seconds ?? 12));
     const cueSeconds = Math.max(0, Number(body.cue_seconds ?? 12));
@@ -173,6 +190,7 @@ export async function POST(request: NextRequest) {
       .from("ooc_sessions")
       .insert({
         event_id: body.event_id ?? null,
+        playlist_id: playlistId,
         session_code: code,
         title: (body.title ?? "Original or Cover Session").trim() || "Original or Cover Session",
         round_count: roundCount,

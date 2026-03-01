@@ -14,7 +14,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const { data, error } = await db
     .from("wlc_session_calls")
     .select(
-      "call_index, round_number, artist, title, source_label, correct_lyric, decoy_lyric_1, decoy_lyric_2, decoy_lyric_3, answer_slot, dj_cue_hint, host_notes"
+      "id, session_id, call_index, round_number, artist, title, source_label, correct_lyric, decoy_lyric_1, decoy_lyric_2, decoy_lyric_3, answer_slot, dj_cue_hint, host_notes, status, asked_at, revealed_at, scored_at, created_at"
     )
     .eq("session_id", sessionId)
     .order("call_index", { ascending: true });
@@ -24,9 +24,22 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const rows = (data ?? []).map((row) => ({
     call_index: row.call_index,
     round_number: row.round_number,
+    id: row.id,
+    session_id: row.session_id,
     artist: row.artist,
     title: row.title,
     source_label: row.source_label,
+    correct_lyric: row.correct_lyric,
+    decoy_lyric_1: row.decoy_lyric_1,
+    decoy_lyric_2: row.decoy_lyric_2,
+    decoy_lyric_3: row.decoy_lyric_3,
+    answer_slot: row.answer_slot,
+    dj_cue_hint: row.dj_cue_hint,
+    status: row.status,
+    asked_at: row.asked_at,
+    revealed_at: row.revealed_at,
+    scored_at: row.scored_at,
+    created_at: row.created_at,
     detail: [
       `Correct slot: ${row.answer_slot}`,
       `Correct lyric: ${row.correct_lyric}`,

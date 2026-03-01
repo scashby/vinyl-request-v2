@@ -30,10 +30,32 @@ export type WrongLyricChallengeDatabase = {
         };
         Relationships: [];
       };
+      collection_playlists: {
+        Row: {
+          id: number;
+          name: string;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          name: string;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          name?: string;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
       wlc_sessions: {
         Row: {
           id: number;
           event_id: number | null;
+          playlist_id: number | null;
           session_code: string;
           title: string;
           round_count: number;
@@ -49,6 +71,9 @@ export type WrongLyricChallengeDatabase = {
           target_gap_seconds: number;
           current_round: number;
           current_call_index: number;
+          countdown_started_at: string | null;
+          paused_remaining_seconds: number | null;
+          paused_at: string | null;
           show_title: boolean;
           show_round: boolean;
           show_scoreboard: boolean;
@@ -61,6 +86,7 @@ export type WrongLyricChallengeDatabase = {
         Insert: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code: string;
           title: string;
           round_count?: number;
@@ -76,6 +102,9 @@ export type WrongLyricChallengeDatabase = {
           target_gap_seconds?: number;
           current_round?: number;
           current_call_index?: number;
+          countdown_started_at?: string | null;
+          paused_remaining_seconds?: number | null;
+          paused_at?: string | null;
           show_title?: boolean;
           show_round?: boolean;
           show_scoreboard?: boolean;
@@ -88,6 +117,7 @@ export type WrongLyricChallengeDatabase = {
         Update: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code?: string;
           title?: string;
           round_count?: number;
@@ -103,6 +133,9 @@ export type WrongLyricChallengeDatabase = {
           target_gap_seconds?: number;
           current_round?: number;
           current_call_index?: number;
+          countdown_started_at?: string | null;
+          paused_remaining_seconds?: number | null;
+          paused_at?: string | null;
           show_title?: boolean;
           show_round?: boolean;
           show_scoreboard?: boolean;

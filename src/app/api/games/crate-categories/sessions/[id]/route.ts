@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCrateCategoriesDb } from "src/lib/crateCategoriesDb";
+import { computeCrateCategoriesRemainingSeconds } from "src/lib/crateCategoriesEngine";
 
 export const runtime = "nodejs";
 
 type SessionRow = {
   id: number;
   event_id: number | null;
+  playlist_id: number | null;
   session_code: string;
   title: string;
   round_count: number;
@@ -17,6 +19,9 @@ type SessionRow = {
   target_gap_seconds: number;
   current_round: number;
   current_call_index: number;
+  countdown_started_at: string | null;
+  paused_remaining_seconds: number | null;
+  paused_at: string | null;
   show_title: boolean;
   show_round: boolean;
   show_prompt: boolean;
@@ -28,6 +33,7 @@ type SessionRow = {
 };
 
 type EventRow = { id: number; title: string; date: string; time: string | null; location: string | null };
+type PlaylistRow = { id: number; name: string };
 
 function parseSessionId(id: string) {
   const sessionId = Number(id);
@@ -50,6 +56,9 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const { data: event } = session.event_id
     ? await db.from("events").select("id, title, date, time, location").eq("id", session.event_id).maybeSingle()
     : { data: null };
+  const { data: playlist } = session.playlist_id
+    ? await db.from("collection_playlists").select("id, name").eq("id", session.playlist_id).maybeSingle()
+    : { data: null };
 
   const [{ data: rounds }, { data: calls }] = await Promise.all([
     db.from("ccat_session_rounds").select("id").eq("session_id", sessionId),
@@ -60,6 +69,8 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     {
       ...session,
       event: (event ?? null) as EventRow | null,
+      playlist: (playlist ?? null) as PlaylistRow | null,
+      remaining_seconds: computeCrateCategoriesRemainingSeconds(session),
       rounds_total: (rounds ?? []).length,
       calls_total: (calls ?? []).length,
     },
@@ -77,8 +88,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const allowedFields = new Set([
     "title",
     "event_id",
+    "playlist_id",
     "current_round",
     "current_call_index",
+    "countdown_started_at",
+    "paused_remaining_seconds",
+    "paused_at",
     "show_title",
     "show_round",
     "show_prompt",

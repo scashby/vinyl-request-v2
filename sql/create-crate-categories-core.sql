@@ -3,6 +3,7 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS public.ccat_sessions (
   id bigserial PRIMARY KEY,
   event_id bigint REFERENCES public.events(id) ON DELETE SET NULL,
+  playlist_id bigint REFERENCES public.collection_playlists(id) ON DELETE SET NULL,
   session_code text NOT NULL UNIQUE,
   title text NOT NULL,
   round_count integer NOT NULL DEFAULT 4,
@@ -14,6 +15,9 @@ CREATE TABLE IF NOT EXISTS public.ccat_sessions (
   target_gap_seconds integer NOT NULL DEFAULT 56,
   current_round integer NOT NULL DEFAULT 1,
   current_call_index integer NOT NULL DEFAULT 0,
+  countdown_started_at timestamptz,
+  paused_remaining_seconds integer,
+  paused_at timestamptz,
   show_title boolean NOT NULL DEFAULT true,
   show_round boolean NOT NULL DEFAULT true,
   show_prompt boolean NOT NULL DEFAULT true,
@@ -25,8 +29,15 @@ CREATE TABLE IF NOT EXISTS public.ccat_sessions (
   CONSTRAINT ccat_sessions_status_chk CHECK (status IN ('pending', 'running', 'paused', 'completed')),
   CONSTRAINT ccat_sessions_round_count_chk CHECK (round_count BETWEEN 3 AND 8),
   CONSTRAINT ccat_sessions_tracks_chk CHECK (default_tracks_per_round BETWEEN 3 AND 5),
-  CONSTRAINT ccat_sessions_gap_chk CHECK (target_gap_seconds > 0)
+  CONSTRAINT ccat_sessions_gap_chk CHECK (target_gap_seconds > 0),
+  CONSTRAINT ccat_sessions_paused_remaining_chk CHECK (paused_remaining_seconds IS NULL OR paused_remaining_seconds >= 0)
 );
+
+ALTER TABLE public.ccat_sessions
+  ADD COLUMN IF NOT EXISTS playlist_id bigint REFERENCES public.collection_playlists(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS countdown_started_at timestamptz,
+  ADD COLUMN IF NOT EXISTS paused_remaining_seconds integer,
+  ADD COLUMN IF NOT EXISTS paused_at timestamptz;
 
 CREATE TABLE IF NOT EXISTS public.ccat_session_teams (
   id bigserial PRIMARY KEY,
@@ -107,6 +118,7 @@ CREATE TABLE IF NOT EXISTS public.ccat_session_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ccat_sessions_event_id ON public.ccat_sessions(event_id);
+CREATE INDEX IF NOT EXISTS idx_ccat_sessions_playlist_id ON public.ccat_sessions(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_ccat_sessions_status ON public.ccat_sessions(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ccat_teams_session_id ON public.ccat_session_teams(session_id);
 CREATE INDEX IF NOT EXISTS idx_ccat_rounds_session_id ON public.ccat_session_rounds(session_id);

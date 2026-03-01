@@ -13,13 +13,20 @@
 - `ndr_team_scores`: per-team scoring outcome per call (`artist_correct`, `title_correct`, `awarded_points`).
 - `ndr_session_events`: event log for host actions and audit trail.
 
-## API route skeleton
+## API routes (implemented + planned)
 - `GET /api/games/needle-drop-roulette/events`: event selector feed.
 - `GET /api/games/needle-drop-roulette/sessions?eventId=`: event-aware setup/list view.
 - `POST /api/games/needle-drop-roulette/sessions`: create session, teams, rounds, calls.
 - `GET /api/games/needle-drop-roulette/sessions/[id]`: full session snapshot + linked event payload.
 - `PATCH /api/games/needle-drop-roulette/sessions/[id]`: limited runtime field updates.
 - `GET /api/games/needle-drop-roulette/sessions/history?eventId=`: event-filtered history metrics.
+- `GET /api/games/needle-drop-roulette/sessions/[id]/calls`: ordered drop stack for host/jumbotron/PDF.
+- `POST /api/games/needle-drop-roulette/sessions/[id]/advance`: move to next call and update session pointer.
+- `PATCH /api/games/needle-drop-roulette/calls/[id]`: call lifecycle status changes (`asked`, `locked`, `answer_revealed`, `scored`, `skipped`).
+- `POST /api/games/needle-drop-roulette/sessions/[id]/score`: upsert team score rows for one call.
+- `GET /api/games/needle-drop-roulette/sessions/[id]/leaderboard`: aggregate standings from `ndr_team_scores`.
+- `POST /api/games/needle-drop-roulette/sessions/[id]/pause`: pause active session.
+- `POST /api/games/needle-drop-roulette/sessions/[id]/resume`: resume paused session.
 
 ## Admin scope recommendation
 - Setup page: event selector, rounds (8-12), snippet seconds (5-10), answer mode (slips/whiteboard/mixed), pacing buffer controls, preflight checklist.

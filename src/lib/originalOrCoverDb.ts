@@ -32,10 +32,29 @@ type OriginalOrCoverDatabase = {
         };
         Relationships: [];
       };
+      collection_playlists: {
+        Row: {
+          id: number;
+          name: string;
+          track_count: number;
+        };
+        Insert: {
+          id?: number;
+          name: string;
+          track_count?: number;
+        };
+        Update: {
+          id?: number;
+          name?: string;
+          track_count?: number;
+        };
+        Relationships: [];
+      };
       ooc_sessions: {
         Row: {
           id: number;
           event_id: number | null;
+          playlist_id: number | null;
           session_code: string;
           title: string;
           round_count: number;
@@ -47,6 +66,9 @@ type OriginalOrCoverDatabase = {
           host_buffer_seconds: number;
           target_gap_seconds: number;
           current_round: number;
+          countdown_started_at: string | null;
+          paused_remaining_seconds: number | null;
+          paused_at: string | null;
           current_call_index: number;
           show_title: boolean;
           show_round: boolean;
@@ -60,6 +82,7 @@ type OriginalOrCoverDatabase = {
         Insert: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code: string;
           title: string;
           round_count?: number;
@@ -71,6 +94,9 @@ type OriginalOrCoverDatabase = {
           host_buffer_seconds?: number;
           target_gap_seconds?: number;
           current_round?: number;
+          countdown_started_at?: string | null;
+          paused_remaining_seconds?: number | null;
+          paused_at?: string | null;
           current_call_index?: number;
           show_title?: boolean;
           show_round?: boolean;
@@ -84,6 +110,7 @@ type OriginalOrCoverDatabase = {
         Update: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code?: string;
           title?: string;
           round_count?: number;
@@ -95,6 +122,9 @@ type OriginalOrCoverDatabase = {
           host_buffer_seconds?: number;
           target_gap_seconds?: number;
           current_round?: number;
+          countdown_started_at?: string | null;
+          paused_remaining_seconds?: number | null;
+          paused_at?: string | null;
           current_call_index?: number;
           show_title?: boolean;
           show_round?: boolean;

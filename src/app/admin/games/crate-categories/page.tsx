@@ -25,6 +25,8 @@ type PlaylistRow = {
 
 type SessionRow = {
   id: number;
+  playlist_id: number | null;
+  playlist_name: string | null;
   session_code: string;
   title: string;
   status: string;
@@ -380,7 +382,7 @@ export default function CrateCategoriesSetupPage() {
               {sessions.map((session) => (
                 <div key={session.id} className="rounded border border-stone-700 bg-stone-950/70 p-3">
                   <p>{session.session_code} · {session.title}</p>
-                  <p className="text-stone-400">Event: {session.event_title ?? "(none)"} · Round: {session.current_round}/{session.round_count} · Scored rounds: {session.rounds_scored}/{session.rounds_total} · Status: {session.status}</p>
+                  <p className="text-stone-400">Event: {session.event_title ?? "(none)"} · Playlist: {session.playlist_name ?? "(none)"} · Round: {session.current_round}/{session.round_count} · Scored rounds: {session.rounds_scored}/{session.rounds_total} · Status: {session.status}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Link href={`/admin/games/crate-categories/host?sessionId=${session.id}`} className="rounded border border-stone-600 px-2 py-1 text-xs">Host</Link>
                     <Link href={`/admin/games/crate-categories/assistant?sessionId=${session.id}`} className="rounded border border-stone-600 px-2 py-1 text-xs">Assistant</Link>

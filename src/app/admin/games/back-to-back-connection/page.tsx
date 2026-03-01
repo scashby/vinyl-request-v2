@@ -227,6 +227,7 @@ export default function BackToBackConnectionSetupPage() {
               <Link href="/admin/games/back-to-back-connection/host" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Host</Link>
               <Link href="/admin/games/back-to-back-connection/assistant" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Assistant</Link>
               <Link href="/admin/games/back-to-back-connection/jumbotron" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron</Link>
+              <Link href="/admin/games/back-to-back-connection/help" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Help</Link>
             </div>
           </div>
           <p className="mt-2 text-sm text-stone-300">Play two tracks, teams identify one accepted connection, then optionally name a specific detail.</p>
@@ -345,7 +346,8 @@ export default function BackToBackConnectionSetupPage() {
               <p className="mt-1 text-stone-300">Show prompt, round, countdown, and scoreboard. Keep answer hidden until reveal action.</p>
             </div>
           </div>
-          <p className="mt-3 text-xs text-stone-400">Detailed phase plan, route plan, and risk controls: `docs/back-to-back-connection-plan.md`.</p>
+          <p className="mt-3 text-xs text-stone-400">Detailed phase plan and scope notes: `docs/back-to-back-connection-plan.md`.</p>
+          <p className="mt-1 text-xs text-stone-400">Operator instructions: `docs/back-to-back-connection-instructions.md` · Smoke test: `docs/back-to-back-connection-smoke-test.md`.</p>
         </section>
 
         <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">

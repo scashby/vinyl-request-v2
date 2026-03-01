@@ -235,7 +235,8 @@ export default function LyricGapRelaySetupPage() {
             <h1 className="text-4xl font-black uppercase text-fuchsia-100">Lyric Gap Relay Setup</h1>
             <div className="flex gap-2">
               <Link href="/admin/games/lyric-gap-relay/history" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">History</Link>
-              <Link href="/admin/games/lyric-gap-relay/jumbotron" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron Scope</Link>
+              <Link href="/admin/games/lyric-gap-relay/help" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Help</Link>
+              <Link href="/admin/games/lyric-gap-relay/jumbotron" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron</Link>
             </div>
           </div>
           <p className="mt-2 text-sm text-stone-300">Play to a lyric, stop, and teams fill the next line. Scoring is 2 exact, 1 close-enough, 0 miss.</p>

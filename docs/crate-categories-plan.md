@@ -1,7 +1,7 @@
 # Crate Categories Module Plan
 
 ## Scope Snapshot
-- Status: `undeveloped -> in_development` once admin skeleton exists.
+- Status: `in_development` with testable host runtime.
 - Environment fit: single DJ, two turntables, brewery floor noise, limited tech.
 - Core loop: one category + one prompt type per round, each round has 3-5 tracks.
 - Event linkage: every session supports `event_id -> public.events(id)` with nullable `ON DELETE SET NULL`; setup/history support event-aware filtering.
@@ -21,7 +21,7 @@
 - `decade-lock`
 - `mood-match`
 
-## API Route Skeleton Plan
+## API Route Plan
 - `GET /api/games/crate-categories/events`
   - Return recent events for setup/history selectors.
 - `GET /api/games/crate-categories/sessions?eventId=...`
@@ -36,8 +36,19 @@
   - Runtime-safe updates (`event_id`, display toggles, status, progress indexes).
 - `GET /api/games/crate-categories/sessions/history?eventId=...`
   - Session history list with event filter and simple team/scoring metrics.
+- `GET /api/games/crate-categories/sessions/[id]/calls`
+  - Pull list + host/jumbotron call feed.
+- `GET /api/games/crate-categories/sessions/[id]/rounds`
+  - Round contract feed (category, prompt type, per-round scoring rubric).
+- `GET /api/games/crate-categories/sessions/[id]/leaderboard`
+  - Team totals from round scores.
+- `POST /api/games/crate-categories/sessions/[id]/advance`
+- `POST /api/games/crate-categories/sessions/[id]/pause`
+- `POST /api/games/crate-categories/sessions/[id]/resume`
+- `POST /api/games/crate-categories/sessions/[id]/score`
+- `PATCH /api/games/crate-categories/calls/[id]`
 
-## UI Skeleton Plan
+## UI Plan
 - Setup page:
   - Event selector.
   - Session config for rounds, tracks-per-round, pacing timers, display toggles.
@@ -46,19 +57,20 @@
 - History page:
   - Event dropdown filter and refresh.
   - Session cards with status, teams, calls asked, rounds scored.
-- Host/Assistant/Jumbotron pages:
-  - Scope recommendations only (MVP-safe), no hard runtime dependencies.
+- Host/Jumbotron:
+  - Live runtime for call progression, pause/resume, round scoring, and display sync.
+- Assistant:
+  - Scope recommendation only; remains optional for solo-host operation.
 
 ## Development Phases
 1. MVP
-- Ship schema + route skeletons + setup/history pages.
-- Enable session creation with event linking and history filtering.
-- Keep host/assistant/jumbotron as guidance-only scaffolds.
+- Ship schema + setup/history pages + event-aware APIs.
+- Session creation with event and playlist linkage.
 
-2. Hostable Runtime
-- Add round state transitions (`pending -> active -> closed`).
-- Add call progression controls and per-round scoring forms.
-- Add lightweight session event logging for recoverability.
+2. Hostable Runtime (now)
+- Round state transitions (`pending -> active -> closed`).
+- Call progression controls and per-round scoring forms.
+- Jumbotron polling view with prompt/answer state and scoreboard.
 
 3. Brewery Hardening
 - Add offline-friendly retry and optimistic UI for score submits.

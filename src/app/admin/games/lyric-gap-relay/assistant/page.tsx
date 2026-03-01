@@ -12,7 +12,10 @@ export default function LyricGapRelayAssistantPage() {
       <div className="mx-auto max-w-4xl rounded-3xl border border-fuchsia-900/50 bg-black/40 p-6">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-3xl font-black uppercase text-fuchsia-100">Lyric Gap Relay Assistant</h1>
-          <Link href="/admin/games/lyric-gap-relay" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Back to Setup</Link>
+          <div className="flex gap-2">
+            <Link href="/admin/games/lyric-gap-relay/help" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Help</Link>
+            <Link href="/admin/games/lyric-gap-relay" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Back to Setup</Link>
+          </div>
         </div>
 
         <p className="mt-3 text-sm text-stone-300">Session: {sessionId ?? "(none selected)"}</p>

@@ -57,6 +57,7 @@ export default function BackToBackConnectionHistoryPage() {
           <h1 className="text-3xl font-black uppercase text-amber-200">Back-to-Back Connection History</h1>
           <div className="flex items-center gap-2">
             <Link href="/admin/games/back-to-back-connection" className="rounded border border-stone-700 px-3 py-1 text-sm">Back to Setup</Link>
+            <Link href="/admin/games/back-to-back-connection/help" className="rounded border border-stone-700 px-3 py-1 text-sm">Help</Link>
             <select className="rounded border border-stone-700 bg-stone-950 px-3 py-1 text-sm" value={eventId ?? ""} onChange={(e) => setEventId(Number(e.target.value) || null)}>
               <option value="">All events</option>
               {events.map((event) => (

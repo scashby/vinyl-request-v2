@@ -3,6 +3,7 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS public.gi_sessions (
   id bigserial PRIMARY KEY,
   event_id bigint REFERENCES public.events(id) ON DELETE SET NULL,
+  playlist_id bigint REFERENCES public.collection_playlists(id) ON DELETE SET NULL,
   session_code text NOT NULL UNIQUE,
   title text NOT NULL,
   round_count integer NOT NULL DEFAULT 8,
@@ -17,6 +18,9 @@ CREATE TABLE IF NOT EXISTS public.gi_sessions (
   target_gap_seconds integer NOT NULL DEFAULT 54,
   current_round integer NOT NULL DEFAULT 1,
   current_call_index integer NOT NULL DEFAULT 0,
+  countdown_started_at timestamptz,
+  paused_remaining_seconds integer,
+  paused_at timestamptz,
   show_title boolean NOT NULL DEFAULT true,
   show_round boolean NOT NULL DEFAULT true,
   show_category boolean NOT NULL DEFAULT true,
@@ -33,6 +37,18 @@ CREATE TABLE IF NOT EXISTS public.gi_sessions (
   CONSTRAINT gi_sessions_reason_bonus_points_chk CHECK (reason_bonus_points BETWEEN 0 AND 3),
   CONSTRAINT gi_sessions_target_gap_seconds_chk CHECK (target_gap_seconds > 0)
 );
+
+ALTER TABLE public.gi_sessions
+  ADD COLUMN IF NOT EXISTS playlist_id bigint REFERENCES public.collection_playlists(id) ON DELETE SET NULL;
+
+ALTER TABLE public.gi_sessions
+  ADD COLUMN IF NOT EXISTS countdown_started_at timestamptz;
+
+ALTER TABLE public.gi_sessions
+  ADD COLUMN IF NOT EXISTS paused_remaining_seconds integer;
+
+ALTER TABLE public.gi_sessions
+  ADD COLUMN IF NOT EXISTS paused_at timestamptz;
 
 CREATE TABLE IF NOT EXISTS public.gi_session_teams (
   id bigserial PRIMARY KEY,
@@ -102,8 +118,14 @@ CREATE TABLE IF NOT EXISTS public.gi_round_team_picks (
   resolved_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT gi_round_team_picks_unique_pick UNIQUE (round_id, team_id),
-  CONSTRAINT gi_round_team_picks_points_chk CHECK (awarded_points BETWEEN 0 AND 3)
+  CONSTRAINT gi_round_team_picks_points_chk CHECK (awarded_points BETWEEN 0 AND 8)
 );
+
+ALTER TABLE public.gi_round_team_picks
+  DROP CONSTRAINT IF EXISTS gi_round_team_picks_points_chk;
+
+ALTER TABLE public.gi_round_team_picks
+  ADD CONSTRAINT gi_round_team_picks_points_chk CHECK (awarded_points BETWEEN 0 AND 8);
 
 CREATE TABLE IF NOT EXISTS public.gi_team_scores (
   id bigserial PRIMARY KEY,
@@ -127,6 +149,7 @@ CREATE TABLE IF NOT EXISTS public.gi_session_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_gi_sessions_event_id ON public.gi_sessions(event_id);
+CREATE INDEX IF NOT EXISTS idx_gi_sessions_playlist_id ON public.gi_sessions(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_gi_sessions_status ON public.gi_sessions(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_gi_teams_session_id ON public.gi_session_teams(session_id);
 CREATE INDEX IF NOT EXISTS idx_gi_rounds_session_id ON public.gi_session_rounds(session_id);

@@ -13,21 +13,12 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const db = getLyricGapRelayDb();
   const { data, error } = await db
     .from("lgr_session_calls")
-    .select("call_index, round_number, artist, title, source_label, cue_lyric, answer_lyric, host_notes")
+    .select(
+      "id, session_id, round_number, call_index, source_label, artist, title, cue_lyric, answer_lyric, accepted_answers, host_notes, status, asked_at, answer_revealed_at, scored_at, created_at"
+    )
     .eq("session_id", sessionId)
     .order("call_index", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  const rows = (data ?? []).map((row) => ({
-    call_index: row.call_index,
-    round_number: row.round_number,
-    artist: row.artist,
-    title: row.title,
-    source_label: row.source_label,
-    detail: `Cue: ${row.cue_lyric} | Answer: ${row.answer_lyric}`,
-    host_notes: row.host_notes,
-  }));
-
-  return NextResponse.json({ data: rows }, { status: 200 });
+  return NextResponse.json({ data: data ?? [] }, { status: 200 });
 }

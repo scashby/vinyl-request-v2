@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 
 type CreateSessionBody = {
   event_id?: number | null;
+  playlist_id?: number | null;
   title?: string;
   round_count?: number;
   lyric_points?: number;
@@ -39,6 +40,7 @@ type CreateSessionBody = {
 type SessionListRow = {
   id: number;
   event_id: number | null;
+  playlist_id: number | null;
   session_code: string;
   title: string;
   round_count: number;
@@ -98,7 +100,7 @@ export async function GET(request: NextRequest) {
 
   let query = db
     .from("wlc_sessions")
-    .select("id, event_id, session_code, title, round_count, lyric_points, song_bonus_enabled, song_bonus_points, status, current_round, created_at")
+    .select("id, event_id, playlist_id, session_code, title, round_count, lyric_points, song_bonus_enabled, song_bonus_points, status, current_round, created_at")
     .order("created_at", { ascending: false });
 
   if (eventId) query = query.eq("event_id", Number(eventId));
@@ -172,6 +174,7 @@ export async function POST(request: NextRequest) {
       .from("wlc_sessions")
       .insert({
         event_id: body.event_id ?? null,
+        playlist_id: body.playlist_id ?? null,
         session_code: code,
         title: (body.title ?? "Wrong Lyric Challenge Session").trim() || "Wrong Lyric Challenge Session",
         round_count: roundCount,
@@ -187,6 +190,9 @@ export async function POST(request: NextRequest) {
         target_gap_seconds: targetGapSeconds,
         current_round: 1,
         current_call_index: 0,
+        countdown_started_at: null,
+        paused_remaining_seconds: null,
+        paused_at: null,
         show_title: body.show_title ?? true,
         show_round: body.show_round ?? true,
         show_scoreboard: body.show_scoreboard ?? true,

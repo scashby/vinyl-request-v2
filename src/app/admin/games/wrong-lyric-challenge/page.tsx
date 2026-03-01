@@ -242,8 +242,9 @@ export default function WrongLyricChallengeSetupPage() {
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-4xl font-black uppercase text-red-100">Wrong Lyric Challenge Setup</h1>
             <div className="flex gap-2">
+              <Link href="/admin/games/wrong-lyric-challenge/help" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Help</Link>
               <Link href="/admin/games/wrong-lyric-challenge/history" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">History</Link>
-              <Link href="/admin/games/wrong-lyric-challenge/jumbotron" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron Scope</Link>
+              <Link href="/admin/games/wrong-lyric-challenge/jumbotron" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron</Link>
             </div>
           </div>
           <p className="mt-2 text-sm text-stone-300">Host reads lyric options while DJ cues track. Teams choose the real lyric. Score 2 for correct lyric, optional +1 for naming song.</p>

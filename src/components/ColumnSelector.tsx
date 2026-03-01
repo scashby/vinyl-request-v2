@@ -19,18 +19,20 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ColumnId, COLUMN_DEFINITIONS, COLUMN_GROUPS, DEFAULT_VISIBLE_COLUMNS } from '../app/edit-collection/columnDefinitions';
-
 interface ColumnSelectorProps {
-  visibleColumns: ColumnId[];
-  onColumnsChange: (columns: ColumnId[]) => void;
+  visibleColumns: string[];
+  onColumnsChange: (columns: string[]) => void;
   onClose: () => void;
+  columnDefinitions: Record<string, { id: string; label: string }>;
+  columnGroups: Array<{ id: string; label: string; icon: string; columns: string[] }>;
+  defaultVisibleColumns: string[];
+  selectedColumnsTitle?: string;
 }
 
 interface SortableItemProps {
-  id: ColumnId;
+  id: string;
   label: string;
-  onRemove: (id: ColumnId) => void;
+  onRemove: (id: string) => void;
 }
 
 const SortableItem = memo(function SortableItem({ id, label, onRemove }: SortableItemProps) {
@@ -98,12 +100,20 @@ const SortableItem = memo(function SortableItem({ id, label, onRemove }: Sortabl
   );
 });
 
-const ColumnSelector = memo(function ColumnSelector({ visibleColumns, onColumnsChange, onClose }: ColumnSelectorProps) {
+const ColumnSelector = memo(function ColumnSelector({
+  visibleColumns,
+  onColumnsChange,
+  onClose,
+  columnDefinitions,
+  columnGroups,
+  defaultVisibleColumns,
+  selectedColumnsTitle = 'My List View columns',
+}: ColumnSelectorProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
-    new Set(['main', 'edition'])
+    new Set(columnGroups.slice(0, 2).map((group) => group.id))
   );
   const [searchQuery, setSearchQuery] = useState('');
-  const [tempVisibleColumns, setTempVisibleColumns] = useState<ColumnId[]>(visibleColumns);
+  const [tempVisibleColumns, setTempVisibleColumns] = useState<string[]>(visibleColumns);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -124,7 +134,7 @@ const ColumnSelector = memo(function ColumnSelector({ visibleColumns, onColumnsC
     });
   };
 
-  const toggleColumn = (columnId: ColumnId) => {
+  const toggleColumn = (columnId: string) => {
     if (tempVisibleColumns.includes(columnId)) {
       setTempVisibleColumns(tempVisibleColumns.filter(id => id !== columnId));
     } else {
@@ -137,8 +147,8 @@ const ColumnSelector = memo(function ColumnSelector({ visibleColumns, onColumnsC
 
     if (over && active.id !== over.id) {
       setTempVisibleColumns((items) => {
-        const oldIndex = items.indexOf(active.id as ColumnId);
-        const newIndex = items.indexOf(over.id as ColumnId);
+        const oldIndex = items.indexOf(active.id as string);
+        const newIndex = items.indexOf(over.id as string);
         return arrayMove(items, oldIndex, newIndex);
       });
     }
@@ -154,26 +164,26 @@ const ColumnSelector = memo(function ColumnSelector({ visibleColumns, onColumnsC
   };
 
   const handleReset = () => {
-    setTempVisibleColumns([...DEFAULT_VISIBLE_COLUMNS]);
+    setTempVisibleColumns([...defaultVisibleColumns]);
   };
 
   const currentlyVisible = useMemo(() => {
     return tempVisibleColumns
-      .map(id => COLUMN_DEFINITIONS[id])
+      .map(id => columnDefinitions[id])
       .filter(Boolean);
-  }, [tempVisibleColumns]);
+  }, [columnDefinitions, tempVisibleColumns]);
 
   const filteredGroups = useMemo(() => {
-    if (!searchQuery) return COLUMN_GROUPS;
+    if (!searchQuery) return columnGroups;
     
-    return COLUMN_GROUPS.map(group => {
+    return columnGroups.map(group => {
       const filteredColumns = group.columns.filter(colId => {
-        const col = COLUMN_DEFINITIONS[colId];
+        const col = columnDefinitions[colId];
         return col?.label.toLowerCase().includes(searchQuery.toLowerCase());
       });
       return filteredColumns.length > 0 ? { ...group, columns: filteredColumns } : null;
     }).filter(Boolean);
-  }, [searchQuery]);
+  }, [columnDefinitions, columnGroups, searchQuery]);
 
   return (
     <>
@@ -281,7 +291,7 @@ const ColumnSelector = memo(function ColumnSelector({ visibleColumns, onColumnsC
               {filteredGroups.map(group => {
                 if (!group) return null;
                 const groupColumns = group.columns
-                  .map(colId => COLUMN_DEFINITIONS[colId])
+                  .map(colId => columnDefinitions[colId])
                   .filter(Boolean);
                 const isExpanded = expandedGroups.has(group.id);
 
@@ -379,7 +389,7 @@ const ColumnSelector = memo(function ColumnSelector({ visibleColumns, onColumnsC
                 marginBottom: '8px'
               }}>
                 <span style={{ fontSize: '14px', fontWeight: 600, color: '#333' }}>
-                  ☰ My List View columns
+                  ☰ {selectedColumnsTitle}
                 </span>
               </div>
               <div style={{ fontSize: '12px', color: '#666' }}>

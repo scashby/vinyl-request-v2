@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 type SessionRow = {
   id: number;
   event_id: number | null;
+  playlist_id: number | null;
   session_code: string;
   title: string;
   round_count: number;
@@ -29,6 +30,7 @@ type SessionRow = {
 };
 
 type EventRow = { id: number; title: string; date: string; time: string | null; location: string | null };
+type PlaylistRow = { id: number; name: string };
 
 function parseSessionId(id: string) {
   const sessionId = Number(id);
@@ -51,6 +53,9 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const { data: event } = session.event_id
     ? await db.from("events").select("id, title, date, time, location").eq("id", session.event_id).maybeSingle()
     : { data: null };
+  const { data: playlist } = session.playlist_id
+    ? await db.from("collection_playlists").select("id, name").eq("id", session.playlist_id).maybeSingle()
+    : { data: null };
 
   const { data: calls } = await db.from("sd_session_calls").select("id").eq("session_id", sessionId);
 
@@ -58,6 +63,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     {
       ...session,
       event: (event ?? null) as EventRow | null,
+      playlist: (playlist ?? null) as PlaylistRow | null,
       calls_total: (calls ?? []).length,
     },
     { status: 200 }
@@ -74,6 +80,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const allowedFields = new Set([
     "title",
     "event_id",
+    "playlist_id",
     "current_round",
     "current_call_index",
     "show_title",

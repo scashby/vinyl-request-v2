@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGenreImposterDb } from "src/lib/genreImposterDb";
 import { generateGenreImposterSessionCode } from "src/lib/genreImposterSessionCode";
+import { getBingoDb } from "src/lib/bingoDb";
+import { resolvePlaylistTracks, type ResolvedPlaylistTrack } from "src/lib/bingoEngine";
 
 export const runtime = "nodejs";
 
@@ -22,6 +24,7 @@ type RoundDraft = {
 
 type CreateSessionBody = {
   event_id?: number | null;
+  playlist_id?: number;
   title?: string;
   round_count?: number;
   reveal_mode?: "after_third_spin" | "immediate";
@@ -43,6 +46,7 @@ type CreateSessionBody = {
 type SessionListRow = {
   id: number;
   event_id: number | null;
+  playlist_id: number | null;
   session_code: string;
   title: string;
   round_count: number;
@@ -55,6 +59,23 @@ type SessionListRow = {
 
 type EventRow = { id: number; title: string };
 
+type PlaylistRow = { id: number; name: string };
+
+const AUTO_CATEGORY_POOL = [
+  "Soul / Funk",
+  "90s Hip-Hop",
+  "Dance Floor",
+  "Alt / Indie",
+  "Motown & Friends",
+  "Rock Anthems",
+  "Disco / Boogie",
+  "R&B Essentials",
+  "New Wave",
+  "Latin Heat",
+  "House / Club",
+  "Pop Hooks",
+] as const;
+
 function normalizeTeamNames(teamNames: string[] | undefined): string[] {
   const names = (teamNames ?? []).map((name) => name.trim()).filter(Boolean);
   return Array.from(new Set(names));
@@ -62,6 +83,59 @@ function normalizeTeamNames(teamNames: string[] | undefined): string[] {
 
 function normalizeRoundCount(value: number | undefined) {
   return Math.min(15, Math.max(6, Number(value ?? 8)));
+}
+
+function shuffle<T>(items: T[]): T[] {
+  const next = [...items];
+  for (let i = next.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [next[i], next[j]] = [next[j], next[i]];
+  }
+  return next;
+}
+
+function toTrackSourceLabel(track: ResolvedPlaylistTrack): string | null {
+  const side = track.side?.trim() || "";
+  const position = track.position?.trim() || "";
+
+  let sideAndPosition = "";
+  if (side && position) {
+    const upperSide = side.toUpperCase();
+    const upperPosition = position.toUpperCase();
+    sideAndPosition = upperPosition.startsWith(upperSide) ? position : `${side} ${position}`;
+  } else {
+    sideAndPosition = position || side;
+  }
+
+  const source = [track.albumName?.trim() || null, sideAndPosition || null].filter(Boolean).join(" | ");
+  return source || null;
+}
+
+function buildRoundsFromPlaylistTracks(tracks: ResolvedPlaylistTrack[], roundCount: number) {
+  const pool = shuffle(tracks).slice(0, roundCount * 3);
+
+  return Array.from({ length: roundCount }).map((_, roundOffset) => {
+    const start = roundOffset * 3;
+    const trio = pool.slice(start, start + 3);
+    const imposterCallIndex = Math.floor(Math.random() * 3) + 1;
+
+    return {
+      round_number: roundOffset + 1,
+      category_label: AUTO_CATEGORY_POOL[roundOffset % AUTO_CATEGORY_POOL.length] ?? `Category ${roundOffset + 1}`,
+      category_card_note: "Auto-generated from playlist bank",
+      reason_key: null as string | null,
+      imposter_call_index: imposterCallIndex,
+      calls: trio.map((track, idx) => ({
+        call_index: idx + 1,
+        play_order: idx + 1,
+        source_label: toTrackSourceLabel(track),
+        artist: track.artistName?.trim() || "Unknown Artist",
+        title: track.trackTitle?.trim() || `Track ${start + idx + 1}`,
+        record_label: track.albumName?.trim() || null,
+        host_notes: "Auto-generated",
+      })),
+    };
+  });
 }
 
 function normalizeRounds(rounds: RoundDraft[] | undefined, roundCount: number) {
@@ -109,11 +183,12 @@ async function generateUniqueSessionCode() {
 
 export async function GET(request: NextRequest) {
   const db = getGenreImposterDb();
+  const playlistDb = getBingoDb();
   const eventId = request.nextUrl.searchParams.get("eventId");
 
   let query = db
     .from("gi_sessions")
-    .select("id, event_id, session_code, title, round_count, reveal_mode, reason_mode, status, current_round, created_at")
+    .select("id, event_id, playlist_id, session_code, title, round_count, reveal_mode, reason_mode, status, current_round, created_at")
     .order("created_at", { ascending: false });
 
   if (eventId) query = query.eq("event_id", Number(eventId));
@@ -123,12 +198,17 @@ export async function GET(request: NextRequest) {
 
   const sessions = (data ?? []) as SessionListRow[];
   const eventIds = Array.from(new Set(sessions.map((row) => row.event_id).filter((value): value is number => Number.isFinite(value))));
+  const playlistIds = Array.from(new Set(sessions.map((row) => row.playlist_id).filter((value): value is number => Number.isFinite(value))));
 
-  const { data: events } = eventIds.length
-    ? await db.from("events").select("id, title").in("id", eventIds)
-    : { data: [] as EventRow[] };
+  const [{ data: events }, { data: playlists }] = await Promise.all([
+    eventIds.length ? db.from("events").select("id, title").in("id", eventIds) : Promise.resolve({ data: [] as EventRow[] }),
+    playlistIds.length
+      ? playlistDb.from("collection_playlists").select("id, name").in("id", playlistIds)
+      : Promise.resolve({ data: [] as PlaylistRow[] }),
+  ]);
 
   const eventsById = new Map<number, EventRow>(((events ?? []) as EventRow[]).map((row) => [row.id, row]));
+  const playlistsById = new Map<number, string>(((playlists ?? []) as PlaylistRow[]).map((row) => [row.id, row.name]));
 
   const sessionIds = sessions.map((session) => session.id);
 
@@ -152,6 +232,7 @@ export async function GET(request: NextRequest) {
       data: sessions.map((row) => ({
         ...row,
         event_title: row.event_id ? eventsById.get(row.event_id)?.title ?? null : null,
+        playlist_name: row.playlist_id ? playlistsById.get(row.playlist_id) ?? null : null,
         rounds_total: roundsBySession.get(row.id) ?? 0,
         picks_logged: picksBySession.get(row.id) ?? 0,
       })),
@@ -163,9 +244,27 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const db = getGenreImposterDb();
+    const playlistDb = getBingoDb();
     const body = (await request.json()) as CreateSessionBody;
 
     const roundCount = normalizeRoundCount(body.round_count);
+    const playlistId = Number(body.playlist_id);
+
+    if (!Number.isFinite(playlistId) || playlistId <= 0) {
+      return NextResponse.json({ error: "playlist_id is required" }, { status: 400 });
+    }
+
+    const playlistTracks = await resolvePlaylistTracks(playlistDb, playlistId);
+    const minimumPlaylistTracks = (roundCount + 1) * 3;
+    if (playlistTracks.length < minimumPlaylistTracks) {
+      return NextResponse.json(
+        {
+          error: `Selected playlist has ${playlistTracks.length} playable tracks. At least ${minimumPlaylistTracks} are required.`,
+        },
+        { status: 400 }
+      );
+    }
+
     const removeResleeveSeconds = Math.max(0, Number(body.remove_resleeve_seconds ?? 20));
     const findRecordSeconds = Math.max(0, Number(body.find_record_seconds ?? 12));
     const cueSeconds = Math.max(0, Number(body.cue_seconds ?? 12));
@@ -180,7 +279,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "At least 2 team names are required" }, { status: 400 });
     }
 
-    const rounds = normalizeRounds(body.rounds, roundCount);
+    const providedRounds = normalizeRounds(body.rounds, roundCount);
+    const rounds = providedRounds.length > 0 ? providedRounds : buildRoundsFromPlaylistTracks(playlistTracks, roundCount);
+
     if (rounds.length < roundCount) {
       return NextResponse.json({ error: `Add at least ${roundCount} complete rounds` }, { status: 400 });
     }
@@ -191,6 +292,7 @@ export async function POST(request: NextRequest) {
       .from("gi_sessions")
       .insert({
         event_id: body.event_id ?? null,
+        playlist_id: playlistId,
         session_code: code,
         title: (body.title ?? "Genre Imposter Session").trim() || "Genre Imposter Session",
         round_count: roundCount,
@@ -205,6 +307,9 @@ export async function POST(request: NextRequest) {
         target_gap_seconds: targetGapSeconds,
         current_round: 1,
         current_call_index: 0,
+        countdown_started_at: null,
+        paused_at: null,
+        paused_remaining_seconds: null,
         show_title: body.show_title ?? true,
         show_round: body.show_round ?? true,
         show_category: body.show_category ?? true,

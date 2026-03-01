@@ -36,6 +36,7 @@ export type GenreImposterDatabase = {
         Row: {
           id: number;
           event_id: number | null;
+          playlist_id: number | null;
           session_code: string;
           title: string;
           round_count: number;
@@ -50,6 +51,9 @@ export type GenreImposterDatabase = {
           target_gap_seconds: number;
           current_round: number;
           current_call_index: number;
+          countdown_started_at: string | null;
+          paused_remaining_seconds: number | null;
+          paused_at: string | null;
           show_title: boolean;
           show_round: boolean;
           show_category: boolean;
@@ -62,6 +66,7 @@ export type GenreImposterDatabase = {
         Insert: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code: string;
           title: string;
           round_count?: number;
@@ -76,6 +81,9 @@ export type GenreImposterDatabase = {
           target_gap_seconds?: number;
           current_round?: number;
           current_call_index?: number;
+          countdown_started_at?: string | null;
+          paused_remaining_seconds?: number | null;
+          paused_at?: string | null;
           show_title?: boolean;
           show_round?: boolean;
           show_category?: boolean;
@@ -88,6 +96,7 @@ export type GenreImposterDatabase = {
         Update: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code?: string;
           title?: string;
           round_count?: number;
@@ -102,6 +111,9 @@ export type GenreImposterDatabase = {
           target_gap_seconds?: number;
           current_round?: number;
           current_call_index?: number;
+          countdown_started_at?: string | null;
+          paused_remaining_seconds?: number | null;
+          paused_at?: string | null;
           show_title?: boolean;
           show_round?: boolean;
           show_category?: boolean;

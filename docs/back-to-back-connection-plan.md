@@ -40,6 +40,18 @@
   - patch allowed runtime/session fields including `event_id`
 - `GET /api/games/back-to-back-connection/sessions/history`
   - history list; supports `?eventId=...`
+- `POST /api/games/back-to-back-connection/sessions/[id]/advance`
+  - move to next pair and sync round/session status
+- `POST /api/games/back-to-back-connection/sessions/[id]/pause`
+  - pause active session lifecycle
+- `POST /api/games/back-to-back-connection/sessions/[id]/resume`
+  - resume active session lifecycle
+- `GET /api/games/back-to-back-connection/sessions/[id]/leaderboard`
+  - aggregate score totals and tie-break stats
+- `POST /api/games/back-to-back-connection/sessions/[id]/score`
+  - score upsert for `(session_id, team_id, call_id)`
+- `PATCH /api/games/back-to-back-connection/calls/[id]`
+  - host status transitions for pair lifecycle
 
 ## Admin surfaces
 - Setup page: `src/app/admin/games/back-to-back-connection/page.tsx`
@@ -47,6 +59,8 @@
   - team list and pair deck input
   - pacing budget controls
   - scope recommendation blocks for host/assistant/jumbotron
+- Help page: `src/app/admin/games/back-to-back-connection/help/page.tsx`
+  - in-app quick start and operator sequence
 - History page: `src/app/admin/games/back-to-back-connection/history/page.tsx`
   - event filter in session history/list view
 

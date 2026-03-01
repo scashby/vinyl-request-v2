@@ -11,6 +11,8 @@ export type InventoryTrack = {
   artist: string;
   side: string | null;
   position: string | null;
+  album_format: string | null;
+  format_details: string[] | null;
 };
 
 export type MatchCandidate = {
@@ -156,6 +158,41 @@ const tokenize = (value: string, kind: "title" | "artist" = "title") =>
     .split(/\s+/)
     .map((v) => v.trim())
     .filter(Boolean);
+
+const normalizeFormatToken = (value: unknown) => {
+  const raw = String(value ?? "")
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!raw) return "";
+  if (raw === "45" || raw === "45rpm") return "45 rpm";
+  if (/^45\s*rpm$/.test(raw)) return "45 rpm";
+  if (raw === '7"' || raw === "7" || raw === "7 inch" || raw === "7in") return '7"';
+  if (raw === '12"' || raw === "12" || raw === "12 inch" || raw === "12in") return '12"';
+  if (/^33 ?1\/3 rpm$|^33⅓ rpm$|^33 rpm$/.test(raw)) return "33 rpm";
+  return raw;
+};
+
+const buildTrackFormatTokenSet = (track: InventoryTrack) => {
+  const tokens = new Set<string>();
+  const addToken = (value: string) => {
+    const normalized = normalizeFormatToken(value);
+    if (normalized) tokens.add(normalized);
+  };
+
+  if (track.album_format) addToken(track.album_format);
+  for (const detail of track.format_details ?? []) {
+    addToken(detail);
+    for (const part of detail.split(/[,/|]/)) {
+      const candidate = part.trim();
+      if (!candidate) continue;
+      addToken(candidate);
+    }
+  }
+  return tokens;
+};
 
 const getTrackKey = (track: InventoryTrack) =>
   track.inventory_id && track.position ? `${track.inventory_id}:${track.position}` : "";
@@ -394,20 +431,58 @@ export const matchTracks = (
 };
 
 export const searchInventoryCandidates = async (
-  params: { title: string; artist?: string; limit?: number },
+  params: { title: string; artist?: string; limit?: number; mediaTypes?: string[]; formatDetails?: string[] },
   index?: InventoryIndex
 ): Promise<MatchCandidate[]> => {
   const resolvedIndex = index ?? (await getCachedInventoryIndex());
   const titleRaw = params.title ?? "";
   const artistRaw = params.artist ?? "";
   const limit = Math.min(25, Math.max(1, Number(params.limit ?? 10)));
+  const mediaTypes = new Set(
+    (Array.isArray(params.mediaTypes) ? params.mediaTypes : [])
+      .map((token) => normalizeFormatToken(token))
+      .filter(Boolean)
+  );
+  const formatDetails = new Set(
+    (Array.isArray(params.formatDetails) ? params.formatDetails : [])
+      .map((token) => normalizeFormatToken(token))
+      .filter(Boolean)
+  );
+  const hasFormatFilters = mediaTypes.size > 0 || formatDetails.size > 0;
 
   const queryTitle = normalizeTitle(titleRaw);
   const queryArtist = normalizeArtist(artistRaw);
   if (!queryTitle) return [];
 
   const merged = new Map<string, MatchCandidate>();
+  const passesFormatFilters = (track: InventoryTrack) => {
+    if (!hasFormatFilters) return true;
+    const formatTokens = buildTrackFormatTokenSet(track);
+    if (mediaTypes.size > 0) {
+      let mediaMatch = false;
+      for (const token of mediaTypes) {
+        if (formatTokens.has(token)) {
+          mediaMatch = true;
+          break;
+        }
+      }
+      if (!mediaMatch) return false;
+    }
+    if (formatDetails.size > 0) {
+      let detailMatch = false;
+      for (const token of formatDetails) {
+        if (formatTokens.has(token)) {
+          detailMatch = true;
+          break;
+        }
+      }
+      if (!detailMatch) return false;
+    }
+    return true;
+  };
+
   const addCandidate = (track: InventoryTrack) => {
+    if (!passesFormatFilters(track)) return;
     const candidate = toCandidate(scoreSearchCandidate(queryTitle, queryArtist, track), track);
     if (!candidate.track_key || candidate.score < 0.25) return;
     const current = merged.get(candidate.track_key);
@@ -480,18 +555,22 @@ export const fetchInventoryTracks = async (authHeaderOrLimit?: string | number, 
     artist: string;
     side: string | null;
     position: string | null;
+    album_format: string | null;
+    format_details: string[] | null;
   }>>();
 
   const releaseChunkSize = 250;
   for (let i = 0; i < releaseIds.length; i += releaseChunkSize) {
     const chunk = releaseIds.slice(i, i + releaseChunkSize);
 
-    // Prefetch album artist for release_id (fallback when track_artist is missing).
+    // Prefetch album artist + format metadata for release_id.
     const releaseArtistById = new Map<number, string>();
+    const releaseMediaTypeById = new Map<number, string>();
+    const releaseFormatDetailsById = new Map<number, string[]>();
     {
       const { data: releases, error: releaseError } = await supabase
         .from("releases")
-        .select("id, master:masters(artist:artists(name))")
+        .select("id, media_type, format_details, master:masters(artist:artists(name))")
         .in("id", chunk);
       if (releaseError) {
         throw new Error(`Failed loading release artists: ${releaseError.message}`);
@@ -504,6 +583,17 @@ export const fetchInventoryTracks = async (authHeaderOrLimit?: string | number, 
         const name = artistRow && typeof artistRow === "object" ? (artistRow as { name?: unknown }).name : null;
         if (releaseId && typeof name === "string" && name.trim().length > 0) {
           releaseArtistById.set(releaseId, name.trim());
+        }
+        if (releaseId && typeof row.media_type === "string" && row.media_type.trim().length > 0) {
+          releaseMediaTypeById.set(releaseId, row.media_type.trim());
+        }
+        if (releaseId && Array.isArray(row.format_details)) {
+          const details = row.format_details
+            .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+            .filter((entry): entry is string => entry.length > 0);
+          if (details.length > 0) {
+            releaseFormatDetailsById.set(releaseId, details);
+          }
         }
       }
     }
@@ -531,6 +621,8 @@ export const fetchInventoryTracks = async (authHeaderOrLimit?: string | number, 
         const title = row.title_override || recording?.title;
         if (!title) continue;
         const albumArtist = releaseArtistById.get(releaseId) ?? null;
+        const albumFormat = releaseMediaTypeById.get(releaseId) ?? null;
+        const formatDetails = releaseFormatDetailsById.get(releaseId) ?? null;
         const trackArtist = recording?.track_artist?.trim?.() ? recording.track_artist : null;
         const trackRow = {
           recording_id: recording?.id ?? null,
@@ -538,6 +630,8 @@ export const fetchInventoryTracks = async (authHeaderOrLimit?: string | number, 
           artist: trackArtist || albumArtist || "Unknown Artist",
           side: row.side ?? null,
           position: row.position ?? null,
+          album_format: albumFormat,
+          format_details: formatDetails,
         };
         if (!trackMap.has(releaseId)) {
           trackMap.set(releaseId, []);
@@ -561,6 +655,8 @@ export const fetchInventoryTracks = async (authHeaderOrLimit?: string | number, 
         artist: track.artist,
         side: track.side,
         position: track.position,
+        album_format: track.album_format,
+        format_details: track.format_details,
       });
       if (limit && tracks.length >= limit) {
         return tracks.slice(0, limit);

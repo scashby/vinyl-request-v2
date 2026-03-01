@@ -27,8 +27,8 @@ CREATE TABLE IF NOT EXISTS public.dd_sessions (
   CONSTRAINT dd_sessions_status_chk CHECK (status IN ('pending', 'running', 'paused', 'completed')),
   CONSTRAINT dd_sessions_round_count_chk CHECK (round_count BETWEEN 12 AND 20),
   CONSTRAINT dd_sessions_target_gap_seconds_chk CHECK (target_gap_seconds > 0),
-  CONSTRAINT dd_sessions_exact_points_chk CHECK (exact_points BETWEEN 0 AND 3),
-  CONSTRAINT dd_sessions_adjacent_points_chk CHECK (adjacent_points BETWEEN 0 AND 2)
+  CONSTRAINT dd_sessions_exact_points_chk CHECK (exact_points BETWEEN 0 AND 2),
+  CONSTRAINT dd_sessions_adjacent_points_chk CHECK (adjacent_points BETWEEN 0 AND 1)
 );
 
 CREATE TABLE IF NOT EXISTS public.dd_session_teams (

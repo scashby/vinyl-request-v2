@@ -63,7 +63,7 @@ type ReleaseRow = {
   discogs_release_id?: string | null;
   spotify_album_id?: string | null;
   master?: MasterRow | MasterRow[] | null;
-  release_tracks?: ReleaseTrackRow[] | null;
+  release_tracks?: ReleaseTrackRow | ReleaseTrackRow[] | null;
 };
 
 export async function GET(request: Request) {
@@ -171,6 +171,39 @@ export async function GET(request: Request) {
           )
         `;
 
+    // Star-select fallback is resilient to column additions/removals while preserving relation-based stats.
+    const wildcardSelect = `
+          id,
+          release:releases (
+            *,
+            master:masters (
+              *
+            ),
+            release_tracks:release_tracks (
+              recording:recordings (
+                duration_seconds,
+                credits,
+                lyrics,
+                lyrics_url
+              )
+            )
+          )
+        `;
+
+    // Last-resort fallback if nested track relation is unavailable.
+    const minimalSelect = `
+          id,
+          release:releases (
+            *,
+            master:masters (
+              *
+            )
+          )
+        `;
+
+    // Absolute fallback so stats UI can still render instead of hard-failing.
+    const inventoryOnlySelect = `id`;
+
     const fetchAlbumsPaginated = async (selectClause: string) => {
       const rows: Array<{
         id: string | number;
@@ -204,20 +237,39 @@ export async function GET(request: Request) {
       return rows;
     };
 
+    const selectAttempts: Array<{ label: string; select: string }> = [
+      { label: 'base', select: baseSelect },
+      { label: 'fallback', select: fallbackSelect },
+      { label: 'wildcard', select: wildcardSelect },
+      { label: 'minimal', select: minimalSelect },
+      { label: 'inventory-only', select: inventoryOnlySelect },
+    ];
+
     let albums: Array<{
       id: string | number;
       release?: ReleaseRow | ReleaseRow[] | null;
-    }> = [];
+    }> | null = null;
 
-    try {
-      albums = await fetchAlbumsPaginated(baseSelect);
-    } catch (primaryError) {
-      const message = primaryError instanceof Error ? primaryError.message : String(primaryError);
-      console.warn('Stats primary query failed; retrying with fallback select.', message);
-      albums = await fetchAlbumsPaginated(fallbackSelect);
+    let lastSelectError: unknown = null;
+    for (const attempt of selectAttempts) {
+      try {
+        albums = await fetchAlbumsPaginated(attempt.select);
+        if (attempt.label !== 'base') {
+          console.warn(`Stats query succeeded with ${attempt.label} select fallback.`);
+        }
+        break;
+      } catch (error) {
+        lastSelectError = error;
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`Stats ${attempt.label} select failed.`, message);
+      }
     }
 
-    if (albums.length === 0) return NextResponse.json({ success: true, stats: null });
+    if (!albums) {
+      throw lastSelectError instanceof Error
+        ? lastSelectError
+        : new Error('All stats query fallbacks failed.');
+    }
 
     const albumsWithTracks = new Set<string>();
     const albumsWithMissingDurations = new Set<string>();
@@ -325,7 +377,12 @@ export async function GET(request: Request) {
       const albumIdStr = String(album.id);
       const release = toSingle<ReleaseRow>(album.release);
       const master = toSingle<MasterRow>(release?.master ?? null);
-      const releaseTracks = release?.release_tracks ?? [];
+      const rawReleaseTracks = release?.release_tracks;
+      const releaseTracks = Array.isArray(rawReleaseTracks)
+        ? rawReleaseTracks
+        : rawReleaseTracks
+          ? [rawReleaseTracks as ReleaseTrackRow]
+          : [];
       const recordings = releaseTracks
         .map((track) => toSingle<RecordingRow>(track.recording))
         .filter((recording): recording is RecordingRow => !!recording);

@@ -32,10 +32,29 @@ type SampleDetectiveDatabase = {
         };
         Relationships: [];
       };
+      collection_playlists: {
+        Row: {
+          id: number;
+          name: string;
+          is_smart: boolean;
+        };
+        Insert: {
+          id?: number;
+          name: string;
+          is_smart?: boolean;
+        };
+        Update: {
+          id?: number;
+          name?: string;
+          is_smart?: boolean;
+        };
+        Relationships: [];
+      };
       sd_sessions: {
         Row: {
           id: number;
           event_id: number | null;
+          playlist_id: number | null;
           session_code: string;
           title: string;
           round_count: number;
@@ -60,6 +79,7 @@ type SampleDetectiveDatabase = {
         Insert: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code: string;
           title: string;
           round_count?: number;
@@ -84,6 +104,7 @@ type SampleDetectiveDatabase = {
         Update: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code?: string;
           title?: string;
           round_count?: number;

@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS public.lgr_sessions (
   target_gap_seconds integer NOT NULL DEFAULT 54,
   current_round integer NOT NULL DEFAULT 1,
   current_call_index integer NOT NULL DEFAULT 0,
+  countdown_started_at timestamptz,
+  paused_remaining_seconds integer,
+  paused_at timestamptz,
   show_title boolean NOT NULL DEFAULT true,
   show_round boolean NOT NULL DEFAULT true,
   show_scoreboard boolean NOT NULL DEFAULT true,
@@ -29,6 +32,13 @@ CREATE TABLE IF NOT EXISTS public.lgr_sessions (
   CONSTRAINT lgr_sessions_round_count_chk CHECK (round_count BETWEEN 10 AND 15),
   CONSTRAINT lgr_sessions_target_gap_seconds_chk CHECK (target_gap_seconds > 0)
 );
+
+ALTER TABLE public.lgr_sessions
+  ADD COLUMN IF NOT EXISTS countdown_started_at timestamptz;
+ALTER TABLE public.lgr_sessions
+  ADD COLUMN IF NOT EXISTS paused_remaining_seconds integer;
+ALTER TABLE public.lgr_sessions
+  ADD COLUMN IF NOT EXISTS paused_at timestamptz;
 
 CREATE TABLE IF NOT EXISTS public.lgr_session_teams (
   id bigserial PRIMARY KEY,

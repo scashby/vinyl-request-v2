@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 
 type CreateSessionBody = {
   event_id?: number | null;
+  playlist_id?: number;
   title?: string;
   round_count?: number;
   connection_points?: number;
@@ -37,6 +38,7 @@ type CreateSessionBody = {
 type SessionListRow = {
   id: number;
   event_id: number | null;
+  playlist_id: number | null;
   session_code: string;
   title: string;
   round_count: number;
@@ -103,7 +105,7 @@ export async function GET(request: NextRequest) {
   let query = db
     .from("b2bc_sessions")
     .select(
-      "id, event_id, session_code, title, round_count, connection_points, detail_bonus_points, status, current_round, created_at"
+      "id, event_id, playlist_id, session_code, title, round_count, connection_points, detail_bonus_points, status, current_round, created_at"
     )
     .order("created_at", { ascending: false });
 
@@ -162,6 +164,10 @@ export async function POST(request: NextRequest) {
   try {
     const db = getBackToBackConnectionDb();
     const body = (await request.json()) as CreateSessionBody;
+    const playlistId = Number(body.playlist_id);
+    if (!Number.isFinite(playlistId) || playlistId <= 0) {
+      return NextResponse.json({ error: "playlist_id is required" }, { status: 400 });
+    }
 
     const roundCount = normalizeRoundCount(body.round_count);
     const removeResleeveSeconds = Math.max(0, Number(body.remove_resleeve_seconds ?? 20));
@@ -189,6 +195,7 @@ export async function POST(request: NextRequest) {
       .from("b2bc_sessions")
       .insert({
         event_id: body.event_id ?? null,
+        playlist_id: playlistId,
         session_code: code,
         title: (body.title ?? "Back-to-Back Connection Session").trim() || "Back-to-Back Connection Session",
         round_count: roundCount,

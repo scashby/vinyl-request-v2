@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthHeader } from 'src/lib/supabaseServer';
-import { importRowsToPlaylist, type MatchingMode, type SourceRow } from 'src/lib/playlistImportEngine';
+import { importRowsToPlaylist, type ImportMatchFilters, type MatchingMode, type SourceRow } from 'src/lib/playlistImportEngine';
 import { getSpotifyAccessTokenFromCookies, spotifyApiGet, SpotifyApiError } from '../../../../lib/spotifyUser';
 
 export const runtime = 'nodejs';
@@ -60,6 +60,13 @@ const sanitizePlaylistName = (value?: string) => {
   const cleaned = String(value ?? '').trim();
   if (!cleaned) return 'Custom Playlist';
   return cleaned.slice(0, 80);
+};
+
+const parseStringArray = (value: unknown) => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+    .filter((entry) => entry.length > 0);
 };
 
 const normalizeIsrc = (value: unknown) => {
@@ -187,11 +194,18 @@ export async function POST(req: Request) {
     const startOffset = Number(body?.offset ?? 0);
     const maxPages = Math.min(8, Math.max(1, Number(body?.maxPages ?? 3)));
     const providedSnapshotId = String(body?.snapshotId ?? '').trim();
-    const matchingModeRaw = String(body?.matchingMode ?? 'balanced').trim().toLowerCase();
+    const matchingModeRaw = String(body?.matchingMode ?? 'review').trim().toLowerCase();
     const matchingMode: MatchingMode =
-      matchingModeRaw === 'strict' || matchingModeRaw === 'aggressive' || matchingModeRaw === 'balanced'
+      matchingModeRaw === 'review' ||
+      matchingModeRaw === 'strict' ||
+      matchingModeRaw === 'aggressive' ||
+      matchingModeRaw === 'balanced'
         ? (matchingModeRaw as MatchingMode)
-        : 'balanced';
+        : 'review';
+    const matchFilters: ImportMatchFilters = {
+      mediaTypes: parseStringArray(body?.matchFilters?.mediaTypes),
+      formatDetails: parseStringArray(body?.matchFilters?.formatDetails),
+    };
 
     if (!playlistId) {
       return NextResponse.json({ error: 'playlistId is required' }, { status: 400 });
@@ -287,6 +301,7 @@ export async function POST(req: Request) {
       icon: '🎵',
       color: '#1db954',
       matchingMode,
+      matchFilters,
     });
     localPlaylistId = imported.playlistId;
 

@@ -35,6 +35,7 @@ type SessionRow = {
   calls_total: number;
   calls_scored: number;
   event_title: string | null;
+  playlist_name: string | null;
 };
 
 type CallDraft = {
@@ -231,6 +232,7 @@ export default function SampleDetectiveSetupPage() {
             <div className="flex gap-2">
               <Link href="/admin/games/sample-detective/history" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">History</Link>
               <Link href="/admin/games/sample-detective/jumbotron" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron Scope</Link>
+              <Link href="/admin/games/sample-detective/help" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Help</Link>
             </div>
           </div>
           <p className="mt-2 text-sm text-stone-300">Connect sampled tracks to source records. Designed for special-format nights with heavier prep.</p>
@@ -344,7 +346,7 @@ export default function SampleDetectiveSetupPage() {
               {sessions.map((session) => (
                 <div key={session.id} className="rounded border border-stone-700 bg-stone-950/60 p-3">
                   <p className="text-stone-100">{session.session_code} · {session.title} · {session.status}</p>
-                  <p className="text-stone-400">Event: {session.event_title ?? "(none)"} · Round {session.current_round}/{session.round_count} · Calls {session.calls_scored}/{session.calls_total} scored · Scoring {session.points_correct_pair}+{session.bonus_both_artists_points}</p>
+                  <p className="text-stone-400">Event: {session.event_title ?? "(none)"} · Playlist: {session.playlist_name ?? "(unknown)"} · Round {session.current_round}/{session.round_count} · Calls {session.calls_scored}/{session.calls_total} scored · Scoring {session.points_correct_pair}+{session.bonus_both_artists_points}</p>
                   <div className="mt-2 flex gap-2 text-xs">
                     <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/sample-detective/host?sessionId=${session.id}`}>Host</Link>
                     <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/sample-detective/assistant?sessionId=${session.id}`}>Assistant</Link>

@@ -54,6 +54,7 @@ export default function WrongLyricChallengeHistoryPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-black uppercase text-amber-200">Wrong Lyric Challenge History</h1>
           <div className="flex items-center gap-2">
+            <Link href="/admin/games/wrong-lyric-challenge/help" className="rounded border border-stone-700 px-3 py-1 text-sm">Help</Link>
             <Link href="/admin/games/wrong-lyric-challenge" className="rounded border border-stone-700 px-3 py-1 text-sm">Back to Setup</Link>
             <select className="rounded border border-stone-700 bg-stone-950 px-3 py-1 text-sm" value={eventId ?? ""} onChange={(e) => setEventId(Number(e.target.value) || null)}>
               <option value="">All events</option>

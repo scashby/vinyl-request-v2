@@ -46,6 +46,9 @@ export type LyricGapRelayDatabase = {
           target_gap_seconds: number;
           current_round: number;
           current_call_index: number;
+          countdown_started_at: string | null;
+          paused_remaining_seconds: number | null;
+          paused_at: string | null;
           show_title: boolean;
           show_round: boolean;
           show_scoreboard: boolean;
@@ -70,6 +73,9 @@ export type LyricGapRelayDatabase = {
           target_gap_seconds?: number;
           current_round?: number;
           current_call_index?: number;
+          countdown_started_at?: string | null;
+          paused_remaining_seconds?: number | null;
+          paused_at?: string | null;
           show_title?: boolean;
           show_round?: boolean;
           show_scoreboard?: boolean;
@@ -94,6 +100,9 @@ export type LyricGapRelayDatabase = {
           target_gap_seconds?: number;
           current_round?: number;
           current_call_index?: number;
+          countdown_started_at?: string | null;
+          paused_remaining_seconds?: number | null;
+          paused_at?: string | null;
           show_title?: boolean;
           show_round?: boolean;
           show_scoreboard?: boolean;

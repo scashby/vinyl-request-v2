@@ -32,10 +32,29 @@ type CoverArtClueChaseDatabase = {
         };
         Relationships: [];
       };
+      collection_playlists: {
+        Row: {
+          id: number;
+          name: string;
+          is_smart: boolean;
+        };
+        Insert: {
+          id?: number;
+          name: string;
+          is_smart?: boolean;
+        };
+        Update: {
+          id?: number;
+          name?: string;
+          is_smart?: boolean;
+        };
+        Relationships: [];
+      };
       cacc_sessions: {
         Row: {
           id: number;
           event_id: number | null;
+          playlist_id: number | null;
           session_code: string;
           title: string;
           round_count: number;
@@ -62,6 +81,7 @@ type CoverArtClueChaseDatabase = {
         Insert: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code: string;
           title: string;
           round_count?: number;
@@ -88,6 +108,7 @@ type CoverArtClueChaseDatabase = {
         Update: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code?: string;
           title?: string;
           round_count?: number;
@@ -286,6 +307,30 @@ type CoverArtClueChaseDatabase = {
           scored_by?: string | null;
           notes?: string | null;
           scored_at?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      cacc_session_events: {
+        Row: {
+          id: number;
+          session_id: number;
+          event_type: string;
+          payload: Record<string, unknown> | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          session_id: number;
+          event_type: string;
+          payload?: Record<string, unknown> | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          session_id?: number;
+          event_type?: string;
+          payload?: Record<string, unknown> | null;
           created_at?: string;
         };
         Relationships: [];

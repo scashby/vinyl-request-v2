@@ -3,6 +3,7 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS public.b2bc_sessions (
   id bigserial PRIMARY KEY,
   event_id bigint REFERENCES public.events(id) ON DELETE SET NULL,
+  playlist_id bigint REFERENCES public.collection_playlists(id) ON DELETE SET NULL,
   session_code text NOT NULL UNIQUE,
   title text NOT NULL,
   round_count integer NOT NULL DEFAULT 10,
@@ -29,6 +30,9 @@ CREATE TABLE IF NOT EXISTS public.b2bc_sessions (
   CONSTRAINT b2bc_sessions_connection_points_chk CHECK (connection_points BETWEEN 0 AND 3),
   CONSTRAINT b2bc_sessions_detail_bonus_points_chk CHECK (detail_bonus_points BETWEEN 0 AND 2)
 );
+
+ALTER TABLE public.b2bc_sessions
+  ADD COLUMN IF NOT EXISTS playlist_id bigint REFERENCES public.collection_playlists(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS public.b2bc_session_teams (
   id bigserial PRIMARY KEY,
@@ -105,6 +109,7 @@ CREATE TABLE IF NOT EXISTS public.b2bc_session_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_b2bc_sessions_event_id ON public.b2bc_sessions(event_id);
+CREATE INDEX IF NOT EXISTS idx_b2bc_sessions_playlist_id ON public.b2bc_sessions(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_b2bc_sessions_status ON public.b2bc_sessions(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_b2bc_teams_session_id ON public.b2bc_session_teams(session_id);
 CREATE INDEX IF NOT EXISTS idx_b2bc_rounds_session_id ON public.b2bc_session_rounds(session_id);

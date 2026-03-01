@@ -3,6 +3,7 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS public.ooc_sessions (
   id bigserial PRIMARY KEY,
   event_id bigint REFERENCES public.events(id) ON DELETE SET NULL,
+  playlist_id bigint REFERENCES public.collection_playlists(id) ON DELETE SET NULL,
   session_code text NOT NULL UNIQUE,
   title text NOT NULL,
   round_count integer NOT NULL DEFAULT 10,
@@ -14,6 +15,9 @@ CREATE TABLE IF NOT EXISTS public.ooc_sessions (
   host_buffer_seconds integer NOT NULL DEFAULT 10,
   target_gap_seconds integer NOT NULL DEFAULT 54,
   current_round integer NOT NULL DEFAULT 1,
+  countdown_started_at timestamptz,
+  paused_remaining_seconds integer,
+  paused_at timestamptz,
   current_call_index integer NOT NULL DEFAULT 0,
   show_title boolean NOT NULL DEFAULT true,
   show_round boolean NOT NULL DEFAULT true,
@@ -29,6 +33,19 @@ CREATE TABLE IF NOT EXISTS public.ooc_sessions (
   CONSTRAINT ooc_sessions_points_correct_call_chk CHECK (points_correct_call BETWEEN 0 AND 5),
   CONSTRAINT ooc_sessions_bonus_original_artist_points_chk CHECK (bonus_original_artist_points BETWEEN 0 AND 3)
 );
+
+ALTER TABLE public.ooc_sessions
+  ADD COLUMN IF NOT EXISTS playlist_id bigint,
+  ADD COLUMN IF NOT EXISTS countdown_started_at timestamptz,
+  ADD COLUMN IF NOT EXISTS paused_remaining_seconds integer,
+  ADD COLUMN IF NOT EXISTS paused_at timestamptz;
+
+ALTER TABLE public.ooc_sessions
+  DROP CONSTRAINT IF EXISTS ooc_sessions_playlist_id_fkey;
+
+ALTER TABLE public.ooc_sessions
+  ADD CONSTRAINT ooc_sessions_playlist_id_fkey
+  FOREIGN KEY (playlist_id) REFERENCES public.collection_playlists(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS public.ooc_session_teams (
   id bigserial PRIMARY KEY,
@@ -102,6 +119,7 @@ CREATE TABLE IF NOT EXISTS public.ooc_session_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ooc_sessions_event_id ON public.ooc_sessions(event_id);
+CREATE INDEX IF NOT EXISTS idx_ooc_sessions_playlist_id ON public.ooc_sessions(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_ooc_sessions_status ON public.ooc_sessions(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ooc_teams_session_id ON public.ooc_session_teams(session_id);
 CREATE INDEX IF NOT EXISTS idx_ooc_rounds_session_id ON public.ooc_session_rounds(session_id);

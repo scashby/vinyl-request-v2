@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 type SessionRow = {
   id: number;
   event_id: number | null;
+  playlist_id: number | null;
   session_code: string;
   title: string;
   round_count: number;
@@ -74,6 +75,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const allowedFields = new Set([
     "title",
     "event_id",
+    "playlist_id",
     "current_round",
     "current_call_index",
     "show_title",

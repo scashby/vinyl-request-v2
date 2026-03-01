@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
 import { getAuthHeader } from "src/lib/supabaseServer";
-import { importRowsToPlaylist, parseCsvRows, type MatchingMode } from "src/lib/playlistImportEngine";
+import { importRowsToPlaylist, parseCsvRows, type ImportMatchFilters, type MatchingMode } from "src/lib/playlistImportEngine";
 
 export const runtime = "nodejs";
+
+const parseStringArray = (value: unknown) => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+    .filter((entry) => entry.length > 0);
+};
 
 export async function POST(req: Request) {
   let step = "init";
@@ -13,11 +20,18 @@ export async function POST(req: Request) {
     const csvText = String(body?.csvText ?? "").trim();
     const existingPlaylistId = Number(body?.existingPlaylistId ?? 0);
     const playlistName = String(body?.playlistName ?? "CSV Import");
-    const matchingModeRaw = String(body?.matchingMode ?? "balanced").trim().toLowerCase();
+    const matchingModeRaw = String(body?.matchingMode ?? "review").trim().toLowerCase();
     const matchingMode: MatchingMode =
-      matchingModeRaw === "strict" || matchingModeRaw === "aggressive" || matchingModeRaw === "balanced"
+      matchingModeRaw === "review" ||
+      matchingModeRaw === "strict" ||
+      matchingModeRaw === "aggressive" ||
+      matchingModeRaw === "balanced"
         ? (matchingModeRaw as MatchingMode)
-        : "balanced";
+        : "review";
+    const matchFilters: ImportMatchFilters = {
+      mediaTypes: parseStringArray(body?.matchFilters?.mediaTypes),
+      formatDetails: parseStringArray(body?.matchFilters?.formatDetails),
+    };
 
     if (!csvText) {
       return NextResponse.json({ error: "csvText is required" }, { status: 400 });
@@ -38,6 +52,7 @@ export async function POST(req: Request) {
       icon: "🎵",
       color: "#3578b3",
       matchingMode,
+      matchFilters,
     });
 
     return NextResponse.json({ ok: true, ...result }, { status: 200 });
