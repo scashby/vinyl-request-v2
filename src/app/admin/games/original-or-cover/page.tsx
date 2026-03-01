@@ -7,6 +7,7 @@ import GameEventSelect from "src/components/GameEventSelect";
 import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
+import { downloadGamePullListPdf } from "src/lib/downloadGamePullListPdf";
 
 type EventRow = {
   id: number;
@@ -355,6 +356,8 @@ export default function OriginalOrCoverSetupPage() {
                     <Link className="rounded border border-stone-700 px-2 py-1 text-xs" href={`/admin/games/original-or-cover/host?sessionId=${session.id}`}>Host</Link>
                     <Link className="rounded border border-stone-700 px-2 py-1 text-xs" href={`/admin/games/original-or-cover/assistant?sessionId=${session.id}`}>Assistant</Link>
                     <Link className="rounded border border-stone-700 px-2 py-1 text-xs" href={`/admin/games/original-or-cover/jumbotron?sessionId=${session.id}`}>Jumbotron</Link>
+                    <button className="rounded border border-stone-700 px-2 py-1 text-xs" onClick={() => downloadGamePullListPdf({ gameSlug: "original-or-cover", gameTitle: "Original or Cover", sessionId: session.id, sessionCode: session.session_code, accentRgb: [202, 138, 4] })}>Pull List PDF</button>
+                    <Link className="rounded border border-stone-700 px-2 py-1 text-xs" href="/admin/games/original-or-cover/history">History</Link>
                   </div>
                 </div>
               ))

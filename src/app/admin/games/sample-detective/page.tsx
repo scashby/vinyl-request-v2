@@ -7,6 +7,7 @@ import GameEventSelect from "src/components/GameEventSelect";
 import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
+import { downloadGamePullListPdf } from "src/lib/downloadGamePullListPdf";
 
 type EventRow = {
   id: number;
@@ -348,6 +349,8 @@ export default function SampleDetectiveSetupPage() {
                     <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/sample-detective/host?sessionId=${session.id}`}>Host</Link>
                     <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/sample-detective/assistant?sessionId=${session.id}`}>Assistant</Link>
                     <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/sample-detective/jumbotron?sessionId=${session.id}`}>Jumbotron</Link>
+                    <button className="rounded border border-stone-700 px-2 py-1" onClick={() => downloadGamePullListPdf({ gameSlug: "sample-detective", gameTitle: "Sample Detective", sessionId: session.id, sessionCode: session.session_code, accentRgb: [71, 85, 105] })}>Pull List PDF</button>
+                    <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/sample-detective/history">History</Link>
                   </div>
                 </div>
               ))}

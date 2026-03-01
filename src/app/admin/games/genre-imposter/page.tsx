@@ -6,6 +6,7 @@ import GameEventSelect from "src/components/GameEventSelect";
 import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
+import { downloadGamePullListPdf } from "src/lib/downloadGamePullListPdf";
 
 type EventRow = {
   id: number;
@@ -369,6 +370,7 @@ export default function GenreImposterSetupPage() {
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/genre-imposter/host?sessionId=${session.id}`)}>Host</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/genre-imposter/assistant?sessionId=${session.id}`)}>Assistant</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/genre-imposter/jumbotron?sessionId=${session.id}`)}>Jumbotron</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadGamePullListPdf({ gameSlug: "genre-imposter", gameTitle: "Genre Imposter", sessionId: session.id, sessionCode: session.session_code, accentRgb: [5, 150, 105] })}>Pull List PDF</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push("/admin/games/genre-imposter/history")}>History</button>
                   </div>
                 </div>

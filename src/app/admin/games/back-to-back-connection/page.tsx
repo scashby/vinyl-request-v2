@@ -7,6 +7,7 @@ import GameEventSelect from "src/components/GameEventSelect";
 import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
+import { downloadGamePullListPdf } from "src/lib/downloadGamePullListPdf";
 
 type EventRow = {
   id: number;
@@ -357,6 +358,13 @@ export default function BackToBackConnectionSetupPage() {
                 <div key={session.id} className="rounded border border-stone-700 bg-stone-950/70 p-3">
                   <p>{session.session_code} · {session.title}</p>
                   <p className="text-stone-400">Event: {session.event_title ?? "(none)"} · Round: {session.current_round}/{session.round_count} · Calls: {session.calls_scored}/{session.calls_total} scored · Status: {session.status}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button className="rounded border border-stone-600 px-2 py-1 text-xs" onClick={() => router.push(`/admin/games/back-to-back-connection/host?sessionId=${session.id}`)}>Host</button>
+                    <button className="rounded border border-stone-600 px-2 py-1 text-xs" onClick={() => router.push(`/admin/games/back-to-back-connection/assistant?sessionId=${session.id}`)}>Assistant</button>
+                    <button className="rounded border border-stone-600 px-2 py-1 text-xs" onClick={() => router.push(`/admin/games/back-to-back-connection/jumbotron?sessionId=${session.id}`)}>Jumbotron</button>
+                    <button className="rounded border border-stone-600 px-2 py-1 text-xs" onClick={() => downloadGamePullListPdf({ gameSlug: "back-to-back-connection", gameTitle: "Back-to-Back Connection", sessionId: session.id, sessionCode: session.session_code, accentRgb: [217, 119, 6] })}>Pull List PDF</button>
+                    <button className="rounded border border-stone-600 px-2 py-1 text-xs" onClick={() => router.push("/admin/games/back-to-back-connection/history")}>History</button>
+                  </div>
                 </div>
               ))}
             </div>

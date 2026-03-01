@@ -7,6 +7,7 @@ import GameEventSelect from "src/components/GameEventSelect";
 import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
+import { downloadGamePullListPdf } from "src/lib/downloadGamePullListPdf";
 
 type EventRow = {
   id: number;
@@ -358,6 +359,7 @@ export default function CoverArtClueChaseSetupPage() {
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/cover-art-clue-chase/host?sessionId=${session.id}`)}>Host</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/cover-art-clue-chase/assistant?sessionId=${session.id}`)}>Assistant</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/cover-art-clue-chase/jumbotron?sessionId=${session.id}`)}>Jumbotron</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadGamePullListPdf({ gameSlug: "cover-art-clue-chase", gameTitle: "Cover Art Clue Chase", sessionId: session.id, sessionCode: session.session_code, accentRgb: [13, 148, 136] })}>Pull List PDF</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push("/admin/games/cover-art-clue-chase/history")}>History</button>
                   </div>
                 </div>

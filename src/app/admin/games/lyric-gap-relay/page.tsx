@@ -7,6 +7,7 @@ import GameEventSelect from "src/components/GameEventSelect";
 import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
+import { downloadGamePullListPdf } from "src/lib/downloadGamePullListPdf";
 
 type EventRow = {
   id: number;
@@ -352,10 +353,12 @@ export default function LyricGapRelaySetupPage() {
                 <div key={session.id} className="rounded-xl border border-stone-700 bg-stone-950/70 p-3">
                   <div className="text-sm">{session.session_code} · {session.title} · Round {session.current_round} of {session.round_count} · Calls {session.calls_total}</div>
                   <div className="text-xs text-stone-400">Event: {session.event_title ?? "(none)"} · Judge: {session.judge_mode} · Status: {session.status}</div>
-                  <div className="mt-2 flex gap-2">
+                  <div className="mt-2 flex flex-wrap gap-2">
                     <Link href={`/admin/games/lyric-gap-relay/host?sessionId=${session.id}`} className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Host</Link>
                     <Link href={`/admin/games/lyric-gap-relay/assistant?sessionId=${session.id}`} className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Assistant</Link>
                     <Link href={`/admin/games/lyric-gap-relay/jumbotron?sessionId=${session.id}`} className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron</Link>
+                    <button className="rounded border border-stone-600 px-3 py-1 text-xs uppercase" onClick={() => downloadGamePullListPdf({ gameSlug: "lyric-gap-relay", gameTitle: "Lyric Gap Relay", sessionId: session.id, sessionCode: session.session_code, accentRgb: [192, 38, 211] })}>Pull List PDF</button>
+                    <Link href="/admin/games/lyric-gap-relay/history" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">History</Link>
                   </div>
                 </div>
               ))}

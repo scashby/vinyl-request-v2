@@ -6,6 +6,7 @@ import GameEventSelect from "src/components/GameEventSelect";
 import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
+import { downloadGamePullListPdf } from "src/lib/downloadGamePullListPdf";
 
 type EventRow = {
   id: number;
@@ -330,6 +331,7 @@ export default function NeedleDropRouletteSetupPage() {
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/needle-drop-roulette/host?sessionId=${session.id}`)}>Host</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/needle-drop-roulette/assistant?sessionId=${session.id}`)}>Assistant</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/needle-drop-roulette/jumbotron?sessionId=${session.id}`)}>Jumbotron</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadGamePullListPdf({ gameSlug: "needle-drop-roulette", gameTitle: "Needle Drop Roulette", sessionId: session.id, sessionCode: session.session_code, accentRgb: [194, 65, 12] })}>Pull List PDF</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push("/admin/games/needle-drop-roulette/history")}>History</button>
                   </div>
                 </div>

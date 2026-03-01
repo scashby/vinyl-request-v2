@@ -7,6 +7,7 @@ import GameEventSelect from "src/components/GameEventSelect";
 import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
+import { downloadGamePullListPdf } from "src/lib/downloadGamePullListPdf";
 
 type EventRow = {
   id: number;
@@ -375,6 +376,7 @@ export default function WrongLyricChallengeSetupPage() {
                       <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/wrong-lyric-challenge/host?sessionId=${session.id}`)}>Host</button>
                       <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/wrong-lyric-challenge/assistant?sessionId=${session.id}`)}>Assistant</button>
                       <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/wrong-lyric-challenge/jumbotron?sessionId=${session.id}`)}>Jumbotron</button>
+                      <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadGamePullListPdf({ gameSlug: "wrong-lyric-challenge", gameTitle: "Wrong Lyric Challenge", sessionId: session.id, sessionCode: session.session_code, accentRgb: [185, 28, 28] })}>Pull List PDF</button>
                       <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push("/admin/games/wrong-lyric-challenge/history")}>History</button>
                     </div>
                   </div>

@@ -7,6 +7,7 @@ import GameEventSelect from "src/components/GameEventSelect";
 import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
+import { downloadGamePullListPdf } from "src/lib/downloadGamePullListPdf";
 
 type EventRow = {
   id: number;
@@ -384,6 +385,8 @@ export default function CrateCategoriesSetupPage() {
                     <Link href={`/admin/games/crate-categories/host?sessionId=${session.id}`} className="rounded border border-stone-600 px-2 py-1 text-xs">Host</Link>
                     <Link href={`/admin/games/crate-categories/assistant?sessionId=${session.id}`} className="rounded border border-stone-600 px-2 py-1 text-xs">Assistant</Link>
                     <Link href={`/admin/games/crate-categories/jumbotron?sessionId=${session.id}`} className="rounded border border-stone-600 px-2 py-1 text-xs">Jumbotron</Link>
+                    <button className="rounded border border-stone-600 px-2 py-1 text-xs" onClick={() => downloadGamePullListPdf({ gameSlug: "crate-categories", gameTitle: "Crate Categories", sessionId: session.id, sessionCode: session.session_code, accentRgb: [101, 163, 13] })}>Pull List PDF</button>
+                    <Link href="/admin/games/crate-categories/history" className="rounded border border-stone-600 px-2 py-1 text-xs">History</Link>
                   </div>
                 </div>
               ))}
