@@ -1038,7 +1038,7 @@ function CollectionBrowserPage() {
 
     const all: Album[] = [];
     let page = 0;
-    const pageSize = 75;
+    const pageSize = 250;
     while (true) {
       const url = new URL('/api/library/albums', window.location.origin);
       url.searchParams.set('page', String(page));
@@ -1055,7 +1055,6 @@ function CollectionBrowserPage() {
       const hasMore = Boolean(payload?.hasMore);
       if (!hasMore || batch.length === 0) break;
       page += 1;
-      await new Promise((resolve) => setTimeout(resolve, 40));
     }
 
     setAlbums(all);
