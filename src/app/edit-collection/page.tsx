@@ -955,6 +955,7 @@ function CollectionBrowserPage() {
   const [tracksHydrating, setTracksHydrating] = useState(false);
   const tracksHydratedRef = useRef(false);
   const albumsLoadVersionRef = useRef(0);
+  const loadingOwnerLoadVersionRef = useRef<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchTypeDropdown, setShowSearchTypeDropdown] = useState(false);
   const [selectedLetter, setSelectedLetter] = useState<string>('All');
@@ -1559,60 +1560,78 @@ function CollectionBrowserPage() {
     const loadVersion = albumsLoadVersionRef.current + 1;
     albumsLoadVersionRef.current = loadVersion;
 
-    if (showSpinner) setLoading(true);
-
-    const pageSize = includeTracks ? 250 : 500;
-    const fetchPage = async (page: number) => {
-      const url = new URL('/api/library/albums', window.location.origin);
-      url.searchParams.set('page', String(page));
-      url.searchParams.set('pageSize', String(pageSize));
-      url.searchParams.set('includeTracks', includeTracks ? 'true' : 'false');
-      const res = await fetch(url.toString(), { cache: 'no-store' });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        console.error('Error loading albums via library API:', payload?.error || res.status);
-        return null;
-      }
-      return {
-        batch: Array.isArray(payload?.data) ? (payload.data as Album[]) : [],
-        hasMore: Boolean(payload?.hasMore),
-      };
+    const stopSpinnerIfOwner = () => {
+      if (!showSpinner) return;
+      if (loadingOwnerLoadVersionRef.current !== loadVersion) return;
+      loadingOwnerLoadVersionRef.current = null;
+      setLoading(false);
     };
 
-    const first = await fetchPage(0);
-    if (loadVersion !== albumsLoadVersionRef.current) return;
-
-    if (!first) {
-      if (showSpinner) setLoading(false);
-      return;
+    if (showSpinner) {
+      loadingOwnerLoadVersionRef.current = loadVersion;
+      setLoading(true);
     }
 
-    let all = [...first.batch];
-    setAlbums(all);
-    if (showSpinner) setLoading(false);
+    try {
+      const pageSize = includeTracks ? 80 : 100;
+      const fetchPage = async (page: number) => {
+        const url = new URL('/api/library/albums', window.location.origin);
+        url.searchParams.set('page', String(page));
+        url.searchParams.set('pageSize', String(pageSize));
+        url.searchParams.set('includeTracks', includeTracks ? 'true' : 'false');
+        const res = await fetch(url.toString(), { cache: 'no-store' });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          console.error('Error loading albums via library API:', payload?.error || res.status);
+          return null;
+        }
+        return {
+          batch: Array.isArray(payload?.data) ? (payload.data as Album[]) : [],
+          hasMore: Boolean(payload?.hasMore),
+        };
+      };
 
-    if (!first.hasMore || first.batch.length === 0) {
-      if (includeTracks) {
+      const first = await fetchPage(0);
+      if (loadVersion !== albumsLoadVersionRef.current) {
+        stopSpinnerIfOwner();
+        return;
+      }
+
+      if (!first) {
+        stopSpinnerIfOwner();
+        return;
+      }
+
+      let all = [...first.batch];
+      setAlbums(all);
+      stopSpinnerIfOwner();
+
+      if (!first.hasMore || first.batch.length === 0) {
+        if (includeTracks) {
+          tracksHydratedRef.current = true;
+          setTracksHydrated(true);
+        }
+        return;
+      }
+
+      let page = 1;
+      while (true) {
+        const next = await fetchPage(page);
+        if (loadVersion !== albumsLoadVersionRef.current) return;
+        if (!next || next.batch.length === 0) break;
+        all = all.concat(next.batch);
+        setAlbums(all);
+        if (!next.hasMore) break;
+        page += 1;
+      }
+
+      if (includeTracks && loadVersion === albumsLoadVersionRef.current) {
         tracksHydratedRef.current = true;
         setTracksHydrated(true);
       }
-      return;
-    }
-
-    let page = 1;
-    while (true) {
-      const next = await fetchPage(page);
-      if (loadVersion !== albumsLoadVersionRef.current) return;
-      if (!next || next.batch.length === 0) break;
-      all = all.concat(next.batch);
-      setAlbums(all);
-      if (!next.hasMore) break;
-      page += 1;
-    }
-
-    if (includeTracks && loadVersion === albumsLoadVersionRef.current) {
-      tracksHydratedRef.current = true;
-      setTracksHydrated(true);
+    } catch (error) {
+      console.error('Unexpected error loading albums:', error);
+      stopSpinnerIfOwner();
     }
   }, []);
 
