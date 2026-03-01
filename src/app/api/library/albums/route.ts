@@ -16,7 +16,10 @@ export async function GET(request: NextRequest) {
     const mediaType = (url.searchParams.get("mediaType") ?? "").trim();
     const includeTracks = (url.searchParams.get("includeTracks") ?? "false").toLowerCase() === "true";
     const page = clamp(Number(url.searchParams.get("page") ?? 0), 0, 5000);
-    const pageSize = clamp(Number(url.searchParams.get("pageSize") ?? 100), 10, 250);
+    const requestedPageSize = Number(url.searchParams.get("pageSize") ?? (includeTracks ? 100 : 250));
+    const pageSize = includeTracks
+      ? clamp(requestedPageSize, 10, 250)
+      : clamp(requestedPageSize, 50, 1000);
 
     const from = page * pageSize;
     const to = from + pageSize - 1;

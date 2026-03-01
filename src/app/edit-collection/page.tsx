@@ -1,7 +1,7 @@
 // src/app/edit-collection/page.tsx
 'use client';
 
-import { useCallback, useEffect, useState, useMemo, Suspense, Fragment, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, useMemo, useRef, Suspense, Fragment, type ReactNode } from 'react';
 import { supabase as supabaseTyped } from '../../lib/supabaseClient';
 import CollectionTable from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
@@ -17,6 +17,7 @@ import PlaylistStudioModal, { type PlaylistStudioView } from './playlists/Playli
 import Header from './Header';
 import { ManageColumnFavoritesModal, type ColumnFavorite } from './ManageColumnFavoritesModal';
 import { ManageSortFavoritesModal, type SortFavorite, type SortField } from './ManageSortFavoritesModal';
+import SortSelectorModal from './SortSelectorModal';
 import type { Crate } from '../../types/crate';
 import type { CollectionPlaylist } from '../../types/collectionPlaylist';
 import type { SmartPlaylistRules } from '../../types/collectionPlaylist';
@@ -281,6 +282,135 @@ const DEFAULT_COLLECTION_SORT_FAVORITES: SortFavorite[] = [
   },
 ];
 
+const TRACK_COLUMN_FIELD_GROUPS: Record<string, string[]> = {
+  Main: ['Track', 'Track Artist', 'Album', 'Album Artist', 'Position', 'Length', 'Rating'],
+  Edition: ['Format', 'Year', 'Added Date'],
+  Metadata: ['Genre', 'Label'],
+  Personal: ['Location', 'Collection Status', 'Notes'],
+};
+
+const DEFAULT_ALBUM_TRACK_COLUMN_FAVORITES: ColumnFavorite[] = [
+  {
+    id: 'album-track-favorite-default',
+    name: 'My Album / Track columns',
+    columns: ['Track', 'Track Artist', 'Album', 'Position', 'Length'],
+  },
+];
+
+const DEFAULT_PLAYLIST_COLUMN_FAVORITES: ColumnFavorite[] = [
+  {
+    id: 'playlist-favorite-default',
+    name: 'My Playlist columns',
+    columns: ['Track', 'Track Artist', 'Album', 'Position', 'Length', 'Rating'],
+  },
+];
+
+const TRACK_SORT_FIELD_GROUPS: Record<string, string[]> = {
+  Main: ['Album', 'Album Artist', 'Track Title', 'Track Artist', 'Position', 'Duration', 'Rating', 'Year', 'Added Date'],
+  Metadata: ['Genre', 'Label', 'Format'],
+  Personal: ['Location', 'Collection Status'],
+};
+
+const DEFAULT_ALBUM_TRACK_SORT_FAVORITES: SortFavorite[] = [
+  {
+    id: 'album-track-sort-default',
+    name: 'Album | Position',
+    fields: [
+      { field: 'Album', direction: 'asc' },
+      { field: 'Position', direction: 'asc' },
+    ],
+  },
+];
+
+const DEFAULT_PLAYLIST_SORT_FAVORITES: SortFavorite[] = [
+  {
+    id: 'playlist-sort-default',
+    name: 'Track Artist | Track Title',
+    fields: [
+      { field: 'Track Artist', direction: 'asc' },
+      { field: 'Track Title', direction: 'asc' },
+    ],
+  },
+];
+
+const COLLECTION_COLUMN_FIELD_GROUPS: Record<string, string[]> = Object.fromEntries(
+  COLUMN_GROUPS.map((group) => [
+    group.label,
+    group.columns
+      .map((columnId) => COLUMN_DEFINITIONS[columnId]?.label)
+      .filter((label): label is string => Boolean(label)),
+  ])
+);
+
+const COLLECTION_SORT_FIELD_GROUPS: Record<string, string[]> = {
+  Main: [
+    'Artist',
+    'Barcode',
+    'Cat No',
+    'Core AlbumID',
+    'Format',
+    'Genre',
+    'Label',
+    'Original Release Date',
+    'Original Release Month',
+    'Original Release Year',
+    'Recording Date',
+    'Recording Month',
+    'Recording Year',
+    'Release Date',
+    'Release Month',
+    'Release Year',
+    'Sort Title',
+    'Subtitle',
+    'Title',
+  ],
+  Details: [
+    'Box Set',
+    'Country',
+    'Extra',
+    'Is Live',
+    'Media Condition',
+    'Package/Sleeve Condition',
+    'Packaging',
+    'RPM',
+    'Sound',
+    'SPARS',
+    'Storage Device',
+    'Storage Device Slot',
+    'Studio',
+    'Vinyl Color',
+    'Vinyl Weight',
+  ],
+  Edition: ['Discs', 'Length', 'Tracks'],
+  Classical: ['Chorus', 'Composer', 'Composition', 'Conductor', 'Orchestra'],
+  People: ['Engineer', 'Musician', 'Producer', 'Songwriter'],
+  Personal: [
+    'Added Date',
+    'Added Year',
+    'Collection Status',
+    'Current Value',
+    'Index',
+    'Last Cleaned Date',
+    'Last Cleaned Year',
+    'Last Played Date',
+    'Location',
+    'Modified Date',
+    'My Rating',
+    'Notes',
+    'Owner',
+    'Play Count',
+    'Played Year',
+    'Purchase Date',
+    'Purchase Price',
+    'Purchase Store',
+    'Purchase Year',
+    'Quantity',
+    'Signed by',
+    'Tags',
+  ],
+  Loan: ['Due Date', 'Loan Date', 'Loaned To'],
+};
+
 const formatDisplayDate = (value: string | null | undefined): string => {
   if (!value) return '—';
   const parsed = new Date(value);
@@ -368,6 +498,50 @@ const mapFavoriteColumnsToCollectionColumns = (favorite: ColumnFavorite | null):
     .filter((columnId, index, arr) => arr.indexOf(columnId) === index);
 };
 
+const mapFavoriteColumnsToTrackColumns = (favorite: ColumnFavorite | null): TrackViewColumnId[] => {
+  if (!favorite) return [];
+
+  const byLabel = Object.values(TRACK_VIEW_COLUMN_DEFINITIONS).reduce((acc, definition) => {
+    acc[definition.label.toLowerCase()] = definition.id;
+    return acc;
+  }, {} as Record<string, TrackViewColumnId>);
+
+  const aliases: Record<string, TrackViewColumnId> = {
+    track: 'track_title',
+    title: 'album_title',
+    'track title': 'track_title',
+    artist: 'track_artist',
+    'track artist': 'track_artist',
+    album: 'album_title',
+    'album title': 'album_title',
+    'album artist': 'album_artist',
+    pos: 'position',
+    position: 'position',
+    length: 'length',
+    duration: 'length',
+    rating: 'my_rating',
+    format: 'format',
+    genre: 'genre',
+    label: 'label',
+    year: 'year',
+    added: 'added_date',
+    'added date': 'added_date',
+    location: 'location',
+    status: 'collection_status',
+    'collection status': 'collection_status',
+    notes: 'personal_notes',
+    'my notes': 'personal_notes',
+  };
+
+  return favorite.columns
+    .map((column) => {
+      const key = column.toLowerCase().trim();
+      return byLabel[key] ?? aliases[key] ?? null;
+    })
+    .filter((columnId): columnId is TrackViewColumnId => Boolean(columnId))
+    .filter((columnId, index, arr) => arr.indexOf(columnId) === index);
+};
+
 const getAlbumSortMetric = (album: Album, fieldName: string): string | number | null => {
   const field = fieldName.toLowerCase().trim();
 
@@ -445,6 +619,60 @@ const sortAlbumsByFavoriteFields = (albums: Album[], fields: SortField[]): Album
       const cmp = compareAlbumSortMetric(
         getAlbumSortMetric(a, field.field),
         getAlbumSortMetric(b, field.field),
+        field.direction
+      );
+      if (cmp !== 0) return cmp;
+    }
+    return 0;
+  });
+  return sortable;
+};
+
+const getTrackSortMetric = (row: CollectionTrackRow, fieldName: string): string | number | null => {
+  const field = fieldName.toLowerCase().trim();
+  if (field === 'album') return row.albumTitle;
+  if (field === 'album artist') return row.albumArtist;
+  if (field === 'track title' || field === 'track') return row.trackTitle;
+  if (field === 'track artist' || field === 'artist') return row.trackArtist;
+  if (field === 'position' || field === 'pos') return getTrackPositionSortValue(row.position, row.side);
+  if (field === 'duration' || field === 'length') return row.durationSeconds ?? 0;
+  if (field === 'rating' || field === 'my rating') return row.myRating ?? 0;
+  if (field === 'year') return row.yearInt ?? 0;
+  if (field === 'format') return row.trackFormatFacets.join(' | ') || row.albumMediaType;
+  if (field === 'genre') return formatTrackArrayValues(row.genres);
+  if (field === 'label') return formatTrackArrayValues(row.labels ?? (row.label ? [row.label] : []));
+  if (field === 'location') return row.location ?? '';
+  if (field === 'collection status') return formatTrackStatus(row.status);
+  if (field === 'added date') {
+    const parsed = Date.parse(row.dateAdded ?? '');
+    return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed;
+  }
+  return null;
+};
+
+const compareTrackSortMetric = (
+  aValue: string | number | null,
+  bValue: string | number | null,
+  direction: 'asc' | 'desc'
+): number => {
+  const multiplier = direction === 'asc' ? 1 : -1;
+  const aNull = aValue == null || aValue === '';
+  const bNull = bValue == null || bValue === '';
+  if (aNull && bNull) return 0;
+  if (aNull) return 1 * multiplier;
+  if (bNull) return -1 * multiplier;
+  if (typeof aValue === 'number' && typeof bValue === 'number') return (aValue - bValue) * multiplier;
+  return String(aValue).localeCompare(String(bValue), undefined, { sensitivity: 'base', numeric: true }) * multiplier;
+};
+
+const sortTrackRowsByFavoriteFields = (rows: CollectionTrackRow[], fields: SortField[]): CollectionTrackRow[] => {
+  if (fields.length === 0) return rows;
+  const sortable = [...rows];
+  sortable.sort((a, b) => {
+    for (const field of fields) {
+      const cmp = compareTrackSortMetric(
+        getTrackSortMetric(a, field.field),
+        getTrackSortMetric(b, field.field),
         field.direction
       );
       if (cmp !== 0) return cmp;
@@ -723,6 +951,10 @@ const buildTrackRuleMetadata = (album: Album) => {
 function CollectionBrowserPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tracksHydrated, setTracksHydrated] = useState(false);
+  const [tracksHydrating, setTracksHydrating] = useState(false);
+  const tracksHydratedRef = useRef(false);
+  const albumsLoadVersionRef = useRef(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchTypeDropdown, setShowSearchTypeDropdown] = useState(false);
   const [selectedLetter, setSelectedLetter] = useState<string>('All');
@@ -765,7 +997,7 @@ function CollectionBrowserPage() {
   const [trackFormatFilterMode, setTrackFormatFilterMode] = useState<'include' | 'exclude'>('include');
   const [trackFormatFilters, setTrackFormatFilters] = useState<Set<string>>(new Set());
   
-  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [showSortSelector, setShowSortSelector] = useState(false);
   const [showSortFavoritesDropdown, setShowSortFavoritesDropdown] = useState(false);
   const [showViewModeDropdown, setShowViewModeDropdown] = useState(false);
   const [showColumnFavoritesDropdown, setShowColumnFavoritesDropdown] = useState(false);
@@ -785,15 +1017,95 @@ function CollectionBrowserPage() {
   const [columnSelectorMode, setColumnSelectorMode] = useState<ColumnSelectorMode>('collection');
   const [showManageColumnFavoritesModal, setShowManageColumnFavoritesModal] = useState(false);
   const [showManageSortFavoritesModal, setShowManageSortFavoritesModal] = useState(false);
-  const [columnFavorites, setColumnFavorites] = useState<ColumnFavorite[]>(DEFAULT_COLLECTION_COLUMN_FAVORITES);
-  const [selectedColumnFavoriteId, setSelectedColumnFavoriteId] = useState<string>(DEFAULT_COLLECTION_COLUMN_FAVORITES[0]?.id ?? '');
-  const [sortFavorites, setSortFavorites] = useState<SortFavorite[]>(DEFAULT_COLLECTION_SORT_FAVORITES);
-  const [selectedSortFavoriteId, setSelectedSortFavoriteId] = useState<string>(DEFAULT_COLLECTION_SORT_FAVORITES[0]?.id ?? '');
+  const [collectionColumnFavorites, setCollectionColumnFavorites] = useState<ColumnFavorite[]>(DEFAULT_COLLECTION_COLUMN_FAVORITES);
+  const [albumTrackColumnFavorites, setAlbumTrackColumnFavorites] = useState<ColumnFavorite[]>(DEFAULT_ALBUM_TRACK_COLUMN_FAVORITES);
+  const [playlistColumnFavorites, setPlaylistColumnFavorites] = useState<ColumnFavorite[]>(DEFAULT_PLAYLIST_COLUMN_FAVORITES);
+  const [selectedCollectionColumnFavoriteId, setSelectedCollectionColumnFavoriteId] = useState<string>(DEFAULT_COLLECTION_COLUMN_FAVORITES[0]?.id ?? '');
+  const [selectedAlbumTrackColumnFavoriteId, setSelectedAlbumTrackColumnFavoriteId] = useState<string>(DEFAULT_ALBUM_TRACK_COLUMN_FAVORITES[0]?.id ?? '');
+  const [selectedPlaylistColumnFavoriteId, setSelectedPlaylistColumnFavoriteId] = useState<string>(DEFAULT_PLAYLIST_COLUMN_FAVORITES[0]?.id ?? '');
+  const [collectionSortFavorites, setCollectionSortFavorites] = useState<SortFavorite[]>(DEFAULT_COLLECTION_SORT_FAVORITES);
+  const [albumTrackSortFavorites, setAlbumTrackSortFavorites] = useState<SortFavorite[]>(DEFAULT_ALBUM_TRACK_SORT_FAVORITES);
+  const [playlistSortFavorites, setPlaylistSortFavorites] = useState<SortFavorite[]>(DEFAULT_PLAYLIST_SORT_FAVORITES);
+  const [selectedCollectionSortFavoriteId, setSelectedCollectionSortFavoriteId] = useState<string>(DEFAULT_COLLECTION_SORT_FAVORITES[0]?.id ?? '');
+  const [selectedAlbumTrackSortFavoriteId, setSelectedAlbumTrackSortFavoriteId] = useState<string>(DEFAULT_ALBUM_TRACK_SORT_FAVORITES[0]?.id ?? '');
+  const [selectedPlaylistSortFavoriteId, setSelectedPlaylistSortFavoriteId] = useState<string>(DEFAULT_PLAYLIST_SORT_FAVORITES[0]?.id ?? '');
   const [activeCollectionSortFields, setActiveCollectionSortFields] = useState<SortField[]>(
     DEFAULT_COLLECTION_SORT_FAVORITES[0]?.fields ?? []
   );
+  const [activeAlbumTrackSortFields, setActiveAlbumTrackSortFields] = useState<SortField[]>(
+    DEFAULT_ALBUM_TRACK_SORT_FAVORITES[0]?.fields ?? []
+  );
+  const [activePlaylistSortFields, setActivePlaylistSortFields] = useState<SortField[]>(
+    DEFAULT_PLAYLIST_SORT_FAVORITES[0]?.fields ?? []
+  );
 
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+  const activeColumnFavorites = useMemo(() => {
+    if (viewMode === 'collection') return collectionColumnFavorites;
+    if (viewMode === 'album-track') return albumTrackColumnFavorites;
+    return playlistColumnFavorites;
+  }, [albumTrackColumnFavorites, collectionColumnFavorites, playlistColumnFavorites, viewMode]);
+
+  const activeSelectedColumnFavoriteId = useMemo(() => {
+    if (viewMode === 'collection') return selectedCollectionColumnFavoriteId;
+    if (viewMode === 'album-track') return selectedAlbumTrackColumnFavoriteId;
+    return selectedPlaylistColumnFavoriteId;
+  }, [
+    selectedAlbumTrackColumnFavoriteId,
+    selectedCollectionColumnFavoriteId,
+    selectedPlaylistColumnFavoriteId,
+    viewMode,
+  ]);
+
+  const activeSortFavorites = useMemo(() => {
+    if (viewMode === 'collection') return collectionSortFavorites;
+    if (viewMode === 'album-track') return albumTrackSortFavorites;
+    return playlistSortFavorites;
+  }, [albumTrackSortFavorites, collectionSortFavorites, playlistSortFavorites, viewMode]);
+
+  const activeSelectedSortFavoriteId = useMemo(() => {
+    if (viewMode === 'collection') return selectedCollectionSortFavoriteId;
+    if (viewMode === 'album-track') return selectedAlbumTrackSortFavoriteId;
+    return selectedPlaylistSortFavoriteId;
+  }, [
+    selectedAlbumTrackSortFavoriteId,
+    selectedCollectionSortFavoriteId,
+    selectedPlaylistSortFavoriteId,
+    viewMode,
+  ]);
+
+  const activeSortFields = useMemo(() => {
+    if (viewMode === 'collection') return activeCollectionSortFields;
+    if (viewMode === 'album-track') return activeAlbumTrackSortFields;
+    return activePlaylistSortFields;
+  }, [activeAlbumTrackSortFields, activeCollectionSortFields, activePlaylistSortFields, viewMode]);
+
+  const activeSortFavoriteName = useMemo(() => {
+    return activeSortFavorites.find((favorite) => favorite.id === activeSelectedSortFavoriteId)?.name ?? '';
+  }, [activeSelectedSortFavoriteId, activeSortFavorites]);
+
+  const activeColumnFavoriteModalTitle =
+    viewMode === 'collection'
+      ? 'Manage Column Favorites'
+      : viewMode === 'album-track'
+        ? 'Manage Album / Track Column Favorites'
+        : 'Manage Playlist Column Favorites';
+
+  const activeSortFavoriteModalTitle =
+    viewMode === 'collection'
+      ? 'Manage Sorting Favorites'
+      : viewMode === 'album-track'
+        ? 'Manage Album / Track Sorting Favorites'
+        : 'Manage Playlist Sorting Favorites';
+
+  const activeColumnFieldGroups = viewMode === 'collection'
+    ? COLLECTION_COLUMN_FIELD_GROUPS
+    : TRACK_COLUMN_FIELD_GROUPS;
+
+  const activeSortFieldGroups = viewMode === 'collection'
+    ? COLLECTION_SORT_FIELD_GROUPS
+    : TRACK_SORT_FIELD_GROUPS;
 
   useEffect(() => {
     clearPlaylistRecoveryStorage();
@@ -866,8 +1178,8 @@ function CollectionBrowserPage() {
       try {
         const parsed = JSON.parse(storedFavorites) as ColumnFavorite[];
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setColumnFavorites(parsed);
-          setSelectedColumnFavoriteId(parsed[0].id);
+          setCollectionColumnFavorites(parsed);
+          setSelectedCollectionColumnFavoriteId(parsed[0].id);
         }
       } catch {
         // ignore invalid local storage
@@ -876,7 +1188,47 @@ function CollectionBrowserPage() {
 
     const storedSelectedFavorite = localStorage.getItem('collection-selected-column-favorite-id');
     if (storedSelectedFavorite) {
-      setSelectedColumnFavoriteId(storedSelectedFavorite);
+      setSelectedCollectionColumnFavoriteId(storedSelectedFavorite);
+    }
+  }, []);
+
+  useEffect(() => {
+    const storedFavorites = localStorage.getItem('collection-album-track-column-favorites');
+    if (storedFavorites) {
+      try {
+        const parsed = JSON.parse(storedFavorites) as ColumnFavorite[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAlbumTrackColumnFavorites(parsed);
+          setSelectedAlbumTrackColumnFavoriteId(parsed[0].id);
+        }
+      } catch {
+        // ignore invalid local storage
+      }
+    }
+
+    const storedSelectedFavorite = localStorage.getItem('collection-selected-album-track-column-favorite-id');
+    if (storedSelectedFavorite) {
+      setSelectedAlbumTrackColumnFavoriteId(storedSelectedFavorite);
+    }
+  }, []);
+
+  useEffect(() => {
+    const storedFavorites = localStorage.getItem('collection-playlist-column-favorites');
+    if (storedFavorites) {
+      try {
+        const parsed = JSON.parse(storedFavorites) as ColumnFavorite[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setPlaylistColumnFavorites(parsed);
+          setSelectedPlaylistColumnFavoriteId(parsed[0].id);
+        }
+      } catch {
+        // ignore invalid local storage
+      }
+    }
+
+    const storedSelectedFavorite = localStorage.getItem('collection-selected-playlist-column-favorite-id');
+    if (storedSelectedFavorite) {
+      setSelectedPlaylistColumnFavoriteId(storedSelectedFavorite);
     }
   }, []);
 
@@ -886,8 +1238,8 @@ function CollectionBrowserPage() {
       try {
         const parsed = JSON.parse(storedFavorites) as SortFavorite[];
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setSortFavorites(parsed);
-          setSelectedSortFavoriteId(parsed[0].id);
+          setCollectionSortFavorites(parsed);
+          setSelectedCollectionSortFavoriteId(parsed[0].id);
         }
       } catch {
         // ignore invalid local storage
@@ -896,7 +1248,47 @@ function CollectionBrowserPage() {
 
     const storedSelectedFavorite = localStorage.getItem('collection-selected-sort-favorite-id');
     if (storedSelectedFavorite) {
-      setSelectedSortFavoriteId(storedSelectedFavorite);
+      setSelectedCollectionSortFavoriteId(storedSelectedFavorite);
+    }
+  }, []);
+
+  useEffect(() => {
+    const storedFavorites = localStorage.getItem('collection-album-track-sort-favorites');
+    if (storedFavorites) {
+      try {
+        const parsed = JSON.parse(storedFavorites) as SortFavorite[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAlbumTrackSortFavorites(parsed);
+          setSelectedAlbumTrackSortFavoriteId(parsed[0].id);
+        }
+      } catch {
+        // ignore invalid local storage
+      }
+    }
+
+    const storedSelectedFavorite = localStorage.getItem('collection-selected-album-track-sort-favorite-id');
+    if (storedSelectedFavorite) {
+      setSelectedAlbumTrackSortFavoriteId(storedSelectedFavorite);
+    }
+  }, []);
+
+  useEffect(() => {
+    const storedFavorites = localStorage.getItem('collection-playlist-sort-favorites');
+    if (storedFavorites) {
+      try {
+        const parsed = JSON.parse(storedFavorites) as SortFavorite[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setPlaylistSortFavorites(parsed);
+          setSelectedPlaylistSortFavoriteId(parsed[0].id);
+        }
+      } catch {
+        // ignore invalid local storage
+      }
+    }
+
+    const storedSelectedFavorite = localStorage.getItem('collection-selected-playlist-sort-favorite-id');
+    if (storedSelectedFavorite) {
+      setSelectedPlaylistSortFavoriteId(storedSelectedFavorite);
     }
   }, []);
 
@@ -947,28 +1339,76 @@ function CollectionBrowserPage() {
   }, [viewMode]);
 
   useEffect(() => {
-    localStorage.setItem('collection-column-favorites', JSON.stringify(columnFavorites));
-  }, [columnFavorites]);
+    localStorage.setItem('collection-column-favorites', JSON.stringify(collectionColumnFavorites));
+  }, [collectionColumnFavorites]);
 
   useEffect(() => {
-    localStorage.setItem('collection-selected-column-favorite-id', selectedColumnFavoriteId);
-  }, [selectedColumnFavoriteId]);
+    localStorage.setItem('collection-album-track-column-favorites', JSON.stringify(albumTrackColumnFavorites));
+  }, [albumTrackColumnFavorites]);
 
   useEffect(() => {
-    localStorage.setItem('collection-sort-favorites', JSON.stringify(sortFavorites));
-  }, [sortFavorites]);
+    localStorage.setItem('collection-playlist-column-favorites', JSON.stringify(playlistColumnFavorites));
+  }, [playlistColumnFavorites]);
 
   useEffect(() => {
-    localStorage.setItem('collection-selected-sort-favorite-id', selectedSortFavoriteId);
-  }, [selectedSortFavoriteId]);
+    localStorage.setItem('collection-selected-column-favorite-id', selectedCollectionColumnFavoriteId);
+  }, [selectedCollectionColumnFavoriteId]);
 
   useEffect(() => {
-    if (!selectedSortFavoriteId) return;
-    const selected = sortFavorites.find((favorite) => favorite.id === selectedSortFavoriteId);
+    localStorage.setItem('collection-selected-album-track-column-favorite-id', selectedAlbumTrackColumnFavoriteId);
+  }, [selectedAlbumTrackColumnFavoriteId]);
+
+  useEffect(() => {
+    localStorage.setItem('collection-selected-playlist-column-favorite-id', selectedPlaylistColumnFavoriteId);
+  }, [selectedPlaylistColumnFavoriteId]);
+
+  useEffect(() => {
+    localStorage.setItem('collection-sort-favorites', JSON.stringify(collectionSortFavorites));
+  }, [collectionSortFavorites]);
+
+  useEffect(() => {
+    localStorage.setItem('collection-album-track-sort-favorites', JSON.stringify(albumTrackSortFavorites));
+  }, [albumTrackSortFavorites]);
+
+  useEffect(() => {
+    localStorage.setItem('collection-playlist-sort-favorites', JSON.stringify(playlistSortFavorites));
+  }, [playlistSortFavorites]);
+
+  useEffect(() => {
+    localStorage.setItem('collection-selected-sort-favorite-id', selectedCollectionSortFavoriteId);
+  }, [selectedCollectionSortFavoriteId]);
+
+  useEffect(() => {
+    localStorage.setItem('collection-selected-album-track-sort-favorite-id', selectedAlbumTrackSortFavoriteId);
+  }, [selectedAlbumTrackSortFavoriteId]);
+
+  useEffect(() => {
+    localStorage.setItem('collection-selected-playlist-sort-favorite-id', selectedPlaylistSortFavoriteId);
+  }, [selectedPlaylistSortFavoriteId]);
+
+  useEffect(() => {
+    if (!selectedCollectionSortFavoriteId) return;
+    const selected = collectionSortFavorites.find((favorite) => favorite.id === selectedCollectionSortFavoriteId);
     if (selected) {
       setActiveCollectionSortFields(selected.fields);
     }
-  }, [selectedSortFavoriteId, sortFavorites]);
+  }, [collectionSortFavorites, selectedCollectionSortFavoriteId]);
+
+  useEffect(() => {
+    if (!selectedAlbumTrackSortFavoriteId) return;
+    const selected = albumTrackSortFavorites.find((favorite) => favorite.id === selectedAlbumTrackSortFavoriteId);
+    if (selected) {
+      setActiveAlbumTrackSortFields(selected.fields);
+    }
+  }, [albumTrackSortFavorites, selectedAlbumTrackSortFavoriteId]);
+
+  useEffect(() => {
+    if (!selectedPlaylistSortFavoriteId) return;
+    const selected = playlistSortFavorites.find((favorite) => favorite.id === selectedPlaylistSortFavoriteId);
+    if (selected) {
+      setActivePlaylistSortFields(selected.fields);
+    }
+  }, [playlistSortFavorites, selectedPlaylistSortFavoriteId]);
 
   useEffect(() => {
     localStorage.setItem('collection-track-sort-preference', trackSortBy);
@@ -982,44 +1422,124 @@ function CollectionBrowserPage() {
     localStorage.setItem('collection-track-format-filters', JSON.stringify(Array.from(trackFormatFilters)));
   }, [trackFormatFilters]);
 
-  const handleSortChange = useCallback((newSort: SortOption) => {
-    setSortBy(newSort);
-    setSelectedSortFavoriteId('');
-    setActiveCollectionSortFields([]);
-    localStorage.setItem('collection-sort-preference', newSort);
-    setShowSortDropdown(false);
-    setTableSortState({ column: null, direction: null });
-  }, []);
-
   const handleApplyColumnFavorite = useCallback((favoriteId: string) => {
-    setSelectedColumnFavoriteId(favoriteId);
     setShowColumnFavoritesDropdown(false);
+    if (viewMode === 'collection') {
+      setSelectedCollectionColumnFavoriteId(favoriteId);
+      const favorite = collectionColumnFavorites.find((item) => item.id === favoriteId) ?? null;
+      const mapped = mapFavoriteColumnsToCollectionColumns(favorite);
+      if (mapped.length === 0) return;
+      const nextColumns = [...new Set([...COLLECTION_CONTROL_COLUMNS, ...mapped])];
+      handleCollectionColumnsChange(nextColumns);
+      return;
+    }
 
-    const favorite = columnFavorites.find((item) => item.id === favoriteId) ?? null;
-    const mapped = mapFavoriteColumnsToCollectionColumns(favorite);
+    if (viewMode === 'album-track') {
+      setSelectedAlbumTrackColumnFavoriteId(favoriteId);
+      const favorite = albumTrackColumnFavorites.find((item) => item.id === favoriteId) ?? null;
+      const mapped = mapFavoriteColumnsToTrackColumns(favorite);
+      if (mapped.length === 0) return;
+      const nextColumns = [...new Set(['checkbox' as TrackViewColumnId, ...mapped])];
+      handleAlbumTrackColumnsChange(nextColumns);
+      return;
+    }
+
+    setSelectedPlaylistColumnFavoriteId(favoriteId);
+    const favorite = playlistColumnFavorites.find((item) => item.id === favoriteId) ?? null;
+    const mapped = mapFavoriteColumnsToTrackColumns(favorite);
     if (mapped.length === 0) return;
-
-    const nextColumns = [...new Set([...COLLECTION_CONTROL_COLUMNS, ...mapped])];
-    handleCollectionColumnsChange(nextColumns);
-  }, [columnFavorites, handleCollectionColumnsChange]);
+    const nextColumns = [...new Set(['checkbox' as TrackViewColumnId, ...mapped])];
+    handlePlaylistColumnsChange(nextColumns);
+  }, [
+    albumTrackColumnFavorites,
+    collectionColumnFavorites,
+    handleAlbumTrackColumnsChange,
+    handleCollectionColumnsChange,
+    handlePlaylistColumnsChange,
+    playlistColumnFavorites,
+    viewMode,
+  ]);
 
   const handleApplySortFavorite = useCallback((favoriteId: string) => {
-    setSelectedSortFavoriteId(favoriteId);
     setShowSortFavoritesDropdown(false);
+    if (viewMode === 'collection') {
+      setSelectedCollectionSortFavoriteId(favoriteId);
+      const favorite = collectionSortFavorites.find((item) => item.id === favoriteId) ?? null;
+      if (!favorite || favorite.fields.length === 0) return;
+      setActiveCollectionSortFields(favorite.fields);
+      setTableSortState({ column: null, direction: null });
+      return;
+    }
 
-    const favorite = sortFavorites.find((item) => item.id === favoriteId) ?? null;
+    if (viewMode === 'album-track') {
+      setSelectedAlbumTrackSortFavoriteId(favoriteId);
+      const favorite = albumTrackSortFavorites.find((item) => item.id === favoriteId) ?? null;
+      if (!favorite || favorite.fields.length === 0) return;
+      setActiveAlbumTrackSortFields(favorite.fields);
+      return;
+    }
+
+    setSelectedPlaylistSortFavoriteId(favoriteId);
+    const favorite = playlistSortFavorites.find((item) => item.id === favoriteId) ?? null;
     if (!favorite || favorite.fields.length === 0) return;
-    setActiveCollectionSortFields(favorite.fields);
-    setTableSortState({ column: null, direction: null });
-  }, [sortFavorites]);
+    setActivePlaylistSortFields(favorite.fields);
+  }, [albumTrackSortFavorites, collectionSortFavorites, playlistSortFavorites, viewMode]);
 
-  const handleTrackSortChange = useCallback((newSort: TrackSortOption) => {
-    setTrackSortBy(newSort);
-    setShowSortDropdown(false);
-  }, []);
+  const handleSaveSortFields = useCallback((fields: SortField[]) => {
+    if (viewMode === 'collection') {
+      const targetId = selectedCollectionSortFavoriteId || collectionSortFavorites[0]?.id;
+      if (!targetId) {
+        setShowSortSelector(false);
+        return;
+      }
+      setCollectionSortFavorites((prev) =>
+        prev.map((favorite) => (favorite.id === targetId ? { ...favorite, fields } : favorite))
+      );
+      setSelectedCollectionSortFavoriteId(targetId);
+      setActiveCollectionSortFields(fields);
+      setTableSortState({ column: null, direction: null });
+      setShowSortSelector(false);
+      return;
+    }
+
+    if (viewMode === 'album-track') {
+      const targetId = selectedAlbumTrackSortFavoriteId || albumTrackSortFavorites[0]?.id;
+      if (!targetId) {
+        setShowSortSelector(false);
+        return;
+      }
+      setAlbumTrackSortFavorites((prev) =>
+        prev.map((favorite) => (favorite.id === targetId ? { ...favorite, fields } : favorite))
+      );
+      setSelectedAlbumTrackSortFavoriteId(targetId);
+      setActiveAlbumTrackSortFields(fields);
+      setShowSortSelector(false);
+      return;
+    }
+
+    const targetId = selectedPlaylistSortFavoriteId || playlistSortFavorites[0]?.id;
+    if (!targetId) {
+      setShowSortSelector(false);
+      return;
+    }
+    setPlaylistSortFavorites((prev) =>
+      prev.map((favorite) => (favorite.id === targetId ? { ...favorite, fields } : favorite))
+    );
+    setSelectedPlaylistSortFavoriteId(targetId);
+    setActivePlaylistSortFields(fields);
+    setShowSortSelector(false);
+  }, [
+    albumTrackSortFavorites,
+    collectionSortFavorites,
+    playlistSortFavorites,
+    selectedAlbumTrackSortFavoriteId,
+    selectedCollectionSortFavoriteId,
+    selectedPlaylistSortFavoriteId,
+    viewMode,
+  ]);
 
   const handleTableSortChange = useCallback((column: ColumnId) => {
-    setSelectedSortFavoriteId('');
+    setSelectedCollectionSortFavoriteId('');
     setActiveCollectionSortFields([]);
     setTableSortState(prev => {
       if (prev.column === column) {
@@ -1033,33 +1553,78 @@ function CollectionBrowserPage() {
     });
   }, []);
 
-  const loadAlbums = useCallback(async () => {
-    setLoading(true);
+  const loadAlbums = useCallback(async (options?: { includeTracks?: boolean; showSpinner?: boolean }) => {
+    const includeTracks = options?.includeTracks ?? tracksHydratedRef.current;
+    const showSpinner = options?.showSpinner ?? !includeTracks;
+    const loadVersion = albumsLoadVersionRef.current + 1;
+    albumsLoadVersionRef.current = loadVersion;
 
-    const all: Album[] = [];
-    let page = 0;
-    const pageSize = 250;
-    while (true) {
+    if (showSpinner) setLoading(true);
+
+    const pageSize = includeTracks ? 250 : 500;
+    const fetchPage = async (page: number) => {
       const url = new URL('/api/library/albums', window.location.origin);
       url.searchParams.set('page', String(page));
       url.searchParams.set('pageSize', String(pageSize));
-      url.searchParams.set('includeTracks', 'true');
+      url.searchParams.set('includeTracks', includeTracks ? 'true' : 'false');
       const res = await fetch(url.toString(), { cache: 'no-store' });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
         console.error('Error loading albums via library API:', payload?.error || res.status);
-        break;
+        return null;
       }
-      const batch = Array.isArray(payload?.data) ? (payload.data as Album[]) : [];
-      all.push(...batch);
-      const hasMore = Boolean(payload?.hasMore);
-      if (!hasMore || batch.length === 0) break;
+      return {
+        batch: Array.isArray(payload?.data) ? (payload.data as Album[]) : [],
+        hasMore: Boolean(payload?.hasMore),
+      };
+    };
+
+    const first = await fetchPage(0);
+    if (loadVersion !== albumsLoadVersionRef.current) return;
+
+    if (!first) {
+      if (showSpinner) setLoading(false);
+      return;
+    }
+
+    let all = [...first.batch];
+    setAlbums(all);
+    if (showSpinner) setLoading(false);
+
+    if (!first.hasMore || first.batch.length === 0) {
+      if (includeTracks) {
+        tracksHydratedRef.current = true;
+        setTracksHydrated(true);
+      }
+      return;
+    }
+
+    let page = 1;
+    while (true) {
+      const next = await fetchPage(page);
+      if (loadVersion !== albumsLoadVersionRef.current) return;
+      if (!next || next.batch.length === 0) break;
+      all = all.concat(next.batch);
+      setAlbums(all);
+      if (!next.hasMore) break;
       page += 1;
     }
 
-    setAlbums(all);
-    setLoading(false);
+    if (includeTracks && loadVersion === albumsLoadVersionRef.current) {
+      tracksHydratedRef.current = true;
+      setTracksHydrated(true);
+    }
   }, []);
+
+  const ensureTracksHydrated = useCallback(async () => {
+    if (tracksHydratedRef.current || tracksHydrating) return;
+    setTracksHydrating(true);
+    try {
+      await loadAlbums({ includeTracks: true, showSpinner: false });
+    } finally {
+      setTracksHydrating(false);
+    }
+  }, [loadAlbums, tracksHydrating]);
 
   const loadCrates = useCallback(async () => {
     const { data, error } = await supabase
@@ -1155,10 +1720,18 @@ function CollectionBrowserPage() {
   }, []);
 
   useEffect(() => {
-    loadAlbums();
+    tracksHydratedRef.current = false;
+    setTracksHydrated(false);
+    void loadAlbums({ includeTracks: false, showSpinner: true });
     loadCrates();
     loadPlaylists();
   }, [loadAlbums, loadCrates, loadPlaylists]);
+
+  useEffect(() => {
+    if (viewMode !== 'collection') {
+      void ensureTracksHydrated();
+    }
+  }, [ensureTracksHydrated, viewMode]);
 
   const filteredAndSortedAlbums = useMemo(() => {
     let filtered = albums.filter(album => {
@@ -1278,6 +1851,7 @@ function CollectionBrowserPage() {
   }, [crates, albums, crateItemCounts]);
 
   const allTrackRows = useMemo<CollectionTrackRow[]>(() => {
+    if (!tracksHydrated) return [];
     const rows: CollectionTrackRow[] = [];
 
     albums.forEach((album) => {
@@ -1344,7 +1918,7 @@ function CollectionBrowserPage() {
     });
 
     return rows;
-  }, [albums, collectionFilter]);
+  }, [albums, collectionFilter, tracksHydrated]);
 
   const trackFormatCounts = useMemo(() => {
     return allTrackRows.reduce((acc, row) => {
@@ -1392,7 +1966,7 @@ function CollectionBrowserPage() {
 
   const playlistCounts = useMemo(() => {
     return playlists.reduce((acc, playlist) => {
-      if (playlist.isSmart && playlist.liveUpdate) {
+      if (playlist.isSmart && playlist.liveUpdate && tracksHydrated) {
         const matched = allTrackRows.filter((row) => trackMatchesSmartPlaylist(row, playlist)).length;
         const maxTracks = playlist.smartRules?.maxTracks ?? null;
         acc[playlist.id] = typeof maxTracks === 'number' && maxTracks > 0 ? Math.min(matched, maxTracks) : matched;
@@ -1401,9 +1975,10 @@ function CollectionBrowserPage() {
       }
       return acc;
     }, {} as Record<number, number>);
-  }, [allTrackRows, playlists]);
+  }, [allTrackRows, playlists, tracksHydrated]);
 
   const smartPlaylistSelectedKeys = useMemo(() => {
+    if (!tracksHydrated) return {};
     const result: Record<number, Set<string>> = {};
 
     playlists.forEach((playlist) => {
@@ -1432,7 +2007,7 @@ function CollectionBrowserPage() {
     });
 
     return result;
-  }, [allTrackRows, playlists]);
+  }, [allTrackRows, playlists, tracksHydrated]);
 
   const filteredTrackRows = useMemo(() => {
     let rows = allTrackRows;
@@ -1505,31 +2080,42 @@ function CollectionBrowserPage() {
       }
     }
 
-    rows = [...rows].sort((a, b) => {
-      switch (trackSortBy) {
-        case 'album-asc':
-          return `${a.albumArtist} ${a.albumTitle}`.localeCompare(`${b.albumArtist} ${b.albumTitle}`);
-        case 'album-desc':
-          return `${b.albumArtist} ${b.albumTitle}`.localeCompare(`${a.albumArtist} ${a.albumTitle}`);
-        case 'track-asc':
-          return a.trackTitle.localeCompare(b.trackTitle);
-        case 'track-desc':
-          return b.trackTitle.localeCompare(a.trackTitle);
-        case 'artist-asc':
-          return a.trackArtist.localeCompare(b.trackArtist);
-        case 'artist-desc':
-          return b.trackArtist.localeCompare(a.trackArtist);
-        case 'duration-asc':
-          return (a.durationSeconds ?? 0) - (b.durationSeconds ?? 0);
-        case 'duration-desc':
-          return (b.durationSeconds ?? 0) - (a.durationSeconds ?? 0);
-        case 'position-desc':
-          return getTrackPositionSortValue(b.position, b.side) - getTrackPositionSortValue(a.position, a.side);
-        case 'position-asc':
-        default:
-          return getTrackPositionSortValue(a.position, a.side) - getTrackPositionSortValue(b.position, b.side);
-      }
-    });
+    const trackFavoriteFields =
+      viewMode === 'album-track'
+        ? activeAlbumTrackSortFields
+        : viewMode === 'playlist'
+          ? activePlaylistSortFields
+          : [];
+
+    if (trackFavoriteFields.length > 0) {
+      rows = sortTrackRowsByFavoriteFields(rows, trackFavoriteFields);
+    } else {
+      rows = [...rows].sort((a, b) => {
+        switch (trackSortBy) {
+          case 'album-asc':
+            return `${a.albumArtist} ${a.albumTitle}`.localeCompare(`${b.albumArtist} ${b.albumTitle}`);
+          case 'album-desc':
+            return `${b.albumArtist} ${b.albumTitle}`.localeCompare(`${a.albumArtist} ${a.albumTitle}`);
+          case 'track-asc':
+            return a.trackTitle.localeCompare(b.trackTitle);
+          case 'track-desc':
+            return b.trackTitle.localeCompare(a.trackTitle);
+          case 'artist-asc':
+            return a.trackArtist.localeCompare(b.trackArtist);
+          case 'artist-desc':
+            return b.trackArtist.localeCompare(a.trackArtist);
+          case 'duration-asc':
+            return (a.durationSeconds ?? 0) - (b.durationSeconds ?? 0);
+          case 'duration-desc':
+            return (b.durationSeconds ?? 0) - (a.durationSeconds ?? 0);
+          case 'position-desc':
+            return getTrackPositionSortValue(b.position, b.side) - getTrackPositionSortValue(a.position, a.side);
+          case 'position-asc':
+          default:
+            return getTrackPositionSortValue(a.position, a.side) - getTrackPositionSortValue(b.position, b.side);
+        }
+      });
+    }
 
     return rows;
   }, [
@@ -1547,6 +2133,9 @@ function CollectionBrowserPage() {
     trackFormatFilters,
     trackFormatFilterMode,
     trackSortBy,
+    activeAlbumTrackSortFields,
+    activePlaylistSortFields,
+    viewMode,
   ]);
 
   const groupedTrackRows = useMemo<TrackAlbumGroup[]>(() => {
@@ -1702,22 +2291,6 @@ function CollectionBrowserPage() {
     return playlists.find((playlist) => playlist.id === selectedPlaylistId) || null;
   }, [playlists, selectedPlaylistId]);
 
-  const sortOptionsByCategory = useMemo(() => {
-    return SORT_OPTIONS.reduce((acc, opt) => {
-      if (!acc[opt.category]) acc[opt.category] = [];
-      acc[opt.category].push(opt);
-      return acc;
-    }, {} as Record<string, typeof SORT_OPTIONS>);
-  }, []);
-
-  const trackSortOptionsByCategory = useMemo(() => {
-    return TRACK_SORT_OPTIONS.reduce((acc, opt) => {
-      if (!acc[opt.category]) acc[opt.category] = [];
-      acc[opt.category].push(opt);
-      return acc;
-    }, {} as Record<string, typeof TRACK_SORT_OPTIONS>);
-  }, []);
-
   const handleAlbumClick = useCallback((album: Album) => {
     setSelectedAlbumId(album.id);
   }, []);
@@ -1745,6 +2318,7 @@ function CollectionBrowserPage() {
     setSelectedTrackKeys(new Set());
     setShowColumnFavoritesDropdown(false);
     setShowSortFavoritesDropdown(false);
+    setShowSortSelector(false);
     if (viewMode === 'collection') {
       setExpandedAlbumIds(new Set());
       setShowTrackFormatDropdown(false);
@@ -2667,161 +3241,121 @@ function CollectionBrowserPage() {
                   )}
                 </div>
                 
-                <div className="relative">
+                <div className="relative flex overflow-hidden rounded border border-[#555]">
                   <button
                     onClick={() => {
                       setShowSortFavoritesDropdown(false);
                       setShowColumnFavoritesDropdown(false);
-                      setShowSortDropdown(!showSortDropdown);
+                      setShowSortSelector(true);
                     }}
-                    title="Change sort order"
-                    className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1"
+                    title="Change Sorting"
+                    className="bg-[#3a3a3a] px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444] border-none"
                   >
                     <span>↕️</span>
-                    <span className="text-[9px]">▼</span>
                   </button>
-                  
-                  {showSortDropdown && (
+                  <button
+                    onClick={() => {
+                      setShowColumnFavoritesDropdown(false);
+                      setShowSortFavoritesDropdown(!showSortFavoritesDropdown);
+                    }}
+                    title="Sorting Favorites"
+                    className="bg-[#3a3a3a] px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444] border-none border-l border-l-[#555]"
+                  >
+                    <span className="text-[11px]">▼</span>
+                  </button>
+
+                  {showSortFavoritesDropdown && (
                     <>
-                      <div onClick={() => setShowSortDropdown(false)} className="fixed inset-0 z-[99]" />
-                      <div className="absolute top-full left-0 mt-1 bg-white border border-[#ddd] rounded shadow-lg z-[100] min-w-[240px] max-h-[400px] overflow-y-auto">
-                        {viewMode === 'collection'
-                          ? Object.entries(sortOptionsByCategory).map(([category, options]) => (
-                              <div key={category}>
-                                <div className="px-3 py-2 text-[11px] font-semibold text-[#999] uppercase tracking-wider bg-[#f8f8f8] border-b border-[#e8e8e8]">{category}</div>
-                                {options.map(opt => (
-                                  <button key={opt.value} onClick={() => handleSortChange(opt.value)} className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${sortBy === opt.value ? 'bg-[#e3f2fd]' : ''}`}>
-                                    <span>{opt.label}</span>
-                                    {sortBy === opt.value && <span className="text-[#2196F3]">✓</span>}
-                                  </button>
-                                ))}
-                              </div>
-                            ))
-                          : Object.entries(trackSortOptionsByCategory).map(([category, options]) => (
-                              <div key={category}>
-                                <div className="px-3 py-2 text-[11px] font-semibold text-[#999] uppercase tracking-wider bg-[#f8f8f8] border-b border-[#e8e8e8]">{category}</div>
-                                {options.map(opt => (
-                                  <button key={opt.value} onClick={() => handleTrackSortChange(opt.value)} className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${trackSortBy === opt.value ? 'bg-[#e3f2fd]' : ''}`}>
-                                    <span>{opt.label}</span>
-                                    {trackSortBy === opt.value && <span className="text-[#2196F3]">✓</span>}
-                                  </button>
-                                ))}
-                              </div>
-                            ))}
+                      <div onClick={() => setShowSortFavoritesDropdown(false)} className="fixed inset-0 z-[99]" />
+                      <div className="absolute top-full left-0 mt-1 bg-white border border-[#ddd] rounded shadow-lg z-[100] min-w-[260px]">
+                        <button
+                          onClick={() => {
+                            setShowSortFavoritesDropdown(false);
+                            setShowManageSortFavoritesModal(true);
+                          }}
+                          className="w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] font-semibold hover:bg-[#f5f5f5]"
+                        >
+                          Manage Favorites
+                        </button>
+                        <div className="px-3 py-1 text-[10px] font-semibold text-[#999] uppercase tracking-wider border-t border-[#eee] bg-[#fafafa]">
+                          Favorites
+                        </div>
+                        {activeSortFavorites.map((favorite) => (
+                          <button
+                            key={favorite.id}
+                            onClick={() => handleApplySortFavorite(favorite.id)}
+                            className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${activeSelectedSortFavoriteId === favorite.id ? 'bg-[#e3f2fd]' : ''}`}
+                          >
+                            <span>{favorite.name}</span>
+                            {activeSelectedSortFavoriteId === favorite.id && <span className="text-[#2196F3]">✓</span>}
+                          </button>
+                        ))}
                       </div>
                     </>
                   )}
                 </div>
 
-                {viewMode === 'collection' && (
-                  <div className="relative">
-                    <button
-                      onClick={() => {
-                        setShowSortDropdown(false);
-                        setShowColumnFavoritesDropdown(false);
-                        setShowSortFavoritesDropdown(!showSortFavoritesDropdown);
-                      }}
-                      title="Sorting favorites"
-                      className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1"
-                    >
-                      <span>✓</span>
-                      <span className="text-[9px]">▼</span>
-                    </button>
-                    {showSortFavoritesDropdown && (
-                      <>
-                        <div onClick={() => setShowSortFavoritesDropdown(false)} className="fixed inset-0 z-[99]" />
-                        <div className="absolute top-full left-0 mt-1 bg-white border border-[#ddd] rounded shadow-lg z-[100] min-w-[260px]">
-                          <button
-                            onClick={() => {
-                              setShowSortFavoritesDropdown(false);
-                              setShowManageSortFavoritesModal(true);
-                            }}
-                            className="w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] font-semibold hover:bg-[#f5f5f5]"
-                          >
-                            Manage Favorites
-                          </button>
-                          <div className="px-3 py-1 text-[10px] font-semibold text-[#999] uppercase tracking-wider border-t border-[#eee] bg-[#fafafa]">
-                            Favorites
-                          </div>
-                          {sortFavorites.map((favorite) => (
-                            <button
-                              key={favorite.id}
-                              onClick={() => handleApplySortFavorite(favorite.id)}
-                              className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${selectedSortFavoriteId === favorite.id ? 'bg-[#e3f2fd]' : ''}`}
-                            >
-                              <span>{favorite.name}</span>
-                              {selectedSortFavoriteId === favorite.id && <span className="text-[#2196F3]">✓</span>}
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-                
-                {viewMode === 'collection' && (
-                  <div className="relative">
-                    <button
-                      onClick={() => {
-                        setShowSortDropdown(false);
-                        setShowSortFavoritesDropdown(false);
-                        setShowColumnFavoritesDropdown(!showColumnFavoritesDropdown);
-                      }}
-                      title="Column favorites"
-                      className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1"
-                    >
-                      <span>★</span>
-                      <span className="text-[9px]">▼</span>
-                    </button>
-                    {showColumnFavoritesDropdown && (
-                      <>
-                        <div onClick={() => setShowColumnFavoritesDropdown(false)} className="fixed inset-0 z-[99]" />
-                        <div className="absolute top-full left-0 mt-1 bg-white border border-[#ddd] rounded shadow-lg z-[100] min-w-[260px]">
-                          <button
-                            onClick={() => {
-                              setShowColumnFavoritesDropdown(false);
-                              setShowManageColumnFavoritesModal(true);
-                            }}
-                            className="w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] font-semibold hover:bg-[#f5f5f5]"
-                          >
-                            Manage Favorites
-                          </button>
-                          <div className="px-3 py-1 text-[10px] font-semibold text-[#999] uppercase tracking-wider border-t border-[#eee] bg-[#fafafa]">
-                            Favorites
-                          </div>
-                          {columnFavorites.map((favorite) => (
-                            <button
-                              key={favorite.id}
-                              onClick={() => handleApplyColumnFavorite(favorite.id)}
-                              className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${selectedColumnFavoriteId === favorite.id ? 'bg-[#e3f2fd]' : ''}`}
-                            >
-                              <span>{favorite.name}</span>
-                              {selectedColumnFavoriteId === favorite.id && <span className="text-[#2196F3]">✓</span>}
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
+                <div className="relative flex overflow-hidden rounded border border-[#555]">
+                  <button
+                    onClick={() => {
+                      setShowSortFavoritesDropdown(false);
+                      setShowColumnFavoritesDropdown(false);
+                      setColumnSelectorMode(viewMode);
+                      setShowColumnSelector(true);
+                    }}
+                    title="Change Columns"
+                    className="bg-[#3a3a3a] px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444] border-none"
+                  >
+                    <span>⊞</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSortFavoritesDropdown(false);
+                      setShowColumnFavoritesDropdown(!showColumnFavoritesDropdown);
+                    }}
+                    title="Column Favorites"
+                    className="bg-[#3a3a3a] px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444] border-none border-l border-l-[#555]"
+                  >
+                    <span className="text-[11px]">▼</span>
+                  </button>
 
-                <button
-                  onClick={() => {
-                    setShowSortDropdown(false);
-                    setShowSortFavoritesDropdown(false);
-                    setShowColumnFavoritesDropdown(false);
-                    setColumnSelectorMode(viewMode);
-                    setShowColumnSelector(true);
-                  }}
-                  title="Select visible columns"
-                  className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1"
-                >
-                  <span>⊞</span>
-                  <span className="text-[9px]">▼</span>
-                </button>
+                  {showColumnFavoritesDropdown && (
+                    <>
+                      <div onClick={() => setShowColumnFavoritesDropdown(false)} className="fixed inset-0 z-[99]" />
+                      <div className="absolute top-full left-0 mt-1 bg-white border border-[#ddd] rounded shadow-lg z-[100] min-w-[260px]">
+                        <button
+                          onClick={() => {
+                            setShowColumnFavoritesDropdown(false);
+                            setShowManageColumnFavoritesModal(true);
+                          }}
+                          className="w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] font-semibold hover:bg-[#f5f5f5]"
+                        >
+                          Manage Favorites
+                        </button>
+                        <div className="px-3 py-1 text-[10px] font-semibold text-[#999] uppercase tracking-wider border-t border-[#eee] bg-[#fafafa]">
+                          Favorites
+                        </div>
+                        {activeColumnFavorites.map((favorite) => (
+                          <button
+                            key={favorite.id}
+                            onClick={() => handleApplyColumnFavorite(favorite.id)}
+                            className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${activeSelectedColumnFavoriteId === favorite.id ? 'bg-[#e3f2fd]' : ''}`}
+                          >
+                            <span>{favorite.name}</span>
+                            {activeSelectedColumnFavoriteId === favorite.id && <span className="text-[#2196F3]">✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
               <div className="text-xs text-[#ddd] font-semibold">
-                {loading ? 'Loading...' : viewMode === 'collection' ? `${filteredAndSortedAlbums.length} albums` : `${filteredTrackRows.length} tracks`}
+                {loading
+                  ? 'Loading...'
+                  : viewMode === 'collection'
+                    ? `${filteredAndSortedAlbums.length} albums`
+                    : `${filteredTrackRows.length} tracks${tracksHydrating ? ' (loading track data...)' : ''}`}
               </div>
               {viewMode === 'album-track' && groupedTrackRows.length > 0 && (
                 <div className="flex items-center gap-1.5">
@@ -2866,6 +3400,8 @@ function CollectionBrowserPage() {
             <div className="flex-1 overflow-hidden bg-white min-h-0">
               {loading ? (
                 <div className="p-10 text-center text-[#666]">Loading albums...</div>
+              ) : viewMode !== 'collection' && !tracksHydrated ? (
+                <div className="p-10 text-center text-[#666]">Loading track data...</div>
               ) : (
                 viewMode === 'collection' ? (
                   <CollectionTable albums={filteredAndSortedAlbums} visibleColumns={collectionVisibleColumns} lockedColumns={lockedColumns} onAlbumClick={handleAlbumClick} selectedAlbums={selectedAlbumsAsStrings} onSelectionChange={handleSelectionChange} sortState={tableSortState} onSortChange={handleTableSortChange} onEditAlbum={handleEditAlbum} />
@@ -3063,47 +3599,113 @@ function CollectionBrowserPage() {
           selectedColumnsTitle={activeColumnSelectorConfig.selectedColumnsTitle}
         />
       )}
+      <SortSelectorModal
+        isOpen={showSortSelector}
+        onClose={() => setShowSortSelector(false)}
+        favoriteName={activeSortFavoriteName}
+        fields={activeSortFields}
+        sortFields={activeSortFieldGroups}
+        onSave={handleSaveSortFields}
+      />
       <ManageColumnFavoritesModal
         isOpen={showManageColumnFavoritesModal}
         onClose={() => setShowManageColumnFavoritesModal(false)}
-        favorites={columnFavorites}
+        favorites={activeColumnFavorites}
         onSave={(favorites) => {
-          setColumnFavorites(favorites);
-          if (!favorites.some((item) => item.id === selectedColumnFavoriteId)) {
-            setSelectedColumnFavoriteId(favorites[0]?.id ?? '');
+          if (viewMode === 'collection') {
+            setCollectionColumnFavorites(favorites);
+            if (!favorites.some((item) => item.id === selectedCollectionColumnFavoriteId)) {
+              setSelectedCollectionColumnFavoriteId(favorites[0]?.id ?? '');
+            }
+          } else if (viewMode === 'album-track') {
+            setAlbumTrackColumnFavorites(favorites);
+            if (!favorites.some((item) => item.id === selectedAlbumTrackColumnFavoriteId)) {
+              setSelectedAlbumTrackColumnFavoriteId(favorites[0]?.id ?? '');
+            }
+          } else {
+            setPlaylistColumnFavorites(favorites);
+            if (!favorites.some((item) => item.id === selectedPlaylistColumnFavoriteId)) {
+              setSelectedPlaylistColumnFavoriteId(favorites[0]?.id ?? '');
+            }
           }
           setShowManageColumnFavoritesModal(false);
         }}
-        selectedId={selectedColumnFavoriteId}
+        selectedId={activeSelectedColumnFavoriteId}
         onSelect={(id) => {
-          setSelectedColumnFavoriteId(id);
-          const favorite = columnFavorites.find((item) => item.id === id) ?? null;
-          const mapped = mapFavoriteColumnsToCollectionColumns(favorite);
-          if (mapped.length > 0) {
-            handleCollectionColumnsChange([...new Set([...COLLECTION_CONTROL_COLUMNS, ...mapped])]);
+          if (viewMode === 'collection') {
+            setSelectedCollectionColumnFavoriteId(id);
+            const favorite = collectionColumnFavorites.find((item) => item.id === id) ?? null;
+            const mapped = mapFavoriteColumnsToCollectionColumns(favorite);
+            if (mapped.length > 0) {
+              handleCollectionColumnsChange([...new Set([...COLLECTION_CONTROL_COLUMNS, ...mapped])]);
+            }
+          } else if (viewMode === 'album-track') {
+            setSelectedAlbumTrackColumnFavoriteId(id);
+            const favorite = albumTrackColumnFavorites.find((item) => item.id === id) ?? null;
+            const mapped = mapFavoriteColumnsToTrackColumns(favorite);
+            if (mapped.length > 0) {
+              handleAlbumTrackColumnsChange([...new Set(['checkbox' as TrackViewColumnId, ...mapped])]);
+            }
+          } else {
+            setSelectedPlaylistColumnFavoriteId(id);
+            const favorite = playlistColumnFavorites.find((item) => item.id === id) ?? null;
+            const mapped = mapFavoriteColumnsToTrackColumns(favorite);
+            if (mapped.length > 0) {
+              handlePlaylistColumnsChange([...new Set(['checkbox' as TrackViewColumnId, ...mapped])]);
+            }
           }
         }}
+        title={activeColumnFavoriteModalTitle}
+        columnFields={activeColumnFieldGroups}
       />
       <ManageSortFavoritesModal
         isOpen={showManageSortFavoritesModal}
         onClose={() => setShowManageSortFavoritesModal(false)}
-        favorites={sortFavorites}
+        favorites={activeSortFavorites}
         onSave={(favorites) => {
-          setSortFavorites(favorites);
-          if (!favorites.some((item) => item.id === selectedSortFavoriteId)) {
-            setSelectedSortFavoriteId(favorites[0]?.id ?? '');
+          if (viewMode === 'collection') {
+            setCollectionSortFavorites(favorites);
+            if (!favorites.some((item) => item.id === selectedCollectionSortFavoriteId)) {
+              setSelectedCollectionSortFavoriteId(favorites[0]?.id ?? '');
+            }
+          } else if (viewMode === 'album-track') {
+            setAlbumTrackSortFavorites(favorites);
+            if (!favorites.some((item) => item.id === selectedAlbumTrackSortFavoriteId)) {
+              setSelectedAlbumTrackSortFavoriteId(favorites[0]?.id ?? '');
+            }
+          } else {
+            setPlaylistSortFavorites(favorites);
+            if (!favorites.some((item) => item.id === selectedPlaylistSortFavoriteId)) {
+              setSelectedPlaylistSortFavoriteId(favorites[0]?.id ?? '');
+            }
           }
           setShowManageSortFavoritesModal(false);
         }}
-        selectedId={selectedSortFavoriteId}
+        selectedId={activeSelectedSortFavoriteId}
         onSelect={(id) => {
-          setSelectedSortFavoriteId(id);
-          const favorite = sortFavorites.find((item) => item.id === id) ?? null;
-          if (favorite && favorite.fields.length > 0) {
-            setActiveCollectionSortFields(favorite.fields);
-            setTableSortState({ column: null, direction: null });
+          if (viewMode === 'collection') {
+            setSelectedCollectionSortFavoriteId(id);
+            const favorite = collectionSortFavorites.find((item) => item.id === id) ?? null;
+            if (favorite && favorite.fields.length > 0) {
+              setActiveCollectionSortFields(favorite.fields);
+              setTableSortState({ column: null, direction: null });
+            }
+          } else if (viewMode === 'album-track') {
+            setSelectedAlbumTrackSortFavoriteId(id);
+            const favorite = albumTrackSortFavorites.find((item) => item.id === id) ?? null;
+            if (favorite && favorite.fields.length > 0) {
+              setActiveAlbumTrackSortFields(favorite.fields);
+            }
+          } else {
+            setSelectedPlaylistSortFavoriteId(id);
+            const favorite = playlistSortFavorites.find((item) => item.id === id) ?? null;
+            if (favorite && favorite.fields.length > 0) {
+              setActivePlaylistSortFields(favorite.fields);
+            }
           }
         }}
+        title={activeSortFavoriteModalTitle}
+        sortFields={activeSortFieldGroups}
       />
       {editingAlbumId && <EditAlbumModal albumId={editingAlbumId} onClose={() => setEditingAlbumId(null)} onRefresh={loadAlbums} onNavigate={(newAlbumId) => setEditingAlbumId(newAlbumId)} allAlbumIds={filteredAndSortedAlbums.map(a => a.id)} />}
       {showNewCrateModal && <NewCrateModal isOpen={showNewCrateModal} onClose={() => { setShowNewCrateModal(false); setEditingCrate(null); if (returnToAddToCrate) { setReturnToAddToCrate(false); setNewlyCreatedCrateId(null); }}} onCrateCreated={async (newCrateId) => { await loadCrates(); setEditingCrate(null); if (returnToAddToCrate) { setNewlyCreatedCrateId(newCrateId); setShowNewCrateModal(false); setShowAddToCrateModal(true); } else { setShowNewCrateModal(false); }}} editingCrate={editingCrate} />}

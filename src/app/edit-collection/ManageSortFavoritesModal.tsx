@@ -1,7 +1,7 @@
 // src/app/edit-collection/ManageSortFavoritesModal.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 export interface SortField {
   field: string;
@@ -21,6 +21,8 @@ interface ManageSortFavoritesModalProps {
   onSave: (favorites: SortFavorite[]) => void;
   selectedId?: string;
   onSelect?: (id: string) => void;
+  title?: string;
+  sortFields?: Record<string, string[]>;
 }
 
 const SORT_FIELDS = {
@@ -39,7 +41,9 @@ export function ManageSortFavoritesModal({
   favorites,
   onSave,
   selectedId,
-  onSelect
+  onSelect,
+  title = 'Manage Sorting Favorites',
+  sortFields,
 }: ManageSortFavoritesModalProps) {
   const [localFavorites, setLocalFavorites] = useState<SortFavorite[]>(favorites);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -48,6 +52,19 @@ export function ManageSortFavoritesModal({
   const [selectedFavoriteForEdit, setSelectedFavoriteForEdit] = useState<SortFavorite | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Main']));
   const [searchQuery, setSearchQuery] = useState('');
+  const effectiveSortFields = useMemo(() => sortFields ?? SORT_FIELDS, [sortFields]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setLocalFavorites(favorites);
+    setEditingId(null);
+    setEditingName('');
+    setShowSortSelector(false);
+    setSelectedFavoriteForEdit(null);
+    const firstGroup = Object.keys(effectiveSortFields)[0] ?? 'Main';
+    setExpandedGroups(new Set([firstGroup]));
+    setSearchQuery('');
+  }, [effectiveSortFields, favorites, isOpen]);
 
   if (!isOpen) return null;
 
@@ -81,11 +98,12 @@ export function ManageSortFavoritesModal({
   };
 
   const handleAddNew = () => {
+    const firstField = Object.values(effectiveSortFields)[0]?.[0] ?? 'Artist';
     const newId = `favorite-${Date.now()}`;
     const newFavorite: SortFavorite = {
       id: newId,
       name: 'New Sort Favorite',
-      fields: [{ field: 'Artist', direction: 'asc' }]
+      fields: [{ field: firstField, direction: 'asc' }]
     };
     setLocalFavorites([...localFavorites, newFavorite]);
     setSelectedFavoriteForEdit(newFavorite);
@@ -167,7 +185,7 @@ export function ManageSortFavoritesModal({
         {/* Header */}
         <div className="bg-[#FF8C42] text-white px-4 py-3 rounded-t-md flex justify-between items-center shrink-0">
           <h2 className="m-0 text-base font-semibold">
-            Manage Sorting Favorites
+            {title}
           </h2>
           <button
             onClick={onClose}
@@ -272,7 +290,7 @@ export function ManageSortFavoritesModal({
               <div className="flex-1 flex gap-3 p-3 overflow-hidden">
                 {/* Available Fields */}
                 <div className="flex-1 overflow-y-auto pr-3 border-r border-gray-200">
-                  {Object.entries(SORT_FIELDS).map(([groupName, fields]) => {
+                  {Object.entries(effectiveSortFields).map(([groupName, fields]) => {
                     const isExpanded = expandedGroups.has(groupName);
                     const filteredFields = searchQuery
                       ? fields.filter(f => f.toLowerCase().includes(searchQuery.toLowerCase()))

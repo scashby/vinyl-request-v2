@@ -1,7 +1,7 @@
 // src/app/edit-collection/ManageColumnFavoritesModal.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 export interface ColumnFavorite {
   id: string;
@@ -16,6 +16,8 @@ interface ManageColumnFavoritesModalProps {
   onSave: (favorites: ColumnFavorite[]) => void;
   selectedId: string;
   onSelect: (id: string) => void;
+  title?: string;
+  columnFields?: Record<string, string[]>;
 }
 
 const COLUMN_FIELDS = {
@@ -34,7 +36,9 @@ export function ManageColumnFavoritesModal({
   favorites,
   onSave,
   selectedId,
-  onSelect
+  onSelect,
+  title = 'Manage Column Favorites',
+  columnFields,
 }: ManageColumnFavoritesModalProps) {
   const [localFavorites, setLocalFavorites] = useState<ColumnFavorite[]>(favorites);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -42,6 +46,18 @@ export function ManageColumnFavoritesModal({
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   const [selectedFavoriteForEdit, setSelectedFavoriteForEdit] = useState<ColumnFavorite | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Main']));
+  const effectiveColumnFields = useMemo(() => columnFields ?? COLUMN_FIELDS, [columnFields]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setLocalFavorites(favorites);
+    setEditingId(null);
+    setEditingName('');
+    setShowColumnSelector(false);
+    setSelectedFavoriteForEdit(null);
+    const firstGroup = Object.keys(effectiveColumnFields)[0] ?? 'Main';
+    setExpandedGroups(new Set([firstGroup]));
+  }, [effectiveColumnFields, favorites, isOpen]);
 
   if (!isOpen) return null;
 
@@ -75,11 +91,12 @@ export function ManageColumnFavoritesModal({
   };
 
   const handleAddNew = () => {
+    const firstGroupFields = Object.values(effectiveColumnFields)[0] ?? [];
     const newId = `favorite-${Date.now()}`;
     const newFavorite: ColumnFavorite = {
       id: newId,
       name: 'New Favorite',
-      columns: ['Artist', 'Title']
+      columns: firstGroupFields.slice(0, 2)
     };
     setLocalFavorites([...localFavorites, newFavorite]);
     setSelectedFavoriteForEdit(newFavorite);
@@ -124,7 +141,7 @@ export function ManageColumnFavoritesModal({
         {/* Header */}
         <div className="bg-[#FF8C42] text-white px-4 py-3 rounded-t-md flex justify-between items-center shrink-0">
           <h2 className="m-0 text-base font-semibold">
-            Manage Column Favorites
+            {title}
           </h2>
           <button
             onClick={onClose}
@@ -227,7 +244,7 @@ export function ManageColumnFavoritesModal({
               </div>
 
               <div className="flex-1 overflow-y-auto p-2">
-                {Object.entries(COLUMN_FIELDS).map(([groupName, fields]) => {
+                {Object.entries(effectiveColumnFields).map(([groupName, fields]) => {
                   const isExpanded = expandedGroups.has(groupName);
                   return (
                     <div key={groupName} className="mb-1">
