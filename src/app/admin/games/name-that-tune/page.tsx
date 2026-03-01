@@ -243,7 +243,7 @@ export default function NameThatTuneSetupPage() {
               <p className="mt-1 text-xs text-stone-400">Detected teams: {teamNames.length}</p>
             </label>
 
-            <label className="text-sm">Snippets (one per line: Artist - Title | Optional source) <InlineFieldHelp label="Snippets (one per line: Artist - Title | Optional source)" />
+            <label className="text-sm">Playlist Pull Snippets (one per line: Artist - Title | Optional source) <InlineFieldHelp label="Playlist Pull Snippets" />
               <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={snippetListText} onChange={(e) => setSnippetListText(e.target.value)} />
               <p className={`mt-1 text-xs ${roundCountWarning ? "text-amber-300" : "text-stone-400"}`}>
                 Valid snippets: {snippets.length}. Minimum required for current rounds: {roundCount}.

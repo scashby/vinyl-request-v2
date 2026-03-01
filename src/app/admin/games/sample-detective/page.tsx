@@ -254,7 +254,7 @@ export default function SampleDetectiveSetupPage() {
             <label className="text-sm">Team Names (one per line) <InlineFieldHelp label="Team Names (one per line)" />
               <textarea className="mt-1 h-48 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={teamNamesText} onChange={(e) => setTeamNamesText(e.target.value)} />
             </label>
-            <label className="text-sm">Call List (sampled artist - sampled title | source artist - source title | year | sample timestamp | source label) <InlineFieldHelp label="Call List (sampled artist - sampled title | source artist - source title | year | sample timestamp | source label)" />
+            <label className="text-sm">Playlist Pull Call List (sampled artist - sampled title | source artist - source title | year | sample timestamp | source label) <InlineFieldHelp label="Playlist Pull Call List" />
               <textarea className="mt-1 h-48 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 font-mono text-xs" value={callListText} onChange={(e) => setCallListText(e.target.value)} />
             </label>
           </div>

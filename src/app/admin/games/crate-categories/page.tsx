@@ -292,7 +292,7 @@ export default function CrateCategoriesSetupPage() {
             </label>
           </div>
 
-          <label className="mt-4 block text-sm">Calls (`round | track_slot | artist - title | year | source_label | crate_tag`) <InlineFieldHelp label="Calls (`round | track_slot | artist - title | year | source_label | crate_tag`)" />
+          <label className="mt-4 block text-sm">Playlist Pull Calls (`round | track_slot | artist - title | year | source_label | crate_tag`) <InlineFieldHelp label="Playlist Pull Calls" />
             <textarea className="mt-1 h-48 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 font-mono text-xs" value={callListText} onChange={(e) => setCallListText(e.target.value)} />
           </label>
 

@@ -278,7 +278,7 @@ export default function GenreImposterSetupPage() {
               <p className="mt-1 text-xs text-stone-400">Detected teams: {teamNames.length}</p>
             </label>
 
-            <label className="text-sm">Rounds (one per line) <InlineFieldHelp label="Rounds (one per line)" />
+            <label className="text-sm">Playlist Pull Rounds (one per line) <InlineFieldHelp label="Playlist Pull Rounds" />
               <textarea className="mt-1 h-40 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={roundDeckText} onChange={(e) => setRoundDeckText(e.target.value)} />
               <p className={`mt-1 text-xs ${roundCountWarning ? "text-amber-300" : "text-stone-400"}`}>
                 Valid rounds: {rounds.length}. Minimum required for current rounds: {roundCount}. Format: Category | A~Song~Source | B~Song~Source | C~Song~Source | ImposterIndex(1-3) | Reason key.

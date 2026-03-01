@@ -268,7 +268,7 @@ export default function CoverArtClueChaseSetupPage() {
               <textarea className="mt-1 h-32 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={teamNamesText} onChange={(e) => setTeamNamesText(e.target.value)} />
             </label>
 
-            <label className="text-sm">Calls (Artist - Title | Year | Reveal1 URL | Reveal2 URL | Reveal3 URL | Audio clue optional | Source optional) <InlineFieldHelp label="Calls (Artist - Title | Year | Reveal1 URL | Reveal2 URL | Reveal3 URL | Audio clue optional | Source optional)" />
+            <label className="text-sm">Playlist Pull Calls (Artist - Title | Year | Reveal1 URL | Reveal2 URL | Reveal3 URL | Audio clue optional | Source optional) <InlineFieldHelp label="Playlist Pull Calls" />
               <textarea className="mt-1 h-32 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={callListText} onChange={(e) => setCallListText(e.target.value)} />
             </label>
           </div>

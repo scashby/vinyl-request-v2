@@ -290,7 +290,7 @@ export default function WrongLyricChallengeSetupPage() {
               <p className="mt-1 text-xs text-stone-400">Detected teams: {teamNames.length}</p>
             </label>
 
-            <label className="text-sm">Calls (Artist - Title | correct lyric | decoy1;;decoy2[;;decoy3][;;slot=1..4] | source | dj cue hint) <InlineFieldHelp label="Calls (Artist - Title | correct lyric | decoy1;;decoy2[;;decoy3][;;slot=1..4] | source | dj cue hint)" />
+            <label className="text-sm">Playlist Pull Calls (Artist - Title | correct lyric | decoy1;;decoy2[;;decoy3][;;slot=1..4] | source | dj cue hint) <InlineFieldHelp label="Playlist Pull Calls" />
               <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={callListText} onChange={(e) => setCallListText(e.target.value)} />
               <p className={`mt-1 text-xs ${roundCountWarning ? "text-red-300" : "text-stone-400"}`}>
                 Valid calls for current option count: {usableCalls.length}. Minimum required for rounds: {roundCount}.

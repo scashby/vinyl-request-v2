@@ -267,7 +267,7 @@ export default function BracketBattleSetupPage() {
               <p className="mt-1 text-xs text-stone-400">Detected teams: {teamNames.length}</p>
             </label>
 
-            <label className="text-sm">Bracket entries <InlineFieldHelp label="Bracket entries" /> (one per line: <code>seed. Artist - Title | optional source</code>)
+            <label className="text-sm">Playlist Pull Bracket Entries <InlineFieldHelp label="Playlist Pull Bracket Entries" /> (one per line: <code>seed. Artist - Title | optional source</code>)
               <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={entryListText} onChange={(e) => setEntryListText(e.target.value)} />
               <p className={`mt-1 text-xs ${entryWarning ? "text-amber-300" : "text-stone-400"}`}>
                 Valid entries: {entries.length}. Minimum required for current bracket size: {bracketSize}.

@@ -252,7 +252,7 @@ export default function BackToBackConnectionSetupPage() {
               <p className="mt-1 text-xs text-stone-400">Detected teams: {teamNames.length}</p>
             </label>
 
-            <label className="text-sm">Pairs (Track A | Track B | Connection | Optional detail) <InlineFieldHelp label="Pairs (Track A | Track B | Connection | Optional detail)" />
+            <label className="text-sm">Playlist Pull Pairs (Track A | Track B | Connection | Optional detail) <InlineFieldHelp label="Playlist Pull Pairs" />
               <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={pairListText} onChange={(e) => setPairListText(e.target.value)} />
               <p className={`mt-1 text-xs ${roundCountWarning ? "text-amber-300" : "text-stone-400"}`}>
                 Valid pairs: {calls.length}. Minimum required for current rounds: {roundCount}.

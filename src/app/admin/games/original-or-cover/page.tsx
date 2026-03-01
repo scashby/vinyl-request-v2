@@ -257,8 +257,12 @@ export default function OriginalOrCoverSetupPage() {
           </div>
 
           <div className="rounded-3xl border border-yellow-900/40 bg-black/45 p-6">
-            <h2 className="text-xl font-black uppercase text-yellow-100">Pair Deck</h2>
-            <p className="mt-2 text-xs text-stone-300">Format: <code>Spin Artist - Track | cover|original | Original Artist | Year | Source Label | Host Notes</code></p>
+            <h2 className="text-xl font-black uppercase text-yellow-100">Playlist Pull Pair Deck</h2>
+            <p className="mt-2 text-xs text-stone-300">
+              Format: <code>Spin Artist - Track | cover|original | Original Artist | Year | Source Label | Host Notes</code>. Build this from your playlist/crate pull list.
+              {" "}
+              <InlineFieldHelp label="Playlist Pull Pair Deck" />
+            </p>
             <textarea className="mt-3 min-h-[220px] w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs" value={callListText} onChange={(e) => setCallListText(e.target.value)} />
             <p className="mt-2 text-xs text-stone-400">Parsed calls: {calls.length}</p>
             {roundCountWarning ? <p className="mt-2 text-xs text-yellow-300">Need at least {roundCount} parsed calls for selected round count.</p> : null}

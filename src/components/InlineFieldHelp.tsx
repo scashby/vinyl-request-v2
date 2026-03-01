@@ -43,6 +43,96 @@ function resolveHelp(label: string): HelpContent {
         "Avoid duplicate-heavy lists unless the format expects repeats.",
       ]
     ),
+    "playlist pull calls": content(
+      "Playlist Pull Calls",
+      "This is your structured pull sheet built from a playlist/crate source, not manual song ideation from scratch.",
+      [
+        "Start with a playlist and paste only the rows you plan to play tonight.",
+        "Keep column separators exact so parser, scoring, and host cue notes stay aligned.",
+        "Order rows in play sequence so cue transitions and crate movement are predictable.",
+      ]
+    ),
+    "playlist pull snippets": content(
+      "Playlist Pull Snippets",
+      "Populate snippets from your playlist pull plan, then trim to round count + backup reserve.",
+      [
+        "Use one line per playable snippet in probable play order.",
+        "Keep backup snippets at the end for ties and recovery.",
+        "Pre-cue each snippet in the same order to protect pacing.",
+      ]
+    ),
+    "playlist pull needle drops": content(
+      "Playlist Pull Needle Drops",
+      "Needle drops should come from your pull list, with only playable records included.",
+      [
+        "Exclude tracks that cannot be cued quickly on vinyl.",
+        "Keep difficulty mixed so early rounds don’t stall.",
+        "Annotate source/notes when multiple pressings may differ.",
+      ]
+    ),
+    "playlist pull lyric gaps": content(
+      "Playlist Pull Lyric Gaps",
+      "Use tracks from your playlist pull and attach the exact cue lyric + accepted answers.",
+      [
+        "Only include songs with clean, audible lyric entry points.",
+        "Keep accepted answers normalized before session create.",
+        "Align cue notes with your physical record pull order.",
+      ]
+    ),
+    "playlist pull pairs": content(
+      "Playlist Pull Pairs",
+      "Pair entries should be selected from your playlist pull so both tracks are physically available.",
+      [
+        "Sequence pairs in the exact order you plan to spin them.",
+        "Keep the connection key concise and judgeable.",
+        "Add one reserve pair for tie-break or damaged media.",
+      ]
+    ),
+    "playlist pull + clue cards": content(
+      "Playlist Pull + Clue Cards",
+      "Build clue-card rows from your playlist pull, then attach staged clue metadata.",
+      [
+        "Each line is still a playable pull item first, clue metadata second.",
+        "Keep clue stages increasingly easier for consistent scoring.",
+        "Queue fallback audio only for rows where visual clues might fail.",
+      ]
+    ),
+    "playlist pull bracket entries": content(
+      "Playlist Pull Bracket Entries",
+      "Bracket seeds should be sourced from a prepared playlist pull list.",
+      [
+        "Seed by desired matchup flow, not input order accidents.",
+        "Confirm every seeded entry is physically playable tonight.",
+        "Hold reserve entries in case a seed is unplayable on cue.",
+      ]
+    ),
+    "playlist pull rounds": content(
+      "Playlist Pull Rounds",
+      "Round rows should be composed from your playlist pull in host-ready order.",
+      [
+        "Each round should reference tracks you can cue quickly.",
+        "Place high-risk tracks later to preserve early momentum.",
+        "Keep one reserve round outside the active round count.",
+      ]
+    ),
+    "playlist pull pair deck": content(
+      "Playlist Pull Pair Deck",
+      "This deck is a pull-plan output: each row is a playable original/cover pair with scoring fields.",
+      [
+        "Build pairs from records you have physically staged.",
+        "Keep answer direction (original/cover) explicit and consistent.",
+        "Add host notes only when they help cue speed or adjudication.",
+      ]
+    ),
+    "playlist pull call list": content(
+      "Playlist Pull Call List",
+      "Use your playlist pull as the source of truth, then enrich rows with sample metadata.",
+      [
+        "Verify both sampled and source tracks are in your playable pull.",
+        "Keep timestamp/label metadata short but specific.",
+        "Order rows to minimize crate hopping between rounds.",
+      ]
+    ),
     "session title": content(
       "Session Naming",
       "Choose a title hosts can identify instantly during live control.",
@@ -409,6 +499,7 @@ function resolveHelp(label: string): HelpContent {
   }
 
   if (
+    normalized.includes("playlist pull") ||
     normalized.includes("clue cards") ||
     normalized.includes("call list") ||
     normalized.includes("calls (") ||
@@ -421,9 +512,10 @@ function resolveHelp(label: string): HelpContent {
   ) {
     return content(
       "Deck Format",
-      `Use the exact line format for "${label}" so parser and scoring keys stay aligned.`,
+      `Use the exact line format for "${label}" as a playlist/crate pull plan so parser, cues, and scoring stay aligned.`,
       [
-        "Keep one playable item per line with required separators.",
+        "Keep one playable pull item per line with required separators.",
+        "Treat this as your run sheet from playlist to crate, not freeform entry.",
         "Validate parsed count before creating the session.",
         "Stage a few reserve rows for ties or bad media.",
       ]

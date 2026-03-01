@@ -271,7 +271,7 @@ export default function ArtistAliasSetupPage() {
               <textarea className="mt-1 h-32 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={teamNamesText} onChange={(e) => setTeamNamesText(e.target.value)} />
             </label>
 
-            <label className="text-sm">Clue cards (`Artist | Era clue | Collaborator clue | Label/Region clue | aliases comma list optional | audio clue optional | source optional`) <InlineFieldHelp label="Clue cards (`Artist | Era clue | Collaborator clue | Label/Region clue | aliases comma list optional | audio clue optional | source optional`)" />
+            <label className="text-sm">Playlist Pull + Clue Cards (`Artist | Era clue | Collaborator clue | Label/Region clue | aliases comma list optional | audio clue optional | source optional`) <InlineFieldHelp label="Playlist Pull + Clue Cards" />
               <textarea className="mt-1 h-32 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={callListText} onChange={(e) => setCallListText(e.target.value)} />
             </label>
           </div>

@@ -265,7 +265,7 @@ export default function LyricGapRelaySetupPage() {
               <p className="mt-1 text-xs text-stone-400">Detected teams: {teamNames.length}</p>
             </label>
 
-            <label className="text-sm">Lyric gaps (Artist - Title | cue lyric {'>>>'} accepted answers separated by ;; | source) <InlineFieldHelp label="Lyric gaps call list format" />
+            <label className="text-sm">Playlist Pull Lyric Gaps (Artist - Title | cue lyric {'>>>'} accepted answers separated by ;; | source) <InlineFieldHelp label="Playlist Pull Lyric Gaps" />
               <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={callListText} onChange={(e) => setCallListText(e.target.value)} />
               <p className={`mt-1 text-xs ${roundCountWarning ? "text-amber-300" : "text-stone-400"}`}>
                 Valid lyric gaps: {calls.length}. Minimum required for current rounds: {roundCount}.
