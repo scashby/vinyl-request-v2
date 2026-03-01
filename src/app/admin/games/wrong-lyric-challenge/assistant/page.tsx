@@ -43,6 +43,16 @@ type LeaderboardRow = {
 
 type ScoreDraft = Record<number, { lyric_correct: boolean; song_bonus_awarded: boolean; awarded_points: string; guessed_option: string; notes: string }>;
 
+function createDefaultScoreDraftEntry(): ScoreDraft[number] {
+  return {
+    lyric_correct: false,
+    song_bonus_awarded: false,
+    awarded_points: "",
+    guessed_option: "",
+    notes: "",
+  };
+}
+
 function defaultPoints(session: Session | null, lyricCorrect: boolean, bonusAwarded: boolean): number {
   if (!session) return 0;
   const base = lyricCorrect ? session.lyric_points : 0;
@@ -97,13 +107,7 @@ export default function WrongLyricChallengeAssistantPage() {
   useEffect(() => {
     const draft: ScoreDraft = {};
     for (const row of leaderboard) {
-      draft[row.team_id] = {
-        lyric_correct: false,
-        song_bonus_awarded: false,
-        awarded_points: "",
-        guessed_option: "",
-        notes: "",
-      };
+      draft[row.team_id] = createDefaultScoreDraftEntry();
     }
     setScoreDraft(draft);
   }, [currentCall?.id, leaderboard]);
@@ -114,13 +118,7 @@ export default function WrongLyricChallengeAssistantPage() {
 
     try {
       const awards = leaderboard.map((team) => {
-        const draft = scoreDraft[team.team_id] ?? {
-          lyric_correct: false,
-          song_bonus_awarded: false,
-          awarded_points: "",
-          guessed_option: "",
-          notes: "",
-        };
+        const draft = scoreDraft[team.team_id] ?? createDefaultScoreDraftEntry();
 
         const parsedPoints = Number(draft.awarded_points);
         const parsedOption = Number(draft.guessed_option);
@@ -199,13 +197,7 @@ export default function WrongLyricChallengeAssistantPage() {
           <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-red-200">Assistant Score Entry</h2>
           <div className="mt-3 space-y-2 text-xs">
             {leaderboard.map((team) => {
-              const draft = scoreDraft[team.team_id] ?? {
-                lyric_correct: false,
-                song_bonus_awarded: false,
-                awarded_points: "",
-                guessed_option: "",
-                notes: "",
-              };
+              const draft = scoreDraft[team.team_id] ?? createDefaultScoreDraftEntry();
               const suggested = defaultPoints(session, draft.lyric_correct, draft.song_bonus_awarded);
 
               return (
@@ -219,16 +211,20 @@ export default function WrongLyricChallengeAssistantPage() {
                       <input
                         type="checkbox"
                         checked={draft.lyric_correct}
-                        onChange={(e) =>
-                          setScoreDraft((current) => ({
-                            ...current,
-                            [team.team_id]: {
-                              ...(current[team.team_id] ?? {}),
-                              lyric_correct: e.target.checked,
-                              song_bonus_awarded: e.target.checked ? (current[team.team_id]?.song_bonus_awarded ?? false) : false,
-                            },
-                          }))
-                        }
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setScoreDraft((current) => {
+                            const currentDraft = current[team.team_id] ?? createDefaultScoreDraftEntry();
+                            return {
+                              ...current,
+                              [team.team_id]: {
+                                ...currentDraft,
+                                lyric_correct: checked,
+                                song_bonus_awarded: checked ? currentDraft.song_bonus_awarded : false,
+                              },
+                            };
+                          });
+                        }}
                       />
                       Lyric
                     </label>
@@ -237,15 +233,19 @@ export default function WrongLyricChallengeAssistantPage() {
                         type="checkbox"
                         checked={draft.song_bonus_awarded}
                         disabled={!session?.song_bonus_enabled || !draft.lyric_correct}
-                        onChange={(e) =>
-                          setScoreDraft((current) => ({
-                            ...current,
-                            [team.team_id]: {
-                              ...(current[team.team_id] ?? {}),
-                              song_bonus_awarded: e.target.checked,
-                            },
-                          }))
-                        }
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setScoreDraft((current) => {
+                            const currentDraft = current[team.team_id] ?? createDefaultScoreDraftEntry();
+                            return {
+                              ...current,
+                              [team.team_id]: {
+                                ...currentDraft,
+                                song_bonus_awarded: checked,
+                              },
+                            };
+                          });
+                        }}
                       />
                       Bonus
                     </label>
@@ -253,15 +253,19 @@ export default function WrongLyricChallengeAssistantPage() {
                       className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
                       placeholder={`Auto ${suggested}`}
                       value={draft.awarded_points}
-                      onChange={(e) =>
-                        setScoreDraft((current) => ({
-                          ...current,
-                          [team.team_id]: {
-                            ...(current[team.team_id] ?? {}),
-                            awarded_points: e.target.value,
-                          },
-                        }))
-                      }
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setScoreDraft((current) => {
+                          const currentDraft = current[team.team_id] ?? createDefaultScoreDraftEntry();
+                          return {
+                            ...current,
+                            [team.team_id]: {
+                              ...currentDraft,
+                              awarded_points: value,
+                            },
+                          };
+                        });
+                      }}
                     />
                   </div>
 
@@ -269,15 +273,19 @@ export default function WrongLyricChallengeAssistantPage() {
                     <select
                       className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
                       value={draft.guessed_option}
-                      onChange={(e) =>
-                        setScoreDraft((current) => ({
-                          ...current,
-                          [team.team_id]: {
-                            ...(current[team.team_id] ?? {}),
-                            guessed_option: e.target.value,
-                          },
-                        }))
-                      }
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setScoreDraft((current) => {
+                          const currentDraft = current[team.team_id] ?? createDefaultScoreDraftEntry();
+                          return {
+                            ...current,
+                            [team.team_id]: {
+                              ...currentDraft,
+                              guessed_option: value,
+                            },
+                          };
+                        });
+                      }}
                     >
                       <option value="">Option</option>
                       {(session?.option_count ?? 3) >= 1 ? <option value="1">A</option> : null}
@@ -289,15 +297,19 @@ export default function WrongLyricChallengeAssistantPage() {
                       className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
                       placeholder="Dispute note (optional)"
                       value={draft.notes}
-                      onChange={(e) =>
-                        setScoreDraft((current) => ({
-                          ...current,
-                          [team.team_id]: {
-                            ...(current[team.team_id] ?? {}),
-                            notes: e.target.value,
-                          },
-                        }))
-                      }
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setScoreDraft((current) => {
+                          const currentDraft = current[team.team_id] ?? createDefaultScoreDraftEntry();
+                          return {
+                            ...current,
+                            [team.team_id]: {
+                              ...currentDraft,
+                              notes: value,
+                            },
+                          };
+                        });
+                      }}
                     />
                   </div>
                 </div>

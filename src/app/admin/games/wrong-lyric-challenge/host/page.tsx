@@ -60,6 +60,18 @@ type ScoreDraft = Record<
   }
 >;
 
+function createDefaultScoreDraftEntry(): ScoreDraft[number] {
+  return {
+    lyric_correct: false,
+    song_bonus_awarded: false,
+    awarded_points: "",
+    guessed_option: "",
+    guessed_artist: "",
+    guessed_title: "",
+    notes: "",
+  };
+}
+
 function getDefaultPoints(session: Session | null, lyricCorrect: boolean, bonusAwarded: boolean): number {
   if (!session) return 0;
   const base = lyricCorrect ? session.lyric_points : 0;
@@ -124,15 +136,7 @@ export default function WrongLyricChallengeHostPage() {
   useEffect(() => {
     const draft: ScoreDraft = {};
     for (const row of leaderboard) {
-      draft[row.team_id] = {
-        lyric_correct: false,
-        song_bonus_awarded: false,
-        awarded_points: "",
-        guessed_option: "",
-        guessed_artist: "",
-        guessed_title: "",
-        notes: "",
-      };
+      draft[row.team_id] = createDefaultScoreDraftEntry();
     }
     setScoreDraft(draft);
   }, [callForControls?.id, leaderboard]);
@@ -200,15 +204,7 @@ export default function WrongLyricChallengeHostPage() {
 
     try {
       const awards = leaderboard.map((team) => {
-        const draft = scoreDraft[team.team_id] ?? {
-          lyric_correct: false,
-          song_bonus_awarded: false,
-          awarded_points: "",
-          guessed_option: "",
-          guessed_artist: "",
-          guessed_title: "",
-          notes: "",
-        };
+        const draft = scoreDraft[team.team_id] ?? createDefaultScoreDraftEntry();
 
         const parsedPoints = Number(draft.awarded_points);
         const parsedOption = Number(draft.guessed_option);
@@ -374,15 +370,7 @@ export default function WrongLyricChallengeHostPage() {
               <p className="text-xs uppercase text-red-300">Score Entry</p>
               <div className="mt-2 space-y-2 text-xs">
                 {leaderboard.map((team) => {
-                  const draft = scoreDraft[team.team_id] ?? {
-                    lyric_correct: false,
-                    song_bonus_awarded: false,
-                    awarded_points: "",
-                    guessed_option: "",
-                    guessed_artist: "",
-                    guessed_title: "",
-                    notes: "",
-                  };
+                  const draft = scoreDraft[team.team_id] ?? createDefaultScoreDraftEntry();
 
                   const suggestedPoints = getDefaultPoints(session, draft.lyric_correct, draft.song_bonus_awarded);
 
@@ -401,7 +389,7 @@ export default function WrongLyricChallengeHostPage() {
                               setScoreDraft((current) => ({
                                 ...current,
                                 [team.team_id]: {
-                                  ...(current[team.team_id] ?? {}),
+                                  ...(current[team.team_id] ?? createDefaultScoreDraftEntry()),
                                   lyric_correct: e.target.checked,
                                   song_bonus_awarded: e.target.checked ? (current[team.team_id]?.song_bonus_awarded ?? false) : false,
                                 },
@@ -419,7 +407,7 @@ export default function WrongLyricChallengeHostPage() {
                               setScoreDraft((current) => ({
                                 ...current,
                                 [team.team_id]: {
-                                  ...(current[team.team_id] ?? {}),
+                                  ...(current[team.team_id] ?? createDefaultScoreDraftEntry()),
                                   song_bonus_awarded: e.target.checked,
                                 },
                               }))
@@ -435,7 +423,7 @@ export default function WrongLyricChallengeHostPage() {
                             setScoreDraft((current) => ({
                               ...current,
                               [team.team_id]: {
-                                ...(current[team.team_id] ?? {}),
+                                ...(current[team.team_id] ?? createDefaultScoreDraftEntry()),
                                 awarded_points: e.target.value,
                               },
                             }))
@@ -451,7 +439,7 @@ export default function WrongLyricChallengeHostPage() {
                             setScoreDraft((current) => ({
                               ...current,
                               [team.team_id]: {
-                                ...(current[team.team_id] ?? {}),
+                                ...(current[team.team_id] ?? createDefaultScoreDraftEntry()),
                                 guessed_option: e.target.value,
                               },
                             }))
@@ -471,7 +459,7 @@ export default function WrongLyricChallengeHostPage() {
                             setScoreDraft((current) => ({
                               ...current,
                               [team.team_id]: {
-                                ...(current[team.team_id] ?? {}),
+                                ...(current[team.team_id] ?? createDefaultScoreDraftEntry()),
                                 guessed_artist: e.target.value,
                               },
                             }))
@@ -485,7 +473,7 @@ export default function WrongLyricChallengeHostPage() {
                             setScoreDraft((current) => ({
                               ...current,
                               [team.team_id]: {
-                                ...(current[team.team_id] ?? {}),
+                                ...(current[team.team_id] ?? createDefaultScoreDraftEntry()),
                                 guessed_title: e.target.value,
                               },
                             }))
@@ -501,7 +489,7 @@ export default function WrongLyricChallengeHostPage() {
                           setScoreDraft((current) => ({
                             ...current,
                             [team.team_id]: {
-                              ...(current[team.team_id] ?? {}),
+                              ...(current[team.team_id] ?? createDefaultScoreDraftEntry()),
                               notes: e.target.value,
                             },
                           }))

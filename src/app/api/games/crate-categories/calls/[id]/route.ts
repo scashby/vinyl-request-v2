@@ -20,7 +20,7 @@ type SessionRow = {
 };
 
 type RoundCompletionRow = {
-  status: "pending" | "active" | "closed";
+  status: "pending" | "playing" | "revealed" | "scored" | "skipped";
 };
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
