@@ -43,6 +43,21 @@ type SnippetDraft = {
   host_notes?: string;
 };
 
+type PlaylistTrackApiItem = {
+  track_key: string;
+  sort_order: number;
+  track_title: string | null;
+  artist_name: string | null;
+  album_name: string | null;
+  side: string | null;
+  position: string | null;
+};
+
+type PlaylistTracksPayload = {
+  items?: PlaylistTrackApiItem[];
+  error?: string;
+};
+
 type PullListApiRow = {
   call_index: number;
   round_number: number;
@@ -60,21 +75,14 @@ const LOCK_IN_OPTIONS = [
   { value: "hand_raise", label: "Hand Raise" },
 ] as const;
 
-function parseSnippets(lines: string): SnippetDraft[] {
-  return lines
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [artistTitle, sourceLabel] = line.split("|").map((part) => part.trim());
-      const [artist, title] = artistTitle.split(" - ").map((part) => part.trim());
-      return {
-        artist: artist ?? "",
-        title: title ?? "",
-        source_label: sourceLabel || undefined,
-      };
-    })
-    .filter((snippet) => snippet.artist && snippet.title);
+function toSnippet(item: PlaylistTrackApiItem, index: number): SnippetDraft {
+  const sideAndPosition = [item.side?.trim(), item.position?.trim()].filter(Boolean).join(" ");
+  const sourceLabel = [item.album_name?.trim() || null, sideAndPosition || null].filter(Boolean).join(" | ");
+  return {
+    artist: item.artist_name?.trim() || "Unknown Artist",
+    title: item.track_title?.trim() || `Track ${index + 1}`,
+    source_label: sourceLabel || undefined,
+  };
 }
 
 export default function NameThatTuneSetupPage() {
@@ -103,9 +111,9 @@ export default function NameThatTuneSetupPage() {
   const [hostBufferSeconds, setHostBufferSeconds] = useState(8);
 
   const [teamNamesText, setTeamNamesText] = useState("Team A\nTeam B");
-  const [snippetListText, setSnippetListText] = useState(
-    "Madonna - Like a Prayer | LP side A\nOutkast - Hey Ya! | 45\nThe Killers - Mr. Brightside | backup"
-  );
+  const [playlistSnippets, setPlaylistSnippets] = useState<SnippetDraft[]>([]);
+  const [playlistSnippetsLoading, setPlaylistSnippetsLoading] = useState(false);
+  const [playlistSnippetsError, setPlaylistSnippetsError] = useState<string | null>(null);
 
   const [preflight, setPreflight] = useState({
     snippetsPreCue: false,
@@ -127,7 +135,7 @@ export default function NameThatTuneSetupPage() {
       ),
     [teamNamesText]
   );
-  const snippets = useMemo(() => parseSnippets(snippetListText), [snippetListText]);
+  const snippets = useMemo(() => playlistSnippets, [playlistSnippets]);
   const preflightComplete = useMemo(() => Object.values(preflight).every(Boolean), [preflight]);
   const targetGapSeconds = useMemo(
     () => removeResleeveSeconds + findRecordSeconds + cueSeconds + hostBufferSeconds,
@@ -135,10 +143,7 @@ export default function NameThatTuneSetupPage() {
   );
   const backupSnippetCount = useMemo(() => Math.max(2, Math.ceil(roundCount * 0.2)), [roundCount]);
   const recommendedPullSize = useMemo(() => roundCount + backupSnippetCount, [backupSnippetCount, roundCount]);
-  const minimumPlaylistTracks = useMemo(
-    () => Math.max(recommendedPullSize, snippets.length),
-    [recommendedPullSize, snippets.length]
-  );
+  const minimumPlaylistTracks = useMemo(() => recommendedPullSize, [recommendedPullSize]);
   const selectedPlaylist = useMemo(
     () => playlists.find((playlist) => playlist.id === playlistId) ?? null,
     [playlists, playlistId]
@@ -146,6 +151,23 @@ export default function NameThatTuneSetupPage() {
   const playlistTooSmall = useMemo(
     () => (selectedPlaylist ? selectedPlaylist.track_count < minimumPlaylistTracks : false),
     [minimumPlaylistTracks, selectedPlaylist]
+  );
+  const snippetPreviewLimit = useMemo(
+    () => Math.max(recommendedPullSize, roundCount),
+    [recommendedPullSize, roundCount]
+  );
+  const snippetPreviewText = useMemo(
+    () =>
+      snippets
+        .slice(0, snippetPreviewLimit)
+        .map((snippet) => {
+          const source = snippet.source_label?.trim();
+          return source
+            ? `${snippet.artist} - ${snippet.title} | ${source}`
+            : `${snippet.artist} - ${snippet.title}`;
+        })
+        .join("\n"),
+    [snippetPreviewLimit, snippets]
   );
 
   const load = useCallback(async () => {
@@ -175,6 +197,37 @@ export default function NameThatTuneSetupPage() {
     load();
   }, [load]);
 
+  const loadPlaylistSnippets = useCallback(async (selectedPlaylistId: number | null) => {
+    if (!selectedPlaylistId) {
+      setPlaylistSnippets([]);
+      setPlaylistSnippetsError(null);
+      setPlaylistSnippetsLoading(false);
+      return;
+    }
+
+    setPlaylistSnippetsLoading(true);
+    setPlaylistSnippetsError(null);
+    try {
+      const res = await fetch(`/api/playlists/${selectedPlaylistId}/tracks`);
+      const payload = (await res.json()) as PlaylistTracksPayload;
+      if (!res.ok) {
+        throw new Error(payload.error ?? "Failed to load playlist tracks");
+      }
+
+      const items = payload.items ?? [];
+      setPlaylistSnippets(items.map((item, index) => toSnippet(item, index)));
+    } catch (error) {
+      setPlaylistSnippets([]);
+      setPlaylistSnippetsError(error instanceof Error ? error.message : "Failed to load playlist tracks");
+    } finally {
+      setPlaylistSnippetsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPlaylistSnippets(playlistId);
+  }, [loadPlaylistSnippets, playlistId]);
+
   const createSession = async () => {
     if (!playlistId) {
       alert("Select a playlist bank first");
@@ -184,6 +237,18 @@ export default function NameThatTuneSetupPage() {
       alert(
         `Selected playlist has ${selectedPlaylist.track_count} tracks. This setup needs at least ${minimumPlaylistTracks}.`
       );
+      return;
+    }
+    if (playlistSnippetsLoading) {
+      alert("Playlist tracks are still loading. Try again in a moment.");
+      return;
+    }
+    if (playlistSnippetsError) {
+      alert(`Unable to build snippet deck from playlist: ${playlistSnippetsError}`);
+      return;
+    }
+    if (snippets.length < roundCount) {
+      alert(`Selected playlist currently resolves to ${snippets.length} snippets. At least ${roundCount} are required.`);
       return;
     }
     setCreating(true);
@@ -206,7 +271,6 @@ export default function NameThatTuneSetupPage() {
           show_rounds: showRounds,
           show_scoreboard: showScoreboard,
           team_names: teamNames,
-          snippets,
         }),
       });
 
@@ -281,7 +345,7 @@ export default function NameThatTuneSetupPage() {
           <p className="mt-2 text-xs text-stone-300">
             Minimum playlist size for current setup:{" "}
             <span className="font-semibold text-rose-300">{minimumPlaylistTracks}</span>{" "}
-            tracks (max of snippet deck {snippets.length} and pull target {recommendedPullSize}).
+            tracks ({roundCount} primary + {backupSnippetCount} backup pull).
           </p>
           {selectedPlaylist ? (
             <p className={`mt-1 text-xs ${playlistTooSmall ? "text-red-300" : "text-emerald-300"}`}>
@@ -326,15 +390,38 @@ export default function NameThatTuneSetupPage() {
               <p className="mt-1 text-xs text-stone-400">Detected teams: {teamNames.length}</p>
             </label>
 
-            <label className="text-sm">Playlist Pull Snippets (one per line: Artist - Title | Optional source) <InlineFieldHelp label="Playlist Pull Snippets" />
-              <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={snippetListText} onChange={(e) => setSnippetListText(e.target.value)} />
+            <div className="text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span>Playlist Pull Snippets (auto-generated from selected playlist) <InlineFieldHelp label="Playlist Pull Snippets" /></span>
+                <button
+                  type="button"
+                  className="rounded border border-stone-600 px-2 py-1 text-xs disabled:opacity-50"
+                  disabled={!playlistId || playlistSnippetsLoading}
+                  onClick={() => {
+                    void loadPlaylistSnippets(playlistId);
+                  }}
+                >
+                  {playlistSnippetsLoading ? "Loading..." : "Refresh Deck"}
+                </button>
+              </div>
+              <textarea
+                className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                readOnly
+                value={snippetPreviewText}
+                placeholder={
+                  playlistId
+                    ? "Playlist selected. Loading snippets..."
+                    : "Select a playlist bank to load snippets."
+                }
+              />
+              {playlistSnippetsError ? <p className="mt-1 text-xs text-red-300">{playlistSnippetsError}</p> : null}
               <p className={`mt-1 text-xs ${roundCountWarning ? "text-amber-300" : "text-stone-400"}`}>
                 Valid snippets: {snippets.length}. Minimum required for current rounds: {roundCount}.
               </p>
               <p className={`mt-1 text-xs ${recommendedPullWarning ? "text-amber-300" : "text-emerald-300"}`}>
                 Recommended playlist/crate pull: {recommendedPullSize} ({roundCount} primary + {backupSnippetCount} backup).
               </p>
-            </label>
+            </div>
           </div>
 
           <div className="mt-4 rounded-xl border border-stone-700 bg-stone-950/80 p-3 text-sm">
@@ -347,7 +434,7 @@ export default function NameThatTuneSetupPage() {
             </div>
           </div>
 
-          <button disabled={!playlistId || playlistTooSmall || !preflightComplete || teamNames.length < 2 || roundCountWarning || creating} onClick={createSession} className="mt-5 rounded bg-rose-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+          <button disabled={!playlistId || playlistTooSmall || playlistSnippetsLoading || !!playlistSnippetsError || !preflightComplete || teamNames.length < 2 || roundCountWarning || creating} onClick={createSession} className="mt-5 rounded bg-rose-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
             {creating ? "Creating..." : "Create Session"}
           </button>
         </section>

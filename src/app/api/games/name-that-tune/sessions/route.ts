@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getNameThatTuneDb } from "src/lib/nameThatTuneDb";
 import { generateNameThatTuneSessionCode } from "src/lib/nameThatTuneSessionCode";
+import { getBingoDb } from "src/lib/bingoDb";
+import { resolvePlaylistTracks } from "src/lib/bingoEngine";
 
 export const runtime = "nodejs";
 
 type CreateSessionBody = {
   event_id?: number | null;
+  playlist_id?: number;
   title?: string;
   round_count?: number;
   lock_in_rule?: "time_window" | "first_sheet_wins" | "hand_raise";
@@ -51,30 +54,44 @@ function normalizeRoundCount(value: number | undefined) {
   return Math.min(15, Math.max(8, Number(value ?? 10)));
 }
 
-function normalizeSnippets(
-  snippets: CreateSessionBody["snippets"],
-  roundCount: number
-): Array<{
+function shuffle<T>(items: T[]): T[] {
+  const next = [...items];
+  for (let i = next.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [next[i], next[j]] = [next[j], next[i]];
+  }
+  return next;
+}
+
+async function buildSnippetsFromPlaylist(
+  playlistId: number
+): Promise<
+  {
   artist: string;
   title: string;
   source_label: string | null;
   snippet_start_seconds: number;
   snippet_duration_seconds: number;
   host_notes: string | null;
-}> {
-  const parsed = (snippets ?? [])
-    .map((snippet) => ({
-      artist: snippet.artist.trim(),
-      title: snippet.title.trim(),
-      source_label: snippet.source_label?.trim() || null,
-      snippet_start_seconds: Math.max(0, Number(snippet.snippet_start_seconds ?? 0)),
-      snippet_duration_seconds: Math.min(20, Math.max(3, Number(snippet.snippet_duration_seconds ?? 8))),
-      host_notes: snippet.host_notes?.trim() || null,
-    }))
-    .filter((snippet) => snippet.artist && snippet.title);
+  }[]
+> {
+  const playlistDb = getBingoDb();
+  const tracks = await resolvePlaylistTracks(playlistDb, playlistId);
 
-  if (parsed.length === 0) return [];
-  return parsed.slice(0, roundCount);
+  return tracks
+    .map((track, index) => {
+      const sideAndPosition = [track.side?.trim(), track.position?.trim()].filter(Boolean).join(" ");
+      const sourceLabel = [track.albumName?.trim() || null, sideAndPosition || null].filter(Boolean).join(" | ");
+      return {
+        artist: track.artistName?.trim() || "Unknown Artist",
+        title: track.trackTitle?.trim() || `Track ${index + 1}`,
+        source_label: sourceLabel || null,
+        snippet_start_seconds: 0,
+        snippet_duration_seconds: 8,
+        host_notes: null,
+      };
+    })
+    .filter((snippet) => snippet.artist && snippet.title);
 }
 
 async function generateUniqueSessionCode() {
@@ -138,6 +155,10 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as CreateSessionBody;
 
     const roundCount = normalizeRoundCount(body.round_count);
+    const playlistId = Number(body.playlist_id);
+    if (!Number.isFinite(playlistId) || playlistId <= 0) {
+      return NextResponse.json({ error: "playlist_id is required" }, { status: 400 });
+    }
     const lockInWindowSeconds = Math.max(5, Number(body.lock_in_window_seconds ?? 20));
     const removeResleeveSeconds = Math.max(0, Number(body.remove_resleeve_seconds ?? 20));
     const findRecordSeconds = Math.max(0, Number(body.find_record_seconds ?? 12));
@@ -150,9 +171,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "At least 2 team names are required" }, { status: 400 });
     }
 
-    const snippets = normalizeSnippets(body.snippets, roundCount);
+    const snippets = shuffle(await buildSnippetsFromPlaylist(playlistId)).slice(0, roundCount);
     if (snippets.length < roundCount) {
-      return NextResponse.json({ error: `Add at least ${roundCount} snippets` }, { status: 400 });
+      return NextResponse.json(
+        { error: `Selected playlist has ${snippets.length} playable tracks. At least ${roundCount} are required.` },
+        { status: 400 }
+      );
     }
 
     const code = await generateUniqueSessionCode();
