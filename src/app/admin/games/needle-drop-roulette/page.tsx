@@ -215,7 +215,7 @@ export default function NeedleDropRouletteSetupPage() {
         <header className="rounded-3xl border border-orange-900/40 bg-black/45 p-6">
           <p className="text-xs uppercase tracking-[0.28em] text-orange-300">Brewery Floor Mode</p>
           <h1 className="mt-1 text-4xl font-black uppercase text-orange-100">Needle Drop Roulette Setup</h1>
-          <p className="mt-2 text-sm text-stone-300">Blind drops, 5-10 second reveals, and fast resets for solo-host vinyl rounds.</p>
+          <p className="mt-2 text-sm text-stone-300">Drop the needle at random, play a short clip, and have teams guess the artist and song before the reveal.</p>
           <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="needle-drop-roulette" /></div>
         </header>
 

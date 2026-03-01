@@ -272,7 +272,7 @@ export default function CrateCategoriesSetupPage() {
               <Link href="/admin/games/crate-categories/jumbotron" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron Scope</Link>
             </div>
           </div>
-          <p className="mt-2 text-sm text-stone-300">Category-led rounds from your crates and tags, with pacing controls for solo-host vinyl flow.</p>
+          <p className="mt-2 text-sm text-stone-300">Each round uses a crate category, and teams answer based on the songs you play.</p>
           <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="crate-categories" /></div>
         </header>
 

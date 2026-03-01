@@ -247,7 +247,7 @@ export default function WrongLyricChallengeSetupPage() {
               <Link href="/admin/games/wrong-lyric-challenge/jumbotron" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron</Link>
             </div>
           </div>
-          <p className="mt-2 text-sm text-stone-300">Host reads lyric options while DJ cues track. Teams choose the real lyric. Score 2 for correct lyric, optional +1 for naming song.</p>
+          <p className="mt-2 text-sm text-stone-300">Read lyric choices, play the song, and have teams pick which lyric is the real one.</p>
           <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="wrong-lyric-challenge" /></div>
         </header>
 

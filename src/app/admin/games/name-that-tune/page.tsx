@@ -322,7 +322,7 @@ export default function NameThatTuneSetupPage() {
         <header className="rounded-3xl border border-rose-900/40 bg-black/45 p-6">
           <p className="text-xs uppercase tracking-[0.28em] text-rose-300">Brewery Floor Mode</p>
           <h1 className="mt-1 text-4xl font-black uppercase text-rose-100">Name That Tune Setup</h1>
-          <p className="mt-2 text-sm text-stone-300">Single-DJ flow with lock-in answers and turntable pacing budget.</p>
+          <p className="mt-2 text-sm text-stone-300">Play short song clips and let teams race to name the song and artist.</p>
           <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="name-that-tune" /></div>
         </header>
 

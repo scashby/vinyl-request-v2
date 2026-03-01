@@ -240,7 +240,7 @@ export default function ArtistAliasSetupPage() {
               <Link href="/admin/games/artist-alias/jumbotron" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron Scope</Link>
             </div>
           </div>
-          <p className="mt-2 text-sm text-stone-300">Staged clue cards: era, collaborator, then label/region. Scoring rewards early locks.</p>
+          <p className="mt-2 text-sm text-stone-300">Reveal artist clues step by step and let teams lock in early guesses for bigger points.</p>
           <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="artist-alias" /></div>
         </header>
 

@@ -221,7 +221,7 @@ export default function BracketBattleSetupPage() {
         <header className="rounded-3xl border border-blue-900/40 bg-black/45 p-6">
           <p className="text-xs uppercase tracking-[0.28em] text-blue-300">Brewery Floor Mode</p>
           <h1 className="mt-1 text-4xl font-black uppercase text-blue-100">Bracket Battle Setup</h1>
-          <p className="mt-2 text-sm text-stone-300">Seeded tournament flow with paper/hands voting and solo-DJ pacing controls.</p>
+          <p className="mt-2 text-sm text-stone-300">Songs face off in a tournament bracket while teams vote each matchup until one champion wins.</p>
           <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="bracket-battle" /></div>
         </header>
 

@@ -233,7 +233,7 @@ export default function OriginalOrCoverSetupPage() {
               <Link href="/admin/games/original-or-cover/jumbotron" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron Scope</Link>
             </div>
           </div>
-          <p className="mt-2 text-sm text-stone-300">Spin a track, teams call original vs cover, then bonus for naming the original artist.</p>
+          <p className="mt-2 text-sm text-stone-300">Play a track and have teams decide whether it is the original recording or a cover version.</p>
           <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="original-or-cover" /></div>
         </header>
 
