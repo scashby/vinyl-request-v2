@@ -1199,7 +1199,7 @@ export function PlaylistStudioModal({
         className="mx-auto h-full max-h-[920px] w-full max-w-[1240px] overflow-hidden rounded-[28px] border border-[#26324a] bg-[#0d1320] shadow-[0_24px_90px_rgba(0,0,0,0.55)]"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="grid h-full grid-cols-1 md:grid-cols-[270px_1fr]">
+        <div className="grid h-full min-h-0 grid-cols-1 md:grid-cols-[270px_1fr]">
           <aside className="border-b border-[#26324a] bg-[radial-gradient(circle_at_top,_#1f2b45,_#10182b_55%,_#0a101c)] p-4 md:border-b-0 md:border-r md:p-5">
             <div className="mb-4 rounded-2xl border border-[#2d3d5f] bg-black/25 p-4">
               <div className="text-xs uppercase tracking-[0.2em] text-[#7ba6ff]">New System</div>
@@ -1259,7 +1259,7 @@ export function PlaylistStudioModal({
             </div>
           </aside>
 
-          <section className="flex h-full flex-col bg-[linear-gradient(180deg,#11192b_0%,#0f1728_120px,#0c1322_100%)]">
+          <section className="flex h-full min-h-0 flex-col bg-[linear-gradient(180deg,#11192b_0%,#0f1728_120px,#0c1322_100%)]">
             <header className="flex items-center justify-between border-b border-[#24324a] px-4 py-3 md:px-6">
               <div>
                 <div className="text-[11px] uppercase tracking-[0.22em] text-[#84a4d8]">Playlist Operations</div>
@@ -1292,7 +1292,7 @@ export function PlaylistStudioModal({
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
               {view === 'library' && (
                 <div className="space-y-4">
                   <div className="grid gap-3 sm:grid-cols-3">
