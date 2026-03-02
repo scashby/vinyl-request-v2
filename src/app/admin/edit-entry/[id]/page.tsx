@@ -15,6 +15,10 @@ type Track = {
   lyrics_url?: string;
   lyrics?: string;
   lyrics_source?: 'apple_music' | 'genius';
+  is_cover?: boolean | null;
+  original_artist?: string | null;
+  original_year?: number | null;
+  time_signature?: number | null;
 };
 
 type CollectionEntry = {
@@ -58,6 +62,17 @@ type CollectionEntry = {
   apple_music_release_date: string | null;
   apple_music_track_count: number | null;
   apple_music_artwork_url: string | null;
+  lastfm_similar_albums?: string[] | null;
+  critical_reception?: string | null;
+  cultural_significance?: string | null;
+  recording_location?: string | null;
+  apple_music_editorial_notes?: string | null;
+  pitchfork_score?: number | string | null;
+  pitchfork_review?: string | null;
+  chart_positions?: string[] | null;
+  awards?: string[] | null;
+  certifications?: string[] | null;
+  companies?: string[] | null;
   for_sale: boolean;
   sale_price: number | null;
   sale_platform: string | null;
@@ -119,6 +134,26 @@ const asString = (value: unknown): string | null => {
   if (typeof value === 'string') return value;
   if (typeof value === 'number') return String(value);
   return null;
+};
+
+const asNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const asStringArray = (value: unknown): string[] => {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  }
+  if (typeof value === 'string') {
+    return value.split(',').map((item) => item.trim()).filter(Boolean);
+  }
+  return [];
 };
 
 const secondsToDuration = (seconds?: number | null): string => {
@@ -187,7 +222,11 @@ function cleanTrack(track: Partial<Track>): Track {
     artist: track.artist || undefined,
     lyrics_url: track.lyrics_url,
     lyrics: track.lyrics,
-    lyrics_source: track.lyrics_source
+    lyrics_source: track.lyrics_source,
+    is_cover: typeof track.is_cover === 'boolean' ? track.is_cover : null,
+    original_artist: track.original_artist || null,
+    original_year: typeof track.original_year === 'number' ? track.original_year : null,
+    time_signature: typeof track.time_signature === 'number' ? track.time_signature : null
   };
 }
 
@@ -275,6 +314,9 @@ export default function EditEntryPage() {
               id,
               title,
               duration_seconds,
+              lyrics_url,
+              is_cover,
+              original_artist,
               credits
             )
           ),
@@ -286,6 +328,15 @@ export default function EditEntryPage() {
             genres,
             styles,
             discogs_master_id,
+            chart_positions,
+            awards,
+            certifications,
+            cultural_significance,
+            critical_reception,
+            pitchfork_score,
+            pitchfork_review,
+            recording_location,
+            lastfm_similar_albums,
             artist:artists ( id, name )
           )
         )
@@ -311,6 +362,9 @@ export default function EditEntryPage() {
           id?: number | null;
           title?: string | null;
           duration_seconds?: number | null;
+          lyrics_url?: string | null;
+          is_cover?: boolean | null;
+          original_artist?: string | null;
           credits?: unknown;
         } | null;
       }> | null;
@@ -322,6 +376,15 @@ export default function EditEntryPage() {
         genres?: string[] | null;
         styles?: string[] | null;
         discogs_master_id?: string | null;
+        chart_positions?: string[] | null;
+        awards?: string[] | null;
+        certifications?: string[] | null;
+        cultural_significance?: string | null;
+        critical_reception?: string | null;
+        pitchfork_score?: number | null;
+        pitchfork_review?: string | null;
+        recording_location?: string | null;
+        lastfm_similar_albums?: string[] | null;
         artist?: { id?: number | null; name?: string | null } | null;
       } | null;
     } | null;
@@ -333,10 +396,18 @@ export default function EditEntryPage() {
     const { albumDetails, albumLinks } = getAlbumCredits(firstRecording?.credits);
     const tracklist = releaseTracks.map((track) => {
       const recording = toSingle(track.recording);
+      const recordingCredits = asRecord(recording?.credits);
       return cleanTrack({
         position: track.position ?? '',
         title: track.title_override || recording?.title || '',
         duration: secondsToDuration(recording?.duration_seconds ?? null),
+        lyrics_url: asString(recording?.lyrics_url ?? recordingCredits.lyrics_url) ?? undefined,
+        is_cover: typeof recording?.is_cover === 'boolean'
+          ? recording.is_cover
+          : (typeof recordingCredits.is_cover === 'boolean' ? recordingCredits.is_cover : null),
+        original_artist: asString(recording?.original_artist ?? recordingCredits.original_artist),
+        original_year: asNumber(recordingCredits.original_year),
+        time_signature: asNumber(recordingCredits.time_signature),
       });
     });
 
@@ -381,6 +452,17 @@ export default function EditEntryPage() {
       apple_music_release_date: null,
       apple_music_track_count: null,
       apple_music_artwork_url: null,
+      lastfm_similar_albums: master?.lastfm_similar_albums ?? asStringArray(albumDetails.lastfm_similar_albums),
+      critical_reception: asString(master?.critical_reception ?? albumDetails.critical_reception),
+      cultural_significance: asString(master?.cultural_significance ?? albumDetails.cultural_significance),
+      recording_location: asString(master?.recording_location ?? albumDetails.recording_location),
+      apple_music_editorial_notes: asString(albumDetails.apple_music_editorial_notes),
+      pitchfork_score: master?.pitchfork_score ?? asNumber(albumDetails.pitchfork_score),
+      pitchfork_review: asString(master?.pitchfork_review ?? albumDetails.pitchfork_review),
+      chart_positions: Array.isArray(master?.chart_positions) ? master.chart_positions : null,
+      awards: Array.isArray(master?.awards) ? master.awards : null,
+      certifications: Array.isArray(master?.certifications) ? master.certifications : null,
+      companies: asStringArray(albumDetails.companies),
       for_sale: data?.status === 'active' && typeof data?.current_value === 'number',
       sale_price: (data?.current_value as number | null) ?? null,
       sale_platform: null,
@@ -898,14 +980,24 @@ export default function EditEntryPage() {
         for (const track of tracks) {
           const title = track.title?.trim() || '';
           if (!title) continue;
+          const trackCredits: Record<string, unknown> = { ...albumCredits };
+          if (track.artist) trackCredits.track_artist = track.artist;
+          if (track.lyrics_url) trackCredits.lyrics_url = track.lyrics_url;
+          if (typeof track.is_cover === 'boolean') trackCredits.is_cover = track.is_cover;
+          if (track.original_artist) trackCredits.original_artist = track.original_artist;
+          if (typeof track.original_year === 'number') trackCredits.original_year = track.original_year;
+          if (typeof track.time_signature === 'number') trackCredits.time_signature = track.time_signature;
+
           const recordingPayload: Record<string, unknown> = {
             title,
             duration_seconds: parseDurationToSeconds(track.duration),
+            track_artist: track.artist || null,
+            lyrics_url: track.lyrics_url || null,
+            is_cover: typeof track.is_cover === 'boolean' ? track.is_cover : null,
+            original_artist: track.original_artist || null,
           };
-          if (track.artist) {
-            recordingPayload.credits = { ...albumCredits, track_artist: track.artist };
-          } else if (Object.keys(albumCredits).length > 0) {
-            recordingPayload.credits = albumCredits;
+          if (Object.keys(trackCredits).length > 0) {
+            recordingPayload.credits = trackCredits;
           }
 
           const { data: recording, error: recordingError } = await supabase
@@ -1463,6 +1555,44 @@ export default function EditEntryPage() {
                 )}
               </div>
             </div>
+
+            {(entry.lastfm_similar_albums?.length || entry.critical_reception || entry.cultural_significance || entry.recording_location || entry.apple_music_editorial_notes || entry.pitchfork_score || entry.pitchfork_review || entry.chart_positions?.length || entry.awards?.length || entry.certifications?.length || entry.companies?.length) && (
+              <div style={{ marginTop: 24, padding: 16, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                <h4 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 12px 0', color: '#334155' }}>
+                  ✨ Enrichment Display Fields
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>Similar Albums</div>
+                    <div style={{ fontSize: 13, color: '#1f2937' }}>{entry.lastfm_similar_albums?.join(', ') || '—'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>Charts / Awards / Certifications</div>
+                    <div style={{ fontSize: 13, color: '#1f2937' }}>
+                      <div>Charts: {entry.chart_positions?.join(', ') || '—'}</div>
+                      <div>Awards: {entry.awards?.join(', ') || '—'}</div>
+                      <div>Certifications: {entry.certifications?.join(', ') || '—'}</div>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>Reviews & Context</div>
+                    <div style={{ fontSize: 13, color: '#1f2937' }}>
+                      {entry.pitchfork_score !== null && entry.pitchfork_score !== undefined && <div>Pitchfork: {entry.pitchfork_score}</div>}
+                      {entry.pitchfork_review && <div>{entry.pitchfork_review}</div>}
+                      {entry.critical_reception && <div>{entry.critical_reception}</div>}
+                      {entry.cultural_significance && <div>{entry.cultural_significance}</div>}
+                      {entry.recording_location && <div>Recorded at: {entry.recording_location}</div>}
+                      {entry.apple_music_editorial_notes && <div>{entry.apple_music_editorial_notes}</div>}
+                      {!entry.pitchfork_score && !entry.pitchfork_review && !entry.critical_reception && !entry.cultural_significance && !entry.recording_location && !entry.apple_music_editorial_notes && <div>—</div>}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>Companies</div>
+                    <div style={{ fontSize: 13, color: '#1f2937' }}>{entry.companies?.join(', ') || '—'}</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1781,7 +1911,7 @@ export default function EditEntryPage() {
                                 <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
                                   Lyrics
                                 </label>
-                                <div style={{ display: 'flex', justifyContent: 'center', gap: 6, alignItems: 'center', minHeight: 32 }}>
+                                <div style={{ display: 'flex', justifyContent: 'center', gap: 6, alignItems: 'center', minHeight: 24 }}>
                                   {track.lyrics && track.lyrics_source === 'apple_music' && (
                                     <span style={{ fontSize: 20 }} title="Has Apple Music lyrics">🍎</span>
                                   )}
@@ -1800,6 +1930,16 @@ export default function EditEntryPage() {
                                     <span style={{ fontSize: 16, color: '#d1d5db' }}>—</span>
                                   )}
                                 </div>
+                                {(track.is_cover !== null && track.is_cover !== undefined) || track.original_artist || track.original_year || track.time_signature ? (
+                                  <div style={{ marginTop: 4, fontSize: 10, color: '#6b7280', lineHeight: 1.4 }}>
+                                    {(track.is_cover !== null && track.is_cover !== undefined) && (
+                                      <div>{track.is_cover ? 'Cover' : 'Original'}</div>
+                                    )}
+                                    {track.original_artist && <div>{track.original_artist}</div>}
+                                    {track.original_year && <div>{track.original_year}</div>}
+                                    {track.time_signature && <div>{track.time_signature}/4</div>}
+                                  </div>
+                                ) : null}
                               </div>
 
                               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', height: '100%' }}>

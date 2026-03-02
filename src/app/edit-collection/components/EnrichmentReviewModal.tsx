@@ -306,7 +306,7 @@ const ConflictRow = React.memo(({
     const TEXT_LIST_FIELDS = [
         'genres', 'styles', 'musicians', 'credits', 'producers', 'engineers', 
         'tags', 'label', 'labels', 'writers', 'mixers', 'composer', 'lyricist', 
-        'arranger', 'samples', 'sampled_by', 'awards', 'certifications', 'songwriters',
+        'arranger', 'awards', 'certifications', 'songwriters',
         'chart_positions'
     ];
     
@@ -570,8 +570,7 @@ export default function EnrichmentReviewModal({
       'genres', 'styles', 'musicians', 'credits', 'producers', 'engineers', 'tags', 
       'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url', 
       'label', 'labels', 'writers', 'mixers', 'composer', 
-      'lyricist', 'arranger', 'songwriters', 'samples', 
-      'sampled_by', 'awards', 'certifications', 'enriched_metadata'
+      'lyricist', 'arranger', 'songwriters', 'awards', 'certifications', 'enriched_metadata'
     ];
     
     if (MERGEABLE_FIELDS.includes(conflict.field_name)) {
@@ -678,7 +677,7 @@ export default function EnrichmentReviewModal({
       'genres', 'styles', 'musicians', 'credits', 'producers', 'engineers', 'tags',
       'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url',
       'label', 'labels', 'writers', 'mixers', 'composer', 'lyricist',
-      'arranger', 'songwriters', 'samples', 'sampled_by', 'awards', 'certifications'
+      'arranger', 'songwriters', 'awards', 'certifications'
     ]);
 
     const toArray = (val: unknown) => {
@@ -745,7 +744,7 @@ export default function EnrichmentReviewModal({
       'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url', 
       'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 
       'lyricist', 'arranger', 'songwriters', 'tracks', 
-      'samples', 'sampled_by', 'awards', 'certifications', 'enriched_metadata'
+      'awards', 'certifications', 'enriched_metadata'
     ];
 
     const newFinalized = { ...finalizedFields };

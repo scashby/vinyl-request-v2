@@ -34,6 +34,9 @@ type ExistingRecording = {
   track_artist: string | null;
   lyrics: string | null;
   lyrics_url: string | null;
+  is_cover: boolean | null;
+  original_artist: string | null;
+  credits: unknown;
 };
 
 export async function POST(request: NextRequest, context: { params: Promise<{ releaseId: string }> }) {
@@ -104,7 +107,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ re
     const { data: existingRecordings, error: recordingsError } = existingRecordingIds.length
       ? await db
           .from("recordings")
-          .select("id, title, duration_seconds, track_artist, lyrics, lyrics_url")
+          .select("id, title, duration_seconds, track_artist, lyrics, lyrics_url, is_cover, original_artist, credits")
           .in("id", existingRecordingIds)
       : { data: [] as ExistingRecording[], error: null };
     if (recordingsError) throw new Error(recordingsError.message);
@@ -130,21 +133,86 @@ export async function POST(request: NextRequest, context: { params: Promise<{ re
           const old = recordingById.get(existing.recording_id)!;
           const nextTitle = t.title;
           const nextArtist = t.artist || null;
+          const nextLyricsUrl =
+            typeof t.lyrics_url === "string" ? t.lyrics_url.trim() || null : (
+              Object.prototype.hasOwnProperty.call(t, "lyrics_url") ? null : (old.lyrics_url ?? null)
+            );
+          const nextIsCover =
+            typeof t.is_cover === "boolean" ? t.is_cover : (
+              Object.prototype.hasOwnProperty.call(t, "is_cover") ? null : (old.is_cover ?? null)
+            );
+          const nextOriginalArtist =
+            typeof t.original_artist === "string" ? t.original_artist.trim() || null : (
+              Object.prototype.hasOwnProperty.call(t, "original_artist") ? null : (old.original_artist ?? null)
+            );
           const overrideMode = existing.title_override !== null && existing.title_override !== undefined;
           const nextRecordingTitle = overrideMode ? old.title : nextTitle;
+
+          const currentCredits =
+            old.credits && typeof old.credits === "object" && !Array.isArray(old.credits)
+              ? (old.credits as Record<string, unknown>)
+              : {};
+          const incomingCredits =
+            t.credits && typeof t.credits === "object" && !Array.isArray(t.credits)
+              ? (t.credits as Record<string, unknown>)
+              : {};
+          const nextCredits: Record<string, unknown> = {
+            ...currentCredits,
+            ...incomingCredits,
+          };
+
+          if (Object.prototype.hasOwnProperty.call(t, "time_signature")) {
+            if (typeof t.time_signature === "number" && Number.isFinite(t.time_signature)) {
+              nextCredits.time_signature = t.time_signature;
+            } else {
+              delete nextCredits.time_signature;
+            }
+          }
+          if (Object.prototype.hasOwnProperty.call(t, "original_year")) {
+            if (typeof t.original_year === "number" && Number.isFinite(t.original_year)) {
+              nextCredits.original_year = t.original_year;
+            } else {
+              delete nextCredits.original_year;
+            }
+          }
+          if (Object.prototype.hasOwnProperty.call(t, "lyrics_url")) {
+            if (typeof nextLyricsUrl === "string" && nextLyricsUrl.length > 0) {
+              nextCredits.lyrics_url = nextLyricsUrl;
+            } else {
+              delete nextCredits.lyrics_url;
+            }
+          }
+          if (Object.prototype.hasOwnProperty.call(t, "is_cover")) {
+            if (typeof nextIsCover === "boolean") {
+              nextCredits.is_cover = nextIsCover;
+            } else {
+              delete nextCredits.is_cover;
+            }
+          }
+          if (Object.prototype.hasOwnProperty.call(t, "original_artist")) {
+            if (typeof nextOriginalArtist === "string" && nextOriginalArtist.length > 0) {
+              nextCredits.original_artist = nextOriginalArtist;
+            } else {
+              delete nextCredits.original_artist;
+            }
+          }
+
+          const oldCreditsComparable = JSON.stringify(currentCredits);
+          const nextCreditsComparable = JSON.stringify(nextCredits);
           const shouldUpdate =
             (old.title ?? "") !== (nextRecordingTitle ?? "") ||
             (old.track_artist ?? "") !== (nextArtist ?? "") ||
             (old.duration_seconds ?? null) !== (durationSeconds ?? null) ||
+            (old.lyrics_url ?? null) !== (nextLyricsUrl ?? null) ||
+            (old.is_cover ?? null) !== (nextIsCover ?? null) ||
+            (old.original_artist ?? null) !== (nextOriginalArtist ?? null) ||
             (t.note ?? null) !== null ||
             t.bpm !== undefined ||
             t.musical_key !== undefined ||
             t.energy !== undefined ||
             t.danceability !== undefined ||
             t.valence !== undefined ||
-            t.is_cover !== undefined ||
-            t.original_artist !== undefined ||
-            t.credits !== undefined;
+            oldCreditsComparable !== nextCreditsComparable;
 
           if (shouldUpdate) {
             const titleUpdate = overrideMode ? undefined : nextTitle;
@@ -159,10 +227,11 @@ export async function POST(request: NextRequest, context: { params: Promise<{ re
                 energy: typeof t.energy === "number" ? t.energy : null,
                 danceability: typeof t.danceability === "number" ? t.danceability : null,
                 valence: typeof t.valence === "number" ? t.valence : null,
-                is_cover: typeof t.is_cover === "boolean" ? t.is_cover : null,
-                original_artist: typeof t.original_artist === "string" ? t.original_artist : null,
+                lyrics_url: nextLyricsUrl,
+                is_cover: nextIsCover,
+                original_artist: nextOriginalArtist,
                 notes: t.note ?? null,
-                credits: t.credits ?? undefined,
+                credits: nextCredits,
               })
               .eq("id", existing.recording_id);
             if (updateRecError) throw new Error(updateRecError.message);
@@ -185,6 +254,26 @@ export async function POST(request: NextRequest, context: { params: Promise<{ re
         updatedReleaseTrackCount += 1;
       } else {
         // Create a new recording + link row
+        const incomingCredits =
+          t.credits && typeof t.credits === "object" && !Array.isArray(t.credits)
+            ? ({ ...(t.credits as Record<string, unknown>) })
+            : {};
+        if (typeof t.time_signature === "number" && Number.isFinite(t.time_signature)) {
+          incomingCredits.time_signature = t.time_signature;
+        }
+        if (typeof t.original_year === "number" && Number.isFinite(t.original_year)) {
+          incomingCredits.original_year = t.original_year;
+        }
+        if (typeof t.lyrics_url === "string" && t.lyrics_url.trim()) {
+          incomingCredits.lyrics_url = t.lyrics_url.trim();
+        }
+        if (typeof t.is_cover === "boolean") {
+          incomingCredits.is_cover = t.is_cover;
+        }
+        if (typeof t.original_artist === "string" && t.original_artist.trim()) {
+          incomingCredits.original_artist = t.original_artist.trim();
+        }
+
         const { data: insertedRec, error: insertRecError } = await db
           .from("recordings")
           .insert({
@@ -197,9 +286,10 @@ export async function POST(request: NextRequest, context: { params: Promise<{ re
             energy: typeof t.energy === "number" ? t.energy : null,
             danceability: typeof t.danceability === "number" ? t.danceability : null,
             valence: typeof t.valence === "number" ? t.valence : null,
+            lyrics_url: typeof t.lyrics_url === "string" ? t.lyrics_url.trim() || null : null,
             is_cover: typeof t.is_cover === "boolean" ? t.is_cover : null,
             original_artist: typeof t.original_artist === "string" ? t.original_artist : null,
-            credits: t.credits ?? undefined,
+            credits: Object.keys(incomingCredits).length > 0 ? incomingCredits : undefined,
           })
           .select("id")
           .single();

@@ -61,8 +61,11 @@ export type LibraryTrackSavePayload = {
     energy?: number | null;
     danceability?: number | null;
     valence?: number | null;
+    lyrics_url?: string | null;
     is_cover?: boolean | null;
     original_artist?: string | null;
+    original_year?: number | null;
+    time_signature?: number | null;
   }>;
 };
 

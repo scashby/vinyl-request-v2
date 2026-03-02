@@ -44,6 +44,12 @@ interface Track {
   disc_number: number;
   side?: string; // Vinyl side (A, B, C, D, etc.)
   is_header?: boolean;
+  lyrics_url?: string;
+  is_cover?: boolean | null;
+  original_artist?: string;
+  original_year?: number | null;
+  time_signature?: number | null;
+  credits?: Record<string, unknown> | null;
 }
 
 const inferSideFromPosition = (position: string | null | undefined): string | undefined => {
@@ -109,6 +115,12 @@ export interface TracksData {
     type: 'track' | 'header';
     disc_number: number;
     side?: string;
+    lyrics_url?: string | null;
+    is_cover?: boolean | null;
+    original_artist?: string | null;
+    original_year?: number | null;
+    time_signature?: number | null;
+    credits?: Record<string, unknown> | null;
   }>;
   disc_metadata: Array<{
     disc_number: number;
@@ -134,7 +146,7 @@ function SortableTrackRow({
   track: Track;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
-  onUpdate: (id: string, field: keyof Track, value: string) => void;
+  onUpdate: (id: string, field: keyof Track, value: string | number | boolean | null) => void;
 }) {
   const {
     attributes,
@@ -188,57 +200,101 @@ function SortableTrackRow({
     <div
       ref={setNodeRef}
       style={style}
-      className="grid grid-cols-[40px_40px_60px_1fr_200px_220px_80px] py-2 border-b border-gray-100 items-center bg-white hover:bg-gray-50"
+      className="border-b border-gray-100 bg-white hover:bg-gray-50"
     >
-      <div className="flex justify-center">
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={() => onToggleSelect(track.id)}
-          className="cursor-pointer"
-        />
+      <div className="grid grid-cols-[40px_40px_60px_1fr_200px_220px_80px] py-2 items-center">
+        <div className="flex justify-center">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(track.id)}
+            className="cursor-pointer"
+          />
+        </div>
+        <div className="flex justify-center cursor-grab active:cursor-grabbing text-gray-400" {...attributes} {...listeners}>
+          <span className="text-base">≡</span>
+        </div>
+        <div className="text-center text-gray-500 text-sm">
+          {positionLabel}
+        </div>
+        <div className="px-1">
+          <input
+            type="text"
+            value={track.title}
+            onChange={(e) => onUpdate(track.id, 'title', e.target.value)}
+            placeholder="Track title"
+            className="w-full px-2 py-1 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500"
+          />
+        </div>
+        <div className="px-1">
+          <input
+            type="text"
+            value={track.artist}
+            onChange={(e) => onUpdate(track.id, 'artist', e.target.value)}
+            placeholder="Artist"
+            className="w-full px-2 py-1 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500"
+          />
+        </div>
+        <div className="px-1">
+          <input
+            type="text"
+            value={track.note}
+            onChange={(e) => onUpdate(track.id, 'note', e.target.value)}
+            placeholder="Track notes"
+            className="w-full px-2 py-1 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500"
+          />
+        </div>
+        <div className="px-1">
+          <input
+            type="text"
+            value={track.duration}
+            onChange={(e) => onUpdate(track.id, 'duration', e.target.value)}
+            placeholder="0:00"
+            className="w-full px-2 py-1 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500"
+          />
+        </div>
       </div>
-      <div className="flex justify-center cursor-grab active:cursor-grabbing text-gray-400" {...attributes} {...listeners}>
-        <span className="text-base">≡</span>
-      </div>
-      <div className="text-center text-gray-500 text-sm">
-        {positionLabel}
-      </div>
-      <div className="px-1">
-        <input
-          type="text"
-          value={track.title}
-          onChange={(e) => onUpdate(track.id, 'title', e.target.value)}
-          placeholder="Track title"
-          className="w-full px-2 py-1 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500"
-        />
-      </div>
-      <div className="px-1">
-        <input
-          type="text"
-          value={track.artist}
-          onChange={(e) => onUpdate(track.id, 'artist', e.target.value)}
-          placeholder="Artist"
-          className="w-full px-2 py-1 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500"
-        />
-      </div>
-      <div className="px-1">
-        <input
-          type="text"
-          value={track.note}
-          onChange={(e) => onUpdate(track.id, 'note', e.target.value)}
-          placeholder="Track notes"
-          className="w-full px-2 py-1 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500"
-        />
-      </div>
-      <div className="px-1">
-        <input
-          type="text"
-          value={track.duration}
-          onChange={(e) => onUpdate(track.id, 'duration', e.target.value)}
-          placeholder="0:00"
-          className="w-full px-2 py-1 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500"
-        />
+
+      <div className="pl-[148px] pr-2 pb-2">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+          <input
+            type="text"
+            value={track.lyrics_url || ''}
+            onChange={(e) => onUpdate(track.id, 'lyrics_url', e.target.value)}
+            placeholder="Lyrics URL"
+            className="px-2 py-1 border border-gray-200 rounded text-xs text-gray-900 bg-white focus:outline-none focus:border-blue-500"
+          />
+          <input
+            type="text"
+            value={track.original_artist || ''}
+            onChange={(e) => onUpdate(track.id, 'original_artist', e.target.value)}
+            placeholder="Original artist"
+            className="px-2 py-1 border border-gray-200 rounded text-xs text-gray-900 bg-white focus:outline-none focus:border-blue-500"
+          />
+          <input
+            type="number"
+            value={track.original_year ?? ''}
+            onChange={(e) => onUpdate(track.id, 'original_year', e.target.value ? parseInt(e.target.value, 10) : null)}
+            placeholder="Original year"
+            className="px-2 py-1 border border-gray-200 rounded text-xs text-gray-900 bg-white focus:outline-none focus:border-blue-500"
+          />
+          <input
+            type="number"
+            value={track.time_signature ?? ''}
+            onChange={(e) => onUpdate(track.id, 'time_signature', e.target.value ? parseInt(e.target.value, 10) : null)}
+            placeholder="Time sig"
+            className="px-2 py-1 border border-gray-200 rounded text-xs text-gray-900 bg-white focus:outline-none focus:border-blue-500"
+          />
+          <label className="flex items-center gap-2 text-xs text-gray-600 px-2 py-1 border border-gray-200 rounded bg-gray-50">
+            <input
+              type="checkbox"
+              checked={!!track.is_cover}
+              onChange={(e) => onUpdate(track.id, 'is_cover', e.target.checked)}
+              className="cursor-pointer"
+            />
+            Cover track
+          </label>
+        </div>
       </div>
     </div>
   );
@@ -298,6 +354,12 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
         type: track.is_header ? ('header' as const) : ('track' as const),
         disc_number: track.disc_number,
         side: track.side,
+        lyrics_url: track.lyrics_url || null,
+        is_cover: typeof track.is_cover === 'boolean' ? track.is_cover : null,
+        original_artist: track.original_artist || null,
+        original_year: typeof track.original_year === 'number' ? track.original_year : null,
+        time_signature: typeof track.time_signature === 'number' ? track.time_signature : null,
+        credits: track.credits ?? null,
       }));
 
       // Format disc metadata
@@ -348,6 +410,16 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
           disc_number: dbTrack.disc_number || 1,
           side: dbTrack.side || inferredSide,
           is_header: dbTrack.type === 'header',
+          lyrics_url: dbTrack.lyrics_url || '',
+          is_cover: typeof dbTrack.is_cover === 'boolean' ? dbTrack.is_cover : null,
+          original_artist: dbTrack.original_artist || '',
+          original_year: typeof dbTrack.original_year === 'number'
+            ? dbTrack.original_year
+            : (Number.isFinite(Number(dbTrack.original_year)) ? Number(dbTrack.original_year) : null),
+          time_signature: typeof dbTrack.time_signature === 'number'
+            ? dbTrack.time_signature
+            : (Number.isFinite(Number(dbTrack.time_signature)) ? Number(dbTrack.time_signature) : null),
+          credits: dbTrack.credits ?? null,
         };
       }).filter((t) => t !== null) as Track[];
       
@@ -428,7 +500,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
   };
 
   // Track operations
-  const handleUpdateTrack = (trackId: string, field: keyof Track, value: string) => {
+  const handleUpdateTrack = (trackId: string, field: keyof Track, value: string | number | boolean | null) => {
     setTracks(tracks.map(track =>
       track.id === trackId ? { ...track, [field]: value } : track
     ));
@@ -443,6 +515,12 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
       duration: '0:00',
       note: '',
       disc_number: activeDisc,
+      lyrics_url: '',
+      is_cover: null,
+      original_artist: '',
+      original_year: null,
+      time_signature: null,
+      credits: null,
     };
     setTracks([...tracks, newTrack]);
   };
@@ -457,6 +535,12 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
       note: '',
       disc_number: activeDisc,
       is_header: true,
+      lyrics_url: '',
+      is_cover: null,
+      original_artist: '',
+      original_year: null,
+      time_signature: null,
+      credits: null,
     };
     setTracks([...tracks, newHeader]);
   };
@@ -793,6 +877,9 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
           <div className="px-2">Artist</div>
           <div className="px-2">Notes</div>
           <div className="px-2">Length</div>
+        </div>
+        <div className="px-3 py-1.5 text-[11px] text-gray-500 bg-gray-50 border-b border-gray-200">
+          Per-track enrichment fields (lyrics URL, cover/original metadata, time signature) are shown below each track row.
         </div>
 
         <DndContext

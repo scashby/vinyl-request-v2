@@ -47,8 +47,7 @@ const ALLOWED_COLUMNS = new Set([
   'danceability', 'energy', 'mood_acoustic', 'mood_happy', 'mood_sad',
   'mood_aggressive', 'mood_electronic', 'mood_party', 'mood_relaxed',
   'rpm', 'vinyl_weight', 'vinyl_color', 'packaging', 'is_box_set', 'box_set', 'extra',
-  // --- UNBLOCKED FIELDS ---
-  'samples', 'sampled_by',
+  // Samples fields are intentionally excluded from UI selection until provider support returns.
   'is_cover', 'original_artist', 'original_year',
   'tracks.lyrics', 'tracks.lyrics_url',
   'cultural_significance', 'recording_location', 'critical_reception', 'awards', 'certifications',

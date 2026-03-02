@@ -20,6 +20,11 @@ interface DbTrack {
   side?: string;
   artist?: string;
   note?: string | null;
+  lyrics_url?: string | null;
+  is_cover?: boolean | null;
+  original_artist?: string | null;
+  original_year?: number | null;
+  time_signature?: number | null;
   type?: 'track' | 'header';
 }
 
@@ -42,6 +47,17 @@ interface Album {
   
   // Phase 4 Fixes: JSON Data source
   tracks?: DbTrack[];       // Was 'tracklists' string
+  lastfm_similar_albums?: string[];
+  critical_reception?: string;
+  cultural_significance?: string;
+  recording_location?: string;
+  apple_music_editorial_notes?: string;
+  pitchfork_score?: number | string | null;
+  pitchfork_review?: string;
+  chart_positions?: string[];
+  awards?: string[];
+  certifications?: string[];
+  companies?: string[];
   
   blocked_tracks?: { position: string; reason: string }[];
 }
@@ -59,6 +75,35 @@ type ReleaseTrackQueryRow = {
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
+
+const asRecord = (value: unknown): Record<string, unknown> => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
+};
+
+const asString = (value: unknown): string | null => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  return null;
+};
+
+const asStringArray = (value: unknown): string[] => {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  }
+  if (typeof value === 'string' && value.trim().length > 0) return [value.trim()];
+  return [];
+};
+
+const asNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
 
 
 interface EventData {
@@ -125,6 +170,15 @@ function AlbumDetailContent() {
                title,
                notes,
                cover_image_url,
+               chart_positions,
+               awards,
+               certifications,
+               cultural_significance,
+               critical_reception,
+               pitchfork_score,
+               pitchfork_review,
+               recording_location,
+               lastfm_similar_albums,
                artist:artists (id, name)
              ),
              release_tracks:release_tracks (
@@ -139,7 +193,11 @@ function AlbumDetailContent() {
                  duration_seconds,
                  isrc,
                  bpm,
-                 notes
+                 notes,
+                 lyrics_url,
+                 is_cover,
+                 original_artist,
+                 credits
                )
              )
            )`
@@ -160,9 +218,14 @@ function AlbumDetailContent() {
       const master = toSingle(release?.master);
       const artist = toSingle(master?.artist);
       const imageUrl = master?.cover_image_url || '';
+      const firstTrack = toSingle(release?.release_tracks?.[0] ?? null);
+      const firstRecording = toSingle(firstTrack?.recording);
+      const firstCredits = asRecord(firstRecording?.credits);
+      const albumDetails = asRecord(firstCredits.album_details ?? firstCredits.albumDetails ?? firstCredits.album_metadata);
 
       const tracks = (release?.release_tracks || []).map((track) => {
         const typedTrack = track as ReleaseTrackQueryRow;
+        const recordingCredits = asRecord(typedTrack.recording?.credits);
         return ({
         id: track.id,
         recording_id: typedTrack.recording_id ?? typedTrack.recording?.id,
@@ -174,6 +237,13 @@ function AlbumDetailContent() {
         bpm: typedTrack.recording?.bpm ?? undefined,
         side: typedTrack.side ?? undefined,
         note: typedTrack.recording?.notes ?? null,
+        lyrics_url: asString(typedTrack.recording?.lyrics_url ?? recordingCredits.lyrics_url),
+        is_cover: typeof typedTrack.recording?.is_cover === 'boolean'
+          ? typedTrack.recording.is_cover
+          : (typeof recordingCredits.is_cover === 'boolean' ? recordingCredits.is_cover : null),
+        original_artist: asString(typedTrack.recording?.original_artist ?? recordingCredits.original_artist),
+        original_year: asNumber(recordingCredits.original_year),
+        time_signature: asNumber(recordingCredits.time_signature),
         type: 'track',
       });
       });
@@ -192,6 +262,17 @@ function AlbumDetailContent() {
         master_notes: master?.notes,
         media_condition: data.media_condition,
         tracks,
+        lastfm_similar_albums: asStringArray(master?.lastfm_similar_albums ?? albumDetails.lastfm_similar_albums),
+        critical_reception: asString(master?.critical_reception ?? albumDetails.critical_reception) ?? undefined,
+        cultural_significance: asString(master?.cultural_significance ?? albumDetails.cultural_significance) ?? undefined,
+        recording_location: asString(master?.recording_location ?? albumDetails.recording_location) ?? undefined,
+        apple_music_editorial_notes: asString(albumDetails.apple_music_editorial_notes) ?? undefined,
+        pitchfork_score: master?.pitchfork_score ?? asString(albumDetails.pitchfork_score),
+        pitchfork_review: asString(master?.pitchfork_review ?? albumDetails.pitchfork_review) ?? undefined,
+        chart_positions: asStringArray(master?.chart_positions ?? albumDetails.chart_positions),
+        awards: asStringArray(master?.awards ?? albumDetails.awards),
+        certifications: asStringArray(master?.certifications ?? albumDetails.certifications),
+        companies: asStringArray(albumDetails.companies),
       } as Album);
     } catch {
       setError('Failed to load album');
@@ -370,6 +451,21 @@ function AlbumDetailContent() {
   const imageUrl = album.image_url && album.image_url.toLowerCase() !== 'no' ? album.image_url : '/images/coverplaceholder.png';
   const queueTypes = eventData?.queue_types || (eventData?.queue_type ? [eventData.queue_type] : ['side']);
   const queueTypesArray = Array.isArray(queueTypes) ? queueTypes : [queueTypes];
+  const hasSimilarAlbums = (album.lastfm_similar_albums?.length ?? 0) > 0;
+  const hasReviewsContext = Boolean(
+    album.critical_reception ||
+    album.cultural_significance ||
+    album.recording_location ||
+    album.apple_music_editorial_notes ||
+    album.pitchfork_score ||
+    album.pitchfork_review
+  );
+  const hasChartRecognition = Boolean(
+    (album.chart_positions?.length ?? 0) > 0 ||
+    (album.awards?.length ?? 0) > 0 ||
+    (album.certifications?.length ?? 0) > 0
+  );
+  const hasCompanies = (album.companies?.length ?? 0) > 0;
 
   return (
     <div className="min-h-screen relative font-sans text-white bg-black selection:bg-blue-500 selection:text-white">
@@ -457,6 +553,70 @@ function AlbumDetailContent() {
             </div>
           )}
 
+          {(hasSimilarAlbums || hasReviewsContext || hasChartRecognition || hasCompanies) && (
+            <div className="space-y-4 mb-8 max-w-3xl">
+              {hasSimilarAlbums && (
+                <div className="bg-black/35 border border-white/10 rounded-lg p-4">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-gray-300 mb-2">Similar Albums</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {album.lastfm_similar_albums?.map((name) => (
+                      <span key={name} className="text-[11px] px-2 py-1 rounded border border-white/15 bg-white/5 text-gray-200">
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {hasReviewsContext && (
+                <div className="bg-black/35 border border-white/10 rounded-lg p-4 space-y-2">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-gray-300">Reviews & Context</h3>
+                  {album.pitchfork_score !== null && album.pitchfork_score !== undefined && (
+                    <p className="text-sm text-gray-200"><span className="text-gray-400">Pitchfork:</span> {album.pitchfork_score}</p>
+                  )}
+                  {album.pitchfork_review && <p className="text-sm text-gray-300">{album.pitchfork_review}</p>}
+                  {album.critical_reception && <p className="text-sm text-gray-300">{album.critical_reception}</p>}
+                  {album.cultural_significance && <p className="text-sm text-gray-300">{album.cultural_significance}</p>}
+                  {album.recording_location && <p className="text-sm text-gray-300"><span className="text-gray-400">Recorded at:</span> {album.recording_location}</p>}
+                  {album.apple_music_editorial_notes && <p className="text-sm text-gray-300">{album.apple_music_editorial_notes}</p>}
+                </div>
+              )}
+
+              {hasChartRecognition && (
+                <div className="bg-black/35 border border-white/10 rounded-lg p-4">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-gray-300 mb-2">Charts & Recognition</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                    <div>
+                      <div className="text-[11px] text-gray-400 uppercase mb-1">Charts</div>
+                      <div className="text-gray-300">{(album.chart_positions ?? []).join(', ') || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-gray-400 uppercase mb-1">Awards</div>
+                      <div className="text-gray-300">{(album.awards ?? []).join(', ') || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-gray-400 uppercase mb-1">Certifications</div>
+                      <div className="text-gray-300">{(album.certifications ?? []).join(', ') || '—'}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {hasCompanies && (
+                <div className="bg-black/35 border border-white/10 rounded-lg p-4">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-gray-300 mb-2">Companies</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {album.companies?.map((company) => (
+                      <span key={company} className="text-[11px] px-2 py-1 rounded border border-white/15 bg-white/5 text-gray-200">
+                        {company}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Voting / Request Section */}
           {eventId && eventData?.has_queue && (
             <div className="bg-black/40 backdrop-blur-md p-5 rounded-xl border border-white/10">
@@ -529,6 +689,26 @@ function AlbumDetailContent() {
                         {track.note && (
                           <div className="text-[11px] text-gray-500 italic truncate">{track.note}</div>
                         )}
+                        {(track.is_cover !== null && track.is_cover !== undefined) || track.original_artist || track.original_year || track.time_signature || track.lyrics_url ? (
+                          <div className="text-[11px] text-gray-500 flex flex-wrap gap-3 mt-1">
+                            {(track.is_cover !== null && track.is_cover !== undefined) && (
+                              <span>{track.is_cover ? 'Cover' : 'Original'}</span>
+                            )}
+                            {track.original_artist && <span>Original Artist: {track.original_artist}</span>}
+                            {track.original_year && <span>Original Year: {track.original_year}</span>}
+                            {track.time_signature && <span>Time Sig: {track.time_signature}</span>}
+                            {track.lyrics_url && (
+                              <a
+                                href={track.lyrics_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-300 hover:text-blue-200 underline"
+                              >
+                                Lyrics
+                              </a>
+                            )}
+                          </div>
+                        ) : null}
                       </div>
                       <span className="text-xs font-mono text-gray-600 mr-4">{track.duration || '--:--'}</span>
                       {queueTypesArray.includes('track') && eventId && eventData?.has_queue && !blocked && (
@@ -559,4 +739,4 @@ export default function AlbumDetailPage() {
     </Suspense>
   );
 }
-// AUDIT: inspected, no changes.
+// AUDIT: added public enrichment sections and track-level enrichment metadata display.

@@ -85,6 +85,12 @@ export type Album = {
     type: 'track' | 'header';
     side?: string;
     note?: string | null;
+    lyrics_url?: string | null;
+    is_cover?: boolean | null;
+    original_artist?: string | null;
+    original_year?: number | null;
+    time_signature?: number | null;
+    credits?: Record<string, unknown> | null;
   }> | null;
   disc_metadata?: Array<Record<string, unknown>> | null;
   matrix_numbers?: string[] | null;
@@ -139,6 +145,13 @@ export type Album = {
   cultural_significance?: string | null;
   critical_reception?: string | null;
   recording_location?: string | null;
+  apple_music_editorial_notes?: string | null;
+  companies?: string[] | null;
+  lastfm_similar_albums?: string[] | null;
+  // Deprecated: retained for compatibility until producer/consumer is reintroduced.
+  allmusic_similar_albums?: string[] | null;
+  enrichment_summary?: Record<string, unknown> | null;
+  enriched_metadata?: Record<string, unknown> | null;
   allmusic_rating?: number | string | null;
   allmusic_review?: string | null;
   pitchfork_score?: number | string | null;
@@ -159,6 +172,7 @@ export type Album = {
   mood_aggressive?: number | null;
   mood_relaxed?: number | null;
   mood_party?: number | null;
+  time_signature?: number | null;
 
   // UI compatibility fields (legacy modal layout mapped to V3 storage)
   sale_quantity?: number | null;

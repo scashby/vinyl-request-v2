@@ -587,9 +587,6 @@ export async function GET(request: Request) {
             return hasString(creditInfo.albumDetails.original_artist);
           case 'original_year':
             return creditInfo.albumDetails.original_year !== null && creditInfo.albumDetails.original_year !== undefined;
-          case 'samples':
-          case 'sampled_by':
-            return hasArray(creditInfo.albumDetails[field]);
           case 'genres':
             return hasGenres;
           case 'styles':

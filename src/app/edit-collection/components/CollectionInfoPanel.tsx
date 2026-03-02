@@ -99,6 +99,21 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
       .map((link) => link.master_tags?.name ?? '')
       .filter(Boolean)
   ));
+  const masterLike = (album.release?.master ?? {}) as Record<string, unknown>;
+  const similarAlbums = toSafeStringArray(album.lastfm_similar_albums ?? masterLike.lastfm_similar_albums);
+  const chartPositions = toSafeStringArray(album.chart_positions ?? masterLike.chart_positions);
+  const awards = toSafeStringArray(album.awards ?? masterLike.awards);
+  const certifications = toSafeStringArray(album.certifications ?? masterLike.certifications);
+  const companies = toSafeStringArray(album.companies);
+  const reviewBlocks = [
+    album.pitchfork_score !== null && album.pitchfork_score !== undefined ? `Pitchfork: ${album.pitchfork_score}` : null,
+    album.pitchfork_review ?? null,
+    album.critical_reception ?? null,
+    album.cultural_significance ?? null,
+    album.recording_location ? `Recorded at: ${album.recording_location}` : null,
+    album.apple_music_editorial_notes ?? null,
+  ].filter((item): item is string => Boolean(item && item.trim().length > 0));
+  const hasEnrichmentContext = similarAlbums.length > 0 || reviewBlocks.length > 0 || chartPositions.length > 0 || awards.length > 0 || certifications.length > 0 || companies.length > 0;
 
   const getEbayUrl = (): string => {
     const query = `${artistName} ${albumTitle}`.replace(/\s+/g, '+');
@@ -452,6 +467,44 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
           </div>
         </div>
       </div>
+
+      {hasEnrichmentContext && (
+        <div className="mb-4">
+          <div className="text-base font-bold text-[#2196F3] mb-3">Enrichment</div>
+          <div className="bg-white p-3 rounded space-y-3">
+            {similarAlbums.length > 0 && (
+              <div className="text-[13px] text-gray-800 font-normal">
+                <span className="font-semibold block mb-1">Similar Albums</span>
+                <span>{similarAlbums.join(', ')}</span>
+              </div>
+            )}
+            {reviewBlocks.length > 0 && (
+              <div className="text-[13px] text-gray-800 font-normal">
+                <span className="font-semibold block mb-1">Reviews & Context</span>
+                <div className="space-y-1">
+                  {reviewBlocks.map((item) => (
+                    <div key={item}>{item}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {(chartPositions.length > 0 || awards.length > 0 || certifications.length > 0) && (
+              <div className="text-[13px] text-gray-800 font-normal">
+                <span className="font-semibold block mb-1">Charts & Recognition</span>
+                {chartPositions.length > 0 && <div>Charts: {chartPositions.join(', ')}</div>}
+                {awards.length > 0 && <div>Awards: {awards.join(', ')}</div>}
+                {certifications.length > 0 && <div>Certifications: {certifications.join(', ')}</div>}
+              </div>
+            )}
+            {companies.length > 0 && (
+              <div className="text-[13px] text-gray-800 font-normal">
+                <span className="font-semibold block mb-1">Companies</span>
+                <span>{companies.join(', ')}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="mb-4">
         <div className="text-base font-bold text-[#2196F3] mb-3">Personal</div>

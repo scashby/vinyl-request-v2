@@ -115,6 +115,8 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ in
           lastfm_url,
           spotify_url,
           genius_url,
+          lastfm_similar_albums,
+          allmusic_similar_albums,
           custom_links,
           artist:artists (id, name),
           master_tag_links:master_tag_links (
@@ -143,4 +145,3 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ in
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-

@@ -128,6 +128,16 @@ const asNumber = (value: unknown): number | null => {
   return null;
 };
 
+const asBoolean = (value: unknown): boolean | null => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+  }
+  return null;
+};
+
 const asStringArray = (value: unknown): string[] => {
   if (!value) return [];
   if (Array.isArray(value)) {
@@ -225,6 +235,7 @@ const buildAlbumCredits = (album: Album): Record<string, unknown> => {
     recording_date: normalizeEmpty(album.recording_date),
     tempo_bpm: album.tempo_bpm ?? undefined,
     musical_key: normalizeEmpty(album.musical_key),
+    time_signature: album.time_signature ?? undefined,
     energy: album.energy ?? undefined,
     danceability: album.danceability ?? undefined,
     mood_acoustic: album.mood_acoustic ?? undefined,
@@ -243,6 +254,12 @@ const buildAlbumCredits = (album: Album): Record<string, unknown> => {
     chart_positions: album.chart_positions ?? undefined,
     awards: album.awards ?? undefined,
     certifications: album.certifications ?? undefined,
+    apple_music_editorial_notes: normalizeEmpty(album.apple_music_editorial_notes),
+    companies: album.companies ?? undefined,
+    lastfm_similar_albums: album.lastfm_similar_albums ?? undefined,
+    allmusic_similar_albums: album.allmusic_similar_albums ?? undefined,
+    enrichment_summary: album.enrichment_summary ?? undefined,
+    enriched_metadata: album.enriched_metadata ?? undefined,
     apple_music_id: normalizeEmpty(album.apple_music_id),
     lastfm_id: normalizeEmpty(album.lastfm_id),
     musicbrainz_url: normalizeEmpty(album.musicbrainz_url),
@@ -399,6 +416,16 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           const recording = toSingle(track.recording);
           const recordingCredits = asRecord(recording?.credits);
           const trackArtist = asString(recording?.track_artist ?? recordingCredits.track_artist);
+          const originalYearRaw = recordingCredits.original_year;
+          const originalYear =
+            typeof originalYearRaw === 'number'
+              ? originalYearRaw
+              : (typeof originalYearRaw === 'string' ? Number(originalYearRaw) : null);
+          const timeSignatureRaw = recordingCredits.time_signature;
+          const timeSignature =
+            typeof timeSignatureRaw === 'number'
+              ? timeSignatureRaw
+              : (typeof timeSignatureRaw === 'string' ? Number(timeSignatureRaw) : null);
           const discNumberRaw = recordingCredits.disc_number;
           const discNumber =
             typeof discNumberRaw === 'number'
@@ -414,6 +441,12 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             disc_number: discNumber,
             side: track.side ?? undefined,
             note: recording?.notes ?? null,
+            lyrics_url: asString(recording?.lyrics_url ?? recordingCredits.lyrics_url),
+            is_cover: asBoolean(recording?.is_cover ?? recordingCredits.is_cover),
+            original_artist: asString(recording?.original_artist ?? recordingCredits.original_artist),
+            original_year: Number.isFinite(originalYear) ? originalYear : null,
+            time_signature: Number.isFinite(timeSignature) ? timeSignature : null,
+            credits: recordingCredits,
           };
         });
         const maxDiscNumber = trackList.reduce((max, track) => Math.max(max, track.disc_number ?? 1), 1);
@@ -515,12 +548,23 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           cultural_significance: asString(master?.cultural_significance ?? albumDetails.cultural_significance),
           critical_reception: asString(master?.critical_reception ?? albumDetails.critical_reception),
           recording_location: asString(master?.recording_location ?? albumDetails.recording_location),
+          apple_music_editorial_notes: asString(albumDetails.apple_music_editorial_notes),
+          companies: asStringArray(albumDetails.companies),
+          lastfm_similar_albums: master?.lastfm_similar_albums ?? asStringArray(albumDetails.lastfm_similar_albums),
+          allmusic_similar_albums: master?.allmusic_similar_albums ?? asStringArray(albumDetails.allmusic_similar_albums),
+          enrichment_summary: Object.keys(asRecord(albumDetails.enrichment_summary)).length > 0
+            ? asRecord(albumDetails.enrichment_summary)
+            : null,
+          enriched_metadata: Object.keys(asRecord(albumDetails.enriched_metadata)).length > 0
+            ? asRecord(albumDetails.enriched_metadata)
+            : null,
           allmusic_rating: master?.allmusic_rating ?? asNumber(albumDetails.allmusic_rating),
           allmusic_review: asString(master?.allmusic_review ?? albumDetails.allmusic_review),
           pitchfork_score: master?.pitchfork_score ?? asNumber(albumDetails.pitchfork_score),
           pitchfork_review: asString(master?.pitchfork_review ?? albumDetails.pitchfork_review),
           tempo_bpm: typeof albumDetails.tempo_bpm === 'number' ? albumDetails.tempo_bpm : null,
           musical_key: asString(albumDetails.musical_key),
+          time_signature: asNumber(albumDetails.time_signature),
           energy: typeof albumDetails.energy === 'number' ? albumDetails.energy : null,
           danceability: typeof albumDetails.danceability === 'number' ? albumDetails.danceability : null,
           mood_acoustic: typeof albumDetails.mood_acoustic === 'number' ? albumDetails.mood_acoustic : null,
@@ -709,11 +753,18 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               if (track.type === 'header') return track;
               const trackTitle = track.title?.trim() || '';
               if (!trackTitle) return track;
+              const existingTrackCredits = asRecord(track.credits);
 
               const recordingCredits = discardEmpty({
+                ...existingTrackCredits,
                 ...albumCredits,
                 track_artist: track.artist ?? null,
                 disc_number: track.disc_number ?? null,
+                lyrics_url: track.lyrics_url ?? undefined,
+                is_cover: typeof track.is_cover === 'boolean' ? track.is_cover : undefined,
+                original_artist: track.original_artist ?? undefined,
+                original_year: typeof track.original_year === 'number' ? track.original_year : undefined,
+                time_signature: typeof track.time_signature === 'number' ? track.time_signature : undefined,
               });
 
               const details =
@@ -735,6 +786,11 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
                 danceability: details && typeof details.danceability === 'number' ? Number(details.danceability) : null,
                 valence: details && typeof details.mood_happy === 'number' ? Number(details.mood_happy) : null,
                 musical_key: details && typeof details.musical_key === 'string' ? details.musical_key : null,
+                lyrics_url: track.lyrics_url ?? null,
+                is_cover: typeof track.is_cover === 'boolean' ? track.is_cover : null,
+                original_artist: track.original_artist ?? null,
+                original_year: typeof track.original_year === 'number' ? track.original_year : null,
+                time_signature: typeof track.time_signature === 'number' ? track.time_signature : null,
               };
             });
 
@@ -902,6 +958,8 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             lastfm_url: editedAlbum.lastfm_url ?? null,
             spotify_url: editedAlbum.spotify_url ?? null,
             genius_url: editedAlbum.genius_url ?? null,
+            lastfm_similar_albums: editedAlbum.lastfm_similar_albums ?? null,
+            allmusic_similar_albums: editedAlbum.allmusic_similar_albums ?? null,
             custom_links: (editedAlbum.custom_links ?? []) as unknown as Database['public']['Tables']['masters']['Update']['custom_links'],
             main_artist_id: mainArtistId,
           };

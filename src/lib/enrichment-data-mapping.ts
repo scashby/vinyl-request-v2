@@ -316,6 +316,7 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
 
   // --- SIMILAR ALBUMS ---
   'lastfm_similar_albums': ['lastfm'],
+  // 'allmusic_similar_albums' is intentionally deprecated until a producer/consumer is reintroduced.
 
   // --- REVIEWS & CHARTS (Newly Added) ---
   'pitchfork_score': ['pitchfork'],
