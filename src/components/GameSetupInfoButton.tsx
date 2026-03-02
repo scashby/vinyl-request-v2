@@ -24,6 +24,11 @@ type GameHelpMeta = {
   accent: string;
   quickTip: string;
   details: string[];
+  sections?: Array<{
+    heading: string;
+    ordered?: boolean;
+    items: string[];
+  }>;
 };
 
 const HELP_META: Record<GameSlug, GameHelpMeta> = {
@@ -113,6 +118,30 @@ const HELP_META: Record<GameSlug, GameHelpMeta> = {
       "Keep reason-mode policy fixed for full session consistency.",
       "Preload tie-break round in case team scores converge late.",
       "Use reveal timing that matches your solo-host pacing comfort.",
+    ],
+    sections: [
+      {
+        heading: "Solo-Host Workflow",
+        ordered: true,
+        items: [
+          "Setup page: pick event + playlist bank, then either paste manual rounds or leave rounds blank for auto-generation.",
+          "Complete preflight checks before creating the session.",
+          "Host runtime: advance spins 1-3, save picks, then score the round.",
+          "Assistant runtime (optional): capture team picks during playback while host manages reveal timing.",
+          "Jumbotron stays read-only and mirrors current reveal/scoreboard state.",
+        ],
+      },
+      {
+        heading: "Smoke Test Checklist",
+        ordered: true,
+        items: [
+          "Create one session with manual rounds and one with auto-generated rounds.",
+          "Verify host controls: advance, pause, resume, and call status transitions.",
+          "Save picks and score a round; confirm +2 imposter and conditional +1 reason bonus.",
+          "Confirm jumbotron hides answer pre-reveal and updates leaderboard after scoring.",
+          "Check history view and event filter return expected sessions.",
+        ],
+      },
     ],
   },
   "lyric-gap-relay": {
@@ -264,6 +293,22 @@ export default function GameSetupInfoButton({ gameSlug }: GameSetupInfoButtonPro
                   <li key={detail}>{detail}</li>
                 ))}
               </ul>
+
+              {meta.sections?.map((section) => {
+                const ListTag = section.ordered ? "ol" : "ul";
+                const listClasses = section.ordered ? "mt-2 list-decimal space-y-1 pl-5 text-sm text-stone-200" : "mt-2 list-disc space-y-1 pl-5 text-sm text-stone-200";
+
+                return (
+                  <section key={section.heading} className="mt-4">
+                    <h4 className="text-xs uppercase tracking-[0.16em] text-stone-300">{section.heading}</h4>
+                    <ListTag className={listClasses}>
+                      {section.items.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ListTag>
+                  </section>
+                );
+              })}
             </div>
           </div>
         </>

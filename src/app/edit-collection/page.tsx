@@ -1086,6 +1086,13 @@ function CollectionBrowserPage() {
     return activeSortFavorites.find((favorite) => favorite.id === activeSelectedSortFavoriteId)?.name ?? '';
   }, [activeSelectedSortFavoriteId, activeSortFavorites]);
 
+  const getSortFavoriteDisplayLabel = useCallback((favorite: SortFavorite) => {
+    if (!favorite.fields?.length) return favorite.name;
+    return favorite.fields
+      .map((field) => `${field.field} ${field.direction === 'asc' ? '↑' : '↓'}`)
+      .join(' | ');
+  }, []);
+
   const activeColumnFavoriteModalTitle =
     viewMode === 'collection'
       ? 'Manage Column Favorites'
@@ -3259,113 +3266,117 @@ function CollectionBrowserPage() {
                   )}
                 </div>
                 
-                <button
-                  onClick={() => {
-                    setShowSortFavoritesDropdown(false);
-                    setShowColumnFavoritesDropdown(false);
-                    setShowSortSelector(true);
-                  }}
-                  title="Change Sorting"
-                  className="bg-[#3a3a3a] border border-[#555] rounded px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444]"
-                >
-                  <span>↕️</span>
-                </button>
-
-                <div className="relative">
-                  <button
-                    onClick={() => {
-                      setShowColumnFavoritesDropdown(false);
-                      setShowSortFavoritesDropdown(!showSortFavoritesDropdown);
-                    }}
-                    title="Sorting Favorites"
-                    className="bg-[#3a3a3a] border border-[#555] rounded px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444]"
-                  >
-                    <span className="text-[11px]">▼</span>
-                  </button>
-                  {showSortFavoritesDropdown && (
-                    <>
-                      <div onClick={() => setShowSortFavoritesDropdown(false)} className="fixed inset-0 z-[99]" />
-                      <div className="absolute top-full left-0 mt-1 bg-white border border-[#ddd] rounded shadow-lg z-[100] min-w-[260px]">
-                        <button
-                          onClick={() => {
-                            setShowSortFavoritesDropdown(false);
-                            setShowManageSortFavoritesModal(true);
-                          }}
-                          className="w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] font-semibold hover:bg-[#f5f5f5]"
-                        >
-                          Manage Favorites
-                        </button>
-                        <div className="px-3 py-1 text-[10px] font-semibold text-[#999] uppercase tracking-wider border-t border-[#eee] bg-[#fafafa]">
-                          Favorites
-                        </div>
-                        {activeSortFavorites.map((favorite) => (
-                          <button
-                            key={favorite.id}
-                            onClick={() => handleApplySortFavorite(favorite.id)}
-                            className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${activeSelectedSortFavoriteId === favorite.id ? 'bg-[#e3f2fd]' : ''}`}
-                          >
-                            <span>{favorite.name}</span>
-                            {activeSelectedSortFavoriteId === favorite.id && <span className="text-[#2196F3]">✓</span>}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => {
-                    setShowSortFavoritesDropdown(false);
-                    setShowColumnFavoritesDropdown(false);
-                    setColumnSelectorMode(viewMode);
-                    setShowColumnSelector(true);
-                  }}
-                  title="Change Columns"
-                  className="bg-[#3a3a3a] border border-[#555] rounded px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444]"
-                >
-                  <span>⊞</span>
-                </button>
-
-                <div className="relative">
+                <div className="flex items-center">
                   <button
                     onClick={() => {
                       setShowSortFavoritesDropdown(false);
-                      setShowColumnFavoritesDropdown(!showColumnFavoritesDropdown);
+                      setShowColumnFavoritesDropdown(false);
+                      setShowSortSelector(true);
                     }}
-                    title="Column Favorites"
-                    className="bg-[#3a3a3a] border border-[#555] rounded px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444]"
+                    title="Change Sorting"
+                    className="bg-[#3a3a3a] border border-[#555] rounded-l rounded-r-none border-r-0 px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444]"
                   >
-                    <span className="text-[11px]">▼</span>
+                    <span className="text-sm leading-none">⇅</span>
                   </button>
-                  {showColumnFavoritesDropdown && (
-                    <>
-                      <div onClick={() => setShowColumnFavoritesDropdown(false)} className="fixed inset-0 z-[99]" />
-                      <div className="absolute top-full left-0 mt-1 bg-white border border-[#ddd] rounded shadow-lg z-[100] min-w-[260px]">
-                        <button
-                          onClick={() => {
-                            setShowColumnFavoritesDropdown(false);
-                            setShowManageColumnFavoritesModal(true);
-                          }}
-                          className="w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] font-semibold hover:bg-[#f5f5f5]"
-                        >
-                          Manage Favorites
-                        </button>
-                        <div className="px-3 py-1 text-[10px] font-semibold text-[#999] uppercase tracking-wider border-t border-[#eee] bg-[#fafafa]">
-                          Favorites
-                        </div>
-                        {activeColumnFavorites.map((favorite) => (
+
+                  <div className="relative">
+                    <button
+                      onClick={() => {
+                        setShowColumnFavoritesDropdown(false);
+                        setShowSortFavoritesDropdown(!showSortFavoritesDropdown);
+                      }}
+                      title="Sorting Favorites"
+                      className="bg-[#3a3a3a] border border-[#555] rounded-r rounded-l-none px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444]"
+                    >
+                      <span className="text-[11px]">▼</span>
+                    </button>
+                    {showSortFavoritesDropdown && (
+                      <>
+                        <div onClick={() => setShowSortFavoritesDropdown(false)} className="fixed inset-0 z-[99]" />
+                        <div className="absolute top-full left-0 mt-1 bg-white border border-[#ddd] rounded shadow-lg z-[100] min-w-[260px]">
                           <button
-                            key={favorite.id}
-                            onClick={() => handleApplyColumnFavorite(favorite.id)}
-                            className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${activeSelectedColumnFavoriteId === favorite.id ? 'bg-[#e3f2fd]' : ''}`}
+                            onClick={() => {
+                              setShowSortFavoritesDropdown(false);
+                              setShowManageSortFavoritesModal(true);
+                            }}
+                            className="w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] font-semibold hover:bg-[#f5f5f5]"
                           >
-                            <span>{favorite.name}</span>
-                            {activeSelectedColumnFavoriteId === favorite.id && <span className="text-[#2196F3]">✓</span>}
+                            Manage Favorites
                           </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
+                          <div className="px-3 py-1 text-[10px] font-semibold text-[#999] uppercase tracking-wider border-t border-[#eee] bg-[#fafafa]">
+                            Favorites
+                          </div>
+                          {activeSortFavorites.map((favorite) => (
+                            <button
+                              key={favorite.id}
+                              onClick={() => handleApplySortFavorite(favorite.id)}
+                              className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${activeSelectedSortFavoriteId === favorite.id ? 'bg-[#e3f2fd]' : ''}`}
+                            >
+                              <span className="truncate pr-3">{getSortFavoriteDisplayLabel(favorite)}</span>
+                              {activeSelectedSortFavoriteId === favorite.id && <span className="text-[#2196F3]">✓</span>}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center">
+                  <button
+                    onClick={() => {
+                      setShowSortFavoritesDropdown(false);
+                      setShowColumnFavoritesDropdown(false);
+                      setColumnSelectorMode(viewMode);
+                      setShowColumnSelector(true);
+                    }}
+                    title="Change Columns"
+                    className="bg-[#3a3a3a] border border-[#555] rounded-l rounded-r-none border-r-0 px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444]"
+                  >
+                    <span className="text-sm leading-none">▦</span>
+                  </button>
+
+                  <div className="relative">
+                    <button
+                      onClick={() => {
+                        setShowSortFavoritesDropdown(false);
+                        setShowColumnFavoritesDropdown(!showColumnFavoritesDropdown);
+                      }}
+                      title="Column Favorites"
+                      className="bg-[#3a3a3a] border border-[#555] rounded-r rounded-l-none px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444]"
+                    >
+                      <span className="text-[11px]">▼</span>
+                    </button>
+                    {showColumnFavoritesDropdown && (
+                      <>
+                        <div onClick={() => setShowColumnFavoritesDropdown(false)} className="fixed inset-0 z-[99]" />
+                        <div className="absolute top-full left-0 mt-1 bg-white border border-[#ddd] rounded shadow-lg z-[100] min-w-[260px]">
+                          <button
+                            onClick={() => {
+                              setShowColumnFavoritesDropdown(false);
+                              setShowManageColumnFavoritesModal(true);
+                            }}
+                            className="w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] font-semibold hover:bg-[#f5f5f5]"
+                          >
+                            Manage Favorites
+                          </button>
+                          <div className="px-3 py-1 text-[10px] font-semibold text-[#999] uppercase tracking-wider border-t border-[#eee] bg-[#fafafa]">
+                            Favorites
+                          </div>
+                          {activeColumnFavorites.map((favorite) => (
+                            <button
+                              key={favorite.id}
+                              onClick={() => handleApplyColumnFavorite(favorite.id)}
+                              className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${activeSelectedColumnFavoriteId === favorite.id ? 'bg-[#e3f2fd]' : ''}`}
+                            >
+                              <span>{favorite.name}</span>
+                              {activeSelectedColumnFavoriteId === favorite.id && <span className="text-[#2196F3]">✓</span>}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="text-xs text-[#ddd] font-semibold">
@@ -3683,19 +3694,29 @@ function CollectionBrowserPage() {
         onSave={(favorites) => {
           if (viewMode === 'collection') {
             setCollectionSortFavorites(favorites);
-            if (!favorites.some((item) => item.id === selectedCollectionSortFavoriteId)) {
-              setSelectedCollectionSortFavoriteId(favorites[0]?.id ?? '');
-            }
+            const nextId = favorites.some((item) => item.id === selectedCollectionSortFavoriteId)
+              ? selectedCollectionSortFavoriteId
+              : (favorites[0]?.id ?? '');
+            setSelectedCollectionSortFavoriteId(nextId);
+            const nextFavorite = favorites.find((item) => item.id === nextId) ?? null;
+            setActiveCollectionSortFields(nextFavorite?.fields ?? []);
+            setTableSortState({ column: null, direction: null });
           } else if (viewMode === 'album-track') {
             setAlbumTrackSortFavorites(favorites);
-            if (!favorites.some((item) => item.id === selectedAlbumTrackSortFavoriteId)) {
-              setSelectedAlbumTrackSortFavoriteId(favorites[0]?.id ?? '');
-            }
+            const nextId = favorites.some((item) => item.id === selectedAlbumTrackSortFavoriteId)
+              ? selectedAlbumTrackSortFavoriteId
+              : (favorites[0]?.id ?? '');
+            setSelectedAlbumTrackSortFavoriteId(nextId);
+            const nextFavorite = favorites.find((item) => item.id === nextId) ?? null;
+            setActiveAlbumTrackSortFields(nextFavorite?.fields ?? []);
           } else {
             setPlaylistSortFavorites(favorites);
-            if (!favorites.some((item) => item.id === selectedPlaylistSortFavoriteId)) {
-              setSelectedPlaylistSortFavoriteId(favorites[0]?.id ?? '');
-            }
+            const nextId = favorites.some((item) => item.id === selectedPlaylistSortFavoriteId)
+              ? selectedPlaylistSortFavoriteId
+              : (favorites[0]?.id ?? '');
+            setSelectedPlaylistSortFavoriteId(nextId);
+            const nextFavorite = favorites.find((item) => item.id === nextId) ?? null;
+            setActivePlaylistSortFields(nextFavorite?.fields ?? []);
           }
           setShowManageSortFavoritesModal(false);
         }}

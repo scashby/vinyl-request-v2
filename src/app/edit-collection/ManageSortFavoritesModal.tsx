@@ -46,8 +46,6 @@ export function ManageSortFavoritesModal({
   sortFields,
 }: ManageSortFavoritesModalProps) {
   const [localFavorites, setLocalFavorites] = useState<SortFavorite[]>(favorites);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState('');
   const [showSortSelector, setShowSortSelector] = useState(false);
   const [selectedFavoriteForEdit, setSelectedFavoriteForEdit] = useState<SortFavorite | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Main']));
@@ -57,8 +55,6 @@ export function ManageSortFavoritesModal({
   useEffect(() => {
     if (!isOpen) return;
     setLocalFavorites(favorites);
-    setEditingId(null);
-    setEditingName('');
     setShowSortSelector(false);
     setSelectedFavoriteForEdit(null);
     const firstGroup = Object.keys(effectiveSortFields)[0] ?? 'Main';
@@ -75,25 +71,17 @@ export function ManageSortFavoritesModal({
 
   const handleDelete = (id: string) => {
     if (confirm('Are you sure you want to delete this favorite?')) {
-      setLocalFavorites(localFavorites.filter(f => f.id !== id));
-    }
-  };
-
-  const handleRename = (id: string) => {
-    const favorite = localFavorites.find(f => f.id === id);
-    if (favorite) {
-      setEditingId(id);
-      setEditingName(favorite.name);
-    }
-  };
-
-  const handleSaveRename = () => {
-    if (editingId && editingName.trim()) {
-      setLocalFavorites(localFavorites.map(f =>
-        f.id === editingId ? { ...f, name: editingName.trim() } : f
-      ));
-      setEditingId(null);
-      setEditingName('');
+      setLocalFavorites((prev) => {
+        const next = prev.filter((f) => f.id !== id);
+        if (selectedFavoriteForEdit?.id === id) {
+          setSelectedFavoriteForEdit(null);
+          setShowSortSelector(false);
+        }
+        if (onSelect && selectedId === id) {
+          onSelect(next[0]?.id ?? '');
+        }
+        return next;
+      });
     }
   };
 
@@ -105,16 +93,17 @@ export function ManageSortFavoritesModal({
       name: 'New Sort Favorite',
       fields: [{ field: firstField, direction: 'asc' }]
     };
-    setLocalFavorites([...localFavorites, newFavorite]);
+    setLocalFavorites((prev) => [...prev, newFavorite]);
     setSelectedFavoriteForEdit(newFavorite);
     setShowSortSelector(true);
+    onSelect?.(newId);
   };
 
   const handleSaveSortFields = (fields: SortField[]) => {
     if (selectedFavoriteForEdit) {
-      setLocalFavorites(localFavorites.map(f =>
-        f.id === selectedFavoriteForEdit.id ? { ...f, fields } : f
-      ));
+      setLocalFavorites((prev) =>
+        prev.map((f) => (f.id === selectedFavoriteForEdit.id ? { ...f, fields } : f))
+      );
       setShowSortSelector(false);
       setSelectedFavoriteForEdit(null);
     }
@@ -197,74 +186,81 @@ export function ManageSortFavoritesModal({
 
         <div className="flex flex-1 overflow-hidden">
           {/* Favorites List */}
-          <div className={`flex flex-col ${
+          <div className={`flex flex-col shrink-0 transition-all duration-200 ${
             showSortSelector ? 'w-[280px] border-r border-gray-200' : 'w-full'
           }`}>
-            <div className="p-4 border-b border-gray-200">
+            <div className="p-4 border-b border-gray-100">
               <button
                 onClick={handleAddNew}
-                className="w-full px-3 py-2 bg-[#5BA3D0] text-white border-none rounded text-[13px] font-semibold cursor-pointer flex items-center justify-center gap-1.5 hover:bg-[#4a8eb8] transition-colors"
+                className="w-full py-2 px-3 bg-blue-400 text-white border-none rounded text-[13px] font-semibold cursor-pointer flex items-center justify-center gap-1.5 hover:bg-blue-500"
               >
                 <span className="text-base">+</span>
                 <span>New Favorite</span>
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto p-2">
               {localFavorites.map((fav) => (
                 <div
                   key={fav.id}
-                  onClick={() => handleEdit(fav)}
-                  className={`flex items-center justify-between p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 group ${
-                    selectedFavoriteForEdit?.id === fav.id ? 'bg-blue-50' : ''
-                  } ${selectedId === fav.id ? 'bg-blue-50/20' : ''}`}
+                  className={`mb-1 border rounded transition-colors ${
+                    selectedId === fav.id
+                      ? 'border-blue-400 bg-blue-50'
+                      : selectedFavoriteForEdit?.id === fav.id
+                        ? 'border-gray-300 bg-gray-50'
+                        : 'border-gray-200 bg-white'
+                  }`}
+                  onClick={() => onSelect?.(fav.id)}
                 >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="flex items-center gap-2 p-2">
                     {onSelect && (
                       <input
                         type="radio"
                         checked={selectedId === fav.id}
                         onChange={() => onSelect(fav.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="cursor-pointer shrink-0"
+                        className="cursor-pointer"
                       />
                     )}
-                    
-                    {editingId === fav.id ? (
-                      <input
-                        value={editingName}
-                        onChange={(e) => setEditingName(e.target.value)}
-                        onBlur={handleSaveRename}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSaveRename()}
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex-1 px-2 py-1 text-[13px] border border-blue-300 rounded outline-none"
-                        autoFocus
-                      />
-                    ) : (
-                      <span className="text-[13px] font-medium text-gray-700">
-                        {fav.name}
-                      </span>
-                    )}
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="flex-1 text-[13px] font-medium text-gray-900">
+                      {fav.name}
+                    </span>
+                    <div className="flex gap-1">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleRename(fav.id);
+                          handleEdit(fav);
                         }}
-                        className="p-1 text-gray-400 hover:text-blue-500 transition-colors"
+                        title="Edit sort fields"
+                        className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-[12px] text-gray-800 cursor-pointer hover:bg-gray-200"
                       >
-                        ✎
+                        Edit
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDelete(fav.id);
                         }}
-                        className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                        title="Delete favorite"
+                        className="w-7 h-7 flex items-center justify-center bg-transparent border border-red-200 rounded cursor-pointer text-sm text-red-500 hover:bg-red-50 hover:text-red-600"
                       >
                         🗑
                       </button>
                     </div>
+                  </div>
+                  <div className="px-2 pb-2 pl-8 text-[11px] text-gray-600 flex flex-wrap items-center gap-1">
+                    {fav.fields.length === 0 ? (
+                      <span className="text-gray-400">No sort fields selected</span>
+                    ) : (
+                      fav.fields.map((field, index) => (
+                        <span key={`${fav.id}-${field.field}-${index}`} className="inline-flex items-center gap-1">
+                          <span>{field.field}</span>
+                          <span className="px-1 py-0.5 border border-gray-300 rounded bg-white text-[10px] text-gray-700 font-semibold">
+                            {field.direction.toUpperCase()}
+                          </span>
+                          {index < fav.fields.length - 1 && <span className="text-gray-400">|</span>}
+                        </span>
+                      ))
+                    )}
                   </div>
                 </div>
               ))}
