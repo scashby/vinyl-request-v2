@@ -7,18 +7,24 @@ const DEFAULT_LIMIT = 200;
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = (searchParams.get("q") || "").trim().toLowerCase();
+  const includeForSale = (searchParams.get("includeForSale") ?? "false").toLowerCase() === "true";
 
   if (!query) {
     return NextResponse.json({ data: [] }, { status: 200 });
   }
 
-  const { data: inventoryRows, error } = await supabaseAdmin
+  let inventoryQuery = supabaseAdmin
     .from("inventory")
     .select(
       "id, releases ( id, media_type, format_details, release_year, release_tracks ( id, position, side, title_override, recordings ( id, title, track_artist ) ) )"
     )
-    .eq("releases.media_type", "Vinyl")
-    .limit(DEFAULT_LIMIT);
+    .eq("releases.media_type", "Vinyl");
+
+  if (!includeForSale) {
+    inventoryQuery = inventoryQuery.neq("status", "for_sale");
+  }
+
+  const { data: inventoryRows, error } = await inventoryQuery.limit(DEFAULT_LIMIT);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

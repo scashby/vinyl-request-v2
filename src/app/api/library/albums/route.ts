@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const location = (url.searchParams.get("location") ?? "").trim();
     const mediaType = (url.searchParams.get("mediaType") ?? "").trim();
     const includeTracks = (url.searchParams.get("includeTracks") ?? "false").toLowerCase() === "true";
+    const includeForSale = (url.searchParams.get("includeForSale") ?? "false").toLowerCase() === "true";
     const page = clamp(Number(url.searchParams.get("page") ?? 0), 0, 5000);
     const requestedPageSize = Number(url.searchParams.get("pageSize") ?? (includeTracks ? 100 : 250));
     const pageSize = includeTracks
@@ -138,6 +139,7 @@ export async function GET(request: NextRequest) {
 
     const db = supabaseAdmin;
     let query = db.from("inventory").select(includeTracks ? selectWithTracks : selectWithoutTracks);
+    if (!includeForSale) query = query.neq("status", "for_sale");
 
     if (location) query = query.eq("location", location);
     // Note: filtering by nested release fields via PostgREST can be environment-dependent.

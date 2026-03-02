@@ -26,14 +26,15 @@ export async function GET(request: NextRequest) {
     ]
       .map((value) => value.trim())
       .filter(Boolean);
+    const includeForSale = (url.searchParams.get("includeForSale") ?? "false").toLowerCase() === "true";
 
     if (!q) {
       return NextResponse.json({ error: "q is required" }, { status: 400 });
     }
 
     const authHeader = getAuthHeader(request);
-    const index = await getCachedInventoryIndex(authHeader);
-    const candidates = await searchInventoryCandidates({ title: q, artist, limit, mediaTypes, formatDetails }, index);
+    const index = await getCachedInventoryIndex(authHeader, { includeForSale });
+    const candidates = await searchInventoryCandidates({ title: q, artist, limit, mediaTypes, formatDetails, includeForSale }, index);
 
     const db = getBingoDb();
     const keys = candidates

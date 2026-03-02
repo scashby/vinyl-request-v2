@@ -37,6 +37,10 @@ type InventoryIndex = {
   byToken: Map<string, InventoryTrack[]>;
 };
 
+type InventoryIndexOptions = {
+  includeForSale?: boolean;
+};
+
 type CachedInventoryIndex = {
   expiresAt: number;
   index: InventoryIndex;
@@ -346,14 +350,15 @@ export const buildInventoryIndex = (tracks: InventoryTrack[]): InventoryIndex =>
   return { exact, titleOnly, byToken };
 };
 
-export const getCachedInventoryIndex = async (authHeader?: string) => {
+export const getCachedInventoryIndex = async (authHeader?: string, options: InventoryIndexOptions = {}) => {
+  const includeForSale = options.includeForSale === true;
   const now = Date.now();
-  const key = getCacheKeyForAuthHeader(authHeader);
+  const key = `${getCacheKeyForAuthHeader(authHeader)}:${includeForSale ? "with-sale" : "no-sale"}`;
   const cached = inventoryIndexCache[key];
   if (cached && cached.expiresAt > now && cached.version === INVENTORY_INDEX_VERSION) {
     return cached.index;
   }
-  const tracks = await fetchInventoryTracks(authHeader);
+  const tracks = await fetchInventoryTracks(authHeader, undefined, { includeForSale });
   const index = buildInventoryIndex(tracks);
   inventoryIndexCache[key] = { expiresAt: now + INVENTORY_INDEX_TTL_MS, index, version: INVENTORY_INDEX_VERSION };
   return index;
@@ -431,10 +436,10 @@ export const matchTracks = (
 };
 
 export const searchInventoryCandidates = async (
-  params: { title: string; artist?: string; limit?: number; mediaTypes?: string[]; formatDetails?: string[] },
+  params: { title: string; artist?: string; limit?: number; mediaTypes?: string[]; formatDetails?: string[]; includeForSale?: boolean },
   index?: InventoryIndex
 ): Promise<MatchCandidate[]> => {
-  const resolvedIndex = index ?? (await getCachedInventoryIndex());
+  const resolvedIndex = index ?? (await getCachedInventoryIndex(undefined, { includeForSale: params.includeForSale === true }));
   const titleRaw = params.title ?? "";
   const artistRaw = params.artist ?? "";
   const limit = Math.min(25, Math.max(1, Number(params.limit ?? 10)));
@@ -506,10 +511,15 @@ export const searchInventoryCandidates = async (
     .slice(0, limit);
 };
 
-export const fetchInventoryTracks = async (authHeaderOrLimit?: string | number, limitMaybe?: number) => {
+export const fetchInventoryTracks = async (
+  authHeaderOrLimit?: string | number,
+  limitMaybe?: number,
+  options: InventoryIndexOptions = {}
+) => {
   const tracks: InventoryTrack[] = [];
   const authHeader = typeof authHeaderOrLimit === "string" ? authHeaderOrLimit : undefined;
   const limit = typeof authHeaderOrLimit === "number" ? authHeaderOrLimit : limitMaybe;
+  const includeForSale = options.includeForSale === true;
   const supabase = authHeader ? supabaseServer(authHeader) : supabaseAdmin;
 
   // Step 1: fetch inventory rows to determine the release ids in the library.
@@ -519,12 +529,17 @@ export const fetchInventoryTracks = async (authHeaderOrLimit?: string | number, 
   while (true) {
     const from = inventoryPage * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
-    const { data: inventoryRows, error: inventoryError } = await supabase
+    let inventoryQuery = supabase
       .from("inventory")
       .select("id, release_id")
       .not("release_id", "is", null)
-      .order("id", { ascending: true })
-      .range(from, to);
+      .order("id", { ascending: true });
+
+    if (!includeForSale) {
+      inventoryQuery = inventoryQuery.neq("status", "for_sale");
+    }
+
+    const { data: inventoryRows, error: inventoryError } = await inventoryQuery.range(from, to);
 
     if (inventoryError) {
       throw new Error(`Failed loading inventory rows: ${inventoryError.message}`);

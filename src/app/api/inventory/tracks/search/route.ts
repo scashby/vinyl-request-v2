@@ -11,13 +11,14 @@ export async function GET(req: Request) {
     const artist = (url.searchParams.get('artist') ?? '').trim();
     const limitRaw = url.searchParams.get('limit');
     const limit = limitRaw ? Number(limitRaw) : 10;
+    const includeForSale = (url.searchParams.get('includeForSale') ?? 'false').toLowerCase() === 'true';
 
     if (!q) {
       return NextResponse.json({ error: 'q is required' }, { status: 400 });
     }
 
-    const index = await getCachedInventoryIndex(getAuthHeader(req));
-    const results = await searchInventoryCandidates({ title: q, artist, limit }, index);
+    const index = await getCachedInventoryIndex(getAuthHeader(req), { includeForSale });
+    const results = await searchInventoryCandidates({ title: q, artist, limit, includeForSale }, index);
     return NextResponse.json({ ok: true, results });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Search failed';

@@ -967,6 +967,33 @@ const buildTrackRuleMetadata = (album: Album) => {
   };
 };
 
+const isAlbumForSale = (album: Album): boolean => album.status === 'for_sale' || album.for_sale === true;
+
+const isTruthyRuleValue = (value: unknown): boolean => {
+  if (value === true) return true;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === 'yes' || normalized === '1';
+  }
+  return false;
+};
+
+const isSaleOnlyCrate = (crate: Crate | null | undefined): boolean => {
+  if (!crate) return false;
+  const rules = crate.smart_rules?.rules;
+  if (crate.is_smart && Array.isArray(rules) && rules.length === 1) {
+    const rule = rules[0];
+    return (
+      rule?.field === 'for_sale' &&
+      rule?.operator === 'is' &&
+      isTruthyRuleValue(rule?.value)
+    );
+  }
+  const normalizedName = crate.name.trim().toLowerCase();
+  return normalizedName === 'sale' || normalizedName === 'for sale';
+};
+
 function CollectionBrowserPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
@@ -984,7 +1011,6 @@ function CollectionBrowserPage() {
   const [selectedFolderValue, setSelectedFolderValue] = useState<string | null>(null);
   const [selectedCrateId, setSelectedCrateId] = useState<number | null>(null);
   const [crates, setCrates] = useState<Crate[]>([]);
-  const [crateItemCounts, setCrateItemCounts] = useState<Record<number, number>>({});
   const [crateItemsByCrate, setCrateItemsByCrate] = useState<Record<number, Set<number>>>({});
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<number | null>(null);
@@ -1605,6 +1631,7 @@ function CollectionBrowserPage() {
         url.searchParams.set('page', String(page));
         url.searchParams.set('pageSize', String(pageSize));
         url.searchParams.set('includeTracks', includeTracks ? 'true' : 'false');
+        url.searchParams.set('includeForSale', 'true');
         const res = await fetch(url.toString(), { cache: 'no-store' });
         const payload = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -1695,13 +1722,6 @@ function CollectionBrowserPage() {
       return;
     }
 
-    const counts = (crateItems ?? []).reduce((acc, item) => {
-      if (item.crate_id && item.inventory_id) {
-        acc[item.crate_id] = (acc[item.crate_id] || 0) + 1;
-      }
-      return acc;
-    }, {} as Record<number, number>);
-
     const itemMap = (crateItems ?? []).reduce((acc, item) => {
       if (!item.crate_id || !item.inventory_id) return acc;
       if (!acc[item.crate_id]) {
@@ -1711,7 +1731,6 @@ function CollectionBrowserPage() {
       return acc;
     }, {} as Record<number, Set<number>>);
 
-    setCrateItemCounts(counts);
     setCrateItemsByCrate(itemMap);
   }, []);
 
@@ -1778,9 +1797,30 @@ function CollectionBrowserPage() {
     }
   }, [ensureTracksHydrated, viewMode]);
 
+  const selectedCrate = useMemo(
+    () => (selectedCrateId !== null ? crates.find((crate) => crate.id === selectedCrateId) ?? null : null),
+    [crates, selectedCrateId]
+  );
+
+  const isCrateContextActive = useMemo(() => {
+    if (folderMode !== 'crates') return false;
+    if (viewMode === 'collection') return true;
+    return trackSource === 'crates';
+  }, [folderMode, trackSource, viewMode]);
+
+  const isViewingSaleCrate = useMemo(
+    () => isCrateContextActive && isSaleOnlyCrate(selectedCrate),
+    [isCrateContextActive, selectedCrate]
+  );
+
+  const nonSaleAlbums = useMemo(() => albums.filter((album) => !isAlbumForSale(album)), [albums]);
+  const defaultVisibleAlbumCount = nonSaleAlbums.length;
+
   const filteredAndSortedAlbums = useMemo(() => {
     let filtered = albums.filter(album => {
-      if (collectionFilter === 'For Sale' && album.status !== 'for_sale') return false;
+      const albumIsForSale = isAlbumForSale(album);
+      if (isViewingSaleCrate && !albumIsForSale) return false;
+      if (!isViewingSaleCrate && albumIsForSale) return false;
       
       if (selectedLetter !== 'All') {
         const firstChar = getAlbumArtist(album).charAt(0).toUpperCase();
@@ -1792,7 +1832,6 @@ function CollectionBrowserPage() {
       }
 
       if (viewMode === 'collection' && folderMode === 'crates' && selectedCrateId !== null) {
-        const selectedCrate = crates.find(c => c.id === selectedCrateId);
         if (selectedCrate) {
           if (selectedCrate.is_smart) {
             if (!albumMatchesSmartCrate(album, selectedCrate)) {
@@ -1873,33 +1912,48 @@ function CollectionBrowserPage() {
     }
 
     return filtered;
-  }, [activeCollectionSortFields, albums, collectionFilter, selectedLetter, selectedFolderValue, selectedCrateId, folderMode, crates, searchQuery, sortBy, tableSortState, crateItemsByCrate, viewMode]);
+  }, [activeCollectionSortFields, albums, isViewingSaleCrate, selectedLetter, selectedFolderValue, selectedCrateId, folderMode, selectedCrate, searchQuery, sortBy, tableSortState, crateItemsByCrate, viewMode]);
 
   const folderCounts = useMemo(() => {
-    return albums.reduce((acc, album) => {
+    return nonSaleAlbums.reduce((acc, album) => {
       const itemKey = album.release?.media_type || 'Unknown';
       acc[itemKey] = (acc[itemKey] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-  }, [albums]);
+  }, [nonSaleAlbums]);
 
   const cratesWithCounts = useMemo(() => {
     return crates.map(crate => {
+      const crateIsSaleOnly = isSaleOnlyCrate(crate);
       let count = 0;
       if (crate.is_smart) {
-        count = albums.filter(album => albumMatchesSmartCrate(album, crate)).length;
+        count = albums.filter((album) => {
+          if (crateIsSaleOnly && !isAlbumForSale(album)) return false;
+          if (!crateIsSaleOnly && isAlbumForSale(album)) return false;
+          return albumMatchesSmartCrate(album, crate);
+        }).length;
       } else {
-        count = crateItemCounts[crate.id] || 0;
+        const crateInventoryIds = crateItemsByCrate[crate.id] ?? new Set<number>();
+        count = albums.filter((album) => {
+          if (!crateInventoryIds.has(album.id)) return false;
+          if (crateIsSaleOnly && !isAlbumForSale(album)) return false;
+          if (!crateIsSaleOnly && isAlbumForSale(album)) return false;
+          return true;
+        }).length;
       }
       return { ...crate, album_count: count };
     });
-  }, [crates, albums, crateItemCounts]);
+  }, [crates, albums, crateItemsByCrate]);
 
   const allTrackRows = useMemo<CollectionTrackRow[]>(() => {
     const rows: CollectionTrackRow[] = [];
 
     albums.forEach((album) => {
-      if (collectionFilter === 'For Sale' && album.status !== 'for_sale') {
+      const albumIsForSale = isAlbumForSale(album);
+      if (isViewingSaleCrate && !albumIsForSale) {
+        return;
+      }
+      if (!isViewingSaleCrate && albumIsForSale) {
         return;
       }
       const albumArtist = getAlbumArtist(album);
@@ -1962,7 +2016,7 @@ function CollectionBrowserPage() {
     });
 
     return rows;
-  }, [albums, collectionFilter]);
+  }, [albums, isViewingSaleCrate]);
 
   const trackFormatCounts = useMemo(() => {
     return allTrackRows.reduce((acc, row) => {
@@ -2055,8 +2109,6 @@ function CollectionBrowserPage() {
 
   const filteredTrackRows = useMemo(() => {
     let rows = allTrackRows;
-
-    const selectedCrate = selectedCrateId !== null ? crates.find((crate) => crate.id === selectedCrateId) : null;
 
     if (trackSource === 'crates' && selectedCrate) {
       if (selectedCrate.is_smart) {
@@ -2165,8 +2217,7 @@ function CollectionBrowserPage() {
   }, [
     allTrackRows,
     trackSource,
-    selectedCrateId,
-    crates,
+    selectedCrate,
     albums,
     crateItemsByCrate,
     selectedPlaylistId,
@@ -3005,7 +3056,7 @@ function CollectionBrowserPage() {
                 <>
                   <div onClick={() => setShowCollectionDropdown(false)} className="fixed inset-0 z-[99]" />
                   <div className="absolute top-full left-0 mt-1 bg-[#2a2a2a] border border-[#555] rounded z-[100] min-w-[150px] shadow-lg">
-                    {['All', 'For Sale'].map(filter => (
+                    {['All'].map(filter => (
                       <button 
                         key={filter}
                         onClick={() => { setCollectionFilter(filter); setShowCollectionDropdown(false); }}
@@ -3199,7 +3250,7 @@ function CollectionBrowserPage() {
                 <>
                   <button onClick={() => setSelectedFolderValue(null)} title="Show all albums" className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${!selectedFolderValue ? 'bg-[#5A9BD5]' : ''}`}>
                     <span>[All Albums]</span>
-                    <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${!selectedFolderValue ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{albums.length}</span>
+                    <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${!selectedFolderValue ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{defaultVisibleAlbumCount}</span>
                   </button>
 
                   {sortedFolderItems.map(([format, count]) => (
@@ -3213,7 +3264,7 @@ function CollectionBrowserPage() {
                 <>
                   <button onClick={() => setSelectedCrateId(null)} title="Show all albums" className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${selectedCrateId === null ? 'bg-[#5A9BD5]' : ''}`}>
                     <span>📚 [All Albums]</span>
-                    <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${selectedCrateId === null ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{albums.length}</span>
+                    <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${selectedCrateId === null ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{defaultVisibleAlbumCount}</span>
                   </button>
 
                   {cratesWithCounts
