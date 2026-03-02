@@ -105,9 +105,7 @@ export default function CoverArtClueChaseSetupPage() {
   const [hostBufferSeconds, setHostBufferSeconds] = useState(10);
 
   const [teamNamesText, setTeamNamesText] = useState("Table 1\nTable 2");
-  const [callListText, setCallListText] = useState(
-    "Fleetwood Mac - Rumours | 1977 | https://img.example.com/r1-1.jpg | https://img.example.com/r1-2.jpg | https://img.example.com/r1-3.jpg | clean intro on side B | LP A\nDaft Punk - Discovery | 2001 | https://img.example.com/r2-1.jpg | https://img.example.com/r2-2.jpg | https://img.example.com/r2-3.jpg | vocoder clue | LP B"
-  );
+  const [callListText, setCallListText] = useState("");
 
   const [preflight, setPreflight] = useState({
     imageDeckPrepared: false,

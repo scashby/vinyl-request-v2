@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 
 type CreateSessionBody = {
   event_id?: number | null;
+  playlist_id?: number | null;
   title?: string;
   bracket_size?: number;
   vote_method?: "hands" | "slips";
@@ -31,6 +32,7 @@ type CreateSessionBody = {
 type SessionListRow = {
   id: number;
   event_id: number | null;
+  playlist_id: number | null;
   session_code: string;
   title: string;
   bracket_size: number;
@@ -41,6 +43,7 @@ type SessionListRow = {
 };
 
 type EventRow = { id: number; title: string };
+type PlaylistRow = { id: number; name: string };
 
 function normalizeTeamNames(teamNames: string[] | undefined): string[] {
   const names = (teamNames ?? []).map((name) => name.trim()).filter(Boolean);
@@ -111,7 +114,7 @@ export async function GET(request: NextRequest) {
 
   let query = db
     .from("bb_sessions")
-    .select("id, event_id, session_code, title, bracket_size, vote_method, status, current_round, created_at")
+    .select("id, event_id, playlist_id, session_code, title, bracket_size, vote_method, status, current_round, created_at")
     .order("created_at", { ascending: false });
 
   if (eventId) query = query.eq("event_id", Number(eventId));
@@ -127,6 +130,13 @@ export async function GET(request: NextRequest) {
     : { data: [] as EventRow[] };
 
   const eventsById = new Map<number, EventRow>(((events ?? []) as EventRow[]).map((row) => [row.id, row]));
+  const playlistIds = Array.from(
+    new Set(sessions.map((row) => row.playlist_id).filter((value): value is number => Number.isFinite(value)))
+  );
+  const { data: playlists } = playlistIds.length
+    ? await db.from("collection_playlists").select("id, name").in("id", playlistIds)
+    : { data: [] as PlaylistRow[] };
+  const playlistsById = new Map<number, PlaylistRow>(((playlists ?? []) as PlaylistRow[]).map((row) => [row.id, row]));
 
   const sessionIds = sessions.map((session) => session.id);
   const { data: matchups } = sessionIds.length
@@ -143,6 +153,7 @@ export async function GET(request: NextRequest) {
       data: sessions.map((row) => ({
         ...row,
         event_title: row.event_id ? eventsById.get(row.event_id)?.title ?? null : null,
+        playlist_name: row.playlist_id ? playlistsById.get(row.playlist_id)?.name ?? null : null,
         matchups_total: matchupCountBySession.get(row.id) ?? 0,
       })),
     },
@@ -154,6 +165,20 @@ export async function POST(request: NextRequest) {
   try {
     const db = getBracketBattleDb();
     const body = (await request.json()) as CreateSessionBody;
+    const playlistId = Number(body.playlist_id);
+
+    if (!Number.isFinite(playlistId) || playlistId <= 0) {
+      return NextResponse.json({ error: "playlist_id is required" }, { status: 400 });
+    }
+
+    const { data: playlist, error: playlistError } = await db
+      .from("collection_playlists")
+      .select("id")
+      .eq("id", playlistId)
+      .maybeSingle();
+
+    if (playlistError) return NextResponse.json({ error: playlistError.message }, { status: 500 });
+    if (!playlist) return NextResponse.json({ error: "Playlist not found" }, { status: 404 });
 
     const bracketSize = normalizeBracketSize(body.bracket_size);
     const removeResleeveSeconds = Math.max(0, Number(body.remove_resleeve_seconds ?? 20));
@@ -184,6 +209,7 @@ export async function POST(request: NextRequest) {
       .from("bb_sessions")
       .insert({
         event_id: body.event_id ?? null,
+        playlist_id: playlistId,
         session_code: code,
         title: (body.title ?? "Bracket Battle Session").trim() || "Bracket Battle Session",
         bracket_size: bracketSize,

@@ -107,9 +107,7 @@ export default function ArtistAliasSetupPage() {
   const [hostBufferSeconds, setHostBufferSeconds] = useState(10);
 
   const [teamNamesText, setTeamNamesText] = useState("Table 1\nTable 2");
-  const [callListText, setCallListText] = useState(
-    "Prince | 80s Minneapolis funk | Teamed with The Revolution | Warner Bros / Minneapolis | The Artist Formerly Known as Prince, Love Symbol | Optional audio teaser | LP A\nDavid Bowie | 70s glam to art-pop pivot | Worked heavily with Brian Eno | UK/EMI to RCA run | Ziggy Stardust, Thin White Duke | | LP B"
-  );
+  const [callListText, setCallListText] = useState("");
 
   const [preflight, setPreflight] = useState({
     clueCardsPrepared: false,

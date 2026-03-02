@@ -34,6 +34,7 @@ export type BracketBattleDatabase = {
         Row: {
           id: number;
           event_id: number | null;
+          playlist_id: number | null;
           session_code: string;
           title: string;
           bracket_size: number;
@@ -58,6 +59,7 @@ export type BracketBattleDatabase = {
         Insert: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code: string;
           title: string;
           bracket_size?: number;
@@ -82,6 +84,7 @@ export type BracketBattleDatabase = {
         Update: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code?: string;
           title?: string;
           bracket_size?: number;

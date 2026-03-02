@@ -98,9 +98,7 @@ export default function DecadeDashSetupPage() {
   const [hostBufferSeconds, setHostBufferSeconds] = useState(10);
 
   const [teamNamesText, setTeamNamesText] = useState("Table 1\nTable 2");
-  const [callListText, setCallListText] = useState(
-    "Madonna - Like a Prayer | 1989 | LP A1\nOutkast - Hey Ya! | 2003 | LP B2"
-  );
+  const [callListText, setCallListText] = useState("");
 
   const [preflight, setPreflight] = useState({
     decadeCardsOnTables: false,

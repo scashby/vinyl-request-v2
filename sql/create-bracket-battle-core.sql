@@ -3,6 +3,7 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS public.bb_sessions (
   id bigserial PRIMARY KEY,
   event_id bigint REFERENCES public.events(id) ON DELETE SET NULL,
+  playlist_id bigint REFERENCES public.collection_playlists(id) ON DELETE SET NULL,
   session_code text NOT NULL UNIQUE,
   title text NOT NULL,
   bracket_size integer NOT NULL DEFAULT 8,
@@ -29,6 +30,14 @@ CREATE TABLE IF NOT EXISTS public.bb_sessions (
   CONSTRAINT bb_sessions_status_chk CHECK (status IN ('pending', 'running', 'paused', 'completed')),
   CONSTRAINT bb_sessions_target_gap_seconds_chk CHECK (target_gap_seconds > 0)
 );
+
+ALTER TABLE public.bb_sessions
+  ADD COLUMN IF NOT EXISTS playlist_id bigint;
+ALTER TABLE public.bb_sessions
+  DROP CONSTRAINT IF EXISTS bb_sessions_playlist_id_fkey;
+ALTER TABLE public.bb_sessions
+  ADD CONSTRAINT bb_sessions_playlist_id_fkey
+  FOREIGN KEY (playlist_id) REFERENCES public.collection_playlists(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS public.bb_session_teams (
   id bigserial PRIMARY KEY,
@@ -139,6 +148,7 @@ CREATE TABLE IF NOT EXISTS public.bb_session_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_bb_sessions_event_id ON public.bb_sessions(event_id);
+CREATE INDEX IF NOT EXISTS idx_bb_sessions_playlist_id ON public.bb_sessions(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_bb_sessions_status ON public.bb_sessions(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_bb_teams_session_id ON public.bb_session_teams(session_id);
 CREATE INDEX IF NOT EXISTS idx_bb_entries_session_id ON public.bb_session_entries(session_id);

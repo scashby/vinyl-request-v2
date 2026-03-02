@@ -3,6 +3,7 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS public.dd_sessions (
   id bigserial PRIMARY KEY,
   event_id bigint REFERENCES public.events(id) ON DELETE SET NULL,
+  playlist_id bigint REFERENCES public.collection_playlists(id) ON DELETE SET NULL,
   session_code text NOT NULL UNIQUE,
   title text NOT NULL,
   round_count integer NOT NULL DEFAULT 14,
@@ -30,6 +31,14 @@ CREATE TABLE IF NOT EXISTS public.dd_sessions (
   CONSTRAINT dd_sessions_exact_points_chk CHECK (exact_points BETWEEN 0 AND 2),
   CONSTRAINT dd_sessions_adjacent_points_chk CHECK (adjacent_points BETWEEN 0 AND 1)
 );
+
+ALTER TABLE public.dd_sessions
+  ADD COLUMN IF NOT EXISTS playlist_id bigint;
+ALTER TABLE public.dd_sessions
+  DROP CONSTRAINT IF EXISTS dd_sessions_playlist_id_fkey;
+ALTER TABLE public.dd_sessions
+  ADD CONSTRAINT dd_sessions_playlist_id_fkey
+  FOREIGN KEY (playlist_id) REFERENCES public.collection_playlists(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS public.dd_session_teams (
   id bigserial PRIMARY KEY,
@@ -102,6 +111,7 @@ CREATE TABLE IF NOT EXISTS public.dd_session_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_dd_sessions_event_id ON public.dd_sessions(event_id);
+CREATE INDEX IF NOT EXISTS idx_dd_sessions_playlist_id ON public.dd_sessions(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_dd_sessions_status ON public.dd_sessions(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_dd_teams_session_id ON public.dd_session_teams(session_id);
 CREATE INDEX IF NOT EXISTS idx_dd_rounds_session_id ON public.dd_session_rounds(session_id);

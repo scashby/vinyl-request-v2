@@ -113,9 +113,7 @@ export default function WrongLyricChallengeSetupPage() {
   const [hostBufferSeconds, setHostBufferSeconds] = useState(10);
 
   const [teamNamesText, setTeamNamesText] = useState("Team A\nTeam B");
-  const [callListText, setCallListText] = useState(
-    "Prince - Purple Rain | I never meant to cause you any sorrow | I never meant to cause you any pain;;I only wanted one time to see you laughing;;slot=2 | LP side B | cue by chorus\nFleetwood Mac - Dreams | Players only love you when they're playing | Women they will come and they will go;;Players only call you when they're lonely;;slot=1 | LP side A | keep under 15 sec"
-  );
+  const [callListText, setCallListText] = useState("");
 
   const [creating, setCreating] = useState(false);
 

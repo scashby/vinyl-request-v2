@@ -102,9 +102,7 @@ export default function OriginalOrCoverSetupPage() {
   const [hostBufferSeconds, setHostBufferSeconds] = useState(10);
 
   const [teamNamesText, setTeamNamesText] = useState("Table 1\nTable 2");
-  const [callListText, setCallListText] = useState(
-    "The Fugees - Killing Me Softly | cover | Roberta Flack | 1996 | LP crate A | Big crowd recognition\nRoberta Flack - Killing Me Softly | original | Roberta Flack | 1973 | LP crate B | Use when reset time is tight"
-  );
+  const [callListText, setCallListText] = useState("");
 
   const [preflight, setPreflight] = useState({
     pairKeyVerified: false,

@@ -37,6 +37,7 @@ export type DecadeDashDatabase = {
         Row: {
           id: number;
           event_id: number | null;
+          playlist_id: number | null;
           session_code: string;
           title: string;
           round_count: number;
@@ -62,6 +63,7 @@ export type DecadeDashDatabase = {
         Insert: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code: string;
           title: string;
           round_count?: number;
@@ -87,6 +89,7 @@ export type DecadeDashDatabase = {
         Update: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code?: string;
           title?: string;
           round_count?: number;

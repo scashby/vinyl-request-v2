@@ -3,6 +3,7 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS public.aa_sessions (
   id bigserial PRIMARY KEY,
   event_id bigint REFERENCES public.events(id) ON DELETE SET NULL,
+  playlist_id bigint REFERENCES public.collection_playlists(id) ON DELETE SET NULL,
   session_code text NOT NULL UNIQUE,
   title text NOT NULL,
   round_count integer NOT NULL DEFAULT 10,
@@ -32,6 +33,14 @@ CREATE TABLE IF NOT EXISTS public.aa_sessions (
   CONSTRAINT aa_sessions_stage_two_points_chk CHECK (stage_two_points BETWEEN 0 AND 5),
   CONSTRAINT aa_sessions_final_reveal_points_chk CHECK (final_reveal_points BETWEEN 0 AND 5)
 );
+
+ALTER TABLE public.aa_sessions
+  ADD COLUMN IF NOT EXISTS playlist_id bigint;
+ALTER TABLE public.aa_sessions
+  DROP CONSTRAINT IF EXISTS aa_sessions_playlist_id_fkey;
+ALTER TABLE public.aa_sessions
+  ADD CONSTRAINT aa_sessions_playlist_id_fkey
+  FOREIGN KEY (playlist_id) REFERENCES public.collection_playlists(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS public.aa_session_teams (
   id bigserial PRIMARY KEY,
@@ -108,6 +117,7 @@ CREATE TABLE IF NOT EXISTS public.aa_session_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_aa_sessions_event_id ON public.aa_sessions(event_id);
+CREATE INDEX IF NOT EXISTS idx_aa_sessions_playlist_id ON public.aa_sessions(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_aa_sessions_status ON public.aa_sessions(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_aa_teams_session_id ON public.aa_session_teams(session_id);
 CREATE INDEX IF NOT EXISTS idx_aa_rounds_session_id ON public.aa_session_rounds(session_id);

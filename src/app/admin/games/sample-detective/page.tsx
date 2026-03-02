@@ -103,9 +103,7 @@ export default function SampleDetectiveSetupPage() {
   const [hostBufferSeconds, setHostBufferSeconds] = useState(10);
 
   const [teamNamesText, setTeamNamesText] = useState("Table 1\nTable 2");
-  const [callListText, setCallListText] = useState(
-    "Lauryn Hill - Doo Wop (That Thing) | The 5th Dimension - Together Let's Find Love | 1998 | 00:12 | 45 bin A\nKanye West - Gold Digger | Ray Charles - I Got a Woman | 2005 | 00:08 | LP shelf B"
-  );
+  const [callListText, setCallListText] = useState("");
 
   const [preflight, setPreflight] = useState({
     sourcePairsVerified: false,

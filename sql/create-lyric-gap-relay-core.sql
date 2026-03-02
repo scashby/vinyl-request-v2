@@ -3,6 +3,7 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS public.lgr_sessions (
   id bigserial PRIMARY KEY,
   event_id bigint REFERENCES public.events(id) ON DELETE SET NULL,
+  playlist_id bigint REFERENCES public.collection_playlists(id) ON DELETE SET NULL,
   session_code text NOT NULL UNIQUE,
   title text NOT NULL,
   round_count integer NOT NULL DEFAULT 10,
@@ -39,6 +40,13 @@ ALTER TABLE public.lgr_sessions
   ADD COLUMN IF NOT EXISTS paused_remaining_seconds integer;
 ALTER TABLE public.lgr_sessions
   ADD COLUMN IF NOT EXISTS paused_at timestamptz;
+ALTER TABLE public.lgr_sessions
+  ADD COLUMN IF NOT EXISTS playlist_id bigint;
+ALTER TABLE public.lgr_sessions
+  DROP CONSTRAINT IF EXISTS lgr_sessions_playlist_id_fkey;
+ALTER TABLE public.lgr_sessions
+  ADD CONSTRAINT lgr_sessions_playlist_id_fkey
+  FOREIGN KEY (playlist_id) REFERENCES public.collection_playlists(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS public.lgr_session_teams (
   id bigserial PRIMARY KEY,
@@ -109,6 +117,7 @@ CREATE TABLE IF NOT EXISTS public.lgr_session_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_lgr_sessions_event_id ON public.lgr_sessions(event_id);
+CREATE INDEX IF NOT EXISTS idx_lgr_sessions_playlist_id ON public.lgr_sessions(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_lgr_sessions_status ON public.lgr_sessions(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_lgr_teams_session_id ON public.lgr_session_teams(session_id);
 CREATE INDEX IF NOT EXISTS idx_lgr_rounds_session_id ON public.lgr_session_rounds(session_id);

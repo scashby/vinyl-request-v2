@@ -36,6 +36,7 @@ type ArtistAliasDatabase = {
         Row: {
           id: number;
           event_id: number | null;
+          playlist_id: number | null;
           session_code: string;
           title: string;
           round_count: number;
@@ -62,6 +63,7 @@ type ArtistAliasDatabase = {
         Insert: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code: string;
           title: string;
           round_count?: number;
@@ -88,6 +90,7 @@ type ArtistAliasDatabase = {
         Update: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code?: string;
           title?: string;
           round_count?: number;

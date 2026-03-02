@@ -107,9 +107,7 @@ export default function LyricGapRelaySetupPage() {
   const [hostBufferSeconds, setHostBufferSeconds] = useState(10);
 
   const [teamNamesText, setTeamNamesText] = useState("Team A\nTeam B");
-  const [callListText, setCallListText] = useState(
-    "Queen - We Are The Champions | We are the champions, my friends >>> and we'll keep on fighting till the end | LP side A\nWhitney Houston - I Wanna Dance with Somebody | Oh, I wanna dance with somebody >>> I wanna feel the heat with somebody | 12in"
-  );
+  const [callListText, setCallListText] = useState("");
 
   const [preflight, setPreflight] = useState({
     answerKeyPrinted: false,

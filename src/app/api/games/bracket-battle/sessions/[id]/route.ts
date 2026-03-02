@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 type SessionRow = {
   id: number;
   event_id: number | null;
+  playlist_id: number | null;
   session_code: string;
   title: string;
   bracket_size: number;
@@ -35,6 +36,7 @@ type EventRow = {
   time: string | null;
   location: string | null;
 };
+type PlaylistRow = { id: number; name: string };
 
 function parseSessionId(id: string) {
   const sessionId = Number(id);
@@ -55,9 +57,12 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 
   const session = data as SessionRow;
 
-  const [{ data: event }, { data: teams }, { data: rounds }, { data: matchups }] = await Promise.all([
+  const [{ data: event }, { data: playlist }, { data: teams }, { data: rounds }, { data: matchups }] = await Promise.all([
     session.event_id
       ? db.from("events").select("id, title, date, time, location").eq("id", session.event_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    session.playlist_id
+      ? db.from("collection_playlists").select("id, name").eq("id", session.playlist_id).maybeSingle()
       : Promise.resolve({ data: null }),
     db.from("bb_session_teams").select("id").eq("session_id", sessionId),
     db.from("bb_session_rounds").select("id").eq("session_id", sessionId),
@@ -68,6 +73,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     {
       ...session,
       event: (event ?? null) as EventRow | null,
+      playlist: (playlist ?? null) as PlaylistRow | null,
       teams_total: (teams ?? []).length,
       rounds_total: (rounds ?? []).length,
       matchups_total: (matchups ?? []).length,
@@ -86,6 +92,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const allowedFields = new Set([
     "title",
     "event_id",
+    "playlist_id",
     "current_round",
     "current_matchup_index",
     "show_title",

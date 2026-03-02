@@ -137,12 +137,8 @@ export default function CrateCategoriesSetupPage() {
   const [hostBufferSeconds, setHostBufferSeconds] = useState(12);
 
   const [teamNamesText, setTeamNamesText] = useState("Table 1\nTable 2");
-  const [roundListText, setRoundListText] = useState(
-    "Women in Soul | identify-thread | 4 | 2 | 1\n90s One-Hit Wonders | odd-one-out | 3 | 2 | 1"
-  );
-  const [callListText, setCallListText] = useState(
-    "1 | 1 | Aretha Franklin - Think | 1968 | 45 A | soul\n1 | 2 | Gladys Knight & The Pips - Midnight Train to Georgia | 1973 | LP B | soul\n1 | 3 | Chaka Khan - I'm Every Woman | 1978 | 12in | soul\n1 | 4 | Etta James - At Last | 1960 | LP A | soul\n2 | 1 | Chumbawamba - Tubthumping | 1997 | LP C | alt\n2 | 2 | New Radicals - You Get What You Give | 1998 | LP D | pop\n2 | 3 | The Verve - Bitter Sweet Symphony | 1997 | LP E | brit"
-  );
+  const [roundListText, setRoundListText] = useState("");
+  const [callListText, setCallListText] = useState("");
 
   const [preflight, setPreflight] = useState({
     categoryCardsPrinted: false,

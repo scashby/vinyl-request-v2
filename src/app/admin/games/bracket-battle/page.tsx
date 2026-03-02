@@ -96,9 +96,7 @@ export default function BracketBattleSetupPage() {
   const [hostBufferSeconds, setHostBufferSeconds] = useState(10);
 
   const [teamNamesText, setTeamNamesText] = useState("Table 1\nTable 2");
-  const [entryListText, setEntryListText] = useState(
-    "1. Artist A - Song A | 12in\n2. Artist B - Song B | 7in\n3. Artist C - Song C | LP\n4. Artist D - Song D | LP\n5. Artist E - Song E | 7in\n6. Artist F - Song F | LP\n7. Artist G - Song G | 7in\n8. Artist H - Song H | LP"
-  );
+  const [entryListText, setEntryListText] = useState("");
 
   const [preflight, setPreflight] = useState({
     bracketPrinted: false,

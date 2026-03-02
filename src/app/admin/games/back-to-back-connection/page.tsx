@@ -96,9 +96,7 @@ export default function BackToBackConnectionSetupPage() {
   const [hostBufferSeconds, setHostBufferSeconds] = useState(10);
 
   const [teamNamesText, setTeamNamesText] = useState("Table 1\nTable 2");
-  const [pairListText, setPairListText] = useState(
-    "Chic - Good Times | Queen - Another One Bites the Dust | Shared bassline influence | Bernard Edwards groove\nDaft Punk - One More Time | Modjo - Lady (Hear Me Tonight) | French house crossover | Built from disco-era sampling"
-  );
+  const [pairListText, setPairListText] = useState("");
 
   const [preflight, setPreflight] = useState({
     pairOrderPrinted: false,

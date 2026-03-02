@@ -90,9 +90,7 @@ export default function NeedleDropRouletteSetupPage() {
   const [hostBufferSeconds, setHostBufferSeconds] = useState(10);
 
   const [teamNamesText, setTeamNamesText] = useState("Table 1\nTable 2");
-  const [callListText, setCallListText] = useState(
-    "Stevie Wonder - Superstition | LP crate A\nPrince - Kiss | 12in\nFleetwood Mac - Dreams | crate B"
-  );
+  const [callListText, setCallListText] = useState("");
 
   const [preflight, setPreflight] = useState({
     slipsOrBoardsReady: false,

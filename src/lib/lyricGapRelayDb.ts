@@ -34,6 +34,7 @@ export type LyricGapRelayDatabase = {
         Row: {
           id: number;
           event_id: number | null;
+          playlist_id: number | null;
           session_code: string;
           title: string;
           round_count: number;
@@ -61,6 +62,7 @@ export type LyricGapRelayDatabase = {
         Insert: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code: string;
           title: string;
           round_count?: number;
@@ -88,6 +90,7 @@ export type LyricGapRelayDatabase = {
         Update: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code?: string;
           title?: string;
           round_count?: number;
