@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
+import { isForSaleInventory } from "src/lib/saleUtils";
 
 const VINYL_SIZES = ['7"', '10"', '12"'];
 const DEFAULT_LIMIT = 200;
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
   let inventoryQuery = supabaseAdmin
     .from("inventory")
     .select(
-      "id, releases ( id, media_type, format_details, release_year, release_tracks ( id, position, side, title_override, recordings ( id, title, track_artist ) ) )"
+      "id, status, location, releases ( id, media_type, format_details, release_year, release_tracks ( id, position, side, title_override, recordings ( id, title, track_artist ) ) )"
     )
     .eq("releases.media_type", "Vinyl");
 
@@ -41,6 +42,7 @@ export async function GET(request: NextRequest) {
   }[] = [];
 
   for (const row of inventoryRows ?? []) {
+    if (!includeForSale && isForSaleInventory(row)) continue;
     const release = row.releases;
     if (!release || !release.release_tracks) continue;
     const sizes = release.format_details ?? [];

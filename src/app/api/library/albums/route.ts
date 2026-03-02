@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
 import { toSingle } from "src/lib/library/mappers";
+import { isForSaleInventory } from "src/lib/saleUtils";
 
 export const runtime = "nodejs";
 
@@ -157,7 +158,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const albums = (data ?? []).map((row) => {
+    const rows = includeForSale
+      ? (data ?? [])
+      : (data ?? []).filter((row) => !isForSaleInventory(row));
+
+    const albums = rows.map((row) => {
       const typedRow = row as unknown as { release?: unknown } & Record<string, unknown>;
       const release = toSingle(typedRow.release) as Record<string, unknown> | null;
       const master = toSingle(release?.master as unknown) as Record<string, unknown> | null;

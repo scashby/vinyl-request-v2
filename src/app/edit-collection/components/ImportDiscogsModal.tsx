@@ -257,6 +257,40 @@ const ensureSaleCrateExists = async (): Promise<number | null> => {
   return inserted.id;
 };
 
+const syncExistingInventoryFolderAssignments = async (comparedAlbums: ComparedAlbum[]): Promise<void> => {
+  const assignments = comparedAlbums
+    .filter((album) => album.existingId && album.sale_folder_resolved)
+    .map((album) => ({
+      id: album.existingId as number,
+      status: album.is_sale_folder ? 'for_sale' : 'active',
+      location: album.location || null,
+    }));
+
+  if (assignments.length === 0) return;
+
+  const grouped = assignments.reduce((acc, assignment) => {
+    const key = `${assignment.status}::${assignment.location ?? ''}`;
+    if (!acc[key]) {
+      acc[key] = { status: assignment.status, location: assignment.location, ids: [] as number[] };
+    }
+    acc[key].ids.push(assignment.id);
+    return acc;
+  }, {} as Record<string, { status: string; location: string | null; ids: number[] }>);
+
+  for (const group of Object.values(grouped)) {
+    const { error } = await supabase
+      .from('inventory')
+      .update({
+        status: group.status,
+        location: group.location,
+      })
+      .in('id', group.ids);
+    if (error) {
+      throw error;
+    }
+  }
+};
+
 const applyArtworkToReleaseRecordings = async (
   releaseId: number,
   artwork: Record<string, unknown>
@@ -1268,20 +1302,17 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         discogsFolderNamesById.set(0, 'All');
 
         if (sourceType === 'collection') {
-          try {
-            const foldersRes = await fetch('/api/discogs/folders');
-            if (foldersRes.ok) {
-              const foldersData = (await foldersRes.json()) as DiscogsFoldersResponse;
-              for (const folder of foldersData.folders ?? []) {
-                const folderId = typeof folder.id === 'number' ? folder.id : null;
-                const folderName = typeof folder.name === 'string' ? folder.name.trim() : '';
-                if (folderId !== null && folderName) {
-                  discogsFolderNamesById.set(folderId, folderName);
-                }
-              }
+          const foldersRes = await fetch('/api/discogs/folders');
+          if (!foldersRes.ok) {
+            throw new Error('Failed to load Discogs folder names. Reconnect Discogs and retry so Sale folder membership can be synced correctly.');
+          }
+          const foldersData = (await foldersRes.json()) as DiscogsFoldersResponse;
+          for (const folder of foldersData.folders ?? []) {
+            const folderId = typeof folder.id === 'number' ? folder.id : null;
+            const folderName = typeof folder.name === 'string' ? folder.name.trim() : '';
+            if (folderId !== null && folderName) {
+              discogsFolderNamesById.set(folderId, folderName);
             }
-          } catch (folderError) {
-            console.warn('Failed to load Discogs folder names:', folderError);
           }
         }
 
@@ -1560,6 +1591,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
       const isCollection = sourceType === 'collection';
       if (isCollection) {
         await ensureSaleCrateExists();
+        await syncExistingInventoryFolderAssignments(comparedAlbums);
       }
 
       // Determine which albums to process based on Sync Mode

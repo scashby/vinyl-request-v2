@@ -37,6 +37,7 @@ import {
   getAlbumYearInt,
   getAlbumYearValue
 } from './albumHelpers';
+import { hasSaleSmartRule, isForSaleInventory, isSaleFolderName, SALE_SMART_RULES } from '../../lib/saleUtils';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const supabase = supabaseTyped as any;
@@ -967,31 +968,14 @@ const buildTrackRuleMetadata = (album: Album) => {
   };
 };
 
-const isAlbumForSale = (album: Album): boolean => album.status === 'for_sale' || album.for_sale === true;
-
-const isTruthyRuleValue = (value: unknown): boolean => {
-  if (value === true) return true;
-  if (typeof value === 'number') return value === 1;
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    return normalized === 'true' || normalized === 'yes' || normalized === '1';
-  }
-  return false;
-};
+const isAlbumForSale = (album: Album): boolean => isForSaleInventory(album);
 
 const isSaleOnlyCrate = (crate: Crate | null | undefined): boolean => {
   if (!crate) return false;
-  const rules = crate.smart_rules?.rules;
-  if (crate.is_smart && Array.isArray(rules) && rules.length === 1) {
-    const rule = rules[0];
-    return (
-      rule?.field === 'for_sale' &&
-      rule?.operator === 'is' &&
-      isTruthyRuleValue(rule?.value)
-    );
+  if (crate.is_smart && hasSaleSmartRule(crate.smart_rules)) {
+    return true;
   }
-  const normalizedName = crate.name.trim().toLowerCase();
-  return normalizedName === 'sale' || normalizedName === 'for sale';
+  return isSaleFolderName(crate.name);
 };
 
 function CollectionBrowserPage() {
@@ -1698,7 +1682,66 @@ function CollectionBrowserPage() {
     }
   }, [loadAlbums, tracksHydrating]);
 
+  const ensureSaleCrateExists = useCallback(async () => {
+    const { data: existingCrates, error: existingError } = await supabase
+      .from('crates')
+      .select('id, name, icon, color, is_smart, smart_rules, sort_order');
+
+    if (existingError) {
+      console.error('Error checking crates before sale crate bootstrap:', existingError);
+      return;
+    }
+
+    const cratesList = existingCrates ?? [];
+    const existingByRule = cratesList.find((crate) => hasSaleSmartRule(crate.smart_rules));
+    if (existingByRule?.id) {
+      return;
+    }
+
+    const existingByName = cratesList.find((crate) => isSaleFolderName(crate.name));
+    if (existingByName?.id) {
+      const { error: updateError } = await supabase
+        .from('crates')
+        .update({
+          is_smart: true,
+          smart_rules: SALE_SMART_RULES,
+          match_rules: 'all',
+          live_update: true,
+          icon: existingByName.icon || '💰',
+          color: existingByName.color || '#d97706',
+        })
+        .eq('id', existingByName.id);
+
+      if (updateError) {
+        console.error('Error converting existing sale crate to smart crate:', updateError);
+      }
+      return;
+    }
+
+    const maxSortOrder = cratesList.reduce((max, crate) => {
+      const sortOrder = typeof crate.sort_order === 'number' ? crate.sort_order : 0;
+      return Math.max(max, sortOrder);
+    }, -1);
+
+    const { error: insertError } = await supabase.from('crates').insert({
+      name: 'Sale',
+      icon: '💰',
+      color: '#d97706',
+      is_smart: true,
+      smart_rules: SALE_SMART_RULES,
+      match_rules: 'all',
+      live_update: true,
+      sort_order: maxSortOrder + 1,
+    });
+
+    if (insertError) {
+      console.error('Error creating sale crate:', insertError);
+    }
+  }, []);
+
   const loadCrates = useCallback(async () => {
+    await ensureSaleCrateExists();
+
     const { data, error } = await supabase
       .from('crates')
       .select('*')
@@ -1732,7 +1775,7 @@ function CollectionBrowserPage() {
     }, {} as Record<number, Set<number>>);
 
     setCrateItemsByCrate(itemMap);
-  }, []);
+  }, [ensureSaleCrateExists]);
 
   const loadPlaylists = useCallback(async () => {
     const { data: playlistRows, error: playlistError } = await supabase

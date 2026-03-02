@@ -1,6 +1,7 @@
 // src/lib/crateUtils.ts
 import type { Album } from '../types/album';
 import type { SmartRule, Crate } from '../types/crate';
+import { isForSaleInventory } from './saleUtils';
 
 /**
  * Evaluate if an album matches a smart crate's rules
@@ -132,7 +133,7 @@ function getAlbumFieldValue(album: Album, field: string): unknown {
     case 'status':
       return album.status ?? null;
     case 'for_sale':
-      return album.status === 'for_sale' || album.for_sale === true;
+      return isForSaleInventory(album);
     case 'barcode':
       return release?.barcode ?? album.barcode ?? null;
     case 'catalog_number':

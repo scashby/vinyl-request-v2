@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
 import { supabaseServer } from "src/lib/supabaseServer";
 import { stripDiscogsDisambiguationSuffix } from "src/lib/artistName";
+import { isForSaleInventory } from "src/lib/saleUtils";
 
 const PAGE_SIZE = 1000;
 
@@ -531,7 +532,7 @@ export const fetchInventoryTracks = async (
     const to = from + PAGE_SIZE - 1;
     let inventoryQuery = supabase
       .from("inventory")
-      .select("id, release_id")
+      .select("id, release_id, status, location")
       .not("release_id", "is", null)
       .order("id", { ascending: true });
 
@@ -547,6 +548,7 @@ export const fetchInventoryTracks = async (
 
     const rows = inventoryRows ?? [];
     for (const row of rows) {
+      if (!includeForSale && isForSaleInventory(row)) continue;
       const inventoryId = typeof row.id === "number" ? row.id : null;
       const releaseId = typeof row.release_id === "number" ? row.release_id : null;
       if (!inventoryId || !releaseId) continue;
