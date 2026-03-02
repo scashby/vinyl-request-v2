@@ -45,4 +45,13 @@ ALTER TABLE public.bb_sessions
   FOREIGN KEY (playlist_id) REFERENCES public.collection_playlists(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_bb_sessions_playlist_id ON public.bb_sessions(playlist_id);
 
+ALTER TABLE public.trivia_sessions
+  ADD COLUMN IF NOT EXISTS playlist_id bigint;
+ALTER TABLE public.trivia_sessions
+  DROP CONSTRAINT IF EXISTS trivia_sessions_playlist_id_fkey;
+ALTER TABLE public.trivia_sessions
+  ADD CONSTRAINT trivia_sessions_playlist_id_fkey
+  FOREIGN KEY (playlist_id) REFERENCES public.collection_playlists(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_trivia_sessions_playlist_id ON public.trivia_sessions(playlist_id);
+
 COMMIT;

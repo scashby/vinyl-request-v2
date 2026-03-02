@@ -5,6 +5,13 @@ export const runtime = "nodejs";
 
 type CallPatchBody = {
   status?: "pending" | "asked" | "answer_revealed" | "scored" | "skipped";
+  question_text?: string;
+  answer_key?: string;
+  accepted_answers?: string[];
+  source_note?: string | null;
+  prep_status?: "draft" | "ready";
+  display_element_type?: "song" | "artist" | "album" | "cover_art" | "vinyl_label";
+  display_image_override_url?: string | null;
 };
 
 type CallRow = {
@@ -12,6 +19,9 @@ type CallRow = {
   session_id: number;
   call_index: number;
   round_number: number;
+  question_text: string;
+  answer_key: string;
+  prep_status: "draft" | "ready";
 };
 
 type SessionRow = {
@@ -25,12 +35,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!Number.isFinite(callId)) return NextResponse.json({ error: "Invalid call id" }, { status: 400 });
 
   const body = (await request.json()) as CallPatchBody;
-  if (!body.status) return NextResponse.json({ error: "status is required" }, { status: 400 });
+  const hasEditableField =
+    typeof body.status === "string" ||
+    typeof body.question_text === "string" ||
+    typeof body.answer_key === "string" ||
+    Array.isArray(body.accepted_answers) ||
+    typeof body.source_note === "string" ||
+    body.source_note === null ||
+    typeof body.prep_status === "string" ||
+    typeof body.display_element_type === "string" ||
+    typeof body.display_image_override_url === "string" ||
+    body.display_image_override_url === null;
+  if (!hasEditableField) return NextResponse.json({ error: "No valid fields provided" }, { status: 400 });
 
   const db = getTriviaDb();
   const { data: call, error: callError } = await db
     .from("trivia_session_calls")
-    .select("id, session_id, call_index, round_number")
+    .select("id, session_id, call_index, round_number, question_text, answer_key, prep_status")
     .eq("id", callId)
     .maybeSingle();
 
@@ -40,10 +61,55 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const typedCall = call as CallRow;
   const now = new Date().toISOString();
 
-  const patch: Record<string, unknown> = { status: body.status };
-  if (body.status === "asked") patch.asked_at = now;
-  if (body.status === "answer_revealed") patch.answer_revealed_at = now;
-  if (body.status === "scored") patch.scored_at = now;
+  const patch: Record<string, unknown> = {};
+
+  if (body.status) {
+    patch.status = body.status;
+    if (body.status === "asked") patch.asked_at = now;
+    if (body.status === "answer_revealed") patch.answer_revealed_at = now;
+    if (body.status === "scored") patch.scored_at = now;
+  }
+
+  if (typeof body.question_text === "string") patch.question_text = body.question_text.trim();
+  if (typeof body.answer_key === "string") patch.answer_key = body.answer_key.trim();
+  if (Array.isArray(body.accepted_answers)) {
+    patch.accepted_answers = Array.from(
+      new Set(
+        body.accepted_answers
+          .map((answer) => String(answer).trim())
+          .filter(Boolean)
+      )
+    );
+  }
+  if (typeof body.source_note === "string" || body.source_note === null) {
+    patch.source_note = typeof body.source_note === "string" ? (body.source_note.trim() || null) : null;
+  }
+  if (body.prep_status === "draft" || body.prep_status === "ready") patch.prep_status = body.prep_status;
+  if (
+    body.display_element_type === "song" ||
+    body.display_element_type === "artist" ||
+    body.display_element_type === "album" ||
+    body.display_element_type === "cover_art" ||
+    body.display_element_type === "vinyl_label"
+  ) {
+    patch.display_element_type = body.display_element_type;
+  }
+  if (typeof body.display_image_override_url === "string" || body.display_image_override_url === null) {
+    patch.display_image_override_url =
+      typeof body.display_image_override_url === "string"
+        ? (body.display_image_override_url.trim() || null)
+        : null;
+  }
+
+  const nextPrepStatus = (patch.prep_status as "draft" | "ready" | undefined) ?? typedCall.prep_status;
+  const nextQuestion = (patch.question_text as string | undefined) ?? typedCall.question_text;
+  const nextAnswer = (patch.answer_key as string | undefined) ?? typedCall.answer_key;
+  if (nextPrepStatus === "ready" && (!nextQuestion.trim() || !nextAnswer.trim())) {
+    return NextResponse.json(
+      { error: "question_text and answer_key are required before marking prep_status=ready" },
+      { status: 400 }
+    );
+  }
 
   const { error } = await db.from("trivia_session_calls").update(patch).eq("id", callId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

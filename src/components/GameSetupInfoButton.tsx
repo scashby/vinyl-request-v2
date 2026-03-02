@@ -158,10 +158,10 @@ const HELP_META: Record<GameSlug, GameHelpMeta> = {
   "music-trivia": {
     title: "Music Trivia Setup Help",
     accent: "#06b6d4",
-    quickTip: "Balance category coverage and difficulty targets before session create.",
+    quickTip: "Balance category coverage and difficulty targets, then finish question/media prep before host start.",
     details: [
       "Confirm rounds x questions per round matches your runtime window.",
-      "Prepare backup questions and answer slip batches ahead of host start.",
+      "After session create, use Prep to finalize question/answer and display element for every call.",
       "Keep tie-break question reserved outside primary question count.",
       "Use event linkage for clean history filtering after the event.",
     ],

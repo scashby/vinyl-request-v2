@@ -11,20 +11,29 @@ type Session = {
   current_round: number;
   round_count: number;
   questions_per_round: number;
+  tie_breaker_count: number;
   current_call_index: number;
   status: "pending" | "running" | "paused" | "completed";
   remaining_seconds: number;
   target_gap_seconds: number;
+  prep_ready_main: number;
+  prep_ready_tiebreakers: number;
+  prep_total_main: number;
+  prep_total_tiebreakers: number;
 };
 
 type Call = {
   id: number;
   round_number: number;
   call_index: number;
+  is_tiebreaker: boolean;
   category: string;
   difficulty: "easy" | "medium" | "hard";
   question_text: string;
   answer_key: string;
+  prep_status: "draft" | "ready";
+  display_element_type: "song" | "artist" | "album" | "cover_art" | "vinyl_label";
+  effective_display_image_url: string | null;
   base_points: number;
   bonus_points: number;
   status: "pending" | "asked" | "answer_revealed" | "scored" | "skipped";
@@ -79,8 +88,16 @@ export default function MusicTriviaHostPage() {
     return calls.find((call) => call.call_index === session.current_call_index) ?? null;
   }, [calls, session]);
 
-  const nextPendingCall = useMemo(() => calls.find((call) => call.status === "pending") ?? null, [calls]);
-  const callForControls = activeCall ?? nextPendingCall;
+  const nextPendingMainCall = useMemo(
+    () => calls.find((call) => !call.is_tiebreaker && call.status === "pending") ?? null,
+    [calls]
+  );
+  const nextPendingTieBreaker = useMemo(
+    () => calls.find((call) => call.is_tiebreaker && call.status === "pending") ?? null,
+    [calls]
+  );
+  const callForControls = activeCall ?? nextPendingMainCall;
+  const tieBreakerForControls = activeCall?.is_tiebreaker ? activeCall : nextPendingTieBreaker;
 
   const previousCalls = useMemo(
     () => calls.filter((call) => ["asked", "answer_revealed", "scored", "skipped"].includes(call.status)).slice(-6),
@@ -97,6 +114,11 @@ export default function MusicTriviaHostPage() {
 
   const advance = async () => {
     await fetch(`/api/games/trivia/sessions/${sessionId}/advance`, { method: "POST" });
+    load();
+  };
+
+  const advanceTieBreaker = async () => {
+    await fetch(`/api/games/trivia/sessions/${sessionId}/advance-tiebreaker`, { method: "POST" });
     load();
   };
 
@@ -166,15 +188,22 @@ export default function MusicTriviaHostPage() {
               <p className="text-xs uppercase tracking-[0.25em] text-cyan-300">Host Console</p>
               <h1 className="text-3xl font-black uppercase">Music Trivia Host</h1>
               <p className="text-sm text-stone-400">
-                {session?.title} · {session?.session_code} · Round {session?.current_round} of {session?.round_count}
+                {session?.title} · {session?.session_code} · {session && session.current_round > session.round_count ? "Tie-Breaker" : `Round ${session?.current_round} of ${session?.round_count}`}
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
+              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/music-trivia/prep?sessionId=${sessionId}`}>Prep</Link>
               <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/music-trivia/jumbotron?sessionId=${sessionId}`}>Jumbotron</Link>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/music-trivia/history">History</Link>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/music-trivia">Setup</Link>
             </div>
           </div>
+
+          {session ? (
+            <p className={`mt-3 text-xs ${((session.prep_total_main - session.prep_ready_main) + (session.prep_total_tiebreakers - session.prep_ready_tiebreakers) > 0) ? "text-amber-300" : "text-emerald-300"}`}>
+              Prep readiness · Main {session.prep_ready_main}/{session.prep_total_main} · Tie-breaker {session.prep_ready_tiebreakers}/{session.prep_total_tiebreakers}
+            </p>
+          ) : null}
         </header>
 
         <div className="grid gap-4 lg:grid-cols-[1.2fr,1fr]">
@@ -186,8 +215,10 @@ export default function MusicTriviaHostPage() {
                   <tr className="text-stone-300">
                     <th className="pb-2">#</th>
                     <th className="pb-2">Round</th>
+                    <th className="pb-2">Type</th>
                     <th className="pb-2">Category</th>
                     <th className="pb-2">Difficulty</th>
+                    <th className="pb-2">Prep</th>
                     <th className="pb-2">Status</th>
                   </tr>
                 </thead>
@@ -196,8 +227,10 @@ export default function MusicTriviaHostPage() {
                     <tr key={call.id} className="border-t border-stone-800 align-top">
                       <td className="py-2 font-bold text-cyan-300">{call.call_index}</td>
                       <td className="py-2">{call.round_number}</td>
+                      <td className="py-2">{call.is_tiebreaker ? "Tie" : "Main"}</td>
                       <td className="py-2">{call.category}</td>
                       <td className="py-2 uppercase">{call.difficulty}</td>
+                      <td className="py-2">{call.prep_status}</td>
                       <td className="py-2 text-stone-400">{call.status}</td>
                     </tr>
                   ))}
@@ -215,11 +248,19 @@ export default function MusicTriviaHostPage() {
                 </p>
                 <p className="mt-1 text-lg font-black">{callForControls?.question_text ?? "No active question"}</p>
                 <p className="mt-2 text-sm text-stone-300">Difficulty: {callForControls?.difficulty ?? "-"}</p>
+                <p className="mt-1 text-xs text-stone-400">Display: {callForControls?.display_element_type ?? "-"}</p>
                 <p className="mt-2 text-sm text-amber-300">
                   {(callForControls?.status === "answer_revealed" || callForControls?.status === "scored")
                     ? `Answer: ${callForControls.answer_key}`
                     : "Answer hidden until reveal"}
                 </p>
+                {callForControls?.effective_display_image_url ? (
+                  <img
+                    alt={`Display asset for question ${callForControls.call_index}`}
+                    className="mt-3 h-28 w-full rounded border border-cyan-700/40 object-cover"
+                    src={callForControls.effective_display_image_url}
+                  />
+                ) : null}
               </div>
 
               <div className="mt-3 text-xs">
@@ -237,10 +278,16 @@ export default function MusicTriviaHostPage() {
               <p className="mt-1 text-xs text-stone-400">Gap timer target: {session?.target_gap_seconds ?? 0}s · Remaining: {session?.remaining_seconds ?? 0}s</p>
               <div className="mt-2 flex flex-wrap gap-2 text-xs">
                 <button onClick={advance} className="rounded bg-cyan-700 px-2 py-1">Advance Question</button>
+                <button onClick={advanceTieBreaker} className="rounded bg-fuchsia-700 px-2 py-1">Advance Tie-Breaker</button>
                 <button onClick={() => patchCallStatus("asked")} className="rounded bg-blue-700 px-2 py-1">Mark Asked</button>
                 <button onClick={() => patchCallStatus("answer_revealed")} className="rounded bg-amber-700 px-2 py-1">Reveal Answer</button>
                 <button onClick={() => patchCallStatus("skipped")} className="rounded bg-red-700 px-2 py-1">Skip</button>
               </div>
+              {tieBreakerForControls ? (
+                <p className="mt-2 text-[11px] text-fuchsia-200">
+                  Next tie-breaker: Q{tieBreakerForControls.call_index} · {tieBreakerForControls.category}
+                </p>
+              ) : null}
               <div className="mt-2 flex flex-wrap gap-2 text-xs">
                 <button onClick={pause} className="rounded border border-stone-600 px-2 py-1">Pause</button>
                 <button onClick={resume} className="rounded border border-stone-600 px-2 py-1">Resume</button>

@@ -30,6 +30,12 @@ type SessionRow = {
   current_round: number;
   round_count: number;
   questions_per_round: number;
+  tie_breaker_count: number;
+  playlist_name: string | null;
+  prep_main_ready: number;
+  prep_main_total: number;
+  prep_tiebreaker_ready: number;
+  prep_tiebreaker_total: number;
   event_title: string | null;
 };
 
@@ -60,6 +66,7 @@ export default function MusicTriviaSetupPage() {
   const [title, setTitle] = useState("Music Trivia Session");
   const [roundCount, setRoundCount] = useState(3);
   const [questionsPerRound, setQuestionsPerRound] = useState(5);
+  const [tieBreakerCount, setTieBreakerCount] = useState(2);
   const [scoreMode, setScoreMode] = useState<"standard" | "difficulty_bonus_static">("difficulty_bonus_static");
 
   const [showTitle, setShowTitle] = useState(true);
@@ -109,14 +116,15 @@ export default function MusicTriviaSetupPage() {
   );
 
   const callStackPreview = Math.max(1, roundCount) * Math.max(1, questionsPerRound);
+  const totalCallStackPreview = callStackPreview + Math.max(0, tieBreakerCount);
   const backupQuestionTracks = useMemo(() => Math.max(3, Math.ceil(callStackPreview * 0.15)), [callStackPreview]);
   const recommendedPullSize = useMemo(
-    () => callStackPreview + backupQuestionTracks,
-    [backupQuestionTracks, callStackPreview]
+    () => totalCallStackPreview + backupQuestionTracks,
+    [backupQuestionTracks, totalCallStackPreview]
   );
   const minimumPlaylistTracks = useMemo(
-    () => Math.max(recommendedPullSize, callStackPreview),
-    [recommendedPullSize, callStackPreview]
+    () => Math.max(recommendedPullSize, totalCallStackPreview),
+    [recommendedPullSize, totalCallStackPreview]
   );
   const selectedPlaylist = useMemo(
     () => playlists.find((playlist) => playlist.id === playlistId) ?? null,
@@ -183,6 +191,7 @@ export default function MusicTriviaSetupPage() {
           title,
           round_count: roundCount,
           questions_per_round: questionsPerRound,
+          tie_breaker_count: tieBreakerCount,
           score_mode: scoreMode,
           remove_resleeve_seconds: removeResleeveSeconds,
           find_record_seconds: findRecordSeconds,
@@ -207,7 +216,7 @@ export default function MusicTriviaSetupPage() {
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error ?? "Failed to create session");
 
-      router.push(`/admin/games/music-trivia/host?sessionId=${payload.id}`);
+      router.push(`/admin/games/music-trivia/prep?sessionId=${payload.id}`);
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to create session");
     } finally {
@@ -250,6 +259,10 @@ export default function MusicTriviaSetupPage() {
             <label className="text-sm">Questions / Round <InlineFieldHelp label="Questions / Round" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={1} value={questionsPerRound} onChange={(e) => setQuestionsPerRound(Math.max(1, Number(e.target.value) || 1))} />
             </label>
+
+            <label className="text-sm">Tie-breakers <InlineFieldHelp label="Tie-breakers" />
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={tieBreakerCount} onChange={(e) => setTieBreakerCount(Math.max(0, Number(e.target.value) || 0))} />
+            </label>
           </div>
 
           <p className="mt-2 text-xs text-stone-300">
@@ -257,7 +270,7 @@ export default function MusicTriviaSetupPage() {
             <span className="font-semibold text-emerald-300">{minimumPlaylistTracks}</span> tracks.
           </p>
           <p className="mt-1 text-xs text-cyan-300">
-            Recommended playlist/crate pull: {recommendedPullSize} ({callStackPreview} primary + {backupQuestionTracks} backup).
+            Recommended playlist/crate pull: {recommendedPullSize} ({callStackPreview} primary + {tieBreakerCount} tie-breaker + {backupQuestionTracks} backup).
           </p>
           {selectedPlaylist ? (
             <p className={`mt-1 text-xs ${playlistTooSmall ? "text-red-300" : "text-emerald-300"}`}>
@@ -366,9 +379,13 @@ export default function MusicTriviaSetupPage() {
             <div className="space-y-3">
               {sessions.map((session) => (
                 <div key={session.id} className="rounded-xl border border-stone-700 bg-stone-950/70 p-3">
-                  <div className="text-sm">{session.session_code} · {session.title} · Round {session.current_round} of {session.round_count} · QPR {session.questions_per_round}</div>
-                  <div className="text-xs text-stone-400">Event: {session.event_title ?? "(none)"} · Status: {session.status}</div>
+                  <div className="text-sm">{session.session_code} · {session.title} · Round {session.current_round} of {session.round_count} · QPR {session.questions_per_round} · TB {session.tie_breaker_count}</div>
+                  <div className="text-xs text-stone-400">Event: {session.event_title ?? "(none)"} · Playlist: {session.playlist_name ?? "(none)"} · Status: {session.status}</div>
+                  <div className="mt-1 text-xs text-cyan-300">
+                    Prep: Main {session.prep_main_ready}/{session.prep_main_total} · Tie-breaker {session.prep_tiebreaker_ready}/{session.prep_tiebreaker_total}
+                  </div>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    <button className="rounded border border-cyan-700 px-2 py-1" onClick={() => router.push(`/admin/games/music-trivia/prep?sessionId=${session.id}`)}>Prep</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/music-trivia/host?sessionId=${session.id}`)}>Host</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/music-trivia/jumbotron?sessionId=${session.id}`)}>Jumbotron</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadGamePullListPdf({ gameSlug: "trivia", gameTitle: "Music Trivia", sessionId: session.id, sessionCode: session.session_code, accentRgb: [8, 145, 178] })}>Pull List PDF</button>

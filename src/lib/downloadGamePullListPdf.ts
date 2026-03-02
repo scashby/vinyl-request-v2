@@ -67,6 +67,7 @@ function normalizeGenericRow(row: Record<string, unknown>, fallbackIndex: number
     text(row.category) ? `Category: ${text(row.category)}` : null,
     text(row.difficulty) ? `Difficulty: ${text(row.difficulty)}` : null,
     text(row.answer_key) ? `Answer: ${text(row.answer_key)}` : null,
+    text(row.display_element_type) ? `Display: ${text(row.display_element_type)}` : null,
     text(row.dj_cue_hint) ? `Cue: ${text(row.dj_cue_hint)}` : null,
   ].filter(Boolean) as string[];
 

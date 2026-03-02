@@ -1445,9 +1445,14 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           : undefined;
         const currentScanId = getCurrentScanId(queuedAlbumId);
         setStatus(`Scanning by ID (range ${rangeLabel})... Currently scanning ID: ${currentScanId}. Found ${collectedConflicts.length} conflict(s).`);
+        const parsedBatchSize = Number.parseInt(batchSize, 10);
+        const effectiveBatchSize = Number.isFinite(parsedBatchSize) && parsedBatchSize > 0
+          ? Math.min(parsedBatchSize, 100)
+          : 10;
+
         const payload = {
           albumIds: queuedAlbumId ? [queuedAlbumId] : undefined,
-          limit: queuedAlbumId ? undefined : 1,
+          limit: queuedAlbumId ? undefined : effectiveBatchSize,
           cursor: queuedAlbumId ? undefined : cursorRef.current,
           maxId: queuedAlbumId ? undefined : scanRangeRef.current.end ?? undefined,
           // FIXED: Renamed folder to location in API call if necessary, or just don't pass it if it's dead

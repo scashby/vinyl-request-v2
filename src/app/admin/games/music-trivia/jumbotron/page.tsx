@@ -10,6 +10,7 @@ type Session = {
   round_count: number;
   current_call_index: number;
   questions_per_round: number;
+  tie_breaker_count: number;
   remaining_seconds: number;
   status: "pending" | "running" | "paused" | "completed";
   show_title: boolean;
@@ -21,10 +22,13 @@ type Session = {
 type Call = {
   id: number;
   call_index: number;
+  is_tiebreaker: boolean;
   category: string;
   difficulty: "easy" | "medium" | "hard";
   question_text: string;
   answer_key: string;
+  display_element_type: "song" | "artist" | "album" | "cover_art" | "vinyl_label";
+  effective_display_image_url: string | null;
   status: "pending" | "asked" | "answer_revealed" | "scored" | "skipped";
 };
 
@@ -91,6 +95,12 @@ export default function MusicTriviaJumbotronPage() {
   }, [calls, session]);
 
   const currentQuestionNumber = currentCall?.call_index ?? 0;
+  const tieBreakers = useMemo(() => calls.filter((call) => call.is_tiebreaker), [calls]);
+  const tieBreakerIndex = useMemo(() => {
+    if (!currentCall?.is_tiebreaker) return null;
+    const index = tieBreakers.findIndex((call) => call.id === currentCall.id);
+    return index >= 0 ? index + 1 : null;
+  }, [currentCall, tieBreakers]);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_50%_0%,#0a4453,transparent_38%),linear-gradient(180deg,#020202,#0d0d0d)] p-8 text-white">
@@ -99,9 +109,17 @@ export default function MusicTriviaJumbotronPage() {
           {session?.show_title ? <h1 className="text-5xl font-black uppercase tracking-tight text-cyan-200">{session?.title ?? "Music Trivia"}</h1> : null}
 
           <div className="mt-4 flex flex-wrap gap-6 text-xl font-semibold">
-            {session?.show_rounds ? <p>Round {session?.current_round} of {session?.round_count}</p> : null}
+            {session?.show_rounds ? (
+              <p>
+                {currentCall?.is_tiebreaker ? "Tie-Breaker" : `Round ${session?.current_round} of ${session?.round_count}`}
+              </p>
+            ) : null}
             {session?.show_question_counter ? (
-              <p>Question {currentQuestionNumber} / {(session?.round_count ?? 0) * (session?.questions_per_round ?? 0)}</p>
+              <p>
+                {currentCall?.is_tiebreaker
+                  ? `Tie-Breaker ${tieBreakerIndex ?? "-"} / ${session?.tie_breaker_count ?? 0}`
+                  : `Question ${currentQuestionNumber} / ${(session?.round_count ?? 0) * (session?.questions_per_round ?? 0)}`}
+              </p>
             ) : null}
             <p>Next Gap: <span className="font-black text-cyan-300">{remaining}s</span></p>
             {session?.status === "paused" ? <p className="text-red-400">Paused</p> : null}
@@ -110,8 +128,19 @@ export default function MusicTriviaJumbotronPage() {
 
         <section className="rounded-3xl border border-stone-700 bg-black/45 p-8">
           <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Current Question</p>
+          {currentCall?.effective_display_image_url ? (
+            <img
+              alt={`Trivia display asset for question ${currentCall.call_index}`}
+              className="mt-3 h-64 w-full rounded-2xl border border-cyan-700/40 object-cover"
+              src={currentCall.effective_display_image_url}
+            />
+          ) : (
+            <div className="mt-3 flex h-64 items-center justify-center rounded-2xl border border-stone-700 bg-stone-950/60 text-xl font-semibold text-stone-400">
+              No image available
+            </div>
+          )}
           <p className="mt-2 text-5xl font-black text-cyan-200">{currentCall?.question_text ?? "Waiting for host"}</p>
-          <p className="mt-3 text-xl text-stone-200">{currentCall ? `${currentCall.category} · ${currentCall.difficulty.toUpperCase()}` : ""}</p>
+          <p className="mt-3 text-xl text-stone-200">{currentCall ? `${currentCall.category} · ${currentCall.difficulty.toUpperCase()} · ${currentCall.display_element_type}` : ""}</p>
           {(currentCall?.status === "answer_revealed" || currentCall?.status === "scored") ? (
             <p className="mt-4 text-3xl font-bold text-amber-300">Answer: {currentCall.answer_key}</p>
           ) : (

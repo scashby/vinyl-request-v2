@@ -356,6 +356,8 @@ export async function POST(req: Request) {
         .map((link) => link.tag?.name)
         .filter((name): name is string => typeof name === 'string' && name.length > 0);
 
+      const detailsSimilarAlbums = asStringArray(albumDetails.lastfm_similar_albums);
+
       return {
         id: album.id,
         release_id: release?.id ?? null,
@@ -395,7 +397,9 @@ export async function POST(req: Request) {
         cat_no: release?.catalog_number ?? null,
         genres: master?.genres ?? null,
         styles: master?.styles ?? null,
-        lastfm_similar_albums: master?.lastfm_similar_albums ?? null,
+        lastfm_similar_albums:
+          master?.lastfm_similar_albums
+          ?? (detailsSimilarAlbums.length > 0 ? detailsSimilarAlbums : null),
         master_notes: master?.notes ?? null,
         cultural_significance: master?.cultural_significance ?? albumDetails.cultural_significance ?? null,
         recording_location: master?.recording_location ?? albumDetails.recording_location ?? null,
@@ -480,6 +484,7 @@ export async function POST(req: Request) {
           }
 
           if (!hasMissingSelectedField(typedAlbum)) {
+            if (missingDataOnly) return null;
             return {
               album: typedAlbum,
               candidates,

@@ -168,9 +168,14 @@ const parseDurationLabelToSeconds = (value: string | null | undefined): number |
   return null;
 };
 
+const isInvalidTrackPositionToken = (value: string): boolean => {
+  const normalized = value.trim().toUpperCase();
+  return normalized === 'NAN' || normalized === 'NULL' || normalized === 'UNDEFINED';
+};
+
 const normalizeTrackPosition = (position: string | null | undefined, fallback: number): string => {
-  const raw = (position ?? '').trim();
-  if (raw) return raw;
+  const raw = String(position ?? '').trim();
+  if (raw && !isInvalidTrackPositionToken(raw)) return raw;
   return String(fallback);
 };
 
@@ -444,8 +449,22 @@ const formatTrackArrayValues = (values: string[] | null | undefined): string => 
 };
 
 const getTrackPositionLabel = (row: CollectionTrackRow): string => {
-  const positionNumber = (row.position.match(/\d+/g) ?? [row.position]).slice(-1)[0];
-  return row.side ? `${row.side}${positionNumber}` : row.position;
+  const rawPosition = String(row.position ?? '').trim();
+  const side = (row.side ?? '').trim().toUpperCase();
+
+  if (!rawPosition) return side || '—';
+  if (!side) return rawPosition;
+  if (isInvalidTrackPositionToken(rawPosition)) return side;
+
+  const upperPosition = rawPosition.toUpperCase();
+  if (upperPosition.startsWith(side)) return rawPosition;
+
+  const positionNumberMatch = rawPosition.match(/\d+/g);
+  if (positionNumberMatch?.length) {
+    return `${side}${positionNumberMatch[positionNumberMatch.length - 1]}`;
+  }
+
+  return rawPosition;
 };
 
 const isCollectionColumnId = (value: string): value is ColumnId =>

@@ -3,10 +3,12 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS public.trivia_sessions (
   id bigserial PRIMARY KEY,
   event_id bigint REFERENCES public.events(id) ON DELETE SET NULL,
+  playlist_id bigint REFERENCES public.collection_playlists(id) ON DELETE SET NULL,
   session_code text NOT NULL UNIQUE,
   title text NOT NULL,
   round_count integer NOT NULL DEFAULT 3,
   questions_per_round integer NOT NULL DEFAULT 5,
+  tie_breaker_count integer NOT NULL DEFAULT 2,
   score_mode text NOT NULL DEFAULT 'difficulty_bonus_static',
   question_categories text[] NOT NULL DEFAULT ARRAY['General Music']::text[],
   difficulty_easy_target integer NOT NULL DEFAULT 2,
@@ -40,6 +42,7 @@ CREATE TABLE IF NOT EXISTS public.trivia_sessions (
   ),
   CONSTRAINT trivia_sessions_round_count_chk CHECK (round_count > 0),
   CONSTRAINT trivia_sessions_questions_per_round_chk CHECK (questions_per_round > 0),
+  CONSTRAINT trivia_sessions_tie_breaker_count_chk CHECK (tie_breaker_count >= 0),
   CONSTRAINT trivia_sessions_target_gap_seconds_chk CHECK (target_gap_seconds > 0)
 );
 
@@ -58,12 +61,24 @@ CREATE TABLE IF NOT EXISTS public.trivia_session_calls (
   session_id bigint NOT NULL REFERENCES public.trivia_sessions(id) ON DELETE CASCADE,
   round_number integer NOT NULL,
   call_index integer NOT NULL,
+  playlist_track_key text,
+  is_tiebreaker boolean NOT NULL DEFAULT false,
   category text NOT NULL,
   difficulty text NOT NULL,
   question_text text NOT NULL,
   answer_key text NOT NULL,
   accepted_answers jsonb NOT NULL DEFAULT '[]'::jsonb,
   source_note text,
+  prep_status text NOT NULL DEFAULT 'draft',
+  display_element_type text NOT NULL DEFAULT 'song',
+  display_image_override_url text,
+  auto_cover_art_url text,
+  auto_vinyl_label_url text,
+  source_artist text,
+  source_title text,
+  source_album text,
+  source_side text,
+  source_position text,
   base_points integer NOT NULL DEFAULT 1,
   bonus_points integer NOT NULL DEFAULT 0,
   status text NOT NULL DEFAULT 'pending',
@@ -73,6 +88,12 @@ CREATE TABLE IF NOT EXISTS public.trivia_session_calls (
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT trivia_session_calls_difficulty_chk CHECK (
     difficulty IN ('easy', 'medium', 'hard')
+  ),
+  CONSTRAINT trivia_session_calls_prep_status_chk CHECK (
+    prep_status IN ('draft', 'ready')
+  ),
+  CONSTRAINT trivia_session_calls_display_element_type_chk CHECK (
+    display_element_type IN ('song', 'artist', 'album', 'cover_art', 'vinyl_label')
   ),
   CONSTRAINT trivia_session_calls_status_chk CHECK (
     status IN ('pending', 'asked', 'answer_revealed', 'scored', 'skipped')
@@ -102,10 +123,48 @@ CREATE TABLE IF NOT EXISTS public.trivia_session_events (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE public.trivia_sessions
+  ADD COLUMN IF NOT EXISTS playlist_id bigint;
+ALTER TABLE public.trivia_sessions
+  DROP CONSTRAINT IF EXISTS trivia_sessions_playlist_id_fkey;
+ALTER TABLE public.trivia_sessions
+  ADD CONSTRAINT trivia_sessions_playlist_id_fkey
+  FOREIGN KEY (playlist_id) REFERENCES public.collection_playlists(id) ON DELETE SET NULL;
+ALTER TABLE public.trivia_sessions
+  ADD COLUMN IF NOT EXISTS tie_breaker_count integer NOT NULL DEFAULT 2;
+
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS playlist_track_key text;
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS is_tiebreaker boolean NOT NULL DEFAULT false;
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS prep_status text NOT NULL DEFAULT 'draft';
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS display_element_type text NOT NULL DEFAULT 'song';
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS display_image_override_url text;
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS auto_cover_art_url text;
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS auto_vinyl_label_url text;
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS source_artist text;
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS source_title text;
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS source_album text;
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS source_side text;
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS source_position text;
+
 CREATE INDEX IF NOT EXISTS idx_trivia_sessions_event_id ON public.trivia_sessions(event_id);
+CREATE INDEX IF NOT EXISTS idx_trivia_sessions_playlist_id ON public.trivia_sessions(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_trivia_sessions_status ON public.trivia_sessions(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_trivia_calls_session_id ON public.trivia_session_calls(session_id);
 CREATE INDEX IF NOT EXISTS idx_trivia_calls_status ON public.trivia_session_calls(session_id, status);
+CREATE INDEX IF NOT EXISTS idx_trivia_calls_tiebreaker ON public.trivia_session_calls(session_id, is_tiebreaker, call_index);
+CREATE INDEX IF NOT EXISTS idx_trivia_calls_prep_status ON public.trivia_session_calls(session_id, prep_status);
 CREATE INDEX IF NOT EXISTS idx_trivia_teams_session_id ON public.trivia_session_teams(session_id);
 CREATE INDEX IF NOT EXISTS idx_trivia_scores_session_id ON public.trivia_team_scores(session_id);
 CREATE INDEX IF NOT EXISTS idx_trivia_scores_call_id ON public.trivia_team_scores(call_id);
