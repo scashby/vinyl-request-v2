@@ -3276,7 +3276,7 @@ function CollectionBrowserPage() {
                     title="Change Sorting"
                     className="bg-[#3a3a3a] border border-[#555] rounded-l rounded-r-none border-r-0 px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444]"
                   >
-                    <span className="text-sm leading-none">⇅</span>
+                    <span>↕️</span>
                   </button>
 
                   <div className="relative">
@@ -3333,7 +3333,7 @@ function CollectionBrowserPage() {
                     title="Change Columns"
                     className="bg-[#3a3a3a] border border-[#555] rounded-l rounded-r-none border-r-0 px-2 py-1 cursor-pointer text-xs text-white flex items-center justify-center hover:bg-[#444]"
                   >
-                    <span className="text-sm leading-none">▦</span>
+                    <span>⊞</span>
                   </button>
 
                   <div className="relative">
