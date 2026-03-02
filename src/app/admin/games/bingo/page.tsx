@@ -175,7 +175,7 @@ export default function BingoSetupPage() {
         <header className="rounded-3xl border border-amber-900/50 bg-black/45 p-6">
           <p className="text-xs uppercase tracking-[0.28em] text-amber-300">Dive Bar Console</p>
           <h1 className="mt-1 text-4xl font-black uppercase text-amber-100">Vinyl Bingo Setup</h1>
-          <p className="mt-2 text-sm text-stone-300">A classic bingo game with songs instead of numbers: play tracks, mark matching squares, and race to bingo.</p>
+          <p className="mt-2 text-sm text-stone-300">Music Bingo uses songs instead of numbers: as tracks play, teams mark matching squares, and the first team to complete the winning pattern wins.</p>
           <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="bingo" /></div>
         </header>
 

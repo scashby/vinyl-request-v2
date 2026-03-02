@@ -235,7 +235,7 @@ export default function SampleDetectiveSetupPage() {
               <Link href="/admin/games/sample-detective/help" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Help</Link>
             </div>
           </div>
-          <p className="mt-2 text-sm text-stone-300">Play sampled tracks and have teams match each one to the original source song.</p>
+          <p className="mt-2 text-sm text-stone-300">Sample Detective plays sampled tracks, teams match each one to its original source song, and the team with the most correct matches wins.</p>
           <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="sample-detective" /></div>
         </header>
 

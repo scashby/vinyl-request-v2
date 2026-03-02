@@ -230,7 +230,7 @@ export default function DecadeDashSetupPage() {
               <Link href="/admin/games/decade-dash/jumbotron" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron Scope</Link>
             </div>
           </div>
-          <p className="mt-2 text-sm text-stone-300">Play a song and have teams choose the decade they think it came from.</p>
+          <p className="mt-2 text-sm text-stone-300">Decade Dash plays a song each round, teams choose the decade they think it came from, and the team with the most correct decade calls wins.</p>
           <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="decade-dash" /></div>
         </header>
 

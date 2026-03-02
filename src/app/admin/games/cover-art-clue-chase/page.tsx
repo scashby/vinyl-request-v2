@@ -239,7 +239,7 @@ export default function CoverArtClueChaseSetupPage() {
               <Link href="/admin/games/cover-art-clue-chase/jumbotron" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron Scope</Link>
             </div>
           </div>
-          <p className="mt-2 text-sm text-stone-300">Reveal album art in stages and let teams guess early for more points, with an audio clue if needed.</p>
+          <p className="mt-2 text-sm text-stone-300">Cover Art Clue Chase reveals album art in stages, teams guess as early as possible for more points, and the highest score wins.</p>
           <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="cover-art-clue-chase" /></div>
         </header>
 

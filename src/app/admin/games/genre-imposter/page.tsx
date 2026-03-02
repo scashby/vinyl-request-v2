@@ -245,7 +245,7 @@ export default function GenreImposterSetupPage() {
         <header className="rounded-3xl border border-emerald-900/40 bg-black/45 p-6">
           <p className="text-xs uppercase tracking-[0.28em] text-emerald-300">Brewery Floor Mode</p>
           <h1 className="mt-1 text-4xl font-black uppercase text-emerald-100">Genre Imposter Setup</h1>
-          <p className="mt-2 text-sm text-stone-300">Play three songs in a category and ask teams to spot the one that does not belong.</p>
+          <p className="mt-2 text-sm text-stone-300">Genre Imposter plays three songs in a category, teams pick the one that does not belong, and the team with the most correct imposter picks wins.</p>
           <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="genre-imposter" /></div>
         </header>
 

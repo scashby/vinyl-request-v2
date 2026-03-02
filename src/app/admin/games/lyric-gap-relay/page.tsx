@@ -239,7 +239,7 @@ export default function LyricGapRelaySetupPage() {
               <Link href="/admin/games/lyric-gap-relay/jumbotron" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron</Link>
             </div>
           </div>
-          <p className="mt-2 text-sm text-stone-300">Stop the song at a key line and have teams finish the next lyric.</p>
+          <p className="mt-2 text-sm text-stone-300">Lyric Gap Relay stops the song at a key line, teams finish the next lyric, and the team with the most correct fills wins.</p>
           <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="lyric-gap-relay" /></div>
         </header>
 

@@ -230,7 +230,7 @@ export default function BackToBackConnectionSetupPage() {
               <Link href="/admin/games/back-to-back-connection/help" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Help</Link>
             </div>
           </div>
-          <p className="mt-2 text-sm text-stone-300">Play two songs back to back and ask teams what connection they share.</p>
+          <p className="mt-2 text-sm text-stone-300">Back-to-Back Connection plays two songs in a row, teams identify the shared link, and the team with the most correct connections wins.</p>
           <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="back-to-back-connection" /></div>
         </header>
 

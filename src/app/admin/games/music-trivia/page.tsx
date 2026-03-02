@@ -222,7 +222,7 @@ export default function MusicTriviaSetupPage() {
         <header className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
           <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">Brewery Floor Mode</p>
           <h1 className="mt-1 text-4xl font-black uppercase text-cyan-100">Music Trivia Setup</h1>
-          <p className="mt-2 text-sm text-stone-300">Ask music questions between songs and have teams write answers to score points each round.</p>
+          <p className="mt-2 text-sm text-stone-300">Music Trivia asks teams music questions between songs, scores each round from written answers, and the highest total score wins.</p>
           <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="music-trivia" /></div>
         </header>
 
