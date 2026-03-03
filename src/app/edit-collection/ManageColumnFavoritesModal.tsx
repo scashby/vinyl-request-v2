@@ -26,7 +26,7 @@ const COLUMN_FIELDS = {
   Edition: ['Discs', 'Length', 'Tracks'],
   Classical: ['Chorus', 'Composer', 'Composition', 'Conductor', 'Orchestra'],
   People: ['Engineer', 'Musician', 'Producer', 'Songwriter'],
-  Personal: ['Added Date', 'Added Year', 'Collection Status', 'Current Value', 'Index', 'Last Cleaned Date', 'Last Cleaned Year', 'Last Played Date', 'Location', 'Modified Date', 'My Rating', 'Notes', 'Owner', 'Play Count', 'Played Year', 'Purchase Date', 'Purchase Price', 'Purchase Store', 'Purchase Year', 'Quantity', 'Signed by', 'Tags'],
+  Personal: ['Added Date', 'Added Year', 'Collection Status', 'Current Value', 'Index', 'Last Cleaned Date', 'Last Cleaned Year', 'Last Played Date', 'Modified Date', 'My Rating', 'Notes', 'Owner', 'Play Count', 'Played Year', 'Purchase Date', 'Purchase Price', 'Purchase Store', 'Purchase Year', 'Quantity', 'Signed by', 'Tags'],
   Loan: ['Due Date', 'Loan Date', 'Loaned To'],
 };
 

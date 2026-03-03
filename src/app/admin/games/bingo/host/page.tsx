@@ -17,7 +17,11 @@ type Session = {
   pull_call_id: number | null;
 };
 
-type Call = BingoTransportCall;
+type Call = BingoTransportCall & {
+  metadata_locked?: boolean;
+  side?: string | null;
+  position?: string | null;
+};
 
 export default function BingoHostPage() {
   const searchParams = useSearchParams();
@@ -25,6 +29,13 @@ export default function BingoHostPage() {
 
   const [session, setSession] = useState<Session | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
+  const [metadataDraft, setMetadataDraft] = useState({
+    track_title: "",
+    artist_name: "",
+    album_name: "",
+    side: "",
+    position: "",
+  });
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -60,6 +71,17 @@ export default function BingoHostPage() {
     return [...calls].reverse().find((call) => call.status === "called") ?? null;
   }, [calls, session?.current_call_index]);
 
+  useEffect(() => {
+    if (!currentCall) return;
+    setMetadataDraft({
+      track_title: currentCall.track_title ?? "",
+      artist_name: currentCall.artist_name ?? "",
+      album_name: currentCall.album_name ?? "",
+      side: currentCall.side ?? "",
+      position: currentCall.position ?? "",
+    });
+  }, [currentCall?.id]);
+
   const previous = useMemo(() => called.slice(Math.max(0, called.length - 5), called.length - 1), [called]);
 
   const pause = async () => {
@@ -79,6 +101,34 @@ export default function BingoHostPage() {
 
   const replace = async () => {
     await fetch(`/api/games/bingo/sessions/${sessionId}/replace`, { method: "POST" });
+    load();
+  };
+
+  const saveMetadata = async () => {
+    if (!currentCall) return;
+    await fetch(`/api/games/bingo/calls/${currentCall.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...metadataDraft,
+        metadata_locked: true,
+      }),
+    });
+    load();
+  };
+
+  const unlockMetadata = async () => {
+    if (!currentCall) return;
+    await fetch(`/api/games/bingo/calls/${currentCall.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ metadata_locked: false }),
+    });
+    load();
+  };
+
+  const refreshFromPlaylist = async () => {
+    await fetch(`/api/games/bingo/sessions/${sessionId}/refresh-metadata`, { method: "POST" });
     load();
   };
 
@@ -167,6 +217,48 @@ export default function BingoHostPage() {
                   ))}
                 </div>
               </div>
+              <div className="mt-3 grid gap-2 text-xs md:grid-cols-2">
+                <input
+                  className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                  value={metadataDraft.track_title}
+                  onChange={(e) => setMetadataDraft((draft) => ({ ...draft, track_title: e.target.value }))}
+                  placeholder="Track title"
+                />
+                <input
+                  className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                  value={metadataDraft.artist_name}
+                  onChange={(e) => setMetadataDraft((draft) => ({ ...draft, artist_name: e.target.value }))}
+                  placeholder="Track artist"
+                />
+                <input
+                  className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                  value={metadataDraft.album_name}
+                  onChange={(e) => setMetadataDraft((draft) => ({ ...draft, album_name: e.target.value }))}
+                  placeholder="Album"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                    value={metadataDraft.side}
+                    onChange={(e) => setMetadataDraft((draft) => ({ ...draft, side: e.target.value }))}
+                    placeholder="Side"
+                  />
+                  <input
+                    className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                    value={metadataDraft.position}
+                    onChange={(e) => setMetadataDraft((draft) => ({ ...draft, position: e.target.value }))}
+                    placeholder="Position"
+                  />
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                <button onClick={saveMetadata} className="rounded bg-amber-700 px-2 py-1">Save Metadata</button>
+                <button onClick={unlockMetadata} className="rounded border border-stone-600 px-2 py-1">Unlock Row</button>
+                <button onClick={refreshFromPlaylist} className="rounded border border-stone-600 px-2 py-1">Refresh from Playlist</button>
+              </div>
+              <p className="mt-1 text-[11px] text-stone-500">
+                {currentCall?.metadata_locked ? "Metadata locked" : "Metadata follows playlist sync"}
+              </p>
             </div>
 
             <BingoTransportLane

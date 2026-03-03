@@ -83,6 +83,8 @@ CREATE TABLE IF NOT EXISTS public.bingo_session_calls (
   album_name text,
   side text,
   position text,
+  metadata_locked boolean NOT NULL DEFAULT false,
+  metadata_synced_at timestamptz,
   status text NOT NULL DEFAULT 'pending',
   prep_started_at timestamptz,
   called_at timestamptz,
@@ -96,7 +98,9 @@ CREATE TABLE IF NOT EXISTS public.bingo_session_calls (
 );
 
 ALTER TABLE public.bingo_session_calls
-  ADD COLUMN IF NOT EXISTS ball_number integer;
+  ADD COLUMN IF NOT EXISTS ball_number integer,
+  ADD COLUMN IF NOT EXISTS metadata_locked boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS metadata_synced_at timestamptz;
 
 CREATE TABLE IF NOT EXISTS public.bingo_cards (
   id bigserial PRIMARY KEY,
@@ -120,6 +124,7 @@ CREATE INDEX IF NOT EXISTS idx_bingo_sessions_event_id ON public.bingo_sessions(
 CREATE INDEX IF NOT EXISTS idx_bingo_sessions_playlist_id ON public.bingo_sessions(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_bingo_calls_session_id ON public.bingo_session_calls(session_id);
 CREATE INDEX IF NOT EXISTS idx_bingo_calls_status ON public.bingo_session_calls(session_id, status);
+CREATE INDEX IF NOT EXISTS idx_bingo_calls_metadata_sync ON public.bingo_session_calls(session_id, metadata_locked, metadata_synced_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_bingo_calls_unique_ball_number ON public.bingo_session_calls(session_id, ball_number) WHERE ball_number IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_bingo_cards_session_id ON public.bingo_cards(session_id);
 CREATE INDEX IF NOT EXISTS idx_bingo_events_session_id ON public.bingo_session_events(session_id);

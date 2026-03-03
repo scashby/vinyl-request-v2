@@ -109,12 +109,13 @@ export async function fetchLocations(): Promise<PickerDataItem[]> {
   try {
     const { data, error } = await supabase
       .from('inventory')
-      .select('location')
-      .not('location', 'is', null)
-      .not('location', 'eq', '');
+      .select('discogs_folder_name, location');
     if (error) return [];
     const locationCounts = new Map<string, number>();
-    data?.forEach(row => { if (row.location) locationCounts.set(row.location, (locationCounts.get(row.location) || 0) + 1); });
+    data?.forEach(row => {
+      const folderName = (row.discogs_folder_name || row.location || '').trim();
+      if (folderName) locationCounts.set(folderName, (locationCounts.get(folderName) || 0) + 1);
+    });
     return Array.from(locationCounts.entries())
       .map(([name, count]) => ({ id: name, name, count }))
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -274,15 +275,60 @@ export async function fetchTags(): Promise<PickerDataItem[]> {
 // ============================================================================
 
 export async function updateLocation(id: string, newName: string): Promise<boolean> {
-  try { const { error } = await supabase.from('inventory').update({ location: newName }).eq('location', id); return !error; } catch { return false; }
+  try {
+    const [{ error: folderError }, { error: legacyError }] = await Promise.all([
+      supabase
+        .from('inventory')
+        .update({ discogs_folder_name: newName, location: newName })
+        .eq('discogs_folder_name', id),
+      supabase
+        .from('inventory')
+        .update({ discogs_folder_name: newName, location: newName })
+        .is('discogs_folder_name', null)
+        .eq('location', id),
+    ]);
+    return !folderError && !legacyError;
+  } catch {
+    return false;
+  }
 }
 
 export async function deleteLocation(id: string): Promise<boolean> {
-  try { const { error } = await supabase.from('inventory').update({ location: null }).eq('location', id); return !error; } catch { return false; }
+  try {
+    const [{ error: folderError }, { error: legacyError }] = await Promise.all([
+      supabase
+        .from('inventory')
+        .update({ discogs_folder_name: null, location: null })
+        .eq('discogs_folder_name', id),
+      supabase
+        .from('inventory')
+        .update({ discogs_folder_name: null, location: null })
+        .is('discogs_folder_name', null)
+        .eq('location', id),
+    ]);
+    return !folderError && !legacyError;
+  } catch {
+    return false;
+  }
 }
 
 export async function mergeLocations(targetId: string, sourceIds: string[]): Promise<boolean> {
-  try { const { error } = await supabase.from('inventory').update({ location: targetId }).in('location', sourceIds); return !error; } catch { return false; }
+  try {
+    const [{ error: folderError }, { error: legacyError }] = await Promise.all([
+      supabase
+        .from('inventory')
+        .update({ discogs_folder_name: targetId, location: targetId })
+        .in('discogs_folder_name', sourceIds),
+      supabase
+        .from('inventory')
+        .update({ discogs_folder_name: targetId, location: targetId })
+        .is('discogs_folder_name', null)
+        .in('location', sourceIds),
+    ]);
+    return !folderError && !legacyError;
+  } catch {
+    return false;
+  }
 }
 
 export async function updateArtist(id: string, newName: string): Promise<boolean> {
@@ -690,16 +736,17 @@ export async function fetchMusicians(): Promise<PickerDataItem[]> { return fetch
 // Legacy tab compatibility helpers (mapped to V3 sources)
 // ============================================================================
 
-const fetchReleaseStringList = async (column: 'notes'): Promise<PickerDataItem[]> => {
+const fetchReleaseStudios = async (): Promise<PickerDataItem[]> => {
   try {
     const { data, error } = await supabase
       .from('releases')
-      .select(column)
-      .not(column, 'is', null);
+      .select('studio')
+      .not('studio', 'is', null)
+      .not('studio', 'eq', '');
     if (error) return [];
     const counts = new Map<string, number>();
     (data ?? []).forEach((row) => {
-      const value = (row[column] as string | null | undefined)?.trim();
+      const value = (row.studio as string | null | undefined)?.trim();
       if (!value) return;
       counts.set(value, (counts.get(value) || 0) + 1);
     });
@@ -742,15 +789,13 @@ export async function fetchPackaging(): Promise<PickerDataItem[]> {
 }
 
 export async function fetchStudios(): Promise<PickerDataItem[]> {
-  const [detailValues, noteValues] = await Promise.all([
+  const [releaseValues, detailValues] = await Promise.all([
+    fetchReleaseStudios(),
     fetchAlbumDetailsList('studio'),
-    fetchReleaseStringList('notes'),
   ]);
   const map = new Map<string, PickerDataItem>();
+  releaseValues.forEach((item) => map.set(item.name, item));
   detailValues.forEach((item) => map.set(item.name, item));
-  noteValues.forEach((item) => {
-    if (!map.has(item.name)) map.set(item.name, item);
-  });
   return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -833,7 +878,27 @@ export async function updatePackaging(id: string, newName: string): Promise<bool
 }
 
 export async function updateStudio(id: string, newName: string): Promise<boolean> {
-  return updateAlbumDetailsFieldName('studio', id, newName);
+  try {
+    const [{ error: releaseError }, detailsOk] = await Promise.all([
+      supabase.from('releases').update({ studio: newName }).eq('studio', id),
+      updateAlbumDetailsFieldName('studio', id, newName),
+    ]);
+    return !releaseError && detailsOk;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteStudio(id: string): Promise<boolean> {
+  try {
+    const [{ error: releaseError }, detailsOk] = await Promise.all([
+      supabase.from('releases').update({ studio: null }).eq('studio', id),
+      deleteAlbumDetailsFieldName('studio', id),
+    ]);
+    return !releaseError && detailsOk;
+  } catch {
+    return false;
+  }
 }
 
 export async function updateSound(id: string, newName: string): Promise<boolean> {
@@ -984,7 +1049,15 @@ export async function mergePurchaseStores(targetId: string, sourceIds: string[])
 }
 
 export async function mergeStudios(targetId: string, sourceIds: string[]): Promise<boolean> {
-  return mergeAlbumDetailsFieldName('studio', targetId, sourceIds);
+  try {
+    const [{ error: releaseError }, detailsOk] = await Promise.all([
+      supabase.from('releases').update({ studio: targetId }).in('studio', sourceIds),
+      mergeAlbumDetailsFieldName('studio', targetId, sourceIds),
+    ]);
+    return !releaseError && detailsOk;
+  } catch {
+    return false;
+  }
 }
 
 export async function mergeSounds(targetId: string, sourceIds: string[]): Promise<boolean> {

@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS public.gi_session_calls (
   round_number integer NOT NULL,
   call_index integer NOT NULL,
   play_order integer NOT NULL,
+  playlist_track_key text,
   source_label text,
   artist text,
   title text,
@@ -91,6 +92,8 @@ CREATE TABLE IF NOT EXISTS public.gi_session_calls (
   fits_category boolean NOT NULL DEFAULT true,
   is_imposter boolean NOT NULL DEFAULT false,
   host_notes text,
+  metadata_locked boolean NOT NULL DEFAULT false,
+  metadata_synced_at timestamptz,
   status text NOT NULL DEFAULT 'pending',
   cued_at timestamptz,
   played_at timestamptz,
@@ -148,6 +151,11 @@ CREATE TABLE IF NOT EXISTS public.gi_session_events (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE public.gi_session_calls
+  ADD COLUMN IF NOT EXISTS playlist_track_key text,
+  ADD COLUMN IF NOT EXISTS metadata_locked boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS metadata_synced_at timestamptz;
+
 CREATE INDEX IF NOT EXISTS idx_gi_sessions_event_id ON public.gi_sessions(event_id);
 CREATE INDEX IF NOT EXISTS idx_gi_sessions_playlist_id ON public.gi_sessions(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_gi_sessions_status ON public.gi_sessions(status, created_at DESC);
@@ -155,6 +163,8 @@ CREATE INDEX IF NOT EXISTS idx_gi_teams_session_id ON public.gi_session_teams(se
 CREATE INDEX IF NOT EXISTS idx_gi_rounds_session_id ON public.gi_session_rounds(session_id);
 CREATE INDEX IF NOT EXISTS idx_gi_calls_session_id ON public.gi_session_calls(session_id);
 CREATE INDEX IF NOT EXISTS idx_gi_calls_round_id ON public.gi_session_calls(round_id);
+CREATE INDEX IF NOT EXISTS idx_gi_calls_track_key ON public.gi_session_calls(session_id, playlist_track_key);
+CREATE INDEX IF NOT EXISTS idx_gi_calls_metadata_sync ON public.gi_session_calls(session_id, metadata_locked, metadata_synced_at);
 CREATE INDEX IF NOT EXISTS idx_gi_picks_session_id ON public.gi_round_team_picks(session_id);
 CREATE INDEX IF NOT EXISTS idx_gi_scores_session_id ON public.gi_team_scores(session_id);
 CREATE INDEX IF NOT EXISTS idx_gi_events_session_id ON public.gi_session_events(session_id);

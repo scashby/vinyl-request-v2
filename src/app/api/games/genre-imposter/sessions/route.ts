@@ -14,6 +14,7 @@ type RoundDraft = {
   calls?: Array<{
     call_index?: number;
     play_order?: number;
+    playlist_track_key?: string;
     source_label?: string;
     artist?: string;
     title?: string;
@@ -128,6 +129,7 @@ function buildRoundsFromPlaylistTracks(tracks: ResolvedPlaylistTrack[], roundCou
       calls: trio.map((track, idx) => ({
         call_index: idx + 1,
         play_order: idx + 1,
+        playlist_track_key: track.trackKey,
         source_label: toTrackSourceLabel(track),
         artist: track.artistName?.trim() || "Unknown Artist",
         title: track.trackTitle?.trim() || `Track ${start + idx + 1}`,
@@ -147,6 +149,7 @@ function normalizeRounds(rounds: RoundDraft[] | undefined, roundCount: number) {
         return {
           call_index: callIndex,
           play_order: Number(provided.play_order ?? provided.call_index ?? callIndex),
+          playlist_track_key: provided.playlist_track_key?.trim() || null,
           source_label: provided.source_label?.trim() || null,
           artist: provided.artist?.trim() || null,
           title: provided.title?.trim() || null,
@@ -362,6 +365,7 @@ export async function POST(request: NextRequest) {
           round_number: round.round_number,
           call_index: call.call_index,
           play_order: call.play_order,
+          playlist_track_key: call.playlist_track_key ?? null,
           source_label: call.source_label,
           artist: call.artist,
           title: call.title,

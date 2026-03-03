@@ -346,6 +346,16 @@ export function PlaylistStudioModal({
   const [retryingUnmatched, setRetryingUnmatched] = useState(false);
   const wasOpenRef = useRef(false);
   const unmatchedSectionRef = useRef<HTMLDivElement | null>(null);
+  const AUTH_RETURN_MODAL_KEY = 'edit-collection-auth-return-modal';
+  const spotifyAuthHref = useMemo(() => {
+    if (typeof window === 'undefined') return '/api/auth/spotify';
+    const returnTo = `${window.location.pathname}${window.location.search}`;
+    return `/api/auth/spotify?returnTo=${encodeURIComponent(returnTo)}`;
+  }, []);
+  const markSpotifyReturnModal = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(AUTH_RETURN_MODAL_KEY, 'spotify-playlists');
+  }, []);
 
   const appendablePlaylists = useMemo(
     () => localPlaylists.filter((playlist) => !playlist.isSmart),
@@ -2167,7 +2177,8 @@ export function PlaylistStudioModal({
                           Spotify is not connected.
                           <div className="mt-2">
                             <a
-                              href="/api/auth/spotify"
+                              href={spotifyAuthHref}
+                              onClick={markSpotifyReturnModal}
                               className="inline-flex rounded-md border border-[#64b674] bg-[#1f6940] px-3 py-1.5 text-xs font-semibold text-white"
                             >
                               Connect Spotify
@@ -2184,7 +2195,8 @@ export function PlaylistStudioModal({
                               className="w-full rounded-lg border border-[#30466b] bg-[#0f182a] px-3 py-2 text-sm text-white"
                             />
                             <a
-                              href="/api/auth/spotify"
+                              href={spotifyAuthHref}
+                              onClick={markSpotifyReturnModal}
                               className="rounded-md border border-[#49a163] bg-[#227746] px-3 py-2 text-xs font-semibold text-white"
                             >
                               Reconnect

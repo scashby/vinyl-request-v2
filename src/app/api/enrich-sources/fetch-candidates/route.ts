@@ -155,6 +155,7 @@ export async function POST(req: Request) {
       .select(`
         id,
         location,
+        discogs_folder_name,
         release:releases (
           id,
           discogs_release_id,
@@ -212,7 +213,7 @@ export async function POST(req: Request) {
         .order('id', { ascending: true })
         .limit(limit);
 
-      if (location) query = query.eq('location', location);
+      if (location) query = query.eq('discogs_folder_name', location);
       if (typeof maxId === 'number' && Number.isFinite(maxId) && maxId > 0) {
         query = query.lte('id', maxId);
       }
@@ -252,6 +253,7 @@ export async function POST(req: Request) {
     type CandidateAlbumRow = {
       id: number;
       location?: string | null;
+      discogs_folder_name?: string | null;
       release?: {
         id?: number | null;
         media_type?: string | null;
@@ -418,7 +420,7 @@ export async function POST(req: Request) {
         tracks_lyrics: hasLyrics ? ['has_lyrics'] : [],
         disc_metadata: albumDetails.disc_metadata ?? null,
         matrix_numbers: albumDetails.matrix_numbers ?? null,
-        location: album.location ?? null,
+        location: album.discogs_folder_name ?? album.location ?? null,
         enriched_metadata: albumDetails.enriched_metadata ?? null,
         enrichment_summary: albumDetails.enrichment_summary ?? null,
         enrichment_sources: albumDetails.enrichment_sources ?? null,

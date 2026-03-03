@@ -12,6 +12,12 @@ type CallPatchBody = {
   prep_status?: "draft" | "ready";
   display_element_type?: "song" | "artist" | "album" | "cover_art" | "vinyl_label";
   display_image_override_url?: string | null;
+  source_artist?: string | null;
+  source_title?: string | null;
+  source_album?: string | null;
+  source_side?: string | null;
+  source_position?: string | null;
+  metadata_locked?: boolean;
 };
 
 type CallRow = {
@@ -45,7 +51,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     typeof body.prep_status === "string" ||
     typeof body.display_element_type === "string" ||
     typeof body.display_image_override_url === "string" ||
-    body.display_image_override_url === null;
+    body.display_image_override_url === null ||
+    typeof body.source_artist === "string" ||
+    body.source_artist === null ||
+    typeof body.source_title === "string" ||
+    body.source_title === null ||
+    typeof body.source_album === "string" ||
+    body.source_album === null ||
+    typeof body.source_side === "string" ||
+    body.source_side === null ||
+    typeof body.source_position === "string" ||
+    body.source_position === null ||
+    typeof body.metadata_locked === "boolean";
   if (!hasEditableField) return NextResponse.json({ error: "No valid fields provided" }, { status: 400 });
 
   const db = getTriviaDb();
@@ -99,6 +116,37 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       typeof body.display_image_override_url === "string"
         ? (body.display_image_override_url.trim() || null)
         : null;
+  }
+  if (typeof body.source_artist === "string" || body.source_artist === null) {
+    patch.source_artist = typeof body.source_artist === "string" ? body.source_artist.trim() || null : null;
+  }
+  if (typeof body.source_title === "string" || body.source_title === null) {
+    patch.source_title = typeof body.source_title === "string" ? body.source_title.trim() || null : null;
+  }
+  if (typeof body.source_album === "string" || body.source_album === null) {
+    patch.source_album = typeof body.source_album === "string" ? body.source_album.trim() || null : null;
+  }
+  if (typeof body.source_side === "string" || body.source_side === null) {
+    patch.source_side = typeof body.source_side === "string" ? body.source_side.trim().toUpperCase() || null : null;
+  }
+  if (typeof body.source_position === "string" || body.source_position === null) {
+    patch.source_position = typeof body.source_position === "string" ? body.source_position.trim() || null : null;
+  }
+  if (typeof body.metadata_locked === "boolean") {
+    patch.metadata_locked = body.metadata_locked;
+  }
+
+  const touchedMetadataFields =
+    Object.prototype.hasOwnProperty.call(body, "source_artist") ||
+    Object.prototype.hasOwnProperty.call(body, "source_title") ||
+    Object.prototype.hasOwnProperty.call(body, "source_album") ||
+    Object.prototype.hasOwnProperty.call(body, "source_side") ||
+    Object.prototype.hasOwnProperty.call(body, "source_position");
+  if (touchedMetadataFields && typeof body.metadata_locked !== "boolean") {
+    patch.metadata_locked = true;
+  }
+  if (touchedMetadataFields) {
+    patch.metadata_synced_at = now;
   }
 
   const nextPrepStatus = (patch.prep_status as "draft" | "ready" | undefined) ?? typedCall.prep_status;

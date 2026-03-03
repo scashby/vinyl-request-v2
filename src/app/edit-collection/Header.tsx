@@ -1,7 +1,7 @@
 // src/app/edit-collection/Header.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SettingsModal } from './settings/SettingsModal';
 import ManagePickListsModal from './ManagePickListsModal';
 import ManageCratesModal from './crates/ManageCratesModal';
@@ -28,6 +28,8 @@ interface HeaderProps {
   onOpenExportCsvTxt?: () => void;
 }
 
+const AUTH_RETURN_MODAL_KEY = 'edit-collection-auth-return-modal';
+
 export default function Header({ 
   albums = [], 
   loadAlbums = async () => {}, 
@@ -52,6 +54,35 @@ export default function Header({
   const [showImportEnrichModal, setShowImportEnrichModal] = useState(false);
   const [showFindDuplicates, setShowFindDuplicates] = useState(false);
   const [editingCrate, setEditingCrate] = useState<Crate | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const discogsStatus = params.get('import');
+    const spotifyStatus = params.get('spotify');
+    if (!discogsStatus && !spotifyStatus) return;
+
+    const returnModal = window.localStorage.getItem(AUTH_RETURN_MODAL_KEY);
+
+    if (discogsStatus === 'discogs_success') {
+      if (returnModal === 'discogs-enrich') {
+        setShowImportEnrichModal(true);
+      } else {
+        setShowImportDiscogsModal(true);
+      }
+    }
+
+    if (spotifyStatus === 'connected' && returnModal === 'spotify-playlists') {
+      onOpenManagePlaylists();
+    }
+
+    window.localStorage.removeItem(AUTH_RETURN_MODAL_KEY);
+    params.delete('import');
+    params.delete('spotify');
+    const nextSearch = params.toString();
+    const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${window.location.hash}`;
+    window.history.replaceState({}, '', nextUrl);
+  }, [onOpenManagePlaylists]);
 
   return (
     <>

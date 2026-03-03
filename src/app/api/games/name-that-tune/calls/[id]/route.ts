@@ -5,6 +5,11 @@ export const runtime = "nodejs";
 
 type CallPatchBody = {
   status?: "pending" | "asked" | "locked" | "answer_revealed" | "scored" | "skipped";
+  artist_answer?: string;
+  title_answer?: string;
+  source_label?: string | null;
+  host_notes?: string | null;
+  metadata_locked?: boolean;
 };
 
 type CallRow = {
@@ -25,7 +30,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!Number.isFinite(callId)) return NextResponse.json({ error: "Invalid call id" }, { status: 400 });
 
   const body = (await request.json()) as CallPatchBody;
-  if (!body.status) return NextResponse.json({ error: "status is required" }, { status: 400 });
+  const hasMetadataPatch =
+    typeof body.artist_answer === "string" ||
+    typeof body.title_answer === "string" ||
+    typeof body.source_label === "string" ||
+    body.source_label === null ||
+    typeof body.host_notes === "string" ||
+    body.host_notes === null ||
+    typeof body.metadata_locked === "boolean";
+  if (!body.status && !hasMetadataPatch) return NextResponse.json({ error: "No valid fields provided" }, { status: 400 });
 
   const db = getNameThatTuneDb();
   const { data: call, error: callError } = await db
@@ -40,10 +53,29 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const typedCall = call as CallRow;
   const now = new Date().toISOString();
 
-  const patch: Record<string, unknown> = { status: body.status };
-  if (body.status === "asked") patch.asked_at = now;
-  if (body.status === "answer_revealed") patch.answer_revealed_at = now;
-  if (body.status === "scored") patch.scored_at = now;
+  const patch: Record<string, unknown> = {};
+  if (body.status) {
+    patch.status = body.status;
+    if (body.status === "asked") patch.asked_at = now;
+    if (body.status === "answer_revealed") patch.answer_revealed_at = now;
+    if (body.status === "scored") patch.scored_at = now;
+  }
+  if (typeof body.artist_answer === "string") patch.artist_answer = body.artist_answer.trim();
+  if (typeof body.title_answer === "string") patch.title_answer = body.title_answer.trim();
+  if (typeof body.source_label === "string" || body.source_label === null) {
+    patch.source_label = typeof body.source_label === "string" ? body.source_label.trim() || null : null;
+  }
+  if (typeof body.host_notes === "string" || body.host_notes === null) {
+    patch.host_notes = typeof body.host_notes === "string" ? body.host_notes.trim() || null : null;
+  }
+  if (typeof body.metadata_locked === "boolean") {
+    patch.metadata_locked = body.metadata_locked;
+  } else if (hasMetadataPatch) {
+    patch.metadata_locked = true;
+  }
+  if (hasMetadataPatch) {
+    patch.metadata_synced_at = now;
+  }
 
   const { error: patchError } = await db.from("ntt_session_calls").update(patch).eq("id", callId);
   if (patchError) return NextResponse.json({ error: patchError.message }, { status: 500 });

@@ -108,6 +108,49 @@ WHERE
     OR w.artist_album_norm IS DISTINCT FROM CONCAT_WS(' ', LOWER(n.cleaned_artist), n.cleaned_title)
   );
 
+WITH normalized_recordings AS (
+  SELECT
+    r.id,
+    NULLIF(TRIM(REGEXP_REPLACE(COALESCE(r.track_artist, ''), '\s+\(\d+\)\s*$', '')), '') AS cleaned_track_artist,
+    CASE
+      WHEN jsonb_typeof(r.credits) = 'object'
+        THEN NULLIF(
+          TRIM(
+            REGEXP_REPLACE(
+              COALESCE(r.credits ->> 'track_artist', ''),
+              '\s+\(\d+\)\s*$',
+              ''
+            )
+          ),
+          ''
+        )
+      ELSE NULL
+    END AS cleaned_credit_track_artist,
+    r.credits
+  FROM recordings r
+)
+UPDATE recordings r
+SET
+  track_artist = n.cleaned_track_artist,
+  credits = CASE
+    WHEN jsonb_typeof(n.credits) <> 'object' THEN n.credits
+    WHEN n.cleaned_credit_track_artist IS NULL THEN n.credits - 'track_artist'
+    ELSE jsonb_set(n.credits, '{track_artist}', to_jsonb(n.cleaned_credit_track_artist), true)
+  END
+FROM normalized_recordings n
+WHERE
+  r.id = n.id
+  AND (
+    r.track_artist IS DISTINCT FROM n.cleaned_track_artist
+    OR (
+      jsonb_typeof(n.credits) = 'object'
+      AND (
+        (n.cleaned_credit_track_artist IS NULL AND (n.credits ? 'track_artist'))
+        OR (n.cleaned_credit_track_artist IS NOT NULL AND (n.credits ->> 'track_artist') IS DISTINCT FROM n.cleaned_credit_track_artist)
+      )
+    )
+  );
+
 SELECT
   COUNT(*)::int AS artists_with_discogs_suffix_after
 FROM artists

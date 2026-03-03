@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase } from 'lib/supabaseClient'
 import Image from 'next/image';
 import GenreStyleSelector from 'components/GenreStyleSelector';
+import { normalizeArtistDisplay } from 'lib/artistName';
 
 type Track = { 
   position: string; 
@@ -981,7 +982,8 @@ export default function EditEntryPage() {
           const title = track.title?.trim() || '';
           if (!title) continue;
           const trackCredits: Record<string, unknown> = { ...albumCredits };
-          if (track.artist) trackCredits.track_artist = track.artist;
+          const normalizedTrackArtist = normalizeArtistDisplay(track.artist ?? null);
+          if (normalizedTrackArtist) trackCredits.track_artist = normalizedTrackArtist;
           if (track.lyrics_url) trackCredits.lyrics_url = track.lyrics_url;
           if (typeof track.is_cover === 'boolean') trackCredits.is_cover = track.is_cover;
           if (track.original_artist) trackCredits.original_artist = track.original_artist;
@@ -991,7 +993,7 @@ export default function EditEntryPage() {
           const recordingPayload: Record<string, unknown> = {
             title,
             duration_seconds: parseDurationToSeconds(track.duration),
-            track_artist: track.artist || null,
+            track_artist: normalizedTrackArtist,
             lyrics_url: track.lyrics_url || null,
             is_cover: typeof track.is_cover === 'boolean' ? track.is_cover : null,
             original_artist: track.original_artist || null,

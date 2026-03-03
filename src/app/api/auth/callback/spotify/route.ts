@@ -20,12 +20,15 @@ export async function GET(req: NextRequest) {
   try {
     const cookieStore = await cookies();
     const expectedState = cookieStore.get('spotify_oauth_state')?.value ?? '';
+    const returnToPath = cookieStore.get('spotify_post_auth_return_to')?.value ?? '/edit-collection';
     if (!expectedState || expectedState !== state) {
       return NextResponse.redirect(`${redirectBase}?spotify=state_mismatch`);
     }
 
     const token = await exchangeSpotifyCode(code);
-    const res = NextResponse.redirect(`${redirectBase}?spotify=connected`);
+    const redirectUrl = new URL(returnToPath, req.url);
+    redirectUrl.searchParams.set('spotify', 'connected');
+    const res = NextResponse.redirect(redirectUrl);
     res.cookies.set('spotify_access_token', token.access_token, {
       httpOnly: true,
       secure: true,
@@ -57,6 +60,13 @@ export async function GET(req: NextRequest) {
       maxAge: 60 * 60 * 24 * 90,
     });
     res.cookies.set('spotify_oauth_state', '', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 0,
+    });
+    res.cookies.set('spotify_post_auth_return_to', '', {
       httpOnly: true,
       secure: true,
       sameSite: 'lax',

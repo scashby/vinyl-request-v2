@@ -155,7 +155,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
       case 'spotify_label': return { title: 'Select Label', itemLabel: 'Label', mode: 'single' as const };
       case 'format': return { title: 'Select Format', itemLabel: 'Format', mode: 'single' as const };
       case 'genre': return { title: 'Select Genres', itemLabel: 'Genre', mode: 'multi' as const };
-      case 'location': return { title: 'Select Location', itemLabel: 'Location', mode: 'single' as const };
+      case 'location': return { title: 'Select Discogs Folder', itemLabel: 'Discogs Folder', mode: 'single' as const };
       case 'artist': return { title: 'Select Artists', itemLabel: 'Artist', mode: 'single' as const };
       case 'secondary_artists': return { title: 'Select Secondary Artists', itemLabel: 'Artist', mode: 'multi' as const };
       default: return { title: '', itemLabel: '', mode: 'single' as const };

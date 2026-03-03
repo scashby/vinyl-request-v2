@@ -107,6 +107,10 @@ export type CandidateData = {
   lastfm_similar_albums?: string[];
   enrichment_summary?: Record<string, string>; // Structured External Data (Setlist.fm, links, etc)
   companies?: string[]; // Discogs Companies
+  pressing_plant?: string;
+  discogs_companies?: Array<{ name?: string; entity_type_name?: string }>;
+  discogs_identifiers?: Array<{ type?: string; value?: string; description?: string }>;
+  discogs_formats?: Array<{ name?: string; qty?: string | number; descriptions?: string[] }>;
   rpm?: string;
   vinyl_weight?: string;
   vinyl_color?: string[];
@@ -460,8 +464,9 @@ interface DiscogsTrack {
 }
 
 interface DiscogsIdentifier {
-  type: string;
-  value: string;
+  type?: string;
+  value?: string;
+  description?: string;
 }
 
 interface DiscogsArtist {
@@ -1332,6 +1337,24 @@ export async function fetchDiscogsData(
         const kind = String(c.entity_type_name ?? '').toLowerCase();
         return kind.includes('recorded') || kind.includes('studio');
       })?.name,
+      pressing_plant: data.companies?.find((c: DiscogsCompany) => {
+        const kind = String(c.entity_type_name ?? '').toLowerCase();
+        return kind.includes('pressed by') || kind.includes('pressing plant') || kind.includes('manufactured by');
+      })?.name,
+      discogs_companies: data.companies?.map((company) => ({
+        name: company.name,
+        entity_type_name: company.entity_type_name,
+      })),
+      discogs_identifiers: data.identifiers?.map((identifier) => ({
+        type: identifier.type,
+        value: identifier.value,
+        description: identifier.description,
+      })),
+      discogs_formats: data.formats?.map((format) => ({
+        name: format.name,
+        qty: format.qty,
+        descriptions: format.descriptions,
+      })),
       tracklist: data.tracklist?.map((t: DiscogsTrack) => `${t.position} - ${t.title} (${t.duration})`).join('\n'),
       tracks: data.tracklist
         ?.filter((t: DiscogsTrack) => t.type_ !== 'heading')

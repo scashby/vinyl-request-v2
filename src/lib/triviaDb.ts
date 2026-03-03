@@ -189,6 +189,8 @@ export type TriviaDatabase = {
           source_album: string | null;
           source_side: string | null;
           source_position: string | null;
+          metadata_locked: boolean;
+          metadata_synced_at: string | null;
           base_points: number;
           bonus_points: number;
           status: string;
@@ -220,6 +222,8 @@ export type TriviaDatabase = {
           source_album?: string | null;
           source_side?: string | null;
           source_position?: string | null;
+          metadata_locked?: boolean;
+          metadata_synced_at?: string | null;
           base_points?: number;
           bonus_points?: number;
           status?: string;
@@ -251,6 +255,8 @@ export type TriviaDatabase = {
           source_album?: string | null;
           source_side?: string | null;
           source_position?: string | null;
+          metadata_locked?: boolean;
+          metadata_synced_at?: string | null;
           base_points?: number;
           bonus_points?: number;
           status?: string;

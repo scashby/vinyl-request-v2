@@ -4,6 +4,7 @@ import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 import { parseDiscogsFormat } from "src/utils/formatUtils";
 import type { Json } from "types/supabase";
 import { discogsHeaders, discogsUrl, hasDiscogsCredentials } from "src/lib/discogsAuth";
+import { normalizeArtistDisplay } from "src/lib/artistName";
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
@@ -171,7 +172,7 @@ export async function POST(req: Request) {
       
       // Extract artist from track-level artists field
       if (track.artists && track.artists.length > 0) {
-        trackArtist = track.artists.map(a => a.name).join(', ');
+        trackArtist = normalizeArtistDisplay(track.artists.map(a => a.name).join(', ')) ?? undefined;
       }
       
       return {
@@ -212,6 +213,7 @@ export async function POST(req: Request) {
         .from('recordings')
         .insert({
           title: track.title || null,
+          track_artist: track.artist ?? null,
           duration_seconds: parseDurationToSeconds(track.duration),
           credits: (() => {
             const baseCredits: Record<string, unknown> = {};

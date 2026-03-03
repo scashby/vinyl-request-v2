@@ -7,6 +7,7 @@ import { parseDiscogsFormat } from '../../../lib/formatParser';
 import type { Database } from '../../../types/supabase';
 import { normalizeArtist, normalizeTitle, normalizeArtistAlbum } from '../../../lib/importUtils';
 import { stripDiscogsDisambiguationSuffix } from '../../../lib/artistName';
+import { isForSaleInventory, isSaleFolderName } from '../../../lib/saleUtils';
 
 type SyncMode = 'full_replacement' | 'full_sync' | 'partial_sync' | 'new_only';
 type ImportStage = 'select_mode' | 'fetching_definitions' | 'fetching' | 'preview' | 'importing' | 'complete';
@@ -47,7 +48,7 @@ interface DiscogsBasicInfo {
 interface DiscogsItem {
   id: number;
   instance_id: number;
-  folder_id: number;
+  folder_id: number | string;
   date_added: string;
   rating: number;
   notes?: DiscogsNote[];
@@ -105,7 +106,7 @@ interface DiscogsField {
 }
 
 interface DiscogsFolder {
-  id?: number;
+  id?: number | string;
   name?: string;
 }
 
@@ -143,6 +144,28 @@ const normalizeReleaseDate = (released?: string | null): string | null => {
   return `${year}-${mm}-${dd}`;
 };
 
+const parseDiscogsFolderId = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = Number.parseInt(trimmed, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+};
+
+const parseDiscogsInstanceId = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = Number.parseInt(trimmed, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+};
+
 const buildFormatLabel = (release?: { media_type?: string | null; format_details?: string[] | null; qty?: number | null } | null) => {
   if (!release) return '';
   const parts = [release.media_type, ...(release.format_details ?? [])].filter(Boolean);
@@ -157,125 +180,78 @@ const asRecord = (value: unknown): Record<string, unknown> => {
   return value as Record<string, unknown>;
 };
 
-const SALE_FOLDER_NAMES = new Set(['sale', 'for sale']);
-
 const isDiscogsSaleFolderName = (value: string | null | undefined): boolean => {
-  const normalized = (value ?? '').trim().toLowerCase();
-  return normalized.length > 0 && SALE_FOLDER_NAMES.has(normalized);
+  return isSaleFolderName(value);
 };
 
-const isTruthySmartRuleValue = (value: unknown): boolean => {
-  if (value === true) return true;
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    return normalized === 'true' || normalized === 'yes' || normalized === '1';
-  }
-  if (typeof value === 'number') return value === 1;
-  return false;
-};
-
-const hasSaleSmartRule = (smartRules: unknown): boolean => {
-  const rules = asRecord(smartRules).rules;
-  if (!Array.isArray(rules) || rules.length !== 1) return false;
-  const rule = asRecord(rules[0]);
-  return (
-    String(rule.field ?? '').trim().toLowerCase() === 'for_sale' &&
-    String(rule.operator ?? '').trim().toLowerCase() === 'is' &&
-    isTruthySmartRuleValue(rule.value)
-  );
-};
-
-const SALE_SMART_RULES = {
-  rules: [
-    {
-      field: 'for_sale',
-      operator: 'is',
-      value: true,
-    },
-  ],
-};
+const AUTH_RETURN_MODAL_KEY = 'edit-collection-auth-return-modal';
 
 const ensureSaleCrateExists = async (): Promise<number | null> => {
-  const { data: crates, error } = await supabase
-    .from('crates')
-    .select('id, name, icon, color, is_smart, smart_rules, sort_order');
-
-  if (error) {
-    console.warn('Unable to load crates before ensuring sale crate:', error.message);
-    return null;
-  }
-
-  const existingByRule = (crates ?? []).find((crate) => hasSaleSmartRule(crate.smart_rules));
-  if (existingByRule?.id) {
-    return existingByRule.id;
-  }
-
-  const existingByName = (crates ?? []).find((crate) => isDiscogsSaleFolderName(crate.name));
-  if (existingByName?.id) {
-    const { error: updateError } = await supabase
-      .from('crates')
-      .update({
-        is_smart: true,
-        smart_rules: SALE_SMART_RULES as unknown as Database['public']['Tables']['crates']['Update']['smart_rules'],
-        match_rules: 'all',
-        live_update: true,
-        icon: existingByName.icon ?? '💰',
-        color: existingByName.color ?? '#d97706',
-      })
-      .eq('id', existingByName.id);
-    if (updateError) {
-      console.warn('Unable to convert existing sale crate to smart crate:', updateError.message);
+  try {
+    const res = await fetch('/api/crates/ensure-sale', { method: 'POST' });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      console.warn('Unable to ensure sale crate:', payload?.error || res.status);
+      return null;
     }
-    return existingByName.id;
-  }
-
-  const maxSortOrder = (crates ?? []).reduce((max, crate) => {
-    const value = typeof crate.sort_order === 'number' ? crate.sort_order : 0;
-    return Math.max(max, value);
-  }, -1);
-
-  const { data: inserted, error: insertError } = await supabase
-    .from('crates')
-    .insert({
-      name: 'Sale',
-      icon: '💰',
-      color: '#d97706',
-      is_smart: true,
-      smart_rules: SALE_SMART_RULES as unknown as Database['public']['Tables']['crates']['Insert']['smart_rules'],
-      match_rules: 'all',
-      live_update: true,
-      sort_order: maxSortOrder + 1,
-    })
-    .select('id')
-    .single();
-
-  if (insertError || !inserted) {
-    console.warn('Unable to create sale crate:', insertError?.message ?? 'Unknown error');
+    return typeof payload?.id === 'number' ? payload.id : null;
+  } catch (error) {
+    console.warn('Unable to ensure sale crate:', getErrorMessage(error));
     return null;
   }
-
-  return inserted.id;
 };
 
-const syncExistingInventoryFolderAssignments = async (comparedAlbums: ComparedAlbum[]): Promise<void> => {
+const isInventoryStatusConstraintError = (error: unknown): boolean => {
+  const message = getErrorMessage(error).toLowerCase();
+  return message.includes('inventory_status_check') || (message.includes('check constraint') && message.includes('inventory'));
+};
+
+const syncExistingInventoryFolderAssignments = async (
+  comparedAlbums: ComparedAlbum[],
+  options?: { legacySaleStatus?: boolean }
+): Promise<boolean> => {
+  const legacySaleStatus = options?.legacySaleStatus === true;
   const assignments = comparedAlbums
-    .filter((album) => album.existingId && album.sale_folder_resolved)
+    .filter((album) => album.existingId && album.status !== 'REMOVED')
     .map((album) => ({
       id: album.existingId as number,
-      status: album.is_sale_folder ? 'for_sale' : 'active',
-      location: album.location || null,
+      status: album.is_sale_folder ? (legacySaleStatus ? 'active' : 'for_sale') : 'active',
+      location: album.discogs_folder_name || album.location || null,
+      discogs_instance_id: album.discogs_instance_id ?? null,
+      discogs_folder_id: album.discogs_folder_id ?? null,
+      discogs_folder_name: album.discogs_folder_name || album.location || null,
     }));
 
-  if (assignments.length === 0) return;
+  if (assignments.length === 0) return !legacySaleStatus;
 
   const grouped = assignments.reduce((acc, assignment) => {
-    const key = `${assignment.status}::${assignment.location ?? ''}`;
+    const key = [
+      assignment.status,
+      assignment.location ?? '',
+      assignment.discogs_instance_id ?? '',
+      assignment.discogs_folder_id ?? '',
+      assignment.discogs_folder_name ?? '',
+    ].join('::');
     if (!acc[key]) {
-      acc[key] = { status: assignment.status, location: assignment.location, ids: [] as number[] };
+      acc[key] = {
+        status: assignment.status,
+        location: assignment.location,
+        discogs_instance_id: assignment.discogs_instance_id,
+        discogs_folder_id: assignment.discogs_folder_id,
+        discogs_folder_name: assignment.discogs_folder_name,
+        ids: [] as number[],
+      };
     }
     acc[key].ids.push(assignment.id);
     return acc;
-  }, {} as Record<string, { status: string; location: string | null; ids: number[] }>);
+  }, {} as Record<string, {
+    status: string;
+    location: string | null;
+    discogs_instance_id: number | null;
+    discogs_folder_id: number | null;
+    discogs_folder_name: string | null;
+    ids: number[];
+  }>);
 
   for (const group of Object.values(grouped)) {
     const { error } = await supabase
@@ -283,12 +259,20 @@ const syncExistingInventoryFolderAssignments = async (comparedAlbums: ComparedAl
       .update({
         status: group.status,
         location: group.location,
+        discogs_instance_id: group.discogs_instance_id,
+        discogs_folder_id: group.discogs_folder_id,
+        discogs_folder_name: group.discogs_folder_name,
       })
       .in('id', group.ids);
     if (error) {
+      if (!legacySaleStatus && isInventoryStatusConstraintError(error)) {
+        return await syncExistingInventoryFolderAssignments(comparedAlbums, { legacySaleStatus: true });
+      }
       throw error;
     }
   }
+
+  return !legacySaleStatus;
 };
 
 const applyArtworkToReleaseRecordings = async (
@@ -393,6 +377,10 @@ const getOrCreateRelease = async (
     box_set?: string | null;
     sound?: string | null;
     studio?: string | null;
+    pressing_plant?: string | null;
+    discogs_companies?: unknown | null;
+    discogs_identifiers?: unknown | null;
+    discogs_formats?: unknown | null;
     disc_metadata?: unknown | null;
     matrix_numbers?: unknown | null;
   }
@@ -440,6 +428,10 @@ const getOrCreateRelease = async (
       box_set: payload.box_set ?? null,
       sound: payload.sound ?? null,
       studio: payload.studio ?? null,
+      pressing_plant: payload.pressing_plant ?? null,
+      discogs_companies: (payload.discogs_companies ?? null) as Database['public']['Tables']['releases']['Insert']['discogs_companies'],
+      discogs_identifiers: (payload.discogs_identifiers ?? null) as Database['public']['Tables']['releases']['Insert']['discogs_identifiers'],
+      discogs_formats: (payload.discogs_formats ?? null) as Database['public']['Tables']['releases']['Insert']['discogs_formats'],
       disc_metadata: (payload.disc_metadata ?? null) as Database['public']['Tables']['releases']['Insert']['disc_metadata'],
       matrix_numbers: (payload.matrix_numbers ?? null) as Database['public']['Tables']['releases']['Insert']['matrix_numbers'],
       discogs_release_id: payload.discogs_release_id,
@@ -451,7 +443,29 @@ const getOrCreateRelease = async (
   return created;
 };
 
-const getOrCreateInventory = async (releaseId: number) => {
+const getOrCreateInventory = async (
+  releaseId: number,
+  options?: { discogsInstanceId?: number | null }
+) => {
+  const discogsInstanceId = options?.discogsInstanceId ?? null;
+
+  if (discogsInstanceId !== null) {
+    const { data: existingByInstance } = await supabase
+      .from('inventory')
+      .select('id')
+      .eq('discogs_instance_id', discogsInstanceId)
+      .maybeSingle();
+    if (existingByInstance) return existingByInstance;
+
+    const { data: createdByInstance, error: createByInstanceError } = await supabase
+      .from('inventory')
+      .insert({ release_id: releaseId, discogs_instance_id: discogsInstanceId })
+      .select('id')
+      .single();
+    if (createByInstanceError || !createdByInstance) throw createByInstanceError;
+    return createdByInstance;
+  }
+
   const { data: existing } = await supabase
     .from('inventory')
     .select('id')
@@ -479,6 +493,11 @@ const splitDiscogsUpdates = (payload: Record<string, unknown>) => {
     switch (key) {
       case 'status':
         inventoryUpdates.status = value ?? null;
+        break;
+      case 'discogs_instance_id':
+      case 'discogs_folder_id':
+      case 'discogs_folder_name':
+        inventoryUpdates[key] = value ?? null;
         break;
       case 'location':
       case 'media_condition':
@@ -556,6 +575,10 @@ const splitDiscogsUpdates = (payload: Record<string, unknown>) => {
       case 'studio':
       case 'disc_metadata':
       case 'matrix_numbers':
+      case 'pressing_plant':
+      case 'discogs_companies':
+      case 'discogs_identifiers':
+      case 'discogs_formats':
         releaseUpdates[key] = value ?? null;
         break;
       default:
@@ -576,6 +599,7 @@ interface ParsedAlbum {
   country: string | null;
   year: string | null;
   year_int: number | null;
+  discogs_instance_id: number | null;
   location: string;
   discogs_folder_id: number | null;
   discogs_folder_name: string | null;
@@ -598,6 +622,9 @@ interface ExistingAlbum {
   id: number;
   release_id?: number | null;
   master_id?: number | null;
+  discogs_instance_id?: number | null;
+  discogs_folder_id?: number | null;
+  discogs_folder_name?: string | null;
   artist: string;
   title: string;
   artist_norm: string;
@@ -647,7 +674,7 @@ interface ComparedAlbum extends ParsedAlbum {
   needsEnrichment: boolean;
   requiresInventorySync?: boolean;
   missingFields: string[];
-  matchType?: 'discogs_id' | 'master_id' | 'artist_title' | 'unmatched';
+  matchType?: 'discogs_instance_id' | 'discogs_id' | 'master_id' | 'artist_title' | 'unmatched';
   discogsIdMismatch?: boolean;
   weakMatch?: boolean;
   matchScore?: number;
@@ -733,12 +760,17 @@ function compareAlbums(
   existing: ExistingAlbum[],
   sourceType: DiscogsSourceType
 ): ComparedAlbum[] {
+  const instanceIdMap = new Map<number, ExistingAlbum>();
   const releaseIdMap = new Map<string, ExistingAlbum[]>();
   const masterIdMap = new Map<string, ExistingAlbum[]>();
   const artistAlbumMap = new Map<string, ExistingAlbum[]>();
   const matchedDbIds = new Set<number>();
   
   existing.forEach(album => {
+    const instanceId = parseDiscogsInstanceId(album.discogs_instance_id);
+    if (instanceId !== null) {
+      instanceIdMap.set(instanceId, album);
+    }
     if (album.discogs_release_id) {
       const entries = releaseIdMap.get(album.discogs_release_id) ?? [];
       entries.push(album);
@@ -755,6 +787,41 @@ function compareAlbums(
     artistAlbumMap.set(normalizedKey, entries);
   });
 
+  const consumeMatchedAlbum = (album: ExistingAlbum) => {
+    matchedDbIds.add(album.id);
+
+    const instanceId = parseDiscogsInstanceId(album.discogs_instance_id);
+    if (instanceId !== null) {
+      instanceIdMap.delete(instanceId);
+    }
+
+    if (album.discogs_release_id) {
+      const remaining = (releaseIdMap.get(album.discogs_release_id) ?? []).filter((candidate) => candidate.id !== album.id);
+      if (remaining.length > 0) {
+        releaseIdMap.set(album.discogs_release_id, remaining);
+      } else {
+        releaseIdMap.delete(album.discogs_release_id);
+      }
+    }
+
+    if (album.discogs_master_id) {
+      const remaining = (masterIdMap.get(album.discogs_master_id) ?? []).filter((candidate) => candidate.id !== album.id);
+      if (remaining.length > 0) {
+        masterIdMap.set(album.discogs_master_id, remaining);
+      } else {
+        masterIdMap.delete(album.discogs_master_id);
+      }
+    }
+
+    const normalizedKey = normalizeArtistAlbum(album.artist, album.title);
+    const remainingArtistMatches = (artistAlbumMap.get(normalizedKey) ?? []).filter((candidate) => candidate.id !== album.id);
+    if (remainingArtistMatches.length > 0) {
+      artistAlbumMap.set(normalizedKey, remainingArtistMatches);
+    } else {
+      artistAlbumMap.delete(normalizedKey);
+    }
+  };
+
   const compared: ComparedAlbum[] = [];
 
   for (const parsedAlbum of parsed) {
@@ -770,8 +837,16 @@ function compareAlbums(
       if (!parsedFormatKey) return list;
       return list.filter((candidate) => formatKeyFromString(candidate.format ?? null) === parsedFormatKey);
     };
+
+    if (!existingAlbum && sourceType === 'collection' && parsedAlbum.discogs_instance_id !== null) {
+      const instanceMatch = instanceIdMap.get(parsedAlbum.discogs_instance_id);
+      if (instanceMatch) {
+        existingAlbum = instanceMatch;
+        matchType = 'discogs_instance_id';
+      }
+    }
     
-    if (parsedAlbum.discogs_release_id) {
+    if (!existingAlbum && parsedAlbum.discogs_release_id) {
       const candidates = releaseIdMap.get(parsedAlbum.discogs_release_id) ?? [];
       if (candidates.length === 1) {
         existingAlbum = candidates[0];
@@ -986,12 +1061,27 @@ function compareAlbums(
       }
       
       const discogsIdChanged = parsedAlbum.discogs_release_id !== existingAlbum.discogs_release_id;
-      const existingStatus = normalizeComparable(existingAlbum.status ?? null);
-      const shouldBeForSale = sourceType === 'collection' && parsedAlbum.sale_folder_resolved && parsedAlbum.is_sale_folder;
+      const existingInstanceId = parseDiscogsInstanceId(existingAlbum.discogs_instance_id);
+      const instanceIdChanged =
+        sourceType === 'collection' &&
+        parsedAlbum.discogs_instance_id !== null &&
+        existingInstanceId !== parsedAlbum.discogs_instance_id;
+      const existingIsForSale = isForSaleInventory(existingAlbum);
+      const incomingFolderName = parsedAlbum.discogs_folder_name ?? parsedAlbum.location ?? null;
+      const shouldBeForSale = sourceType === 'collection' && isDiscogsSaleFolderName(incomingFolderName);
+      const existingFolderId = parseDiscogsFolderId(existingAlbum.discogs_folder_id);
+      const existingFolderName = normalizeComparable(existingAlbum.discogs_folder_name ?? existingAlbum.location ?? null);
+      const parsedFolderId = parseDiscogsFolderId(parsedAlbum.discogs_folder_id);
+      const parsedFolderName = normalizeComparable(incomingFolderName);
+      const folderChanged =
+        sourceType === 'collection' &&
+        (existingFolderId !== parsedFolderId || existingFolderName !== parsedFolderName);
       const requiresInventorySync =
         sourceType === 'collection'
-          ? (shouldBeForSale && existingStatus !== 'for_sale') ||
-            (parsedAlbum.sale_folder_resolved && !shouldBeForSale && existingStatus === 'for_sale')
+          ? folderChanged ||
+            instanceIdChanged ||
+            (shouldBeForSale && !existingIsForSale) ||
+            (!shouldBeForSale && existingIsForSale)
           : false;
       const isChanged = discogsIdChanged || requiresInventorySync;
 
@@ -1024,28 +1114,7 @@ function compareAlbums(
           country: existingAlbum.country ?? null,
         },
       });
-
-      matchedDbIds.add(existingAlbum.id);
-
-      if (existingAlbum.discogs_release_id) {
-        const remaining = (releaseIdMap.get(existingAlbum.discogs_release_id) ?? []).filter((candidate) => candidate.id !== existingAlbum.id);
-        if (remaining.length > 0) {
-          releaseIdMap.set(existingAlbum.discogs_release_id, remaining);
-        } else {
-          releaseIdMap.delete(existingAlbum.discogs_release_id);
-        }
-      }
-
-      const normalizedKey = normalizeArtistAlbum(existingAlbum.artist, existingAlbum.title);
-      const matchedCandidates = artistAlbumMap.get(normalizedKey);
-      if (matchedCandidates) {
-        const remaining = matchedCandidates.filter((candidate) => candidate.id !== existingAlbum.id);
-        if (remaining.length > 0) {
-          artistAlbumMap.set(normalizedKey, remaining);
-        } else {
-          artistAlbumMap.delete(normalizedKey);
-        }
-      }
+      consumeMatchedAlbum(existingAlbum);
     }
   }
 
@@ -1066,6 +1135,7 @@ function compareAlbums(
       country: null,
       year: null,
       year_int: null,
+      discogs_instance_id: parseDiscogsInstanceId(existingAlbum.discogs_instance_id),
       location: 'Unknown',
       discogs_folder_id: null,
       discogs_folder_name: null,
@@ -1181,6 +1251,7 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
   }
 
   if (data.identifiers && Array.isArray(data.identifiers)) {
+    enriched.discogs_identifiers = data.identifiers;
     const barcode = data.identifiers.find((i) => i.type === 'Barcode');
     if (barcode) {
         enriched.barcode = barcode.value;
@@ -1188,13 +1259,43 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
   }
 
   if (data.companies && Array.isArray(data.companies)) {
+    enriched.discogs_companies = data.companies;
+    const companyNames = data.companies
+      .map((c) => c.name)
+      .filter((name): name is string => typeof name === 'string' && name.trim().length > 0);
+    if (companyNames.length > 0) {
+      enriched.companies = Array.from(new Set(companyNames));
+    }
+
+    const pressingPlant = data.companies.find((company) => {
+      const role = String(company.entity_type_name ?? company.role ?? '').toLowerCase();
+      return role.includes('pressed by') ||
+        role.includes('pressing plant') ||
+        role.includes('manufactured by');
+    })?.name;
+    if (pressingPlant) {
+      enriched.pressing_plant = pressingPlant;
+    }
+
+    const studioName = data.companies.find((company) => {
+      const role = String(company.entity_type_name ?? company.role ?? '').toLowerCase();
+      return role.includes('recorded at') || role.includes('recorded') || role.includes('studio');
+    })?.name;
+    if (studioName) {
+      enriched.studio = studioName;
+    }
+
     const labels = data.companies
-      .filter((c) => c.entity_type_name === 'Label')
+      .filter((c) => String(c.entity_type_name ?? '').toLowerCase() === 'label')
       .map((c) => c.name);
     
     if (labels.length > 0) {
       enriched.label = labels[0] ?? null;
     }
+  }
+
+  if (data.formats && Array.isArray(data.formats)) {
+    enriched.discogs_formats = data.formats;
   }
 
   if (data.labels && Array.isArray(data.labels) && data.labels[0]) {
@@ -1260,7 +1361,11 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   };
 
   const handleConnect = () => {
-    window.location.href = '/api/auth/discogs';
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(AUTH_RETURN_MODAL_KEY, 'discogs-import');
+    }
+    const returnTo = `${window.location.pathname}${window.location.search}`;
+    window.location.href = `/api/auth/discogs?returnTo=${encodeURIComponent(returnTo)}`;
   };
 
   const fetchDefinitions = async () => {
@@ -1308,7 +1413,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           }
           const foldersData = (await foldersRes.json()) as DiscogsFoldersResponse;
           for (const folder of foldersData.folders ?? []) {
-            const folderId = typeof folder.id === 'number' ? folder.id : null;
+            const folderId = parseDiscogsFolderId(folder.id);
             const folderName = typeof folder.name === 'string' ? folder.name.trim() : '';
             if (folderId !== null && folderName) {
               discogsFolderNamesById.set(folderId, folderName);
@@ -1371,11 +1476,16 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
                 // Ensure date is YYYY-MM-DD
                 const dateAdded = item.date_added ? item.date_added.split('T')[0] : new Date().toISOString().split('T')[0];
+                const instanceId = sourceType === 'collection' ? parseDiscogsInstanceId(item.instance_id) : null;
+                const folderId = sourceType === 'collection' ? parseDiscogsFolderId(item.folder_id) : null;
                 const folderName =
                   sourceType === 'collection'
-                    ? discogsFolderNamesById.get(item.folder_id) ?? (item.folder_id === 0 ? 'All' : 'Uncategorized')
+                    ? (folderId !== null ? discogsFolderNamesById.get(folderId) : null) ?? (folderId === 0 ? 'All' : 'Uncategorized')
                     : 'Uncategorized';
-                const saleFolderResolved = sourceType === 'collection' && discogsFolderNamesById.has(item.folder_id);
+                const saleFolderResolved =
+                  sourceType === 'collection' &&
+                  folderId !== null &&
+                  discogsFolderNamesById.has(folderId);
                 const isSaleFolder = sourceType === 'collection' && isDiscogsSaleFolderName(folderName);
 
                 allFetchedItems.push({
@@ -1388,8 +1498,9 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     country: null,
                     year,
                     year_int: isNaN(yearInt!) ? null : yearInt,
+                    discogs_instance_id: instanceId,
                     location: folderName,
-                    discogs_folder_id: sourceType === 'collection' ? item.folder_id : null,
+                    discogs_folder_id: sourceType === 'collection' ? folderId : null,
                     discogs_folder_name: sourceType === 'collection' ? folderName : null,
                     sale_folder_resolved: saleFolderResolved,
                     is_sale_folder: isSaleFolder,
@@ -1429,6 +1540,9 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 id,
                 status,
                 location,
+                discogs_instance_id,
+                discogs_folder_id,
+                discogs_folder_name,
                 media_condition,
                 sleeve_condition,
                 personal_notes,
@@ -1504,6 +1618,9 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 discogs_master_id: master?.discogs_master_id ?? null,
                 status: typeof row.status === 'string' ? row.status : null,
                 location: row.location ?? null,
+                discogs_instance_id: parseDiscogsInstanceId(row.discogs_instance_id),
+                discogs_folder_id: parseDiscogsFolderId(row.discogs_folder_id),
+                discogs_folder_name: typeof row.discogs_folder_name === 'string' ? row.discogs_folder_name : null,
                 format: formatLabel,
                 catalog_number: release?.catalog_number ?? null,
                 label: release?.label ?? null,
@@ -1587,11 +1704,12 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
     try {
       let albumsToProcess: ComparedAlbum[] = [];
+      let supportsForSaleStatus = true;
 
       const isCollection = sourceType === 'collection';
       if (isCollection) {
         await ensureSaleCrateExists();
-        await syncExistingInventoryFolderAssignments(comparedAlbums);
+        supportsForSaleStatus = await syncExistingInventoryFolderAssignments(comparedAlbums);
       }
 
       // Determine which albums to process based on Sync Mode
@@ -1648,6 +1766,9 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               const normalizedFormat = album.format?.trim() || '';
               const normalizedMediaCondition = album.media_condition?.trim() || '';
               const formatData = await parseDiscogsFormat(normalizedFormat);
+              const discogsFolderName = album.discogs_folder_name || album.location || null;
+              const isSaleFolder = isDiscogsSaleFolderName(discogsFolderName);
+              const canonicalStatus = isSaleFolder && supportsForSaleStatus ? 'for_sale' : 'active';
 
               payload = {
                 artist: album.artist,
@@ -1657,8 +1778,11 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 discogs_master_id: album.discogs_master_id || undefined,
                 catalog_number: album.catalog_number,
                 label: album.label,
-                status: album.sale_folder_resolved ? (album.is_sale_folder ? 'for_sale' : 'active') : undefined,
-                location: album.location,
+                status: canonicalStatus,
+                location: discogsFolderName,
+                discogs_instance_id: album.discogs_instance_id ?? null,
+                discogs_folder_id: album.discogs_folder_id ?? null,
+                discogs_folder_name: discogsFolderName,
                 date_added: album.date_added,
                 sleeve_condition: album.sleeve_condition,
                 personal_notes: album.personal_notes,
@@ -1736,16 +1860,44 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     box_set: getString(releaseUpdates.box_set),
                     sound: getString(releaseUpdates.sound),
                     studio: getString(releaseUpdates.studio),
+                    pressing_plant: getString(releaseUpdates.pressing_plant),
+                    discogs_companies: releaseUpdates.discogs_companies ?? null,
+                    discogs_identifiers: releaseUpdates.discogs_identifiers ?? null,
+                    discogs_formats: releaseUpdates.discogs_formats ?? null,
                     disc_metadata: releaseUpdates.disc_metadata ?? null,
                     matrix_numbers: releaseUpdates.matrix_numbers ?? null,
                     discogs_release_id: getString(releaseUpdates.discogs_release_id) ?? album.discogs_release_id,
                   });
               const inventoryRow = album.existingId
                 ? { id: album.existingId }
-                : await getOrCreateInventory(releaseRow.id);
+                : await getOrCreateInventory(releaseRow.id, { discogsInstanceId: album.discogs_instance_id ?? null });
 
               if (Object.keys(inventoryUpdates).length > 0) {
-                await supabase.from('inventory').update(inventoryUpdates as Record<string, unknown>).eq('id', inventoryRow.id);
+                const { error: inventoryUpdateError } = await supabase
+                  .from('inventory')
+                  .update(inventoryUpdates as Record<string, unknown>)
+                  .eq('id', inventoryRow.id);
+
+                if (inventoryUpdateError) {
+                  const attemptedForSale = inventoryUpdates.status === 'for_sale';
+                  if (attemptedForSale && isInventoryStatusConstraintError(inventoryUpdateError)) {
+                    supportsForSaleStatus = false;
+                    const fallbackUpdates = {
+                      ...inventoryUpdates,
+                      status: 'active',
+                      location: (typeof inventoryUpdates.location === 'string' && inventoryUpdates.location.length > 0)
+                        ? inventoryUpdates.location
+                        : 'Sale',
+                    };
+                    const { error: fallbackError } = await supabase
+                      .from('inventory')
+                      .update(fallbackUpdates as Record<string, unknown>)
+                      .eq('id', inventoryRow.id);
+                    if (fallbackError) throw fallbackError;
+                  } else {
+                    throw inventoryUpdateError;
+                  }
+                }
               }
               if (Object.keys(releaseUpdates).length > 0) {
                 await supabase.from('releases').update(releaseUpdates as Record<string, unknown>).eq('id', releaseRow.id);

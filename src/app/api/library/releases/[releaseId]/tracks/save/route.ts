@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
 import { buildCanonicalPosition, normalizePosition } from "src/lib/library/normalize";
 import type { LibraryTrackSavePayload, LibraryTrackSaveResult } from "src/lib/library/types";
+import { normalizeArtistDisplay } from "src/lib/artistName";
 
 export const runtime = "nodejs";
 
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ re
       .map((t) => ({
         ...t,
         title: String(t.title ?? "").trim(),
-        artist: typeof t.artist === "string" ? t.artist.trim() : null,
+        artist: normalizeArtistDisplay(typeof t.artist === "string" ? t.artist.trim() : null),
         duration: typeof t.duration === "string" ? t.duration.trim() : null,
         side: typeof t.side === "string" ? t.side.trim() : undefined,
       }))
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ re
         if (existing.recording_id && recordingById.has(existing.recording_id)) {
           const old = recordingById.get(existing.recording_id)!;
           const nextTitle = t.title;
-          const nextArtist = t.artist || null;
+          const nextArtist = normalizeArtistDisplay(t.artist) ?? null;
           const nextLyricsUrl =
             typeof t.lyrics_url === "string" ? t.lyrics_url.trim() || null : (
               Object.prototype.hasOwnProperty.call(t, "lyrics_url") ? null : (old.lyrics_url ?? null)
@@ -160,6 +161,11 @@ export async function POST(request: NextRequest, context: { params: Promise<{ re
             ...currentCredits,
             ...incomingCredits,
           };
+          if (nextArtist) {
+            nextCredits.track_artist = nextArtist;
+          } else {
+            delete nextCredits.track_artist;
+          }
 
           if (Object.prototype.hasOwnProperty.call(t, "time_signature")) {
             if (typeof t.time_signature === "number" && Number.isFinite(t.time_signature)) {
@@ -273,12 +279,14 @@ export async function POST(request: NextRequest, context: { params: Promise<{ re
         if (typeof t.original_artist === "string" && t.original_artist.trim()) {
           incomingCredits.original_artist = t.original_artist.trim();
         }
+        const nextArtist = normalizeArtistDisplay(t.artist) ?? null;
+        if (nextArtist) incomingCredits.track_artist = nextArtist;
 
         const { data: insertedRec, error: insertRecError } = await db
           .from("recordings")
           .insert({
             title: t.title,
-            track_artist: t.artist || null,
+            track_artist: nextArtist,
             duration_seconds: durationSeconds,
             notes: t.note ?? null,
             bpm: typeof t.bpm === "number" ? t.bpm : null,

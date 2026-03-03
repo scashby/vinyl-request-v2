@@ -202,6 +202,7 @@ export type GenreImposterDatabase = {
           round_number: number;
           call_index: number;
           play_order: number;
+          playlist_track_key: string | null;
           source_label: string | null;
           artist: string | null;
           title: string | null;
@@ -209,6 +210,8 @@ export type GenreImposterDatabase = {
           fits_category: boolean;
           is_imposter: boolean;
           host_notes: string | null;
+          metadata_locked: boolean;
+          metadata_synced_at: string | null;
           status: GiCallStatus;
           cued_at: string | null;
           played_at: string | null;
@@ -222,6 +225,7 @@ export type GenreImposterDatabase = {
           round_number: number;
           call_index: number;
           play_order: number;
+          playlist_track_key?: string | null;
           source_label?: string | null;
           artist?: string | null;
           title?: string | null;
@@ -229,6 +233,8 @@ export type GenreImposterDatabase = {
           fits_category?: boolean;
           is_imposter?: boolean;
           host_notes?: string | null;
+          metadata_locked?: boolean;
+          metadata_synced_at?: string | null;
           status?: GiCallStatus;
           cued_at?: string | null;
           played_at?: string | null;
@@ -242,6 +248,7 @@ export type GenreImposterDatabase = {
           round_number?: number;
           call_index?: number;
           play_order?: number;
+          playlist_track_key?: string | null;
           source_label?: string | null;
           artist?: string | null;
           title?: string | null;
@@ -249,6 +256,8 @@ export type GenreImposterDatabase = {
           fits_category?: boolean;
           is_imposter?: boolean;
           host_notes?: string | null;
+          metadata_locked?: boolean;
+          metadata_synced_at?: string | null;
           status?: GiCallStatus;
           cued_at?: string | null;
           played_at?: string | null;

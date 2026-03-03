@@ -119,16 +119,19 @@ export type BingoDatabase = {
           id: number;
           title: string | null;
           track_artist: string | null;
+          credits: Json | null;
         };
         Insert: {
           id?: number;
           title?: string | null;
           track_artist?: string | null;
+          credits?: Json | null;
         };
         Update: {
           id?: number;
           title?: string | null;
           track_artist?: string | null;
+          credits?: Json | null;
         };
         Relationships: [];
       };
@@ -301,6 +304,8 @@ export type BingoDatabase = {
           album_name: string | null;
           side: string | null;
           position: string | null;
+          metadata_locked: boolean;
+          metadata_synced_at: string | null;
           status: string;
           prep_started_at: string | null;
           called_at: string | null;
@@ -319,6 +324,8 @@ export type BingoDatabase = {
           album_name?: string | null;
           side?: string | null;
           position?: string | null;
+          metadata_locked?: boolean;
+          metadata_synced_at?: string | null;
           status?: string;
           prep_started_at?: string | null;
           called_at?: string | null;
@@ -337,6 +344,8 @@ export type BingoDatabase = {
           album_name?: string | null;
           side?: string | null;
           position?: string | null;
+          metadata_locked?: boolean;
+          metadata_synced_at?: string | null;
           status?: string;
           prep_started_at?: string | null;
           called_at?: string | null;

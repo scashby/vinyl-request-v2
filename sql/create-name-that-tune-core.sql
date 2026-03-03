@@ -3,6 +3,7 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS public.ntt_sessions (
   id bigserial PRIMARY KEY,
   event_id bigint REFERENCES public.events(id) ON DELETE SET NULL,
+  playlist_id bigint REFERENCES public.collection_playlists(id) ON DELETE SET NULL,
   session_code text NOT NULL UNIQUE,
   title text NOT NULL,
   round_count integer NOT NULL DEFAULT 10,
@@ -51,6 +52,7 @@ CREATE TABLE IF NOT EXISTS public.ntt_session_calls (
   session_id bigint NOT NULL REFERENCES public.ntt_sessions(id) ON DELETE CASCADE,
   round_number integer NOT NULL,
   call_index integer NOT NULL,
+  playlist_track_key text,
   source_label text,
   artist_answer text NOT NULL,
   title_answer text NOT NULL,
@@ -59,6 +61,8 @@ CREATE TABLE IF NOT EXISTS public.ntt_session_calls (
   snippet_start_seconds integer NOT NULL DEFAULT 0,
   snippet_duration_seconds integer NOT NULL DEFAULT 8,
   host_notes text,
+  metadata_locked boolean NOT NULL DEFAULT false,
+  metadata_synced_at timestamptz,
   status text NOT NULL DEFAULT 'pending',
   asked_at timestamptz,
   answer_revealed_at timestamptz,
@@ -95,10 +99,26 @@ CREATE TABLE IF NOT EXISTS public.ntt_session_events (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE public.ntt_sessions
+  ADD COLUMN IF NOT EXISTS playlist_id bigint;
+ALTER TABLE public.ntt_sessions
+  DROP CONSTRAINT IF EXISTS ntt_sessions_playlist_id_fkey;
+ALTER TABLE public.ntt_sessions
+  ADD CONSTRAINT ntt_sessions_playlist_id_fkey
+  FOREIGN KEY (playlist_id) REFERENCES public.collection_playlists(id) ON DELETE SET NULL;
+
+ALTER TABLE public.ntt_session_calls
+  ADD COLUMN IF NOT EXISTS playlist_track_key text,
+  ADD COLUMN IF NOT EXISTS metadata_locked boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS metadata_synced_at timestamptz;
+
 CREATE INDEX IF NOT EXISTS idx_ntt_sessions_event_id ON public.ntt_sessions(event_id);
+CREATE INDEX IF NOT EXISTS idx_ntt_sessions_playlist_id ON public.ntt_sessions(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_ntt_sessions_status ON public.ntt_sessions(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ntt_calls_session_id ON public.ntt_session_calls(session_id);
+CREATE INDEX IF NOT EXISTS idx_ntt_calls_track_key ON public.ntt_session_calls(session_id, playlist_track_key);
 CREATE INDEX IF NOT EXISTS idx_ntt_calls_status ON public.ntt_session_calls(session_id, status);
+CREATE INDEX IF NOT EXISTS idx_ntt_calls_metadata_sync ON public.ntt_session_calls(session_id, metadata_locked, metadata_synced_at);
 CREATE INDEX IF NOT EXISTS idx_ntt_teams_session_id ON public.ntt_session_teams(session_id);
 CREATE INDEX IF NOT EXISTS idx_ntt_scores_session_id ON public.ntt_team_scores(session_id);
 CREATE INDEX IF NOT EXISTS idx_ntt_scores_call_id ON public.ntt_team_scores(call_id);

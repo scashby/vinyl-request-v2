@@ -78,15 +78,15 @@ export function UniversalBottomBar({
           />
         </div>
 
-        {/* Location */}
+        {/* Discogs Folder */}
         <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1.5">Location</label>
+          <label className="block text-xs font-semibold text-gray-500 mb-1.5">Discogs Folder</label>
           <div className="flex items-stretch">
             <input
               type="text"
               value={album.location || ''}
               onChange={(e) => onChange('location', e.target.value)}
-              placeholder="Storage location"
+              placeholder="Discogs folder"
               className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-[13px] bg-white text-gray-900 focus:outline-none focus:border-blue-500 border-r-0"
             />
             <button 

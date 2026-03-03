@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getNameThatTuneDb } from "src/lib/nameThatTuneDb";
+import { autoSyncSessionPlaylistMetadata } from "src/lib/playlistMetadataSync";
 
 export const runtime = "nodejs";
 
@@ -11,10 +12,15 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   }
 
   const db = getNameThatTuneDb();
+  try {
+    await autoSyncSessionPlaylistMetadata("name-that-tune", sessionId);
+  } catch {
+    // Fail-open for host/operator views.
+  }
   const { data, error } = await db
     .from("ntt_session_calls")
     .select(
-      "id, session_id, round_number, call_index, source_label, artist_answer, title_answer, accepted_artist_aliases, accepted_title_aliases, snippet_start_seconds, snippet_duration_seconds, host_notes, status, asked_at, answer_revealed_at, scored_at, created_at"
+      "id, session_id, round_number, call_index, playlist_track_key, source_label, artist_answer, title_answer, accepted_artist_aliases, accepted_title_aliases, snippet_start_seconds, snippet_duration_seconds, host_notes, metadata_locked, metadata_synced_at, status, asked_at, answer_revealed_at, scored_at, created_at"
     )
     .eq("session_id", sessionId)
     .order("call_index", { ascending: true });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
 import { isForSaleInventory } from "src/lib/saleUtils";
+import { resolveTrackArtist } from "src/lib/artistName";
 
 const VINYL_SIZES = ['7"', '10"', '12"'];
 const DEFAULT_LIMIT = 200;
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
   let inventoryQuery = supabaseAdmin
     .from("inventory")
     .select(
-      "id, status, location, releases ( id, media_type, format_details, release_year, release_tracks ( id, position, side, title_override, recordings ( id, title, track_artist ) ) )"
+      "id, status, location, discogs_folder_name, discogs_folder_id, discogs_instance_id, releases ( id, media_type, format_details, release_year, release_tracks ( id, position, side, title_override, recordings ( id, title, track_artist, credits ) ) )"
     )
     .eq("releases.media_type", "Vinyl");
 
@@ -52,7 +53,10 @@ export async function GET(request: NextRequest) {
     for (const track of release.release_tracks) {
       const recording = track.recordings;
       const title = track.title_override || recording?.title;
-      const artist = recording?.track_artist || "Unknown Artist";
+      const artist = resolveTrackArtist({
+        trackArtist: recording?.track_artist,
+        credits: recording?.credits,
+      });
       if (!title) continue;
 
       const haystack = `${title} ${artist}`.toLowerCase();

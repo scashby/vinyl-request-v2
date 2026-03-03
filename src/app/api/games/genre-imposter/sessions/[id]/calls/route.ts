@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGenreImposterDb } from "src/lib/genreImposterDb";
+import { autoSyncSessionPlaylistMetadata } from "src/lib/playlistMetadataSync";
 
 export const runtime = "nodejs";
 
@@ -11,9 +12,14 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   }
 
   const db = getGenreImposterDb();
+  try {
+    await autoSyncSessionPlaylistMetadata("genre-imposter", sessionId);
+  } catch {
+    // Fail-open to keep host views responsive.
+  }
   const { data, error } = await db
     .from("gi_session_calls")
-    .select("id, round_id, round_number, call_index, play_order, artist, title, source_label, record_label, fits_category, is_imposter, host_notes, status, cued_at, played_at, revealed_at")
+    .select("id, round_id, round_number, call_index, play_order, playlist_track_key, artist, title, source_label, record_label, fits_category, is_imposter, host_notes, metadata_locked, metadata_synced_at, status, cued_at, played_at, revealed_at")
     .eq("session_id", sessionId)
     .order("round_number", { ascending: true })
     .order("play_order", { ascending: true });

@@ -24,7 +24,7 @@ import {
   fetchStorageDevices,
   fetchPurchaseStores, updatePurchaseStore, deletePurchaseStore, mergePurchaseStores,
   fetchOwners, updateOwner, deleteOwner, mergeOwners,
-  fetchStudios, updateStudio, mergeStudios,
+  fetchStudios, updateStudio, deleteStudio, mergeStudios,
   fetchSounds, updateSound, mergeSounds,
   fetchComposers, updateComposer, mergeComposers,
   fetchConductors, updateConductor, mergeConductors,
@@ -176,7 +176,7 @@ const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
   'box-set': { label: 'Box Set', fetchFn: fetchBoxSets, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false },
   country: { label: 'Country', fetchFn: fetchCountries, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false },
   format: { label: 'Format', fetchFn: fetchFormats, updateFn: updateFormat, deleteFn: async () => false, mergeFn: mergeFormats, allowDelete: true, allowMerge: true, hasSortName: false },
-  location: { label: 'Location', fetchFn: fetchLocations, updateFn: updateLocation, deleteFn: deleteLocation, mergeFn: mergeLocations, allowDelete: true, allowMerge: true, hasSortName: false },
+  location: { label: 'Discogs Folder', fetchFn: fetchLocations, updateFn: updateLocation, deleteFn: deleteLocation, mergeFn: mergeLocations, allowDelete: true, allowMerge: true, hasSortName: false },
   owner: { label: 'Owner', fetchFn: fetchOwners, updateFn: updateOwner, deleteFn: deleteOwner, mergeFn: mergeOwners, allowDelete: true, allowMerge: true, hasSortName: false },
   packaging: { label: 'Packaging', fetchFn: fetchPackaging, updateFn: updatePackaging, deleteFn: deletePackaging, mergeFn: mergePackaging, allowDelete: true, allowMerge: true, hasSortName: false },
   'purchase-store': { label: 'Purchase Store', fetchFn: fetchPurchaseStores, updateFn: updatePurchaseStore, deleteFn: deletePurchaseStore, mergeFn: mergePurchaseStores, allowDelete: true, allowMerge: true, hasSortName: false },
@@ -184,7 +184,7 @@ const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
   sound: { label: 'Sound', fetchFn: fetchSounds, updateFn: updateSound, mergeFn: mergeSounds, allowDelete: false, allowMerge: true, hasSortName: false },
   spars: { label: 'SPARS', fetchFn: fetchSPARS, updateFn: updateSPARS, deleteFn: async () => false, mergeFn: mergeSPARS, allowDelete: true, allowMerge: true, hasSortName: false },
   'storage-device': { label: 'Storage Device', fetchFn: fetchStorageDevices, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false },
-  studio: { label: 'Studio', fetchFn: fetchStudios, updateFn: updateStudio, mergeFn: mergeStudios, allowDelete: false, allowMerge: true, hasSortName: false },
+  studio: { label: 'Studio', fetchFn: fetchStudios, updateFn: updateStudio, deleteFn: deleteStudio, mergeFn: mergeStudios, allowDelete: true, allowMerge: true, hasSortName: false },
 };
 
 export default function ManagePickListsModal({ isOpen, onClose, initialList, hideListSelector = false }: ManagePickListsModalProps) {

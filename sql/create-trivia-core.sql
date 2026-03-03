@@ -79,6 +79,8 @@ CREATE TABLE IF NOT EXISTS public.trivia_session_calls (
   source_album text,
   source_side text,
   source_position text,
+  metadata_locked boolean NOT NULL DEFAULT false,
+  metadata_synced_at timestamptz,
   base_points integer NOT NULL DEFAULT 1,
   bonus_points integer NOT NULL DEFAULT 0,
   status text NOT NULL DEFAULT 'pending',
@@ -157,12 +159,17 @@ ALTER TABLE public.trivia_session_calls
   ADD COLUMN IF NOT EXISTS source_side text;
 ALTER TABLE public.trivia_session_calls
   ADD COLUMN IF NOT EXISTS source_position text;
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS metadata_locked boolean NOT NULL DEFAULT false;
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS metadata_synced_at timestamptz;
 
 CREATE INDEX IF NOT EXISTS idx_trivia_sessions_event_id ON public.trivia_sessions(event_id);
 CREATE INDEX IF NOT EXISTS idx_trivia_sessions_playlist_id ON public.trivia_sessions(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_trivia_sessions_status ON public.trivia_sessions(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_trivia_calls_session_id ON public.trivia_session_calls(session_id);
 CREATE INDEX IF NOT EXISTS idx_trivia_calls_status ON public.trivia_session_calls(session_id, status);
+CREATE INDEX IF NOT EXISTS idx_trivia_calls_metadata_sync ON public.trivia_session_calls(session_id, metadata_locked, metadata_synced_at);
 CREATE INDEX IF NOT EXISTS idx_trivia_calls_tiebreaker ON public.trivia_session_calls(session_id, is_tiebreaker, call_index);
 CREATE INDEX IF NOT EXISTS idx_trivia_calls_prep_status ON public.trivia_session_calls(session_id, prep_status);
 CREATE INDEX IF NOT EXISTS idx_trivia_teams_session_id ON public.trivia_session_teams(session_id);

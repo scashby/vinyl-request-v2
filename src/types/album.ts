@@ -41,6 +41,9 @@ export type Album = {
   collection_status?: string | null;
   for_sale?: boolean | null;
   location?: string | null;
+  discogs_folder_name?: string | null;
+  discogs_folder_id?: number | null;
+  discogs_instance_id?: number | null;
   country?: string | null;
   date_added?: string | null;
 
@@ -56,6 +59,7 @@ export type Album = {
   package_sleeve_condition?: string | null;
   packaging?: string | null;
   studio?: string | null;
+  pressing_plant?: string | null;
   sound?: string | null;
   vinyl_color?: string[] | null;
   vinyl_weight?: string | null;
@@ -67,6 +71,9 @@ export type Album = {
 
   // Release metadata
   barcode?: string | null;
+  discogs_companies?: unknown[] | null;
+  discogs_identifiers?: unknown[] | null;
+  discogs_formats?: unknown[] | null;
   genres?: string[] | null;
   styles?: string[] | null;
   label?: string | null;

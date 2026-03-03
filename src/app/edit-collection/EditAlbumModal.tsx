@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { supabase } from 'lib/supabaseClient';
 import { parseDiscogsFormat } from 'lib/formatParser';
+import { normalizeArtistDisplay, resolveTrackArtist } from 'lib/artistName';
 import type { Album } from 'types/album';
 import type { Database } from 'types/supabase';
 import { MainTab, type MainTabRef } from './tabs/MainTab';
@@ -415,7 +416,11 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         const trackList = (releaseTracks ?? []).map((track, index) => {
           const recording = toSingle(track.recording);
           const recordingCredits = asRecord(recording?.credits);
-          const trackArtist = asString(recording?.track_artist ?? recordingCredits.track_artist);
+          const trackArtist = resolveTrackArtist({
+            trackArtist: asString(recording?.track_artist),
+            credits: recordingCredits,
+            albumArtist: artist?.name ?? null,
+          });
           const originalYearRaw = recordingCredits.original_year;
           const originalYear =
             typeof originalYearRaw === 'number'
@@ -453,6 +458,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         const uniqueSides = new Set(trackList.map((track) => track.side).filter(Boolean));
 
         let collectionStatus: Album['collection_status'] = 'in_collection';
+        if (status === 'for_sale') collectionStatus = 'for_sale';
         if (status === 'wishlist') collectionStatus = 'wish_list';
         if (status === 'incoming') collectionStatus = 'on_order';
         if (status === 'sold') collectionStatus = 'sold';
@@ -715,7 +721,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         if (editedAlbum.collection_status === 'wish_list') status = 'wishlist';
         if (editedAlbum.collection_status === 'on_order') status = 'incoming';
         if (editedAlbum.collection_status === 'sold') status = 'sold';
-        if (editedAlbum.collection_status === 'for_sale' || editedAlbum.for_sale) status = 'active';
+        if (editedAlbum.collection_status === 'for_sale' || editedAlbum.for_sale) status = 'for_sale';
 
         const inventoryUpdate = {
           personal_notes: editedAlbum.personal_notes ?? null,
@@ -758,7 +764,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               const recordingCredits = discardEmpty({
                 ...existingTrackCredits,
                 ...albumCredits,
-                track_artist: track.artist ?? null,
+                track_artist: normalizeArtistDisplay(track.artist ?? null),
                 disc_number: track.disc_number ?? null,
                 lyrics_url: track.lyrics_url ?? undefined,
                 is_cover: typeof track.is_cover === 'boolean' ? track.is_cover : undefined,
@@ -778,6 +784,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               return {
                 ...track,
                 title: trackTitle,
+                artist: normalizeArtistDisplay(track.artist ?? null),
                 credits: Object.keys(recordingCredits).length > 0
                   ? (recordingCredits as unknown as Database['public']['Tables']['recordings']['Insert']['credits'])
                   : null,
@@ -1183,7 +1190,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           <PickerModal
             isOpen={true}
             onClose={() => setShowLocationPicker(false)}
-            title="Select Location"
+            title="Select Discogs Folder"
             mode="single"
             items={locations}
             selectedIds={editedAlbum.location ? [editedAlbum.location] : []}
@@ -1201,8 +1208,8 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               setShowLocationPicker(false);
               setShowNewLocationModal(true);
             }}
-            searchPlaceholder="Search locations..."
-            itemLabel="Location"
+            searchPlaceholder="Search Discogs folders..."
+            itemLabel="Discogs Folder"
             showSortName={false}
           />
         )}
@@ -1223,7 +1230,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           <EditModal
             isOpen={true}
             onClose={() => setShowNewLocationModal(false)}
-            title="New Location"
+            title="New Discogs Folder"
             itemName=""
             onSave={(newName) => {
               handleFieldChange('location', newName);
@@ -1235,7 +1242,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               });
               setShowNewLocationModal(false);
             }}
-            itemLabel="Location"
+            itemLabel="Discogs Folder"
             showSortName={false}
           />
         )}

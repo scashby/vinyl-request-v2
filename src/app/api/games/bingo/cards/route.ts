@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
-import { resolveTrackKeys } from "src/lib/bingoEngine";
+import { autoSyncSessionPlaylistMetadata } from "src/lib/playlistMetadataSync";
 
 export const runtime = "nodejs";
 
@@ -11,6 +11,11 @@ export async function GET(request: NextRequest) {
   }
 
   const db = getBingoDb();
+  try {
+    await autoSyncSessionPlaylistMetadata("bingo", sessionId);
+  } catch {
+    // Fail-open for card rendering.
+  }
   const { data: session } = await db
     .from("bingo_sessions")
     .select("id, card_label_mode")
@@ -33,38 +38,6 @@ export async function GET(request: NextRequest) {
     side: string | null;
     position: string | null;
   }>;
-
-  const needsHydration = typedCalls.some(
-    (call) => !!call.playlist_track_key && (/^Track\b/i.test(call.track_title) || call.artist_name === "Unknown Artist")
-  );
-
-  if (needsHydration) {
-    try {
-      const keys = typedCalls.map((c) => c.playlist_track_key).filter((v): v is string => typeof v === "string" && v.length > 0);
-      const resolved = await resolveTrackKeys(db, keys);
-      for (const call of typedCalls) {
-        if (!call.playlist_track_key) continue;
-        const patch = resolved.get(call.playlist_track_key);
-        if (!patch) continue;
-        if (!/^Track\b/i.test(call.track_title) && call.artist_name !== "Unknown Artist") continue;
-
-        await db
-          .from("bingo_session_calls")
-          .update({
-            track_title: patch.track_title,
-            artist_name: patch.artist_name,
-            album_name: patch.album_name,
-            side: patch.side,
-            position: patch.position,
-          })
-          .eq("id", call.id);
-
-        Object.assign(call, patch);
-      }
-    } catch {
-      // Fail-open: cards can still render from stored labels.
-    }
-  }
 
   const { data, error } = await db
     .from("bingo_cards")

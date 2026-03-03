@@ -6,7 +6,8 @@ type Card = {
   grid: Array<{ row: number; col: number; label: string }>;
 };
 
-export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", _title: string) {
+export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", title: string) {
+  void title;
   // Use US Letter landscape for predictable printing in the US.
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "letter" });
 

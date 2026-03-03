@@ -16,7 +16,8 @@ type DiscogsResponse = {
   country?: string;
   year?: number;
   released?: string;
-  identifiers?: Array<{ type?: string; value?: string }>;
+  identifiers?: Array<{ type?: string; value?: string; description?: string }>;
+  companies?: Array<{ name?: string; entity_type_name?: string; role?: string }>;
   formats?: Array<{ name?: string; qty?: string | number; descriptions?: string[] }>;
   tracklist?: Array<{
     position?: string;
@@ -204,7 +205,7 @@ export async function POST(req: Request) {
 
     const { data: inventoryRow, error: dbError } = await supabase
       .from('inventory')
-      .select('id, release_id, releases ( id, discogs_release_id, release_year, masters ( id, title, discogs_master_id, cover_image_url, genres, styles, original_release_year, main_artist_id ) )')
+      .select('id, release_id, releases ( id, discogs_release_id, release_year, release_date, media_type, format_details, qty, label, catalog_number, country, barcode, studio, pressing_plant, discogs_companies, discogs_identifiers, discogs_formats, masters ( id, title, discogs_master_id, cover_image_url, genres, styles, original_release_year, main_artist_id ) )')
       .eq('id', albumId)
       .single();
 
@@ -280,6 +281,8 @@ export async function POST(req: Request) {
     const needsMediaType = !release.media_type;
     const needsFormatDetails = !release.format_details || release.format_details.length === 0;
     const needsQty = !release.qty;
+    const needsStudio = !release.studio;
+    const needsPressingPlant = !release.pressing_plant;
 
     if (!foundReleaseId && !needsMasterId && !needsImage && !needsGenres && !needsStyles && !needsLabel && !needsCatalog && !needsCountry && !needsYear && !needsBarcode && !needsReleaseDate && !needsMediaType && !needsFormatDetails && !needsQty) {
       console.log('⏭️ Album already has all Discogs metadata');
@@ -355,6 +358,9 @@ export async function POST(req: Request) {
         console.log(`✓ Found barcode: ${barcode}`);
       }
     }
+    if (discogsData.identifiers && discogsData.identifiers.length > 0) {
+      releaseUpdate.discogs_identifiers = discogsData.identifiers;
+    }
 
     if (needsReleaseDate) {
       const releaseDate = normalizeReleaseDate(discogsData.released ?? null);
@@ -375,6 +381,9 @@ export async function POST(req: Request) {
 
     const formatString = buildDiscogsFormatString(discogsData.formats);
     const parsedFormat = formatString ? parseDiscogsFormat(formatString) : null;
+    if (discogsData.formats && discogsData.formats.length > 0) {
+      releaseUpdate.discogs_formats = discogsData.formats;
+    }
     if (parsedFormat) {
       if (needsMediaType && parsedFormat.media_type) {
         releaseUpdate.media_type = parsedFormat.media_type;
@@ -387,6 +396,32 @@ export async function POST(req: Request) {
       if (needsQty && parsedFormat.qty) {
         releaseUpdate.qty = parsedFormat.qty;
         console.log(`✓ Found qty: ${parsedFormat.qty}`);
+      }
+    }
+
+    if (discogsData.companies && discogsData.companies.length > 0) {
+      releaseUpdate.discogs_companies = discogsData.companies;
+
+      if (needsStudio) {
+        const studioName = discogsData.companies.find((company) => {
+          const role = String(company.entity_type_name ?? company.role ?? '').toLowerCase();
+          return role.includes('recorded at') || role.includes('recorded') || role.includes('studio');
+        })?.name;
+        if (studioName) {
+          releaseUpdate.studio = studioName;
+          console.log(`✓ Found studio: ${studioName}`);
+        }
+      }
+
+      if (needsPressingPlant) {
+        const pressingPlant = discogsData.companies.find((company) => {
+          const role = String(company.entity_type_name ?? company.role ?? '').toLowerCase();
+          return role.includes('pressed by') || role.includes('pressing plant') || role.includes('manufactured by');
+        })?.name;
+        if (pressingPlant) {
+          releaseUpdate.pressing_plant = pressingPlant;
+          console.log(`✓ Found pressing plant: ${pressingPlant}`);
+        }
       }
     }
     

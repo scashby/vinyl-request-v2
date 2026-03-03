@@ -38,7 +38,6 @@ const FIELD_OPTIONS: { value: CrateFieldType; label: string; type: 'text' | 'num
   { value: 'format', label: 'Format', type: 'text' },
   { value: 'country', label: 'Country', type: 'text' },
   { value: 'label', label: 'Label', type: 'text' },
-  { value: 'location', label: 'Location', type: 'text' },
   { value: 'status', label: 'Status', type: 'text' },
   { value: 'media_condition', label: 'Media Condition', type: 'text' },
   { value: 'sleeve_condition', label: 'Sleeve Condition', type: 'text' },

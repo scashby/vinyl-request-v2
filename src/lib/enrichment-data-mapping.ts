@@ -206,6 +206,10 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
     'recording_date',
     'original_release_date',
     'studio',
+    'pressing_plant',
+    'discogs_companies',
+    'discogs_identifiers',
+    'discogs_formats',
     'recording_location',
     'companies',
     'release_notes'
@@ -288,7 +292,11 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   'country': ['musicbrainz', 'discogs', 'theaudiodb'],
   'recording_date': ['musicbrainz', 'wikipedia'],
   'master_release_date': ['discogs'],
-  'studio': [],
+  'studio': ['discogs', 'musicbrainz'],
+  'pressing_plant': ['discogs'],
+  'discogs_companies': ['discogs'],
+  'discogs_identifiers': ['discogs'],
+  'discogs_formats': ['discogs'],
   'companies': ['musicbrainz', 'discogs', 'spotify'],
   
   // --- CONTEXT ---

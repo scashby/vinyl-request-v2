@@ -3,6 +3,7 @@ import type { CollectionPlaylist, SmartPlaylistRule } from "src/types/collection
 import type { CollectionTrackRow } from "src/types/collectionTrackRow";
 import { trackMatchesSmartPlaylist } from "src/lib/playlistUtils";
 import { BINGO_COLUMNS, type BingoColumn, getColumnLetterForBallNumber } from "src/lib/bingoBall";
+import { resolveTrackArtist } from "src/lib/artistName";
 
 export type GameMode =
   | "single_line"
@@ -71,7 +72,7 @@ type DbReleaseTrack = {
   side: string | null;
   title_override: string | null;
 };
-type DbRecording = { id: number; title: string | null; track_artist: string | null };
+type DbRecording = { id: number; title: string | null; track_artist: string | null; credits: unknown | null };
 type DbRelease = { id: number; master_id: number | null };
 type DbMaster = { id: number; title: string; main_artist_id: number | null };
 type DbArtist = { id: number; name: string };
@@ -295,11 +296,11 @@ async function buildCollectionTrackRows(db: BingoDbClient): Promise<CollectionTr
 
   const recordingIds = Array.from(new Set(releaseTrackRows.map((row) => row.recording_id).filter((v): v is number => typeof v === "number")));
   const { data: recordings, error: recordingError } = recordingIds.length
-    ? await dbAny.from("recordings").select("id, title, track_artist, duration_seconds").in("id", recordingIds)
+    ? await dbAny.from("recordings").select("id, title, track_artist, credits, duration_seconds").in("id", recordingIds)
     : { data: [], error: null };
   if (recordingError) throw new Error(recordingError.message);
-  const recordingsById = new Map<number, { id: number; title: string | null; track_artist: string | null; duration_seconds: number | null }>(
-    ((recordings ?? []) as Array<{ id: number; title: string | null; track_artist: string | null; duration_seconds: number | null }>).map((row) => [row.id, row])
+  const recordingsById = new Map<number, { id: number; title: string | null; track_artist: string | null; credits: unknown | null; duration_seconds: number | null }>(
+    ((recordings ?? []) as Array<{ id: number; title: string | null; track_artist: string | null; credits: unknown | null; duration_seconds: number | null }>).map((row) => [row.id, row])
   );
 
   const trackRows: CollectionTrackRow[] = [];
@@ -328,7 +329,11 @@ async function buildCollectionTrackRows(db: BingoDbClient): Promise<CollectionTr
         recordingId: recording?.id ?? null,
         albumArtist,
         albumTitle,
-        trackArtist: recording?.track_artist ?? albumArtist,
+        trackArtist: resolveTrackArtist({
+          trackArtist: recording?.track_artist,
+          credits: recording?.credits,
+          albumArtist,
+        }),
         trackTitle: track.title_override ?? recording?.title ?? `Track ${position}`,
         position,
         side,
@@ -488,7 +493,7 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
   const allRecordingIds = Array.from(new Set([...directRecordingIds, ...inferredRecordingIds]));
 
   const { data: recordingRows, error: recordingError } = allRecordingIds.length
-    ? await db.from("recordings").select("id, title, track_artist").in("id", allRecordingIds)
+    ? await db.from("recordings").select("id, title, track_artist, credits").in("id", allRecordingIds)
     : { data: [] as DbRecording[], error: null };
   if (recordingError) throw new Error(recordingError.message);
 
@@ -543,7 +548,11 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
     const position = releaseTrack?.position ?? parsed.fallbackPosition ?? null;
     const fallbackTitle = position ? `Track ${position}` : `Track ${index + 1}`;
     const trackTitle = releaseTrack?.title_override ?? recording?.title ?? fallbackTitle;
-    const artistName = recording?.track_artist ?? (master?.main_artist_id ? artistById.get(master.main_artist_id)?.name : undefined) ?? "Unknown Artist";
+    const artistName = resolveTrackArtist({
+      trackArtist: recording?.track_artist,
+      credits: recording?.credits,
+      albumArtist: master?.main_artist_id ? artistById.get(master.main_artist_id)?.name : undefined,
+    });
 
     return {
       trackKey: item.track_key,
@@ -620,7 +629,7 @@ export async function resolveTrackKeys(db: BingoDbClient, trackKeys: string[]): 
   const allRecordingIds = Array.from(new Set([...directRecordingIds, ...inferredRecordingIds]));
 
   const { data: recordingRows, error: recordingError } = allRecordingIds.length
-    ? await db.from("recordings").select("id, title, track_artist").in("id", allRecordingIds)
+    ? await db.from("recordings").select("id, title, track_artist, credits").in("id", allRecordingIds)
     : { data: [] as DbRecording[], error: null };
   if (recordingError) throw new Error(recordingError.message);
   const recordingById = new Map<number, DbRecording>(((recordingRows ?? []) as DbRecording[]).map((row) => [row.id, row]));
@@ -675,7 +684,11 @@ export async function resolveTrackKeys(db: BingoDbClient, trackKeys: string[]): 
     const position = releaseTrack?.position ?? parsed.fallbackPosition ?? null;
     const fallbackTitle = position ? `Track ${position}` : `Track ${index + 1}`;
     const trackTitle = releaseTrack?.title_override ?? recording?.title ?? fallbackTitle;
-    const artistName = recording?.track_artist ?? (master?.main_artist_id ? artistById.get(master.main_artist_id)?.name : undefined) ?? "Unknown Artist";
+    const artistName = resolveTrackArtist({
+      trackArtist: recording?.track_artist,
+      credits: recording?.credits,
+      albumArtist: master?.main_artist_id ? artistById.get(master.main_artist_id)?.name : undefined,
+    });
 
     result.set(track_key, {
       track_title: trackTitle,

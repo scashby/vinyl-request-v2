@@ -93,7 +93,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       .order("round_number", { ascending: true }),
     db
       .from("gi_session_calls")
-      .select("id, round_id, round_number, call_index, play_order, source_label, artist, title, record_label, fits_category, is_imposter, host_notes, status, cued_at, played_at, revealed_at")
+      .select("id, round_id, round_number, call_index, play_order, playlist_track_key, source_label, artist, title, record_label, fits_category, is_imposter, host_notes, metadata_locked, metadata_synced_at, status, cued_at, played_at, revealed_at")
       .eq("session_id", sessionId)
       .order("round_number", { ascending: true })
       .order("play_order", { ascending: true }),

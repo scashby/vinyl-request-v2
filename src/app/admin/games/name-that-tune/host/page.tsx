@@ -28,6 +28,7 @@ type Call = {
   snippet_start_seconds: number;
   snippet_duration_seconds: number;
   host_notes: string | null;
+  metadata_locked?: boolean;
   status: "pending" | "asked" | "locked" | "answer_revealed" | "scored" | "skipped";
 };
 
@@ -57,6 +58,12 @@ export default function NameThatTuneHostPage() {
   const [scoreDraft, setScoreDraft] = useState<ScoreDraft>({});
   const [saving, setSaving] = useState(false);
   const [working, setWorking] = useState(false);
+  const [metadataDraft, setMetadataDraft] = useState({
+    artist_answer: "",
+    title_answer: "",
+    source_label: "",
+    host_notes: "",
+  });
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -104,6 +111,16 @@ export default function NameThatTuneHostPage() {
     }
     setScoreDraft(draft);
   }, [callForControls?.id, leaderboard]);
+
+  useEffect(() => {
+    if (!callForControls) return;
+    setMetadataDraft({
+      artist_answer: callForControls.artist_answer ?? "",
+      title_answer: callForControls.title_answer ?? "",
+      source_label: callForControls.source_label ?? "",
+      host_notes: callForControls.host_notes ?? "",
+    });
+  }, [callForControls?.id]);
 
   const runAction = async (fn: () => Promise<void>) => {
     setWorking(true);
@@ -207,6 +224,49 @@ export default function NameThatTuneHostPage() {
     }
   };
 
+  const saveMetadata = async () => {
+    if (!callForControls) return;
+    await runAction(async () => {
+      const res = await fetch(`/api/games/name-that-tune/calls/${callForControls.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...metadataDraft,
+          metadata_locked: true,
+        }),
+      });
+      if (!res.ok) {
+        const payload = await res.json();
+        throw new Error(payload.error ?? "Failed to save metadata");
+      }
+    });
+  };
+
+  const unlockMetadata = async () => {
+    if (!callForControls) return;
+    await runAction(async () => {
+      const res = await fetch(`/api/games/name-that-tune/calls/${callForControls.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ metadata_locked: false }),
+      });
+      if (!res.ok) {
+        const payload = await res.json();
+        throw new Error(payload.error ?? "Failed to unlock metadata");
+      }
+    });
+  };
+
+  const refreshFromPlaylist = async () => {
+    await runAction(async () => {
+      const res = await fetch(`/api/games/name-that-tune/sessions/${sessionId}/refresh-metadata`, { method: "POST" });
+      if (!res.ok) {
+        const payload = await res.json();
+        throw new Error(payload.error ?? "Failed to refresh metadata");
+      }
+    });
+  };
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#090909,#171717)] p-6 text-stone-100">
       <div className="mx-auto max-w-7xl space-y-4">
@@ -276,6 +336,40 @@ export default function NameThatTuneHostPage() {
                 {callForControls?.host_notes ? (
                   <p className="mt-2 text-xs text-stone-400">Host note: {callForControls.host_notes}</p>
                 ) : null}
+                <div className="mt-3 grid gap-2 text-xs md:grid-cols-2">
+                  <input
+                    className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                    value={metadataDraft.artist_answer}
+                    onChange={(e) => setMetadataDraft((draft) => ({ ...draft, artist_answer: e.target.value }))}
+                    placeholder="Artist answer"
+                  />
+                  <input
+                    className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                    value={metadataDraft.title_answer}
+                    onChange={(e) => setMetadataDraft((draft) => ({ ...draft, title_answer: e.target.value }))}
+                    placeholder="Title answer"
+                  />
+                  <input
+                    className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                    value={metadataDraft.source_label}
+                    onChange={(e) => setMetadataDraft((draft) => ({ ...draft, source_label: e.target.value }))}
+                    placeholder="Source label"
+                  />
+                  <input
+                    className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                    value={metadataDraft.host_notes}
+                    onChange={(e) => setMetadataDraft((draft) => ({ ...draft, host_notes: e.target.value }))}
+                    placeholder="Host notes"
+                  />
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                  <button disabled={working || !callForControls} onClick={saveMetadata} className="rounded bg-rose-700 px-2 py-1 disabled:opacity-50">Save Metadata</button>
+                  <button disabled={working || !callForControls} onClick={unlockMetadata} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Unlock Row</button>
+                  <button disabled={working} onClick={refreshFromPlaylist} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Refresh from Playlist</button>
+                </div>
+                <p className="mt-1 text-[11px] text-stone-500">
+                  {callForControls?.metadata_locked ? "Metadata locked" : "Metadata follows playlist sync"}
+                </p>
               </div>
 
               <div className="mt-3 text-xs">

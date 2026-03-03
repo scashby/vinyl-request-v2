@@ -16,6 +16,17 @@ export async function GET(req: Request) {
     process.env.DISCOGS_CALLBACK_URL ||
     `${reqUrl.protocol}//${host || reqUrl.host}/api/auth/callback/discogs`;
   const cookieDomain = resolveCookieDomain(host);
+  const returnToRaw = reqUrl.searchParams.get('returnTo') || req.headers.get('referer');
+  const returnToPath = (() => {
+    if (!returnToRaw) return '/edit-collection';
+    try {
+      const parsed = new URL(returnToRaw, reqUrl.origin);
+      const path = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+      return path.startsWith('/') ? path : '/edit-collection';
+    } catch {
+      return '/edit-collection';
+    }
+  })();
 
   const nonce = Math.floor(Math.random() * 1000000000).toString();
   const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -62,6 +73,14 @@ export async function GET(req: Request) {
       ...(cookieDomain ? { domain: cookieDomain } : {}),
       path: '/',
       maxAge: 60 * 10 // 10 minutes
+    });
+    cookieStore.set('post_auth_return_to', returnToPath, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
+      path: '/',
+      maxAge: 60 * 10
     });
 
     return NextResponse.redirect(`https://discogs.com/oauth/authorize?oauth_token=${token}`);

@@ -2,6 +2,9 @@ type SaleCandidate = {
   status?: unknown;
   for_sale?: unknown;
   location?: unknown;
+  discogs_folder_name?: unknown;
+  discogs_folder_id?: unknown;
+  discogs_instance_id?: unknown;
 };
 
 const SALE_FOLDER_NAMES = new Set(["sale", "for sale"]);
@@ -56,5 +59,17 @@ export const isForSaleInventory = (value: SaleCandidate | null | undefined): boo
   if (!value) return false;
   if (normalizeSaleToken(value.status) === "for_sale") return true;
   if (isTruthySaleValue(value.for_sale)) return true;
-  return isSaleLocation(value.location);
+  if (isSaleFolderName(value.discogs_folder_name)) return true;
+
+  const hasDiscogsFolderIdentity =
+    typeof value.discogs_folder_name === "string" ||
+    typeof value.discogs_folder_id === "number" ||
+    typeof value.discogs_instance_id === "number";
+
+  // Transitional fallback for legacy rows not yet migrated to canonical folder fields.
+  if (!hasDiscogsFolderIdentity) {
+    return isSaleLocation(value.location);
+  }
+
+  return false;
 };

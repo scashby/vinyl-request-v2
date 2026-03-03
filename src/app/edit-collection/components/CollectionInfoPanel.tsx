@@ -356,10 +356,6 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
         {' | '}{totalRuntime}
       </div>
 
-      <div className="text-[13px] text-[#333] mb-3 font-normal">
-         <span className="font-semibold">Location:</span> {album.location || 'Unknown'}
-      </div>
-
       <div className="text-[13px] text-[#666] mb-3 font-normal">
         <span className="font-semibold">CAT NO</span> {album.release?.catalog_number || '—'}
       </div>

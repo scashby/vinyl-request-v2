@@ -24,6 +24,7 @@ import type { SmartPlaylistRules } from '../../types/collectionPlaylist';
 import type { CollectionTrackRow } from '../../types/collectionTrackRow';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import { trackMatchesSmartPlaylist } from '../../lib/playlistUtils';
+import { resolveTrackArtist } from '../../lib/artistName';
 import CollectionInfoPanel from './components/CollectionInfoPanel';
 import { BoxIcon } from '../../components/BoxIcon';
 import { getDisplayFormat } from '../../utils/formatDisplay';
@@ -37,7 +38,7 @@ import {
   getAlbumYearInt,
   getAlbumYearValue
 } from './albumHelpers';
-import { hasSaleSmartRule, isForSaleInventory, isSaleFolderName, SALE_SMART_RULES } from '../../lib/saleUtils';
+import { hasSaleSmartRule, isForSaleInventory, isSaleFolderName } from '../../lib/saleUtils';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const supabase = supabaseTyped as any;
@@ -50,7 +51,6 @@ type SortOption =
   | 'format-asc' | 'format-desc' 
   | 'tags-count-desc' | 'tags-count-asc' 
   | 'condition-asc' | 'condition-desc'
-  | 'location-asc' | 'location-desc'
   | 'decade-desc' | 'decade-asc';
 
 type TrackSortOption =
@@ -73,8 +73,6 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
   { value: 'added-asc', label: 'Date Added (Oldest)', category: 'Time' },
   { value: 'format-asc', label: 'Format (A→Z)', category: 'Physical' },
   { value: 'format-desc', label: 'Format (Z→A)', category: 'Physical' },
-  { value: 'location-asc', label: 'Location (A→Z)', category: 'Physical' },
-  { value: 'location-desc', label: 'Location (Z→A)', category: 'Physical' },
   { value: 'condition-asc', label: 'Condition (A→Z)', category: 'Physical' },
   { value: 'condition-desc', label: 'Condition (Z→A)', category: 'Physical' },
   { value: 'tags-count-desc', label: 'Most Tags', category: 'Metadata' },
@@ -112,11 +110,23 @@ type TrackViewColumnId =
   | 'label'
   | 'year'
   | 'added_date'
-  | 'location'
   | 'collection_status'
   | 'personal_notes';
 
 type Playlist = CollectionPlaylist;
+
+const COLLECTION_UI_CONTEXT_STORAGE_KEY = 'collection-ui-context-v2';
+
+type PersistedCollectionUiContext = {
+  viewMode?: AppViewMode;
+  trackSource?: TrackListSource;
+  folderMode?: SidebarMode;
+  selectedFolderValue?: string | null;
+  selectedCrateId?: number | null;
+  selectedPlaylistId?: number | null;
+  searchQuery?: string;
+  selectedLetter?: string;
+};
 
 const PLAYLIST_STORAGE_KEYS = [
   'collection-playlists-backup-v2',
@@ -194,7 +204,6 @@ const TRACK_VIEW_COLUMN_DEFINITIONS: Record<TrackViewColumnId, { id: TrackViewCo
   label: { id: 'label', label: 'Label' },
   year: { id: 'year', label: 'Year' },
   added_date: { id: 'added_date', label: 'Added' },
-  location: { id: 'location', label: 'Location' },
   collection_status: { id: 'collection_status', label: 'Status' },
   personal_notes: { id: 'personal_notes', label: 'Notes' },
 };
@@ -222,7 +231,7 @@ const TRACK_VIEW_COLUMN_GROUPS: Array<{ id: string; label: string; icon: string;
     id: 'track-personal',
     label: 'Personal',
     icon: '📝',
-    columns: ['location', 'collection_status', 'personal_notes'],
+    columns: ['collection_status', 'personal_notes'],
   },
 ];
 
@@ -292,7 +301,7 @@ const TRACK_COLUMN_FIELD_GROUPS: Record<string, string[]> = {
   Main: ['Track', 'Track Artist', 'Album', 'Album Artist', 'Position', 'Length', 'Rating'],
   Edition: ['Format', 'Year', 'Added Date'],
   Metadata: ['Genre', 'Label'],
-  Personal: ['Location', 'Collection Status', 'Notes'],
+  Personal: ['Collection Status', 'Notes'],
 };
 
 const DEFAULT_ALBUM_TRACK_COLUMN_FAVORITES: ColumnFavorite[] = [
@@ -314,7 +323,7 @@ const DEFAULT_PLAYLIST_COLUMN_FAVORITES: ColumnFavorite[] = [
 const TRACK_SORT_FIELD_GROUPS: Record<string, string[]> = {
   Main: ['Album', 'Album Artist', 'Track Title', 'Track Artist', 'Position', 'Duration', 'Rating', 'Year', 'Added Date'],
   Metadata: ['Genre', 'Label', 'Format'],
-  Personal: ['Location', 'Collection Status'],
+  Personal: ['Collection Status'],
 };
 
 const DEFAULT_ALBUM_TRACK_SORT_FAVORITES: SortFavorite[] = [
@@ -399,7 +408,6 @@ const COLLECTION_SORT_FIELD_GROUPS: Record<string, string[]> = {
     'Last Cleaned Date',
     'Last Cleaned Year',
     'Last Played Date',
-    'Location',
     'Modified Date',
     'My Rating',
     'Notes',
@@ -492,7 +500,6 @@ const mapFavoriteColumnsToCollectionColumns = (favorite: ColumnFavorite | null):
     'my notes': 'personal_notes',
     notes: 'personal_notes',
     owner: 'owner',
-    location: 'location',
     format: 'format',
     artist: 'artist',
     title: 'title',
@@ -546,7 +553,6 @@ const mapFavoriteColumnsToTrackColumns = (favorite: ColumnFavorite | null): Trac
     year: 'year',
     added: 'added_date',
     'added date': 'added_date',
-    location: 'location',
     status: 'collection_status',
     'collection status': 'collection_status',
     notes: 'personal_notes',
@@ -573,7 +579,6 @@ const getAlbumSortMetric = (album: Album, fieldName: string): string | number | 
   if (field === 'label') return album.release?.label ?? album.label ?? '';
   if (field === 'cat no' || field === 'cat no.') return album.cat_no ?? album.catalog_number ?? album.release?.catalog_number ?? '';
   if (field === 'barcode') return album.barcode ?? album.release?.barcode ?? '';
-  if (field === 'location') return album.location ?? '';
   if (field === 'collection status') return album.collection_status ?? album.status ?? '';
   if (field === 'my rating') return album.my_rating ?? 0;
   if (field === 'purchase price') return album.purchase_price ?? 0;
@@ -661,7 +666,6 @@ const getTrackSortMetric = (row: CollectionTrackRow, fieldName: string): string 
   if (field === 'format') return row.trackFormatFacets.join(' | ') || row.albumMediaType;
   if (field === 'genre') return formatTrackArrayValues(row.genres);
   if (field === 'label') return formatTrackArrayValues(row.labels ?? (row.label ? [row.label] : []));
-  if (field === 'location') return row.location ?? '';
   if (field === 'collection status') return formatTrackStatus(row.status);
   if (field === 'added date') {
     const parsed = Date.parse(row.dateAdded ?? '');
@@ -1038,6 +1042,7 @@ function CollectionBrowserPage() {
     column: null,
     direction: null
   });
+  const [uiContextHydrated, setUiContextHydrated] = useState(false);
 
   const [collectionVisibleColumns, setCollectionVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
   const [albumTrackVisibleColumns, setAlbumTrackVisibleColumns] = useState<TrackViewColumnId[]>(DEFAULT_ALBUM_TRACK_VISIBLE_COLUMNS);
@@ -1153,7 +1158,7 @@ function CollectionBrowserPage() {
     if (stored) {
       try {
         const parsed = JSON.parse(stored) as string[];
-        const filtered = parsed.filter(isCollectionColumnId);
+        const filtered = parsed.filter(isCollectionColumnId).filter((id) => id !== 'location');
         if (filtered.length > 0) {
           setCollectionVisibleColumns(filtered);
         }
@@ -1168,7 +1173,9 @@ function CollectionBrowserPage() {
     if (!stored) return;
     try {
       const parsed = JSON.parse(stored) as string[];
-      const filtered = parsed.filter(isTrackViewColumnId);
+      const filtered = parsed
+        .filter((id) => id !== 'location')
+        .filter(isTrackViewColumnId);
       if (filtered.length > 0) {
         setAlbumTrackVisibleColumns(filtered);
       }
@@ -1182,7 +1189,9 @@ function CollectionBrowserPage() {
     if (!stored) return;
     try {
       const parsed = JSON.parse(stored) as string[];
-      const filtered = parsed.filter(isTrackViewColumnId);
+      const filtered = parsed
+        .filter((id) => id !== 'location')
+        .filter(isTrackViewColumnId);
       if (filtered.length > 0) {
         setPlaylistVisibleColumns(filtered);
       }
@@ -1207,6 +1216,47 @@ function CollectionBrowserPage() {
     if (storedViewMode === 'collection' || storedViewMode === 'album-track' || storedViewMode === 'playlist') {
       setViewMode(storedViewMode);
     }
+  }, []);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(COLLECTION_UI_CONTEXT_STORAGE_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as PersistedCollectionUiContext;
+        if (parsed.viewMode === 'collection' || parsed.viewMode === 'album-track' || parsed.viewMode === 'playlist') {
+          setViewMode(parsed.viewMode);
+        }
+        if (parsed.trackSource === 'crates' || parsed.trackSource === 'playlists') {
+          setTrackSource(parsed.trackSource);
+        }
+        if (parsed.folderMode === 'format' || parsed.folderMode === 'crates' || parsed.folderMode === 'playlists') {
+          setFolderMode(parsed.folderMode);
+        }
+        if (typeof parsed.selectedFolderValue === 'string') {
+          setSelectedFolderValue(parsed.selectedFolderValue);
+        } else if (parsed.selectedFolderValue === null) {
+          setSelectedFolderValue(null);
+        }
+        if (typeof parsed.selectedCrateId === 'number' || parsed.selectedCrateId === null) {
+          setSelectedCrateId(parsed.selectedCrateId ?? null);
+        }
+        if (typeof parsed.selectedPlaylistId === 'number' || parsed.selectedPlaylistId === null) {
+          setSelectedPlaylistId(parsed.selectedPlaylistId ?? null);
+        }
+        if (typeof parsed.searchQuery === 'string') {
+          setSearchQuery(parsed.searchQuery);
+        }
+        if (typeof parsed.selectedLetter === 'string') {
+          const isAlphabet = /^[A-Z]$/.test(parsed.selectedLetter);
+          if (parsed.selectedLetter === 'All' || parsed.selectedLetter === '0-9' || isAlphabet) {
+            setSelectedLetter(parsed.selectedLetter);
+          }
+        }
+      } catch {
+        // ignore invalid local storage payload
+      }
+    }
+    setUiContextHydrated(true);
   }, []);
 
   useEffect(() => {
@@ -1330,8 +1380,9 @@ function CollectionBrowserPage() {
   }, []);
 
   const handleCollectionColumnsChange = useCallback((columns: ColumnId[]) => {
-    setCollectionVisibleColumns(columns);
-    localStorage.setItem('collection-visible-columns', JSON.stringify(columns));
+    const sanitized = columns.filter((id) => id !== 'location');
+    setCollectionVisibleColumns(sanitized);
+    localStorage.setItem('collection-visible-columns', JSON.stringify(sanitized));
   }, []);
 
   const handleAlbumTrackColumnsChange = useCallback((columns: TrackViewColumnId[]) => {
@@ -1374,6 +1425,31 @@ function CollectionBrowserPage() {
   useEffect(() => {
     localStorage.setItem('collection-view-mode', viewMode);
   }, [viewMode]);
+
+  useEffect(() => {
+    if (!uiContextHydrated) return;
+    const context: PersistedCollectionUiContext = {
+      viewMode,
+      trackSource,
+      folderMode,
+      selectedFolderValue,
+      selectedCrateId,
+      selectedPlaylistId,
+      searchQuery,
+      selectedLetter,
+    };
+    localStorage.setItem(COLLECTION_UI_CONTEXT_STORAGE_KEY, JSON.stringify(context));
+  }, [
+    uiContextHydrated,
+    viewMode,
+    trackSource,
+    folderMode,
+    selectedFolderValue,
+    selectedCrateId,
+    selectedPlaylistId,
+    searchQuery,
+    selectedLetter,
+  ]);
 
   useEffect(() => {
     localStorage.setItem('collection-column-favorites', JSON.stringify(collectionColumnFavorites));
@@ -1683,59 +1759,14 @@ function CollectionBrowserPage() {
   }, [loadAlbums, tracksHydrating]);
 
   const ensureSaleCrateExists = useCallback(async () => {
-    const { data: existingCrates, error: existingError } = await supabase
-      .from('crates')
-      .select('id, name, icon, color, is_smart, smart_rules, sort_order');
-
-    if (existingError) {
-      console.error('Error checking crates before sale crate bootstrap:', existingError);
-      return;
-    }
-
-    const cratesList = existingCrates ?? [];
-    const existingByRule = cratesList.find((crate) => hasSaleSmartRule(crate.smart_rules));
-    if (existingByRule?.id) {
-      return;
-    }
-
-    const existingByName = cratesList.find((crate) => isSaleFolderName(crate.name));
-    if (existingByName?.id) {
-      const { error: updateError } = await supabase
-        .from('crates')
-        .update({
-          is_smart: true,
-          smart_rules: SALE_SMART_RULES,
-          match_rules: 'all',
-          live_update: true,
-          icon: existingByName.icon || '💰',
-          color: existingByName.color || '#d97706',
-        })
-        .eq('id', existingByName.id);
-
-      if (updateError) {
-        console.error('Error converting existing sale crate to smart crate:', updateError);
+    try {
+      const res = await fetch('/api/crates/ensure-sale', { method: 'POST' });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        console.error('Error ensuring sale crate via API:', payload?.error || res.status);
       }
-      return;
-    }
-
-    const maxSortOrder = cratesList.reduce((max, crate) => {
-      const sortOrder = typeof crate.sort_order === 'number' ? crate.sort_order : 0;
-      return Math.max(max, sortOrder);
-    }, -1);
-
-    const { error: insertError } = await supabase.from('crates').insert({
-      name: 'Sale',
-      icon: '💰',
-      color: '#d97706',
-      is_smart: true,
-      smart_rules: SALE_SMART_RULES,
-      match_rules: 'all',
-      live_update: true,
-      sort_order: maxSortOrder + 1,
-    });
-
-    if (insertError) {
-      console.error('Error creating sale crate:', insertError);
+    } catch (error) {
+      console.error('Error ensuring sale crate via API:', error);
     }
   }, []);
 
@@ -1943,8 +1974,6 @@ function CollectionBrowserPage() {
             return getDisplayFormat(getAlbumFormat(a)).localeCompare(getDisplayFormat(getAlbumFormat(b)));
           case 'format-desc':
             return getDisplayFormat(getAlbumFormat(b)).localeCompare(getDisplayFormat(getAlbumFormat(a)));
-          case 'location-asc': return (a.location || '').localeCompare(b.location || '');
-          case 'location-desc': return (b.location || '').localeCompare(a.location || '');
           case 'condition-asc': return (a.media_condition || '').localeCompare(b.media_condition || '');
           case 'condition-desc': return (b.media_condition || '').localeCompare(a.media_condition || '');
           case 'tags-count-desc': return toSafeStringArray(getAlbumTags(b)).length - toSafeStringArray(getAlbumTags(a)).length;
@@ -2018,7 +2047,11 @@ function CollectionBrowserPage() {
             recordingId: track.recording?.id ?? null,
             albumArtist,
             albumTitle,
-            trackArtist: track.recording?.track_artist || albumArtist,
+            trackArtist: resolveTrackArtist({
+              trackArtist: track.recording?.track_artist,
+              credits: track.recording?.credits,
+              albumArtist,
+            }),
             trackTitle: track.title_override ?? track.recording?.title ?? 'Untitled',
             position,
             side,
@@ -2045,7 +2078,10 @@ function CollectionBrowserPage() {
           recordingId: null,
           albumArtist,
           albumTitle,
-          trackArtist: track.artist ?? albumArtist,
+          trackArtist: resolveTrackArtist({
+            trackArtist: track.artist ?? null,
+            albumArtist,
+          }),
           trackTitle: track.title,
           position,
           side,
@@ -2912,8 +2948,6 @@ function CollectionBrowserPage() {
         return row.yearInt ?? '—';
       case 'added_date':
         return formatDisplayDate(row.dateAdded);
-      case 'location':
-        return row.location || '—';
       case 'collection_status':
         return formatTrackStatus(row.status);
       case 'personal_notes':
@@ -2990,8 +3024,6 @@ function CollectionBrowserPage() {
         return firstTrack?.yearInt ?? '—';
       case 'added_date':
         return firstTrack ? formatDisplayDate(firstTrack.dateAdded) : '—';
-      case 'location':
-        return firstTrack?.location || '—';
       case 'collection_status':
         return formatTrackStatus(firstTrack?.status);
       case 'personal_notes':
@@ -3038,11 +3070,19 @@ function CollectionBrowserPage() {
     }
 
     if (columnSelectorMode === 'album-track') {
-      handleAlbumTrackColumnsChange(columns.filter(isTrackViewColumnId));
+      handleAlbumTrackColumnsChange(
+        columns
+          .filter((column) => column !== 'location')
+          .filter(isTrackViewColumnId)
+      );
       return;
     }
 
-    handlePlaylistColumnsChange(columns.filter(isTrackViewColumnId));
+    handlePlaylistColumnsChange(
+      columns
+        .filter((column) => column !== 'location')
+        .filter(isTrackViewColumnId)
+    );
   }, [columnSelectorMode, handleAlbumTrackColumnsChange, handleCollectionColumnsChange, handlePlaylistColumnsChange]);
 
   return (
@@ -4063,7 +4103,6 @@ function ExportCsvTxtModal({
       tags: 'custom_tags',
       'cat no': 'cat_no',
       'cat no.': 'cat_no',
-      location: 'location',
       owner: 'owner',
       format: 'format',
       artist: 'artist',
@@ -4125,7 +4164,6 @@ function ExportCsvTxtModal({
       case 'genres': return (album.genres ?? album.release?.master?.genres ?? []).join(' | ');
       case 'styles': return (album.styles ?? album.release?.master?.styles ?? []).join(' | ');
       case 'labels': return (album.labels ?? (album.label ? [album.label] : [])).join(' | ');
-      case 'location': return album.location || '';
       case 'collection_status': return album.collection_status || album.status || '';
       case 'media_condition': return album.media_condition || '';
       case 'package_sleeve_condition': return album.package_sleeve_condition || album.sleeve_condition || '';

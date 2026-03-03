@@ -9,6 +9,7 @@ import { supabase } from 'src/lib/supabaseClient';
 import { useSearchParams } from 'next/navigation';
 import { formatEventText } from 'src/utils/textFormatter';
 import type { Database } from 'src/types/supabase';
+import { isForSaleInventory } from 'src/lib/saleUtils';
 
 interface BrowseAlbum {
   id: number;
@@ -50,11 +51,15 @@ type MasterTagLinkRow = {
 
 type InventoryBrowseRow = {
   id: number;
+  status?: string | null;
   personal_notes?: string | null;
   master_notes?: string | null;
   media_condition?: string | null;
   created_at?: string | null;
   location?: string | null;
+  discogs_folder_name?: string | null;
+  discogs_folder_id?: number | null;
+  discogs_instance_id?: number | null;
   release?: (Partial<ReleaseRow> & {
     master?: (Partial<MasterRow> & {
       artist?: ArtistRow | null;
@@ -190,10 +195,14 @@ function BrowseAlbumsContent() {
             .from('inventory')
             .select(
               `id,
+               status,
                personal_notes,
                media_condition,
                created_at,
                location,
+               discogs_folder_name,
+               discogs_folder_id,
+               discogs_instance_id,
                release:releases (
                  id,
                  media_type,
@@ -231,7 +240,9 @@ function BrowseAlbumsContent() {
         const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
           Array.isArray(value) ? value[0] ?? null : value ?? null;
 
-        const parsed = allRows.map((row) => {
+        const parsed = allRows
+          .filter((row) => !isForSaleInventory(row))
+          .map((row) => {
           const release = toSingle(row.release);
           const master = toSingle(release?.master);
           const artist = toSingle(master?.artist);
@@ -261,7 +272,7 @@ function BrowseAlbumsContent() {
                 ? imageUrl.trim()
                 : '/images/coverplaceholder.png',
           };
-        });
+          });
 
         setAlbums(parsed);
       } catch (err) {

@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
 
   const cookieStore = await cookies();
   const requestSecret = cookieStore.get('discogs_request_secret')?.value;
+  const returnToPath = cookieStore.get('post_auth_return_to')?.value || '/edit-collection';
 
   if (!oauthToken || !oauthVerifier || !requestSecret) {
     return NextResponse.json({ error: 'Invalid callback parameters' }, { status: 400 });
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
     `oauth_verifier="${oauthVerifier}"`;
 
   try {
-    const response = await fetch('https://api.discogs.com/oauth/access_token', {
+    const tokenResponse = await fetch('https://api.discogs.com/oauth/access_token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -46,12 +47,12 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Discogs Access Token Failed: ${response.status} ${text}`);
+    if (!tokenResponse.ok) {
+      const text = await tokenResponse.text();
+      throw new Error(`Discogs Access Token Failed: ${tokenResponse.status} ${text}`);
     }
 
-    const text = await response.text();
+    const text = await tokenResponse.text();
     const params = new URLSearchParams(text);
     const token = params.get('oauth_token');
     const tokenSecret = params.get('oauth_token_secret');
@@ -128,9 +129,18 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const redirectUrl = new URL('/edit-collection', req.url);
+    const redirectUrl = new URL(returnToPath, req.url);
     redirectUrl.searchParams.set('import', 'discogs_success');
-    return NextResponse.redirect(redirectUrl);
+    const redirectResponse = NextResponse.redirect(redirectUrl);
+    redirectResponse.cookies.set('post_auth_return_to', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
+      path: '/',
+      maxAge: 0,
+    });
+    return redirectResponse;
 
   } catch (error) {
     console.error('OAuth Callback Error:', error);

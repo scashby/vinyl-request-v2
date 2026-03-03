@@ -34,6 +34,7 @@ export type NameThatTuneDatabase = {
         Row: {
           id: number;
           event_id: number | null;
+          playlist_id: number | null;
           session_code: string;
           title: string;
           round_count: number;
@@ -60,6 +61,7 @@ export type NameThatTuneDatabase = {
         Insert: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code: string;
           title: string;
           round_count?: number;
@@ -86,6 +88,7 @@ export type NameThatTuneDatabase = {
         Update: {
           id?: number;
           event_id?: number | null;
+          playlist_id?: number | null;
           session_code?: string;
           title?: string;
           round_count?: number;
@@ -144,6 +147,7 @@ export type NameThatTuneDatabase = {
           session_id: number;
           round_number: number;
           call_index: number;
+          playlist_track_key: string | null;
           source_label: string | null;
           artist_answer: string;
           title_answer: string;
@@ -152,6 +156,8 @@ export type NameThatTuneDatabase = {
           snippet_start_seconds: number;
           snippet_duration_seconds: number;
           host_notes: string | null;
+          metadata_locked: boolean;
+          metadata_synced_at: string | null;
           status: "pending" | "asked" | "locked" | "answer_revealed" | "scored" | "skipped";
           asked_at: string | null;
           answer_revealed_at: string | null;
@@ -163,6 +169,7 @@ export type NameThatTuneDatabase = {
           session_id: number;
           round_number: number;
           call_index: number;
+          playlist_track_key?: string | null;
           source_label?: string | null;
           artist_answer: string;
           title_answer: string;
@@ -171,6 +178,8 @@ export type NameThatTuneDatabase = {
           snippet_start_seconds?: number;
           snippet_duration_seconds?: number;
           host_notes?: string | null;
+          metadata_locked?: boolean;
+          metadata_synced_at?: string | null;
           status?: "pending" | "asked" | "locked" | "answer_revealed" | "scored" | "skipped";
           asked_at?: string | null;
           answer_revealed_at?: string | null;
@@ -182,6 +191,7 @@ export type NameThatTuneDatabase = {
           session_id?: number;
           round_number?: number;
           call_index?: number;
+          playlist_track_key?: string | null;
           source_label?: string | null;
           artist_answer?: string;
           title_answer?: string;
@@ -190,6 +200,8 @@ export type NameThatTuneDatabase = {
           snippet_start_seconds?: number;
           snippet_duration_seconds?: number;
           host_notes?: string | null;
+          metadata_locked?: boolean;
+          metadata_synced_at?: string | null;
           status?: "pending" | "asked" | "locked" | "answer_revealed" | "scored" | "skipped";
           asked_at?: string | null;
           answer_revealed_at?: string | null;

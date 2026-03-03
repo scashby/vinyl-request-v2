@@ -84,7 +84,7 @@ export const COLUMN_DEFINITIONS: Record<ColumnId, ColumnDefinition> = {
   length: { id: 'length', label: 'Length', width: '80px' }, // ADDED
   
   // Details
-  location: { id: 'location', label: 'Location', width: '150px' },
+  location: { id: 'location', label: 'Discogs Folder', width: '150px' },
   country: { id: 'country', label: 'Country', width: '100px' },
   extra: { id: 'extra', label: 'Extra', width: '150px' },
   media_condition: { id: 'media_condition', label: 'Media Cond', width: '150px' },
@@ -144,7 +144,7 @@ export const COLUMN_GROUPS = [
     label: 'Details',
     icon: '📝',
     columns: [
-      'location', 'country', 'extra', 'media_condition', 
+      'country', 'extra', 'media_condition', 
       'package_sleeve_condition', 'rpm', 'vinyl_color', 'vinyl_weight'
     ] as ColumnId[]
   },
@@ -165,7 +165,7 @@ export const COLUMN_GROUPS = [
     label: 'Personal',
     icon: '👤',
     columns: [
-      'added_date', 'collection_status', 'location', 'my_rating', 'personal_notes', 'release_notes', 'master_notes',
+      'added_date', 'collection_status', 'my_rating', 'personal_notes', 'release_notes', 'master_notes',
       'owner', 'custom_tags', 'modified_date'
     ] as ColumnId[]
   },
@@ -187,7 +187,6 @@ export const DEFAULT_VISIBLE_COLUMNS: ColumnId[] = [
   'artist',
   'title',
   'format',
-  'location',
   'personal_notes',
   'genres',
   'added_date'

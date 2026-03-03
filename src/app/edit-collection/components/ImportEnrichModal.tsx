@@ -32,6 +32,7 @@ import type {
   PatternRootCause,
   SourceDiagnostic,
 } from 'types/enrichmentDiagnostics';
+import { normalizeArtistDisplay } from 'lib/artistName';
 
 const ALLOWED_COLUMNS = new Set([
   'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels', 'cat_no',
@@ -41,6 +42,7 @@ const ALLOWED_COLUMNS = new Set([
   'apple_music_id', 'apple_music_url', 'lastfm_id', 'lastfm_url', 
   'musicbrainz_id', 'musicbrainz_url', 'wikipedia_url', 'genius_url',
   'tags', 'lastfm_tags', 'notes', 'release_notes', 'master_notes', 'enriched_metadata', 'enrichment_summary', 'companies', 'genres', 'styles', 'original_release_date',
+  'pressing_plant', 'discogs_companies', 'discogs_identifiers', 'discogs_formats',
   'inner_sleeve_images', 'musicians', 'credits', 'producers', 'engineers', 
   'songwriters', 'composer', 'conductor', 'orchestra',
   'tempo_bpm', 'musical_key', 'lyrics', 'lyrics_url', 'time_signature', 
@@ -56,6 +58,7 @@ const ALLOWED_COLUMNS = new Set([
   'apple_music_editorial_notes',
   'lastfm_similar_albums'
 ]);
+const AUTH_RETURN_MODAL_KEY = 'edit-collection-auth-return-modal';
 
 const toSingle = <T,>(value: T | T[] | null | undefined): T | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
@@ -735,8 +738,12 @@ const splitV3Updates = (updates: Record<string, unknown>): UpdateBatch => {
       case 'box_set':
       case 'sound':
       case 'studio':
+      case 'pressing_plant':
       case 'disc_metadata':
       case 'matrix_numbers':
+      case 'discogs_companies':
+      case 'discogs_identifiers':
+      case 'discogs_formats':
         releaseUpdates[key] = normalizeCreditsValue(value) ?? null;
         break;
       case 'tracklist':
@@ -1560,7 +1567,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             addLog('System', 'skipped', msg);
             const shouldLogin = window.confirm('Discogs auth is missing for enrichment. Connect Discogs now?');
             if (shouldLogin) {
-              window.location.href = '/api/auth/discogs';
+              window.localStorage.setItem(AUTH_RETURN_MODAL_KEY, 'discogs-enrich');
+              const returnTo = `${window.location.pathname}${window.location.search}`;
+              window.location.href = `/api/auth/discogs?returnTo=${encodeURIComponent(returnTo)}`;
             }
             return;
           }
@@ -2468,7 +2477,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       if (track.lyrics) credits.lyrics = track.lyrics;
       if (track.lyrics_url) credits.lyrics_url = track.lyrics_url;
       if (track.lyrics_source) credits.lyrics_source = track.lyrics_source;
-      if (track.artist) credits.track_artist = track.artist;
+      const normalizedTrackArtist = normalizeArtistDisplay(track.artist ? String(track.artist) : null);
+      if (normalizedTrackArtist) credits.track_artist = normalizedTrackArtist;
       if (track.note) credits.track_note = track.note;
       if (track.is_cover !== undefined) credits.is_cover = track.is_cover;
       if (track.original_artist) credits.original_artist = track.original_artist;
@@ -2483,7 +2493,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         .map((track) => ({
           title: String(track.title ?? '').trim(),
           duration_seconds: parseDurationToSeconds(track.duration),
-          track_artist: track.artist ? String(track.artist) : null,
+          track_artist: normalizeArtistDisplay(track.artist ? String(track.artist) : null),
           lyrics: track.lyrics ? String(track.lyrics) : null,
           lyrics_url: track.lyrics_url ? String(track.lyrics_url) : null,
           is_cover: typeof track.is_cover === 'boolean' ? track.is_cover : null,
@@ -2547,7 +2557,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const updatePayload: Record<string, unknown> = {
         credits: nextCredits as unknown as import('types/supabase').Json,
       };
-      if (match.artist) updatePayload.track_artist = String(match.artist);
+      if (match.artist) updatePayload.track_artist = normalizeArtistDisplay(String(match.artist));
       if (match.lyrics) updatePayload.lyrics = String(match.lyrics);
       if (match.lyrics_url) updatePayload.lyrics_url = String(match.lyrics_url);
       if (typeof match.is_cover === 'boolean') updatePayload.is_cover = match.is_cover;

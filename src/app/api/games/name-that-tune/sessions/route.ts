@@ -34,6 +34,7 @@ type CreateSessionBody = {
 type SessionListRow = {
   id: number;
   event_id: number | null;
+  playlist_id: number | null;
   session_code: string;
   title: string;
   round_count: number;
@@ -67,6 +68,7 @@ async function buildSnippetsFromPlaylist(
   playlistId: number
 ): Promise<
   {
+  playlist_track_key: string;
   artist: string;
   title: string;
   source_label: string | null;
@@ -92,6 +94,7 @@ async function buildSnippetsFromPlaylist(
       }
       const sourceLabel = [track.albumName?.trim() || null, sideAndPosition || null].filter(Boolean).join(" | ");
       return {
+        playlist_track_key: track.trackKey,
         artist: track.artistName?.trim() || "Unknown Artist",
         title: track.trackTitle?.trim() || `Track ${index + 1}`,
         source_label: sourceLabel || null,
@@ -119,7 +122,7 @@ export async function GET(request: NextRequest) {
 
   let query = db
     .from("ntt_sessions")
-    .select("id, event_id, session_code, title, round_count, lock_in_rule, status, current_round, created_at")
+    .select("id, event_id, playlist_id, session_code, title, round_count, lock_in_rule, status, current_round, created_at")
     .order("created_at", { ascending: false });
 
   if (eventId) query = query.eq("event_id", Number(eventId));
@@ -194,6 +197,7 @@ export async function POST(request: NextRequest) {
       .from("ntt_sessions")
       .insert({
         event_id: body.event_id ?? null,
+        playlist_id: playlistId,
         session_code: code,
         title: (body.title ?? "Name That Tune Session").trim() || "Name That Tune Session",
         round_count: roundCount,
@@ -233,6 +237,7 @@ export async function POST(request: NextRequest) {
           session_id: session.id,
           round_number: index + 1,
           call_index: index + 1,
+          playlist_track_key: snippet.playlist_track_key,
           source_label: snippet.source_label,
           artist_answer: snippet.artist,
           title_answer: snippet.title,

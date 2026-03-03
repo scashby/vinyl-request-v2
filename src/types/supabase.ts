@@ -723,6 +723,9 @@ export type Database = {
           release_id: number | null;
           status: string | null;
           location: string | null;
+          discogs_instance_id: number | null;
+          discogs_folder_id: number | null;
+          discogs_folder_name: string | null;
           media_condition: string | null;
           sleeve_condition: string | null;
           date_added: string | null;
@@ -741,6 +744,9 @@ export type Database = {
           release_id?: number | null;
           status?: string | null;
           location?: string | null;
+          discogs_instance_id?: number | null;
+          discogs_folder_id?: number | null;
+          discogs_folder_name?: string | null;
           media_condition?: string | null;
           sleeve_condition?: string | null;
           date_added?: string | null;
@@ -759,6 +765,9 @@ export type Database = {
           release_id?: number | null;
           status?: string | null;
           location?: string | null;
+          discogs_instance_id?: number | null;
+          discogs_folder_id?: number | null;
+          discogs_folder_name?: string | null;
           media_condition?: string | null;
           sleeve_condition?: string | null;
           date_added?: string | null;
@@ -1159,6 +1168,10 @@ export type Database = {
           box_set: string | null;
           sound: string | null;
           studio: string | null;
+          pressing_plant: string | null;
+          discogs_companies: Json | null;
+          discogs_identifiers: Json | null;
+          discogs_formats: Json | null;
           disc_metadata: Json | null;
           matrix_numbers: Json | null;
         };
@@ -1187,6 +1200,10 @@ export type Database = {
           box_set?: string | null;
           sound?: string | null;
           studio?: string | null;
+          pressing_plant?: string | null;
+          discogs_companies?: Json | null;
+          discogs_identifiers?: Json | null;
+          discogs_formats?: Json | null;
           disc_metadata?: Json | null;
           matrix_numbers?: Json | null;
         };
@@ -1215,6 +1232,10 @@ export type Database = {
           box_set?: string | null;
           sound?: string | null;
           studio?: string | null;
+          pressing_plant?: string | null;
+          discogs_companies?: Json | null;
+          discogs_identifiers?: Json | null;
+          discogs_formats?: Json | null;
           disc_metadata?: Json | null;
           matrix_numbers?: Json | null;
         };
