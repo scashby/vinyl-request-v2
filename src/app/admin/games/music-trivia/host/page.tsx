@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import InlineEditableCell from "../../_components/InlineEditableCell";
 
 type Session = {
   id: number;
@@ -62,13 +63,6 @@ export default function MusicTriviaHostPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [scoreDraft, setScoreDraft] = useState<ScoreDraft>({});
   const [saving, setSaving] = useState(false);
-  const [metadataDraft, setMetadataDraft] = useState({
-    source_artist: "",
-    source_title: "",
-    source_album: "",
-    source_side: "",
-    source_position: "",
-  });
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -125,16 +119,24 @@ export default function MusicTriviaHostPage() {
     setScoreDraft(draft);
   }, [callForControls?.id, leaderboard]);
 
-  useEffect(() => {
-    if (!callForControls) return;
-    setMetadataDraft({
-      source_artist: callForControls.source_artist ?? "",
-      source_title: callForControls.source_title ?? "",
-      source_album: callForControls.source_album ?? "",
-      source_side: callForControls.source_side ?? "",
-      source_position: callForControls.source_position ?? "",
-    });
-  }, [callForControls?.id]);
+  const patchCallMetadata = useCallback(
+    async (callId: number, patch: Record<string, unknown>) => {
+      const response = await fetch(`/api/games/trivia/calls/${callId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...patch,
+          metadata_locked: true,
+        }),
+      });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error ?? "Failed to save source metadata");
+      }
+      await load();
+    },
+    [load]
+  );
 
   const advance = async () => {
     await fetch(`/api/games/trivia/sessions/${sessionId}/advance`, { method: "POST" });
@@ -203,19 +205,6 @@ export default function MusicTriviaHostPage() {
     }
   };
 
-  const saveMetadata = async () => {
-    if (!callForControls) return;
-    await fetch(`/api/games/trivia/calls/${callForControls.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...metadataDraft,
-        metadata_locked: true,
-      }),
-    });
-    load();
-  };
-
   const unlockMetadata = async () => {
     if (!callForControls) return;
     await fetch(`/api/games/trivia/calls/${callForControls.id}`, {
@@ -268,6 +257,9 @@ export default function MusicTriviaHostPage() {
                     <th className="pb-2">#</th>
                     <th className="pb-2">Round</th>
                     <th className="pb-2">Type</th>
+                    <th className="pb-2">Source Artist</th>
+                    <th className="pb-2">Source Title</th>
+                    <th className="pb-2">Source Album</th>
                     <th className="pb-2">Category</th>
                     <th className="pb-2">Difficulty</th>
                     <th className="pb-2">Prep</th>
@@ -280,6 +272,24 @@ export default function MusicTriviaHostPage() {
                       <td className="py-2 font-bold text-cyan-300">{call.call_index}</td>
                       <td className="py-2">{call.round_number}</td>
                       <td className="py-2">{call.is_tiebreaker ? "Tie" : "Main"}</td>
+                      <td className="py-1">
+                        <InlineEditableCell
+                          onSave={(nextValue) => patchCallMetadata(call.id, { source_artist: nextValue })}
+                          value={call.source_artist ?? ""}
+                        />
+                      </td>
+                      <td className="py-1">
+                        <InlineEditableCell
+                          onSave={(nextValue) => patchCallMetadata(call.id, { source_title: nextValue })}
+                          value={call.source_title ?? ""}
+                        />
+                      </td>
+                      <td className="py-1">
+                        <InlineEditableCell
+                          onSave={(nextValue) => patchCallMetadata(call.id, { source_album: nextValue || null })}
+                          value={call.source_album ?? ""}
+                        />
+                      </td>
                       <td className="py-2">{call.category}</td>
                       <td className="py-2 uppercase">{call.difficulty}</td>
                       <td className="py-2">{call.prep_status}</td>
@@ -313,47 +323,8 @@ export default function MusicTriviaHostPage() {
                     src={callForControls.effective_display_image_url}
                   />
                 ) : null}
-                <div className="mt-3 grid gap-2 text-xs md:grid-cols-2">
-                  <input
-                    className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
-                    value={metadataDraft.source_artist}
-                    onChange={(e) => setMetadataDraft((draft) => ({ ...draft, source_artist: e.target.value }))}
-                    placeholder="Source artist"
-                  />
-                  <input
-                    className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
-                    value={metadataDraft.source_title}
-                    onChange={(e) => setMetadataDraft((draft) => ({ ...draft, source_title: e.target.value }))}
-                    placeholder="Source title"
-                  />
-                  <input
-                    className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
-                    value={metadataDraft.source_album}
-                    onChange={(e) => setMetadataDraft((draft) => ({ ...draft, source_album: e.target.value }))}
-                    placeholder="Source album"
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
-                      value={metadataDraft.source_side}
-                      onChange={(e) => setMetadataDraft((draft) => ({ ...draft, source_side: e.target.value }))}
-                      placeholder="Side"
-                    />
-                    <input
-                      className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
-                      value={metadataDraft.source_position}
-                      onChange={(e) => setMetadataDraft((draft) => ({ ...draft, source_position: e.target.value }))}
-                      placeholder="Position"
-                    />
-                  </div>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                  <button onClick={saveMetadata} className="rounded bg-cyan-700 px-2 py-1">Save Metadata</button>
-                  <button onClick={unlockMetadata} className="rounded border border-stone-600 px-2 py-1">Unlock Row</button>
-                  <button onClick={refreshFromPlaylist} className="rounded border border-stone-600 px-2 py-1">Refresh from Playlist</button>
-                </div>
                 <p className="mt-1 text-[11px] text-stone-500">
-                  {callForControls?.metadata_locked ? "Metadata locked" : "Metadata follows playlist sync"}
+                  Click source fields in Question Stack to edit inline. Press Enter to save.
                 </p>
               </div>
 
@@ -386,6 +357,8 @@ export default function MusicTriviaHostPage() {
                 <button onClick={pause} className="rounded border border-stone-600 px-2 py-1">Pause</button>
                 <button onClick={resume} className="rounded border border-stone-600 px-2 py-1">Resume</button>
                 <button onClick={() => patchCallStatus("scored")} className="rounded border border-stone-600 px-2 py-1">Mark Scored</button>
+                <button onClick={refreshFromPlaylist} className="rounded border border-stone-600 px-2 py-1">Refresh from Playlist</button>
+                <button onClick={unlockMetadata} className="rounded border border-stone-600 px-2 py-1">Unlock Current Row</button>
               </div>
             </div>
 

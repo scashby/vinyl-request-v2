@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import InlineEditableCell from "../../_components/InlineEditableCell";
 
 type Session = {
   id: number;
@@ -84,13 +85,6 @@ export default function GenreImposterHostPage() {
   const [working, setWorking] = useState(false);
   const [savingPicks, setSavingPicks] = useState(false);
   const [savingScores, setSavingScores] = useState(false);
-  const [metadataDraft, setMetadataDraft] = useState({
-    artist: "",
-    title: "",
-    source_label: "",
-    record_label: "",
-    host_notes: "",
-  });
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -169,16 +163,24 @@ export default function GenreImposterHostPage() {
     return currentRoundCalls.find((call) => call.status !== "scored") ?? currentRoundCalls[0] ?? null;
   }, [currentRoundCalls, session]);
 
-  useEffect(() => {
-    if (!activeCall) return;
-    setMetadataDraft({
-      artist: activeCall.artist ?? "",
-      title: activeCall.title ?? "",
-      source_label: activeCall.source_label ?? "",
-      record_label: activeCall.record_label ?? "",
-      host_notes: activeCall.host_notes ?? "",
-    });
-  }, [activeCall?.id]);
+  const patchCallMetadata = useCallback(
+    async (callId: number, patch: Record<string, unknown>) => {
+      const res = await fetch(`/api/games/genre-imposter/calls/${callId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...patch,
+          metadata_locked: true,
+        }),
+      });
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error ?? "Failed to save round metadata");
+      }
+      await load();
+    },
+    [load]
+  );
 
   const runAction = async (fn: () => Promise<void>) => {
     setWorking(true);
@@ -235,24 +237,6 @@ export default function GenreImposterHostPage() {
       if (!res.ok) {
         const payload = await res.json();
         throw new Error(payload.error ?? `Failed to mark ${status}`);
-      }
-    });
-  };
-
-  const saveMetadata = async () => {
-    if (!activeCall) return;
-    await runAction(async () => {
-      const res = await fetch(`/api/games/genre-imposter/calls/${activeCall.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...metadataDraft,
-          metadata_locked: true,
-        }),
-      });
-      if (!res.ok) {
-        const payload = await res.json();
-        throw new Error(payload.error ?? "Failed to save metadata");
       }
     });
   };
@@ -386,7 +370,9 @@ export default function GenreImposterHostPage() {
                   <tr className="text-stone-300">
                     <th className="pb-2">Round</th>
                     <th className="pb-2">Slot</th>
-                    <th className="pb-2">Track</th>
+                    <th className="pb-2">Artist</th>
+                    <th className="pb-2">Title</th>
+                    <th className="pb-2">Source</th>
                     <th className="pb-2">Status</th>
                   </tr>
                 </thead>
@@ -395,7 +381,24 @@ export default function GenreImposterHostPage() {
                     <tr key={call.id} className="border-t border-stone-800 align-top">
                       <td className="py-2">{call.round_number}</td>
                       <td className="py-2 font-bold text-emerald-300">{call.call_index}</td>
-                      <td className="py-2">{call.artist ?? "Unknown"} - {call.title ?? "Untitled"}</td>
+                      <td className="py-1">
+                        <InlineEditableCell
+                          onSave={(nextValue) => patchCallMetadata(call.id, { artist: nextValue || null })}
+                          value={call.artist ?? ""}
+                        />
+                      </td>
+                      <td className="py-1">
+                        <InlineEditableCell
+                          onSave={(nextValue) => patchCallMetadata(call.id, { title: nextValue || null })}
+                          value={call.title ?? ""}
+                        />
+                      </td>
+                      <td className="py-1">
+                        <InlineEditableCell
+                          onSave={(nextValue) => patchCallMetadata(call.id, { source_label: nextValue || null })}
+                          value={call.source_label ?? ""}
+                        />
+                      </td>
                       <td className="py-2 text-stone-400">{call.status}</td>
                     </tr>
                   ))}
@@ -445,45 +448,12 @@ export default function GenreImposterHostPage() {
                   </button>
                 ))}
               </div>
-              <div className="mt-3 grid gap-2 text-xs md:grid-cols-2">
-                <input
-                  className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
-                  value={metadataDraft.artist}
-                  onChange={(e) => setMetadataDraft((draft) => ({ ...draft, artist: e.target.value }))}
-                  placeholder="Artist"
-                />
-                <input
-                  className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
-                  value={metadataDraft.title}
-                  onChange={(e) => setMetadataDraft((draft) => ({ ...draft, title: e.target.value }))}
-                  placeholder="Title"
-                />
-                <input
-                  className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
-                  value={metadataDraft.source_label}
-                  onChange={(e) => setMetadataDraft((draft) => ({ ...draft, source_label: e.target.value }))}
-                  placeholder="Source label"
-                />
-                <input
-                  className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
-                  value={metadataDraft.record_label}
-                  onChange={(e) => setMetadataDraft((draft) => ({ ...draft, record_label: e.target.value }))}
-                  placeholder="Record label"
-                />
-                <input
-                  className="rounded border border-stone-700 bg-stone-950 px-2 py-1 md:col-span-2"
-                  value={metadataDraft.host_notes}
-                  onChange={(e) => setMetadataDraft((draft) => ({ ...draft, host_notes: e.target.value }))}
-                  placeholder="Host notes"
-                />
-              </div>
               <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                <button disabled={working || !activeCall} onClick={saveMetadata} className="rounded bg-emerald-700 px-2 py-1 disabled:opacity-50">Save Metadata</button>
-                <button disabled={working || !activeCall} onClick={unlockMetadata} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Unlock Row</button>
+                <button disabled={working || !activeCall} onClick={unlockMetadata} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Unlock Current Row</button>
                 <button disabled={working} onClick={refreshFromPlaylist} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Refresh from Playlist</button>
               </div>
               <p className="mt-1 text-[11px] text-stone-500">
-                {activeCall?.metadata_locked ? "Metadata locked" : "Metadata follows playlist sync"}
+                Click Artist/Title/Source fields in Round Stack to edit inline. Press Enter to save.
               </p>
             </div>
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
+import { rehydrateBingoCardLabels } from "src/lib/playlistMetadataSync";
 
 export const runtime = "nodejs";
 
@@ -83,6 +84,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const { error } = await db.from("bingo_session_calls").update(patch).eq("id", callId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (hasMetadataPatch && (typeof body.track_title === "string" || typeof body.artist_name === "string")) {
+    await rehydrateBingoCardLabels(typedCall.session_id);
+  }
 
   if (body.status === "called") {
     const { data: session } = await db

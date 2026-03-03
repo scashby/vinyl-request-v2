@@ -74,7 +74,7 @@ function hasDiff(row: Record<string, unknown>, patch: Record<string, unknown>): 
   });
 }
 
-async function rehydrateBingoCardLabels(sessionId: number): Promise<void> {
+export async function rehydrateBingoCardLabels(sessionId: number): Promise<void> {
   const db = getBingoDb();
 
   const { data: session } = await db

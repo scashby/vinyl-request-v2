@@ -81,6 +81,11 @@ export default function BingoTransportLane({
     return sortedCalls.find((call) => call.status === "pending" && call.call_index > boundary) ?? null;
   }, [sortedCalls, cueCall, currentCall, currentCallIndex, pullCallId]);
 
+  const pullingCall = useMemo(() => {
+    const boundary = pullCall?.call_index ?? cueCall?.call_index ?? currentCall?.call_index ?? currentCallIndex ?? 0;
+    return sortedCalls.find((call) => call.status === "pending" && call.call_index > boundary) ?? null;
+  }, [sortedCalls, pullCall, cueCall, currentCall, currentCallIndex]);
+
   const firstCallable = useMemo(
     () => (!currentCall ? sortedCalls.find((call) => call.status === "pending" || call.status === "prep_started") ?? null : null),
     [sortedCalls, currentCall]
@@ -99,6 +104,7 @@ export default function BingoTransportLane({
     pushCall(currentCall);
     pushCall(cueCall);
     pushCall(pullCall);
+    pushCall(pullingCall);
 
     const queueStart = currentCall?.call_index ?? firstCallable?.call_index ?? 1;
     for (const call of sortedCalls) {
@@ -117,7 +123,7 @@ export default function BingoTransportLane({
     }
 
     return rows;
-  }, [sortedCalls, currentCall, cueCall, pullCall, maxRows, firstCallable]);
+  }, [sortedCalls, currentCall, cueCall, pullCall, pullingCall, maxRows, firstCallable]);
 
   const inFlight = pendingAction !== null;
 
@@ -165,10 +171,31 @@ export default function BingoTransportLane({
           const isCurrent = currentCall?.id === call.id;
           const isCue = cueCall?.id === call.id;
           const isPull = pullCall?.id === call.id;
+          const isPulling = pullingCall?.id === call.id;
 
-          const callTone: ActionTone = isCurrent || firstCallable?.id === call.id ? "green" : isCue ? "yellow" : "red";
-          const cueTone: ActionTone = isCue ? "green" : isPull ? "yellow" : "red";
-          const pullTone: ActionTone = isPull ? "green" : call.status === "pending" && pullCall && call.call_index > pullCall.call_index ? "yellow" : "red";
+          const queueStatusLabel = isCue
+            ? "Cued"
+            : isPull
+              ? "Pulled"
+              : isPulling
+                ? "Pulling"
+                : call.status === "pending"
+                  ? "Pending"
+                  : toStatusLabel(call.status);
+
+          const callTone: ActionTone =
+            isCurrent || isCue || firstCallable?.id === call.id
+              ? "green"
+              : isPull
+                ? "yellow"
+                : "red";
+          const cueTone: ActionTone = isPull ? "green" : isPulling ? "yellow" : "red";
+          const pullTone: ActionTone =
+            isPulling
+              ? "green"
+              : call.status === "pending" && pullingCall && call.call_index > pullingCall.call_index
+                ? "yellow"
+                : "red";
 
           const callDisabled =
             inFlight ||
@@ -181,11 +208,12 @@ export default function BingoTransportLane({
             inFlight ||
             DONE_STATUSES.has(call.status) ||
             isCurrent ||
+            isCue ||
             call.status === "called" ||
             (currentCall && call.call_index <= currentCall.call_index);
 
           const cueBoundary = cueCall?.call_index ?? currentCall?.call_index ?? currentCallIndex ?? 0;
-          const pullDisabled = inFlight || call.status !== "pending" || call.call_index <= cueBoundary;
+          const pullDisabled = inFlight || call.status !== "pending" || isCue || isPull || call.call_index <= cueBoundary;
 
           return (
             <div key={call.id} className="rounded border border-stone-700 bg-stone-950/70 p-3 text-xs">
@@ -193,7 +221,7 @@ export default function BingoTransportLane({
                 <p className="font-semibold text-stone-100">
                   #{call.call_index} · {formatBallLabel(call.ball_number, call.column_letter)} - {call.track_title}
                 </p>
-                <span className="rounded border border-stone-700 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-stone-300">{toStatusLabel(call.status)}</span>
+                <span className="rounded border border-stone-700 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-stone-300">{queueStatusLabel}</span>
               </div>
               <p className="mt-1 text-stone-300">{call.artist_name} · {call.album_name ?? ""}</p>
               <p className="mt-1 text-stone-500">Side {call.side ?? "-"} · Position {call.position ?? "-"}</p>
