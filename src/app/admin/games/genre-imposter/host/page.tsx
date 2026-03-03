@@ -241,31 +241,6 @@ export default function GenreImposterHostPage() {
     });
   };
 
-  const unlockMetadata = async () => {
-    if (!activeCall) return;
-    await runAction(async () => {
-      const res = await fetch(`/api/games/genre-imposter/calls/${activeCall.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ metadata_locked: false }),
-      });
-      if (!res.ok) {
-        const payload = await res.json();
-        throw new Error(payload.error ?? "Failed to unlock metadata");
-      }
-    });
-  };
-
-  const refreshFromPlaylist = async () => {
-    await runAction(async () => {
-      const res = await fetch(`/api/games/genre-imposter/sessions/${sessionId}/refresh-metadata`, { method: "POST" });
-      if (!res.ok) {
-        const payload = await res.json();
-        throw new Error(payload.error ?? "Failed to refresh metadata");
-      }
-    });
-  };
-
   const savePicks = async () => {
     if (!session || !currentRound) return;
     setSavingPicks(true);
@@ -447,10 +422,6 @@ export default function GenreImposterHostPage() {
                     {action.label}
                   </button>
                 ))}
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                <button disabled={working || !activeCall} onClick={unlockMetadata} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Unlock Current Row</button>
-                <button disabled={working} onClick={refreshFromPlaylist} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Refresh from Playlist</button>
               </div>
               <p className="mt-1 text-[11px] text-stone-500">
                 Click Artist/Title/Source fields in Round Stack to edit inline. Press Enter to save.

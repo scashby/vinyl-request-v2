@@ -125,59 +125,6 @@ async function getTransportAnchorCalls(db: ReturnType<typeof getBingoDb>, sessio
   };
 }
 
-async function movePendingCallAfterIndex(
-  db: ReturnType<typeof getBingoDb>,
-  sessionId: number,
-  callId: number,
-  fromIndex: number,
-  insertAfterIndex: number
-): Promise<number> {
-  if (fromIndex <= insertAfterIndex + 1) return fromIndex;
-
-  const targetIndex = insertAfterIndex + 1;
-  const rangeStart = targetIndex;
-  const rangeEnd = fromIndex - 1;
-
-  const { error: parkError } = await db
-    .from("bingo_session_calls")
-    .update({ call_index: -fromIndex })
-    .eq("session_id", sessionId)
-    .eq("id", callId);
-  if (parkError) throw new Error(parkError.message);
-
-  if (rangeStart <= rangeEnd) {
-    const { data: shiftRows, error: shiftRowsError } = await db
-      .from("bingo_session_calls")
-      .select("id, call_index")
-      .eq("session_id", sessionId)
-      .gte("call_index", rangeStart)
-      .lte("call_index", rangeEnd);
-    if (shiftRowsError) throw new Error(shiftRowsError.message);
-
-    const ordered = ((shiftRows ?? []) as Array<{ id: number; call_index: number }>).sort(
-      (a, b) => b.call_index - a.call_index
-    );
-
-    for (const row of ordered) {
-      const { error: shiftError } = await db
-        .from("bingo_session_calls")
-        .update({ call_index: row.call_index + 1 })
-        .eq("session_id", sessionId)
-        .eq("id", row.id);
-      if (shiftError) throw new Error(shiftError.message);
-    }
-  }
-
-  const { error: placeError } = await db
-    .from("bingo_session_calls")
-    .update({ call_index: targetIndex })
-    .eq("session_id", sessionId)
-    .eq("id", callId);
-  if (placeError) throw new Error(placeError.message);
-
-  return targetIndex;
-}
-
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const sessionId = Number(id);
@@ -232,15 +179,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
-    const nextIndex = await movePendingCallAfterIndex(
-      db,
-      sessionId,
-      typedTarget.id,
-      typedTarget.call_index,
-      anchors.insertAfterIndex
-    );
-
-    await insertEvent(sessionId, "pull_set", { call_id: typedTarget.id, call_index: nextIndex });
+    // Queue-only promote: keeps draw numbers and cue/pull anchors intact.
+    await insertEvent(sessionId, "pull_promote", { call_id: typedTarget.id, call_index: typedTarget.call_index });
     return NextResponse.json({ ok: true }, { status: 200 });
   }
 

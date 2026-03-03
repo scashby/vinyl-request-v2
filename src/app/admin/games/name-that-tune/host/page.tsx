@@ -228,31 +228,6 @@ export default function NameThatTuneHostPage() {
     }
   };
 
-  const unlockMetadata = async () => {
-    if (!callForControls) return;
-    await runAction(async () => {
-      const res = await fetch(`/api/games/name-that-tune/calls/${callForControls.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ metadata_locked: false }),
-      });
-      if (!res.ok) {
-        const payload = await res.json();
-        throw new Error(payload.error ?? "Failed to unlock metadata");
-      }
-    });
-  };
-
-  const refreshFromPlaylist = async () => {
-    await runAction(async () => {
-      const res = await fetch(`/api/games/name-that-tune/sessions/${sessionId}/refresh-metadata`, { method: "POST" });
-      if (!res.ok) {
-        const payload = await res.json();
-        throw new Error(payload.error ?? "Failed to refresh metadata");
-      }
-    });
-  };
-
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#090909,#171717)] p-6 text-stone-100">
       <div className="mx-auto max-w-7xl space-y-4">
@@ -370,8 +345,6 @@ export default function NameThatTuneHostPage() {
                 <button disabled={working} onClick={pause} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Pause</button>
                 <button disabled={working} onClick={resume} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Resume</button>
                 <button disabled={working || !callForControls} onClick={() => patchCallStatus("scored")} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Mark Scored</button>
-                <button disabled={working} onClick={refreshFromPlaylist} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Refresh from Playlist</button>
-                <button disabled={working || !callForControls} onClick={unlockMetadata} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Unlock Current Row</button>
               </div>
             </div>
 

@@ -205,21 +205,6 @@ export default function MusicTriviaHostPage() {
     }
   };
 
-  const unlockMetadata = async () => {
-    if (!callForControls) return;
-    await fetch(`/api/games/trivia/calls/${callForControls.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ metadata_locked: false }),
-    });
-    load();
-  };
-
-  const refreshFromPlaylist = async () => {
-    await fetch(`/api/games/trivia/sessions/${sessionId}/refresh-metadata`, { method: "POST" });
-    load();
-  };
-
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#090909,#171717)] p-6 text-stone-100">
       <div className="mx-auto max-w-7xl space-y-4">
@@ -357,8 +342,6 @@ export default function MusicTriviaHostPage() {
                 <button onClick={pause} className="rounded border border-stone-600 px-2 py-1">Pause</button>
                 <button onClick={resume} className="rounded border border-stone-600 px-2 py-1">Resume</button>
                 <button onClick={() => patchCallStatus("scored")} className="rounded border border-stone-600 px-2 py-1">Mark Scored</button>
-                <button onClick={refreshFromPlaylist} className="rounded border border-stone-600 px-2 py-1">Refresh from Playlist</button>
-                <button onClick={unlockMetadata} className="rounded border border-stone-600 px-2 py-1">Unlock Current Row</button>
               </div>
             </div>
 

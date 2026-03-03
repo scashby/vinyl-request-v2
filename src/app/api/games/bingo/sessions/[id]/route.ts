@@ -50,6 +50,11 @@ function parseSessionId(id: string) {
   return sessionId;
 }
 
+function parseEventCallId(raw: unknown): number | null {
+  const value = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : Number.NaN;
+  return Number.isFinite(value) ? value : null;
+}
+
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const sessionId = parseSessionId(id);
@@ -81,9 +86,25 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     .limit(1)
     .maybeSingle();
 
+  const { data: promoteEvents } = await db
+    .from("bingo_session_events")
+    .select("payload")
+    .eq("session_id", sessionId)
+    .eq("event_type", "pull_promote")
+    .order("id", { ascending: false })
+    .limit(100);
+
   const typedPullEvent = (pullEvent ?? null) as SessionEventRow | null;
-  const pullCallIdRaw = typedPullEvent?.payload?.call_id;
-  const pullCallId = typeof pullCallIdRaw === "number" && Number.isFinite(pullCallIdRaw) ? pullCallIdRaw : null;
+  const pullCallId = parseEventCallId(typedPullEvent?.payload?.call_id);
+
+  const promotedCallIds: number[] = [];
+  const seenPromoted = new Set<number>();
+  for (const row of (promoteEvents ?? []) as SessionEventRow[]) {
+    const promotedCallId = parseEventCallId(row?.payload?.call_id);
+    if (!promotedCallId || seenPromoted.has(promotedCallId)) continue;
+    seenPromoted.add(promotedCallId);
+    promotedCallIds.push(promotedCallId);
+  }
 
   return NextResponse.json(
     {
@@ -91,6 +112,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       playlist_name: playlist?.name ?? "Unknown Playlist",
       seconds_to_next_call: computeRemainingSeconds(session),
       pull_call_id: pullCallId,
+      promoted_call_ids: promotedCallIds,
     },
     { status: 200 }
   );

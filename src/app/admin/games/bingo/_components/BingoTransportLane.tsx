@@ -39,6 +39,7 @@ type BingoTransportLaneProps = {
   calls: BingoTransportCall[];
   currentCallIndex: number;
   pullCallId: number | null | undefined;
+  promotedCallIds?: number[];
   onChanged: () => Promise<void> | void;
   accent: "host" | "assistant";
   maxRows?: number;
@@ -49,6 +50,7 @@ export default function BingoTransportLane({
   calls,
   currentCallIndex,
   pullCallId,
+  promotedCallIds = [],
   onChanged,
   accent,
   maxRows = 5,
@@ -94,6 +96,7 @@ export default function BingoTransportLane({
   const laneCalls = useMemo(() => {
     const seen = new Set<number>();
     const rows: BingoTransportCall[] = [];
+    const callById = new Map(sortedCalls.map((call) => [call.id, call]));
 
     const pushCall = (call: BingoTransportCall | null) => {
       if (!call || seen.has(call.id)) return;
@@ -106,10 +109,25 @@ export default function BingoTransportLane({
     pushCall(pullingCall);
 
     const queueStart = currentCall?.call_index ?? firstCallable?.call_index ?? 1;
-    for (const call of sortedCalls) {
+    const pendingTail = sortedCalls.filter((call) => {
+      if (DONE_STATUSES.has(call.status)) return false;
+      if (call.call_index < queueStart) return false;
+      return !seen.has(call.id);
+    });
+    const pendingTailById = new Map(pendingTail.map((call) => [call.id, call]));
+    const pullBoundary = pullingCall?.call_index ?? pullCall?.call_index ?? cueCall?.call_index ?? currentCall?.call_index ?? currentCallIndex ?? 0;
+
+    for (const promotedCallId of promotedCallIds) {
       if (rows.length >= maxRows) break;
-      if (DONE_STATUSES.has(call.status)) continue;
-      if (call.call_index < queueStart) continue;
+      const promotedCall = pendingTailById.get(promotedCallId) ?? callById.get(promotedCallId) ?? null;
+      if (!promotedCall) continue;
+      if (promotedCall.status !== "pending") continue;
+      if (promotedCall.call_index <= pullBoundary) continue;
+      pushCall(promotedCall);
+    }
+
+    for (const call of pendingTail) {
+      if (rows.length >= maxRows) break;
       pushCall(call);
     }
 
@@ -122,7 +140,7 @@ export default function BingoTransportLane({
     }
 
     return rows;
-  }, [sortedCalls, currentCall, cueCall, pullCall, pullingCall, maxRows, firstCallable]);
+  }, [sortedCalls, currentCall, cueCall, pullCall, pullingCall, maxRows, firstCallable, currentCallIndex, promotedCallIds]);
 
   const inFlight = pendingAction !== null;
 
