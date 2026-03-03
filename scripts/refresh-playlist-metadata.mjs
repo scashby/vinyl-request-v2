@@ -1,5 +1,10 @@
 #!/usr/bin/env node
 import { createClient } from "@supabase/supabase-js";
+import nextEnv from "@next/env";
+
+// Load .env/.env.local like Next.js so shell `source` is not required.
+const { loadEnvConfig } = nextEnv;
+loadEnvConfig(process.cwd());
 
 const GAME_CONFIG = {
   bingo: { sessionTable: "bingo_sessions", endpointSlug: "bingo" },
