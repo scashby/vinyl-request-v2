@@ -19,7 +19,7 @@ export type BingoTransportCall = {
 type ActionName = "pull" | "cue" | "call";
 type ActionTone = "green" | "yellow" | "red";
 
-const DONE_STATUSES = new Set(["completed", "skipped"]);
+const DONE_STATUSES = new Set(["called", "completed", "skipped"]);
 
 function actionClass(tone: ActionTone, disabled: boolean) {
   const base = "rounded border px-2 py-1 text-center text-[11px] font-black uppercase tracking-wide transition";
@@ -101,7 +101,6 @@ export default function BingoTransportLane({
       seen.add(call.id);
     };
 
-    pushCall(currentCall);
     pushCall(cueCall);
     pushCall(pullCall);
     pushCall(pullingCall);

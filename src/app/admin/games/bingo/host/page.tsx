@@ -106,23 +106,6 @@ export default function BingoHostPage() {
     [load]
   );
 
-  const refreshFromPlaylist = async () => {
-    await fetch(`/api/games/bingo/sessions/${sessionId}/refresh-metadata`, { method: "POST" });
-    load();
-  };
-
-  const unlockCurrentMetadata = async () => {
-    if (!currentCall) return;
-    await fetch(`/api/games/bingo/calls/${currentCall.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        metadata_locked: false,
-      }),
-    });
-    load();
-  };
-
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#0c0c0c,#1b1b1b)] p-6 text-stone-100">
       <div className="mx-auto max-w-7xl space-y-4">
@@ -195,6 +178,24 @@ export default function BingoHostPage() {
 
           <section className="space-y-4">
             <div className="rounded-2xl border border-stone-700 bg-black/50 p-4">
+              <p className="text-xs uppercase text-amber-300">Session Controls</p>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                <button onClick={pause} className="rounded border border-stone-600 px-2 py-1">
+                  Pause
+                </button>
+                <button onClick={resume} className="rounded border border-stone-600 px-2 py-1">
+                  Resume
+                </button>
+                <button onClick={skip} className="rounded border border-stone-600 px-2 py-1">
+                  Skip
+                </button>
+                <button onClick={replace} className="rounded border border-stone-600 px-2 py-1">
+                  Replace with Next
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-stone-700 bg-black/50 p-4">
               <h2 className="text-sm font-bold uppercase tracking-wide text-amber-200">Call Card</h2>
               <div className="mt-3 rounded border border-red-700/50 bg-red-950/30 p-3">
                 <p className="text-xs uppercase text-red-300">Current</p>
@@ -223,10 +224,6 @@ export default function BingoHostPage() {
                   ))}
                 </div>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                <button onClick={refreshFromPlaylist} className="rounded border border-stone-600 px-2 py-1">Refresh from Playlist</button>
-                <button onClick={unlockCurrentMetadata} className="rounded border border-stone-600 px-2 py-1">Unlock Current Row</button>
-              </div>
               <p className="mt-1 text-[11px] text-stone-500">
                 Click Track/Artist/Album in Crate to edit inline. Press Enter to save.
               </p>
@@ -241,24 +238,6 @@ export default function BingoHostPage() {
               accent="host"
               maxRows={6}
             />
-
-            <div className="rounded-2xl border border-stone-700 bg-black/50 p-4">
-              <p className="text-xs uppercase text-amber-300">Session Controls</p>
-              <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                <button onClick={pause} className="rounded border border-stone-600 px-2 py-1">
-                  Pause
-                </button>
-                <button onClick={resume} className="rounded border border-stone-600 px-2 py-1">
-                  Resume
-                </button>
-                <button onClick={skip} className="rounded border border-stone-600 px-2 py-1">
-                  Skip
-                </button>
-                <button onClick={replace} className="rounded border border-stone-600 px-2 py-1">
-                  Replace with Next
-                </button>
-              </div>
-            </div>
           </section>
         </div>
       </div>
