@@ -15,8 +15,7 @@ type Session = {
   current_round: number;
   round_count: number;
   status: string;
-  pull_call_id: number | null;
-  promoted_call_ids?: number[];
+  transport_queue_call_ids?: number[];
 };
 
 type Call = BingoTransportCall & {
@@ -234,8 +233,7 @@ export default function BingoHostPage() {
               sessionId={sessionId}
               calls={calls}
               currentCallIndex={session?.current_call_index ?? 0}
-              pullCallId={session?.pull_call_id ?? null}
-              promotedCallIds={session?.promoted_call_ids ?? []}
+              transportQueueCallIds={session?.transport_queue_call_ids ?? []}
               onChanged={load}
               accent="host"
               maxRows={6}

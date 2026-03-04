@@ -1,25 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { formatBallLabel } from "src/lib/bingoBall";
 
-export type BingoTransportCall = {
+export type TransportCallRow = {
   id: number;
-  call_index: number;
-  ball_number: number | null;
-  column_letter: string;
-  track_title: string;
-  artist_name: string;
-  album_name: string | null;
-  side: string | null;
-  position: string | null;
+  order_index: number;
+  display_index: string;
+  title: string;
+  artist: string;
+  album?: string | null;
+  side?: string | null;
+  position?: string | null;
   status: string;
 };
 
 type ActionName = "pull" | "cue" | "call";
 type ActionTone = "green" | "yellow" | "red";
-
-const DONE_STATUSES = new Set(["called", "completed", "skipped"]);
 
 function actionClass(tone: ActionTone, disabled: boolean) {
   const base = "rounded border px-2 py-1 text-center text-[11px] font-black uppercase tracking-wide transition";
@@ -34,50 +30,55 @@ function toStatusLabel(status: string) {
   return status.replace(/_/g, " ");
 }
 
-type BingoTransportLaneProps = {
+type GameTransportLaneProps = {
+  gameSlug: "trivia" | "name-that-tune" | "genre-imposter";
   sessionId: number;
-  calls: BingoTransportCall[];
-  currentCallIndex: number;
+  calls: TransportCallRow[];
+  currentOrderIndex: number;
   transportQueueCallIds?: number[];
+  doneStatuses: string[];
   onChanged: () => Promise<void> | void;
   accent: "host" | "assistant";
   maxRows?: number;
 };
 
-export default function BingoTransportLane({
+export default function GameTransportLane({
+  gameSlug,
   sessionId,
   calls,
-  currentCallIndex,
+  currentOrderIndex,
   transportQueueCallIds = [],
+  doneStatuses,
   onChanged,
   accent,
-  maxRows = 5,
-}: BingoTransportLaneProps) {
+  maxRows = 6,
+}: GameTransportLaneProps) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const doneSet = useMemo(() => new Set(doneStatuses), [doneStatuses]);
 
-  const sortedCalls = useMemo(() => [...calls].sort((a, b) => a.call_index - b.call_index), [calls]);
+  const sortedCalls = useMemo(() => [...calls].sort((a, b) => a.order_index - b.order_index), [calls]);
   const callById = useMemo(() => new Map(sortedCalls.map((call) => [call.id, call])), [sortedCalls]);
 
   const currentCall = useMemo(() => {
-    const bySession = sortedCalls.find((call) => call.call_index === currentCallIndex && call.status === "called");
+    const bySession = sortedCalls.find((call) => call.order_index === currentOrderIndex && doneSet.has(call.status));
     if (bySession) return bySession;
-    return [...sortedCalls].reverse().find((call) => call.status === "called") ?? null;
-  }, [sortedCalls, currentCallIndex]);
+    return [...sortedCalls].reverse().find((call) => doneSet.has(call.status)) ?? null;
+  }, [sortedCalls, currentOrderIndex, doneSet]);
 
   const queueCalls = useMemo(() => {
     const fromSessionQueue = transportQueueCallIds
       .map((id) => callById.get(id) ?? null)
-      .filter((call): call is BingoTransportCall => {
+      .filter((call): call is TransportCallRow => {
         if (!call) return false;
-        if (DONE_STATUSES.has(call.status)) return false;
-        return call.call_index > currentCallIndex;
+        if (doneSet.has(call.status)) return false;
+        return call.order_index > currentOrderIndex;
       });
 
     if (fromSessionQueue.length > 0) return fromSessionQueue;
 
-    return sortedCalls.filter((call) => !DONE_STATUSES.has(call.status) && call.call_index > currentCallIndex);
-  }, [transportQueueCallIds, callById, currentCallIndex, sortedCalls]);
+    return sortedCalls.filter((call) => !doneSet.has(call.status) && call.order_index > currentOrderIndex);
+  }, [transportQueueCallIds, callById, doneSet, currentOrderIndex, sortedCalls]);
 
   const queueRankById = useMemo(() => new Map(queueCalls.map((call, index) => [call.id, index])), [queueCalls]);
 
@@ -86,9 +87,9 @@ export default function BingoTransportLane({
   const laneCalls = useMemo(() => {
     if (queueCalls.length > 0) return queueCalls.slice(0, maxRows);
     return sortedCalls
-      .filter((call) => !DONE_STATUSES.has(call.status))
+      .filter((call) => !doneSet.has(call.status))
       .slice(0, maxRows);
-  }, [queueCalls, sortedCalls, maxRows]);
+  }, [queueCalls, sortedCalls, doneSet, maxRows]);
 
   const inFlight = pendingAction !== null;
 
@@ -98,7 +99,7 @@ export default function BingoTransportLane({
     setPendingAction(key);
     setErrorMessage(null);
     try {
-      const response = await fetch(`/api/games/bingo/sessions/${sessionId}/transport`, {
+      const response = await fetch(`/api/games/${gameSlug}/sessions/${sessionId}/transport`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, call_id: callId }),
@@ -165,18 +166,16 @@ export default function BingoTransportLane({
 
           const callDisabled =
             inFlight ||
-            DONE_STATUSES.has(call.status) ||
+            doneSet.has(call.status) ||
             isCurrent ||
-            (currentCall && call.call_index < currentCall.call_index) ||
-            (!currentCall && call.status === "called");
+            (currentCall && call.order_index < currentCall.order_index);
 
           const cueDisabled =
             inFlight ||
-            DONE_STATUSES.has(call.status) ||
+            doneSet.has(call.status) ||
             isCurrent ||
             isCue ||
-            call.status === "called" ||
-            (currentCall && call.call_index <= currentCall.call_index);
+            (currentCall && call.order_index <= currentCall.order_index);
 
           const pullDisabled =
             inFlight ||
@@ -190,12 +189,12 @@ export default function BingoTransportLane({
             <div key={call.id} className="rounded border border-stone-700 bg-stone-950/70 p-3 text-xs">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-semibold text-stone-100">
-                  #{call.call_index} · {formatBallLabel(call.ball_number, call.column_letter)} - {call.track_title}
+                  {call.display_index} · {call.title}
                 </p>
                 <span className="rounded border border-stone-700 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-stone-300">{queueStatusLabel}</span>
               </div>
-              <p className="mt-1 text-stone-300">{call.artist_name} · {call.album_name ?? ""}</p>
-              <p className="mt-1 text-stone-500">Side {call.side ?? "-"} · Position {call.position ?? "-"}</p>
+              <p className="mt-1 text-stone-300">{call.artist}{call.album ? ` · ${call.album}` : ""}</p>
+              {call.side || call.position ? <p className="mt-1 text-stone-500">Side {call.side ?? "-"} · Position {call.position ?? "-"}</p> : null}
 
               <div className="mt-2 grid grid-cols-3 gap-2">
                 <button

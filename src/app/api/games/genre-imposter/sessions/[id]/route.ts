@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getGenreImposterDb } from "src/lib/genreImposterDb";
 import { computeGenreImposterRemainingSeconds } from "src/lib/genreImposterEngine";
 import { getBingoDb } from "src/lib/bingoDb";
+import { computeTransportQueueIds, type TransportQueueEvent } from "src/lib/transportQueue";
 
 export const runtime = "nodejs";
 
@@ -50,10 +51,26 @@ type PlaylistRow = {
   track_count: number;
 };
 
+type SessionEventRow = {
+  payload: { call_id?: unknown } | null;
+};
+
+type TransportEventRow = {
+  event_type: string;
+  payload: { call_id?: unknown; after_call_id?: unknown } | null;
+};
+
+const DONE_STATUSES = new Set(["played", "revealed", "scored", "skipped"]);
+
 function parseSessionId(id: string) {
   const sessionId = Number(id);
   if (!Number.isFinite(sessionId)) return null;
   return sessionId;
+}
+
+function parseEventCallId(raw: unknown): number | null {
+  const value = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : Number.NaN;
+  return Number.isFinite(value) ? value : null;
 }
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -62,6 +79,8 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   if (!sessionId) return NextResponse.json({ error: "Invalid session id" }, { status: 400 });
 
   const db = getGenreImposterDb();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dbAny = db as any;
   const playlistDb = getBingoDb();
   const { data, error } = await db.from("gi_sessions").select("*").eq("id", sessionId).maybeSingle();
 
@@ -70,7 +89,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 
   const session = data as SessionRow;
 
-  const [{ data: event }, { data: playlist }, { data: teams }, { data: rounds }, { data: calls }, { data: scores }] = await Promise.all([
+  const [{ data: event }, { data: playlist }, { data: teams }, { data: rounds }, { data: calls }, { data: scores }, { data: cueEvent }, { data: pullEvent }, { data: promoteEvents }, { data: transportEvents }] = await Promise.all([
     session.event_id
       ? db.from("events").select("id, title, date, time, location").eq("id", session.event_id).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -101,6 +120,36 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       .from("gi_team_scores")
       .select("id, team_id, total_points, imposter_hits, reason_bonus_hits, updated_at")
       .eq("session_id", sessionId),
+    dbAny
+      .from("gi_session_events")
+      .select("payload")
+      .eq("session_id", sessionId)
+      .eq("event_type", "cue_set")
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    dbAny
+      .from("gi_session_events")
+      .select("payload")
+      .eq("session_id", sessionId)
+      .eq("event_type", "pull_set")
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    dbAny
+      .from("gi_session_events")
+      .select("payload")
+      .eq("session_id", sessionId)
+      .eq("event_type", "pull_promote")
+      .order("id", { ascending: false })
+      .limit(100),
+    dbAny
+      .from("gi_session_events")
+      .select("event_type, payload")
+      .eq("session_id", sessionId)
+      .in("event_type", ["cue_set", "pull_set", "pull_promote", "call_set"])
+      .order("id", { ascending: true })
+      .limit(5000),
   ]);
 
   const currentRound = ((rounds ?? []) as Array<{ round_number: number }>).find(
@@ -108,6 +157,40 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   );
   const currentRoundCalls = ((calls ?? []) as Array<{ round_number: number }>).filter(
     (call) => call.round_number === session.current_round
+  );
+
+  const typedCueEvent = (cueEvent ?? null) as SessionEventRow | null;
+  const typedPullEvent = (pullEvent ?? null) as SessionEventRow | null;
+  const cueCallId = parseEventCallId(typedCueEvent?.payload?.call_id);
+  const pullCallId = parseEventCallId(typedPullEvent?.payload?.call_id);
+
+  const promotedCallIds: number[] = [];
+  const seenPromoted = new Set<number>();
+  for (const row of (promoteEvents ?? []) as SessionEventRow[]) {
+    const promotedCallId = parseEventCallId(row?.payload?.call_id);
+    if (!promotedCallId || seenPromoted.has(promotedCallId)) continue;
+    seenPromoted.add(promotedCallId);
+    promotedCallIds.push(promotedCallId);
+  }
+
+  const currentTransportIndex = Math.max(0, ((session.current_round - 1) * 3) + session.current_call_index);
+  const queueIds = computeTransportQueueIds(
+    ((calls ?? []) as Array<{ id: number; round_number: number; play_order: number; status: string }>).map((call) => ({
+      id: call.id,
+      order: ((call.round_number - 1) * 3) + call.play_order,
+      status: call.status,
+    })),
+    ((transportEvents ?? []) as TransportEventRow[]).map(
+      (row): TransportQueueEvent => ({
+        eventType: row.event_type,
+        callId: parseEventCallId(row.payload?.call_id) ?? null,
+        afterCallId: parseEventCallId(row.payload?.after_call_id),
+      })
+    ),
+    {
+      currentOrder: currentTransportIndex,
+      doneStatuses: DONE_STATUSES,
+    }
   );
 
   return NextResponse.json(
@@ -126,6 +209,11 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       scored_teams_total: (scores ?? []).length,
       current_round_detail: currentRound ?? null,
       current_round_calls: currentRoundCalls,
+      cue_call_id: cueCallId,
+      pull_call_id: pullCallId,
+      promoted_call_ids: promotedCallIds,
+      current_transport_index: currentTransportIndex,
+      transport_queue_call_ids: queueIds,
     },
     { status: 200 }
   );

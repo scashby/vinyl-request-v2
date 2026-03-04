@@ -12,7 +12,7 @@ type Session = {
   current_call_index: number;
   current_round: number;
   round_count: number;
-  pull_call_id: number | null;
+  transport_queue_call_ids?: number[];
 };
 type Call = BingoTransportCall;
 
@@ -98,7 +98,7 @@ export default function BingoAssistantPage() {
             sessionId={sessionId}
             calls={calls}
             currentCallIndex={session?.current_call_index ?? 0}
-            pullCallId={session?.pull_call_id ?? null}
+            transportQueueCallIds={session?.transport_queue_call_ids ?? []}
             onChanged={load}
             accent="assistant"
             maxRows={6}

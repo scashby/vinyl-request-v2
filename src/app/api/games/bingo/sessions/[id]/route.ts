@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
 import { computeRemainingSeconds } from "src/lib/bingoEngine";
+import { computeTransportQueueIds, type TransportQueueEvent } from "src/lib/transportQueue";
 
 export const runtime = "nodejs";
 
@@ -44,6 +45,19 @@ type SessionEventRow = {
   payload: { call_id?: unknown } | null;
 };
 
+type SessionCallRow = {
+  id: number;
+  call_index: number;
+  status: string;
+};
+
+type TransportEventRow = {
+  event_type: string;
+  payload: { call_id?: unknown; after_call_id?: unknown } | null;
+};
+
+const DONE_STATUSES = new Set(["called", "completed", "skipped"]);
+
 function parseSessionId(id: string) {
   const sessionId = Number(id);
   if (!Number.isFinite(sessionId)) return null;
@@ -77,22 +91,34 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     .eq("id", session.playlist_id)
     .maybeSingle();
 
-  const { data: pullEvent } = await db
-    .from("bingo_session_events")
-    .select("payload")
-    .eq("session_id", sessionId)
-    .eq("event_type", "pull_set")
-    .order("id", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const { data: promoteEvents } = await db
-    .from("bingo_session_events")
-    .select("payload")
-    .eq("session_id", sessionId)
-    .eq("event_type", "pull_promote")
-    .order("id", { ascending: false })
-    .limit(100);
+  const [{ data: pullEvent }, { data: promoteEvents }, { data: calls }, { data: transportEvents }] = await Promise.all([
+    db
+      .from("bingo_session_events")
+      .select("payload")
+      .eq("session_id", sessionId)
+      .eq("event_type", "pull_set")
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    db
+      .from("bingo_session_events")
+      .select("payload")
+      .eq("session_id", sessionId)
+      .eq("event_type", "pull_promote")
+      .order("id", { ascending: false })
+      .limit(100),
+    db
+      .from("bingo_session_calls")
+      .select("id, call_index, status")
+      .eq("session_id", sessionId),
+    db
+      .from("bingo_session_events")
+      .select("event_type, payload")
+      .eq("session_id", sessionId)
+      .in("event_type", ["cue_set", "pull_set", "pull_promote", "call_set"])
+      .order("id", { ascending: true })
+      .limit(5000),
+  ]);
 
   const typedPullEvent = (pullEvent ?? null) as SessionEventRow | null;
   const pullCallId = parseEventCallId(typedPullEvent?.payload?.call_id);
@@ -106,6 +132,25 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     promotedCallIds.push(promotedCallId);
   }
 
+  const queueIds = computeTransportQueueIds(
+    ((calls ?? []) as SessionCallRow[]).map((call) => ({
+      id: call.id,
+      order: call.call_index,
+      status: call.status,
+    })),
+    ((transportEvents ?? []) as TransportEventRow[]).map(
+      (row): TransportQueueEvent => ({
+        eventType: row.event_type,
+        callId: parseEventCallId(row.payload?.call_id) ?? null,
+        afterCallId: parseEventCallId(row.payload?.after_call_id),
+      })
+    ),
+    {
+      currentOrder: session.current_call_index,
+      doneStatuses: DONE_STATUSES,
+    }
+  );
+
   return NextResponse.json(
     {
       ...session,
@@ -113,6 +158,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       seconds_to_next_call: computeRemainingSeconds(session),
       pull_call_id: pullCallId,
       promoted_call_ids: promotedCallIds,
+      transport_queue_call_ids: queueIds,
     },
     { status: 200 }
   );

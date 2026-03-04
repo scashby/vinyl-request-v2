@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import InlineEditableCell from "../../_components/InlineEditableCell";
+import GameTransportLane, { type TransportCallRow } from "../../_components/GameTransportLane";
 
 type Session = {
   id: number;
@@ -17,6 +18,7 @@ type Session = {
   lock_in_window_seconds: number;
   remaining_seconds: number;
   target_gap_seconds: number;
+  transport_queue_call_ids?: number[];
 };
 
 type Call = {
@@ -96,6 +98,20 @@ export default function NameThatTuneHostPage() {
 
   const previousCalls = useMemo(
     () => calls.filter((call) => ["asked", "locked", "answer_revealed", "scored", "skipped"].includes(call.status)).slice(-6),
+    [calls]
+  );
+
+  const transportCalls = useMemo<TransportCallRow[]>(
+    () =>
+      calls.map((call) => ({
+        id: call.id,
+        order_index: call.call_index,
+        display_index: `#${call.call_index}`,
+        title: call.title_answer?.trim() || "Untitled",
+        artist: call.artist_answer?.trim() || "Unknown Artist",
+        album: call.source_label?.trim() || null,
+        status: call.status,
+      })),
     [calls]
   );
 
@@ -347,6 +363,18 @@ export default function NameThatTuneHostPage() {
                 <button disabled={working || !callForControls} onClick={() => patchCallStatus("scored")} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Mark Scored</button>
               </div>
             </div>
+
+            <GameTransportLane
+              gameSlug="name-that-tune"
+              sessionId={sessionId}
+              calls={transportCalls}
+              currentOrderIndex={session?.current_call_index ?? 0}
+              transportQueueCallIds={session?.transport_queue_call_ids ?? []}
+              doneStatuses={["asked", "locked", "answer_revealed", "scored", "skipped"]}
+              onChanged={load}
+              accent="host"
+              maxRows={6}
+            />
 
             <div className="rounded-2xl border border-stone-700 bg-black/45 p-4">
               <p className="text-xs uppercase text-rose-300">Score Entry</p>

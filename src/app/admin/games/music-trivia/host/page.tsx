@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import InlineEditableCell from "../../_components/InlineEditableCell";
+import GameTransportLane, { type TransportCallRow } from "../../_components/GameTransportLane";
 
 type Session = {
   id: number;
@@ -21,6 +22,7 @@ type Session = {
   prep_ready_tiebreakers: number;
   prep_total_main: number;
   prep_total_tiebreakers: number;
+  transport_queue_call_ids?: number[];
 };
 
 type Call = {
@@ -109,6 +111,27 @@ export default function MusicTriviaHostPage() {
   const previousCalls = useMemo(
     () => calls.filter((call) => ["asked", "answer_revealed", "scored", "skipped"].includes(call.status)).slice(-6),
     [calls]
+  );
+
+  const transportCalls = useMemo<TransportCallRow[]>(
+    () =>
+      calls
+        .filter((call) => {
+          const tieBreakerMode = (session?.current_round ?? 0) > (session?.round_count ?? Number.MAX_SAFE_INTEGER);
+          return tieBreakerMode ? call.is_tiebreaker : !call.is_tiebreaker;
+        })
+        .map((call) => ({
+          id: call.id,
+          order_index: call.call_index,
+          display_index: `#${call.call_index}`,
+          title: call.source_title?.trim() || call.question_text,
+          artist: call.source_artist?.trim() || "Unknown Artist",
+          album: call.source_album?.trim() || null,
+          side: call.source_side,
+          position: call.source_position,
+          status: call.status,
+        })),
+    [calls, session?.current_round, session?.round_count]
   );
 
   useEffect(() => {
@@ -344,6 +367,18 @@ export default function MusicTriviaHostPage() {
                 <button onClick={() => patchCallStatus("scored")} className="rounded border border-stone-600 px-2 py-1">Mark Scored</button>
               </div>
             </div>
+
+            <GameTransportLane
+              gameSlug="trivia"
+              sessionId={sessionId}
+              calls={transportCalls}
+              currentOrderIndex={session?.current_call_index ?? 0}
+              transportQueueCallIds={session?.transport_queue_call_ids ?? []}
+              doneStatuses={["asked", "answer_revealed", "scored", "skipped"]}
+              onChanged={load}
+              accent="host"
+              maxRows={6}
+            />
 
             <div className="rounded-2xl border border-stone-700 bg-black/45 p-4">
               <p className="text-xs uppercase text-cyan-300">Score Entry</p>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import InlineEditableCell from "../../_components/InlineEditableCell";
+import GameTransportLane, { type TransportCallRow } from "../../_components/GameTransportLane";
 
 type Session = {
   id: number;
@@ -18,6 +19,8 @@ type Session = {
   reason_bonus_points: number;
   target_gap_seconds: number;
   remaining_seconds: number;
+  transport_queue_call_ids?: number[];
+  current_transport_index?: number;
   playlist: { id: number; name: string; track_count: number } | null;
   teams: Array<{ id: number; team_name: string; table_label: string | null; active: boolean }>;
   rounds: Array<{
@@ -162,6 +165,23 @@ export default function GenreImposterHostPage() {
 
     return currentRoundCalls.find((call) => call.status !== "scored") ?? currentRoundCalls[0] ?? null;
   }, [currentRoundCalls, session]);
+
+  const transportCalls = useMemo<TransportCallRow[]>(
+    () =>
+      (session?.calls ?? [])
+        .slice()
+        .sort((a, b) => (a.round_number - b.round_number) || (a.play_order - b.play_order))
+        .map((call) => ({
+          id: call.id,
+          order_index: ((call.round_number - 1) * 3) + call.play_order,
+          display_index: `R${call.round_number}-S${call.call_index}`,
+          title: call.title?.trim() || "Untitled",
+          artist: call.artist?.trim() || "Unknown Artist",
+          album: call.source_label?.trim() || null,
+          status: call.status,
+        })),
+    [session?.calls]
+  );
 
   const patchCallMetadata = useCallback(
     async (callId: number, patch: Record<string, unknown>) => {
@@ -427,6 +447,18 @@ export default function GenreImposterHostPage() {
                 Click Artist/Title/Source fields in Round Stack to edit inline. Press Enter to save.
               </p>
             </div>
+
+            <GameTransportLane
+              gameSlug="genre-imposter"
+              sessionId={sessionId}
+              calls={transportCalls}
+              currentOrderIndex={session?.current_transport_index ?? Math.max(0, (((session?.current_round ?? 1) - 1) * 3) + (session?.current_call_index ?? 0))}
+              transportQueueCallIds={session?.transport_queue_call_ids ?? []}
+              doneStatuses={["played", "revealed", "scored", "skipped"]}
+              onChanged={load}
+              accent="host"
+              maxRows={6}
+            />
 
             <div className="rounded-2xl border border-stone-700 bg-black/45 p-4">
               <p className="text-xs uppercase text-emerald-300">Pick Capture + Scoring</p>
