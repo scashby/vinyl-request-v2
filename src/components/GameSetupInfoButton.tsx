@@ -161,6 +161,7 @@ const HELP_META: Record<GameSlug, GameHelpMeta> = {
     quickTip: "Balance category coverage and difficulty targets, then finish question/media prep before host start.",
     details: [
       "Confirm rounds x questions per round matches your runtime window.",
+      "Optional setup import format: Question >>> Answer ;; Alt | Category | difficulty | display element | source note.",
       "After session create, use Prep to finalize question/answer and display element for every call.",
       "Keep tie-break question reserved outside primary question count.",
       "Use event linkage for clean history filtering after the event.",

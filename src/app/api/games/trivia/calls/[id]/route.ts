@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTriviaDb } from "src/lib/triviaDb";
+import { sanitizeCuePayload, type JsonValue } from "src/lib/triviaBank";
 
 export const runtime = "nodejs";
 
 type CallPatchBody = {
   status?: "pending" | "asked" | "answer_revealed" | "scored" | "skipped";
+  question_id?: number | null;
+  question_type?: "free_response" | "multiple_choice" | "true_false" | "ordering";
   question_text?: string;
   answer_key?: string;
   accepted_answers?: string[];
+  options_payload?: JsonValue;
+  answer_payload?: JsonValue;
+  explanation_text?: string | null;
+  reveal_payload?: JsonValue;
   source_note?: string | null;
+  cue_notes_text?: string | null;
+  cue_payload?: JsonValue;
   prep_status?: "draft" | "ready";
   display_element_type?: "song" | "artist" | "album" | "cover_art" | "vinyl_label";
   display_image_override_url?: string | null;
@@ -35,6 +44,47 @@ type SessionRow = {
   started_at: string | null;
 };
 
+function asString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function asNullableString(value: unknown): string | null {
+  const text = asString(value);
+  return text || null;
+}
+
+function asJson(value: unknown): JsonValue {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    Array.isArray(value) ||
+    (value && typeof value === "object")
+  ) {
+    return value as JsonValue;
+  }
+  return {};
+}
+
+function parsePositiveId(value: unknown): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.floor(parsed);
+}
+
+function isQuestionType(value: unknown): value is "free_response" | "multiple_choice" | "true_false" | "ordering" {
+  const text = asString(value).toLowerCase();
+  return text === "free_response" || text === "multiple_choice" || text === "true_false" || text === "ordering";
+}
+
+function cuePayloadHasValidationError(raw: unknown, sanitizedCount: number): boolean {
+  const rawSegments = raw && typeof raw === "object" && !Array.isArray(raw) && Array.isArray((raw as { segments?: unknown }).segments)
+    ? ((raw as { segments: unknown[] }).segments ?? [])
+    : [];
+  return rawSegments.length !== sanitizedCount;
+}
+
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const callId = Number(id);
@@ -43,11 +93,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const body = (await request.json()) as CallPatchBody;
   const hasEditableField =
     typeof body.status === "string" ||
+    Object.prototype.hasOwnProperty.call(body, "question_id") ||
+    typeof body.question_type === "string" ||
     typeof body.question_text === "string" ||
     typeof body.answer_key === "string" ||
     Array.isArray(body.accepted_answers) ||
+    Object.prototype.hasOwnProperty.call(body, "options_payload") ||
+    Object.prototype.hasOwnProperty.call(body, "answer_payload") ||
+    Object.prototype.hasOwnProperty.call(body, "explanation_text") ||
+    Object.prototype.hasOwnProperty.call(body, "reveal_payload") ||
     typeof body.source_note === "string" ||
     body.source_note === null ||
+    Object.prototype.hasOwnProperty.call(body, "cue_notes_text") ||
+    Object.prototype.hasOwnProperty.call(body, "cue_payload") ||
     typeof body.prep_status === "string" ||
     typeof body.display_element_type === "string" ||
     typeof body.display_image_override_url === "string" ||
@@ -87,6 +145,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (body.status === "scored") patch.scored_at = now;
   }
 
+  if (Object.prototype.hasOwnProperty.call(body, "question_id")) {
+    const questionId = parsePositiveId(body.question_id);
+    patch.question_id = questionId;
+  }
+  if (isQuestionType(body.question_type)) patch.question_type = body.question_type;
+
   if (typeof body.question_text === "string") patch.question_text = body.question_text.trim();
   if (typeof body.answer_key === "string") patch.answer_key = body.answer_key.trim();
   if (Array.isArray(body.accepted_answers)) {
@@ -98,9 +162,35 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       )
     );
   }
+
+  if (Object.prototype.hasOwnProperty.call(body, "options_payload")) {
+    patch.options_payload = asJson(body.options_payload);
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "answer_payload")) {
+    patch.answer_payload = asJson(body.answer_payload);
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "explanation_text")) {
+    patch.explanation_text = asNullableString(body.explanation_text);
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "reveal_payload")) {
+    patch.reveal_payload = asJson(body.reveal_payload);
+  }
+
   if (typeof body.source_note === "string" || body.source_note === null) {
     patch.source_note = typeof body.source_note === "string" ? (body.source_note.trim() || null) : null;
   }
+
+  if (Object.prototype.hasOwnProperty.call(body, "cue_notes_text")) {
+    patch.cue_notes_text = asNullableString(body.cue_notes_text);
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "cue_payload")) {
+    const sanitizedCuePayload = sanitizeCuePayload(body.cue_payload);
+    if (cuePayloadHasValidationError(body.cue_payload, sanitizedCuePayload.segments.length)) {
+      return NextResponse.json({ error: "cue_payload has invalid segment timing. Use non-negative times and end >= start." }, { status: 400 });
+    }
+    patch.cue_payload = sanitizedCuePayload as unknown as JsonValue;
+  }
+
   if (body.prep_status === "draft" || body.prep_status === "ready") patch.prep_status = body.prep_status;
   if (
     body.display_element_type === "song" ||

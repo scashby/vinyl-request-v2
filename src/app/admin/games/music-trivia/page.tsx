@@ -22,6 +22,14 @@ type PlaylistRow = {
   track_count: number;
 };
 
+type DeckRow = {
+  id: number;
+  title: string;
+  status: "draft" | "ready" | "archived";
+  item_total: number;
+  item_locked_total: number;
+};
+
 type SessionRow = {
   id: number;
   session_code: string;
@@ -37,6 +45,18 @@ type SessionRow = {
   prep_tiebreaker_ready: number;
   prep_tiebreaker_total: number;
   event_title: string | null;
+  deck_title?: string | null;
+};
+
+type QuestionDeckEntryDraft = {
+  question_text: string;
+  answer_key: string;
+  accepted_answers: string[];
+  category?: string;
+  difficulty?: "easy" | "medium" | "hard";
+  display_element_type?: "song" | "artist" | "album" | "cover_art" | "vinyl_label";
+  source_note?: string | null;
+  prep_status: "ready";
 };
 
 const CATEGORY_OPTIONS = [
@@ -52,6 +72,68 @@ const CATEGORY_OPTIONS = [
   "Local Legends",
 ] as const;
 
+const DISPLAY_ELEMENT_OPTIONS = new Set(["song", "artist", "album", "cover_art", "vinyl_label"] as const);
+
+function parseQuestionDeck(text: string): { entries: QuestionDeckEntryDraft[]; invalidLineCount: number } {
+  let invalidLineCount = 0;
+
+  const entries = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [corePartRaw, categoryPart, difficultyPart, displayPart, sourcePart] = line.split("|").map((part) => part.trim());
+      const dividerIndex = corePartRaw.indexOf(">>>");
+      if (dividerIndex < 0) {
+        invalidLineCount += 1;
+        return null;
+      }
+
+      const questionText = corePartRaw.slice(0, dividerIndex).trim();
+      const answersRaw = corePartRaw.slice(dividerIndex + 3).trim();
+      const acceptedAnswers = Array.from(
+        new Set(
+          answersRaw
+            .split(";;")
+            .map((value) => value.trim())
+            .filter(Boolean)
+        )
+      );
+      const answerKey = acceptedAnswers[0] ?? "";
+
+      if (!questionText || !answerKey) {
+        invalidLineCount += 1;
+        return null;
+      }
+
+      const difficultyValue = difficultyPart?.toLowerCase();
+      const normalizedDifficulty =
+        difficultyValue === "easy" || difficultyValue === "medium" || difficultyValue === "hard"
+          ? difficultyValue
+          : undefined;
+      const displayValue = displayPart?.toLowerCase();
+      const normalizedDisplay =
+        displayValue && DISPLAY_ELEMENT_OPTIONS.has(displayValue as QuestionDeckEntryDraft["display_element_type"])
+          ? (displayValue as QuestionDeckEntryDraft["display_element_type"])
+          : undefined;
+
+      const entry: QuestionDeckEntryDraft = {
+        question_text: questionText,
+        answer_key: answerKey,
+        accepted_answers: acceptedAnswers,
+        prep_status: "ready",
+      };
+      if (categoryPart) entry.category = categoryPart;
+      if (normalizedDifficulty) entry.difficulty = normalizedDifficulty;
+      if (normalizedDisplay) entry.display_element_type = normalizedDisplay;
+      if (sourcePart) entry.source_note = sourcePart;
+      return entry;
+    })
+    .filter((entry): entry is QuestionDeckEntryDraft => Boolean(entry));
+
+  return { entries, invalidLineCount };
+}
+
 export default function MusicTriviaSetupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -59,10 +141,12 @@ export default function MusicTriviaSetupPage() {
 
   const [events, setEvents] = useState<EventRow[]>([]);
   const [playlists, setPlaylists] = useState<PlaylistRow[]>([]);
+  const [decks, setDecks] = useState<DeckRow[]>([]);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
 
   const [eventId, setEventId] = useState<number | null>(Number.isFinite(eventIdFromUrl) ? eventIdFromUrl : null);
   const [playlistId, setPlaylistId] = useState<number | null>(null);
+  const [deckId, setDeckId] = useState<number | null>(null);
   const [title, setTitle] = useState("Music Trivia Session");
   const [roundCount, setRoundCount] = useState(3);
   const [questionsPerRound, setQuestionsPerRound] = useState(5);
@@ -73,6 +157,7 @@ export default function MusicTriviaSetupPage() {
   const [showRounds, setShowRounds] = useState(true);
   const [showQuestionCounter, setShowQuestionCounter] = useState(true);
   const [showLeaderboard, setShowLeaderboard] = useState(true);
+  const [showCueHints, setShowCueHints] = useState(false);
 
   const [removeResleeveSeconds, setRemoveResleeveSeconds] = useState(20);
   const [findRecordSeconds, setFindRecordSeconds] = useState(12);
@@ -83,6 +168,7 @@ export default function MusicTriviaSetupPage() {
   const [difficultyEasy, setDifficultyEasy] = useState(2);
   const [difficultyMedium, setDifficultyMedium] = useState(2);
   const [difficultyHard, setDifficultyHard] = useState(1);
+  const [questionDeckText, setQuestionDeckText] = useState("");
 
   const [teamNamesText, setTeamNamesText] = useState("Team A\nTeam B");
   const [maxTeams, setMaxTeams] = useState(0);
@@ -117,6 +203,12 @@ export default function MusicTriviaSetupPage() {
 
   const callStackPreview = Math.max(1, roundCount) * Math.max(1, questionsPerRound);
   const totalCallStackPreview = callStackPreview + Math.max(0, tieBreakerCount);
+  const parsedQuestionDeck = useMemo(() => parseQuestionDeck(questionDeckText), [questionDeckText]);
+  const questionDeckHasContent = questionDeckText.trim().length > 0;
+  const questionDeckOverflowCount = Math.max(0, parsedQuestionDeck.entries.length - totalCallStackPreview);
+  const questionDeckAppliedCount = Math.min(parsedQuestionDeck.entries.length, totalCallStackPreview);
+  const hasQuestionDeckErrors = questionDeckHasContent && parsedQuestionDeck.invalidLineCount > 0;
+  const tieBreakerStartsAt = callStackPreview + 1;
   const backupQuestionTracks = useMemo(() => Math.max(3, Math.ceil(callStackPreview * 0.15)), [callStackPreview]);
   const recommendedPullSize = useMemo(
     () => totalCallStackPreview + backupQuestionTracks,
@@ -130,6 +222,10 @@ export default function MusicTriviaSetupPage() {
     () => playlists.find((playlist) => playlist.id === playlistId) ?? null,
     [playlistId, playlists]
   );
+  const selectedDeck = useMemo(
+    () => decks.find((deck) => deck.id === deckId) ?? null,
+    [deckId, decks]
+  );
   const playlistTooSmall = useMemo(
     () => (selectedPlaylist ? selectedPlaylist.track_count < minimumPlaylistTracks : false),
     [minimumPlaylistTracks, selectedPlaylist]
@@ -137,9 +233,10 @@ export default function MusicTriviaSetupPage() {
   const preflightComplete = Object.values(preflight).every(Boolean);
 
   const load = useCallback(async () => {
-    const [eventRes, playlistRes, sessionRes] = await Promise.all([
+    const [eventRes, playlistRes, deckRes, sessionRes] = await Promise.all([
       fetch("/api/games/trivia/events"),
       fetch("/api/games/playlists"),
+      fetch("/api/games/trivia/decks?limit=200"),
       fetch(`/api/games/trivia/sessions${eventId ? `?eventId=${eventId}` : ""}`),
     ]);
 
@@ -151,6 +248,11 @@ export default function MusicTriviaSetupPage() {
     if (playlistRes.ok) {
       const payload = await playlistRes.json();
       setPlaylists(payload.data ?? []);
+    }
+
+    if (deckRes.ok) {
+      const payload = await deckRes.json();
+      setDecks(payload.data ?? []);
     }
 
     if (sessionRes.ok) {
@@ -171,12 +273,16 @@ export default function MusicTriviaSetupPage() {
   };
 
   const createSession = async () => {
-    if (!playlistId) {
-      alert("Select a playlist bank first");
+    if (!playlistId && !deckId) {
+      alert("Select a playlist or a ready deck first");
       return;
     }
-    if (playlistTooSmall && selectedPlaylist) {
+    if (!deckId && playlistTooSmall && selectedPlaylist) {
       alert(`Selected playlist has ${selectedPlaylist.track_count} tracks. This setup needs at least ${minimumPlaylistTracks}.`);
+      return;
+    }
+    if (!deckId && hasQuestionDeckErrors) {
+      alert("Fix question deck lines first. Each line needs: Question >>> Answer");
       return;
     }
     if (teamNames.length < 2) return;
@@ -188,6 +294,7 @@ export default function MusicTriviaSetupPage() {
         body: JSON.stringify({
           event_id: eventId,
           playlist_id: playlistId,
+          deck_id: deckId,
           title,
           round_count: roundCount,
           questions_per_round: questionsPerRound,
@@ -201,6 +308,7 @@ export default function MusicTriviaSetupPage() {
           show_rounds: showRounds,
           show_question_counter: showQuestionCounter,
           show_leaderboard: showLeaderboard,
+          show_cue_hints: showCueHints,
           categories,
           difficulty_targets: {
             easy: difficultyEasy,
@@ -210,6 +318,7 @@ export default function MusicTriviaSetupPage() {
           max_teams: maxTeams > 0 ? maxTeams : null,
           slips_batch_size: slipsBatchSize > 0 ? slipsBatchSize : null,
           team_names: teamNames,
+          question_deck: deckId ? undefined : parsedQuestionDeck.entries,
         }),
       });
 
@@ -232,7 +341,13 @@ export default function MusicTriviaSetupPage() {
           <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">Brewery Floor Mode</p>
           <h1 className="mt-1 text-4xl font-black uppercase text-cyan-100">Music Trivia Setup</h1>
           <p className="mt-2 text-sm text-stone-300">Music Trivia asks teams music questions between songs, scores each round from written answers, and the highest total score wins.</p>
-          <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="music-trivia" /></div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2 text-xs">
+              <button className="rounded border border-stone-700 px-3 py-1" onClick={() => router.push("/admin/games/music-trivia/bank")}>Question Bank</button>
+              <button className="rounded border border-stone-700 px-3 py-1" onClick={() => router.push("/admin/games/music-trivia/decks")}>Deck Builder</button>
+            </div>
+            <GameSetupInfoButton gameSlug="music-trivia" />
+          </div>
         </header>
 
         <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
@@ -240,6 +355,19 @@ export default function MusicTriviaSetupPage() {
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
             <GamePlaylistSelect playlists={playlists} playlistId={playlistId} setPlaylistId={setPlaylistId} />
+
+            <label className="text-sm">Deck (optional, snapshot-backed)
+              <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={deckId ?? ""} onChange={(e) => setDeckId(e.target.value ? Number(e.target.value) : null)}>
+                <option value="">No deck (use direct question flow)</option>
+                {decks
+                  .filter((deck) => deck.status !== "archived")
+                  .map((deck) => (
+                    <option key={deck.id} value={deck.id}>
+                      {deck.title} ({deck.status}, {deck.item_total} items)
+                    </option>
+                  ))}
+              </select>
+            </label>
 
             <label className="text-sm">Session Title <InlineFieldHelp label="Session Title" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -265,20 +393,28 @@ export default function MusicTriviaSetupPage() {
             </label>
           </div>
 
-          <p className="mt-2 text-xs text-stone-300">
-            Minimum playlist size for current setup:{" "}
-            <span className="font-semibold text-emerald-300">{minimumPlaylistTracks}</span> tracks.
-          </p>
-          <p className="mt-1 text-xs text-cyan-300">
-            Recommended playlist/crate pull: {recommendedPullSize} ({callStackPreview} primary + {tieBreakerCount} tie-breaker + {backupQuestionTracks} backup).
-          </p>
-          {selectedPlaylist ? (
-            <p className={`mt-1 text-xs ${playlistTooSmall ? "text-red-300" : "text-emerald-300"}`}>
-              Selected bank: {selectedPlaylist.name} ({selectedPlaylist.track_count} tracks)
-              {playlistTooSmall ? ` · add ${minimumPlaylistTracks - selectedPlaylist.track_count} tracks or lower setup requirements.` : " · meets minimum."}
-            </p>
+          {!deckId ? (
+            <>
+              <p className="mt-2 text-xs text-stone-300">
+                Minimum playlist size for current setup:{" "}
+                <span className="font-semibold text-emerald-300">{minimumPlaylistTracks}</span> tracks.
+              </p>
+              <p className="mt-1 text-xs text-cyan-300">
+                Recommended playlist/crate pull: {recommendedPullSize} ({callStackPreview} primary + {tieBreakerCount} tie-breaker + {backupQuestionTracks} backup).
+              </p>
+              {selectedPlaylist ? (
+                <p className={`mt-1 text-xs ${playlistTooSmall ? "text-red-300" : "text-emerald-300"}`}>
+                  Selected bank: {selectedPlaylist.name} ({selectedPlaylist.track_count} tracks)
+                  {playlistTooSmall ? ` · add ${minimumPlaylistTracks - selectedPlaylist.track_count} tracks or lower setup requirements.` : " · meets minimum."}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-amber-300">Select a playlist bank to validate minimum track requirement.</p>
+              )}
+            </>
           ) : (
-            <p className="mt-1 text-xs text-amber-300">Select a playlist bank to validate minimum track requirement.</p>
+            <p className="mt-2 text-xs text-emerald-300">
+              Deck mode enabled: <span className="font-semibold">{selectedDeck?.title ?? `Deck ${deckId}`}</span>. Playlist selection is optional.
+            </p>
           )}
 
           <div className="mt-4 grid gap-2 text-sm md:grid-cols-2">
@@ -286,6 +422,7 @@ export default function MusicTriviaSetupPage() {
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showRounds} onChange={(e) => setShowRounds(e.target.checked)} /> <span>Jumbotron round status <InlineFieldHelp label="Jumbotron round status" /></span></label>
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showQuestionCounter} onChange={(e) => setShowQuestionCounter(e.target.checked)} /> <span>Jumbotron question counter <InlineFieldHelp label="Jumbotron question counter" /></span></label>
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showLeaderboard} onChange={(e) => setShowLeaderboard(e.target.checked)} /> <span>Jumbotron leaderboard <InlineFieldHelp label="Jumbotron leaderboard" /></span></label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showCueHints} onChange={(e) => setShowCueHints(e.target.checked)} /> <span>Jumbotron cue hints (safe) <InlineFieldHelp label="Jumbotron cue hints (safe)" /></span></label>
           </div>
         </section>
 
@@ -311,6 +448,9 @@ export default function MusicTriviaSetupPage() {
         <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-cyan-100">Question Deck</h2>
           <p className="mt-1 text-xs text-stone-400">Generate call stack preview: {callStackPreview} questions.</p>
+          {deckId ? (
+            <p className="mt-1 text-xs text-amber-300">Deck selected: manual import below is ignored for this session.</p>
+          ) : null}
 
           <div className="mt-4 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
             {CATEGORY_OPTIONS.map((category) => (
@@ -332,6 +472,28 @@ export default function MusicTriviaSetupPage() {
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={difficultyHard} onChange={(e) => setDifficultyHard(Math.max(0, Number(e.target.value) || 0))} />
             </label>
           </div>
+
+          <label className="mt-4 block text-sm">
+            Optional Question Deck Import (one line per question)
+            <textarea
+              className="mt-1 h-40 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 font-mono text-xs"
+              placeholder={'Question >>> Answer ;; Alt Answer | Category | easy|medium|hard | song|artist|album|cover_art|vinyl_label | Source note'}
+              value={questionDeckText}
+              onChange={(e) => setQuestionDeckText(e.target.value)}
+              disabled={Boolean(deckId)}
+            />
+          </label>
+          <p className="mt-2 text-xs text-stone-400">
+            Import applies top-to-bottom to Q1-Q{totalCallStackPreview}. Tie-breakers begin at Q{tieBreakerStartsAt}.
+          </p>
+          <p className={`mt-1 text-xs ${hasQuestionDeckErrors ? "text-amber-300" : "text-cyan-300"}`}>
+            Parsed: {questionDeckAppliedCount}/{totalCallStackPreview}
+            {questionDeckOverflowCount > 0 ? ` · ${questionDeckOverflowCount} extra line(s) will be ignored.` : ""}
+            {parsedQuestionDeck.invalidLineCount > 0 ? ` · ${parsedQuestionDeck.invalidLineCount} invalid line(s) need fixing.` : ""}
+          </p>
+          <p className="mt-1 text-[11px] text-stone-500">
+            Example: Who sang &quot;Ain&apos;t No Mountain High Enough&quot;? &gt;&gt;&gt; Marvin Gaye & Tammi Terrell ;; Marvin Gaye and Tammi Terrell | Soul & Funk | medium | artist | Motown era round
+          </p>
         </section>
 
         <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
@@ -362,7 +524,18 @@ export default function MusicTriviaSetupPage() {
             </div>
           </div>
 
-          <button disabled={!playlistId || playlistTooSmall || !preflightComplete || teamNames.length < 2 || creating} onClick={createSession} className="mt-5 rounded bg-cyan-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+          <button
+            disabled={
+              (!playlistId && !deckId) ||
+              (!deckId && playlistTooSmall) ||
+              !preflightComplete ||
+              teamNames.length < 2 ||
+              creating ||
+              (!deckId && hasQuestionDeckErrors)
+            }
+            onClick={createSession}
+            className="mt-5 rounded bg-cyan-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+          >
             {creating ? "Creating..." : "Create Session"}
           </button>
         </section>
@@ -380,7 +553,7 @@ export default function MusicTriviaSetupPage() {
               {sessions.map((session) => (
                 <div key={session.id} className="rounded-xl border border-stone-700 bg-stone-950/70 p-3">
                   <div className="text-sm">{session.session_code} · {session.title} · Round {session.current_round} of {session.round_count} · QPR {session.questions_per_round} · TB {session.tie_breaker_count}</div>
-                  <div className="text-xs text-stone-400">Event: {session.event_title ?? "(none)"} · Playlist: {session.playlist_name ?? "(none)"} · Status: {session.status}</div>
+                  <div className="text-xs text-stone-400">Event: {session.event_title ?? "(none)"} · Playlist: {session.playlist_name ?? "(none)"} · Deck: {session.deck_title ?? "(none)"} · Status: {session.status}</div>
                   <div className="mt-1 text-xs text-cyan-300">
                     Prep: Main {session.prep_main_ready}/{session.prep_main_total} · Tie-breaker {session.prep_tiebreaker_ready}/{session.prep_tiebreaker_total}
                   </div>

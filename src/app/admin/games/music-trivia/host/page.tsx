@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import InlineEditableCell from "../../_components/InlineEditableCell";
 import GameTransportLane, { type TransportCallRow } from "../../_components/GameTransportLane";
+import { formatSecondsClock } from "src/lib/triviaBank";
 
 type Session = {
   id: number;
@@ -27,6 +28,8 @@ type Session = {
 
 type Call = {
   id: number;
+  question_id: number | null;
+  question_type: "free_response" | "multiple_choice" | "true_false" | "ordering";
   round_number: number;
   call_index: number;
   is_tiebreaker: boolean;
@@ -34,6 +37,31 @@ type Call = {
   difficulty: "easy" | "medium" | "hard";
   question_text: string;
   answer_key: string;
+  options_payload: unknown;
+  answer_payload: unknown;
+  explanation_text: string | null;
+  reveal_payload: {
+    media_assets?: Array<{
+      signed_url?: string | null;
+      asset_type?: string;
+      asset_role?: string;
+    }>;
+  };
+  reveal_media_assets?: Array<{
+    signed_url?: string | null;
+    asset_type?: string;
+    asset_role?: string;
+  }>;
+  cue_notes_text: string | null;
+  cue_payload: {
+    segments?: Array<{
+      role?: string;
+      track_label?: string | null;
+      start_seconds?: number;
+      end_seconds?: number | null;
+      instruction?: string | null;
+    }>;
+  };
   prep_status: "draft" | "ready";
   display_element_type: "song" | "artist" | "album" | "cover_art" | "vinyl_label";
   effective_display_image_url: string | null;
@@ -56,6 +84,50 @@ type LeaderboardRow = {
 };
 
 type ScoreDraft = Record<number, { correct: boolean; awarded_points: string }>;
+
+type CueSegment = {
+  role: string;
+  track_label: string | null;
+  start_seconds: number;
+  end_seconds: number | null;
+  instruction: string | null;
+};
+
+function asObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
+}
+
+function asStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => String(entry).trim()).filter(Boolean);
+}
+
+function readChoiceOptions(call: Call | null): string[] {
+  if (!call) return [];
+  const optionsPayload = call.options_payload;
+  if (Array.isArray(optionsPayload)) return asStringList(optionsPayload);
+
+  const payload = asObject(optionsPayload);
+  if (Array.isArray(payload.options)) return asStringList(payload.options);
+  if (Array.isArray(payload.choices)) return asStringList(payload.choices);
+  return [];
+}
+
+function readCueSegments(call: Call | null): CueSegment[] {
+  if (!call?.cue_payload || !Array.isArray(call.cue_payload.segments)) return [];
+  return call.cue_payload.segments
+    .map((segment) => asObject(segment))
+    .map((segment) => ({
+      role: String(segment.role ?? "primary"),
+      track_label: typeof segment.track_label === "string" ? segment.track_label : null,
+      start_seconds: Number(segment.start_seconds),
+      end_seconds: Number.isFinite(Number(segment.end_seconds)) ? Number(segment.end_seconds) : null,
+      instruction: typeof segment.instruction === "string" ? segment.instruction : null,
+    }))
+    .filter((segment) => Number.isFinite(segment.start_seconds) && segment.start_seconds >= 0)
+    .sort((a, b) => a.start_seconds - b.start_seconds);
+}
 
 export default function MusicTriviaHostPage() {
   const sessionId = Number(useSearchParams().get("sessionId"));
@@ -107,6 +179,15 @@ export default function MusicTriviaHostPage() {
   );
   const callForControls = activeCall ?? nextPendingMainCall;
   const tieBreakerForControls = activeCall?.is_tiebreaker ? activeCall : nextPendingTieBreaker;
+  const currentChoices = useMemo(() => readChoiceOptions(callForControls), [callForControls]);
+  const currentCueSegments = useMemo(() => readCueSegments(callForControls), [callForControls]);
+  const revealMediaAssets = useMemo(
+    () =>
+      (callForControls?.reveal_media_assets ??
+        callForControls?.reveal_payload?.media_assets ??
+        []).filter((asset) => typeof asset?.signed_url === "string" && asset.signed_url.length > 0),
+    [callForControls]
+  );
 
   const previousCalls = useMemo(
     () => calls.filter((call) => ["asked", "answer_revealed", "scored", "skipped"].includes(call.status)).slice(-6),
@@ -319,6 +400,35 @@ export default function MusicTriviaHostPage() {
                 <p className="mt-1 text-lg font-black">{callForControls?.question_text ?? "No active question"}</p>
                 <p className="mt-2 text-sm text-stone-300">Difficulty: {callForControls?.difficulty ?? "-"}</p>
                 <p className="mt-1 text-xs text-stone-400">Display: {callForControls?.display_element_type ?? "-"}</p>
+                {currentChoices.length > 0 ? (
+                  <div className="mt-2 rounded border border-stone-700/70 bg-stone-950/60 p-2 text-xs">
+                    <p className="font-semibold text-cyan-200">Choices</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-5 text-stone-200">
+                      {currentChoices.map((choice, index) => (
+                        <li key={`${index}-${choice}`}>{choice}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {(callForControls?.cue_notes_text || currentCueSegments.length > 0) ? (
+                  <div className="mt-2 rounded border border-cyan-800/70 bg-cyan-950/20 p-2 text-xs">
+                    <p className="font-semibold uppercase tracking-wide text-cyan-200">Cue Notes</p>
+                    {callForControls?.cue_notes_text ? <p className="mt-1 text-stone-200">{callForControls.cue_notes_text}</p> : null}
+                    {currentCueSegments.length > 0 ? (
+                      <div className="mt-2 space-y-1 text-stone-200">
+                        {currentCueSegments.map((segment, index) => (
+                          <p key={`${segment.role}-${segment.start_seconds}-${index}`}>
+                            [{segment.end_seconds !== null ? `${formatSecondsClock(segment.start_seconds)}-${formatSecondsClock(segment.end_seconds)}` : formatSecondsClock(segment.start_seconds)}] {segment.role}
+                            {segment.track_label ? ` · ${segment.track_label}` : ""}
+                            {segment.instruction ? ` · ${segment.instruction}` : ""}
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <p className="mt-2 text-sm text-amber-300">
                   {(callForControls?.status === "answer_revealed" || callForControls?.status === "scored")
                     ? `Answer: ${callForControls.answer_key}`
@@ -330,6 +440,29 @@ export default function MusicTriviaHostPage() {
                     className="mt-3 h-28 w-full rounded border border-cyan-700/40 object-cover"
                     src={callForControls.effective_display_image_url}
                   />
+                ) : null}
+
+                {(callForControls?.status === "answer_revealed" || callForControls?.status === "scored") ? (
+                  <div className="mt-3 rounded border border-amber-700/40 bg-amber-950/20 p-2 text-xs">
+                    <p className="font-semibold uppercase tracking-wide text-amber-300">Reveal Panel</p>
+                    {callForControls.explanation_text ? (
+                      <p className="mt-1 text-stone-200">{callForControls.explanation_text}</p>
+                    ) : (
+                      <p className="mt-1 text-stone-400">No explanation provided.</p>
+                    )}
+                    {revealMediaAssets.length > 0 ? (
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                        {revealMediaAssets.map((asset, index) => (
+                          <img
+                            key={`${asset.signed_url}-${index}`}
+                            alt={`Reveal asset ${index + 1}`}
+                            className="h-28 w-full rounded border border-amber-700/40 object-cover"
+                            src={asset.signed_url ?? ""}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 ) : null}
                 <p className="mt-1 text-[11px] text-stone-500">
                   Click source fields in Question Stack to edit inline. Press Enter to save.

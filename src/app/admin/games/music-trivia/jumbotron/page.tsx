@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { formatSecondsClock } from "src/lib/triviaBank";
 
 type Session = {
   title: string;
@@ -17,16 +18,41 @@ type Session = {
   show_rounds: boolean;
   show_question_counter: boolean;
   show_leaderboard: boolean;
+  show_cue_hints: boolean;
 };
 
 type Call = {
   id: number;
   call_index: number;
+  question_type: "free_response" | "multiple_choice" | "true_false" | "ordering";
   is_tiebreaker: boolean;
   category: string;
   difficulty: "easy" | "medium" | "hard";
   question_text: string;
   answer_key: string;
+  options_payload: unknown;
+  explanation_text: string | null;
+  reveal_payload: {
+    media_assets?: Array<{
+      signed_url?: string | null;
+      asset_type?: string;
+      asset_role?: string;
+    }>;
+  };
+  reveal_media_assets?: Array<{
+    signed_url?: string | null;
+    asset_type?: string;
+    asset_role?: string;
+  }>;
+  cue_notes_text: string | null;
+  cue_payload: {
+    segments?: Array<{
+      role?: string;
+      track_label?: string | null;
+      start_seconds?: number;
+      end_seconds?: number | null;
+    }>;
+  };
   display_element_type: "song" | "artist" | "album" | "cover_art" | "vinyl_label";
   effective_display_image_url: string | null;
   status: "pending" | "asked" | "answer_revealed" | "scored" | "skipped";
@@ -38,6 +64,26 @@ type LeaderboardRow = {
   total_points: number;
   correct_answers: number;
 };
+
+function asObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
+}
+
+function asStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => String(entry).trim()).filter(Boolean);
+}
+
+function readChoices(call: Call | null): string[] {
+  if (!call) return [];
+  const optionsPayload = call.options_payload;
+  if (Array.isArray(optionsPayload)) return asStringList(optionsPayload);
+  const payload = asObject(optionsPayload);
+  if (Array.isArray(payload.options)) return asStringList(payload.options);
+  if (Array.isArray(payload.choices)) return asStringList(payload.choices);
+  return [];
+}
 
 export default function MusicTriviaJumbotronPage() {
   const sessionId = Number(useSearchParams().get("sessionId"));
@@ -101,6 +147,26 @@ export default function MusicTriviaJumbotronPage() {
     const index = tieBreakers.findIndex((call) => call.id === currentCall.id);
     return index >= 0 ? index + 1 : null;
   }, [currentCall, tieBreakers]);
+  const choiceOptions = useMemo(() => readChoices(currentCall), [currentCall]);
+  const safeCueHints = useMemo(() => {
+    if (!currentCall?.cue_payload?.segments || !Array.isArray(currentCall.cue_payload.segments)) return [];
+    return currentCall.cue_payload.segments
+      .map((segment) => asObject(segment))
+      .map((segment) => ({
+        role: String(segment.role ?? "cue"),
+        trackLabel: typeof segment.track_label === "string" ? segment.track_label : null,
+        startSeconds: Number(segment.start_seconds),
+      }))
+      .filter((segment) => Number.isFinite(segment.startSeconds) && segment.startSeconds >= 0)
+      .sort((a, b) => a.startSeconds - b.startSeconds);
+  }, [currentCall]);
+  const revealMediaAssets = useMemo(
+    () =>
+      (currentCall?.reveal_media_assets ??
+        currentCall?.reveal_payload?.media_assets ??
+        []).filter((asset) => typeof asset?.signed_url === "string" && asset.signed_url.length > 0),
+    [currentCall]
+  );
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_50%_0%,#0a4453,transparent_38%),linear-gradient(180deg,#020202,#0d0d0d)] p-8 text-white">
@@ -141,8 +207,42 @@ export default function MusicTriviaJumbotronPage() {
           )}
           <p className="mt-2 text-5xl font-black text-cyan-200">{currentCall?.question_text ?? "Waiting for host"}</p>
           <p className="mt-3 text-xl text-stone-200">{currentCall ? `${currentCall.category} · ${currentCall.difficulty.toUpperCase()} · ${currentCall.display_element_type}` : ""}</p>
+          {choiceOptions.length > 0 ? (
+            <div className="mt-3 rounded-xl border border-stone-700 bg-stone-950/70 p-4 text-left text-2xl">
+              {choiceOptions.map((choice, index) => (
+                <p key={`${index}-${choice}`}>{String.fromCharCode(65 + index)}. {choice}</p>
+              ))}
+            </div>
+          ) : null}
+          {session?.show_cue_hints && safeCueHints.length > 0 ? (
+            <div className="mt-3 rounded-xl border border-cyan-700/40 bg-cyan-950/20 p-3 text-left">
+              <p className="text-sm uppercase tracking-[0.18em] text-cyan-300">Cue Hints</p>
+              <div className="mt-2 space-y-1 text-lg text-cyan-100">
+                {safeCueHints.map((hint, index) => (
+                  <p key={`${hint.role}-${hint.startSeconds}-${index}`}>
+                    {formatSecondsClock(hint.startSeconds)} · {hint.role}{hint.trackLabel ? ` · ${hint.trackLabel}` : ""}
+                  </p>
+                ))}
+              </div>
+            </div>
+          ) : null}
           {(currentCall?.status === "answer_revealed" || currentCall?.status === "scored") ? (
-            <p className="mt-4 text-3xl font-bold text-amber-300">Answer: {currentCall.answer_key}</p>
+            <div className="mt-4 rounded-xl border border-amber-700/40 bg-amber-950/20 p-4 text-left">
+              <p className="text-3xl font-bold text-amber-300">Answer: {currentCall.answer_key}</p>
+              {currentCall.explanation_text ? <p className="mt-2 text-xl text-stone-100">{currentCall.explanation_text}</p> : null}
+              {revealMediaAssets.length > 0 ? (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {revealMediaAssets.map((asset, index) => (
+                    <img
+                      key={`${asset.signed_url}-${index}`}
+                      alt={`Reveal media ${index + 1}`}
+                      className="h-48 w-full rounded border border-amber-700/40 object-cover"
+                      src={asset.signed_url ?? ""}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
           ) : (
             <p className="mt-4 text-2xl font-semibold text-stone-300">Submit your answers now</p>
           )}

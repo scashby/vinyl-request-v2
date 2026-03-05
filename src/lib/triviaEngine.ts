@@ -26,6 +26,18 @@ export type CreateTriviaCallsInput = {
   categories: string[];
   scoreMode: TriviaScoreMode;
   difficultyTargets?: Partial<Record<TriviaDifficulty, number>>;
+  questionDeck?: TriviaQuestionDeckEntry[];
+};
+
+export type TriviaQuestionDeckEntry = {
+  questionText: string;
+  answerKey: string;
+  acceptedAnswers?: string[];
+  category?: string;
+  difficulty?: TriviaDifficulty;
+  displayElementType?: TriviaDisplayElementType;
+  sourceNote?: string | null;
+  prepStatus?: TriviaPrepStatus;
 };
 
 type TriviaCallInsertRow = {
@@ -33,13 +45,21 @@ type TriviaCallInsertRow = {
   round_number: number;
   call_index: number;
   playlist_track_key: string | null;
+  question_id: number | null;
+  question_type: "free_response" | "multiple_choice" | "true_false" | "ordering";
   is_tiebreaker: boolean;
   category: string;
   difficulty: TriviaDifficulty;
   question_text: string;
   answer_key: string;
   accepted_answers: string[];
+  options_payload: JsonValue;
+  answer_payload: JsonValue;
+  explanation_text: string | null;
+  reveal_payload: JsonValue;
   source_note: string | null;
+  cue_notes_text: string | null;
+  cue_payload: JsonValue;
   prep_status: TriviaPrepStatus;
   display_element_type: TriviaDisplayElementType;
   display_image_override_url: string | null;
@@ -127,6 +147,54 @@ function buildDifficultyStack(
 function getBonusPoints(scoreMode: TriviaScoreMode, difficulty: TriviaDifficulty): number {
   if (scoreMode !== "difficulty_bonus_static") return 0;
   return difficulty === "hard" ? 1 : 0;
+}
+
+export function computeTriviaBonusPoints(scoreMode: TriviaScoreMode, difficulty: TriviaDifficulty): number {
+  return getBonusPoints(scoreMode, difficulty);
+}
+
+function normalizeAcceptedAnswers(answerKey: string, values: string[] | undefined): string[] {
+  const cleaned = (values ?? []).map((value) => value.trim()).filter(Boolean);
+  return Array.from(new Set([answerKey, ...cleaned]));
+}
+
+function applyDeckEntry(
+  row: TriviaCallInsertRow,
+  scoreMode: TriviaScoreMode,
+  entry: TriviaQuestionDeckEntry | undefined
+): TriviaCallInsertRow {
+  if (!entry) return row;
+  const questionText = entry.questionText.trim();
+  const answerKey = entry.answerKey.trim();
+  if (!questionText || !answerKey) return row;
+
+  const category = entry.category?.trim() || row.category;
+  const difficulty = entry.difficulty ?? row.difficulty;
+  const displayElementType = entry.displayElementType ?? row.display_element_type;
+  const sourceNote =
+    entry.sourceNote === undefined
+      ? row.source_note
+      : (entry.sourceNote?.trim() || null);
+
+  return {
+    ...row,
+    category,
+    difficulty,
+    question_text: questionText,
+    answer_key: answerKey,
+    accepted_answers: normalizeAcceptedAnswers(answerKey, entry.acceptedAnswers),
+    answer_payload: {
+      ...(row.answer_payload && typeof row.answer_payload === "object" && !Array.isArray(row.answer_payload)
+        ? row.answer_payload as Record<string, JsonValue>
+        : {}),
+      type: "free_response",
+      canonical: answerKey,
+    },
+    source_note: sourceNote,
+    prep_status: entry.prepStatus ?? "ready",
+    display_element_type: displayElementType,
+    bonus_points: getBonusPoints(scoreMode, difficulty),
+  };
 }
 
 function firstNonEmpty(values: Array<string | null | undefined>): string | null {
@@ -371,11 +439,13 @@ export async function generateTriviaSessionCalls(db: TriviaDbClient, input: Crea
     const displayElementType = getDisplayElementType(index);
     const answerKey = buildAnswerTemplate(track, displayElementType, callIndex);
 
-    return {
+    const row: TriviaCallInsertRow = {
       session_id: input.sessionId,
       round_number: roundNumber,
       call_index: callIndex,
       playlist_track_key: track.playlistTrackKey,
+      question_id: null,
+      question_type: "free_response",
       is_tiebreaker: false,
       category,
       difficulty,
@@ -388,7 +458,16 @@ export async function generateTriviaSessionCalls(db: TriviaDbClient, input: Crea
       }),
       answer_key: answerKey,
       accepted_answers: [answerKey],
+      options_payload: [],
+      answer_payload: {
+        type: "free_response",
+        canonical: answerKey,
+      },
+      explanation_text: null,
+      reveal_payload: {},
       source_note: "Template stub auto-seeded from playlist metadata",
+      cue_notes_text: null,
+      cue_payload: { segments: [] },
       prep_status: "draft",
       display_element_type: displayElementType,
       display_image_override_url: null,
@@ -403,6 +482,8 @@ export async function generateTriviaSessionCalls(db: TriviaDbClient, input: Crea
       bonus_points: getBonusPoints(input.scoreMode, difficulty),
       status: "pending",
     };
+
+    return applyDeckEntry(row, input.scoreMode, input.questionDeck?.[index]);
   });
 
   const tieBreakerRows: TriviaCallInsertRow[] = Array.from({ length: tieBreakerCount }, (_, index) => {
@@ -412,11 +493,13 @@ export async function generateTriviaSessionCalls(db: TriviaDbClient, input: Crea
     const difficulty: TriviaDifficulty = "hard";
     const answerKey = buildAnswerTemplate(track, displayElementType, callIndex);
 
-    return {
+    const row: TriviaCallInsertRow = {
       session_id: input.sessionId,
       round_number: input.roundCount + 1,
       call_index: callIndex,
       playlist_track_key: track.playlistTrackKey,
+      question_id: null,
+      question_type: "free_response",
       is_tiebreaker: true,
       category: "Tie-Breaker",
       difficulty,
@@ -429,7 +512,16 @@ export async function generateTriviaSessionCalls(db: TriviaDbClient, input: Crea
       }),
       answer_key: answerKey,
       accepted_answers: [answerKey],
+      options_payload: [],
+      answer_payload: {
+        type: "free_response",
+        canonical: answerKey,
+      },
+      explanation_text: null,
+      reveal_payload: {},
       source_note: "Tie-breaker template stub auto-seeded from playlist metadata",
+      cue_notes_text: null,
+      cue_payload: { segments: [] },
       prep_status: "draft",
       display_element_type: displayElementType,
       display_image_override_url: null,
@@ -444,6 +536,8 @@ export async function generateTriviaSessionCalls(db: TriviaDbClient, input: Crea
       bonus_points: getBonusPoints(input.scoreMode, difficulty),
       status: "pending",
     };
+
+    return applyDeckEntry(row, input.scoreMode, input.questionDeck?.[mainQuestionCount + index]);
   });
 
   const rows = [...mainRows, ...tieBreakerRows];

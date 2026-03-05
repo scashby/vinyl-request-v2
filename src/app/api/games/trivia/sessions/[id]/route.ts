@@ -9,6 +9,7 @@ type SessionRow = {
   id: number;
   event_id: number | null;
   playlist_id: number | null;
+  deck_id: number | null;
   session_code: string;
   title: string;
   round_count: number;
@@ -33,6 +34,7 @@ type SessionRow = {
   show_rounds: boolean;
   show_question_counter: boolean;
   show_leaderboard: boolean;
+  show_cue_hints: boolean;
   max_teams: number | null;
   slips_batch_size: number | null;
   status: "pending" | "running" | "paused" | "completed";
@@ -201,6 +203,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const allowedFields = new Set([
     "title",
+    "deck_id",
     "current_round",
     "current_call_index",
     "tie_breaker_count",
@@ -208,6 +211,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "show_rounds",
     "show_question_counter",
     "show_leaderboard",
+    "show_cue_hints",
     "status",
     "countdown_started_at",
     "paused_remaining_seconds",
