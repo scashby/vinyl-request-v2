@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { formatBallLabel } from "src/lib/bingoBall";
+import { formatBallLabel, getBingoColumnTextClass } from "src/lib/bingoBall";
 import InlineEditableCell from "../../_components/InlineEditableCell";
 import BingoTransportLane, { type BingoTransportCall } from "../_components/BingoTransportLane";
 
@@ -147,30 +147,35 @@ export default function BingoHostPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {calls.map((call) => (
-                    <tr key={call.id} className="border-t border-stone-800 align-top">
-                      <td className="py-2 text-stone-400">{call.call_index}</td>
-                      <td className="py-2 font-bold text-amber-300">{formatBallLabel(call.ball_number, call.column_letter)}</td>
-                      <td className="py-1">
-                        <InlineEditableCell
-                          onSave={(nextValue) => patchCallMetadata(call.id, { track_title: nextValue })}
-                          value={call.track_title}
-                        />
-                      </td>
-                      <td className="py-1">
-                        <InlineEditableCell
-                          onSave={(nextValue) => patchCallMetadata(call.id, { artist_name: nextValue })}
-                          value={call.artist_name}
-                        />
-                      </td>
-                      <td className="py-1 text-stone-400">
-                        <InlineEditableCell
-                          onSave={(nextValue) => patchCallMetadata(call.id, { album_name: nextValue || null })}
-                          value={call.album_name ?? ""}
-                        />
-                      </td>
-                    </tr>
-                  ))}
+                  {calls.map((call) => {
+                    const ballLabel = formatBallLabel(call.ball_number, call.column_letter);
+                    const ballToneClass = getBingoColumnTextClass(call.column_letter, call.ball_number);
+
+                    return (
+                      <tr key={call.id} className="border-t border-stone-800 align-top">
+                        <td className="py-2 text-stone-400">{call.call_index}</td>
+                        <td className={`py-2 font-bold ${ballToneClass}`}>{ballLabel}</td>
+                        <td className="py-1">
+                          <InlineEditableCell
+                            onSave={(nextValue) => patchCallMetadata(call.id, { track_title: nextValue })}
+                            value={call.track_title}
+                          />
+                        </td>
+                        <td className="py-1">
+                          <InlineEditableCell
+                            onSave={(nextValue) => patchCallMetadata(call.id, { artist_name: nextValue })}
+                            value={call.artist_name}
+                          />
+                        </td>
+                        <td className="py-1 text-stone-400">
+                          <InlineEditableCell
+                            onSave={(nextValue) => patchCallMetadata(call.id, { album_name: nextValue || null })}
+                            value={call.album_name ?? ""}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -200,28 +205,45 @@ export default function BingoHostPage() {
               <div className="mt-3 rounded border border-red-700/50 bg-red-950/30 p-3">
                 <p className="text-xs uppercase text-red-300">Current</p>
                 <p className="text-lg font-black">
-                  {currentCall ? `${formatBallLabel(currentCall.ball_number, currentCall.column_letter)} - ${currentCall.track_title}` : "No call yet"}
+                  {currentCall ? (
+                    <>
+                      <span className={getBingoColumnTextClass(currentCall.column_letter, currentCall.ball_number)}>
+                        {formatBallLabel(currentCall.ball_number, currentCall.column_letter)}
+                      </span>{" "}
+                      - {currentCall.track_title}
+                    </>
+                  ) : (
+                    "No call yet"
+                  )}
                 </p>
                 <p className="text-sm text-stone-300">{currentCall ? `${currentCall.artist_name} · ${currentCall.album_name ?? ""}` : ""}</p>
               </div>
               <div className="mt-3 text-xs">
                 <p className="font-semibold text-stone-300">Previous Calls</p>
                 <ul className="mt-1 space-y-1 text-stone-400">
-                  {previous.map((call) => (
-                    <li key={call.id}>
-                      {formatBallLabel(call.ball_number, call.column_letter)} - {call.track_title}
-                    </li>
-                  ))}
+                  {previous.map((call) => {
+                    const ballLabel = formatBallLabel(call.ball_number, call.column_letter);
+                    const ballToneClass = getBingoColumnTextClass(call.column_letter, call.ball_number);
+                    return (
+                      <li key={call.id}>
+                        <span className={ballToneClass}>{ballLabel}</span> - {call.track_title}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
               <div className="mt-3 text-xs">
                 <p className="font-semibold text-stone-300">Full Called Order</p>
                 <div className="mt-1 max-h-24 overflow-auto text-stone-400">
-                  {called.map((call) => (
-                    <div key={call.id}>
-                      {call.call_index}. {formatBallLabel(call.ball_number, call.column_letter)} - {call.track_title}
-                    </div>
-                  ))}
+                  {called.map((call) => {
+                    const ballLabel = formatBallLabel(call.ball_number, call.column_letter);
+                    const ballToneClass = getBingoColumnTextClass(call.column_letter, call.ball_number);
+                    return (
+                      <div key={call.id}>
+                        {call.call_index}. <span className={ballToneClass}>{ballLabel}</span> - {call.track_title}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
               <p className="mt-1 text-[11px] text-stone-500">

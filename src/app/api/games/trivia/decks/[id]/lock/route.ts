@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTriviaDb } from "src/lib/triviaDb";
 import { TRIVIA_BANK_ENABLED } from "src/lib/triviaBankApi";
-import { type JsonValue } from "src/lib/triviaBank";
+import { hasRequiredCueSource, type JsonValue } from "src/lib/triviaBank";
 import { loadQuestionSnapshotsByIds } from "src/lib/triviaDeckSnapshots";
 
 export const runtime = "nodejs";
@@ -22,12 +22,17 @@ function parseDeckId(raw: string): number | null {
   return value;
 }
 
-function hasSnapshotPromptAndAnswer(snapshotPayload: JsonValue): boolean {
+function hasSnapshotPromptAnswerAndCue(snapshotPayload: JsonValue): boolean {
   if (!snapshotPayload || typeof snapshotPayload !== "object" || Array.isArray(snapshotPayload)) return false;
   const snapshot = snapshotPayload as Record<string, unknown>;
   const promptText = typeof snapshot.prompt_text === "string" ? snapshot.prompt_text.trim() : "";
   const answerKey = typeof snapshot.answer_key === "string" ? snapshot.answer_key.trim() : "";
-  return promptText.length > 0 && answerKey.length > 0;
+  if (!promptText.length || !answerKey.length) return false;
+  return hasRequiredCueSource({
+    cueSourceType: snapshot.cue_source_type,
+    cueSourcePayload: snapshot.cue_source_payload,
+    primaryCueStartSeconds: snapshot.primary_cue_start_seconds,
+  });
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -70,7 +75,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         .filter((row) => {
           if (!Number.isFinite(Number(row.question_id))) return false;
           if (forceRefreshSnapshots) return true;
-          return !hasSnapshotPromptAndAnswer(row.snapshot_payload);
+          return !hasSnapshotPromptAnswerAndCue(row.snapshot_payload);
         })
         .map((row) => Number(row.question_id))
         .filter((questionId) => Number.isFinite(questionId) && questionId > 0)
@@ -84,7 +89,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   for (const item of items) {
     const questionId = Number(item.question_id);
-    const shouldRefresh = forceRefreshSnapshots || !hasSnapshotPromptAndAnswer(item.snapshot_payload);
+    const shouldRefresh = forceRefreshSnapshots || !hasSnapshotPromptAnswerAndCue(item.snapshot_payload);
 
     let nextSnapshot = item.snapshot_payload;
     if (shouldRefresh && Number.isFinite(questionId) && questionId > 0) {
@@ -95,10 +100,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
     }
 
-    if (!hasSnapshotPromptAndAnswer(nextSnapshot)) {
+    if (!hasSnapshotPromptAnswerAndCue(nextSnapshot)) {
       return NextResponse.json(
         {
-          error: `Deck item ${item.id} is missing snapshot prompt/answer and cannot be locked.`,
+          error: `Deck item ${item.id} is missing required vinyl cue setup and cannot be locked.`,
         },
         { status: 409 }
       );

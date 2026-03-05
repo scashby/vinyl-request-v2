@@ -12,7 +12,7 @@ import {
 } from "src/lib/triviaEngine";
 import { getBingoDb } from "src/lib/bingoDb";
 import { getPlaylistTrackCount } from "src/lib/bingoEngine";
-import { sanitizeCuePayload, type JsonValue } from "src/lib/triviaBank";
+import { hasRequiredCueSource, parseCueTimeToSeconds, sanitizeCuePayload, type JsonValue } from "src/lib/triviaBank";
 
 export const runtime = "nodejs";
 
@@ -165,6 +165,12 @@ function asQuestionType(value: unknown): "free_response" | "multiple_choice" | "
   return "free_response";
 }
 
+function asCueSourceType(value: unknown): "inventory_track" | "uploaded_clip" | null {
+  const text = asString(value).toLowerCase();
+  if (text === "inventory_track" || text === "uploaded_clip") return text;
+  return null;
+}
+
 function asDisplayElementType(value: unknown): "song" | "artist" | "album" | "cover_art" | "vinyl_label" {
   const text = asString(value).toLowerCase();
   if (text === "song" || text === "artist" || text === "album" || text === "cover_art" || text === "vinyl_label") return text;
@@ -247,6 +253,25 @@ async function seedCallsFromDeck(params: {
       const category = asString(snapshot.category) || "General Music";
       const acceptedAnswers = asAcceptedAnswers(answerKey, snapshot.accepted_answers);
       const cuePayload = sanitizeCuePayload(snapshot.cue_payload);
+      const cueSourceType = asCueSourceType(snapshot.cue_source_type);
+      const cueSourcePayload = asObject(snapshot.cue_source_payload);
+      const primaryCueStartSeconds = parseCueTimeToSeconds(snapshot.primary_cue_start_seconds);
+      const primaryCueEndRaw = parseCueTimeToSeconds(snapshot.primary_cue_end_seconds);
+      const primaryCueEndSeconds =
+        primaryCueStartSeconds !== null &&
+        primaryCueEndRaw !== null &&
+        primaryCueEndRaw >= primaryCueStartSeconds
+          ? primaryCueEndRaw
+          : null;
+      const primaryCueInstruction = asNullableString(snapshot.primary_cue_instruction);
+
+      if (!hasRequiredCueSource({
+        cueSourceType,
+        cueSourcePayload,
+        primaryCueStartSeconds,
+      })) {
+        throw new Error(`Deck item #${item.item_index} is missing required vinyl cue setup.`);
+      }
 
       const answerPayload = Object.keys(asObject(snapshot.answer_payload)).length > 0
         ? (snapshot.answer_payload as JsonValue)
@@ -297,6 +322,11 @@ async function seedCallsFromDeck(params: {
         explanation_text: asNullableString(snapshot.explanation_text),
         reveal_payload: revealPayload,
         source_note: asNullableString(snapshot.source_note),
+        cue_source_type: cueSourceType,
+        cue_source_payload: cueSourcePayload as unknown as JsonValue,
+        primary_cue_start_seconds: primaryCueStartSeconds,
+        primary_cue_end_seconds: primaryCueEndSeconds,
+        primary_cue_instruction: primaryCueInstruction,
         cue_notes_text: asNullableString(snapshot.cue_notes_text),
         cue_payload: cuePayload as unknown as JsonValue,
         prep_status: (asString(snapshot.prep_status).toLowerCase() === "draft" ? "draft" : "ready") as TriviaPrepStatus,

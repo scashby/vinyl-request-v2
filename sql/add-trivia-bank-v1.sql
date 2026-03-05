@@ -17,6 +17,11 @@ CREATE TABLE IF NOT EXISTS public.trivia_questions (
   default_difficulty text NOT NULL DEFAULT 'medium',
   source_note text,
   is_tiebreaker_eligible boolean NOT NULL DEFAULT true,
+  cue_source_type text,
+  cue_source_payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+  primary_cue_start_seconds integer,
+  primary_cue_end_seconds integer,
+  primary_cue_instruction text,
   cue_notes_text text,
   cue_payload jsonb NOT NULL DEFAULT '{"segments":[]}'::jsonb,
   created_by text,
@@ -36,6 +41,14 @@ CREATE TABLE IF NOT EXISTS public.trivia_questions (
   ),
   CONSTRAINT trivia_questions_default_difficulty_chk CHECK (
     default_difficulty IN ('easy', 'medium', 'hard')
+  ),
+  CONSTRAINT trivia_questions_cue_source_type_chk CHECK (
+    cue_source_type IS NULL OR cue_source_type IN ('inventory_track', 'uploaded_clip')
+  ),
+  CONSTRAINT trivia_questions_primary_cue_window_chk CHECK (
+    primary_cue_end_seconds IS NULL
+    OR primary_cue_start_seconds IS NULL
+    OR primary_cue_end_seconds >= primary_cue_start_seconds
   )
 );
 
@@ -47,6 +60,7 @@ CREATE TABLE IF NOT EXISTS public.trivia_question_facets (
   region text,
   language text,
   has_media boolean NOT NULL DEFAULT false,
+  has_required_cue boolean NOT NULL DEFAULT false,
   difficulty text NOT NULL DEFAULT 'medium',
   category text NOT NULL DEFAULT 'General Music',
   CONSTRAINT trivia_question_facets_difficulty_chk CHECK (
@@ -62,6 +76,19 @@ ALTER TABLE public.trivia_questions
   ADD COLUMN IF NOT EXISTS reveal_payload jsonb NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE public.trivia_questions
   ADD COLUMN IF NOT EXISTS display_element_type text NOT NULL DEFAULT 'song';
+ALTER TABLE public.trivia_questions
+  ADD COLUMN IF NOT EXISTS cue_source_type text;
+ALTER TABLE public.trivia_questions
+  ADD COLUMN IF NOT EXISTS cue_source_payload jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE public.trivia_questions
+  ADD COLUMN IF NOT EXISTS primary_cue_start_seconds integer;
+ALTER TABLE public.trivia_questions
+  ADD COLUMN IF NOT EXISTS primary_cue_end_seconds integer;
+ALTER TABLE public.trivia_questions
+  ADD COLUMN IF NOT EXISTS primary_cue_instruction text;
+
+ALTER TABLE public.trivia_question_facets
+  ADD COLUMN IF NOT EXISTS has_required_cue boolean NOT NULL DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS public.trivia_question_tags (
   id bigserial PRIMARY KEY,
@@ -159,6 +186,16 @@ ALTER TABLE public.trivia_session_calls
   ADD COLUMN IF NOT EXISTS cue_notes_text text;
 ALTER TABLE public.trivia_session_calls
   ADD COLUMN IF NOT EXISTS cue_payload jsonb NOT NULL DEFAULT '{"segments":[]}'::jsonb;
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS cue_source_type text;
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS cue_source_payload jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS primary_cue_start_seconds integer;
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS primary_cue_end_seconds integer;
+ALTER TABLE public.trivia_session_calls
+  ADD COLUMN IF NOT EXISTS primary_cue_instruction text;
 
 ALTER TABLE public.trivia_session_calls
   DROP CONSTRAINT IF EXISTS trivia_session_calls_question_id_fkey;
@@ -184,6 +221,66 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1
     FROM pg_constraint
+    WHERE conname = 'trivia_questions_cue_source_type_chk'
+  ) THEN
+    ALTER TABLE public.trivia_questions
+      ADD CONSTRAINT trivia_questions_cue_source_type_chk
+      CHECK (cue_source_type IS NULL OR cue_source_type IN ('inventory_track', 'uploaded_clip'));
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'trivia_questions_primary_cue_window_chk'
+  ) THEN
+    ALTER TABLE public.trivia_questions
+      ADD CONSTRAINT trivia_questions_primary_cue_window_chk
+      CHECK (
+        primary_cue_end_seconds IS NULL
+        OR primary_cue_start_seconds IS NULL
+        OR primary_cue_end_seconds >= primary_cue_start_seconds
+      );
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'trivia_session_calls_cue_source_type_chk'
+  ) THEN
+    ALTER TABLE public.trivia_session_calls
+      ADD CONSTRAINT trivia_session_calls_cue_source_type_chk
+      CHECK (cue_source_type IS NULL OR cue_source_type IN ('inventory_track', 'uploaded_clip'));
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'trivia_session_calls_primary_cue_window_chk'
+  ) THEN
+    ALTER TABLE public.trivia_session_calls
+      ADD CONSTRAINT trivia_session_calls_primary_cue_window_chk
+      CHECK (
+        primary_cue_end_seconds IS NULL
+        OR primary_cue_start_seconds IS NULL
+        OR primary_cue_end_seconds >= primary_cue_start_seconds
+      );
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
     WHERE conname = 'trivia_questions_display_element_type_chk'
   ) THEN
     ALTER TABLE public.trivia_questions
@@ -192,10 +289,56 @@ BEGIN
   END IF;
 END $$;
 
+UPDATE public.trivia_questions q
+SET
+  primary_cue_start_seconds = COALESCE(
+    q.primary_cue_start_seconds,
+    CASE
+      WHEN (q.cue_payload -> 'segments' -> 0 ->> 'start_seconds') ~ '^[0-9]+$'
+      THEN (q.cue_payload -> 'segments' -> 0 ->> 'start_seconds')::int
+      ELSE NULL
+    END
+  ),
+  primary_cue_end_seconds = COALESCE(
+    q.primary_cue_end_seconds,
+    CASE
+      WHEN (q.cue_payload -> 'segments' -> 0 ->> 'end_seconds') ~ '^[0-9]+$'
+      THEN (q.cue_payload -> 'segments' -> 0 ->> 'end_seconds')::int
+      ELSE NULL
+    END
+  ),
+  primary_cue_instruction = COALESCE(
+    q.primary_cue_instruction,
+    NULLIF(q.cue_payload -> 'segments' -> 0 ->> 'instruction', '')
+  )
+WHERE q.primary_cue_start_seconds IS NULL
+  OR q.primary_cue_end_seconds IS NULL
+  OR q.primary_cue_instruction IS NULL;
+
+UPDATE public.trivia_question_facets f
+SET has_required_cue = (
+  q.cue_source_type IS NOT NULL
+  AND q.primary_cue_start_seconds IS NOT NULL
+)
+FROM public.trivia_questions q
+WHERE q.id = f.question_id;
+
+UPDATE public.trivia_questions
+SET
+  status = 'draft',
+  published_at = NULL,
+  updated_at = now()
+WHERE status = 'published'
+  AND (
+    cue_source_type IS NULL
+    OR primary_cue_start_seconds IS NULL
+  );
+
 CREATE INDEX IF NOT EXISTS idx_trivia_questions_status ON public.trivia_questions(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_trivia_questions_type ON public.trivia_questions(question_type, default_difficulty);
+CREATE INDEX IF NOT EXISTS idx_trivia_questions_required_cue ON public.trivia_questions(cue_source_type, primary_cue_start_seconds);
 CREATE INDEX IF NOT EXISTS idx_trivia_questions_prompt_lower ON public.trivia_questions ((lower(prompt_text)));
-CREATE INDEX IF NOT EXISTS idx_trivia_q_facets_category ON public.trivia_question_facets(category, difficulty, has_media);
+CREATE INDEX IF NOT EXISTS idx_trivia_q_facets_category ON public.trivia_question_facets(category, difficulty, has_media, has_required_cue);
 CREATE INDEX IF NOT EXISTS idx_trivia_q_tags_tag ON public.trivia_question_tags(tag);
 CREATE INDEX IF NOT EXISTS idx_trivia_q_assets_question ON public.trivia_question_assets(question_id, asset_role, sort_order);
 CREATE INDEX IF NOT EXISTS idx_trivia_decks_status ON public.trivia_decks(status, updated_at DESC);

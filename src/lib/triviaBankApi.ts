@@ -1,4 +1,12 @@
-import { sanitizeCuePayload, type JsonValue, type TriviaDifficulty, type TriviaQuestionType } from "src/lib/triviaBank";
+import {
+  hasRequiredCueSource,
+  normalizeCueSourceType,
+  parseCueTimeToSeconds,
+  sanitizeCuePayload,
+  type JsonValue,
+  type TriviaDifficulty,
+  type TriviaQuestionType,
+} from "src/lib/triviaBank";
 
 export const TRIVIA_BANK_ENABLED = (process.env.TRIVIA_BANK_V1 ?? "true").toLowerCase() !== "false";
 
@@ -71,6 +79,20 @@ export function normalizeQuestionWriteInput(body: Record<string, unknown>) {
     : [];
   const hasCueValidationError = cueSegmentsRaw.length !== cuePayloadSanitized.segments.length;
   const cuePayload = cuePayloadSanitized as unknown as JsonValue;
+  const cueSourceType = normalizeCueSourceType(body.cue_source_type);
+  const cueSourcePayload = asJson(body.cue_source_payload, {});
+  const primaryCueStartSeconds = parseCueTimeToSeconds(body.primary_cue_start_seconds);
+  const primaryCueEndSecondsRaw = parseCueTimeToSeconds(body.primary_cue_end_seconds);
+  const primaryCueEndSeconds =
+    primaryCueStartSeconds !== null && primaryCueEndSecondsRaw !== null && primaryCueEndSecondsRaw >= primaryCueStartSeconds
+      ? primaryCueEndSecondsRaw
+      : null;
+  const primaryCueInstruction = asNullableString(body.primary_cue_instruction);
+  const hasRequiredCue = hasRequiredCueSource({
+    cueSourceType,
+    cueSourcePayload,
+    primaryCueStartSeconds,
+  });
   const acceptedAnswers = normalizeTagList(body.accepted_answers);
   const answerKeyRaw =
     asString(body.answer_key) ||
@@ -92,6 +114,12 @@ export function normalizeQuestionWriteInput(body: Record<string, unknown>) {
     default_difficulty: asTriviaDifficulty(body.default_difficulty),
     source_note: asNullableString(body.source_note),
     is_tiebreaker_eligible: asBoolean(body.is_tiebreaker_eligible, true),
+    cue_source_type: cueSourceType,
+    cue_source_payload: cueSourcePayload,
+    primary_cue_start_seconds: primaryCueStartSeconds,
+    primary_cue_end_seconds: primaryCueEndSeconds,
+    primary_cue_instruction: primaryCueInstruction,
+    has_required_cue: hasRequiredCue,
     cue_notes_text: asNullableString(body.cue_notes_text),
     cue_payload: cuePayload,
     cue_payload_has_validation_error: hasCueValidationError,
@@ -104,6 +132,7 @@ export function normalizeQuestionWriteInput(body: Record<string, unknown>) {
       region: asNullableString(body.region),
       language: asNullableString(body.language),
       has_media: asBoolean(body.has_media, false),
+      has_required_cue: hasRequiredCue,
       difficulty: asTriviaDifficulty(body.facet_difficulty ?? body.default_difficulty),
       category: asString(body.facet_category ?? body.default_category) || "General Music",
     },

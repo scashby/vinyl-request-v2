@@ -5,6 +5,7 @@ type Json = string | number | boolean | null | { [key: string]: Json | undefined
 type TriviaQuestionStatus = "draft" | "published" | "archived";
 type TriviaQuestionType = "free_response" | "multiple_choice" | "true_false" | "ordering";
 type TriviaDifficulty = "easy" | "medium" | "hard";
+type TriviaCueSourceType = "inventory_track" | "uploaded_clip";
 type TriviaAssetRole = "clue_primary" | "clue_secondary" | "answer_visual" | "explanation_media";
 type TriviaAssetType = "image" | "audio" | "video";
 type TriviaDeckStatus = "draft" | "ready" | "archived";
@@ -55,6 +56,11 @@ export type TriviaDatabase = {
           default_difficulty: TriviaDifficulty;
           source_note: string | null;
           is_tiebreaker_eligible: boolean;
+          cue_source_type: TriviaCueSourceType | null;
+          cue_source_payload: Json;
+          primary_cue_start_seconds: number | null;
+          primary_cue_end_seconds: number | null;
+          primary_cue_instruction: string | null;
           cue_notes_text: string | null;
           cue_payload: Json;
           created_by: string | null;
@@ -81,6 +87,11 @@ export type TriviaDatabase = {
           default_difficulty?: TriviaDifficulty;
           source_note?: string | null;
           is_tiebreaker_eligible?: boolean;
+          cue_source_type?: TriviaCueSourceType | null;
+          cue_source_payload?: Json;
+          primary_cue_start_seconds?: number | null;
+          primary_cue_end_seconds?: number | null;
+          primary_cue_instruction?: string | null;
           cue_notes_text?: string | null;
           cue_payload?: Json;
           created_by?: string | null;
@@ -107,6 +118,11 @@ export type TriviaDatabase = {
           default_difficulty?: TriviaDifficulty;
           source_note?: string | null;
           is_tiebreaker_eligible?: boolean;
+          cue_source_type?: TriviaCueSourceType | null;
+          cue_source_payload?: Json;
+          primary_cue_start_seconds?: number | null;
+          primary_cue_end_seconds?: number | null;
+          primary_cue_instruction?: string | null;
           cue_notes_text?: string | null;
           cue_payload?: Json;
           created_by?: string | null;
@@ -127,6 +143,7 @@ export type TriviaDatabase = {
           region: string | null;
           language: string | null;
           has_media: boolean;
+          has_required_cue: boolean;
           difficulty: TriviaDifficulty;
           category: string;
         };
@@ -138,6 +155,7 @@ export type TriviaDatabase = {
           region?: string | null;
           language?: string | null;
           has_media?: boolean;
+          has_required_cue?: boolean;
           difficulty?: TriviaDifficulty;
           category?: string;
         };
@@ -149,6 +167,7 @@ export type TriviaDatabase = {
           region?: string | null;
           language?: string | null;
           has_media?: boolean;
+          has_required_cue?: boolean;
           difficulty?: TriviaDifficulty;
           category?: string;
         };
@@ -471,6 +490,11 @@ export type TriviaDatabase = {
           explanation_text: string | null;
           reveal_payload: Json;
           source_note: string | null;
+          cue_source_type: TriviaCueSourceType | null;
+          cue_source_payload: Json;
+          primary_cue_start_seconds: number | null;
+          primary_cue_end_seconds: number | null;
+          primary_cue_instruction: string | null;
           cue_notes_text: string | null;
           cue_payload: Json;
           prep_status: string;
@@ -512,6 +536,11 @@ export type TriviaDatabase = {
           explanation_text?: string | null;
           reveal_payload?: Json;
           source_note?: string | null;
+          cue_source_type?: TriviaCueSourceType | null;
+          cue_source_payload?: Json;
+          primary_cue_start_seconds?: number | null;
+          primary_cue_end_seconds?: number | null;
+          primary_cue_instruction?: string | null;
           cue_notes_text?: string | null;
           cue_payload?: Json;
           prep_status?: string;
@@ -553,6 +582,11 @@ export type TriviaDatabase = {
           explanation_text?: string | null;
           reveal_payload?: Json;
           source_note?: string | null;
+          cue_source_type?: TriviaCueSourceType | null;
+          cue_source_payload?: Json;
+          primary_cue_start_seconds?: number | null;
+          primary_cue_end_seconds?: number | null;
+          primary_cue_instruction?: string | null;
           cue_notes_text?: string | null;
           cue_payload?: Json;
           prep_status?: string;

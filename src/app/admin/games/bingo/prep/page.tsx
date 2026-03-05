@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { generateBingoCardsPdf } from "src/lib/bingoCardsPdf";
 import { generateBingoCallSheetPdf } from "src/lib/bingoCallSheetPdf";
-import { formatBallLabel } from "src/lib/bingoBall";
+import { formatBallLabel, getBingoColumnTextClass } from "src/lib/bingoBall";
 
 type Session = {
   id: number;
@@ -143,17 +143,22 @@ export default function BingoPrepPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {calls.map((call) => (
-                    <tr key={call.id} className="border-t border-stone-800 align-top">
-                      <td className="py-2 text-stone-400">{call.call_index}</td>
-                      <td className="py-2 font-bold text-amber-300">{formatBallLabel(call.ball_number, call.column_letter)}</td>
-                      <td className="py-2">{call.artist_name}</td>
-                      <td className="py-2 text-stone-300">{call.album_name ?? ""}</td>
-                      <td className="py-2 text-stone-400">{call.side ?? "-"}</td>
-                      <td className="py-2 text-stone-400">{call.position ?? "-"}</td>
-                      <td className="py-2">{call.track_title}</td>
-                    </tr>
-                  ))}
+                  {calls.map((call) => {
+                    const ballLabel = formatBallLabel(call.ball_number, call.column_letter);
+                    const ballToneClass = getBingoColumnTextClass(call.column_letter, call.ball_number);
+
+                    return (
+                      <tr key={call.id} className="border-t border-stone-800 align-top">
+                        <td className="py-2 text-stone-400">{call.call_index}</td>
+                        <td className={`py-2 font-bold ${ballToneClass}`}>{ballLabel}</td>
+                        <td className="py-2">{call.artist_name}</td>
+                        <td className="py-2 text-stone-300">{call.album_name ?? ""}</td>
+                        <td className="py-2 text-stone-400">{call.side ?? "-"}</td>
+                        <td className="py-2 text-stone-400">{call.position ?? "-"}</td>
+                        <td className="py-2">{call.track_title}</td>
+                      </tr>
+                    );
+                  })}
                   {calls.length === 0 ? (
                     <tr>
                       <td className="py-4 text-xs text-stone-500" colSpan={7}>No calls loaded.</td>

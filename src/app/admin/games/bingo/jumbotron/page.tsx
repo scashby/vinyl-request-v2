@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { getBingoColumnTextClass } from "src/lib/bingoBall";
 
 type Session = {
   session_code: string;
@@ -98,7 +99,9 @@ export default function BingoJumbotronPage() {
 
         <section className="rounded-3xl border border-stone-700 bg-black/45 p-8 text-center">
           <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Current Column</p>
-          <p className="mt-2 text-8xl font-black text-amber-200">{current ? current.column_letter : "-"}</p>
+          <p className={`mt-2 text-8xl font-black ${current ? getBingoColumnTextClass(current.column_letter, current.ball_number) : "text-amber-200"}`}>
+            {current ? current.column_letter : "-"}
+          </p>
           <p className="mt-4 text-6xl font-black text-amber-100">{current ? current.track_title : "Waiting"}</p>
           <p className="mt-2 text-4xl font-semibold text-stone-200">{current ? current.artist_name : ""}</p>
         </section>
@@ -108,7 +111,7 @@ export default function BingoJumbotronPage() {
           <div className="mt-3 grid gap-2 text-2xl font-semibold">
             {recent.map((call) => (
               <div key={call.id}>
-                {call.column_letter} · {call.track_title} · {call.artist_name}
+                <span className={getBingoColumnTextClass(call.column_letter, call.ball_number)}>{call.column_letter}</span> · {call.track_title} · {call.artist_name}
               </div>
             ))}
           </div>

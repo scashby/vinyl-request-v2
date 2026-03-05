@@ -1,33 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import GameEventSelect from "src/components/GameEventSelect";
-import GamePlaylistSelect from "src/components/GamePlaylistSelect";
-import GameSetupInfoButton from "src/components/GameSetupInfoButton";
-import InlineFieldHelp from "src/components/InlineFieldHelp";
 import { downloadGamePullListPdf } from "src/lib/downloadGamePullListPdf";
+import { formatSecondsClock, parseCueTimeToSeconds } from "src/lib/triviaBank";
 
 type EventRow = {
   id: number;
   title: string;
   date: string;
-  time: string | null;
-  location: string | null;
-};
-
-type PlaylistRow = {
-  id: number;
-  name: string;
-  track_count: number;
-};
-
-type DeckRow = {
-  id: number;
-  title: string;
-  status: "draft" | "ready" | "archived";
-  item_total: number;
-  item_locked_total: number;
 };
 
 type SessionRow = {
@@ -48,90 +30,121 @@ type SessionRow = {
   deck_title?: string | null;
 };
 
-type QuestionDeckEntryDraft = {
-  question_text: string;
-  answer_key: string;
-  accepted_answers: string[];
-  category?: string;
-  difficulty?: "easy" | "medium" | "hard";
-  display_element_type?: "song" | "artist" | "album" | "cover_art" | "vinyl_label";
-  source_note?: string | null;
-  prep_status: "ready";
+type InventoryTrackResult = {
+  inventory_id: number;
+  release_id: number | null;
+  release_track_id: number | null;
+  artist: string;
+  album: string;
+  title: string;
+  side: string | null;
+  position: string | null;
+  track_key: string | null;
+  score: number | null;
 };
 
-const CATEGORY_OPTIONS = [
-  "General Music",
-  "Classic Rock",
-  "Soul & Funk",
-  "Hip-Hop",
-  "80s",
-  "90s",
-  "2000s",
-  "One-Hit Wonders",
-  "Soundtracks",
-  "Local Legends",
-] as const;
+type QuestionCardDraft = {
+  id: string;
+  question_text: string;
+  correct_answer: string;
+  alternate_answers_text: string;
+  category: string;
+  tags_text: string;
+  cue_start_text: string;
+  cue_end_text: string;
+  cue_instruction: string;
+  cue_notes_text: string;
+  inventory_query: string;
+  inventory_results: InventoryTrackResult[];
+  selected_track: InventoryTrackResult | null;
+  searching: boolean;
+};
 
-const DISPLAY_ELEMENT_OPTIONS = new Set(["song", "artist", "album", "cover_art", "vinyl_label"] as const);
+type TimerProfileKey = "fast" | "balanced" | "relaxed";
 
-function parseQuestionDeck(text: string): { entries: QuestionDeckEntryDraft[]; invalidLineCount: number } {
-  let invalidLineCount = 0;
+type TimerProfile = {
+  label: string;
+  remove_resleeve_seconds: number;
+  find_record_seconds: number;
+  cue_seconds: number;
+  host_buffer_seconds: number;
+};
 
-  const entries = text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [corePartRaw, categoryPart, difficultyPart, displayPart, sourcePart] = line.split("|").map((part) => part.trim());
-      const dividerIndex = corePartRaw.indexOf(">>>");
-      if (dividerIndex < 0) {
-        invalidLineCount += 1;
-        return null;
-      }
+const TIMER_PROFILES: Record<TimerProfileKey, TimerProfile> = {
+  fast: {
+    label: "Fast",
+    remove_resleeve_seconds: 15,
+    find_record_seconds: 8,
+    cue_seconds: 10,
+    host_buffer_seconds: 6,
+  },
+  balanced: {
+    label: "Balanced",
+    remove_resleeve_seconds: 20,
+    find_record_seconds: 12,
+    cue_seconds: 12,
+    host_buffer_seconds: 8,
+  },
+  relaxed: {
+    label: "Relaxed",
+    remove_resleeve_seconds: 25,
+    find_record_seconds: 15,
+    cue_seconds: 15,
+    host_buffer_seconds: 10,
+  },
+};
 
-      const questionText = corePartRaw.slice(0, dividerIndex).trim();
-      const answersRaw = corePartRaw.slice(dividerIndex + 3).trim();
-      const acceptedAnswers = Array.from(
-        new Set(
-          answersRaw
-            .split(";;")
-            .map((value) => value.trim())
-            .filter(Boolean)
-        )
-      );
-      const answerKey = acceptedAnswers[0] ?? "";
+function createEmptyQuestionCard(id: string): QuestionCardDraft {
+  return {
+    id,
+    question_text: "",
+    correct_answer: "",
+    alternate_answers_text: "",
+    category: "General Music",
+    tags_text: "",
+    cue_start_text: "0:30",
+    cue_end_text: "",
+    cue_instruction: "",
+    cue_notes_text: "",
+    inventory_query: "",
+    inventory_results: [],
+    selected_track: null,
+    searching: false,
+  };
+}
 
-      if (!questionText || !answerKey) {
-        invalidLineCount += 1;
-        return null;
-      }
+function parseDelimitedText(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,]+/)
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+    )
+  );
+}
 
-      const difficultyValue = difficultyPart?.toLowerCase();
-      const normalizedDifficulty =
-        difficultyValue === "easy" || difficultyValue === "medium" || difficultyValue === "hard"
-          ? difficultyValue
-          : undefined;
-      const displayValue = displayPart?.toLowerCase();
-      const normalizedDisplay =
-        displayValue && DISPLAY_ELEMENT_OPTIONS.has(displayValue as QuestionDeckEntryDraft["display_element_type"])
-          ? (displayValue as QuestionDeckEntryDraft["display_element_type"])
-          : undefined;
+function validateQuestionCard(question: QuestionCardDraft): string | null {
+  if (!question.question_text.trim()) return "Question text is required.";
+  if (!question.correct_answer.trim()) return "Correct answer is required.";
+  if (!question.selected_track) return "Pick a vinyl track for cue source.";
 
-      const entry: QuestionDeckEntryDraft = {
-        question_text: questionText,
-        answer_key: answerKey,
-        accepted_answers: acceptedAnswers,
-        prep_status: "ready",
-      };
-      if (categoryPart) entry.category = categoryPart;
-      if (normalizedDifficulty) entry.difficulty = normalizedDifficulty;
-      if (normalizedDisplay) entry.display_element_type = normalizedDisplay;
-      if (sourcePart) entry.source_note = sourcePart;
-      return entry;
-    })
-    .filter((entry): entry is QuestionDeckEntryDraft => Boolean(entry));
+  const startSeconds = parseCueTimeToSeconds(question.cue_start_text);
+  if (startSeconds === null) return "Cue start time is required (use m:ss).";
 
-  return { entries, invalidLineCount };
+  const endSeconds = question.cue_end_text.trim() ? parseCueTimeToSeconds(question.cue_end_text) : null;
+  if (question.cue_end_text.trim() && endSeconds === null) return "Cue end time is invalid.";
+  if (startSeconds !== null && endSeconds !== null && endSeconds < startSeconds) {
+    return "Cue end time must be after cue start time.";
+  }
+
+  return null;
+}
+
+function formatTrackLabel(track: InventoryTrackResult | null): string {
+  if (!track) return "No vinyl track selected";
+  const sidePos = [track.side, track.position].filter(Boolean).join(" ");
+  return `${track.artist} - ${track.album} - ${track.title}${sidePos ? ` (${sidePos})` : ""}`;
 }
 
 export default function MusicTriviaSetupPage() {
@@ -139,49 +152,28 @@ export default function MusicTriviaSetupPage() {
   const searchParams = useSearchParams();
   const eventIdFromUrl = Number(searchParams.get("eventId"));
 
+  const cardCounterRef = useRef(1);
+
   const [events, setEvents] = useState<EventRow[]>([]);
-  const [playlists, setPlaylists] = useState<PlaylistRow[]>([]);
-  const [decks, setDecks] = useState<DeckRow[]>([]);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
 
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [eventId, setEventId] = useState<number | null>(Number.isFinite(eventIdFromUrl) ? eventIdFromUrl : null);
-  const [playlistId, setPlaylistId] = useState<number | null>(null);
-  const [deckId, setDeckId] = useState<number | null>(null);
-  const [title, setTitle] = useState("Music Trivia Session");
-  const [roundCount, setRoundCount] = useState(3);
+  const [title, setTitle] = useState("Vinyl Trivia Night");
+  const [roundCount, setRoundCount] = useState(2);
   const [questionsPerRound, setQuestionsPerRound] = useState(5);
-  const [tieBreakerCount, setTieBreakerCount] = useState(2);
+  const [tieBreakerCount, setTieBreakerCount] = useState(1);
+  const [timerProfile, setTimerProfile] = useState<TimerProfileKey>("balanced");
   const [scoreMode, setScoreMode] = useState<"standard" | "difficulty_bonus_static">("difficulty_bonus_static");
-
-  const [showTitle, setShowTitle] = useState(true);
-  const [showRounds, setShowRounds] = useState(true);
-  const [showQuestionCounter, setShowQuestionCounter] = useState(true);
-  const [showLeaderboard, setShowLeaderboard] = useState(true);
-  const [showCueHints, setShowCueHints] = useState(false);
-
-  const [removeResleeveSeconds, setRemoveResleeveSeconds] = useState(20);
-  const [findRecordSeconds, setFindRecordSeconds] = useState(12);
-  const [cueSeconds, setCueSeconds] = useState(12);
-  const [hostBufferSeconds, setHostBufferSeconds] = useState(8);
-
-  const [categories, setCategories] = useState<string[]>(["General Music", "Classic Rock", "Soul & Funk"]);
-  const [difficultyEasy, setDifficultyEasy] = useState(2);
-  const [difficultyMedium, setDifficultyMedium] = useState(2);
-  const [difficultyHard, setDifficultyHard] = useState(1);
-  const [questionDeckText, setQuestionDeckText] = useState("");
-
   const [teamNamesText, setTeamNamesText] = useState("Team A\nTeam B");
-  const [maxTeams, setMaxTeams] = useState(0);
-  const [slipsBatchSize, setSlipsBatchSize] = useState(0);
 
-  const [preflight, setPreflight] = useState({
-    backupQuestions: false,
-    answerSlips: false,
-    pencilsMarkers: false,
-    tieBreaker: false,
-  });
+  const [questions, setQuestions] = useState<QuestionCardDraft[]>([
+    createEmptyQuestionCard(String(cardCounterRef.current++)),
+  ]);
 
   const [creating, setCreating] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const teamNames = useMemo(
     () =>
@@ -196,63 +188,47 @@ export default function MusicTriviaSetupPage() {
     [teamNamesText]
   );
 
-  const targetGapSeconds = useMemo(
-    () => removeResleeveSeconds + findRecordSeconds + cueSeconds + hostBufferSeconds,
-    [cueSeconds, findRecordSeconds, hostBufferSeconds, removeResleeveSeconds]
+  const requiredQuestionCount = useMemo(
+    () => Math.max(1, roundCount) * Math.max(1, questionsPerRound) + Math.max(0, tieBreakerCount),
+    [roundCount, questionsPerRound, tieBreakerCount]
   );
 
-  const callStackPreview = Math.max(1, roundCount) * Math.max(1, questionsPerRound);
-  const totalCallStackPreview = callStackPreview + Math.max(0, tieBreakerCount);
-  const parsedQuestionDeck = useMemo(() => parseQuestionDeck(questionDeckText), [questionDeckText]);
-  const questionDeckHasContent = questionDeckText.trim().length > 0;
-  const questionDeckOverflowCount = Math.max(0, parsedQuestionDeck.entries.length - totalCallStackPreview);
-  const questionDeckAppliedCount = Math.min(parsedQuestionDeck.entries.length, totalCallStackPreview);
-  const hasQuestionDeckErrors = questionDeckHasContent && parsedQuestionDeck.invalidLineCount > 0;
-  const tieBreakerStartsAt = callStackPreview + 1;
-  const backupQuestionTracks = useMemo(() => Math.max(3, Math.ceil(callStackPreview * 0.15)), [callStackPreview]);
-  const recommendedPullSize = useMemo(
-    () => totalCallStackPreview + backupQuestionTracks,
-    [backupQuestionTracks, totalCallStackPreview]
+  const mainQuestionCount = useMemo(
+    () => Math.max(1, roundCount) * Math.max(1, questionsPerRound),
+    [roundCount, questionsPerRound]
   );
-  const minimumPlaylistTracks = useMemo(
-    () => Math.max(recommendedPullSize, totalCallStackPreview),
-    [recommendedPullSize, totalCallStackPreview]
+
+  const selectedQuestions = useMemo(
+    () => questions.slice(0, requiredQuestionCount),
+    [questions, requiredQuestionCount]
   );
-  const selectedPlaylist = useMemo(
-    () => playlists.find((playlist) => playlist.id === playlistId) ?? null,
-    [playlistId, playlists]
+
+  const questionValidationErrors = useMemo(
+    () => selectedQuestions.map((question) => validateQuestionCard(question)),
+    [selectedQuestions]
   );
-  const selectedDeck = useMemo(
-    () => decks.find((deck) => deck.id === deckId) ?? null,
-    [deckId, decks]
+
+  const invalidQuestionCount = useMemo(
+    () => questionValidationErrors.filter((error) => Boolean(error)).length,
+    [questionValidationErrors]
   );
-  const playlistTooSmall = useMemo(
-    () => (selectedPlaylist ? selectedPlaylist.track_count < minimumPlaylistTracks : false),
-    [minimumPlaylistTracks, selectedPlaylist]
+
+  const missingCueCount = useMemo(
+    () => selectedQuestions.filter((question) => !question.selected_track || parseCueTimeToSeconds(question.cue_start_text) === null).length,
+    [selectedQuestions]
   );
-  const preflightComplete = Object.values(preflight).every(Boolean);
+
+  const reviewReady = teamNames.length >= 2 && invalidQuestionCount === 0;
 
   const load = useCallback(async () => {
-    const [eventRes, playlistRes, deckRes, sessionRes] = await Promise.all([
+    const [eventRes, sessionRes] = await Promise.all([
       fetch("/api/games/trivia/events"),
-      fetch("/api/games/playlists"),
-      fetch("/api/games/trivia/decks?limit=200"),
       fetch(`/api/games/trivia/sessions${eventId ? `?eventId=${eventId}` : ""}`),
     ]);
 
     if (eventRes.ok) {
       const payload = await eventRes.json();
       setEvents(payload.data ?? []);
-    }
-
-    if (playlistRes.ok) {
-      const payload = await playlistRes.json();
-      setPlaylists(payload.data ?? []);
-    }
-
-    if (deckRes.ok) {
-      const payload = await deckRes.json();
-      setDecks(payload.data ?? []);
     }
 
     if (sessionRes.ok) {
@@ -265,284 +241,598 @@ export default function MusicTriviaSetupPage() {
     load();
   }, [load]);
 
-  const toggleCategory = (category: string) => {
-    setCategories((current) => {
-      if (current.includes(category)) return current.filter((value) => value !== category);
-      return [...current, category];
-    });
-  };
+  useEffect(() => {
+    setQuestions((current) => {
+      if (current.length === requiredQuestionCount) return current;
+      if (current.length > requiredQuestionCount) return current.slice(0, requiredQuestionCount);
 
-  const createSession = async () => {
-    if (!playlistId && !deckId) {
-      alert("Select a playlist or a ready deck first");
+      const next = [...current];
+      while (next.length < requiredQuestionCount) {
+        next.push(createEmptyQuestionCard(String(cardCounterRef.current++)));
+      }
+      return next;
+    });
+  }, [requiredQuestionCount]);
+
+  const updateQuestion = useCallback((id: string, patch: Partial<QuestionCardDraft>) => {
+    setQuestions((current) => current.map((question) => (question.id === id ? { ...question, ...patch } : question)));
+  }, []);
+
+  const searchInventory = useCallback(async (questionId: string) => {
+    const question = questions.find((entry) => entry.id === questionId);
+    if (!question) return;
+
+    const query = question.inventory_query.trim();
+    if (!query) {
+      updateQuestion(questionId, { inventory_results: [] });
       return;
     }
-    if (!deckId && playlistTooSmall && selectedPlaylist) {
-      alert(`Selected playlist has ${selectedPlaylist.track_count} tracks. This setup needs at least ${minimumPlaylistTracks}.`);
-      return;
-    }
-    if (!deckId && hasQuestionDeckErrors) {
-      alert("Fix question deck lines first. Each line needs: Question >>> Answer");
-      return;
-    }
-    if (teamNames.length < 2) return;
-    setCreating(true);
+
+    updateQuestion(questionId, { searching: true });
     try {
-      const res = await fetch("/api/games/trivia/sessions", {
+      const res = await fetch(`/api/games/trivia/inventory-search?q=${encodeURIComponent(query)}&limit=8`);
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error ?? "Inventory search failed");
+
+      updateQuestion(questionId, {
+        inventory_results: Array.isArray(payload.data) ? payload.data : [],
+      });
+    } catch {
+      updateQuestion(questionId, { inventory_results: [] });
+    } finally {
+      updateQuestion(questionId, { searching: false });
+    }
+  }, [questions, updateQuestion]);
+
+  const addQuestionCard = useCallback(() => {
+    setQuestions((current) => [...current, createEmptyQuestionCard(String(cardCounterRef.current++))]);
+  }, []);
+
+  const removeQuestionCard = useCallback((id: string) => {
+    setQuestions((current) => {
+      if (current.length <= 1) return current;
+      const next = current.filter((question) => question.id !== id);
+      return next.length === 0 ? [createEmptyQuestionCard(String(cardCounterRef.current++))] : next;
+    });
+  }, []);
+
+  const timerConfig = TIMER_PROFILES[timerProfile];
+
+  const saveQuestionCard = useCallback(async (question: QuestionCardDraft) => {
+    const validationError = validateQuestionCard(question);
+    if (validationError) throw new Error(validationError);
+
+    const cueStartSeconds = parseCueTimeToSeconds(question.cue_start_text);
+    const cueEndSeconds = question.cue_end_text.trim() ? parseCueTimeToSeconds(question.cue_end_text) : null;
+    if (cueStartSeconds === null) throw new Error("Cue start time is required.");
+
+    const alternateAnswers = parseDelimitedText(question.alternate_answers_text);
+    const tags = parseDelimitedText(question.tags_text);
+
+    const inventoryTrack = question.selected_track;
+    if (!inventoryTrack) throw new Error("Pick a vinyl track for cue source.");
+
+    const cueInstruction = question.cue_instruction.trim() || `Cue ${inventoryTrack.title} at ${formatSecondsClock(cueStartSeconds)}`;
+
+    const res = await fetch("/api/games/trivia/questions/quick", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question_text: question.question_text,
+        correct_answer: question.correct_answer,
+        alternate_answers: alternateAnswers,
+        category: question.category,
+        tags,
+        cue_source_type: "inventory_track",
+        cue_source_payload: {
+          inventory_id: inventoryTrack.inventory_id,
+          release_id: inventoryTrack.release_id,
+          release_track_id: inventoryTrack.release_track_id,
+          artist: inventoryTrack.artist,
+          album: inventoryTrack.album,
+          title: inventoryTrack.title,
+          side: inventoryTrack.side,
+          position: inventoryTrack.position,
+        },
+        primary_cue_start_seconds: cueStartSeconds,
+        primary_cue_end_seconds: cueEndSeconds,
+        primary_cue_instruction: cueInstruction,
+        cue_notes_text: question.cue_notes_text,
+        source_note: `Wizard cue source: ${formatTrackLabel(inventoryTrack)}`,
+        publish: true,
+      }),
+    });
+
+    const payload = await res.json();
+    if (!res.ok) {
+      throw new Error(payload.error ?? "Failed to save question");
+    }
+
+    return Number(payload.id);
+  }, []);
+
+  const saveAllQuestionsAsDraftDeck = useCallback(async () => {
+    setErrorMessage(null);
+    setSavingDraft(true);
+    try {
+      const ids: number[] = [];
+      for (let index = 0; index < selectedQuestions.length; index += 1) {
+        const question = selectedQuestions[index];
+        try {
+          const questionId = await saveQuestionCard(question);
+          ids.push(questionId);
+        } catch (error) {
+          throw new Error(`Question ${index + 1}: ${error instanceof Error ? error.message : "Invalid question"}`);
+        }
+      }
+
+      const createDeckRes = await fetch("/api/games/trivia/decks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: `${title} Question Deck`,
+          build_mode: "manual",
+          status: "draft",
+          rules_payload: {
+            round_count: roundCount,
+            questions_per_round: questionsPerRound,
+            tie_breaker_count: tieBreakerCount,
+            target_count: roundCount * questionsPerRound,
+            filters: {
+              statuses: ["published"],
+              has_required_cue: true,
+            },
+          },
+          items: ids.map((questionId, index) => ({
+            item_index: index + 1,
+            round_number: index < mainQuestionCount ? (Math.floor(index / questionsPerRound) + 1) : (roundCount + 1),
+            is_tiebreaker: index >= mainQuestionCount,
+            question_id: questionId,
+          })),
+        }),
+      });
+      const createDeckPayload = await createDeckRes.json();
+      if (!createDeckRes.ok) throw new Error(createDeckPayload.error ?? "Failed to create draft deck");
+
+      alert(`Draft deck created: ${createDeckPayload.deck_code ?? createDeckPayload.id}`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to save draft deck");
+    } finally {
+      setSavingDraft(false);
+    }
+  }, [mainQuestionCount, questionsPerRound, roundCount, saveQuestionCard, selectedQuestions, tieBreakerCount, title]);
+
+  const createSessionFromWizard = useCallback(async () => {
+    if (creating) return;
+
+    setErrorMessage(null);
+    setCreating(true);
+
+    try {
+      const questionIds: number[] = [];
+      for (let index = 0; index < selectedQuestions.length; index += 1) {
+        const question = selectedQuestions[index];
+        try {
+          const questionId = await saveQuestionCard(question);
+          questionIds.push(questionId);
+        } catch (error) {
+          throw new Error(`Question ${index + 1}: ${error instanceof Error ? error.message : "Invalid question"}`);
+        }
+      }
+
+      const res = await fetch("/api/games/trivia/wizard/create-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           event_id: eventId,
-          playlist_id: playlistId,
-          deck_id: deckId,
           title,
+          deck_title: `${title} Deck`,
           round_count: roundCount,
           questions_per_round: questionsPerRound,
           tie_breaker_count: tieBreakerCount,
           score_mode: scoreMode,
-          remove_resleeve_seconds: removeResleeveSeconds,
-          find_record_seconds: findRecordSeconds,
-          cue_seconds: cueSeconds,
-          host_buffer_seconds: hostBufferSeconds,
-          show_title: showTitle,
-          show_rounds: showRounds,
-          show_question_counter: showQuestionCounter,
-          show_leaderboard: showLeaderboard,
-          show_cue_hints: showCueHints,
-          categories,
-          difficulty_targets: {
-            easy: difficultyEasy,
-            medium: difficultyMedium,
-            hard: difficultyHard,
-          },
-          max_teams: maxTeams > 0 ? maxTeams : null,
-          slips_batch_size: slipsBatchSize > 0 ? slipsBatchSize : null,
+          remove_resleeve_seconds: timerConfig.remove_resleeve_seconds,
+          find_record_seconds: timerConfig.find_record_seconds,
+          cue_seconds: timerConfig.cue_seconds,
+          host_buffer_seconds: timerConfig.host_buffer_seconds,
+          show_title: true,
+          show_rounds: true,
+          show_question_counter: true,
+          show_leaderboard: true,
+          show_cue_hints: false,
           team_names: teamNames,
-          question_deck: deckId ? undefined : parsedQuestionDeck.entries,
+          question_ids: questionIds,
         }),
       });
 
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error ?? "Failed to create session");
 
-      router.push(`/admin/games/music-trivia/prep?sessionId=${payload.id}`);
+      const sessionId = Number(payload?.session?.id);
+      if (!Number.isFinite(sessionId)) throw new Error("Session created but response was missing session id.");
+
+      await load();
+      router.push(`/admin/games/music-trivia/prep?sessionId=${sessionId}`);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to create session");
+      setErrorMessage(error instanceof Error ? error.message : "Failed to create session");
     } finally {
       setCreating(false);
-      load();
     }
-  };
+  }, [creating, eventId, load, questionsPerRound, roundCount, router, saveQuestionCard, scoreMode, selectedQuestions, teamNames, tieBreakerCount, timerConfig, title]);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,#0f2d3a,transparent_45%),linear-gradient(180deg,#111,#070707)] p-6 text-stone-100">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <header className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
-          <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">Brewery Floor Mode</p>
-          <h1 className="mt-1 text-4xl font-black uppercase text-cyan-100">Music Trivia Setup</h1>
-          <p className="mt-2 text-sm text-stone-300">Music Trivia asks teams music questions between songs, scores each round from written answers, and the highest total score wins.</p>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap gap-2 text-xs">
-              <button className="rounded border border-stone-700 px-3 py-1" onClick={() => router.push("/admin/games/music-trivia/bank")}>Question Bank</button>
-              <button className="rounded border border-stone-700 px-3 py-1" onClick={() => router.push("/admin/games/music-trivia/decks")}>Deck Builder</button>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_18%_20%,#1d4d44,transparent_45%),linear-gradient(180deg,#0f1312,#060807)] p-6 text-stone-100">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <header className="rounded-3xl border border-emerald-900/40 bg-black/45 p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.28em] text-emerald-300">Consumer Mode</p>
+              <h1 className="mt-1 text-4xl font-black uppercase text-emerald-100">Create Vinyl Trivia Game</h1>
+              <p className="mt-2 text-sm text-stone-300">
+                Every question requires a playable vinyl cue. Fill out the wizard and start hosting.
+              </p>
             </div>
-            <GameSetupInfoButton gameSlug="music-trivia" />
+            <div className="flex flex-wrap gap-2 text-xs">
+              <Link href="/admin/games/music-trivia/bank" className="rounded border border-stone-700 px-3 py-1">Studio: Question Bank</Link>
+              <Link href="/admin/games/music-trivia/decks" className="rounded border border-stone-700 px-3 py-1">Studio: Deck Builder</Link>
+              <Link href="/admin/games/music-trivia/history" className="rounded border border-stone-700 px-3 py-1">History</Link>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-2 text-xs md:grid-cols-3">
+            <div className={`rounded border px-3 py-2 ${step === 1 ? "border-emerald-400 bg-emerald-950/30" : "border-stone-700 bg-stone-950/60"}`}>1. Game Basics</div>
+            <div className={`rounded border px-3 py-2 ${step === 2 ? "border-emerald-400 bg-emerald-950/30" : "border-stone-700 bg-stone-950/60"}`}>2. Questions + Vinyl Cues</div>
+            <div className={`rounded border px-3 py-2 ${step === 3 ? "border-emerald-400 bg-emerald-950/30" : "border-stone-700 bg-stone-950/60"}`}>3. Review + Start</div>
           </div>
         </header>
 
-        <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-cyan-100">Session Config</h2>
-          <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <GameEventSelect events={events} eventId={eventId} setEventId={setEventId} />
-            <GamePlaylistSelect playlists={playlists} playlistId={playlistId} setPlaylistId={setPlaylistId} />
+        {step === 1 ? (
+          <section className="rounded-3xl border border-emerald-900/40 bg-black/45 p-6">
+            <h2 className="text-xl font-black uppercase text-emerald-100">Step 1: Game Basics</h2>
+            <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <label className="text-sm">Game Name
+                <input
+                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+              </label>
 
-            <label className="text-sm">Deck (optional, snapshot-backed)
-              <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={deckId ?? ""} onChange={(e) => setDeckId(e.target.value ? Number(e.target.value) : null)}>
-                <option value="">No deck (use direct question flow)</option>
-                {decks
-                  .filter((deck) => deck.status !== "archived")
-                  .map((deck) => (
-                    <option key={deck.id} value={deck.id}>
-                      {deck.title} ({deck.status}, {deck.item_total} items)
+              <label className="text-sm">Event (optional)
+                <select
+                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                  value={eventId ?? ""}
+                  onChange={(e) => setEventId(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">No event selected</option>
+                  {events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.date} - {event.title}
                     </option>
                   ))}
-              </select>
-            </label>
+                </select>
+              </label>
 
-            <label className="text-sm">Session Title <InlineFieldHelp label="Session Title" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} />
-            </label>
+              <label className="text-sm">Score Mode
+                <select
+                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                  value={scoreMode}
+                  onChange={(e) => setScoreMode((e.target.value as "standard" | "difficulty_bonus_static") ?? "difficulty_bonus_static")}
+                >
+                  <option value="difficulty_bonus_static">Difficulty Bonus</option>
+                  <option value="standard">Standard</option>
+                </select>
+              </label>
 
-            <label className="text-sm">Score Mode <InlineFieldHelp label="Score Mode" />
-              <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={scoreMode} onChange={(e) => setScoreMode((e.target.value as "standard" | "difficulty_bonus_static") ?? "difficulty_bonus_static")}>
-                <option value="difficulty_bonus_static">Difficulty Bonus (Static)</option>
-                <option value="standard">Standard</option>
-              </select>
-            </label>
+              <label className="text-sm">Rounds
+                <input
+                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                  type="number"
+                  min={1}
+                  value={roundCount}
+                  onChange={(e) => setRoundCount(Math.max(1, Number(e.target.value) || 1))}
+                />
+              </label>
 
-            <label className="text-sm">Rounds <InlineFieldHelp label="Rounds" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={1} value={roundCount} onChange={(e) => setRoundCount(Math.max(1, Number(e.target.value) || 1))} />
-            </label>
+              <label className="text-sm">Questions per Round
+                <input
+                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                  type="number"
+                  min={1}
+                  value={questionsPerRound}
+                  onChange={(e) => setQuestionsPerRound(Math.max(1, Number(e.target.value) || 1))}
+                />
+              </label>
 
-            <label className="text-sm">Questions / Round <InlineFieldHelp label="Questions / Round" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={1} value={questionsPerRound} onChange={(e) => setQuestionsPerRound(Math.max(1, Number(e.target.value) || 1))} />
-            </label>
+              <label className="text-sm">Tie-breakers
+                <input
+                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                  type="number"
+                  min={0}
+                  value={tieBreakerCount}
+                  onChange={(e) => setTieBreakerCount(Math.max(0, Number(e.target.value) || 0))}
+                />
+              </label>
+            </div>
 
-            <label className="text-sm">Tie-breakers <InlineFieldHelp label="Tie-breakers" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={tieBreakerCount} onChange={(e) => setTieBreakerCount(Math.max(0, Number(e.target.value) || 0))} />
-            </label>
-          </div>
+            <div className="mt-4 rounded-xl border border-stone-700 bg-stone-950/70 p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-emerald-300">Timer Profile</p>
+              <div className="mt-3 grid gap-2 md:grid-cols-3">
+                {(Object.keys(TIMER_PROFILES) as TimerProfileKey[]).map((profileKey) => {
+                  const profile = TIMER_PROFILES[profileKey];
+                  const active = profileKey === timerProfile;
+                  return (
+                    <button
+                      key={profileKey}
+                      onClick={() => setTimerProfile(profileKey)}
+                      className={`rounded border px-3 py-3 text-left text-sm ${active ? "border-emerald-400 bg-emerald-950/40" : "border-stone-700 bg-stone-900/70"}`}
+                    >
+                      <p className="font-semibold">{profile.label}</p>
+                      <p className="mt-1 text-xs text-stone-300">Resleeve {profile.remove_resleeve_seconds}s - Find {profile.find_record_seconds}s - Cue {profile.cue_seconds}s - Buffer {profile.host_buffer_seconds}s</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-          {!deckId ? (
-            <>
-              <p className="mt-2 text-xs text-stone-300">
-                Minimum playlist size for current setup:{" "}
-                <span className="font-semibold text-emerald-300">{minimumPlaylistTracks}</span> tracks.
+            <label className="mt-4 block text-sm">Teams (one per line)
+              <textarea
+                className="mt-1 h-32 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                value={teamNamesText}
+                onChange={(e) => setTeamNamesText(e.target.value)}
+              />
+              <p className={`mt-1 text-xs ${teamNames.length >= 2 ? "text-emerald-300" : "text-amber-300"}`}>
+                {teamNames.length >= 2 ? `${teamNames.length} teams ready` : "At least 2 teams are required"}
               </p>
-              <p className="mt-1 text-xs text-cyan-300">
-                Recommended playlist/crate pull: {recommendedPullSize} ({callStackPreview} primary + {tieBreakerCount} tie-breaker + {backupQuestionTracks} backup).
+            </label>
+
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-stone-300">
+                Total required questions: <span className="font-semibold text-emerald-300">{requiredQuestionCount}</span>
               </p>
-              {selectedPlaylist ? (
-                <p className={`mt-1 text-xs ${playlistTooSmall ? "text-red-300" : "text-emerald-300"}`}>
-                  Selected bank: {selectedPlaylist.name} ({selectedPlaylist.track_count} tracks)
-                  {playlistTooSmall ? ` · add ${minimumPlaylistTracks - selectedPlaylist.track_count} tracks or lower setup requirements.` : " · meets minimum."}
+              <button
+                onClick={() => setStep(2)}
+                disabled={teamNames.length < 2}
+                className="rounded bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+              >
+                Continue to Questions
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        {step === 2 ? (
+          <section className="rounded-3xl border border-emerald-900/40 bg-black/45 p-6">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-xl font-black uppercase text-emerald-100">Step 2: Questions + Vinyl Cues</h2>
+              <p className="text-xs text-stone-300">Media is required for every question.</p>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+              <button onClick={() => setStep(1)} className="rounded border border-stone-700 px-3 py-1">Back to Basics</button>
+              <button onClick={addQuestionCard} className="rounded border border-emerald-700 px-3 py-1">Add Extra Question Card</button>
+              <button
+                onClick={() => setStep(3)}
+                className="rounded bg-emerald-700 px-3 py-1 font-semibold text-white"
+              >
+                Review & Start
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              {questions.map((question, index) => {
+                const isRequired = index < requiredQuestionCount;
+                const isTieBreaker = isRequired && index >= mainQuestionCount;
+                const validationError = validateQuestionCard(question);
+                const cueStartSeconds = parseCueTimeToSeconds(question.cue_start_text);
+
+                return (
+                  <article key={question.id} className={`rounded-2xl border p-4 ${isRequired ? "border-emerald-800/70 bg-emerald-950/10" : "border-stone-700 bg-stone-950/60"}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-emerald-200">
+                        Q{index + 1} {isTieBreaker ? "(Tie-breaker)" : ""} {isRequired ? "" : "(Extra)"}
+                      </p>
+                      <button
+                        onClick={() => removeQuestionCard(question.id)}
+                        className="rounded border border-stone-700 px-2 py-1 text-xs"
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <label className="text-sm">Question text
+                        <textarea
+                          className="mt-1 h-20 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                          value={question.question_text}
+                          onChange={(e) => updateQuestion(question.id, { question_text: e.target.value })}
+                        />
+                      </label>
+
+                      <label className="text-sm">Correct answer
+                        <input
+                          className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                          value={question.correct_answer}
+                          onChange={(e) => updateQuestion(question.id, { correct_answer: e.target.value })}
+                        />
+                      </label>
+
+                      <label className="text-sm">Alternate answers (comma or new line)
+                        <textarea
+                          className="mt-1 h-20 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                          value={question.alternate_answers_text}
+                          onChange={(e) => updateQuestion(question.id, { alternate_answers_text: e.target.value })}
+                        />
+                      </label>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <label className="text-sm">Category
+                          <input
+                            className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                            value={question.category}
+                            onChange={(e) => updateQuestion(question.id, { category: e.target.value })}
+                          />
+                        </label>
+                        <label className="text-sm">Tags
+                          <input
+                            className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                            value={question.tags_text}
+                            onChange={(e) => updateQuestion(question.id, { tags_text: e.target.value })}
+                            placeholder="70s, soul, vocals"
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 rounded-xl border border-cyan-900/60 bg-cyan-950/20 p-3">
+                      <p className="text-xs uppercase tracking-[0.2em] text-cyan-200">Cue Source (Required)</p>
+                      <div className="mt-2 grid gap-3 md:grid-cols-[1fr,auto]">
+                        <input
+                          className="rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm"
+                          placeholder="Search vinyl inventory: artist, album, track"
+                          value={question.inventory_query}
+                          onChange={(e) => updateQuestion(question.id, { inventory_query: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              searchInventory(question.id);
+                            }
+                          }}
+                        />
+                        <button
+                          onClick={() => searchInventory(question.id)}
+                          className="rounded border border-cyan-700 px-3 py-2 text-sm"
+                          disabled={question.searching}
+                        >
+                          {question.searching ? "Searching..." : "Search"}
+                        </button>
+                      </div>
+
+                      {question.inventory_results.length > 0 ? (
+                        <div className="mt-2 max-h-44 overflow-y-auto rounded border border-stone-700 bg-stone-950/70 p-2 text-xs">
+                          {question.inventory_results.map((result) => (
+                            <button
+                              key={`${result.inventory_id}-${result.side ?? ""}-${result.position ?? ""}-${result.title}`}
+                              onClick={() => {
+                                updateQuestion(question.id, {
+                                  selected_track: result,
+                                  cue_instruction: question.cue_instruction.trim() || `Cue ${result.title}`,
+                                });
+                              }}
+                              className="block w-full rounded px-2 py-1 text-left hover:bg-stone-800"
+                            >
+                              {result.artist} - {result.album} - {result.title}
+                              {(result.side || result.position) ? ` (${[result.side, result.position].filter(Boolean).join(" ")})` : ""}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      <div className="mt-3 grid gap-3 md:grid-cols-3">
+                        <label className="text-sm">Cue start (m:ss)
+                          <input
+                            className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                            value={question.cue_start_text}
+                            onChange={(e) => updateQuestion(question.id, { cue_start_text: e.target.value })}
+                          />
+                        </label>
+                        <label className="text-sm">Cue end (optional)
+                          <input
+                            className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                            value={question.cue_end_text}
+                            onChange={(e) => updateQuestion(question.id, { cue_end_text: e.target.value })}
+                          />
+                        </label>
+                        <label className="text-sm">Cue instruction
+                          <input
+                            className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                            value={question.cue_instruction}
+                            onChange={(e) => updateQuestion(question.id, { cue_instruction: e.target.value })}
+                            placeholder="Start at chorus"
+                          />
+                        </label>
+                      </div>
+
+                      <label className="mt-3 block text-sm">Extra cue notes
+                        <textarea
+                          className="mt-1 h-16 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                          value={question.cue_notes_text}
+                          onChange={(e) => updateQuestion(question.id, { cue_notes_text: e.target.value })}
+                          placeholder="Play any song on album, start at 2:30"
+                        />
+                      </label>
+
+                      <div className="mt-3 rounded border border-cyan-800/70 bg-cyan-950/30 p-3 text-xs">
+                        <p className="font-semibold uppercase tracking-wide text-cyan-200">Host Pull Card Preview</p>
+                        <p className="mt-1 text-stone-100">{formatTrackLabel(question.selected_track)}</p>
+                        <p className="mt-1 text-stone-200">Cue: {cueStartSeconds !== null ? formatSecondsClock(cueStartSeconds) : "--:--"}</p>
+                        {question.cue_instruction.trim() ? <p className="mt-1 text-stone-300">Instruction: {question.cue_instruction.trim()}</p> : null}
+                      </div>
+                    </div>
+
+                    {isRequired && validationError ? <p className="mt-2 text-xs text-amber-300">{validationError}</p> : null}
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+
+        {step === 3 ? (
+          <section className="rounded-3xl border border-emerald-900/40 bg-black/45 p-6">
+            <h2 className="text-xl font-black uppercase text-emerald-100">Step 3: Review & Start</h2>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="rounded border border-stone-700 bg-stone-950/70 p-3 text-sm">
+                <p className="font-semibold text-emerald-200">Game Summary</p>
+                <p className="mt-1">Title: {title}</p>
+                <p>Rounds: {roundCount}</p>
+                <p>Questions per round: {questionsPerRound}</p>
+                <p>Tie-breakers: {tieBreakerCount}</p>
+                <p>Teams: {teamNames.length}</p>
+                <p>Timer profile: {timerConfig.label}</p>
+              </div>
+
+              <div className="rounded border border-stone-700 bg-stone-950/70 p-3 text-sm">
+                <p className="font-semibold text-emerald-200">Validation</p>
+                <p className={invalidQuestionCount === 0 ? "mt-1 text-emerald-300" : "mt-1 text-amber-300"}>
+                  Questions ready: {selectedQuestions.length - invalidQuestionCount}/{selectedQuestions.length}
                 </p>
-              ) : (
-                <p className="mt-1 text-xs text-amber-300">Select a playlist bank to validate minimum track requirement.</p>
-              )}
-            </>
-          ) : (
-            <p className="mt-2 text-xs text-emerald-300">
-              Deck mode enabled: <span className="font-semibold">{selectedDeck?.title ?? `Deck ${deckId}`}</span>. Playlist selection is optional.
-            </p>
-          )}
-
-          <div className="mt-4 grid gap-2 text-sm md:grid-cols-2">
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> <span>Jumbotron title <InlineFieldHelp label="Jumbotron title" /></span></label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showRounds} onChange={(e) => setShowRounds(e.target.checked)} /> <span>Jumbotron round status <InlineFieldHelp label="Jumbotron round status" /></span></label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showQuestionCounter} onChange={(e) => setShowQuestionCounter(e.target.checked)} /> <span>Jumbotron question counter <InlineFieldHelp label="Jumbotron question counter" /></span></label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showLeaderboard} onChange={(e) => setShowLeaderboard(e.target.checked)} /> <span>Jumbotron leaderboard <InlineFieldHelp label="Jumbotron leaderboard" /></span></label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showCueHints} onChange={(e) => setShowCueHints(e.target.checked)} /> <span>Jumbotron cue hints (safe) <InlineFieldHelp label="Jumbotron cue hints (safe)" /></span></label>
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-cyan-100">Pacing Budget</h2>
-          <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <label className="text-sm">Remove + Resleeve (sec) <InlineFieldHelp label="Remove + Resleeve (sec)" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={removeResleeveSeconds} onChange={(e) => setRemoveResleeveSeconds(Math.max(0, Number(e.target.value) || 0))} />
-            </label>
-            <label className="text-sm">Find Record (sec) <InlineFieldHelp label="Find Record (sec)" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={findRecordSeconds} onChange={(e) => setFindRecordSeconds(Math.max(0, Number(e.target.value) || 0))} />
-            </label>
-            <label className="text-sm">Cue (sec) <InlineFieldHelp label="Cue (sec)" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={cueSeconds} onChange={(e) => setCueSeconds(Math.max(0, Number(e.target.value) || 0))} />
-            </label>
-            <label className="text-sm">Host Buffer (sec) <InlineFieldHelp label="Host Buffer (sec)" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={hostBufferSeconds} onChange={(e) => setHostBufferSeconds(Math.max(0, Number(e.target.value) || 0))} />
-            </label>
-          </div>
-          <p className="mt-3 text-sm text-stone-300">Derived target gap: <span className="font-semibold text-cyan-300">{targetGapSeconds}s</span></p>
-        </section>
-
-        <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-cyan-100">Question Deck</h2>
-          <p className="mt-1 text-xs text-stone-400">Generate call stack preview: {callStackPreview} questions.</p>
-          {deckId ? (
-            <p className="mt-1 text-xs text-amber-300">Deck selected: manual import below is ignored for this session.</p>
-          ) : null}
-
-          <div className="mt-4 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-            {CATEGORY_OPTIONS.map((category) => (
-              <label key={category} className="inline-flex items-center gap-2 rounded border border-stone-700 bg-stone-950/80 px-3 py-2 text-sm">
-                <input type="checkbox" checked={categories.includes(category)} onChange={() => toggleCategory(category)} />
-                {category}
-              </label>
-            ))}
-          </div>
-
-          <div className="mt-4 grid gap-4 md:grid-cols-3">
-            <label className="text-sm">Easy target <InlineFieldHelp label="Easy target" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={difficultyEasy} onChange={(e) => setDifficultyEasy(Math.max(0, Number(e.target.value) || 0))} />
-            </label>
-            <label className="text-sm">Medium target <InlineFieldHelp label="Medium target" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={difficultyMedium} onChange={(e) => setDifficultyMedium(Math.max(0, Number(e.target.value) || 0))} />
-            </label>
-            <label className="text-sm">Hard target <InlineFieldHelp label="Hard target" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={difficultyHard} onChange={(e) => setDifficultyHard(Math.max(0, Number(e.target.value) || 0))} />
-            </label>
-          </div>
-
-          <label className="mt-4 block text-sm">
-            Optional Question Deck Import (one line per question)
-            <textarea
-              className="mt-1 h-40 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 font-mono text-xs"
-              placeholder={'Question >>> Answer ;; Alt Answer | Category | easy|medium|hard | song|artist|album|cover_art|vinyl_label | Source note'}
-              value={questionDeckText}
-              onChange={(e) => setQuestionDeckText(e.target.value)}
-              disabled={Boolean(deckId)}
-            />
-          </label>
-          <p className="mt-2 text-xs text-stone-400">
-            Import applies top-to-bottom to Q1-Q{totalCallStackPreview}. Tie-breakers begin at Q{tieBreakerStartsAt}.
-          </p>
-          <p className={`mt-1 text-xs ${hasQuestionDeckErrors ? "text-amber-300" : "text-cyan-300"}`}>
-            Parsed: {questionDeckAppliedCount}/{totalCallStackPreview}
-            {questionDeckOverflowCount > 0 ? ` · ${questionDeckOverflowCount} extra line(s) will be ignored.` : ""}
-            {parsedQuestionDeck.invalidLineCount > 0 ? ` · ${parsedQuestionDeck.invalidLineCount} invalid line(s) need fixing.` : ""}
-          </p>
-          <p className="mt-1 text-[11px] text-stone-500">
-            Example: Who sang &quot;Ain&apos;t No Mountain High Enough&quot;? &gt;&gt;&gt; Marvin Gaye & Tammi Terrell ;; Marvin Gaye and Tammi Terrell | Soul & Funk | medium | artist | Motown era round
-          </p>
-        </section>
-
-        <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-cyan-100">Team Setup</h2>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <label className="text-sm">Teams (one per line) <InlineFieldHelp label="Teams (one per line)" />
-              <textarea className="mt-1 h-36 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={teamNamesText} onChange={(e) => setTeamNamesText(e.target.value)} />
-              <p className="mt-1 text-xs text-stone-400">Detected teams: {teamNames.length}</p>
-            </label>
-
-            <div className="grid gap-4">
-              <label className="text-sm">Max teams (optional) <InlineFieldHelp label="Max teams (optional)" />
-                <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={maxTeams} onChange={(e) => setMaxTeams(Math.max(0, Number(e.target.value) || 0))} />
-              </label>
-              <label className="text-sm">Slips batch size (optional) <InlineFieldHelp label="Slips batch size (optional)" />
-                <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={slipsBatchSize} onChange={(e) => setSlipsBatchSize(Math.max(0, Number(e.target.value) || 0))} />
-              </label>
+                <p className={missingCueCount === 0 ? "text-emerald-300" : "text-amber-300"}>
+                  Questions missing cue source/time: {missingCueCount}
+                </p>
+                <p className={teamNames.length >= 2 ? "text-emerald-300" : "text-amber-300"}>
+                  Teams ready: {teamNames.length}
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div className="mt-4 rounded-xl border border-stone-700 bg-stone-950/80 p-3 text-sm">
-            <p className="font-semibold uppercase tracking-wide text-cyan-200">Preflight Checklist</p>
-            <div className="mt-2 grid gap-2 md:grid-cols-2">
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.backupQuestions} onChange={(e) => setPreflight((p) => ({ ...p, backupQuestions: e.target.checked }))} /> <span>Backup questions ready <InlineFieldHelp label="Backup questions ready" /></span></label>
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.answerSlips} onChange={(e) => setPreflight((p) => ({ ...p, answerSlips: e.target.checked }))} /> <span>Answer slips ready <InlineFieldHelp label="Answer slips ready" /></span></label>
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.pencilsMarkers} onChange={(e) => setPreflight((p) => ({ ...p, pencilsMarkers: e.target.checked }))} /> <span>Pencils/markers ready <InlineFieldHelp label="Pencils/markers ready" /></span></label>
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.tieBreaker} onChange={(e) => setPreflight((p) => ({ ...p, tieBreaker: e.target.checked }))} /> <span>Tie-breaker ready <InlineFieldHelp label="Tie-breaker ready" /></span></label>
+            {errorMessage ? (
+              <p className="mt-3 rounded border border-red-700/60 bg-red-950/30 px-3 py-2 text-sm text-red-200">{errorMessage}</p>
+            ) : null}
+
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <button onClick={() => setStep(2)} className="rounded border border-stone-700 px-3 py-2 text-sm">Back to Questions</button>
+              <button
+                onClick={saveAllQuestionsAsDraftDeck}
+                disabled={savingDraft || creating || !reviewReady}
+                className="rounded border border-emerald-700 px-3 py-2 text-sm disabled:opacity-50"
+              >
+                {savingDraft ? "Saving Draft Deck..." : "Save Draft Deck"}
+              </button>
+              <button
+                onClick={createSessionFromWizard}
+                disabled={!reviewReady || creating || savingDraft}
+                className="rounded bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {creating ? "Creating Game..." : "Create & Start Game"}
+              </button>
             </div>
-          </div>
+          </section>
+        ) : null}
 
-          <button
-            disabled={
-              (!playlistId && !deckId) ||
-              (!deckId && playlistTooSmall) ||
-              !preflightComplete ||
-              teamNames.length < 2 ||
-              creating ||
-              (!deckId && hasQuestionDeckErrors)
-            }
-            onClick={createSession}
-            className="mt-5 rounded bg-cyan-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
-          >
-            {creating ? "Creating..." : "Create Session"}
-          </button>
-        </section>
-
-        <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
+        <section className="rounded-3xl border border-emerald-900/40 bg-black/45 p-6">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-xl font-black uppercase text-cyan-100">Existing Sessions</h2>
+            <h2 className="text-xl font-black uppercase text-emerald-100">Existing Sessions</h2>
             <button onClick={load} className="rounded border border-stone-700 px-3 py-1 text-sm">Refresh</button>
           </div>
 
@@ -552,17 +842,16 @@ export default function MusicTriviaSetupPage() {
             <div className="space-y-3">
               {sessions.map((session) => (
                 <div key={session.id} className="rounded-xl border border-stone-700 bg-stone-950/70 p-3">
-                  <div className="text-sm">{session.session_code} · {session.title} · Round {session.current_round} of {session.round_count} · QPR {session.questions_per_round} · TB {session.tie_breaker_count}</div>
-                  <div className="text-xs text-stone-400">Event: {session.event_title ?? "(none)"} · Playlist: {session.playlist_name ?? "(none)"} · Deck: {session.deck_title ?? "(none)"} · Status: {session.status}</div>
-                  <div className="mt-1 text-xs text-cyan-300">
-                    Prep: Main {session.prep_main_ready}/{session.prep_main_total} · Tie-breaker {session.prep_tiebreaker_ready}/{session.prep_tiebreaker_total}
+                  <div className="text-sm">{session.session_code} - {session.title} - Round {session.current_round} of {session.round_count} - QPR {session.questions_per_round} - TB {session.tie_breaker_count}</div>
+                  <div className="text-xs text-stone-400">Event: {session.event_title ?? "(none)"} - Deck: {session.deck_title ?? "(none)"} - Playlist: {session.playlist_name ?? "(none)"} - Status: {session.status}</div>
+                  <div className="mt-1 text-xs text-emerald-300">
+                    Prep: Main {session.prep_main_ready}/{session.prep_main_total} - Tie-breaker {session.prep_tiebreaker_ready}/{session.prep_tiebreaker_total}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                    <button className="rounded border border-cyan-700 px-2 py-1" onClick={() => router.push(`/admin/games/music-trivia/prep?sessionId=${session.id}`)}>Prep</button>
+                    <button className="rounded border border-emerald-700 px-2 py-1" onClick={() => router.push(`/admin/games/music-trivia/prep?sessionId=${session.id}`)}>Prep</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/music-trivia/host?sessionId=${session.id}`)}>Host</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/music-trivia/jumbotron?sessionId=${session.id}`)}>Jumbotron</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadGamePullListPdf({ gameSlug: "trivia", gameTitle: "Music Trivia", sessionId: session.id, sessionCode: session.session_code, accentRgb: [8, 145, 178] })}>Pull List PDF</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push("/admin/games/music-trivia/history")}>History</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadGamePullListPdf({ gameSlug: "trivia", gameTitle: "Music Trivia", sessionId: session.id, sessionCode: session.session_code, accentRgb: [22, 163, 74] })}>Pull List PDF</button>
                   </div>
                 </div>
               ))}

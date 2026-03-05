@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTriviaDb, type TriviaDatabase } from "src/lib/triviaDb";
-import { deterministicShuffle, type JsonValue } from "src/lib/triviaBank";
+import { deterministicShuffle, hasRequiredCueSource, type JsonValue } from "src/lib/triviaBank";
 import { TRIVIA_BANK_ENABLED } from "src/lib/triviaBankApi";
 import { loadQuestionSnapshotsByIds } from "src/lib/triviaDeckSnapshots";
 
@@ -170,6 +170,20 @@ function applyDiversitySelection(params: {
   };
 }
 
+function snapshotHasPromptAnswerAndCue(snapshotPayload: JsonValue): boolean {
+  if (!snapshotPayload || typeof snapshotPayload !== "object" || Array.isArray(snapshotPayload)) return false;
+  const snapshot = snapshotPayload as Record<string, unknown>;
+  const promptText = typeof snapshot.prompt_text === "string" ? snapshot.prompt_text.trim() : "";
+  const answerKey = typeof snapshot.answer_key === "string" ? snapshot.answer_key.trim() : "";
+  if (!promptText || !answerKey) return false;
+
+  return hasRequiredCueSource({
+    cueSourceType: snapshot.cue_source_type,
+    cueSourcePayload: snapshot.cue_source_payload,
+    primaryCueStartSeconds: snapshot.primary_cue_start_seconds,
+  });
+}
+
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!TRIVIA_BANK_ENABLED) return NextResponse.json({ error: "Trivia bank disabled" }, { status: 404 });
 
@@ -247,6 +261,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const facetRegion = asStringList(filters.regions);
   const facetLanguage = asStringList(filters.languages);
   const hasMedia = typeof filters.has_media === "boolean" ? filters.has_media : null;
+  const hasRequiredCue = typeof filters.has_required_cue === "boolean" ? filters.has_required_cue : true;
 
   const manualQuestionIds = asNumberList(body.manual_question_ids ?? mergedRules.manual_question_ids);
 
@@ -261,30 +276,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     constrainedIds = intersectIds(constrainedIds, (tagRows ?? []).map((row) => row.question_id));
   }
 
-  const shouldApplyFacets =
-    facetCategory.length > 0 ||
-    facetDifficulty.length > 0 ||
-    facetEra.length > 0 ||
-    facetGenre.length > 0 ||
-    facetDecade.length > 0 ||
-    facetRegion.length > 0 ||
-    facetLanguage.length > 0 ||
-    hasMedia !== null;
-
-  if (shouldApplyFacets) {
-    let facetQuery = db.from("trivia_question_facets").select("question_id");
-    if (facetCategory.length > 0) facetQuery = facetQuery.in("category", facetCategory);
-    if (facetDifficulty.length > 0) facetQuery = facetQuery.in("difficulty", facetDifficulty);
-    if (facetEra.length > 0) facetQuery = facetQuery.in("era", facetEra);
-    if (facetGenre.length > 0) facetQuery = facetQuery.in("genre", facetGenre);
-    if (facetDecade.length > 0) facetQuery = facetQuery.in("decade", facetDecade);
-    if (facetRegion.length > 0) facetQuery = facetQuery.in("region", facetRegion);
-    if (facetLanguage.length > 0) facetQuery = facetQuery.in("language", facetLanguage);
-    if (hasMedia !== null) facetQuery = facetQuery.eq("has_media", hasMedia);
-    const { data: facetRows, error: facetsError } = await facetQuery;
-    if (facetsError) return NextResponse.json({ error: facetsError.message }, { status: 500 });
-    constrainedIds = intersectIds(constrainedIds, (facetRows ?? []).map((row) => row.question_id));
-  }
+  let facetQuery = db.from("trivia_question_facets").select("question_id");
+  if (facetCategory.length > 0) facetQuery = facetQuery.in("category", facetCategory);
+  if (facetDifficulty.length > 0) facetQuery = facetQuery.in("difficulty", facetDifficulty);
+  if (facetEra.length > 0) facetQuery = facetQuery.in("era", facetEra);
+  if (facetGenre.length > 0) facetQuery = facetQuery.in("genre", facetGenre);
+  if (facetDecade.length > 0) facetQuery = facetQuery.in("decade", facetDecade);
+  if (facetRegion.length > 0) facetQuery = facetQuery.in("region", facetRegion);
+  if (facetLanguage.length > 0) facetQuery = facetQuery.in("language", facetLanguage);
+  if (hasMedia !== null) facetQuery = facetQuery.eq("has_media", hasMedia);
+  facetQuery = facetQuery.eq("has_required_cue", hasRequiredCue);
+  const { data: facetRows, error: facetsError } = await facetQuery;
+  if (facetsError) return NextResponse.json({ error: facetsError.message }, { status: 500 });
+  constrainedIds = intersectIds(constrainedIds, (facetRows ?? []).map((row) => row.question_id));
 
   if (constrainedIds && constrainedIds.size === 0) {
     return NextResponse.json(
@@ -434,7 +438,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const hasPrompt = typeof asObject.prompt_text === "string" && asObject.prompt_text.trim().length > 0;
     const hasAnswer = typeof asObject.answer_key === "string" && asObject.answer_key.trim().length > 0;
 
-    if (hasPrompt && hasAnswer) {
+    if (hasPrompt && hasAnswer && snapshotHasPromptAnswerAndCue(existing.snapshot_payload)) {
       finalItems.push({
         question_id: existing.question_id,
         snapshot_payload: existing.snapshot_payload,
@@ -445,7 +449,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const fallbackQuestionId = Number(existing.question_id);
     if (Number.isFinite(fallbackQuestionId) && fallbackQuestionId > 0) {
       const snapshot = snapshotByQuestionId.get(fallbackQuestionId);
-      if (snapshot) {
+      if (snapshot && snapshotHasPromptAnswerAndCue(snapshot as unknown as JsonValue)) {
         finalItems.push({
           question_id: fallbackQuestionId,
           snapshot_payload: snapshot as unknown as JsonValue,
@@ -456,7 +460,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   for (const questionId of manualNewQuestionIds) {
     const snapshot = snapshotByQuestionId.get(questionId);
-    if (!snapshot) continue;
+    if (!snapshot || !snapshotHasPromptAnswerAndCue(snapshot as unknown as JsonValue)) continue;
     finalItems.push({
       question_id: questionId,
       snapshot_payload: snapshot as unknown as JsonValue,
@@ -465,7 +469,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   for (const questionId of selectedFillQuestionIds) {
     const snapshot = snapshotByQuestionId.get(questionId);
-    if (!snapshot) continue;
+    if (!snapshot || !snapshotHasPromptAnswerAndCue(snapshot as unknown as JsonValue)) continue;
     finalItems.push({
       question_id: questionId,
       snapshot_payload: snapshot as unknown as JsonValue,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { formatBallLabel } from "src/lib/bingoBall";
+import { formatBallLabel, getBingoColumnTextClass } from "src/lib/bingoBall";
 
 export type BingoTransportCall = {
   id: number;
@@ -190,7 +190,7 @@ export default function BingoTransportLane({
             <div key={call.id} className="rounded border border-stone-700 bg-stone-950/70 p-3 text-xs">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-semibold text-stone-100">
-                  #{call.call_index} · {formatBallLabel(call.ball_number, call.column_letter)} - {call.track_title}
+                  #{call.call_index} · <span className={getBingoColumnTextClass(call.column_letter, call.ball_number)}>{formatBallLabel(call.ball_number, call.column_letter)}</span> - {call.track_title}
                 </p>
                 <span className="rounded border border-stone-700 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-stone-300">{queueStatusLabel}</span>
               </div>

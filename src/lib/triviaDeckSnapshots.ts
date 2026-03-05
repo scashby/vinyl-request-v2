@@ -11,6 +11,11 @@ type RawQuestionRow = {
   options_payload: unknown;
   explanation_text: string | null;
   source_note: string | null;
+  cue_source_type: unknown;
+  cue_source_payload: unknown;
+  primary_cue_start_seconds: unknown;
+  primary_cue_end_seconds: unknown;
+  primary_cue_instruction: unknown;
   default_category: string;
   default_difficulty: string;
   display_element_type: string;
@@ -61,6 +66,11 @@ function toSnapshot(question: RawQuestionRow, assets: TriviaQuestionAssetRef[]):
     optionsPayload: question.options_payload,
     explanationText: question.explanation_text,
     sourceNote: question.source_note,
+    cueSourceType: question.cue_source_type,
+    cueSourcePayload: question.cue_source_payload,
+    primaryCueStartSeconds: question.primary_cue_start_seconds,
+    primaryCueEndSeconds: question.primary_cue_end_seconds,
+    primaryCueInstruction: question.primary_cue_instruction,
     displayElementType: question.display_element_type,
     revealPayload: question.reveal_payload,
     cueNotesText: question.cue_notes_text,
@@ -73,7 +83,7 @@ export async function loadQuestionSnapshot(db: TriviaDbClient, questionId: numbe
   const [{ data: question }, { data: assets }] = await Promise.all([
     db
       .from("trivia_questions")
-      .select("id, question_type, prompt_text, answer_key, accepted_answers, answer_payload, options_payload, explanation_text, source_note, default_category, default_difficulty, display_element_type, reveal_payload, cue_notes_text, cue_payload")
+      .select("id, question_type, prompt_text, answer_key, accepted_answers, answer_payload, options_payload, explanation_text, source_note, cue_source_type, cue_source_payload, primary_cue_start_seconds, primary_cue_end_seconds, primary_cue_instruction, default_category, default_difficulty, display_element_type, reveal_payload, cue_notes_text, cue_payload")
       .eq("id", questionId)
       .maybeSingle(),
     db
@@ -96,7 +106,7 @@ export async function loadQuestionSnapshotsByIds(db: TriviaDbClient, questionIds
   const [{ data: questions, error: questionError }, { data: assets, error: assetError }] = await Promise.all([
     db
       .from("trivia_questions")
-      .select("id, question_type, prompt_text, answer_key, accepted_answers, answer_payload, options_payload, explanation_text, source_note, default_category, default_difficulty, display_element_type, reveal_payload, cue_notes_text, cue_payload")
+      .select("id, question_type, prompt_text, answer_key, accepted_answers, answer_payload, options_payload, explanation_text, source_note, cue_source_type, cue_source_payload, primary_cue_start_seconds, primary_cue_end_seconds, primary_cue_instruction, default_category, default_difficulty, display_element_type, reveal_payload, cue_notes_text, cue_payload")
       .in("id", ids),
     db
       .from("trivia_question_assets")

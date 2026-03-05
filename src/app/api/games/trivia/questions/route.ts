@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
       ? facetDifficultyRaw
       : "";
   const hasMedia = parseBoolean(searchParams.get("has_media"));
+  const hasRequiredCue = parseBoolean(searchParams.get("has_required_cue"));
   const limit = Math.min(200, parsePositiveInt(searchParams.get("limit"), 50));
   const offset = Math.max(0, parsePositiveInt(searchParams.get("offset"), 0));
 
@@ -88,11 +89,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (facetCategory || facetDifficulty || hasMedia !== null) {
+  if (facetCategory || facetDifficulty || hasMedia !== null || hasRequiredCue !== null) {
     let facetsQuery = db.from("trivia_question_facets").select("question_id");
     if (facetCategory) facetsQuery = facetsQuery.eq("category", facetCategory);
     if (facetDifficulty) facetsQuery = facetsQuery.eq("difficulty", facetDifficulty);
     if (hasMedia !== null) facetsQuery = facetsQuery.eq("has_media", hasMedia);
+    if (hasRequiredCue !== null) facetsQuery = facetsQuery.eq("has_required_cue", hasRequiredCue);
     const { data, error } = await facetsQuery;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     constrainedIds = intersectIds(
@@ -108,7 +110,7 @@ export async function GET(request: NextRequest) {
   let query = db
     .from("trivia_questions")
     .select(
-      "id, question_code, status, question_type, prompt_text, answer_key, accepted_answers, answer_payload, options_payload, reveal_payload, display_element_type, explanation_text, default_category, default_difficulty, source_note, is_tiebreaker_eligible, cue_notes_text, cue_payload, created_by, updated_by, created_at, updated_at, published_at, archived_at",
+      "id, question_code, status, question_type, prompt_text, answer_key, accepted_answers, answer_payload, options_payload, reveal_payload, display_element_type, explanation_text, default_category, default_difficulty, source_note, is_tiebreaker_eligible, cue_source_type, cue_source_payload, primary_cue_start_seconds, primary_cue_end_seconds, primary_cue_instruction, cue_notes_text, cue_payload, created_by, updated_by, created_at, updated_at, published_at, archived_at",
       { count: "exact" }
     )
     .order("updated_at", { ascending: false })
@@ -129,7 +131,7 @@ export async function GET(request: NextRequest) {
     questionIds.length
       ? db
           .from("trivia_question_facets")
-          .select("question_id, era, genre, decade, region, language, has_media, difficulty, category")
+          .select("question_id, era, genre, decade, region, language, has_media, has_required_cue, difficulty, category")
           .in("question_id", questionIds)
       : Promise.resolve({ data: [] as unknown[] }),
     questionIds.length
@@ -193,6 +195,9 @@ export async function POST(request: NextRequest) {
     if (!normalized.prompt_text || !normalized.answer_key) {
       return NextResponse.json({ error: "prompt_text and answer_key are required" }, { status: 400 });
     }
+    if (normalized.status === "published" && !normalized.has_required_cue) {
+      return NextResponse.json({ error: "Pick a vinyl track and cue time to continue." }, { status: 400 });
+    }
     if (normalized.cue_payload_has_validation_error) {
       return NextResponse.json({ error: "cue_payload has invalid segment timing. Use non-negative times and end >= start." }, { status: 400 });
     }
@@ -219,6 +224,11 @@ export async function POST(request: NextRequest) {
         default_difficulty: normalized.default_difficulty,
         source_note: normalized.source_note,
         is_tiebreaker_eligible: normalized.is_tiebreaker_eligible,
+        cue_source_type: normalized.cue_source_type,
+        cue_source_payload: normalized.cue_source_payload,
+        primary_cue_start_seconds: normalized.primary_cue_start_seconds,
+        primary_cue_end_seconds: normalized.primary_cue_end_seconds,
+        primary_cue_instruction: normalized.primary_cue_instruction,
         cue_notes_text: normalized.cue_notes_text,
         cue_payload: normalized.cue_payload,
         created_by: userLabel,

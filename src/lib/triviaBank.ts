@@ -11,6 +11,24 @@ export type TriviaDifficulty = "easy" | "medium" | "hard";
 export type TriviaAssetRole = "clue_primary" | "clue_secondary" | "answer_visual" | "explanation_media";
 export type TriviaAssetType = "image" | "audio" | "video";
 export type TriviaCueRole = "primary" | "any_album_track" | "original" | "cover" | "alt";
+export type TriviaCueSourceType = "inventory_track" | "uploaded_clip";
+
+export type TriviaCueSourcePayloadInventoryTrack = {
+  inventory_id: number;
+  release_id?: number | null;
+  release_track_id?: number | null;
+  artist: string;
+  album: string;
+  title: string;
+  side?: string | null;
+  position?: string | null;
+};
+
+export type TriviaCueSourcePayloadUploadedClip = {
+  asset_id?: number | null;
+  bucket: string;
+  object_path: string;
+};
 
 export type TriviaCueSegment = {
   role: TriviaCueRole;
@@ -49,6 +67,11 @@ export type TriviaQuestionSnapshot = {
   options_payload: JsonValue;
   explanation_text: string | null;
   source_note: string | null;
+  cue_source_type: TriviaCueSourceType | null;
+  cue_source_payload: JsonValue;
+  primary_cue_start_seconds: number | null;
+  primary_cue_end_seconds: number | null;
+  primary_cue_instruction: string | null;
   display_element_type: "song" | "artist" | "album" | "cover_art" | "vinyl_label";
   reveal_payload: JsonValue;
   cue_notes_text: string | null;
@@ -81,6 +104,12 @@ function normalizeCueRole(raw: unknown): TriviaCueRole {
     return value;
   }
   return "primary";
+}
+
+export function normalizeCueSourceType(raw: unknown): TriviaCueSourceType | null {
+  const value = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (value === "inventory_track" || value === "uploaded_clip") return value;
+  return null;
 }
 
 export function parseCueTimeToSeconds(value: unknown): number | null {
@@ -167,6 +196,32 @@ export function sanitizeCuePayload(value: unknown): TriviaCuePayload {
   return { segments };
 }
 
+export function hasRequiredCueSource(params: {
+  cueSourceType: unknown;
+  cueSourcePayload: unknown;
+  primaryCueStartSeconds: unknown;
+}): boolean {
+  const cueSourceType = normalizeCueSourceType(params.cueSourceType);
+  const primaryCueStartSeconds = parseCueTimeToSeconds(params.primaryCueStartSeconds);
+  if (!cueSourceType || primaryCueStartSeconds === null) return false;
+
+  if (!params.cueSourcePayload || typeof params.cueSourcePayload !== "object" || Array.isArray(params.cueSourcePayload)) {
+    return false;
+  }
+  const payload = params.cueSourcePayload as Record<string, unknown>;
+
+  if (cueSourceType === "inventory_track") {
+    const inventoryId = Number(payload.inventory_id);
+    const title = typeof payload.title === "string" ? payload.title.trim() : "";
+    const artist = typeof payload.artist === "string" ? payload.artist.trim() : "";
+    return Number.isFinite(inventoryId) && inventoryId > 0 && title.length > 0 && artist.length > 0;
+  }
+
+  const bucket = typeof payload.bucket === "string" ? payload.bucket.trim() : "";
+  const objectPath = typeof payload.object_path === "string" ? payload.object_path.trim() : "";
+  return bucket.length > 0 && objectPath.length > 0;
+}
+
 function normalizeAnswerList(values: unknown, fallback: string): string[] {
   const normalized = Array.isArray(values)
     ? values.map((value) => String(value).trim()).filter(Boolean)
@@ -204,6 +259,11 @@ export function buildQuestionSnapshot(input: {
   optionsPayload: unknown;
   explanationText: unknown;
   sourceNote: unknown;
+  cueSourceType: unknown;
+  cueSourcePayload: unknown;
+  primaryCueStartSeconds: unknown;
+  primaryCueEndSeconds: unknown;
+  primaryCueInstruction: unknown;
   displayElementType: unknown;
   revealPayload: unknown;
   cueNotesText: unknown;
@@ -216,6 +276,18 @@ export function buildQuestionSnapshot(input: {
   const explanationText = typeof input.explanationText === "string" ? input.explanationText.trim() : "";
   const sourceNote = typeof input.sourceNote === "string" ? input.sourceNote.trim() : "";
   const cueNotesText = typeof input.cueNotesText === "string" ? input.cueNotesText.trim() : "";
+  const primaryCueStartSeconds = parseCueTimeToSeconds(input.primaryCueStartSeconds);
+  const primaryCueEndSecondsRaw = parseCueTimeToSeconds(input.primaryCueEndSeconds);
+  const primaryCueEndSeconds =
+    primaryCueStartSeconds !== null && primaryCueEndSecondsRaw !== null && primaryCueEndSecondsRaw >= primaryCueStartSeconds
+      ? primaryCueEndSecondsRaw
+      : null;
+  const primaryCueInstruction = typeof input.primaryCueInstruction === "string" ? input.primaryCueInstruction.trim() : "";
+  const cueSourceType = normalizeCueSourceType(input.cueSourceType);
+  const cueSourcePayload =
+    input.cueSourcePayload && typeof input.cueSourcePayload === "object" && !Array.isArray(input.cueSourcePayload)
+      ? (input.cueSourcePayload as JsonValue)
+      : {};
 
   return {
     question_id: Number.isFinite(Number(input.questionId)) ? Number(input.questionId) : null,
@@ -229,6 +301,11 @@ export function buildQuestionSnapshot(input: {
     options_payload: (input.optionsPayload as JsonValue | undefined) ?? [],
     explanation_text: explanationText || null,
     source_note: sourceNote || null,
+    cue_source_type: cueSourceType,
+    cue_source_payload: cueSourcePayload,
+    primary_cue_start_seconds: primaryCueStartSeconds,
+    primary_cue_end_seconds: primaryCueEndSeconds,
+    primary_cue_instruction: primaryCueInstruction || null,
     display_element_type: asDisplayElementType(input.displayElementType),
     reveal_payload: (input.revealPayload as JsonValue | undefined) ?? {},
     cue_notes_text: cueNotesText || null,

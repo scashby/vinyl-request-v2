@@ -1,6 +1,14 @@
 export const BINGO_COLUMNS = ["B", "I", "N", "G", "O"] as const;
 export type BingoColumn = (typeof BINGO_COLUMNS)[number];
 
+const BINGO_COLUMN_TEXT_CLASSES: Record<BingoColumn, string> = {
+  B: "text-sky-300",
+  I: "text-fuchsia-300",
+  N: "text-emerald-300",
+  G: "text-amber-300",
+  O: "text-rose-300",
+};
+
 export function getColumnLetterForBallNumber(ballNumber: number): BingoColumn {
   if (!Number.isFinite(ballNumber) || ballNumber < 1 || ballNumber > 75) return "B";
   const index = Math.floor((ballNumber - 1) / 15);
@@ -20,4 +28,21 @@ export function formatBallLabel(ballNumber: number | null | undefined, columnLet
   }
   if (columnLetter) return columnLetter;
   return "?";
+}
+
+export function resolveBingoColumn(columnLetter?: string | null, ballNumber?: number | null): BingoColumn {
+  if (typeof columnLetter === "string") {
+    const normalized = columnLetter.trim().toUpperCase();
+    if (BINGO_COLUMNS.includes(normalized as BingoColumn)) {
+      return normalized as BingoColumn;
+    }
+  }
+  if (Number.isFinite(ballNumber)) {
+    return getColumnLetterForBallNumber(ballNumber as number);
+  }
+  return "B";
+}
+
+export function getBingoColumnTextClass(columnLetter?: string | null, ballNumber?: number | null): string {
+  return BINGO_COLUMN_TEXT_CLASSES[resolveBingoColumn(columnLetter, ballNumber)];
 }

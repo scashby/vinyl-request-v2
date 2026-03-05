@@ -19,6 +19,11 @@ type MediaAsset = {
   duration_seconds: number | null;
 };
 
+type CueAsset = {
+  bucket: string;
+  object_path: string;
+};
+
 function asObject(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return value as Record<string, unknown>;
@@ -63,6 +68,19 @@ function extractMediaAssets(revealPayload: unknown): MediaAsset[] {
     .sort((a, b) => a.sort_order - b.sort_order);
 }
 
+function extractCueAsset(cueSourceType: unknown, cueSourcePayload: unknown): CueAsset | null {
+  const cueType = asString(cueSourceType).toLowerCase();
+  if (cueType !== "uploaded_clip") return null;
+  const payload = asObject(cueSourcePayload);
+  const bucket = asString(payload.bucket) || "trivia-assets";
+  const objectPath = asString(payload.object_path);
+  if (!objectPath) return null;
+  return {
+    bucket,
+    object_path: objectPath,
+  };
+}
+
 async function signMediaAssets(assets: MediaAsset[]): Promise<Map<string, string>> {
   const byBucket = new Map<string, string[]>();
   for (const asset of assets) {
@@ -100,7 +118,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 
   const { data, error } = await db
     .from("trivia_session_calls")
-    .select("id, session_id, round_number, call_index, playlist_track_key, question_id, question_type, is_tiebreaker, category, difficulty, question_text, answer_key, accepted_answers, options_payload, answer_payload, explanation_text, reveal_payload, source_note, cue_notes_text, cue_payload, prep_status, display_element_type, display_image_override_url, auto_cover_art_url, auto_vinyl_label_url, source_artist, source_title, source_album, source_side, source_position, metadata_locked, metadata_synced_at, base_points, bonus_points, status, asked_at, answer_revealed_at, scored_at, created_at")
+    .select("id, session_id, round_number, call_index, playlist_track_key, question_id, question_type, is_tiebreaker, category, difficulty, question_text, answer_key, accepted_answers, options_payload, answer_payload, explanation_text, reveal_payload, source_note, cue_source_type, cue_source_payload, primary_cue_start_seconds, primary_cue_end_seconds, primary_cue_instruction, cue_notes_text, cue_payload, prep_status, display_element_type, display_image_override_url, auto_cover_art_url, auto_vinyl_label_url, source_artist, source_title, source_album, source_side, source_position, metadata_locked, metadata_synced_at, base_points, bonus_points, status, asked_at, answer_revealed_at, scored_at, created_at")
     .eq("session_id", sessionId)
     .order("call_index", { ascending: true });
 
@@ -108,11 +126,32 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 
   const rows = (data ?? []) as Array<Record<string, unknown>>;
   const allAssets = rows.flatMap((row) => extractMediaAssets(row.reveal_payload));
-  const signedMap = await signMediaAssets(allAssets);
+  const cueAssets: MediaAsset[] = rows
+    .map((row) => extractCueAsset(row.cue_source_type, row.cue_source_payload))
+    .filter((asset): asset is CueAsset => Boolean(asset))
+    .map((asset) => ({
+      id: null,
+      asset_role: "clue_primary",
+      asset_type: "audio",
+      bucket: asset.bucket,
+      object_path: asset.object_path,
+      sort_order: 0,
+      mime_type: null,
+      width: null,
+      height: null,
+      duration_seconds: null,
+    }));
+  const signedMap = await signMediaAssets([...allAssets, ...cueAssets]);
 
   const mapped = rows.map((row) => {
     const revealPayload = asObject(row.reveal_payload);
     const cuePayload = sanitizeCuePayload(row.cue_payload);
+    const cueSourcePayload = asObject(row.cue_source_payload);
+    const cueSourceType = asString(row.cue_source_type) || null;
+    const cueAsset = extractCueAsset(cueSourceType, cueSourcePayload);
+    const cueSourceSignedUrl = cueAsset
+      ? (signedMap.get(`${cueAsset.bucket}:${cueAsset.object_path}`) ?? null)
+      : null;
     const mediaAssets = extractMediaAssets(row.reveal_payload);
 
     const signedMediaAssets = mediaAssets.map((asset) => {
@@ -145,6 +184,12 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       cue_notes_text: asNullableString(row.cue_notes_text),
       cue_payload: cuePayload,
       cue_segments: cuePayload.segments,
+      cue_source_type: cueSourceType,
+      cue_source_payload: cueSourcePayload,
+      cue_source_signed_url: cueSourceSignedUrl,
+      primary_cue_start_seconds: asNumberOrNull(row.primary_cue_start_seconds),
+      primary_cue_end_seconds: asNumberOrNull(row.primary_cue_end_seconds),
+      primary_cue_instruction: asNullableString(row.primary_cue_instruction),
       effective_display_image_url: effectiveDisplayImageUrl,
     };
   });

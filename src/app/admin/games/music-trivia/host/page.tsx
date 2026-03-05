@@ -52,6 +52,23 @@ type Call = {
     asset_type?: string;
     asset_role?: string;
   }>;
+  cue_source_type: "inventory_track" | "uploaded_clip" | null;
+  cue_source_payload: {
+    inventory_id?: number;
+    release_id?: number | null;
+    release_track_id?: number | null;
+    artist?: string;
+    album?: string;
+    title?: string;
+    side?: string | null;
+    position?: string | null;
+    bucket?: string;
+    object_path?: string;
+  };
+  cue_source_signed_url?: string | null;
+  primary_cue_start_seconds: number | null;
+  primary_cue_end_seconds: number | null;
+  primary_cue_instruction: string | null;
   cue_notes_text: string | null;
   cue_payload: {
     segments?: Array<{
@@ -129,6 +146,27 @@ function readCueSegments(call: Call | null): CueSegment[] {
     .sort((a, b) => a.start_seconds - b.start_seconds);
 }
 
+function readCueSourceSummary(call: Call | null): string {
+  if (!call) return "No cue source selected";
+  const payload = asObject(call.cue_source_payload);
+  if (call.cue_source_type === "inventory_track") {
+    const artist = typeof payload.artist === "string" ? payload.artist.trim() : "";
+    const album = typeof payload.album === "string" ? payload.album.trim() : "";
+    const title = typeof payload.title === "string" ? payload.title.trim() : "";
+    const side = typeof payload.side === "string" ? payload.side.trim() : "";
+    const position = typeof payload.position === "string" ? payload.position.trim() : "";
+    const sidePosition = [side, position].filter(Boolean).join(" ");
+    const line = [artist, album, title].filter(Boolean).join(" - ");
+    if (!line) return "Inventory cue source selected";
+    return sidePosition ? `${line} (${sidePosition})` : line;
+  }
+  if (call.cue_source_type === "uploaded_clip") {
+    const objectPath = typeof payload.object_path === "string" ? payload.object_path.trim() : "";
+    return objectPath ? `Uploaded clip: ${objectPath}` : "Uploaded clip source";
+  }
+  return "No cue source selected";
+}
+
 export default function MusicTriviaHostPage() {
   const sessionId = Number(useSearchParams().get("sessionId"));
 
@@ -181,6 +219,7 @@ export default function MusicTriviaHostPage() {
   const tieBreakerForControls = activeCall?.is_tiebreaker ? activeCall : nextPendingTieBreaker;
   const currentChoices = useMemo(() => readChoiceOptions(callForControls), [callForControls]);
   const currentCueSegments = useMemo(() => readCueSegments(callForControls), [callForControls]);
+  const cueSourceSummary = useMemo(() => readCueSourceSummary(callForControls), [callForControls]);
   const revealMediaAssets = useMemo(
     () =>
       (callForControls?.reveal_media_assets ??
@@ -411,23 +450,40 @@ export default function MusicTriviaHostPage() {
                   </div>
                 ) : null}
 
-                {(callForControls?.cue_notes_text || currentCueSegments.length > 0) ? (
-                  <div className="mt-2 rounded border border-cyan-800/70 bg-cyan-950/20 p-2 text-xs">
-                    <p className="font-semibold uppercase tracking-wide text-cyan-200">Cue Notes</p>
-                    {callForControls?.cue_notes_text ? <p className="mt-1 text-stone-200">{callForControls.cue_notes_text}</p> : null}
-                    {currentCueSegments.length > 0 ? (
-                      <div className="mt-2 space-y-1 text-stone-200">
-                        {currentCueSegments.map((segment, index) => (
-                          <p key={`${segment.role}-${segment.start_seconds}-${index}`}>
-                            [{segment.end_seconds !== null ? `${formatSecondsClock(segment.start_seconds)}-${formatSecondsClock(segment.end_seconds)}` : formatSecondsClock(segment.start_seconds)}] {segment.role}
-                            {segment.track_label ? ` · ${segment.track_label}` : ""}
-                            {segment.instruction ? ` · ${segment.instruction}` : ""}
-                          </p>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
+                <div className="mt-2 rounded border border-cyan-800/70 bg-cyan-950/20 p-2 text-xs">
+                  <p className="font-semibold uppercase tracking-wide text-cyan-200">Cue Panel</p>
+                  <p className="mt-1 text-stone-100">{cueSourceSummary}</p>
+                  <p className="mt-1 text-stone-200">
+                    Primary cue: {callForControls?.primary_cue_start_seconds !== null && callForControls?.primary_cue_start_seconds !== undefined
+                      ? formatSecondsClock(callForControls.primary_cue_start_seconds)
+                      : "--:--"}
+                    {callForControls?.primary_cue_end_seconds !== null && callForControls?.primary_cue_end_seconds !== undefined
+                      ? ` - ${formatSecondsClock(callForControls.primary_cue_end_seconds)}`
+                      : ""}
+                  </p>
+                  {callForControls?.primary_cue_instruction ? (
+                    <p className="mt-1 text-stone-200">Instruction: {callForControls.primary_cue_instruction}</p>
+                  ) : (
+                    <p className="mt-1 text-stone-400">Instruction: none</p>
+                  )}
+                  {callForControls?.cue_notes_text ? <p className="mt-1 text-stone-200">Notes: {callForControls.cue_notes_text}</p> : null}
+                  {currentCueSegments.length > 0 ? (
+                    <div className="mt-2 space-y-1 text-stone-200">
+                      {currentCueSegments.map((segment, index) => (
+                        <p key={`${segment.role}-${segment.start_seconds}-${index}`}>
+                          [{segment.end_seconds !== null ? `${formatSecondsClock(segment.start_seconds)}-${formatSecondsClock(segment.end_seconds)}` : formatSecondsClock(segment.start_seconds)}] {segment.role}
+                          {segment.track_label ? ` · ${segment.track_label}` : ""}
+                          {segment.instruction ? ` · ${segment.instruction}` : ""}
+                        </p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-stone-400">No structured cue segments.</p>
+                  )}
+                  {callForControls?.cue_source_type === "uploaded_clip" && callForControls?.cue_source_signed_url ? (
+                    <audio className="mt-2 w-full" controls src={callForControls.cue_source_signed_url} />
+                  ) : null}
+                </div>
 
                 <p className="mt-2 text-sm text-amber-300">
                   {(callForControls?.status === "answer_revealed" || callForControls?.status === "scored")
