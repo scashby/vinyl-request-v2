@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatSecondsClock, parseCueTimeToSeconds } from "src/lib/triviaBank";
 
 type QuestionStatus = "draft" | "published" | "archived";
@@ -204,6 +204,7 @@ export default function MusicTriviaBankPage() {
   const [taxonomyTags, setTaxonomyTags] = useState<string[]>([]);
 
   const [inventoryQuery, setInventoryQuery] = useState("");
+  const [inventoryLimitText, setInventoryLimitText] = useState("");
   const [inventoryResults, setInventoryResults] = useState<InventoryTrackResult[]>([]);
 
   const [assetRoleDraft, setAssetRoleDraft] = useState<TriviaAssetRole>("clue_primary");
@@ -212,6 +213,7 @@ export default function MusicTriviaBankPage() {
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadingAssets, setUploadingAssets] = useState(false);
+  const inventorySearchRequestRef = useRef(0);
 
   const setFormField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -339,26 +341,57 @@ export default function MusicTriviaBankPage() {
     setInventoryResults([]);
   };
 
-  const searchInventory = async () => {
-    const query = inventoryQuery.trim();
+  const searchInventory = useCallback(async (queryOverride?: string) => {
+    const query = (queryOverride ?? inventoryQuery).trim();
     if (!query) {
+      inventorySearchRequestRef.current += 1;
       setInventoryResults([]);
       return;
     }
 
+    const params = new URLSearchParams({ q: query });
+    const requestedLimit = Number(inventoryLimitText);
+    if (Number.isFinite(requestedLimit) && requestedLimit > 0) {
+      params.set("limit", String(Math.floor(requestedLimit)));
+    }
+
+    const requestId = inventorySearchRequestRef.current + 1;
+    inventorySearchRequestRef.current = requestId;
     setSearching(true);
     try {
-      const res = await fetch(`/api/games/trivia/inventory-search?q=${encodeURIComponent(query)}&limit=25`);
+      const res = await fetch(`/api/games/trivia/inventory-search?${params.toString()}`);
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload.error ?? "Search failed");
-      setInventoryResults(Array.isArray(payload.data) ? payload.data : []);
+      if (inventorySearchRequestRef.current === requestId) {
+        setInventoryResults(Array.isArray(payload.data) ? payload.data : []);
+      }
     } catch (error) {
       alert(error instanceof Error ? error.message : "Search failed");
-      setInventoryResults([]);
+      if (inventorySearchRequestRef.current === requestId) {
+        setInventoryResults([]);
+      }
     } finally {
-      setSearching(false);
+      if (inventorySearchRequestRef.current === requestId) {
+        setSearching(false);
+      }
     }
-  };
+  }, [inventoryLimitText, inventoryQuery]);
+
+  useEffect(() => {
+    const query = inventoryQuery.trim();
+    if (!query) {
+      inventorySearchRequestRef.current += 1;
+      setSearching(false);
+      setInventoryResults([]);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void searchInventory(query);
+    }, 180);
+
+    return () => window.clearTimeout(timer);
+  }, [inventoryQuery, searchInventory]);
 
   const saveQuestion = async (publish: boolean) => {
     if (validationMessage) {
@@ -686,17 +719,32 @@ export default function MusicTriviaBankPage() {
 
               {form.cue_source_mode === "inventory_track" ? (
                 <div className="mt-2 space-y-2">
-                  <div className="grid gap-2 lg:grid-cols-[1fr,auto]">
-                    <input className="rounded border border-stone-700 bg-stone-950 px-2 py-1" value={inventoryQuery} onChange={(e) => setInventoryQuery(e.target.value)} placeholder="Search inventory by artist / album / title" onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void searchInventory();
-                      }
-                    }} />
-                    <button className="rounded border border-cyan-700 px-3 py-1" disabled={searching} onClick={searchInventory}>{searching ? "Searching..." : "Search"}</button>
+                  <div className="grid gap-2 lg:grid-cols-[1fr,120px,auto]">
+                    <input
+                      className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                      value={inventoryQuery}
+                      onChange={(e) => setInventoryQuery(e.target.value)}
+                      placeholder="Search inventory by artist / album / title"
+                    />
+                    <input
+                      className="rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                      value={inventoryLimitText}
+                      onChange={(e) => setInventoryLimitText(e.target.value)}
+                      placeholder="No limit"
+                      inputMode="numeric"
+                    />
+                    <button
+                      className="rounded border border-cyan-700 px-3 py-1"
+                      disabled={searching}
+                      onClick={() => {
+                        void searchInventory(inventoryQuery);
+                      }}
+                    >
+                      {searching ? "Searching..." : "Refresh"}
+                    </button>
                   </div>
 
-                  <p className="text-[11px] text-cyan-100/70">Uses the existing library track search index. Showing up to 25 matches.</p>
+                  <p className="text-[11px] text-cyan-100/70">Live search uses the collection index as you type. Set an optional result limit or leave it blank.</p>
 
                   {inventoryResults.length > 0 ? (
                     <div className="max-h-56 overflow-auto rounded border border-stone-800 bg-stone-950/70">
@@ -711,9 +759,9 @@ export default function MusicTriviaBankPage() {
                             className={`block w-full border-b border-stone-900 px-2 py-2 text-left last:border-b-0 ${isSelected ? "bg-cyan-900/30" : "hover:bg-stone-800"}`}
                             onClick={() => setFormField("selected_track", track)}
                           >
-                            <p className="text-stone-100">{track.artist} - {track.title}</p>
-                            <p className="text-[11px] text-stone-300">Album: {track.album || "-"}</p>
-                            <p className="text-[11px] text-stone-400">Inventory #{track.inventory_id}{track.side ? ` · Side ${track.side}` : ""}{track.position ? ` · ${track.position}` : ""}</p>
+                            <p className="truncate text-stone-100">
+                              {track.artist || "-"} | {track.album || "-"} | {track.title || "-"} | {(track.position || track.side || "-").toUpperCase()} | #{track.inventory_id}
+                            </p>
                           </button>
                         );
                       })}

@@ -450,7 +450,9 @@ export const searchInventoryCandidates = async (
   const resolvedIndex = index ?? (await getCachedInventoryIndex(undefined, { includeForSale: params.includeForSale === true }));
   const titleRaw = params.title ?? "";
   const artistRaw = params.artist ?? "";
-  const limit = Math.min(25, Math.max(1, Number(params.limit ?? 10)));
+  const parsedLimit = Number(params.limit);
+  const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.floor(parsedLimit) : Number.MAX_SAFE_INTEGER;
+  const maxPoolSize = Math.max(1000, limit * 10);
   const mediaTypes = new Set(
     (Array.isArray(params.mediaTypes) ? params.mediaTypes : [])
       .map((token) => normalizeFormatToken(token))
@@ -510,7 +512,7 @@ export const searchInventoryCandidates = async (
     addCandidate(track);
   }
 
-  for (const track of collectCandidates(queryTitle, queryArtist, resolvedIndex, 1000)) {
+  for (const track of collectCandidates(queryTitle, queryArtist, resolvedIndex, maxPoolSize)) {
     addCandidate(track);
   }
 

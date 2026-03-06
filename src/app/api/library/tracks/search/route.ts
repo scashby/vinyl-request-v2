@@ -83,6 +83,13 @@ function applyCollectionMode(rows: LibraryTrackSearchResult[], q: string, limit:
     .map((entry) => entry.row);
 }
 
+function parseRequestedLimit(raw: string | null): number {
+  if (raw === null || raw.trim().length === 0) return Number.MAX_SAFE_INTEGER;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return Number.MAX_SAFE_INTEGER;
+  return Math.floor(parsed);
+}
+
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
@@ -90,9 +97,9 @@ export async function GET(request: NextRequest) {
     const artist = (url.searchParams.get("artist") ?? "").trim();
     const modeRaw = (url.searchParams.get("mode") ?? "").trim().toLowerCase();
     const mode: SearchMode = modeRaw === "collection" ? "collection" : "smart";
-    const limit = Math.min(25, Math.max(1, Number(url.searchParams.get("limit") ?? 10)));
+    const limit = parseRequestedLimit(url.searchParams.get("limit"));
     const candidateLimit = mode === "collection"
-      ? Math.min(120, Math.max(limit * 8, 40))
+      ? Math.max(limit, 200)
       : limit;
     const mediaTypes = [
       ...url.searchParams.getAll("mediaType"),

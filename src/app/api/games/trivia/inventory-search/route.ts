@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-function parseLimit(raw: string | null): number {
+function parseLimit(raw: string | null): number | null {
+  if (raw === null || raw.trim().length === 0) return null;
   const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) return 15;
-  return Math.min(30, Math.floor(parsed));
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.floor(parsed);
 }
 
 export async function GET(request: NextRequest) {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
 
   const proxyUrl = new URL("/api/library/tracks/search", request.url);
   proxyUrl.searchParams.set("q", q);
-  proxyUrl.searchParams.set("limit", String(limit));
+  if (limit !== null) proxyUrl.searchParams.set("limit", String(limit));
   proxyUrl.searchParams.set("mode", mode);
   proxyUrl.searchParams.set("includeForSale", includeForSale ? "true" : "false");
   if (artist) proxyUrl.searchParams.set("artist", artist);
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
       score: Number.isFinite(Number(row.score)) ? Number(row.score) : null,
     }))
     .filter((row) => Number.isFinite(row.inventory_id) && row.inventory_id > 0 && row.title.length > 0)
-    .slice(0, limit);
+    .slice(0, limit ?? undefined);
 
   return NextResponse.json({ data: mapped }, { status: 200 });
 }
