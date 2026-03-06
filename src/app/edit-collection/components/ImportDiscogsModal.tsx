@@ -212,7 +212,7 @@ const syncExistingInventoryFolderAssignments = async (
 ): Promise<boolean> => {
   const legacySaleStatus = options?.legacySaleStatus === true;
   const assignments = comparedAlbums
-    .filter((album) => album.existingId && album.status !== 'REMOVED')
+    .filter((album) => album.existingId && album.status !== 'REMOVED' && album.requiresInventorySync)
     .map((album) => ({
       id: album.existingId as number,
       status: album.is_sale_folder ? (legacySaleStatus ? 'active' : 'for_sale') : 'active',
@@ -1064,6 +1064,7 @@ function compareAlbums(
       const existingInstanceId = parseDiscogsInstanceId(existingAlbum.discogs_instance_id);
       const instanceIdChanged =
         sourceType === 'collection' &&
+        existingInstanceId !== null &&
         parsedAlbum.discogs_instance_id !== null &&
         existingInstanceId !== parsedAlbum.discogs_instance_id;
       const existingIsForSale = isForSaleInventory(existingAlbum);
@@ -1073,9 +1074,13 @@ function compareAlbums(
       const existingFolderName = normalizeComparable(existingAlbum.discogs_folder_name ?? existingAlbum.location ?? null);
       const parsedFolderId = parseDiscogsFolderId(parsedAlbum.discogs_folder_id);
       const parsedFolderName = normalizeComparable(incomingFolderName);
+      const folderIdChanged =
+        existingFolderId !== null &&
+        parsedFolderId !== null &&
+        existingFolderId !== parsedFolderId;
       const folderChanged =
         sourceType === 'collection' &&
-        (existingFolderId !== parsedFolderId || existingFolderName !== parsedFolderName);
+        (folderIdChanged || existingFolderName !== parsedFolderName);
       const requiresInventorySync =
         sourceType === 'collection'
           ? folderChanged ||
@@ -1709,7 +1714,20 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
       const isCollection = sourceType === 'collection';
       if (isCollection) {
         await ensureSaleCrateExists();
-        supportsForSaleStatus = await syncExistingInventoryFolderAssignments(comparedAlbums);
+      }
+
+      if (isCollection && syncMode === 'partial_sync') {
+        const pendingInventorySync = comparedAlbums.filter(
+          (album) => album.existingId && album.status !== 'REMOVED' && album.requiresInventorySync
+        ).length;
+        if (pendingInventorySync > 0) {
+          setProgress({
+            current: 0,
+            total: pendingInventorySync,
+            status: 'Syncing existing inventory folder assignments...',
+          });
+          supportsForSaleStatus = await syncExistingInventoryFolderAssignments(comparedAlbums);
+        }
       }
 
       // Determine which albums to process based on Sync Mode
@@ -1734,7 +1752,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         albumsToProcess = comparedAlbums.filter(a => a.status !== 'REMOVED');
       } else if (syncMode === 'partial_sync') {
         albumsToProcess = comparedAlbums.filter(a =>
-          a.status === 'NEW' || (a.status === 'CHANGED' && (a.needsEnrichment || a.requiresInventorySync))
+          a.status === 'NEW' || (a.status === 'CHANGED' && a.needsEnrichment)
         );
       } else if (syncMode === 'new_only') {
         albumsToProcess = comparedAlbums.filter(a => a.status === 'NEW');
