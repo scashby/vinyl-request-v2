@@ -10,6 +10,7 @@ export type InventoryTrack = {
   recording_id: number | null;
   title: string;
   artist: string;
+  album_title: string | null;
   side: string | null;
   position: string | null;
   album_format: string | null;
@@ -21,6 +22,7 @@ export type MatchCandidate = {
   inventory_id: number | null;
   title: string;
   artist: string;
+  album_title: string | null;
   side: string | null;
   position: string | null;
   score: number;
@@ -49,7 +51,7 @@ type CachedInventoryIndex = {
 };
 
 const INVENTORY_INDEX_TTL_MS = 10 * 60 * 1000;
-const INVENTORY_INDEX_VERSION = 2;
+const INVENTORY_INDEX_VERSION = 3;
 
 type InventoryIndexCache = Record<string, CachedInventoryIndex | undefined>;
 const inventoryIndexCache: InventoryIndexCache =
@@ -212,6 +214,7 @@ const toCandidate = (score: number, track: InventoryTrack): MatchCandidate => ({
   inventory_id: track.inventory_id ?? null,
   title: track.title,
   artist: track.artist,
+  album_title: track.album_title ?? null,
   side: track.side ?? null,
   position: track.position ?? null,
   score: Number(score.toFixed(3)),
@@ -344,7 +347,11 @@ export const buildInventoryIndex = (tracks: InventoryTrack[]): InventoryIndex =>
 
     addToListMap(titleOnly, titleKey, track);
 
-    for (const token of new Set([...tokenize(track.title, "title"), ...tokenize(track.artist, "artist")])) {
+    for (const token of new Set([
+      ...tokenize(track.title, "title"),
+      ...tokenize(track.artist, "artist"),
+      ...tokenize(track.album_title ?? "", "title"),
+    ])) {
       addToListMap(byToken, token, track);
     }
   }
@@ -570,6 +577,7 @@ export const fetchInventoryTracks = async (
     recording_id: number | null;
     title: string;
     artist: string;
+    album_title: string | null;
     side: string | null;
     position: string | null;
     album_format: string | null;
@@ -582,12 +590,13 @@ export const fetchInventoryTracks = async (
 
     // Prefetch album artist + format metadata for release_id.
     const releaseArtistById = new Map<number, string>();
+    const releaseTitleById = new Map<number, string>();
     const releaseMediaTypeById = new Map<number, string>();
     const releaseFormatDetailsById = new Map<number, string[]>();
     {
       const { data: releases, error: releaseError } = await supabase
         .from("releases")
-        .select("id, media_type, format_details, master:masters(artist:artists(name))")
+        .select("id, media_type, format_details, master:masters(title, artist:artists(name))")
         .in("id", chunk);
       if (releaseError) {
         throw new Error(`Failed loading release artists: ${releaseError.message}`);
@@ -595,9 +604,13 @@ export const fetchInventoryTracks = async (
       for (const row of releases ?? []) {
         const releaseId = typeof row.id === "number" ? row.id : null;
         const master = Array.isArray(row.master) ? row.master[0] : row.master;
+        const masterTitle = master && typeof master === "object" ? (master as { title?: unknown }).title : null;
         const artist = master && typeof master === "object" ? (master as { artist?: unknown }).artist : null;
         const artistRow = Array.isArray(artist) ? artist[0] : artist;
         const name = artistRow && typeof artistRow === "object" ? (artistRow as { name?: unknown }).name : null;
+        if (releaseId && typeof masterTitle === "string" && masterTitle.trim().length > 0) {
+          releaseTitleById.set(releaseId, masterTitle.trim());
+        }
         if (releaseId && typeof name === "string" && name.trim().length > 0) {
           releaseArtistById.set(releaseId, name.trim());
         }
@@ -638,6 +651,7 @@ export const fetchInventoryTracks = async (
         const title = row.title_override || recording?.title;
         if (!title) continue;
         const albumArtist = releaseArtistById.get(releaseId) ?? null;
+        const albumTitle = releaseTitleById.get(releaseId) ?? null;
         const albumFormat = releaseMediaTypeById.get(releaseId) ?? null;
         const formatDetails = releaseFormatDetailsById.get(releaseId) ?? null;
         const trackArtist = recording?.track_artist?.trim?.() ? recording.track_artist : null;
@@ -645,6 +659,7 @@ export const fetchInventoryTracks = async (
           recording_id: recording?.id ?? null,
           title,
           artist: trackArtist || albumArtist || "Unknown Artist",
+          album_title: albumTitle,
           side: row.side ?? null,
           position: row.position ?? null,
           album_format: albumFormat,
@@ -670,6 +685,7 @@ export const fetchInventoryTracks = async (
         recording_id: track.recording_id,
         title: track.title,
         artist: track.artist,
+        album_title: track.album_title ?? null,
         side: track.side,
         position: track.position,
         album_format: track.album_format,

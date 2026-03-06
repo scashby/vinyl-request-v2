@@ -198,8 +198,6 @@ export default function MusicTriviaBankPage() {
   const [statusFilter, setStatusFilter] = useState<"" | QuestionStatus>("");
 
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
-  const [categoryDraft, setCategoryDraft] = useState("");
-  const [tagDraft, setTagDraft] = useState("");
   const [tagSearch, setTagSearch] = useState("");
 
   const [taxonomyCategories, setTaxonomyCategories] = useState<string[]>(["General Music"]);
@@ -336,8 +334,6 @@ export default function MusicTriviaBankPage() {
     setSelectedId(null);
     setSelectedDetail(null);
     setForm(DEFAULT_FORM);
-    setCategoryDraft("");
-    setTagDraft("");
     setTagSearch("");
     setInventoryQuery("");
     setInventoryResults([]);
@@ -612,26 +608,12 @@ export default function MusicTriviaBankPage() {
               </label>
 
               <label className="block">Category
-                <div className="mt-1 grid gap-2 lg:grid-cols-[1fr,auto,auto]">
+                <div className="mt-1">
                   <select className="rounded border border-stone-700 bg-stone-950 px-2 py-1" value={form.category} onChange={(e) => setFormField("category", e.target.value)}>
                     {categoryOptions.map((category) => (
                       <option key={category} value={category}>{category}</option>
                     ))}
                   </select>
-                  <input className="rounded border border-stone-700 bg-stone-950 px-2 py-1" placeholder="New category" value={categoryDraft} onChange={(e) => setCategoryDraft(e.target.value)} />
-                  <button
-                    type="button"
-                    className="rounded border border-stone-700 px-2 py-1"
-                    onClick={() => {
-                      const next = categoryDraft.trim();
-                      if (!next) return;
-                      setTaxonomyCategories((current) => Array.from(new Set([...current, next])));
-                      setFormField("category", next);
-                      setCategoryDraft("");
-                    }}
-                  >
-                    Add
-                  </button>
                 </div>
               </label>
 
@@ -644,7 +626,7 @@ export default function MusicTriviaBankPage() {
               </label>
 
               <div className="block lg:col-span-2">
-                <p>Tags (reuse existing tags)</p>
+                <p>Tags (collection master tags)</p>
                 <div className="mt-1 grid gap-2 lg:grid-cols-[1fr,1fr]">
                   <div>
                     <input
@@ -668,6 +650,7 @@ export default function MusicTriviaBankPage() {
                         <option key={tag} value={tag}>{tag}</option>
                       ))}
                     </select>
+                    {tagOptions.length === 0 ? <p className="mt-1 text-[11px] text-amber-300">No master tags found yet.</p> : null}
                   </div>
                   <div>
                     <div className="rounded border border-stone-700 bg-stone-950/60 p-2">
@@ -680,24 +663,6 @@ export default function MusicTriviaBankPage() {
                           </button>
                         ))}
                       </div>
-                    </div>
-                    <div className="mt-2 grid gap-2 lg:grid-cols-[1fr,auto]">
-                      <input className="rounded border border-stone-700 bg-stone-950 px-2 py-1" placeholder="Add new tag" value={tagDraft} onChange={(e) => setTagDraft(e.target.value)} />
-                      <button
-                        type="button"
-                        className="rounded border border-stone-700 px-2 py-1"
-                        onClick={() => {
-                          const next = tagDraft.trim();
-                          if (!next) return;
-                          setTaxonomyTags((current) => Array.from(new Set([...current, next])));
-                          if (!form.selected_tags.includes(next)) {
-                            setFormField("selected_tags", [...form.selected_tags, next]);
-                          }
-                          setTagDraft("");
-                        }}
-                      >
-                        Add Tag
-                      </button>
                     </div>
                   </div>
                 </div>

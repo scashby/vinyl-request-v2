@@ -11,6 +11,8 @@ function parseLimit(raw: string | null): number {
 export async function GET(request: NextRequest) {
   const q = (request.nextUrl.searchParams.get("q") ?? "").trim();
   const artist = (request.nextUrl.searchParams.get("artist") ?? "").trim();
+  const modeRaw = (request.nextUrl.searchParams.get("mode") ?? "collection").trim().toLowerCase();
+  const mode = modeRaw === "smart" ? "smart" : "collection";
   const includeForSale = (request.nextUrl.searchParams.get("includeForSale") ?? "false").toLowerCase() === "true";
   const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
 
@@ -21,6 +23,7 @@ export async function GET(request: NextRequest) {
   const proxyUrl = new URL("/api/library/tracks/search", request.url);
   proxyUrl.searchParams.set("q", q);
   proxyUrl.searchParams.set("limit", String(limit));
+  proxyUrl.searchParams.set("mode", mode);
   proxyUrl.searchParams.set("includeForSale", includeForSale ? "true" : "false");
   if (artist) proxyUrl.searchParams.set("artist", artist);
 
