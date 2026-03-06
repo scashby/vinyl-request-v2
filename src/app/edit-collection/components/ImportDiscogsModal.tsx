@@ -706,6 +706,50 @@ function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
+const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+const isTransientNetworkError = (error: unknown): boolean => {
+  const message = getErrorMessage(error).toLowerCase();
+  return (
+    message.includes('failed to fetch') ||
+    message.includes('networkerror') ||
+    message.includes('network changed') ||
+    message.includes('err_network') ||
+    message.includes('timeout') ||
+    message.includes('temporarily unavailable')
+  );
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const fetchWithRetry = async (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  options?: { retries?: number; baseDelayMs?: number }
+): Promise<Response> => {
+  const retries = options?.retries ?? 2;
+  const baseDelayMs = options?.baseDelayMs ?? 600;
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const response = await fetch(input, init);
+      if (response.ok || !RETRYABLE_HTTP_STATUSES.has(response.status) || attempt === retries) {
+        return response;
+      }
+    } catch (error) {
+      lastError = error;
+      if (!isTransientNetworkError(error) || attempt === retries) {
+        throw error;
+      }
+    }
+
+    await sleep(baseDelayMs * (attempt + 1));
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Fetch failed after retries');
+};
+
 function normalizeComparable(value?: string | null): string {
   return value?.trim().toLowerCase() ?? '';
 }
@@ -1175,7 +1219,10 @@ function compareAlbums(
 async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unknown>> {
   await new Promise(resolve => setTimeout(resolve, 1100)); // Rate limiting
 
-  const response = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);
+  const response = await fetchWithRetry(`/api/discogsProxy?releaseId=${releaseId}`, undefined, {
+    retries: 2,
+    baseDelayMs: 900,
+  });
 
   if (!response.ok) {
     throw new Error(`Discogs API error: ${response.status}`);
@@ -1377,7 +1424,10 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
       setStage('fetching_definitions');
       try {
           // Fetch Fields
-          const fieldRes = await fetch('/api/discogs/fields');
+          const fieldRes = await fetchWithRetry('/api/discogs/fields', undefined, {
+            retries: 2,
+            baseDelayMs: 500,
+          });
           if (fieldRes.ok) {
               const fieldData = await fieldRes.json();
               const mapping = { media: 0, sleeve: 0, notes: 0 };
@@ -1412,7 +1462,10 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         discogsFolderNamesById.set(0, 'All');
 
         if (sourceType === 'collection') {
-          const foldersRes = await fetch('/api/discogs/folders');
+          const foldersRes = await fetchWithRetry('/api/discogs/folders', undefined, {
+            retries: 3,
+            baseDelayMs: 700,
+          });
           if (!foldersRes.ok) {
             throw new Error('Failed to load Discogs folder names. Reconnect Discogs and retry so Sale folder membership can be synced correctly.');
           }
@@ -1429,7 +1482,10 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         while (hasMore) {
             setProgress({ current: allFetchedItems.length, total: 0, status: `Fetching page ${page} from Discogs...` });
             
-            const res = await fetch(`${endpoint}?page=${page}`);
+            const res = await fetchWithRetry(`${endpoint}?page=${page}`, undefined, {
+              retries: 3,
+              baseDelayMs: 700,
+            });
             if (!res.ok) throw new Error('Failed to fetch from Discogs API');
             
             const data: DiscogsCollectionResponse | DiscogsWantlistResponse = await res.json();

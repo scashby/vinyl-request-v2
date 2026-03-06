@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
   if (questionType) query = query.eq("question_type", questionType);
   if (defaultDifficulty) query = query.eq("default_difficulty", defaultDifficulty);
   if (defaultCategory) query = query.eq("default_category", defaultCategory);
-  if (q) query = query.or(`prompt_text.ilike.%${q}%,source_note.ilike.%${q}%,question_code.ilike.%${q}%`);
+  if (q) query = query.or(`prompt_text.ilike.%${q}%,answer_key.ilike.%${q}%,source_note.ilike.%${q}%,question_code.ilike.%${q}%`);
   if (constrainedIds) query = query.in("id", Array.from(constrainedIds));
 
   const { data: questions, error: questionsError, count } = await query;

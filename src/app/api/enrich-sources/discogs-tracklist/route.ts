@@ -42,6 +42,17 @@ const getSideFromPosition = (position?: string) => {
   return match ? match[1].toUpperCase() : null;
 };
 
+const normalizeTrackPosition = (
+  input: string | undefined,
+  fallbackIndex: number,
+  seen: Map<string, number>
+) => {
+  const base = (input ?? '').trim() || `T${String(fallbackIndex + 1).padStart(3, '0')}`;
+  const prior = seen.get(base) ?? 0;
+  seen.set(base, prior + 1);
+  return prior === 0 ? base : `${base}-${prior + 1}`;
+};
+
 const buildDiscogsFormatString = (formats?: { name?: string; qty?: string | number; descriptions?: string[] }[]) => {
   if (!formats || formats.length === 0) return '';
   const format = formats[0];
@@ -166,7 +177,7 @@ export async function POST(req: Request) {
       inner_sleeve_images: galleryImages.length > 0 ? galleryImages : null,
     } : {};
 
-    // Process tracks with per-track artist info
+    // Process tracks with per-track artist info.
     const enrichedTracks = discogsData.tracklist.map((track: DiscogsTrack) => {
       let trackArtist = undefined;
       
@@ -184,8 +195,22 @@ export async function POST(req: Request) {
       };
     });
 
-    const tracksWithArtists = enrichedTracks.filter(t => t.artist).length;
-    console.log(`✓ ${tracksWithArtists}/${enrichedTracks.length} tracks have artist info`);
+    // Persist only real track rows, and ensure each position is unique for (release_id, position).
+    const seenPositions = new Map<string, number>();
+    const tracksToPersist = enrichedTracks
+      .filter((track) => track.type_ !== 'heading')
+      .filter((track) => (track.title ?? '').trim().length > 0)
+      .map((track, index) => {
+        const position = normalizeTrackPosition(track.position, index, seenPositions);
+        return {
+          ...track,
+          position,
+          side: getSideFromPosition(track.position) ?? getSideFromPosition(position),
+        };
+      });
+
+    const tracksWithArtists = tracksToPersist.filter((track) => track.artist).length;
+    console.log(`✓ ${tracksWithArtists}/${tracksToPersist.length} tracks have artist info`);
 
     if (!release?.id) {
       return NextResponse.json({
@@ -208,7 +233,7 @@ export async function POST(req: Request) {
       }, { status: 500 });
     }
 
-    for (const track of enrichedTracks) {
+    for (const track of tracksToPersist) {
       const { data: recording, error: recordingError } = await supabase
         .from('recordings')
         .insert({
@@ -236,12 +261,14 @@ export async function POST(req: Request) {
 
       const { error: linkError } = await supabase
         .from('release_tracks')
-        .insert({
+        .upsert({
           release_id: release.id,
           recording_id: recording.id,
           position: track.position || '',
-          side: getSideFromPosition(track.position),
+          side: track.side,
           title_override: track.title || null,
+        }, {
+          onConflict: 'release_id,position'
         });
 
       if (linkError) {
@@ -261,17 +288,15 @@ export async function POST(req: Request) {
         albumId: album.id,
         artist: artistName,
         title: albumTitle,
-        totalTracks: enrichedTracks.length,
+        totalTracks: tracksToPersist.length,
         tracksWithArtists,
-        tracks: enrichedTracks
-          .filter((track) => track.type_ !== 'heading')
-          .map((track) => ({
+        tracks: tracksToPersist.map((track) => ({
             position: track.position || '',
             title: track.title || '',
             artist: track.artist || null,
             duration: track.duration || null,
             type: 'track' as const,
-            side: getSideFromPosition(track.position) || undefined
+            side: track.side || undefined
           }))
       }
     });
