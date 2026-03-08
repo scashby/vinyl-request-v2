@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "lib/supabaseClient";
 import { Container } from "components/ui/Container";
 import { Button } from "components/ui/Button";
+import { uploadEventImage } from "src/lib/uploadEventImage";
 import {
   defaultEventTypeConfig,
   type EventSubtypeConfig,
@@ -608,23 +609,11 @@ export default function Page() {
       if (!file) return;
 
       try {
-        const fileExt = file.name.split(".").pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
-        const filePath = `event-images/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("event-images")
-          .upload(filePath, file, { cacheControl: "3600", upsert: false });
-
-        if (uploadError) throw uploadError;
-
-        const { data } = supabase.storage.from("event-images").getPublicUrl(filePath);
-        if (data?.publicUrl) {
-          onUpdate(data.publicUrl);
-        }
+        const { publicUrl } = await uploadEventImage(file);
+        onUpdate(publicUrl);
       } catch (error) {
         console.error("Error uploading template image:", error);
-        alert("Failed to upload image. Please try again.");
+        alert(error instanceof Error ? error.message : "Failed to upload image. Please try again.");
       }
     };
 

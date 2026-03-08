@@ -7,6 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from 'src/lib/supabaseClient';
+import { uploadEventImage } from 'src/lib/uploadEventImage';
 import type { Crate, SmartRules } from 'src/types/crate';
 import type { Database } from 'types/supabase';
 import {
@@ -849,22 +850,7 @@ export default function EditEventForm({
 
       try {
         setUploadingImage(true);
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
-        const filePath = `event-images/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('event-images')
-          .upload(filePath, file, {
-            cacheControl: '3600',
-            upsert: false,
-          });
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('event-images')
-          .getPublicUrl(filePath);
+        const { publicUrl } = await uploadEventImage(file);
 
         setEventData((prev) => ({
           ...prev,
@@ -872,7 +858,7 @@ export default function EditEventForm({
         }));
       } catch (error) {
         console.error('Error uploading event image:', error);
-        alert('Failed to upload image. Please try again.');
+        alert(error instanceof Error ? error.message : 'Failed to upload image. Please try again.');
       } finally {
         setUploadingImage(false);
       }
