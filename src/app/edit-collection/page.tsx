@@ -100,6 +100,7 @@ const TRACK_SORT_OPTIONS: { value: TrackSortOption; label: string; category: str
 type AppViewMode = 'collection' | 'album-track' | 'playlist';
 type SidebarMode = 'format' | 'crates' | 'playlists';
 type TrackListSource = 'crates' | 'playlists';
+type SearchType = 'both' | 'albums' | 'tracks';
 type ColumnSelectorMode = AppViewMode;
 type TrackViewColumnId =
   | 'checkbox'
@@ -130,6 +131,7 @@ type PersistedCollectionUiContext = {
   selectedCrateId?: number | null;
   selectedPlaylistId?: number | null;
   searchQuery?: string;
+  searchType?: SearchType;
   selectedLetter?: string;
 };
 
@@ -1015,6 +1017,21 @@ const buildTrackRuleMetadata = (album: Album) => {
 
 const isAlbumForSale = (album: Album): boolean => isForSaleInventory(album);
 
+const getAlbumFormatLabel = (album: Album): string => {
+  const label = getDisplayFormat(getAlbumFormat(album)).trim();
+  return label || 'Unknown';
+};
+
+const getAlbumTrackSearchText = (album: Album): string => {
+  const releaseTracks = (album.release?.release_tracks ?? []).map((track) =>
+    [track.position ?? '', track.recording?.title ?? ''].filter(Boolean).join(' ')
+  );
+  const fallbackTracks = (album.tracks ?? []).map((track) =>
+    [track.position ?? '', track.title ?? '', track.artist ?? ''].filter(Boolean).join(' ')
+  );
+  return [...releaseTracks, ...fallbackTracks].join(' ');
+};
+
 const isSaleOnlyCrate = (crate: Crate | null | undefined): boolean => {
   if (!crate) return false;
   if (crate.is_smart && hasSaleSmartRule(crate.smart_rules)) {
@@ -1032,6 +1049,7 @@ function CollectionBrowserPage() {
   const albumsLoadVersionRef = useRef(0);
   const loadingOwnerLoadVersionRef = useRef<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchType, setSearchType] = useState<SearchType>('albums');
   const [showSearchTypeDropdown, setShowSearchTypeDropdown] = useState(false);
   const [selectedLetter, setSelectedLetter] = useState<string>('All');
   const [viewMode, setViewMode] = useState<AppViewMode>('collection');
@@ -1055,6 +1073,7 @@ function CollectionBrowserPage() {
   
   const [folderSortByCount, setFolderSortByCount] = useState(false);
   const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<number>>(new Set());
+  const [removingSelectedAlbums, setRemovingSelectedAlbums] = useState(false);
   const [selectedTrackKeys, setSelectedTrackKeys] = useState<Set<string>>(new Set());
   const [expandedAlbumIds, setExpandedAlbumIds] = useState<Set<number>>(new Set());
   const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null);
@@ -1072,6 +1091,8 @@ function CollectionBrowserPage() {
   
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
   const [trackSortBy, setTrackSortBy] = useState<TrackSortOption>('album-asc');
+  const [albumFormatFilterMode, setAlbumFormatFilterMode] = useState<'include' | 'exclude'>('include');
+  const [albumFormatFilters, setAlbumFormatFilters] = useState<Set<string>>(new Set());
   const [trackFormatFilterMode, setTrackFormatFilterMode] = useState<'include' | 'exclude'>('include');
   const [trackFormatFilters, setTrackFormatFilters] = useState<Set<string>>(new Set());
   
@@ -1079,6 +1100,7 @@ function CollectionBrowserPage() {
   const [showSortFavoritesDropdown, setShowSortFavoritesDropdown] = useState(false);
   const [showViewModeDropdown, setShowViewModeDropdown] = useState(false);
   const [showColumnFavoritesDropdown, setShowColumnFavoritesDropdown] = useState(false);
+  const [showAlbumFormatDropdown, setShowAlbumFormatDropdown] = useState(false);
   const [showTrackFormatDropdown, setShowTrackFormatDropdown] = useState(false);
   const [, setSmartPlaylistMixNonce] = useState(0);
 
@@ -1290,6 +1312,9 @@ function CollectionBrowserPage() {
         if (typeof parsed.searchQuery === 'string') {
           setSearchQuery(parsed.searchQuery);
         }
+        if (parsed.searchType === 'both' || parsed.searchType === 'albums' || parsed.searchType === 'tracks') {
+          setSearchType(parsed.searchType);
+        }
         if (typeof parsed.selectedLetter === 'string') {
           const isAlphabet = /^[A-Z]$/.test(parsed.selectedLetter);
           if (parsed.selectedLetter === 'All' || parsed.selectedLetter === '0-9' || isAlphabet) {
@@ -1450,6 +1475,21 @@ function CollectionBrowserPage() {
       setTrackSortBy(storedTrackSort as TrackSortOption);
     }
 
+    const storedAlbumFilterMode = localStorage.getItem('collection-album-format-filter-mode');
+    if (storedAlbumFilterMode === 'include' || storedAlbumFilterMode === 'exclude') {
+      setAlbumFormatFilterMode(storedAlbumFilterMode);
+    }
+
+    const storedAlbumFilters = localStorage.getItem('collection-album-format-filters');
+    if (storedAlbumFilters) {
+      try {
+        const parsed = JSON.parse(storedAlbumFilters) as string[];
+        setAlbumFormatFilters(new Set(parsed));
+      } catch {
+        // ignore invalid local storage
+      }
+    }
+
     const storedTrackFilterMode = localStorage.getItem('collection-track-format-filter-mode');
     if (storedTrackFilterMode === 'include' || storedTrackFilterMode === 'exclude') {
       setTrackFormatFilterMode(storedTrackFilterMode);
@@ -1480,6 +1520,7 @@ function CollectionBrowserPage() {
       selectedCrateId,
       selectedPlaylistId,
       searchQuery,
+      searchType,
       selectedLetter,
     };
     localStorage.setItem(COLLECTION_UI_CONTEXT_STORAGE_KEY, JSON.stringify(context));
@@ -1492,6 +1533,7 @@ function CollectionBrowserPage() {
     selectedCrateId,
     selectedPlaylistId,
     searchQuery,
+    searchType,
     selectedLetter,
   ]);
 
@@ -1570,6 +1612,14 @@ function CollectionBrowserPage() {
   useEffect(() => {
     localStorage.setItem('collection-track-sort-preference', trackSortBy);
   }, [trackSortBy]);
+
+  useEffect(() => {
+    localStorage.setItem('collection-album-format-filter-mode', albumFormatFilterMode);
+  }, [albumFormatFilterMode]);
+
+  useEffect(() => {
+    localStorage.setItem('collection-album-format-filters', JSON.stringify(Array.from(albumFormatFilters)));
+  }, [albumFormatFilters]);
 
   useEffect(() => {
     localStorage.setItem('collection-track-format-filter-mode', trackFormatFilterMode);
@@ -1915,6 +1965,14 @@ function CollectionBrowserPage() {
     }
   }, [ensureTracksHydrated, viewMode]);
 
+  useEffect(() => {
+    if (viewMode !== 'collection') return;
+    if (!searchQuery.trim()) return;
+    if (searchType === 'albums') return;
+    if (tracksHydrated || tracksHydrating) return;
+    void ensureTracksHydrated();
+  }, [ensureTracksHydrated, searchQuery, searchType, tracksHydrated, tracksHydrating, viewMode]);
+
   const selectedCrate = useMemo(
     () => (selectedCrateId !== null ? crates.find((crate) => crate.id === selectedCrateId) ?? null : null),
     [crates, selectedCrateId]
@@ -1947,12 +2005,12 @@ function CollectionBrowserPage() {
   const nonSaleAlbums = useMemo(() => albums.filter((album) => !isAlbumForSale(album)), [albums]);
   const defaultVisibleAlbumCount = nonSaleAlbums.length;
 
-  const filteredAndSortedAlbums = useMemo(() => {
-    let filtered = albums.filter(album => {
+  const scopedAlbums = useMemo(() => {
+    return albums.filter((album) => {
       const albumIsForSale = isAlbumForSale(album);
       if (isViewingSaleCrate && !albumIsForSale) return false;
       if (!isViewingSaleCrate && albumIsForSale) return false;
-      
+
       if (selectedLetter !== 'All') {
         const firstChar = getAlbumArtist(album).charAt(0).toUpperCase();
         if (selectedLetter === '0-9') {
@@ -1975,20 +2033,77 @@ function CollectionBrowserPage() {
         if ((album.release?.media_type || 'Unknown') !== selectedFolderValue) return false;
       }
 
+      return true;
+    });
+  }, [
+    albums,
+    isViewingSaleCrate,
+    selectedLetter,
+    viewMode,
+    folderMode,
+    selectedCrateId,
+    selectedCrate,
+    resolvedCrateInventoryIdsByCrate,
+    selectedFolderValue,
+  ]);
+
+  const albumFormatCounts = useMemo(() => {
+    return scopedAlbums.reduce((acc, album) => {
+      const formatLabel = getAlbumFormatLabel(album);
+      acc[formatLabel] = (acc[formatLabel] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [scopedAlbums]);
+
+  const sortedAlbumFormats = useMemo(() => {
+    return Object.entries(albumFormatCounts).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [albumFormatCounts]);
+
+  const albumFormatSummary = useMemo(() => {
+    if (albumFormatFilters.size === 0) return 'All Formats';
+    const values = Array.from(albumFormatFilters);
+    if (values.length === 1) {
+      return `${albumFormatFilterMode === 'include' ? 'Only' : 'Exclude'} ${values[0]}`;
+    }
+    return `${albumFormatFilterMode === 'include' ? 'Only' : 'Exclude'} ${values.length} formats`;
+  }, [albumFormatFilterMode, albumFormatFilters]);
+
+  const searchPlaceholder = useMemo(() => {
+    if (viewMode !== 'collection') return 'Search tracks, artist, album...';
+    if (searchType === 'tracks') return 'Search tracks...';
+    if (searchType === 'both') return 'Search albums + tracks...';
+    return 'Search albums...';
+  }, [searchType, viewMode]);
+
+  const filteredAndSortedAlbums = useMemo(() => {
+    let filtered = scopedAlbums.filter((album) => {
+      if (albumFormatFilters.size > 0) {
+        const formatLabel = getAlbumFormatLabel(album);
+        if (albumFormatFilterMode === 'include') {
+          if (!albumFormatFilters.has(formatLabel)) return false;
+        } else if (albumFormatFilters.has(formatLabel)) {
+          return false;
+        }
+      }
+
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
-        const searchable = [
+        const albumSearchable = [
           getAlbumArtist(album),
           getAlbumTitle(album),
-          getAlbumFormat(album),
+          getAlbumFormatLabel(album),
           getAlbumYearValue(album),
           toSafeSearchString(getAlbumTags(album)),
-          // FIXED: Search canonical genres instead of discogs_genres
           toSafeSearchString(getAlbumGenres(album)),
-          toSafeSearchString(album.release?.label)
+          toSafeSearchString(album.release?.label),
         ].join(' ').toLowerCase();
-        
-        if (!searchable.includes(q)) return false;
+        const trackSearchable = getAlbumTrackSearchText(album).toLowerCase();
+        const matchesAlbums = albumSearchable.includes(q);
+        const matchesTracks = trackSearchable.includes(q);
+
+        if (searchType === 'albums' && !matchesAlbums) return false;
+        if (searchType === 'tracks' && !matchesTracks) return false;
+        if (searchType === 'both' && !matchesAlbums && !matchesTracks) return false;
       }
 
       return true;
@@ -2035,7 +2150,17 @@ function CollectionBrowserPage() {
     }
 
     return filtered;
-  }, [activeCollectionSortFields, albums, isViewingSaleCrate, selectedLetter, selectedFolderValue, selectedCrateId, folderMode, resolvedCrateInventoryIdsByCrate, selectedCrate, searchQuery, sortBy, tableSortState, viewMode]);
+  }, [
+    activeCollectionSortFields,
+    albumFormatFilterMode,
+    albumFormatFilters,
+    scopedAlbums,
+    searchQuery,
+    searchType,
+    sortBy,
+    tableSortState,
+    viewMode,
+  ]);
 
   const folderCounts = useMemo(() => {
     return nonSaleAlbums.reduce((acc, album) => {
@@ -2584,6 +2709,8 @@ function CollectionBrowserPage() {
     setShowColumnFavoritesDropdown(false);
     setShowSortFavoritesDropdown(false);
     setShowSortSelector(false);
+    setShowSearchTypeDropdown(false);
+    setShowAlbumFormatDropdown(false);
     if (viewMode === 'collection') {
       setExpandedAlbumIds(new Set());
       setShowTrackFormatDropdown(false);
@@ -2805,6 +2932,51 @@ function CollectionBrowserPage() {
   const handleRemoveAlbumFromCrate = useCallback(async (albumId: number, crateId: number) => {
     await handleRemoveAlbumsFromCrate(crateId, [albumId]);
   }, [handleRemoveAlbumsFromCrate]);
+
+  const handleRemoveSelectedAlbums = useCallback(async () => {
+    const albumIds = dedupeInventoryIds(Array.from(selectedAlbumIds));
+    if (albumIds.length === 0 || removingSelectedAlbums) return;
+
+    const label = `${albumIds.length} album${albumIds.length === 1 ? '' : 's'}`;
+    if (!confirm(`Remove ${label} from your collection? This cannot be undone.`)) {
+      return;
+    }
+
+    setRemovingSelectedAlbums(true);
+    try {
+      const chunkSize = 100;
+      for (let i = 0; i < albumIds.length; i += chunkSize) {
+        const chunk = albumIds.slice(i, i + chunkSize);
+
+        const { error: deleteCrateItemsError } = await supabase
+          .from('crate_items')
+          .delete()
+          .in('inventory_id', chunk);
+        if (deleteCrateItemsError) throw deleteCrateItemsError;
+
+        const { error: deleteInventoryError } = await supabase
+          .from('inventory')
+          .delete()
+          .in('id', chunk);
+        if (deleteInventoryError) throw deleteInventoryError;
+      }
+
+      setSelectedAlbumIds(new Set());
+      setExpandedAlbumIds((prev) => new Set(Array.from(prev).filter((albumId) => !albumIds.includes(albumId))));
+      setSelectedAlbumId((prev) => (prev !== null && albumIds.includes(prev) ? null : prev));
+      setEditingAlbumId((prev) => (prev !== null && albumIds.includes(prev) ? null : prev));
+
+      await Promise.all([
+        loadAlbums({ includeTracks: tracksHydratedRef.current, showSpinner: false }),
+        loadCrates(),
+      ]);
+    } catch (err) {
+      console.error('Failed to remove selected albums:', err);
+      alert(err instanceof Error ? err.message : 'Failed to remove selected albums.');
+    } finally {
+      setRemovingSelectedAlbums(false);
+    }
+  }, [loadAlbums, loadCrates, removingSelectedAlbums, selectedAlbumIds]);
 
   const handleDeleteCrate = useCallback(async (crate: Crate) => {
     if (isSaleOnlyCrate(crate)) return;
@@ -3466,7 +3638,67 @@ function CollectionBrowserPage() {
           </div>
 
           <div className="flex items-center shrink-0">
-            {viewMode !== 'collection' && (
+            {viewMode === 'collection' ? (
+              <div className="relative mr-1.5">
+                <button
+                  onClick={() => setShowAlbumFormatDropdown(!showAlbumFormatDropdown)}
+                  title="Album format filters"
+                  className="bg-[#2a2a2a] text-white border border-[#555] px-2.5 py-1.5 cursor-pointer text-[12px] rounded h-8 hover:bg-[#333] transition-colors"
+                >
+                  🎚 {albumFormatSummary}
+                </button>
+                {showAlbumFormatDropdown && (
+                  <>
+                    <div onClick={() => setShowAlbumFormatDropdown(false)} className="fixed inset-0 z-[99]" />
+                    <div className="absolute right-0 top-full mt-1 w-[280px] max-h-[320px] overflow-auto bg-[#2a2a2a] border border-[#555] rounded z-[100] shadow-lg p-2">
+                      <div className="flex gap-1 mb-2">
+                        <button
+                          onClick={() => setAlbumFormatFilterMode('include')}
+                          className={`flex-1 px-2 py-1 text-[11px] rounded border ${albumFormatFilterMode === 'include' ? 'bg-[#5A9BD5] border-[#5A9BD5] text-white' : 'bg-[#3a3a3a] border-[#555] text-white'}`}
+                        >
+                          Include
+                        </button>
+                        <button
+                          onClick={() => setAlbumFormatFilterMode('exclude')}
+                          className={`flex-1 px-2 py-1 text-[11px] rounded border ${albumFormatFilterMode === 'exclude' ? 'bg-[#5A9BD5] border-[#5A9BD5] text-white' : 'bg-[#3a3a3a] border-[#555] text-white'}`}
+                        >
+                          Exclude
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => setAlbumFormatFilters(new Set())}
+                        className="w-full mb-2 px-2 py-1 text-[11px] rounded border border-[#555] bg-[#3a3a3a] text-white hover:bg-[#444]"
+                      >
+                        Clear Format Filters
+                      </button>
+                      {sortedAlbumFormats.map(([format, count]) => {
+                        const checked = albumFormatFilters.has(format);
+                        return (
+                          <label key={format} className="flex items-center justify-between px-2 py-1.5 rounded text-[12px] text-white hover:bg-[#3a3a3a] cursor-pointer">
+                            <span className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => {
+                                  setAlbumFormatFilters((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(format)) next.delete(format);
+                                    else next.add(format);
+                                    return next;
+                                  });
+                                }}
+                              />
+                              <span>{format}</span>
+                            </span>
+                            <span className="text-[#bbb]">{count}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
               <div className="relative mr-1.5">
                 <button
                   onClick={() => setShowTrackFormatDropdown(!showTrackFormatDropdown)}
@@ -3532,8 +3764,34 @@ function CollectionBrowserPage() {
                 <span>🔍</span>
                 <span className="text-[10px]">▼</span>
               </button>
+              {showSearchTypeDropdown && (
+                <>
+                  <div onClick={() => setShowSearchTypeDropdown(false)} className="fixed inset-0 z-[99]" />
+                  <div className="absolute left-0 top-full mt-1 min-w-[220px] overflow-hidden rounded border border-[#cfcfcf] bg-white text-[#333] shadow-lg z-[100]">
+                    {[
+                      { value: 'both', label: 'Albums & Tracks', icon: '🗃' },
+                      { value: 'albums', label: 'Albums', icon: '💿' },
+                      { value: 'tracks', label: 'Tracks', icon: '🎵' },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          setSearchType(option.value as SearchType);
+                          setShowSearchTypeDropdown(false);
+                        }}
+                        className={`flex w-full items-center gap-3 px-4 py-3 text-left text-[13px] hover:bg-[#f4f4f4] ${
+                          searchType === option.value ? 'bg-[#e8f1fb] text-[#1b5ea8] font-semibold' : ''
+                        }`}
+                      >
+                        <span className="text-[18px]">{option.icon}</span>
+                        <span>{option.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
-            <input type="text" placeholder={viewMode === 'collection' ? 'Search albums...' : 'Search tracks, artist, album...'} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} title="Search your collection" className="bg-[#2a2a2a] text-white border border-[#555] border-l-0 px-3 py-1.5 rounded-r text-[13px] w-[220px] h-8 outline-none" />
+            <input type="text" placeholder={searchPlaceholder} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} title="Search your collection" className="bg-[#2a2a2a] text-white border border-[#555] border-l-0 px-3 py-1.5 rounded-r text-[13px] w-[220px] h-8 outline-none" />
           </div>
         </div>
 
@@ -3542,7 +3800,14 @@ function CollectionBrowserPage() {
             <button onClick={() => setSelectedAlbumIds(new Set())} title="Clear selection" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">✕ Cancel</button>
             <button title="Select all albums" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">☑ All</button>
             <button title="Edit selected albums" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">✏️ Edit</button>
-            <button title="Remove selected albums" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">🗑 Remove</button>
+            <button
+              onClick={() => void handleRemoveSelectedAlbums()}
+              title="Remove selected albums"
+              disabled={removingSelectedAlbums}
+              className={`border-none text-white px-2.5 py-1 rounded text-xs ${removingSelectedAlbums ? 'bg-white/10 cursor-not-allowed opacity-70' : 'bg-white/20 cursor-pointer'}`}
+            >
+              🗑 Remove
+            </button>
             {selectedCrate ? (
               <>
                 <button
