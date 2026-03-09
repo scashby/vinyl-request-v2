@@ -3,6 +3,8 @@ import type { Album } from '../types/album';
 import type { SmartRule, Crate } from '../types/crate';
 import { isForSaleInventory } from './saleUtils';
 
+export type CrateItemsByCrate = Record<number, Set<number>>;
+
 /**
  * Evaluate if an album matches a smart crate's rules
  */
@@ -19,6 +21,50 @@ export function albumMatchesSmartCrate(album: Album, crate: Crate): boolean {
     // ANY rule must match
     return rules.some(rule => albumMatchesRule(album, rule));
   }
+}
+
+export function getMaterializedCrateInventoryIds(
+  crateItemsByCrate: CrateItemsByCrate,
+  crateId: number
+): Set<number> {
+  return new Set(crateItemsByCrate[crateId] ?? []);
+}
+
+export function resolveCrateInventoryIds(
+  albums: Album[],
+  crate: Crate | null | undefined,
+  crateItemsByCrate: CrateItemsByCrate
+): Set<number> {
+  if (!crate) return new Set<number>();
+  if (!crate.is_smart || crate.live_update === false) {
+    return getMaterializedCrateInventoryIds(crateItemsByCrate, crate.id);
+  }
+  return new Set(
+    albums
+      .filter((album) => albumMatchesSmartCrate(album, crate))
+      .map((album) => album.id)
+  );
+}
+
+export function buildSmartCrateSnapshotIds(albums: Album[], crate: Crate): number[] {
+  if (!crate.is_smart) return [];
+  return albums
+    .filter((album) => albumMatchesSmartCrate(album, crate))
+    .map((album) => album.id);
+}
+
+export function getAlbumCrateMemberships(
+  albumId: number,
+  crates: Crate[],
+  albums: Album[],
+  crateItemsByCrate: CrateItemsByCrate
+): Crate[] {
+  return crates.filter((crate) => resolveCrateInventoryIds(albums, crate, crateItemsByCrate).has(albumId));
+}
+
+export function getCrateKindLabel(crate: Crate): string {
+  if (!crate.is_smart) return 'Manual crate';
+  return crate.live_update === false ? 'Frozen smart crate' : 'Live smart crate';
 }
 
 /**

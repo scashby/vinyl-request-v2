@@ -11,6 +11,16 @@ import {
   SortState 
 } from '../app/edit-collection/columnDefinitions';
 import { getDisplayFormat } from '../utils/formatDisplay';
+import { BoxIcon } from './BoxIcon';
+
+export interface AlbumCrateBadge {
+  crateId: number;
+  name: string;
+  icon: string;
+  isSmart: boolean;
+  isLive: boolean;
+  isSystem: boolean;
+}
 
 interface CollectionTableProps {
   albums: Album[];
@@ -22,6 +32,10 @@ interface CollectionTableProps {
   sortState: SortState;
   onSortChange: (column: ColumnId) => void;
   onEditAlbum: (albumId: number) => void;
+  crateBadgesByAlbumId: Record<number, AlbumCrateBadge[]>;
+  onSelectCrate: (crateId: number) => void;
+  onOpenAlbumCratePicker: (albumId: number) => void;
+  onRemoveAlbumFromCrate: (albumId: number, crateId: number) => void | Promise<void>;
 }
 
 const ROW_HEIGHT = 32;
@@ -35,7 +49,11 @@ const CollectionTable = memo(function CollectionTable({
   lockedColumns,
   sortState,
   onSortChange,
-  onEditAlbum
+  onEditAlbum,
+  crateBadgesByAlbumId,
+  onSelectCrate,
+  onOpenAlbumCratePicker,
+  onRemoveAlbumFromCrate,
 }: CollectionTableProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   
@@ -196,6 +214,71 @@ const CollectionTable = memo(function CollectionTable({
       cat_no: (album: Album) => getAlbumCatalogNumber(album),
       sort_title: (album: Album) => album.sort_title || getAlbumTitle(album),
       subtitle: (album: Album) => album.subtitle || '—',
+      crates: (album: Album) => {
+        const badges = crateBadgesByAlbumId[album.id] ?? [];
+        return (
+          <div className="flex items-center gap-1 w-full min-w-0">
+            <div
+              className="flex items-center gap-1 overflow-x-auto w-full min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {badges.length === 0 ? (
+                <span className="text-gray-400">—</span>
+              ) : (
+                badges.map((badge) => (
+                  <span
+                    key={`${album.id}-${badge.crateId}`}
+                    className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] whitespace-nowrap ${
+                      badge.isSystem
+                        ? 'border-amber-300 bg-amber-50 text-amber-800'
+                        : badge.isSmart && badge.isLive
+                          ? 'border-sky-300 bg-sky-50 text-sky-800'
+                          : badge.isSmart
+                            ? 'border-violet-300 bg-violet-50 text-violet-800'
+                            : 'border-slate-300 bg-slate-100 text-slate-800'
+                    }`}
+                    title={`${badge.name}${badge.isSystem ? ' (system crate)' : badge.isSmart ? badge.isLive ? ' (live smart crate)' : ' (frozen smart crate)' : ' (manual crate)'}`}
+                  >
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer text-inherit"
+                      onClick={() => onSelectCrate(badge.crateId)}
+                    >
+                      {badge.isSmart ? (
+                        <BoxIcon color={badge.icon} size={12} />
+                      ) : (
+                        <span>{badge.icon}</span>
+                      )}
+                      <span>{badge.name}</span>
+                    </button>
+                    {!badge.isSystem && (
+                      <button
+                        type="button"
+                        className="bg-transparent border-none p-0 cursor-pointer text-inherit leading-none"
+                        onClick={() => void onRemoveAlbumFromCrate(album.id, badge.crateId)}
+                        title={`Remove from ${badge.name}`}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </span>
+                ))
+              )}
+            </div>
+            <button
+              type="button"
+              className="shrink-0 rounded border border-dashed border-gray-300 px-1.5 py-0.5 text-[11px] text-gray-600 hover:border-blue-400 hover:text-blue-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenAlbumCratePicker(album.id);
+              }}
+              title="Add this album to crates"
+            >
+              +
+            </button>
+          </div>
+        );
+      },
       format: (album: Album) => getDisplayFormat(getAlbumFormat(album)),
       discs: (album: Album) => formatDiscCount(album),
       sides: (album: Album) => formatSides(album),
@@ -237,7 +320,7 @@ const CollectionTable = memo(function CollectionTable({
         return salePrice ? formatCurrency(salePrice) : '—';
       },
     } as Record<string, (album: Album) => React.ReactNode>;
-  }, [onEditAlbum]);
+  }, [crateBadgesByAlbumId, onEditAlbum, onOpenAlbumCratePicker, onRemoveAlbumFromCrate, onSelectCrate]);
 
   const handleSelectAll = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
@@ -410,7 +493,7 @@ const CollectionTable = memo(function CollectionTable({
                   <div
                     key={col.id}
                     data-cell
-                    className={`h-full px-2 py-1.5 border-b border-gray-200 text-gray-900 text-[13px] whitespace-nowrap overflow-hidden text-ellipsis flex items-center box-border ${
+                    className={`h-full px-2 py-1.5 border-b border-gray-200 text-gray-900 text-[13px] whitespace-nowrap ${col.id === 'crates' ? 'overflow-visible' : 'overflow-hidden text-ellipsis'} flex items-center box-border ${
                       isLastLocked ? 'border-r-2 border-r-gray-400' : 'border-r border-gray-200'
                     }`}
                     style={{
@@ -432,7 +515,7 @@ const CollectionTable = memo(function CollectionTable({
                 <div
                   key={col.id}
                   data-cell
-                  className="h-full px-2 py-1.5 border-b border-r border-gray-200 text-gray-900 text-[13px] whitespace-nowrap overflow-hidden text-ellipsis flex items-center box-border"
+                  className={`h-full px-2 py-1.5 border-b border-r border-gray-200 text-gray-900 text-[13px] whitespace-nowrap ${col.id === 'crates' ? 'overflow-visible' : 'overflow-hidden text-ellipsis'} flex items-center box-border`}
                   style={{
                     width: col.width,
                     minWidth: col.width,
@@ -457,7 +540,11 @@ const CollectionTable = memo(function CollectionTable({
     prevProps.selectedAlbums === nextProps.selectedAlbums &&
     prevProps.sortState.column === nextProps.sortState.column &&
     prevProps.sortState.direction === nextProps.sortState.direction &&
-    prevProps.onEditAlbum === nextProps.onEditAlbum
+    prevProps.onEditAlbum === nextProps.onEditAlbum &&
+    prevProps.crateBadgesByAlbumId === nextProps.crateBadgesByAlbumId &&
+    prevProps.onSelectCrate === nextProps.onSelectCrate &&
+    prevProps.onOpenAlbumCratePicker === nextProps.onOpenAlbumCratePicker &&
+    prevProps.onRemoveAlbumFromCrate === nextProps.onRemoveAlbumFromCrate
   );
 });
 

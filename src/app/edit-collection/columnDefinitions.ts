@@ -13,6 +13,7 @@ export type ColumnId =
   | 'cat_no'
   | 'sort_title'
   | 'subtitle'
+  | 'crates'
   // Edition
   | 'format'
   | 'discs'
@@ -75,6 +76,7 @@ export const COLUMN_DEFINITIONS: Record<ColumnId, ColumnDefinition> = {
   cat_no: { id: 'cat_no', label: 'Cat No', width: '120px' },
   sort_title: { id: 'sort_title', label: 'Sort Title', width: '200px' },
   subtitle: { id: 'subtitle', label: 'Subtitle', width: '200px' },
+  crates: { id: 'crates', label: 'Crates', width: '260px' },
   
   // Edition
   format: { id: 'format', label: 'Format', width: '180px' },
@@ -138,6 +140,12 @@ export const COLUMN_GROUPS = [
     label: 'Edition',
     icon: '💿',
     columns: ['format', 'discs', 'sides', 'tracks', 'length', 'labels'] as ColumnId[]
+  },
+  {
+    id: 'dj',
+    label: 'DJ',
+    icon: '📦',
+    columns: ['crates'] as ColumnId[]
   },
   {
     id: 'details',

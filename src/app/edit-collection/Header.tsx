@@ -26,6 +26,7 @@ interface HeaderProps {
   selectedAlbumIds?: Set<number>;
   onOpenManagePlaylists?: () => void;
   onOpenExportCsvTxt?: () => void;
+  onSmartCrateSaved?: (crate: Crate, previousCrate: Crate | null) => Promise<void> | void;
 }
 
 const AUTH_RETURN_MODAL_KEY = 'edit-collection-auth-return-modal';
@@ -37,7 +38,8 @@ export default function Header({
   filteredAndSortedAlbums = [],
   selectedAlbumIds = new Set(),
   onOpenManagePlaylists = () => {},
-  onOpenExportCsvTxt = () => {}
+  onOpenExportCsvTxt = () => {},
+  onSmartCrateSaved = async () => {}
 }: HeaderProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -155,7 +157,7 @@ export default function Header({
       {showSettings && <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />}
       {showManagePickListsModal && <ManagePickListsModal isOpen={showManagePickListsModal} onClose={() => setShowManagePickListsModal(false)} />}
       {showNewCrateModal && <NewCrateModal isOpen={showNewCrateModal} onClose={() => { setShowNewCrateModal(false); setEditingCrate(null); }} onCrateCreated={async () => { await loadCrates(); setShowNewCrateModal(false); setShowManageCratesModal(true); setEditingCrate(null); }} editingCrate={editingCrate} />}
-      {showNewSmartCrateModal && <NewSmartCrateModal isOpen={showNewSmartCrateModal} onClose={() => { setShowNewSmartCrateModal(false); setEditingCrate(null); }} onCrateCreated={async () => { await loadCrates(); setShowNewSmartCrateModal(false); setShowManageCratesModal(true); setEditingCrate(null); }} editingCrate={editingCrate} />}
+      {showNewSmartCrateModal && <NewSmartCrateModal isOpen={showNewSmartCrateModal} onClose={() => { setShowNewSmartCrateModal(false); setEditingCrate(null); }} onCrateCreated={async (crate) => { await onSmartCrateSaved(crate, editingCrate); await loadCrates(); setShowNewSmartCrateModal(false); setShowManageCratesModal(true); setEditingCrate(null); }} editingCrate={editingCrate} />}
       {showManageCratesModal && <ManageCratesModal isOpen={showManageCratesModal} onClose={() => setShowManageCratesModal(false)} onCratesChanged={() => { loadCrates(); }} onOpenNewCrate={() => { setShowManageCratesModal(false); setEditingCrate(null); setShowNewCrateModal(true); }} onOpenNewSmartCrate={() => { setShowManageCratesModal(false); setEditingCrate(null); setShowNewSmartCrateModal(true); }} onOpenEditCrate={(crate) => { setShowManageCratesModal(false); setEditingCrate(crate); setShowNewCrateModal(true); }} onOpenEditSmartCrate={(crate) => { setShowManageCratesModal(false); setEditingCrate(crate); setShowNewSmartCrateModal(true); }} />}
       {showPrintToPDF && <PrintToPDFModal isOpen={showPrintToPDF} onClose={() => setShowPrintToPDF(false)} allAlbums={albums} currentListAlbums={filteredAndSortedAlbums} checkedAlbumIds={selectedAlbumIds} />}
       {showStatistics && <StatisticsModal isOpen={showStatistics} onClose={() => setShowStatistics(false)} albums={albums} />}

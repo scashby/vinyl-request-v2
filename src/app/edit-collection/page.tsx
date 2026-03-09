@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useState, useMemo, useRef, Suspense, Fragment, type ReactNode } from 'react';
 import { supabase as supabaseTyped } from '../../lib/supabaseClient';
-import CollectionTable from '../../components/CollectionTable';
+import CollectionTable, { type AlbumCrateBadge } from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
 import { ColumnId, COLUMN_DEFINITIONS, COLUMN_GROUPS, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
 import type { Album } from '../../types/album';
@@ -22,7 +22,12 @@ import type { Crate } from '../../types/crate';
 import type { CollectionPlaylist } from '../../types/collectionPlaylist';
 import type { SmartPlaylistRules } from '../../types/collectionPlaylist';
 import type { CollectionTrackRow } from '../../types/collectionTrackRow';
-import { albumMatchesSmartCrate } from '../../lib/crateUtils';
+import {
+  buildSmartCrateSnapshotIds,
+  getCrateKindLabel,
+  resolveCrateInventoryIds,
+  type CrateItemsByCrate,
+} from '../../lib/crateUtils';
 import { trackMatchesSmartPlaylist } from '../../lib/playlistUtils';
 import { resolveTrackArtist } from '../../lib/artistName';
 import CollectionInfoPanel from './components/CollectionInfoPanel';
@@ -257,6 +262,41 @@ const DEFAULT_PLAYLIST_VISIBLE_COLUMNS: TrackViewColumnId[] = [
 const TRACK_COLUMN_CONTROL_IDS = new Set<TrackViewColumnId>(['checkbox']);
 const TRACK_COLUMN_RIGHT_ALIGN_IDS = new Set<TrackViewColumnId>(['length', 'my_rating']);
 const COLLECTION_CONTROL_COLUMNS: ColumnId[] = ['checkbox', 'owned', 'for_sale_indicator', 'menu'];
+
+const normalizeCrateRecord = (row: Partial<Crate> & {
+  smart_rules?: unknown;
+  is_smart?: boolean | null;
+  live_update?: boolean | null;
+  match_rules?: string | null;
+  icon?: string | null;
+  color?: string | null;
+  sort_order?: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}): Crate => ({
+  id: Number(row.id ?? 0),
+  name: String(row.name ?? ''),
+  icon: row.icon ?? (row.is_smart ? '#3b82f6' : '📦'),
+  color: row.color ?? row.icon ?? (row.is_smart ? '#3b82f6' : '#3578b3'),
+  is_smart: row.is_smart === true,
+  smart_rules: (row.smart_rules as Crate['smart_rules']) ?? null,
+  match_rules: row.match_rules === 'any' ? 'any' : 'all',
+  live_update: row.live_update !== false,
+  sort_order: row.sort_order ?? 0,
+  created_at: row.created_at ?? '',
+  updated_at: row.updated_at ?? '',
+});
+
+const dedupeInventoryIds = (albumIds: number[]): number[] => {
+  const seen = new Set<number>();
+  const deduped: number[] = [];
+  for (const albumId of albumIds) {
+    if (!Number.isFinite(albumId) || seen.has(albumId)) continue;
+    seen.add(albumId);
+    deduped.push(albumId);
+  }
+  return deduped;
+};
 
 const DEFAULT_COLLECTION_COLUMN_FAVORITES: ColumnFavorite[] = [
   {
@@ -501,6 +541,7 @@ const mapFavoriteColumnsToCollectionColumns = (favorite: ColumnFavorite | null):
     notes: 'personal_notes',
     owner: 'owner',
     format: 'format',
+    crates: 'crates',
     artist: 'artist',
     title: 'title',
     year: 'year',
@@ -999,7 +1040,7 @@ function CollectionBrowserPage() {
   const [selectedFolderValue, setSelectedFolderValue] = useState<string | null>(null);
   const [selectedCrateId, setSelectedCrateId] = useState<number | null>(null);
   const [crates, setCrates] = useState<Crate[]>([]);
-  const [crateItemsByCrate, setCrateItemsByCrate] = useState<Record<number, Set<number>>>({});
+  const [crateItemsByCrate, setCrateItemsByCrate] = useState<CrateItemsByCrate>({});
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<number | null>(null);
   const [showPlaylistStudioModal, setShowPlaylistStudioModal] = useState(false);
@@ -1025,6 +1066,9 @@ function CollectionBrowserPage() {
   const [editingCrate, setEditingCrate] = useState<Crate | null>(null);
   const [returnToAddToCrate, setReturnToAddToCrate] = useState(false);
   const [newlyCreatedCrateId, setNewlyCreatedCrateId] = useState<number | null>(null);
+  const [crateModalAlbumIds, setCrateModalAlbumIds] = useState<number[]>([]);
+  const [crateModalItemLabel, setCrateModalItemLabel] = useState('Album');
+  const [crateModalActionLabel, setCrateModalActionLabel] = useState('Add to Crates');
   
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
   const [trackSortBy, setTrackSortBy] = useState<TrackSortOption>('album-asc');
@@ -1784,7 +1828,7 @@ function CollectionBrowserPage() {
     }
 
     if (data) {
-      setCrates(data as unknown as Crate[]);
+      setCrates((data as Array<Partial<Crate>>).map((row) => normalizeCrateRecord(row)));
     }
 
     const { data: crateItems, error: crateItemsError } = await supabase
@@ -1803,7 +1847,7 @@ function CollectionBrowserPage() {
       }
       acc[item.crate_id].add(item.inventory_id);
       return acc;
-    }, {} as Record<number, Set<number>>);
+    }, {} as CrateItemsByCrate);
 
     setCrateItemsByCrate(itemMap);
   }, [ensureSaleCrateExists]);
@@ -1876,6 +1920,19 @@ function CollectionBrowserPage() {
     [crates, selectedCrateId]
   );
 
+  useEffect(() => {
+    if (selectedCrateId !== null && !selectedCrate) {
+      setSelectedCrateId(null);
+    }
+  }, [selectedCrate, selectedCrateId]);
+
+  const resolvedCrateInventoryIdsByCrate = useMemo(() => {
+    return crates.reduce((acc, crate) => {
+      acc[crate.id] = resolveCrateInventoryIds(albums, crate, crateItemsByCrate);
+      return acc;
+    }, {} as CrateItemsByCrate);
+  }, [albums, crateItemsByCrate, crates]);
+
   const isCrateContextActive = useMemo(() => {
     if (folderMode !== 'crates') return false;
     if (viewMode === 'collection') return true;
@@ -1907,15 +1964,9 @@ function CollectionBrowserPage() {
 
       if (viewMode === 'collection' && folderMode === 'crates' && selectedCrateId !== null) {
         if (selectedCrate) {
-          if (selectedCrate.is_smart) {
-            if (!albumMatchesSmartCrate(album, selectedCrate)) {
-              return false;
-            }
-          } else {
-            const crateInventoryIds = crateItemsByCrate[selectedCrate.id];
-            if (!crateInventoryIds?.has(album.id)) {
-              return false;
-            }
+          const crateInventoryIds = resolvedCrateInventoryIdsByCrate[selectedCrate.id];
+          if (!crateInventoryIds?.has(album.id)) {
+            return false;
           }
         }
       }
@@ -1984,7 +2035,7 @@ function CollectionBrowserPage() {
     }
 
     return filtered;
-  }, [activeCollectionSortFields, albums, isViewingSaleCrate, selectedLetter, selectedFolderValue, selectedCrateId, folderMode, selectedCrate, searchQuery, sortBy, tableSortState, crateItemsByCrate, viewMode]);
+  }, [activeCollectionSortFields, albums, isViewingSaleCrate, selectedLetter, selectedFolderValue, selectedCrateId, folderMode, resolvedCrateInventoryIdsByCrate, selectedCrate, searchQuery, sortBy, tableSortState, viewMode]);
 
   const folderCounts = useMemo(() => {
     return nonSaleAlbums.reduce((acc, album) => {
@@ -1997,25 +2048,66 @@ function CollectionBrowserPage() {
   const cratesWithCounts = useMemo(() => {
     return crates.map(crate => {
       const crateIsSaleOnly = isSaleOnlyCrate(crate);
-      let count = 0;
-      if (crate.is_smart) {
-        count = albums.filter((album) => {
-          if (crateIsSaleOnly && !isAlbumForSale(album)) return false;
-          if (!crateIsSaleOnly && isAlbumForSale(album)) return false;
-          return albumMatchesSmartCrate(album, crate);
-        }).length;
-      } else {
-        const crateInventoryIds = crateItemsByCrate[crate.id] ?? new Set<number>();
-        count = albums.filter((album) => {
-          if (!crateInventoryIds.has(album.id)) return false;
-          if (crateIsSaleOnly && !isAlbumForSale(album)) return false;
-          if (!crateIsSaleOnly && isAlbumForSale(album)) return false;
-          return true;
-        }).length;
-      }
+      const crateInventoryIds = resolvedCrateInventoryIdsByCrate[crate.id] ?? new Set<number>();
+      const count = albums.filter((album) => {
+        if (!crateInventoryIds.has(album.id)) return false;
+        if (crateIsSaleOnly && !isAlbumForSale(album)) return false;
+        if (!crateIsSaleOnly && isAlbumForSale(album)) return false;
+        return true;
+      }).length;
       return { ...crate, album_count: count };
     });
-  }, [crates, albums, crateItemsByCrate]);
+  }, [albums, crates, resolvedCrateInventoryIdsByCrate]);
+
+  const mutableCratesWithCounts = useMemo(
+    () => cratesWithCounts.filter((crate) => !isSaleOnlyCrate(crate)),
+    [cratesWithCounts]
+  );
+
+  const crateBadgesByAlbumId = useMemo(() => {
+    const badges: Record<number, AlbumCrateBadge[]> = {};
+    const albumsById = new Map(albums.map((album) => [album.id, album]));
+
+    cratesWithCounts.forEach((crate) => {
+      const crateIsSaleOnly = isSaleOnlyCrate(crate);
+      const crateInventoryIds = resolvedCrateInventoryIdsByCrate[crate.id] ?? new Set<number>();
+      crateInventoryIds.forEach((albumId) => {
+        const album = albumsById.get(albumId);
+        if (!album) return;
+        if (crateIsSaleOnly && !isAlbumForSale(album)) return;
+        if (!crateIsSaleOnly && isAlbumForSale(album)) return;
+        if (!badges[albumId]) {
+          badges[albumId] = [];
+        }
+        badges[albumId].push({
+          crateId: crate.id,
+          name: crate.name,
+          icon: crate.icon,
+          isSmart: crate.is_smart,
+          isLive: crate.live_update !== false,
+          isSystem: crateIsSaleOnly,
+        });
+      });
+    });
+
+    Object.values(badges).forEach((albumBadges) => {
+      albumBadges.sort((a, b) => {
+        const crateA = crates.find((crate) => crate.id === a.crateId);
+        const crateB = crates.find((crate) => crate.id === b.crateId);
+        const sortA = crateA?.sort_order ?? 0;
+        const sortB = crateB?.sort_order ?? 0;
+        if (sortA !== sortB) return sortA - sortB;
+        return a.name.localeCompare(b.name);
+      });
+    });
+
+    return badges;
+  }, [albums, crates, cratesWithCounts, resolvedCrateInventoryIdsByCrate]);
+
+  const selectedCrateWithCount = useMemo(
+    () => (selectedCrate ? cratesWithCounts.find((crate) => crate.id === selectedCrate.id) ?? selectedCrate : null),
+    [cratesWithCounts, selectedCrate]
+  );
 
   const allTrackRows = useMemo<CollectionTrackRow[]>(() => {
     const rows: CollectionTrackRow[] = [];
@@ -2190,15 +2282,8 @@ function CollectionBrowserPage() {
     let rows = allTrackRows;
 
     if (trackSource === 'crates' && selectedCrate) {
-      if (selectedCrate.is_smart) {
-        const allowedAlbumIds = new Set(
-          albums.filter((album) => albumMatchesSmartCrate(album, selectedCrate)).map((album) => album.id)
-        );
-        rows = rows.filter((row) => allowedAlbumIds.has(row.inventoryId));
-      } else {
-        const allowedInventoryIds = crateItemsByCrate[selectedCrate.id];
-        rows = rows.filter((row) => allowedInventoryIds?.has(row.inventoryId));
-      }
+      const allowedInventoryIds = resolvedCrateInventoryIdsByCrate[selectedCrate.id];
+      rows = rows.filter((row) => allowedInventoryIds?.has(row.inventoryId));
     }
 
     if (trackSource === 'playlists' && selectedPlaylistId) {
@@ -2297,8 +2382,7 @@ function CollectionBrowserPage() {
     allTrackRows,
     trackSource,
     selectedCrate,
-    albums,
-    crateItemsByCrate,
+    resolvedCrateInventoryIdsByCrate,
     selectedPlaylistId,
     playlists,
     smartPlaylistSelectedKeys,
@@ -2389,6 +2473,13 @@ function CollectionBrowserPage() {
       return a.albumTitle.localeCompare(b.albumTitle);
     });
   }, [filteredTrackRows, trackSortBy]);
+
+  const selectedTrackInventoryIds = useMemo(() => {
+    const inventoryIds = allTrackRows
+      .filter((row) => selectedTrackKeys.has(row.key))
+      .map((row) => row.inventoryId);
+    return dedupeInventoryIds(inventoryIds);
+  }, [allTrackRows, selectedTrackKeys]);
 
   useEffect(() => {
     if (selectedAlbumId) return;
@@ -2528,46 +2619,255 @@ function CollectionBrowserPage() {
     setSmartPlaylistMixNonce((prev) => prev + 1);
   }, []);
 
-  const handleAddToCrates = useCallback(async (crateIds: number[]) => {
-    if (selectedAlbumIds.size === 0 || crateIds.length === 0) return;
+  const closeAddToCrateModal = useCallback(() => {
+    setShowAddToCrateModal(false);
+    setReturnToAddToCrate(false);
+    setNewlyCreatedCrateId(null);
+    setCrateModalAlbumIds([]);
+    setCrateModalItemLabel('Album');
+    setCrateModalActionLabel('Add to Crates');
+  }, []);
 
-    try {
-      const albumIds = Array.from(selectedAlbumIds);
-      
-      const records = [];
-      for (const crateId of crateIds) {
-        for (const albumId of albumIds) {
-          records.push({
-            crate_id: crateId,
-            inventory_id: albumId,
-          });
-        }
-      }
+  const openCratePicker = useCallback((albumIds: number[], options?: { itemLabel?: string; actionLabel?: string }) => {
+    const deduped = dedupeInventoryIds(albumIds);
+    if (deduped.length === 0) return;
+    setCrateModalAlbumIds(deduped);
+    setCrateModalItemLabel(options?.itemLabel ?? 'Album');
+    setCrateModalActionLabel(options?.actionLabel ?? 'Add to Crates');
+    setShowAddToCrateModal(true);
+  }, []);
 
-      const { error } = await supabase
+  const handleOpenSingleAlbumCratePicker = useCallback((albumId: number) => {
+    openCratePicker([albumId]);
+  }, [openCratePicker]);
+
+  const handleSelectCrate = useCallback((crateId: number) => {
+    setTrackSource('crates');
+    setFolderMode('crates');
+    setSelectedCrateId(crateId);
+    setSelectedFolderValue(null);
+    if (viewMode !== 'collection') {
+      setViewMode('collection');
+    }
+  }, [viewMode]);
+
+  const replaceCrateSnapshot = useCallback(async (crate: Crate) => {
+    const snapshotIds = dedupeInventoryIds(buildSmartCrateSnapshotIds(albums, crate));
+    const { error: deleteError } = await supabase
+      .from('crate_items')
+      .delete()
+      .eq('crate_id', crate.id);
+
+    if (deleteError) throw deleteError;
+
+    if (snapshotIds.length === 0) return;
+
+    const chunkSize = 500;
+    for (let i = 0; i < snapshotIds.length; i += chunkSize) {
+      const chunk = snapshotIds.slice(i, i + chunkSize);
+      const records = chunk.map((inventoryId, index) => ({
+        crate_id: crate.id,
+        inventory_id: inventoryId,
+        position: i + index,
+      }));
+      const { error: insertError } = await supabase
         .from('crate_items')
         .insert(records);
+      if (insertError) throw insertError;
+    }
+  }, [albums]);
 
-      if (error) {
-        if (!error.message.includes('duplicate') && !error.message.includes('unique')) {
-          throw error;
+  const clearCrateSnapshot = useCallback(async (crateId: number) => {
+    const { error } = await supabase
+      .from('crate_items')
+      .delete()
+      .eq('crate_id', crateId);
+    if (error) throw error;
+  }, []);
+
+  const handleSmartCrateSaved = useCallback(async (savedCrate: Crate, previousCrate: Crate | null) => {
+    if (!savedCrate.is_smart) return;
+    const wasLive = previousCrate?.live_update !== false;
+    const isLive = savedCrate.live_update !== false;
+
+    if (!previousCrate) {
+      if (!isLive) {
+        await replaceCrateSnapshot(savedCrate);
+      }
+      return;
+    }
+
+    if (wasLive && !isLive) {
+      await replaceCrateSnapshot(savedCrate);
+      return;
+    }
+
+    if (!wasLive && isLive) {
+      await clearCrateSnapshot(savedCrate.id);
+    }
+  }, [clearCrateSnapshot, replaceCrateSnapshot]);
+
+  const ensureCrateReadyForManualMutation = useCallback(async (crateId: number) => {
+    const crate = crates.find((item) => item.id === crateId);
+    if (!crate) {
+      throw new Error(`Crate ${crateId} not found`);
+    }
+    if (isSaleOnlyCrate(crate)) {
+      throw new Error(`"${crate.name}" is a system crate and cannot be changed here.`);
+    }
+    if (crate.is_smart && crate.live_update) {
+      const { error: updateError } = await supabase
+        .from('crates')
+        .update({ live_update: false })
+        .eq('id', crate.id);
+      if (updateError) throw updateError;
+      const frozenCrate = { ...crate, live_update: false };
+      await replaceCrateSnapshot(frozenCrate);
+      return frozenCrate;
+    }
+    return crate;
+  }, [crates, replaceCrateSnapshot]);
+
+  const addAlbumsToCrates = useCallback(async (albumIds: number[], crateIds: number[]) => {
+    const dedupedAlbumIds = dedupeInventoryIds(albumIds);
+    const dedupedCrateIds = dedupeInventoryIds(crateIds);
+    if (dedupedAlbumIds.length === 0 || dedupedCrateIds.length === 0) return;
+
+    try {
+      for (const crateId of dedupedCrateIds) {
+        const crate = crates.find((item) => item.id === crateId);
+        if (!crate || isSaleOnlyCrate(crate)) continue;
+        const existingIds = resolvedCrateInventoryIdsByCrate[crateId] ?? new Set<number>();
+        const nextAlbumIds = dedupedAlbumIds.filter((albumId) => !existingIds.has(albumId));
+        if (nextAlbumIds.length === 0) continue;
+
+        await ensureCrateReadyForManualMutation(crateId);
+
+        const chunkSize = 500;
+        for (let i = 0; i < nextAlbumIds.length; i += chunkSize) {
+          const records = nextAlbumIds.slice(i, i + chunkSize).map((albumId) => ({
+            crate_id: crateId,
+            inventory_id: albumId,
+          }));
+          const { error } = await supabase
+            .from('crate_items')
+            .insert(records);
+
+          if (error && !error.message.includes('duplicate') && !error.message.includes('unique')) {
+            throw error;
+          }
         }
       }
 
       await loadCrates();
       setSelectedAlbumIds(new Set());
-      
-      const crateNames = crates
-        .filter(c => crateIds.includes(c.id))
-        .map(c => c.name)
-        .join(', ');
-      
-      console.log(`✅ Added ${albumIds.length} album(s) to: ${crateNames}`);
     } catch (err) {
       console.error('Failed to add albums to crates:', err);
       throw err;
     }
-  }, [selectedAlbumIds, crates, loadCrates]);
+  }, [crates, ensureCrateReadyForManualMutation, loadCrates, resolvedCrateInventoryIdsByCrate]);
+
+  const handleAddToCrates = useCallback(async (crateIds: number[]) => {
+    await addAlbumsToCrates(crateModalAlbumIds, crateIds);
+    if (crateModalActionLabel === 'Pull to Crate') {
+      setSelectedTrackKeys(new Set());
+    }
+  }, [addAlbumsToCrates, crateModalActionLabel, crateModalAlbumIds]);
+
+  const handleRemoveAlbumsFromCrate = useCallback(async (crateId: number, albumIds: number[]) => {
+    const dedupedAlbumIds = dedupeInventoryIds(albumIds);
+    if (dedupedAlbumIds.length === 0) return;
+
+    const crate = crates.find((item) => item.id === crateId);
+    if (!crate || isSaleOnlyCrate(crate)) return;
+
+    const resolvedIds = resolvedCrateInventoryIdsByCrate[crateId] ?? new Set<number>();
+    const removableIds = dedupedAlbumIds.filter((albumId) => resolvedIds.has(albumId));
+    if (removableIds.length === 0) return;
+
+    try {
+      await ensureCrateReadyForManualMutation(crateId);
+      const { error } = await supabase
+        .from('crate_items')
+        .delete()
+        .eq('crate_id', crateId)
+        .in('inventory_id', removableIds);
+      if (error) throw error;
+
+      await loadCrates();
+      setSelectedAlbumIds((prev) => new Set(Array.from(prev).filter((albumId) => !removableIds.includes(albumId))));
+    } catch (err) {
+      console.error('Failed to remove albums from crate:', err);
+      alert(err instanceof Error ? err.message : 'Failed to remove albums from crate.');
+    }
+  }, [crates, ensureCrateReadyForManualMutation, loadCrates, resolvedCrateInventoryIdsByCrate]);
+
+  const handleRemoveAlbumFromCrate = useCallback(async (albumId: number, crateId: number) => {
+    await handleRemoveAlbumsFromCrate(crateId, [albumId]);
+  }, [handleRemoveAlbumsFromCrate]);
+
+  const handleDeleteCrate = useCallback(async (crate: Crate) => {
+    if (isSaleOnlyCrate(crate)) return;
+    if (!confirm(`Delete crate "${crate.name}"? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('crates')
+        .delete()
+        .eq('id', crate.id);
+      if (error) {
+        alert(error.message || 'Failed to delete crate.');
+        return;
+      }
+
+      if (selectedCrateId === crate.id) {
+        setSelectedCrateId(null);
+      }
+      await loadCrates();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to delete crate.');
+    }
+  }, [loadCrates, selectedCrateId]);
+
+  const handleEditCrate = useCallback((crate: Crate) => {
+    if (isSaleOnlyCrate(crate)) return;
+    setEditingCrate(crate);
+    if (crate.is_smart) {
+      setShowNewSmartCrateModal(true);
+    } else {
+      setShowNewCrateModal(true);
+    }
+  }, []);
+
+  const handleFreezeSelectedCrate = useCallback(async (crate: Crate) => {
+    if (!crate.is_smart || !crate.live_update || isSaleOnlyCrate(crate)) return;
+    try {
+      const { error } = await supabase
+        .from('crates')
+        .update({ live_update: false })
+        .eq('id', crate.id);
+      if (error) {
+        alert(error.message || 'Failed to freeze crate.');
+        return;
+      }
+      await replaceCrateSnapshot({ ...crate, live_update: false });
+      await loadCrates();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to freeze crate.');
+    }
+  }, [loadCrates, replaceCrateSnapshot]);
+
+  const handleRefreshFrozenCrate = useCallback(async (crate: Crate) => {
+    if (!crate.is_smart || crate.live_update || isSaleOnlyCrate(crate)) return;
+    try {
+      await replaceCrateSnapshot(crate);
+      await loadCrates();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to refresh crate from rules.');
+    }
+  }, [loadCrates, replaceCrateSnapshot]);
 
   const toggleTrackSelection = useCallback((trackKey: string) => {
     setSelectedTrackKeys((prev) => {
@@ -3085,6 +3385,8 @@ function CollectionBrowserPage() {
     );
   }, [columnSelectorMode, handleAlbumTrackColumnsChange, handleCollectionColumnsChange, handlePlaylistColumnsChange]);
 
+  const canMutateSelectedCrate = selectedCrate !== null && !isSaleOnlyCrate(selectedCrate);
+
   return (
     <>
       <style>{`
@@ -3114,6 +3416,7 @@ function CollectionBrowserPage() {
           loadCrates={loadCrates}
           filteredAndSortedAlbums={filteredAndSortedAlbums}
           selectedAlbumIds={selectedAlbumIds}
+          onSmartCrateSaved={handleSmartCrateSaved}
           onOpenManagePlaylists={() => {
             setPlaylistStudioInitialView('library');
             setShowPlaylistStudioModal(true);
@@ -3240,7 +3543,45 @@ function CollectionBrowserPage() {
             <button title="Select all albums" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">☑ All</button>
             <button title="Edit selected albums" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">✏️ Edit</button>
             <button title="Remove selected albums" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">🗑 Remove</button>
-            <button onClick={() => setShowAddToCrateModal(true)} title="Add selected albums to a crate" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">📦 Add to Crate</button>
+            {selectedCrate ? (
+              <>
+                <button
+                  onClick={() => {
+                    if (!selectedCrate || !canMutateSelectedCrate) return;
+                    void addAlbumsToCrates(Array.from(selectedAlbumIds), [selectedCrate.id]).catch(() => {});
+                  }}
+                  title={canMutateSelectedCrate ? `Add selected albums to ${selectedCrate.name}` : 'System crates are read-only'}
+                  disabled={!canMutateSelectedCrate}
+                  className={`border-none text-white px-2.5 py-1 rounded text-xs ${canMutateSelectedCrate ? 'bg-white/20 cursor-pointer' : 'bg-white/10 cursor-not-allowed opacity-70'}`}
+                >
+                  📦 Add selected to crate
+                </button>
+                <button
+                  onClick={() => {
+                    if (!selectedCrate || !canMutateSelectedCrate) return;
+                    void handleRemoveAlbumsFromCrate(selectedCrate.id, Array.from(selectedAlbumIds));
+                  }}
+                  title={canMutateSelectedCrate ? `Remove selected albums from ${selectedCrate.name}` : 'System crates are read-only'}
+                  disabled={!canMutateSelectedCrate}
+                  className={`border-none text-white px-2.5 py-1 rounded text-xs ${canMutateSelectedCrate ? 'bg-white/20 cursor-pointer' : 'bg-white/10 cursor-not-allowed opacity-70'}`}
+                >
+                  🗂 Remove from crate
+                </button>
+                <button
+                  onClick={() => {
+                    if (!selectedCrate || !canMutateSelectedCrate) return;
+                    handleEditCrate(selectedCrate);
+                  }}
+                  title={canMutateSelectedCrate ? `Edit ${selectedCrate.name}` : 'System crates are read-only'}
+                  disabled={!canMutateSelectedCrate}
+                  className={`border-none text-white px-2.5 py-1 rounded text-xs ${canMutateSelectedCrate ? 'bg-white/20 cursor-pointer' : 'bg-white/10 cursor-not-allowed opacity-70'}`}
+                >
+                  ✏️ Edit crate
+                </button>
+              </>
+            ) : (
+              <button onClick={() => openCratePicker(Array.from(selectedAlbumIds))} title="Add selected albums to crate(s)" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">📦 Add to Crate</button>
+            )}
             <button title="Export selected to PDF" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">🖨 Print to PDF</button>
             <button title="More actions" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">⋮</button>
             <div className="flex-1" />
@@ -3253,8 +3594,15 @@ function CollectionBrowserPage() {
             <button onClick={() => setSelectedTrackKeys(new Set())} title="Clear selection" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">✕ Cancel</button>
             <button onClick={() => setSelectedTrackKeys(new Set(filteredTrackRows.map((row) => row.key)))} title="Select all tracks" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">☑ All</button>
             <button onClick={() => setShowAddToPlaylistModal(true)} title="Add selected tracks to playlist(s)" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">🎵 Add to Playlist</button>
+            <button
+              onClick={() => openCratePicker(selectedTrackInventoryIds, { itemLabel: 'Media Item', actionLabel: 'Pull to Crate' })}
+              title="Pull the source media for the selected tracks into crate(s)"
+              className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs"
+            >
+              📦 Pull to Crate
+            </button>
             <div className="flex-1" />
-            <span className="text-xs font-medium">{selectedTrackKeys.size} of {filteredTrackRows.length} selected</span>
+            <span className="text-xs font-medium">{selectedTrackKeys.size} of {filteredTrackRows.length} selected · {selectedTrackInventoryIds.length} media item{selectedTrackInventoryIds.length === 1 ? '' : 's'}</span>
           </div>
         )}
 
@@ -3579,6 +3927,67 @@ function CollectionBrowserPage() {
               )}
             </div>
 
+            {viewMode === 'collection' && selectedCrateWithCount && (
+              <div className="px-3 py-2 border-b border-[#ddd] bg-[#f8fafc] flex items-center justify-between gap-3 shrink-0">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {selectedCrateWithCount.is_smart ? (
+                      <BoxIcon color={selectedCrateWithCount.icon} size={18} />
+                    ) : (
+                      <span>{selectedCrateWithCount.icon}</span>
+                    )}
+                    <span className="font-semibold text-[#1f2937] truncate">{selectedCrateWithCount.name}</span>
+                    <span className="text-[11px] uppercase tracking-wide text-[#64748b]">
+                      {getCrateKindLabel(selectedCrateWithCount)}
+                    </span>
+                    {isSaleOnlyCrate(selectedCrateWithCount) && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">System crate</span>
+                    )}
+                  </div>
+                  <div className="mt-1 text-[12px] text-[#64748b]">
+                    {(selectedCrateWithCount.album_count ?? 0).toLocaleString()} media item{selectedCrateWithCount.album_count === 1 ? '' : 's'}
+                    {selectedCrateWithCount.is_smart && selectedCrateWithCount.live_update && ' · live rules'}
+                    {selectedCrateWithCount.is_smart && !selectedCrateWithCount.live_update && ' · frozen pull snapshot'}
+                    {!selectedCrateWithCount.is_smart && ' · manual pull crate'}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {!isSaleOnlyCrate(selectedCrateWithCount) && (
+                    <>
+                      <button
+                        onClick={() => handleEditCrate(selectedCrateWithCount)}
+                        className="rounded border border-[#cbd5e1] bg-white px-2.5 py-1 text-[12px] text-[#1f2937] hover:bg-[#f8fafc]"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => void handleDeleteCrate(selectedCrateWithCount)}
+                        className="rounded border border-[#fecaca] bg-white px-2.5 py-1 text-[12px] text-[#b91c1c] hover:bg-[#fef2f2]"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                  {!isSaleOnlyCrate(selectedCrateWithCount) && selectedCrateWithCount.is_smart && selectedCrateWithCount.live_update && (
+                    <button
+                      onClick={() => void handleFreezeSelectedCrate(selectedCrateWithCount)}
+                      className="rounded border border-[#bfdbfe] bg-white px-2.5 py-1 text-[12px] text-[#1d4ed8] hover:bg-[#eff6ff]"
+                    >
+                      Freeze
+                    </button>
+                  )}
+                  {!isSaleOnlyCrate(selectedCrateWithCount) && selectedCrateWithCount.is_smart && !selectedCrateWithCount.live_update && (
+                    <button
+                      onClick={() => void handleRefreshFrozenCrate(selectedCrateWithCount)}
+                      className="rounded border border-[#ddd6fe] bg-white px-2.5 py-1 text-[12px] text-[#6d28d9] hover:bg-[#f5f3ff]"
+                    >
+                      Refresh from rules
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="flex-1 overflow-hidden bg-white min-h-0">
               {loading ? (
                 <div className="p-10 text-center text-[#666]">Loading albums...</div>
@@ -3586,7 +3995,7 @@ function CollectionBrowserPage() {
                 <div className="p-10 text-center text-[#666]">Loading track data...</div>
               ) : (
                 viewMode === 'collection' ? (
-                  <CollectionTable albums={filteredAndSortedAlbums} visibleColumns={collectionVisibleColumns} lockedColumns={lockedColumns} onAlbumClick={handleAlbumClick} selectedAlbums={selectedAlbumsAsStrings} onSelectionChange={handleSelectionChange} sortState={tableSortState} onSortChange={handleTableSortChange} onEditAlbum={handleEditAlbum} />
+                  <CollectionTable albums={filteredAndSortedAlbums} visibleColumns={collectionVisibleColumns} lockedColumns={lockedColumns} onAlbumClick={handleAlbumClick} selectedAlbums={selectedAlbumsAsStrings} onSelectionChange={handleSelectionChange} sortState={tableSortState} onSortChange={handleTableSortChange} onEditAlbum={handleEditAlbum} crateBadgesByAlbumId={crateBadgesByAlbumId} onSelectCrate={handleSelectCrate} onOpenAlbumCratePicker={handleOpenSingleAlbumCratePicker} onRemoveAlbumFromCrate={handleRemoveAlbumFromCrate} />
                 ) : viewMode === 'album-track' ? (
                   <div className="h-full overflow-auto">
                     <table className="w-full border-collapse text-sm">
@@ -3901,8 +4310,8 @@ function CollectionBrowserPage() {
       />
       {editingAlbumId && <EditAlbumModal albumId={editingAlbumId} onClose={() => setEditingAlbumId(null)} onRefresh={loadAlbums} onNavigate={(newAlbumId) => setEditingAlbumId(newAlbumId)} allAlbumIds={filteredAndSortedAlbums.map(a => a.id)} />}
       {showNewCrateModal && <NewCrateModal isOpen={showNewCrateModal} onClose={() => { setShowNewCrateModal(false); setEditingCrate(null); if (returnToAddToCrate) { setReturnToAddToCrate(false); setNewlyCreatedCrateId(null); }}} onCrateCreated={async (newCrateId) => { await loadCrates(); setEditingCrate(null); if (returnToAddToCrate) { setNewlyCreatedCrateId(newCrateId); setShowNewCrateModal(false); setShowAddToCrateModal(true); } else { setShowNewCrateModal(false); }}} editingCrate={editingCrate} />}
-      {showNewSmartCrateModal && <NewSmartCrateModal isOpen={showNewSmartCrateModal} onClose={() => { setShowNewSmartCrateModal(false); setEditingCrate(null); }} onCrateCreated={() => { loadCrates(); setShowNewSmartCrateModal(false); setEditingCrate(null); }} editingCrate={editingCrate} />}
-      {showAddToCrateModal && <AddToCrateModal isOpen={showAddToCrateModal} onClose={() => { setShowAddToCrateModal(false); setReturnToAddToCrate(false); setNewlyCreatedCrateId(null); }} crates={cratesWithCounts} onAddToCrates={handleAddToCrates} selectedCount={selectedAlbumIds.size} onOpenNewCrate={() => { setReturnToAddToCrate(true); setShowAddToCrateModal(false); setEditingCrate(null); setShowNewCrateModal(true); }} autoSelectCrateId={newlyCreatedCrateId} />}
+      {showNewSmartCrateModal && <NewSmartCrateModal isOpen={showNewSmartCrateModal} onClose={() => { setShowNewSmartCrateModal(false); setEditingCrate(null); }} onCrateCreated={async (crate) => { await handleSmartCrateSaved(crate, editingCrate); await loadCrates(); setShowNewSmartCrateModal(false); setEditingCrate(null); }} editingCrate={editingCrate} />}
+      {showAddToCrateModal && <AddToCrateModal isOpen={showAddToCrateModal} onClose={closeAddToCrateModal} crates={mutableCratesWithCounts} onAddToCrates={handleAddToCrates} selectedCount={crateModalAlbumIds.length} onOpenNewCrate={() => { setReturnToAddToCrate(true); setShowAddToCrateModal(false); setEditingCrate(null); setShowNewCrateModal(true); }} autoSelectCrateId={newlyCreatedCrateId} itemLabel={crateModalItemLabel} actionLabel={crateModalActionLabel} />}
       {showAddToPlaylistModal && (
         <AddToPlaylistModal
           isOpen={showAddToPlaylistModal}

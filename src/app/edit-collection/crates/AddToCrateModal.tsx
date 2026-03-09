@@ -13,6 +13,8 @@ interface AddToCrateModalProps {
   selectedCount: number;
   onOpenNewCrate: () => void;
   autoSelectCrateId?: number | null;
+  itemLabel?: string;
+  actionLabel?: string;
 }
 
 export function AddToCrateModal({
@@ -23,6 +25,8 @@ export function AddToCrateModal({
   selectedCount,
   onOpenNewCrate,
   autoSelectCrateId,
+  itemLabel = 'Album',
+  actionLabel = 'Add to Crates',
 }: AddToCrateModalProps) {
   const [selectedCrateIds, setSelectedCrateIds] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,11 +54,8 @@ export function AddToCrateModal({
 
   if (!isOpen) return null;
 
-  // Filter to manual crates only (smart crates auto-populate)
-  const manualCrates = crates.filter(crate => !crate.is_smart);
-
   // Filter by search query
-  const filteredCrates = manualCrates.filter(crate =>
+  const filteredCrates = crates.filter(crate =>
     crate.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -97,7 +98,7 @@ export function AddToCrateModal({
         {/* Header */}
         <div className="px-4 py-3 border-b border-gray-200 flex justify-between items-center bg-white">
           <h3 className="m-0 text-base font-semibold text-gray-900">
-            Add {selectedCount} Album{selectedCount !== 1 ? 's' : ''} to Crate
+            {actionLabel === 'Pull to Crate' ? 'Pull' : 'Add'} {selectedCount} {itemLabel}{selectedCount !== 1 ? 's' : ''} to Crate
           </h3>
           <button
             onClick={handleCancel}
@@ -130,8 +131,8 @@ export function AddToCrateModal({
             <div className="p-10 text-center text-gray-400 text-[13px]">
               {searchQuery 
                 ? 'No crates match your search' 
-                : manualCrates.length === 0
-                  ? 'No manual crates available. Smart crates auto-populate based on rules.'
+                : crates.length === 0
+                  ? 'No crates available.'
                   : 'No crates available'}
             </div>
           ) : (
@@ -150,13 +151,18 @@ export function AddToCrateModal({
                       onChange={() => handleToggleCrate(crate.id)}
                       className="w-4 h-4 cursor-pointer m-0 accent-blue-600"
                     />
-                    <span className="text-[13px] text-gray-900 flex items-center gap-1.5">
-                      {crate.is_smart ? (
-                        <BoxIcon color={crate.icon} size={16} />
-                      ) : (
-                        <span>{crate.icon}</span>
-                      )}
-                      <span>{crate.name}</span>
+                    <span className="min-w-0 flex flex-col">
+                      <span className="text-[13px] text-gray-900 flex items-center gap-1.5">
+                        {crate.is_smart ? (
+                          <BoxIcon color={crate.icon} size={16} />
+                        ) : (
+                          <span>{crate.icon}</span>
+                        )}
+                        <span className="truncate">{crate.name}</span>
+                      </span>
+                      <span className="text-[11px] text-gray-500">
+                        {!crate.is_smart ? 'Manual crate' : crate.live_update ? 'Live smart crate' : 'Frozen smart crate'}
+                      </span>
                     </span>
                   </div>
                   {crate.album_count !== undefined && (
@@ -194,7 +200,7 @@ export function AddToCrateModal({
                   : 'bg-gray-300 cursor-not-allowed'
               }`}
             >
-              {saving ? 'Adding...' : 'Add to Crates'}
+              {saving ? `${actionLabel}...` : actionLabel}
             </button>
           </div>
         </div>

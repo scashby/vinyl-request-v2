@@ -9,7 +9,7 @@ import { BoxIcon } from '../../../components/BoxIcon';
 interface NewSmartCrateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCrateCreated: () => void;
+  onCrateCreated: (crate: Crate) => Promise<void> | void;
   editingCrate?: Crate | null; // Optional crate to edit
 }
 
@@ -75,6 +75,30 @@ const LEGACY_RULE_FIELD_MAP: Partial<Record<string, CrateFieldType>> = {
   labels: 'label',
   catalog_number: 'cat_no',
 };
+
+const normalizeCrateRow = (row: Partial<Crate> & {
+  smart_rules?: unknown;
+  is_smart?: boolean | null;
+  live_update?: boolean | null;
+  match_rules?: string | null;
+  icon?: string | null;
+  color?: string | null;
+  sort_order?: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}): Crate => ({
+  id: Number(row.id ?? 0),
+  name: String(row.name ?? ''),
+  icon: row.icon ?? '#3b82f6',
+  color: row.color ?? row.icon ?? '#3b82f6',
+  is_smart: row.is_smart !== false,
+  smart_rules: (row.smart_rules as Crate['smart_rules']) ?? null,
+  match_rules: row.match_rules === 'any' ? 'any' : 'all',
+  live_update: row.live_update !== false,
+  sort_order: row.sort_order ?? 0,
+  created_at: row.created_at ?? '',
+  updated_at: row.updated_at ?? '',
+});
 
 // Get operators for a field type
 function getOperatorsForFieldType(fieldType: string): { value: CrateOperatorType; label: string }[] {
@@ -239,22 +263,33 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCra
     try {
       if (isEditing) {
         // UPDATE existing smart crate
-        const { error: updateError } = await supabase
+        const { data: updatedCrate, error: updateError } = await supabase
           .from('crates')
           .update({
             name: name.trim(),
             icon,
+            color: icon,
             smart_rules: { rules } as unknown as import('types/supabase').Json,
             match_rules: matchRules,
             live_update: liveUpdate,
           })
-          .eq('id', editingCrate.id);
+          .eq('id', editingCrate.id)
+          .select('*')
+          .single();
 
         if (updateError) {
           setError(updateError.message);
           setSaving(false);
           return;
         }
+
+        if (!updatedCrate) {
+          setError('Failed to load updated smart crate');
+          setSaving(false);
+          return;
+        }
+
+        await onCrateCreated(normalizeCrateRow(updatedCrate as unknown as Partial<Crate>));
       } else {
         // INSERT new smart crate
         // Get the highest sort_order and add 1
@@ -268,7 +303,7 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCra
           ? (existingCrates[0].sort_order || 0) + 1 
           : 0;
 
-        const { error: insertError } = await supabase
+        const { data: insertedCrate, error: insertError } = await supabase
           .from('crates')
           .insert({
             name: name.trim(),
@@ -279,17 +314,18 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCra
             match_rules: matchRules,
             live_update: liveUpdate,
             sort_order: nextSortOrder,
-          });
+          })
+          .select('*')
+          .single();
 
-        if (insertError) {
-          setError(insertError.message);
+        if (insertError || !insertedCrate) {
+          setError(insertError?.message || 'Failed to create smart crate');
           setSaving(false);
           return;
         }
-      }
 
-      // Success
-      onCrateCreated();
+        await onCrateCreated(normalizeCrateRow(insertedCrate as unknown as Partial<Crate>));
+      }
       handleClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : `Failed to ${isEditing ? 'update' : 'create'} smart crate`);
