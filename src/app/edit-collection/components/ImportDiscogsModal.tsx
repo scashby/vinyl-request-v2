@@ -7,6 +7,7 @@ import { parseDiscogsFormat } from '../../../lib/formatParser';
 import type { Database } from '../../../types/supabase';
 import { normalizeArtist, normalizeTitle, normalizeArtistAlbum } from '../../../lib/importUtils';
 import { stripDiscogsDisambiguationSuffix } from '../../../lib/artistName';
+import { hasValidDiscogsId, hasValidDiscogsMasterId } from '../../../lib/discogs-validation';
 import { isForSaleInventory, isSaleFolderName } from '../../../lib/saleUtils';
 
 type SyncMode = 'full_replacement' | 'full_sync' | 'partial_sync' | 'new_only';
@@ -395,7 +396,10 @@ const getOrCreateRelease = async (
     existing = data;
   }
 
-  if (!existing && payload.catalog_number) {
+  // Discogs release IDs identify a specific pressing. If the incoming release
+  // ID is new, do not collapse it into an older release row based only on a
+  // shared catalog number.
+  if (!existing && payload.catalog_number && !payload.discogs_release_id) {
     const { data } = await supabase
       .from('releases')
       .select('id')
@@ -674,12 +678,14 @@ interface ComparedAlbum extends ParsedAlbum {
   needsEnrichment: boolean;
   requiresInventorySync?: boolean;
   missingFields: string[];
-  matchType?: 'discogs_instance_id' | 'discogs_id' | 'master_id' | 'artist_title' | 'unmatched';
+  matchType?: 'discogs_instance_id' | 'date_added' | 'discogs_id' | 'master_id' | 'artist_title' | 'unmatched';
   discogsIdMismatch?: boolean;
   weakMatch?: boolean;
   matchScore?: number;
   candidateCount?: number;
   candidateMatches?: CandidateMatch[];
+  countSanityAdjusted?: boolean;
+  provisionalMatchType?: 'discogs_instance_id' | 'date_added' | 'discogs_id' | 'master_id' | 'artist_title' | 'unmatched';
   matchedSummary?: Pick<ExistingAlbum, 'id' | 'release_id' | 'master_id' | 'artist' | 'title' | 'discogs_release_id' | 'discogs_master_id' | 'year' | 'format' | 'catalog_number' | 'country'>;
 }
 
@@ -754,6 +760,30 @@ function normalizeComparable(value?: string | null): string {
   return value?.trim().toLowerCase() ?? '';
 }
 
+function normalizeDiscogsReleaseId(value?: string | null): string | null {
+  return hasValidDiscogsId(value ?? null) ? value!.trim() : null;
+}
+
+function normalizeDiscogsMasterId(value?: string | null): string | null {
+  return hasValidDiscogsMasterId(value ?? null) ? value!.trim() : null;
+}
+
+function normalizeDateAdded(value?: string | null): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+
+  const parsed = Date.parse(trimmed);
+  if (Number.isNaN(parsed)) return trimmed;
+
+  return new Date(parsed).toISOString();
+}
+
+function isDateAddedCompatible(parsedDateAdded?: string | null, candidateDateAdded?: string | null): boolean {
+  const parsed = normalizeDateAdded(parsedDateAdded);
+  const candidate = normalizeDateAdded(candidateDateAdded);
+  return !parsed || !candidate || parsed === candidate;
+}
+
 const formatKeyFromString = (format?: string | null): string => {
   if (!format) return '';
   const parsed = parseDiscogsFormat(format);
@@ -792,8 +822,8 @@ function scoreCandidateMatch(parsed: ParsedAlbum, candidate: ExistingAlbum): num
   if (parsed.sleeve_condition && candidate.sleeve_condition && normalizeComparable(parsed.sleeve_condition) === normalizeComparable(candidate.sleeve_condition)) {
     score += 1;
   }
-  if (parsed.date_added && candidate.date_added && normalizeComparable(parsed.date_added) === normalizeComparable(candidate.date_added)) {
-    score += 1;
+  if (isDateAddedCompatible(parsed.date_added, candidate.date_added) && normalizeDateAdded(parsed.date_added) && normalizeDateAdded(candidate.date_added)) {
+    score += 10;
   }
   return score;
 }
@@ -805,6 +835,7 @@ function compareAlbums(
   sourceType: DiscogsSourceType
 ): ComparedAlbum[] {
   const instanceIdMap = new Map<number, ExistingAlbum>();
+  const dateAddedMap = new Map<string, ExistingAlbum[]>();
   const releaseIdMap = new Map<string, ExistingAlbum[]>();
   const masterIdMap = new Map<string, ExistingAlbum[]>();
   const artistAlbumMap = new Map<string, ExistingAlbum[]>();
@@ -812,18 +843,26 @@ function compareAlbums(
   
   existing.forEach(album => {
     const instanceId = parseDiscogsInstanceId(album.discogs_instance_id);
+    const dateAdded = normalizeDateAdded(album.date_added);
+    const releaseId = normalizeDiscogsReleaseId(album.discogs_release_id);
+    const masterId = normalizeDiscogsMasterId(album.discogs_master_id);
     if (instanceId !== null) {
       instanceIdMap.set(instanceId, album);
     }
-    if (album.discogs_release_id) {
-      const entries = releaseIdMap.get(album.discogs_release_id) ?? [];
+    if (dateAdded) {
+      const entries = dateAddedMap.get(dateAdded) ?? [];
       entries.push(album);
-      releaseIdMap.set(album.discogs_release_id, entries);
+      dateAddedMap.set(dateAdded, entries);
     }
-    if (album.discogs_master_id) {
-      const entries = masterIdMap.get(album.discogs_master_id) ?? [];
+    if (releaseId) {
+      const entries = releaseIdMap.get(releaseId) ?? [];
       entries.push(album);
-      masterIdMap.set(album.discogs_master_id, entries);
+      releaseIdMap.set(releaseId, entries);
+    }
+    if (masterId) {
+      const entries = masterIdMap.get(masterId) ?? [];
+      entries.push(album);
+      masterIdMap.set(masterId, entries);
     }
     const normalizedKey = normalizeArtistAlbum(album.artist, album.title);
     const entries = artistAlbumMap.get(normalizedKey) ?? [];
@@ -839,21 +878,33 @@ function compareAlbums(
       instanceIdMap.delete(instanceId);
     }
 
-    if (album.discogs_release_id) {
-      const remaining = (releaseIdMap.get(album.discogs_release_id) ?? []).filter((candidate) => candidate.id !== album.id);
+    const dateAdded = normalizeDateAdded(album.date_added);
+    if (dateAdded) {
+      const remaining = (dateAddedMap.get(dateAdded) ?? []).filter((candidate) => candidate.id !== album.id);
       if (remaining.length > 0) {
-        releaseIdMap.set(album.discogs_release_id, remaining);
+        dateAddedMap.set(dateAdded, remaining);
       } else {
-        releaseIdMap.delete(album.discogs_release_id);
+        dateAddedMap.delete(dateAdded);
       }
     }
 
-    if (album.discogs_master_id) {
-      const remaining = (masterIdMap.get(album.discogs_master_id) ?? []).filter((candidate) => candidate.id !== album.id);
+    const releaseId = normalizeDiscogsReleaseId(album.discogs_release_id);
+    if (releaseId) {
+      const remaining = (releaseIdMap.get(releaseId) ?? []).filter((candidate) => candidate.id !== album.id);
       if (remaining.length > 0) {
-        masterIdMap.set(album.discogs_master_id, remaining);
+        releaseIdMap.set(releaseId, remaining);
       } else {
-        masterIdMap.delete(album.discogs_master_id);
+        releaseIdMap.delete(releaseId);
+      }
+    }
+
+    const masterId = normalizeDiscogsMasterId(album.discogs_master_id);
+    if (masterId) {
+      const remaining = (masterIdMap.get(masterId) ?? []).filter((candidate) => candidate.id !== album.id);
+      if (remaining.length > 0) {
+        masterIdMap.set(masterId, remaining);
+      } else {
+        masterIdMap.delete(masterId);
       }
     }
 
@@ -876,6 +927,9 @@ function compareAlbums(
     let matchScore = 0;
     let candidateCount = 0;
     let candidateMatches: CandidateMatch[] = [];
+    const parsedDateAdded = normalizeDateAdded(parsedAlbum.date_added);
+    const parsedReleaseId = normalizeDiscogsReleaseId(parsedAlbum.discogs_release_id);
+    const parsedMasterId = normalizeDiscogsMasterId(parsedAlbum.discogs_master_id);
     const parsedFormatKey = formatKeyFromString(parsedAlbum.format);
     const filterCandidateMatches = (list: CandidateMatch[]) => {
       if (!parsedFormatKey) return list;
@@ -889,12 +943,38 @@ function compareAlbums(
         matchType = 'discogs_instance_id';
       }
     }
+
+    if (!existingAlbum && sourceType === 'collection' && parsedDateAdded) {
+      const dateAddedCandidates = dateAddedMap.get(parsedDateAdded) ?? [];
+      if (dateAddedCandidates.length === 1) {
+        existingAlbum = dateAddedCandidates[0];
+        matchType = 'date_added';
+      }
+    }
     
-    if (!existingAlbum && parsedAlbum.discogs_release_id) {
-      const candidates = releaseIdMap.get(parsedAlbum.discogs_release_id) ?? [];
+    if (!existingAlbum && parsedReleaseId) {
+      const candidates = releaseIdMap.get(parsedReleaseId) ?? [];
       if (candidates.length === 1) {
-        existingAlbum = candidates[0];
-        matchType = 'discogs_id';
+        if (isDateAddedCompatible(parsedAlbum.date_added, candidates[0]?.date_added)) {
+          existingAlbum = candidates[0];
+          matchType = 'discogs_id';
+        } else {
+          candidateMatches = candidates.map((candidate) => ({
+            id: candidate.id,
+            release_id: candidate.release_id ?? null,
+            master_id: candidate.master_id ?? null,
+            artist: candidate.artist,
+            title: candidate.title,
+            discogs_release_id: candidate.discogs_release_id ?? null,
+            discogs_master_id: candidate.discogs_master_id ?? null,
+            year: candidate.year ?? null,
+            format: candidate.format ?? null,
+            catalog_number: candidate.catalog_number ?? null,
+            country: candidate.country ?? null,
+            score: scoreCandidateMatch(parsedAlbum, candidate),
+          }));
+          candidateCount = candidateMatches.length;
+        }
       } else if (candidates.length > 1) {
         const exactMatches = candidates.filter((candidate) => {
           const candidateFormatKey = formatKeyFromString(candidate.format);
@@ -927,10 +1007,7 @@ function compareAlbums(
             !parsedAlbum.year ||
             !candidate.year ||
             normalizeComparable(parsedAlbum.year) === normalizeComparable(candidate.year);
-          const dateMatches =
-            !parsedAlbum.date_added ||
-            !candidate.date_added ||
-            normalizeComparable(parsedAlbum.date_added) === normalizeComparable(candidate.date_added);
+          const dateMatches = isDateAddedCompatible(parsedAlbum.date_added, candidate.date_added);
           return formatMatches && catalogMatches && labelMatches && barcodeMatches && mediaMatches && sleeveMatches && countryMatches && yearMatches && dateMatches;
         });
 
@@ -956,7 +1033,7 @@ function compareAlbums(
         }
         if (candidateMatches.length === 1) {
           const match = candidates.find((candidate) => candidate.id === candidateMatches[0].id);
-          if (match) {
+          if (match && isDateAddedCompatible(parsedAlbum.date_added, match.date_added)) {
             existingAlbum = match;
             matchType = 'discogs_id';
             weakMatch = false;
@@ -972,8 +1049,8 @@ function compareAlbums(
       }
     }
 
-    if (!existingAlbum && parsedAlbum.discogs_master_id) {
-      const masterCandidates = masterIdMap.get(parsedAlbum.discogs_master_id) ?? [];
+    if (!existingAlbum && parsedMasterId) {
+      const masterCandidates = masterIdMap.get(parsedMasterId) ?? [];
       if (masterCandidates.length > 0) {
         candidateMatches = masterCandidates.map((candidate) => ({
           id: candidate.id,
@@ -999,7 +1076,7 @@ function compareAlbums(
         if (bestMatch) {
           const candidateIndex = masterCandidates.findIndex((candidate) => candidate.id === bestMatch.id);
           const candidate = candidateIndex >= 0 ? masterCandidates[candidateIndex] : undefined;
-          if (candidate) {
+          if (candidate && isDateAddedCompatible(parsedAlbum.date_added, candidate.date_added)) {
             const ambiguous = candidateMatches.length > 1 && bestMatch.score < 3;
             if (!ambiguous) {
               existingAlbum = candidate;
@@ -1008,9 +1085,9 @@ function compareAlbums(
               matchScore = bestMatch.score;
               masterCandidates.splice(candidateIndex, 1);
               if (masterCandidates.length === 0) {
-                masterIdMap.delete(parsedAlbum.discogs_master_id);
+                masterIdMap.delete(parsedMasterId);
               } else {
-                masterIdMap.set(parsedAlbum.discogs_master_id, masterCandidates);
+                masterIdMap.set(parsedMasterId, masterCandidates);
               }
             }
           }
@@ -1019,7 +1096,7 @@ function compareAlbums(
     }
     
     if (!existingAlbum) {
-      if (parsedAlbum.discogs_release_id) {
+      if (parsedReleaseId) {
         const needsReview = ambiguousCandidates && candidateMatches.length > 1;
         compared.push({
           ...parsedAlbum,
@@ -1059,7 +1136,7 @@ function compareAlbums(
         if (bestMatch) {
           const candidateIndex = candidates.findIndex((candidate) => candidate.id === bestMatch.id);
           const candidate = candidateIndex >= 0 ? candidates[candidateIndex] : undefined;
-          if (candidate) {
+          if (candidate && isDateAddedCompatible(parsedAlbum.date_added, candidate.date_added)) {
             const ambiguous = candidateMatches.length > 1 && bestMatch.score < 3;
             if (!ambiguous) {
               existingAlbum = candidate;
@@ -1213,6 +1290,70 @@ function compareAlbums(
   }
 
   return compared;
+}
+
+function applyCountSanityCheck(
+  compared: ComparedAlbum[],
+  options: {
+    sourceType: DiscogsSourceType;
+    existingCount: number;
+    discogsReportedCount: number | null;
+  }
+): ComparedAlbum[] {
+  if (options.sourceType !== 'collection') return compared;
+  if (options.discogsReportedCount === null || !Number.isFinite(options.discogsReportedCount)) return compared;
+
+  const expectedNetAdditions = options.discogsReportedCount - options.existingCount;
+  if (expectedNetAdditions <= 0) return compared;
+
+  const currentNetAdditions =
+    compared.filter((album) => album.status === 'NEW').length -
+    compared.filter((album) => album.status === 'REMOVED').length;
+
+  const additionsStillNeeded = expectedNetAdditions - currentNetAdditions;
+  if (additionsStillNeeded <= 0) return compared;
+
+  const provisionalMatches = compared
+    .map((album, index) => ({ album, index }))
+    .filter(({ album }) =>
+      album.status === 'CHANGED' &&
+      album.discogsIdMismatch &&
+      (album.matchType === 'master_id' || album.matchType === 'artist_title') &&
+      album.weakMatch
+    )
+    .sort((left, right) => {
+      const scoreDiff = (left.album.matchScore ?? 0) - (right.album.matchScore ?? 0);
+      if (scoreDiff !== 0) return scoreDiff;
+
+      const leftTypeRank = left.album.matchType === 'artist_title' ? 0 : 1;
+      const rightTypeRank = right.album.matchType === 'artist_title' ? 0 : 1;
+      if (leftTypeRank !== rightTypeRank) return leftTypeRank - rightTypeRank;
+
+      return (right.album.candidateCount ?? 0) - (left.album.candidateCount ?? 0);
+    })
+    .slice(0, additionsStillNeeded);
+
+  if (provisionalMatches.length === 0) return compared;
+
+  const adjustedIndexes = new Set(provisionalMatches.map(({ index }) => index));
+
+  return compared.map((album, index) => {
+    if (!adjustedIndexes.has(index)) return album;
+
+    return {
+      ...album,
+      status: 'NEW',
+      existingId: undefined,
+      existingReleaseId: undefined,
+      existingMasterId: undefined,
+      needsEnrichment: true,
+      requiresInventorySync: false,
+      discogsIdMismatch: false,
+      matchType: 'unmatched',
+      provisionalMatchType: album.matchType,
+      countSanityAdjusted: true,
+    };
+  });
 }
 
 // Discogs API enrichment
@@ -1369,6 +1510,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   
   const [comparedAlbums, setComparedAlbums] = useState<ComparedAlbum[]>([]);
   const [totalDatabaseCount, setTotalDatabaseCount] = useState<number>(0);
+  const [discogsReportedCount, setDiscogsReportedCount] = useState<number | null>(null);
+  const [discogsFetchedCount, setDiscogsFetchedCount] = useState<number>(0);
   const [isConnected, setIsConnected] = useState(false);
   
   // Metadata Definitions
@@ -1451,12 +1594,15 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     setStage('fetching');
     setError(null);
     setComparedAlbums([]);
+    setDiscogsReportedCount(null);
+    setDiscogsFetchedCount(0);
     
     try {
         // 1. Fetch from API pages
         let page = 1;
         let hasMore = true;
         const allFetchedItems: ParsedAlbum[] = [];
+        let reportedCount: number | null = null;
         const endpoint = sourceType === 'collection' ? '/api/discogs/collection' : '/api/discogs/wantlist';
         const discogsFolderNamesById = new Map<number, string>();
         discogsFolderNamesById.set(0, 'All');
@@ -1489,6 +1635,9 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
             if (!res.ok) throw new Error('Failed to fetch from Discogs API');
             
             const data: DiscogsCollectionResponse | DiscogsWantlistResponse = await res.json();
+            if (typeof data.pagination?.items === 'number' && Number.isFinite(data.pagination.items)) {
+              reportedCount = data.pagination.items;
+            }
             const items = sourceType === 'collection' 
               ? (data as DiscogsCollectionResponse).releases 
               : (data as DiscogsWantlistResponse).wants;
@@ -1536,7 +1685,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 }
 
                 // Ensure date is YYYY-MM-DD
-                const dateAdded = item.date_added ? item.date_added.split('T')[0] : new Date().toISOString().split('T')[0];
+                const dateAdded = normalizeDateAdded(item.date_added) ?? new Date().toISOString();
                 const instanceId = sourceType === 'collection' ? parseDiscogsInstanceId(item.instance_id) : null;
                 const folderId = sourceType === 'collection' ? parseDiscogsFolderId(item.folder_id) : null;
                 const folderName =
@@ -1566,7 +1715,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     sale_folder_resolved: saleFolderResolved,
                     is_sale_folder: isSaleFolder,
                     discogs_release_id: item.id.toString(),
-                    discogs_master_id: info.master_id?.toString() || null,
+                    discogs_master_id: normalizeDiscogsMasterId(info.master_id?.toString() ?? null),
                     date_added: dateAdded,
                     media_condition: mediaCond,
                     sleeve_condition: sleeveCond,
@@ -1675,8 +1824,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 artist_norm: normalizeArtist(artistName),
                 title_norm: normalizeTitle(title),
                 artist_album_norm: normalizeArtistAlbum(artistName, title),
-                discogs_release_id: release?.discogs_release_id ?? null,
-                discogs_master_id: master?.discogs_master_id ?? null,
+                discogs_release_id: normalizeDiscogsReleaseId(release?.discogs_release_id ?? null),
+                discogs_master_id: normalizeDiscogsMasterId(master?.discogs_master_id ?? null),
                 status: typeof row.status === 'string' ? row.status : null,
                 location: row.location ?? null,
                 discogs_instance_id: parseDiscogsInstanceId(row.discogs_instance_id),
@@ -1691,7 +1840,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 country: release?.country ?? null,
                 release_date: release?.release_date ?? null,
                 year: (release?.release_year ?? master?.original_release_year)?.toString() ?? null,
-                date_added: row.date_added ?? null,
+                    date_added: normalizeDateAdded(row.date_added ?? null),
                 image_url: master?.cover_image_url ?? null,
                 cover_image: master?.cover_image_url ?? null,
                 tracks: (release?.release_tracks?.length ?? 0) > 0,
@@ -1726,6 +1875,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               const wantlistAlbum = album as ExistingAlbum;
               return {
                 ...wantlistAlbum,
+                discogs_release_id: normalizeDiscogsReleaseId(wantlistAlbum.discogs_release_id ?? null),
+                discogs_master_id: normalizeDiscogsMasterId(wantlistAlbum.discogs_master_id ?? null),
                 country: null,
                 catalog_number: null,
                 image_url: wantlistAlbum.cover_image ?? null,
@@ -1746,14 +1897,25 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         }
 
         setTotalDatabaseCount(existing.length);
+        setDiscogsReportedCount(reportedCount);
+        setDiscogsFetchedCount(allFetchedItems.length);
 
         // 3. Run Comparison Logic
-        const compared = compareAlbums(allFetchedItems, existing, sourceType);
+        const compared = applyCountSanityCheck(
+          compareAlbums(allFetchedItems, existing, sourceType),
+          {
+            sourceType,
+            existingCount: existing.length,
+            discogsReportedCount: reportedCount,
+          }
+        );
         setComparedAlbums(compared);
         setStage('preview');
 
     } catch (err) {
         setError(getErrorMessage(err) || 'Failed to fetch from Discogs');
+        setDiscogsReportedCount(null);
+        setDiscogsFetchedCount(0);
         setStage('select_mode');
     }
   };
@@ -1857,7 +2019,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 discogs_instance_id: album.discogs_instance_id ?? null,
                 discogs_folder_id: album.discogs_folder_id ?? null,
                 discogs_folder_name: discogsFolderName,
-                date_added: album.date_added,
+                date_added: normalizeDateAdded(album.date_added) ?? album.date_added,
                 sleeve_condition: album.sleeve_condition,
                 personal_notes: album.personal_notes,
                 media_condition: album.status === 'NEW' || normalizedMediaCondition ? normalizedMediaCondition || 'Unknown' : undefined,
@@ -2033,7 +2195,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 artist_norm: album.artist_norm,
                 title_norm: album.title_norm,
                 artist_album_norm: album.artist_album_norm,
-                date_added_to_wantlist: album.date_added,
+                date_added_to_wantlist: normalizeDateAdded(album.date_added) ?? album.date_added,
                 notes: album.personal_notes,
                 cover_image: album.cover_image,
               };
@@ -2073,6 +2235,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     setStage('select_mode');
     setComparedAlbums([]);
     setTotalDatabaseCount(0);
+    setDiscogsReportedCount(null);
+    setDiscogsFetchedCount(0);
     setProgress({ current: 0, total: 0, status: '' });
     setError(null);
     setImportErrors([]);
@@ -2094,9 +2258,18 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
       : 0;
   const changedCount = comparedAlbums.filter(a => a.status === 'CHANGED').length;
   const enrichmentCount = comparedAlbums.filter(a => a.status === 'CHANGED' && a.needsEnrichment).length;
+  const matchedByInstanceId = comparedAlbums.filter(a => a.matchType === 'discogs_instance_id').length;
+  const matchedByDateAdded = comparedAlbums.filter(a => a.matchType === 'date_added').length;
   const matchedByDiscogsId = comparedAlbums.filter(a => a.matchType === 'discogs_id').length;
   const matchedByMasterId = comparedAlbums.filter(a => a.matchType === 'master_id').length;
   const matchedByArtistTitle = comparedAlbums.filter(a => a.matchType === 'artist_title').length;
+  const countAdjustedCount = comparedAlbums.filter(a => a.countSanityAdjusted).length;
+  const actualRemovedCount = comparedAlbums.filter(a => a.status === 'REMOVED').length;
+  const analyzedSourceCount = discogsFetchedCount || comparedAlbums.filter(a => a.status !== 'REMOVED').length;
+  const expectedNetAdditions =
+    sourceType === 'collection' && discogsReportedCount !== null
+      ? discogsReportedCount - totalDatabaseCount
+      : null;
 
   const missingFieldCounts = comparedAlbums.reduce<Record<string, number>>((acc, album) => {
     if (!album.missingFields || album.missingFields.length === 0) return acc;
@@ -2256,7 +2429,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           {stage === 'preview' && (
             <>
               <div className="text-sm mb-4 bg-blue-50 p-3 rounded text-blue-800 border border-blue-200">
-                Analyzed <strong>{comparedAlbums.length}</strong> items from your {sourceType}.
+                Analyzed <strong>{analyzedSourceCount}</strong> items from your {sourceType}.
                 <div className="text-[12px] text-blue-700 mt-1">
                   “NEW” means not found in your collection. “CHANGED” means an existing album will be updated or enriched.
                 </div>
@@ -2296,11 +2469,30 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
               <div className="text-[12px] text-gray-600 mb-4">
                 <div className="mb-1">
-                  Matched by Discogs ID: <strong>{matchedByDiscogsId}</strong> · Matched by Master ID: <strong>{matchedByMasterId}</strong> · Matched by Artist/Title: <strong>{matchedByArtistTitle}</strong>
+                  Matched by Instance ID: <strong>{matchedByInstanceId}</strong> · Matched by Date Added: <strong>{matchedByDateAdded}</strong> · Matched by Discogs ID: <strong>{matchedByDiscogsId}</strong> · Matched by Master ID: <strong>{matchedByMasterId}</strong> · Matched by Artist/Title: <strong>{matchedByArtistTitle}</strong>
                 </div>
                 <div className="mb-1">
-                  Existing albums loaded from DB: <strong>{totalDatabaseCount}</strong> · Discogs items pulled: <strong>{comparedAlbums.length}</strong>
+                  Existing albums loaded from DB: <strong>{totalDatabaseCount}</strong> · Discogs items pulled: <strong>{analyzedSourceCount}</strong>
+                  {discogsReportedCount !== null && (
+                    <> · Discogs reported total: <strong>{discogsReportedCount}</strong></>
+                  )}
                 </div>
+                {sourceType === 'collection' && expectedNetAdditions !== null && (
+                  <div className="mb-1">
+                    Count sanity check target: <strong>{expectedNetAdditions >= 0 ? `+${expectedNetAdditions}` : expectedNetAdditions}</strong> net items
+                    {countAdjustedCount > 0 && (
+                      <> · Reclassified <strong>{countAdjustedCount}</strong> provisional matches to <strong>NEW</strong></>
+                    )}
+                    {countAdjustedCount === 0 && expectedNetAdditions > newCount - actualRemovedCount && (
+                      <> · No weak provisional matches were eligible for automatic reclassification</>
+                    )}
+                  </div>
+                )}
+                {sourceType === 'collection' && discogsReportedCount !== null && discogsReportedCount !== analyzedSourceCount && (
+                  <div className="mb-1 text-amber-700">
+                    Discogs reported total and fetched row count differ. The count sanity check uses the reported total from the All folder.
+                  </div>
+                )}
                 <div className="mb-1">
                   Will add: <strong>{willAdd}</strong> · Will update: <strong>{willUpdate}</strong> · Will enrich: <strong>{willEnrich}</strong> · Will remove: <strong>{willRemove}</strong> · Will skip: <strong>{willSkip}</strong> · Needs review: <strong>{willReview}</strong>
                 </div>
@@ -2380,8 +2572,15 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                           if (album.status === 'NEW') reasons.push('Not found in collection');
                           if (album.status === 'REMOVED') reasons.push('Missing from Discogs');
                           if (album.status === 'REVIEW') reasons.push('Multiple possible matches');
-                          if (album.discogsIdMismatch) reasons.push('Discogs ID differs');
-                          if (album.matchType === 'artist_title') {
+                          if (album.countSanityAdjusted) {
+                            const provisionalLabel = album.provisionalMatchType === 'artist_title' ? 'artist/title' : 'master';
+                            reasons.push(`Count sanity check overrode provisional ${provisionalLabel} match`);
+                          }
+                          if (!album.countSanityAdjusted && album.discogsIdMismatch) reasons.push('Discogs ID differs');
+                          if (!album.countSanityAdjusted && album.matchType === 'date_added') {
+                            reasons.push('Matched by exact date-added timestamp');
+                          }
+                          if (!album.countSanityAdjusted && album.matchType === 'artist_title') {
                             reasons.push(album.weakMatch ? 'Matched by artist/title (weak)' : 'Matched by artist/title');
                           }
                           if (album.missingFields?.length) {
@@ -2434,6 +2633,11 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                                       <div className="font-semibold mb-1">Matched Existing</div>
                                       {album.matchedSummary ? (
                                         <>
+                                          {album.countSanityAdjusted && (
+                                            <div className="mb-1 font-medium text-amber-700">
+                                              Provisional {album.provisionalMatchType === 'artist_title' ? 'artist/title' : 'master'} match was treated as a new addition to satisfy the Discogs count check.
+                                            </div>
+                                          )}
                                           <div>ID: {album.matchedSummary.id}</div>
                                           <div>Release ID: {album.matchedSummary.release_id ?? '—'}</div>
                                           <div>Master ID: {album.matchedSummary.master_id ?? '—'}</div>
