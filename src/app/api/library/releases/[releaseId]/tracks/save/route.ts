@@ -129,6 +129,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ re
       const sideValue = t.side ? normalizePosition(t.side).slice(0, 1) : null;
 
       if (existing) {
+        let nextRecordingId: number | null =
+          typeof existing.recording_id === "number" ? existing.recording_id : null;
+
         // Update recording in-place (preserve lyrics fields)
         if (existing.recording_id && recordingById.has(existing.recording_id)) {
           const old = recordingById.get(existing.recording_id)!;
@@ -243,6 +246,57 @@ export async function POST(request: NextRequest, context: { params: Promise<{ re
             if (updateRecError) throw new Error(updateRecError.message);
             updatedRecordingCount += 1;
           }
+        } else {
+          // Existing release_tracks row can exist without a linked recording; create one and attach it.
+          const incomingCredits =
+            t.credits && typeof t.credits === "object" && !Array.isArray(t.credits)
+              ? ({ ...(t.credits as Record<string, unknown>) })
+              : {};
+          if (typeof t.time_signature === "number" && Number.isFinite(t.time_signature)) {
+            incomingCredits.time_signature = t.time_signature;
+          }
+          if (typeof t.original_year === "number" && Number.isFinite(t.original_year)) {
+            incomingCredits.original_year = t.original_year;
+          }
+          if (typeof t.lyrics_url === "string" && t.lyrics_url.trim()) {
+            incomingCredits.lyrics_url = t.lyrics_url.trim();
+          }
+          if (typeof t.is_cover === "boolean") {
+            incomingCredits.is_cover = t.is_cover;
+          }
+          if (typeof t.original_artist === "string" && t.original_artist.trim()) {
+            incomingCredits.original_artist = t.original_artist.trim();
+          }
+
+          const nextArtist = normalizeArtistDisplay(t.artist) ?? null;
+          if (nextArtist) incomingCredits.track_artist = nextArtist;
+
+          const { data: insertedRec, error: insertRecError } = await db
+            .from("recordings")
+            .insert({
+              title: t.title,
+              track_artist: nextArtist,
+              duration_seconds: durationSeconds,
+              notes: t.note ?? null,
+              bpm: typeof t.bpm === "number" ? t.bpm : null,
+              musical_key: typeof t.musical_key === "string" ? t.musical_key : null,
+              energy: typeof t.energy === "number" ? t.energy : null,
+              danceability: typeof t.danceability === "number" ? t.danceability : null,
+              valence: typeof t.valence === "number" ? t.valence : null,
+              lyrics_url: typeof t.lyrics_url === "string" ? t.lyrics_url.trim() || null : null,
+              is_cover: typeof t.is_cover === "boolean" ? t.is_cover : null,
+              original_artist: typeof t.original_artist === "string" ? t.original_artist : null,
+              credits: Object.keys(incomingCredits).length > 0 ? incomingCredits : undefined,
+            })
+            .select("id")
+            .single();
+
+          if (insertRecError || !insertedRec) {
+            throw new Error(insertRecError?.message || "Failed creating recording");
+          }
+
+          nextRecordingId = insertedRec.id;
+          insertedRecordingCount += 1;
         }
 
         // Update release_tracks row
@@ -254,6 +308,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ re
             position: t.canonicalPosition,
             side: sideValue,
             title_override: nextTitleOverride,
+            recording_id: nextRecordingId,
           })
           .eq("id", existing.id);
         if (updateRtError) throw new Error(updateRtError.message);

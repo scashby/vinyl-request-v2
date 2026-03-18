@@ -134,7 +134,7 @@ export function UniversalBottomBar({
           </button>
         </div>
 
-        {/* Right: Cancel/Save */}
+        {/* Right: Close/Save */}
         <div className="flex gap-2">
           <button
             onClick={onCancel}
@@ -145,7 +145,7 @@ export function UniversalBottomBar({
                 : 'bg-gray-300 text-gray-800 cursor-pointer hover:bg-gray-400'
             }`}
           >
-            Cancel
+            Close
           </button>
           <button
             onClick={onSave}
