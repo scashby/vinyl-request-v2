@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
 import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
@@ -79,7 +79,6 @@ function parseCalls(lines: string): CallDraft[] {
 }
 
 export default function ArtistAliasSetupPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const eventIdFromUrl = Number(searchParams.get("eventId"));
 
@@ -215,7 +214,7 @@ export default function ArtistAliasSetupPage() {
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error ?? "Failed to create session");
 
-      router.push(`/admin/games/artist-alias/host?sessionId=${payload.id}`);
+      window.open(`/admin/games/artist-alias/host?sessionId=${payload.id}`, "_blank", "noopener,noreferrer");
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to create session");
     } finally {
@@ -357,11 +356,11 @@ export default function ArtistAliasSetupPage() {
                   <p>{session.session_code} · {session.title} · Round {session.current_round}/{session.round_count}</p>
                   <p className="text-stone-400">Event: {session.event_title ?? "(none)"} · Score model: {session.stage_one_points}/{session.stage_two_points}/{session.final_reveal_points} · Calls: {session.calls_scored}/{session.calls_total} · Status: {session.status}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/artist-alias/host?sessionId=${session.id}`)}>Host</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/artist-alias/assistant?sessionId=${session.id}`)}>Assistant</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/artist-alias/jumbotron?sessionId=${session.id}`)}>Jumbotron</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/artist-alias/host?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Host</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/artist-alias/assistant?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Assistant</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/artist-alias/jumbotron?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Jumbotron</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadGamePullListPdf({ gameSlug: "artist-alias", gameTitle: "Artist Alias", sessionId: session.id, sessionCode: session.session_code, accentRgb: [139, 92, 246] })}>Pull List PDF</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push("/admin/games/artist-alias/history")}>History</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open("/admin/games/artist-alias/history", "_blank", "noopener,noreferrer")}>History</button>
                   </div>
                 </div>
               ))}

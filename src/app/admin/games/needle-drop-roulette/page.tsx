@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
 import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
@@ -65,7 +65,6 @@ function parseCalls(lines: string): CallDraft[] {
 }
 
 export default function NeedleDropRouletteSetupPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const eventIdFromUrl = Number(searchParams.get("eventId"));
 
@@ -196,7 +195,7 @@ export default function NeedleDropRouletteSetupPage() {
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error ?? "Failed to create session");
 
-      router.push(`/admin/games/needle-drop-roulette/host?sessionId=${payload.id}`);
+      window.open(`/admin/games/needle-drop-roulette/host?sessionId=${payload.id}`, "_blank", "noopener,noreferrer");
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to create session");
     } finally {
@@ -326,11 +325,11 @@ export default function NeedleDropRouletteSetupPage() {
                   <div className="text-sm">{session.session_code} · {session.title} · Round {session.current_round} of {session.round_count} · Calls {session.calls_total}</div>
                   <div className="text-xs text-stone-400">Event: {session.event_title ?? "(none)"} · Mode: {session.answer_mode} · Snippet: {session.snippet_seconds}s · Status: {session.status}</div>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/needle-drop-roulette/host?sessionId=${session.id}`)}>Host</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/needle-drop-roulette/assistant?sessionId=${session.id}`)}>Assistant</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/needle-drop-roulette/jumbotron?sessionId=${session.id}`)}>Jumbotron</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/needle-drop-roulette/host?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Host</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/needle-drop-roulette/assistant?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Assistant</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/needle-drop-roulette/jumbotron?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Jumbotron</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadGamePullListPdf({ gameSlug: "needle-drop-roulette", gameTitle: "Needle Drop Roulette", sessionId: session.id, sessionCode: session.session_code, accentRgb: [194, 65, 12] })}>Pull List PDF</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push("/admin/games/needle-drop-roulette/history")}>History</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open("/admin/games/needle-drop-roulette/history", "_blank", "noopener,noreferrer")}>History</button>
                   </div>
                 </div>
               ))}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { downloadGamePullListPdf } from "src/lib/downloadGamePullListPdf";
 
 type EventRow = {
@@ -91,7 +91,6 @@ function deriveCountsFromDeck(detail: DeckDetail | null): { round_count: number;
 }
 
 export default function MusicTriviaSetupPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const eventIdFromUrl = Number(searchParams.get("eventId"));
 
@@ -210,7 +209,7 @@ export default function MusicTriviaSetupPage() {
       if (!res.ok) throw new Error(payload.error ?? "Failed to create session");
 
       await load();
-      router.push(`/admin/games/music-trivia/prep?sessionId=${payload.id}`);
+      window.open(`/admin/games/music-trivia/prep?sessionId=${payload.id}`, "_blank", "noopener,noreferrer");
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to create session");
     } finally {
@@ -309,9 +308,9 @@ export default function MusicTriviaSetupPage() {
                   <div className="text-xs text-stone-400">Event: {session.event_title ?? "(none)"} - Deck: {session.deck_title ?? "(none)"} - Playlist: {session.playlist_name ?? "(none)"} - Status: {session.status}</div>
                   <div className="mt-1 text-xs text-cyan-300">Prep: Main {session.prep_main_ready}/{session.prep_main_total} - Tie-breaker {session.prep_tiebreaker_ready}/{session.prep_tiebreaker_total}</div>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                    <button className="rounded border border-cyan-700 px-2 py-1" onClick={() => router.push(`/admin/games/music-trivia/prep?sessionId=${session.id}`)}>Prep</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/music-trivia/host?sessionId=${session.id}`)}>Host</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/music-trivia/jumbotron?sessionId=${session.id}`)}>Jumbotron</button>
+                    <button className="rounded border border-cyan-700 px-2 py-1" onClick={() => window.open(`/admin/games/music-trivia/prep?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Prep</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/music-trivia/host?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Host</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/music-trivia/jumbotron?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Jumbotron</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadGamePullListPdf({ gameSlug: "trivia", gameTitle: "Music Trivia", sessionId: session.id, sessionCode: session.session_code, accentRgb: [8, 145, 178] })}>Pull List PDF</button>
                   </div>
                 </div>

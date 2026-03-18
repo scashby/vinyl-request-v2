@@ -30,7 +30,17 @@ export default function GamesHomePage() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,#4a1f16,transparent_40%),radial-gradient(circle_at_80%_0%,#1f3c42,transparent_35%),linear-gradient(180deg,#121212,#1b1b1b)] p-6 text-stone-100">
       <div className="mx-auto max-w-6xl">
         <div className="rounded-3xl border border-amber-900/50 bg-black/40 p-8 shadow-[0_20px_80px_rgba(0,0,0,0.55)] backdrop-blur">
-          <p className="text-xs uppercase tracking-[0.35em] text-amber-300">Analog Night Ops</p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs uppercase tracking-[0.35em] text-amber-300">Analog Night Ops</p>
+            <a
+              href="/edit-collection?playlistStudio=1&playlistView=manual&viewMode=playlist&trackSource=playlists&folderMode=playlists"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded border border-amber-700 px-3 py-1 text-xs uppercase tracking-[0.15em] hover:border-amber-400 hover:text-amber-200"
+            >
+              Open Playlist Editor
+            </a>
+          </div>
           <h1 className="mt-2 text-5xl font-black uppercase tracking-tight text-amber-100">Game Admin Center</h1>
           <p className="mt-3 max-w-2xl text-sm text-stone-300">
             Vinyl-first control room. Printed play, live host orchestration, and big-screen display scenes.
@@ -52,7 +62,12 @@ export default function GamesHomePage() {
                     <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Testing Module</p>
                     <h3 className="text-2xl font-black text-amber-100">{module.title}</h3>
                   </div>
-                  <Link className="rounded border border-amber-700 px-3 py-1 text-xs uppercase tracking-[0.15em] hover:border-amber-400 hover:text-amber-200" href={`/admin/games/${module.slug}`}>
+                  <Link
+                    className="rounded border border-amber-700 px-3 py-1 text-xs uppercase tracking-[0.15em] hover:border-amber-400 hover:text-amber-200"
+                    href={`/admin/games/${module.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     Open Module
                   </Link>
                 </div>
@@ -71,7 +86,12 @@ export default function GamesHomePage() {
                     <p className="text-xs uppercase tracking-[0.2em] text-stone-400">Game {index + 1}</p>
                     <h3 className="text-2xl font-black text-stone-100">{game.title}</h3>
                   </div>
-                  <Link className="rounded border border-stone-600 px-3 py-1 text-xs uppercase tracking-[0.15em] hover:border-amber-400 hover:text-amber-200" href={`/admin/games/${game.slug}`}>
+                  <Link
+                    className="rounded border border-stone-600 px-3 py-1 text-xs uppercase tracking-[0.15em] hover:border-amber-400 hover:text-amber-200"
+                    href={`/admin/games/${game.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     Open Skeleton
                   </Link>
                 </div>
@@ -101,7 +121,12 @@ export default function GamesHomePage() {
                     <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Workshop {index + 1}</p>
                     <h3 className="text-2xl font-black text-amber-100">{game.title}</h3>
                   </div>
-                  <Link className="rounded border border-amber-700 px-3 py-1 text-xs uppercase tracking-[0.15em] hover:border-amber-400 hover:text-amber-200" href={`/admin/games/${game.slug}`}>
+                  <Link
+                    className="rounded border border-amber-700 px-3 py-1 text-xs uppercase tracking-[0.15em] hover:border-amber-400 hover:text-amber-200"
+                    href={`/admin/games/${game.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     Open Skeleton
                   </Link>
                 </div>

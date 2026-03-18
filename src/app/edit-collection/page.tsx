@@ -2,6 +2,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, useMemo, useRef, Suspense, Fragment, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { supabase as supabaseTyped } from '../../lib/supabaseClient';
 import CollectionTable, { type AlbumCrateBadge } from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
@@ -1041,7 +1042,9 @@ const isSaleOnlyCrate = (crate: Crate | null | undefined): boolean => {
 };
 
 function CollectionBrowserPage() {
+  const searchParams = useSearchParams();
   const [albums, setAlbums] = useState<Album[]>([]);
+  const queryContextAppliedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [tracksHydrated, setTracksHydrated] = useState(false);
   const [tracksHydrating, setTracksHydrating] = useState(false);
@@ -1327,6 +1330,42 @@ function CollectionBrowserPage() {
     }
     setUiContextHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (queryContextAppliedRef.current) return;
+    queryContextAppliedRef.current = true;
+
+    const viewModeQuery = searchParams.get('viewMode');
+    if (viewModeQuery === 'collection' || viewModeQuery === 'album-track' || viewModeQuery === 'playlist') {
+      setViewMode(viewModeQuery);
+    }
+
+    const trackSourceQuery = searchParams.get('trackSource');
+    if (trackSourceQuery === 'crates' || trackSourceQuery === 'playlists') {
+      setTrackSource(trackSourceQuery);
+    }
+
+    const folderModeQuery = searchParams.get('folderMode');
+    if (folderModeQuery === 'format' || folderModeQuery === 'crates' || folderModeQuery === 'playlists') {
+      setFolderMode(folderModeQuery);
+    }
+
+    const playlistIdQuery = Number(searchParams.get('selectedPlaylistId'));
+    if (Number.isFinite(playlistIdQuery) && playlistIdQuery > 0) {
+      setSelectedPlaylistId(playlistIdQuery);
+    }
+
+    const openPlaylistStudio = String(searchParams.get('playlistStudio') ?? '').toLowerCase();
+    if (openPlaylistStudio === '1' || openPlaylistStudio === 'true' || openPlaylistStudio === 'open') {
+      const requestedView = String(searchParams.get('playlistView') ?? '').toLowerCase();
+      if (requestedView === 'manual' || requestedView === 'smart' || requestedView === 'import' || requestedView === 'library') {
+        setPlaylistStudioInitialView(requestedView as PlaylistStudioView);
+      } else {
+        setPlaylistStudioInitialView('manual');
+      }
+      setShowPlaylistStudioModal(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const storedFavorites = localStorage.getItem('collection-column-favorites');
@@ -3902,12 +3941,10 @@ function CollectionBrowserPage() {
                         <span>📦</span>
                         <span>Crates</span>
                       </button>
-                      {viewMode !== 'collection' && (
-                        <button onClick={() => handleFolderModeChange('playlists')} className={`w-full px-4 py-2 bg-transparent border-none text-left cursor-pointer text-[13px] text-white flex items-center gap-2 hover:bg-[#3a3a3a] ${folderMode === 'playlists' ? 'bg-[#5A9BD5]' : ''}`}>
-                          <span>🎵</span>
-                          <span>Playlists</span>
-                        </button>
-                      )}
+                      <button onClick={() => handleFolderModeChange('playlists')} className={`w-full px-4 py-2 bg-transparent border-none text-left cursor-pointer text-[13px] text-white flex items-center gap-2 hover:bg-[#3a3a3a] ${folderMode === 'playlists' ? 'bg-[#5A9BD5]' : ''}`}>
+                        <span>🎵</span>
+                        <span>Playlists</span>
+                      </button>
                     </div>
                   </>
                 )}

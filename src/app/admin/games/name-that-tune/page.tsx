@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { generateNameThatTunePullListPdf } from "src/lib/nameThatTunePullListPdf";
 import GameEventSelect from "src/components/GameEventSelect";
 import GamePlaylistSelect from "src/components/GamePlaylistSelect";
@@ -95,7 +95,6 @@ function toSnippet(item: PlaylistTrackApiItem, index: number): SnippetDraft {
 }
 
 export default function NameThatTuneSetupPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const eventIdFromUrl = Number(searchParams.get("eventId"));
 
@@ -286,7 +285,7 @@ export default function NameThatTuneSetupPage() {
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error ?? "Failed to create session");
 
-      router.push(`/admin/games/name-that-tune/host?sessionId=${payload.id}`);
+      window.open(`/admin/games/name-that-tune/host?sessionId=${payload.id}`, "_blank", "noopener,noreferrer");
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to create session");
     } finally {
@@ -463,11 +462,11 @@ export default function NameThatTuneSetupPage() {
                   <div className="text-sm">{session.session_code} · {session.title} · Round {session.current_round} of {session.round_count} · Calls {session.calls_total}</div>
                   <div className="text-xs text-stone-400">Event: {session.event_title ?? "(none)"} · Lock-In: {session.lock_in_rule} · Status: {session.status}</div>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/name-that-tune/host?sessionId=${session.id}`)}>Host</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/name-that-tune/assistant?sessionId=${session.id}`)}>Assistant</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/name-that-tune/jumbotron?sessionId=${session.id}`)}>Jumbotron</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/name-that-tune/host?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Host</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/name-that-tune/assistant?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Assistant</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/name-that-tune/jumbotron?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Jumbotron</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadPullList(session.id, session.session_code)}>Pull List PDF</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push("/admin/games/name-that-tune/history")}>History</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open("/admin/games/name-that-tune/history", "_blank", "noopener,noreferrer")}>History</button>
                   </div>
                 </div>
               ))}

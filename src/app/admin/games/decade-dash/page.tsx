@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
 import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
@@ -71,7 +71,6 @@ function parseCalls(lines: string): CallDraft[] {
 }
 
 export default function DecadeDashSetupPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const eventIdFromUrl = Number(searchParams.get("eventId"));
 
@@ -205,7 +204,7 @@ export default function DecadeDashSetupPage() {
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error ?? "Failed to create session");
 
-      router.push(`/admin/games/decade-dash/host?sessionId=${payload.id}`);
+      window.open(`/admin/games/decade-dash/host?sessionId=${payload.id}`, "_blank", "noopener,noreferrer");
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to create session");
     } finally {
@@ -348,11 +347,11 @@ export default function DecadeDashSetupPage() {
                   <p>{session.session_code} · {session.title} · {session.status}</p>
                   <p className="text-stone-400">Event: {session.event_title ?? "(none)"} · Round: {session.current_round}/{session.round_count} · Calls: {session.calls_scored}/{session.calls_total} scored · Adjacent: {session.adjacent_scoring_enabled ? "On" : "Off"}</p>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/decade-dash/host?sessionId=${session.id}`)}>Host</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/decade-dash/assistant?sessionId=${session.id}`)}>Assistant</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/decade-dash/jumbotron?sessionId=${session.id}`)}>Jumbotron</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/decade-dash/host?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Host</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/decade-dash/assistant?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Assistant</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/decade-dash/jumbotron?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Jumbotron</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadGamePullListPdf({ gameSlug: "decade-dash", gameTitle: "Decade Dash", sessionId: session.id, sessionCode: session.session_code, accentRgb: [14, 116, 144] })}>Pull List PDF</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push("/admin/games/decade-dash/history")}>History</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open("/admin/games/decade-dash/history", "_blank", "noopener,noreferrer")}>History</button>
                   </div>
                 </div>
               ))}

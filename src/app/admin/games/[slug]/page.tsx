@@ -27,7 +27,17 @@ export default async function GameSkeletonPage({ params }: GameSkeletonPageProps
           <Link href="/admin/games" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase tracking-[0.15em] text-stone-200 hover:border-amber-400 hover:text-amber-200">
             Back to Games
           </Link>
-          <p className="rounded border border-stone-700 px-3 py-1 text-xs uppercase tracking-[0.15em] text-stone-300">{statusLabel}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href="/edit-collection?playlistStudio=1&playlistView=manual&viewMode=playlist&trackSource=playlists&folderMode=playlists"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded border border-stone-600 px-3 py-1 text-xs uppercase tracking-[0.15em] text-stone-200 hover:border-amber-400 hover:text-amber-200"
+            >
+              Playlist Editor
+            </a>
+            <p className="rounded border border-stone-700 px-3 py-1 text-xs uppercase tracking-[0.15em] text-stone-300">{statusLabel}</p>
+          </div>
         </div>
 
         <h1 className="mt-5 text-4xl font-black text-amber-100">{game.title}</h1>

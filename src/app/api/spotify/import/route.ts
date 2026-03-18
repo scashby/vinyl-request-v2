@@ -15,6 +15,7 @@ type SpotifyTrackItem = {
       isrc?: string;
     };
     artists?: Array<{ name?: string }>;
+    album?: { name?: string };
   } | null;
   track?: {
     id?: string;
@@ -24,6 +25,7 @@ type SpotifyTrackItem = {
       isrc?: string;
     };
     artists?: Array<{ name?: string }>;
+    album?: { name?: string };
   } | null;
 };
 
@@ -83,6 +85,7 @@ const extractRows = (items: SpotifyTrackItem[] = []): SourceRow[] => {
     const title = typeof trackNode?.name === 'string' ? trackNode.name.trim() : '';
     const artistRaw = (trackNode?.artists ?? []).map((artist) => String(artist?.name ?? '').trim()).filter(Boolean);
     const artist = artistRaw[0] ?? '';
+    const album = typeof trackNode?.album?.name === 'string' ? trackNode.album.name.trim() : '';
     const isrc = normalizeIsrc(trackNode?.external_ids?.isrc);
     const spotifyTrackId = typeof trackNode?.id === 'string' ? trackNode.id.trim() : '';
     const spotifyUri = typeof trackNode?.uri === 'string' ? trackNode.uri.trim() : '';
@@ -90,6 +93,7 @@ const extractRows = (items: SpotifyTrackItem[] = []): SourceRow[] => {
     rows.push({
       title,
       artist: artist || undefined,
+      album: album || undefined,
       isrc: isrc || undefined,
       spotifyTrackId: spotifyTrackId || undefined,
       spotifyUri: spotifyUri || undefined,
@@ -135,8 +139,8 @@ const fetchPlaylistItemsPage = async (
   debugErrors: Array<{ path: string; error: string }>
 ): Promise<{ rows: SourceRow[]; itemCount: number; next: string | null; total: number | null }> => {
   const paths = [
-    `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&market=from_token&fields=items(track(id,uri,name,artists(name)),item(type,id,uri,name,artists(name))),next,total`,
-    `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&fields=items(track(id,uri,name,artists(name)),item(type,id,uri,name,artists(name))),next,total`,
+    `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&market=from_token&fields=items(track(id,uri,name,artists(name),album(name)),item(type,id,uri,name,artists(name),album(name))),next,total`,
+    `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&fields=items(track(id,uri,name,artists(name),album(name)),item(type,id,uri,name,artists(name),album(name))),next,total`,
     `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track&market=from_token`,
     `/playlists/${playlistId}/items?limit=100&offset=${offset}&additional_types=track`,
   ];

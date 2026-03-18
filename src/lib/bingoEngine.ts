@@ -46,6 +46,23 @@ function normalizePositionKey(position: string | null | undefined): string | nul
   return raw.toUpperCase().replace(/[^A-Z0-9]+/g, "");
 }
 
+function buildPositionLookupKeys(position: string | null | undefined, side: string | null | undefined): string[] {
+  const keys = new Set<string>();
+  const normalizedPosition = normalizePositionKey(position);
+  const normalizedSide = normalizePositionKey(side)?.slice(0, 1) ?? null;
+
+  if (normalizedPosition) {
+    keys.add(normalizedPosition);
+    const numericPart = normalizedPosition.replace(/^[A-Z]+/, "");
+    if (numericPart) keys.add(numericPart);
+    if (normalizedSide) {
+      keys.add(`${normalizedSide}${numericPart || normalizedPosition}`);
+    }
+  }
+
+  return Array.from(keys);
+}
+
 export type BingoCardCell = {
   row: number;
   col: number;
@@ -478,9 +495,9 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
   const releaseTrackByReleaseAndPosition = new Map<string, DbReleaseTrack>();
   for (const row of releaseTracksAll) {
     if (!row.release_id) continue;
-    const posKey = normalizePositionKey(row.position);
-    if (!posKey) continue;
-    releaseTrackByReleaseAndPosition.set(`${row.release_id}:${posKey}`, row);
+    for (const posKey of buildPositionLookupKeys(row.position, row.side)) {
+      releaseTrackByReleaseAndPosition.set(`${row.release_id}:${posKey}`, row);
+    }
   }
 
   const inferredRecordingIds = Array.from(
@@ -536,9 +553,11 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
       (parsed.releaseTrackId ? releaseTrackById.get(parsed.releaseTrackId) : undefined) ??
       (inventory?.release_id && parsed.fallbackPosition
         ? (() => {
-            const posKey = normalizePositionKey(parsed.fallbackPosition);
-            if (!posKey) return undefined;
-            return releaseTrackByReleaseAndPosition.get(`${inventory.release_id}:${posKey}`);
+            for (const posKey of buildPositionLookupKeys(parsed.fallbackPosition, null)) {
+              const hit = releaseTrackByReleaseAndPosition.get(`${inventory.release_id}:${posKey}`);
+              if (hit) return hit;
+            }
+            return undefined;
           })()
         : undefined);
 
@@ -614,9 +633,9 @@ export async function resolveTrackKeys(db: BingoDbClient, trackKeys: string[]): 
   const releaseTrackByReleaseAndPosition = new Map<string, DbReleaseTrack>();
   for (const row of releaseTracksAll) {
     if (!row.release_id) continue;
-    const posKey = normalizePositionKey(row.position);
-    if (!posKey) continue;
-    releaseTrackByReleaseAndPosition.set(`${row.release_id}:${posKey}`, row);
+    for (const posKey of buildPositionLookupKeys(row.position, row.side)) {
+      releaseTrackByReleaseAndPosition.set(`${row.release_id}:${posKey}`, row);
+    }
   }
 
   const inferredRecordingIds = Array.from(
@@ -672,9 +691,11 @@ export async function resolveTrackKeys(db: BingoDbClient, trackKeys: string[]): 
       (parsed.releaseTrackId ? releaseTrackById.get(parsed.releaseTrackId) : undefined) ??
       (inventory?.release_id && parsed.fallbackPosition
         ? (() => {
-            const posKey = normalizePositionKey(parsed.fallbackPosition);
-            if (!posKey) return undefined;
-            return releaseTrackByReleaseAndPosition.get(`${inventory.release_id}:${posKey}`);
+            for (const posKey of buildPositionLookupKeys(parsed.fallbackPosition, null)) {
+              const hit = releaseTrackByReleaseAndPosition.get(`${inventory.release_id}:${posKey}`);
+              if (hit) return hit;
+            }
+            return undefined;
           })()
         : undefined);
 

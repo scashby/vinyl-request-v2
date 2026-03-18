@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { generateBingoCardsPdf } from "src/lib/bingoCardsPdf";
 import { generateBingoCallSheetPdf } from "src/lib/bingoCallSheetPdf";
 import EditEventForm from "src/components/EditEventForm";
@@ -40,7 +40,6 @@ const GAME_MODE_OPTIONS = [
 const CREATE_EVENT_OPTION = "__create_new_event__";
 
 export default function BingoSetupPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const eventIdFromUrl = Number(searchParams.get("eventId"));
 
@@ -144,7 +143,7 @@ export default function BingoSetupPage() {
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error ?? "Failed to create session");
 
-      router.push(`/admin/games/bingo/prep?sessionId=${payload.id}`);
+      window.open(`/admin/games/bingo/prep?sessionId=${payload.id}`, "_blank", "noopener,noreferrer");
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to create session");
     } finally {
@@ -211,6 +210,14 @@ export default function BingoSetupPage() {
                 <option value="">Select playlist</option>
                 {playlists.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.track_count})</option>)}
               </select>
+              <a
+                href="/edit-collection?playlistStudio=1&playlistView=manual&viewMode=playlist&trackSource=playlists&folderMode=playlists"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-block rounded border border-stone-600 px-2 py-1 text-xs font-semibold text-stone-200 hover:border-amber-400 hover:text-amber-200"
+              >
+                Open Playlist Editor
+              </a>
             </label>
 
             <label className="text-sm">Game Mode <InlineFieldHelp label="Game Mode" />
@@ -277,9 +284,9 @@ export default function BingoSetupPage() {
                     <div className="mt-1 text-xs text-stone-400">Event: {session.event_title}</div>
                   ) : null}
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/bingo/host?sessionId=${session.id}`)}>Host</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/bingo/assistant?sessionId=${session.id}`)}>Assistant</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/bingo/jumbotron?sessionId=${session.id}`)}>Jumbotron</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/bingo/host?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Host</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/bingo/assistant?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Assistant</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/bingo/jumbotron?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Jumbotron</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "2-up")}>Cards 2-up</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "4-up")}>Cards 4-up</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCallSheet(session.id)}>Call Sheet</button>

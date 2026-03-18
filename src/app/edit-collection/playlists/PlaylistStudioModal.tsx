@@ -33,6 +33,7 @@ type InventorySearchCandidate = {
   inventory_id: number | null;
   title: string;
   artist: string;
+  album_title: string | null;
   side: string | null;
   position: string | null;
   score: number;
@@ -65,6 +66,7 @@ type MatchCandidate = {
   inventory_id?: number | null;
   title: string;
   artist: string;
+  album_title?: string | null;
   side?: string | null;
   position?: string | null;
   score: number;
@@ -343,6 +345,10 @@ export function PlaylistStudioModal({
   const [unmatchedQueryByRow, setUnmatchedQueryByRow] = useState<Record<string, string>>({});
   const [unmatchedSearchByRow, setUnmatchedSearchByRow] = useState<Record<string, MatchCandidate[]>>({});
   const [unmatchedSearchingRowId, setUnmatchedSearchingRowId] = useState<string | null>(null);
+  const [browseUnmatchedRow, setBrowseUnmatchedRow] = useState<UnmatchedTrack | null>(null);
+  const [browseUnmatchedQuery, setBrowseUnmatchedQuery] = useState('');
+  const [browseUnmatchedResults, setBrowseUnmatchedResults] = useState<MatchCandidate[]>([]);
+  const [browseUnmatchedSearching, setBrowseUnmatchedSearching] = useState(false);
   const [retryingUnmatched, setRetryingUnmatched] = useState(false);
   const wasOpenRef = useRef(false);
   const unmatchedSectionRef = useRef<HTMLDivElement | null>(null);
@@ -460,6 +466,10 @@ export function PlaylistStudioModal({
     setUnmatchedQueryByRow({});
     setUnmatchedSearchByRow({});
     setUnmatchedSearchingRowId(null);
+    setBrowseUnmatchedRow(null);
+    setBrowseUnmatchedQuery('');
+    setBrowseUnmatchedResults([]);
+    setBrowseUnmatchedSearching(false);
     setRetryingUnmatched(false);
   }, []);
 
@@ -668,6 +678,7 @@ export function PlaylistStudioModal({
               inventory_id: typeof item.inventory_id === 'number' ? item.inventory_id : null,
               title: String(item.track_title ?? item.title ?? '').trim(),
               artist: String(item.track_artist ?? item.artist ?? '').trim(),
+              album_title: typeof item.album_title === 'string' ? item.album_title.trim() : null,
               side: typeof item.side === 'string' ? item.side : null,
               position: typeof item.position === 'string' ? item.position : null,
               score: typeof item.score === 'number' ? item.score : 0,
@@ -1045,6 +1056,44 @@ export function PlaylistStudioModal({
     }
   };
 
+  const fetchInventoryMatchCandidates = useCallback(async (row: UnmatchedTrack, query: string, limit: number) => {
+    const headers = await getSupabaseAuthHeaders();
+    const url = new URL('/api/library/tracks/search', window.location.origin);
+    url.searchParams.set('q', query);
+    if (row.artist?.trim()) {
+      url.searchParams.set('artist', row.artist.trim());
+    }
+    if (matchVinylOnly) {
+      url.searchParams.append('mediaType', 'vinyl');
+    }
+    if (matchFortyFiveOnly) {
+      url.searchParams.append('formatDetail', '45 rpm');
+      url.searchParams.append('formatDetail', '7"');
+    }
+    url.searchParams.set('limit', String(limit));
+
+    const res = await fetch(url.toString(), { headers });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(formatApiError(payload, res));
+    }
+
+    return Array.isArray((payload as { results?: unknown[] }).results)
+      ? ((payload as { results: Array<Record<string, unknown>> }).results ?? [])
+          .map((item) => ({
+            track_key: String(item.track_key ?? '').trim(),
+            inventory_id: typeof item.inventory_id === 'number' ? item.inventory_id : null,
+            title: String(item.track_title ?? item.title ?? '').trim(),
+            artist: String(item.track_artist ?? item.artist ?? '').trim(),
+            album_title: typeof item.album_title === 'string' ? item.album_title.trim() : null,
+            side: typeof item.side === 'string' ? item.side : null,
+            position: typeof item.position === 'string' ? item.position : null,
+            score: typeof item.score === 'number' ? item.score : 0,
+          }))
+          .filter((item) => item.track_key.length > 0)
+      : [];
+  }, [getSupabaseAuthHeaders, matchFortyFiveOnly, matchVinylOnly]);
+
   const searchUnmatchedCandidates = async (row: UnmatchedTrack) => {
     const fallback = `${row.title ?? ''} ${row.artist ?? ''}`.trim();
     const query = (unmatchedQueryByRow[row.row_id] ?? fallback).trim();
@@ -1057,41 +1106,7 @@ export function PlaylistStudioModal({
     setError(null);
 
     try {
-      const headers = await getSupabaseAuthHeaders();
-      const url = new URL('/api/library/tracks/search', window.location.origin);
-      url.searchParams.set('q', query);
-      if (row.artist?.trim()) {
-        url.searchParams.set('artist', row.artist.trim());
-      }
-      if (matchVinylOnly) {
-        url.searchParams.append('mediaType', 'vinyl');
-      }
-      if (matchFortyFiveOnly) {
-        url.searchParams.append('formatDetail', '45 rpm');
-        url.searchParams.append('formatDetail', '7"');
-      }
-      url.searchParams.set('limit', '8');
-
-      const res = await fetch(url.toString(), { headers });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(formatApiError(payload, res));
-      }
-
-      const mapped = Array.isArray((payload as { results?: unknown[] }).results)
-        ? ((payload as { results: Array<Record<string, unknown>> }).results ?? [])
-            .map((item) => ({
-              track_key: String(item.track_key ?? '').trim(),
-              inventory_id: typeof item.inventory_id === 'number' ? item.inventory_id : null,
-              title: String(item.track_title ?? item.title ?? '').trim(),
-              artist: String(item.track_artist ?? item.artist ?? '').trim(),
-              side: typeof item.side === 'string' ? item.side : null,
-              position: typeof item.position === 'string' ? item.position : null,
-              score: typeof item.score === 'number' ? item.score : 0,
-            }))
-            .filter((item) => item.track_key.length > 0)
-        : [];
-
+      const mapped = await fetchInventoryMatchCandidates(row, query, 8);
       setUnmatchedSearchByRow((prev) => ({
         ...prev,
         [row.row_id]: mapped,
@@ -1100,6 +1115,53 @@ export function PlaylistStudioModal({
       setError(searchError instanceof Error ? searchError.message : 'Unmatched search failed');
     } finally {
       setUnmatchedSearchingRowId(null);
+    }
+  };
+
+  const openBrowseUnmatched = async (row: UnmatchedTrack) => {
+    const fallback = `${row.title ?? ''} ${row.artist ?? ''}`.trim();
+    const query = (unmatchedQueryByRow[row.row_id] ?? fallback).trim();
+    setBrowseUnmatchedRow(row);
+    setBrowseUnmatchedQuery(query);
+    setBrowseUnmatchedResults(unmatchedSearchByRow[row.row_id] ?? row.candidates ?? []);
+
+    if (query.length < 2) return;
+    setBrowseUnmatchedSearching(true);
+    setError(null);
+    try {
+      const mapped = await fetchInventoryMatchCandidates(row, query, 30);
+      setBrowseUnmatchedResults(mapped);
+    } catch (searchError) {
+      setError(searchError instanceof Error ? searchError.message : 'Browse search failed');
+    } finally {
+      setBrowseUnmatchedSearching(false);
+    }
+  };
+
+  const runBrowseUnmatchedSearch = async () => {
+    if (!browseUnmatchedRow) return;
+    const query = browseUnmatchedQuery.trim();
+    if (query.length < 2) {
+      setError('Search query must be at least 2 characters');
+      return;
+    }
+    setBrowseUnmatchedSearching(true);
+    setError(null);
+    try {
+      const mapped = await fetchInventoryMatchCandidates(browseUnmatchedRow, query, 30);
+      setBrowseUnmatchedResults(mapped);
+      setUnmatchedSearchByRow((prev) => ({
+        ...prev,
+        [browseUnmatchedRow.row_id]: mapped.slice(0, 8),
+      }));
+      setUnmatchedQueryByRow((prev) => ({
+        ...prev,
+        [browseUnmatchedRow.row_id]: query,
+      }));
+    } catch (searchError) {
+      setError(searchError instanceof Error ? searchError.message : 'Browse search failed');
+    } finally {
+      setBrowseUnmatchedSearching(false);
     }
   };
 
@@ -1184,6 +1246,7 @@ export function PlaylistStudioModal({
         delete next[row.row_id];
         return next;
       });
+      setBrowseUnmatchedRow((current) => (current?.row_id === row.row_id ? null : current));
       await onImported();
     } catch (resolveError) {
       setError(resolveError instanceof Error ? resolveError.message : 'Failed to add match');
@@ -1625,6 +1688,7 @@ export function PlaylistStudioModal({
                             {manualTrackSearchResults.map((candidate) => {
                               const alreadyAdded = manualTrackKeys.includes(candidate.track_key);
                               const meta: string[] = [];
+                              if (candidate.album_title) meta.push(candidate.album_title);
                               if (candidate.inventory_id) meta.push(`#${candidate.inventory_id}`);
                               if (candidate.position) meta.push(candidate.position);
                               return (
@@ -1641,7 +1705,7 @@ export function PlaylistStudioModal({
                                           sort_order: prev.length,
                                           track_title: candidate.title,
                                           artist_name: candidate.artist,
-                                          album_name: null,
+                                          album_name: candidate.album_title,
                                           side: candidate.side,
                                           position: candidate.position,
                                         },
@@ -2387,12 +2451,19 @@ export function PlaylistStudioModal({
                               >
                                 {unmatchedSearchingRowId === row.row_id ? 'Searching...' : 'Search'}
                               </button>
+                              <button
+                                onClick={() => void openBrowseUnmatched(row)}
+                                className="shrink-0 rounded-md border border-[#5f9bff] bg-[#1f4f89] px-2 py-1 text-xs font-semibold text-white hover:bg-[#2866b1]"
+                              >
+                                Browse
+                              </button>
                             </div>
 
                             {(unmatchedSearchByRow[row.row_id] ?? []).length > 0 && (
                               <div className="mt-2 space-y-1">
                                 {(unmatchedSearchByRow[row.row_id] ?? []).slice(0, 4).map((candidate) => {
                                   const meta: string[] = [];
+                                  if (candidate.album_title) meta.push(candidate.album_title);
                                   if (candidate.inventory_id) meta.push(`#${candidate.inventory_id}`);
                                   if (candidate.position) meta.push(candidate.position);
                                   return (
@@ -2409,17 +2480,25 @@ export function PlaylistStudioModal({
                                           Search match {Math.round(candidate.score * 100)}%
                                         </div>
                                       </div>
-                                      <button
-                                        disabled={resolvingTrackKey === candidate.track_key}
-                                        onClick={() => void addUnmatchedCandidate(row, candidate)}
-                                        className={`shrink-0 rounded-md border px-2 py-1 text-xs font-semibold ${
-                                          resolvingTrackKey === candidate.track_key
-                                            ? 'cursor-not-allowed border-[#3d4a65] bg-[#1f2a41] text-[#8094b9]'
-                                            : 'border-[#5f9bff] bg-[#1f4f89] text-white hover:bg-[#2866b1]'
-                                        }`}
-                                      >
-                                        {resolvingTrackKey === candidate.track_key ? 'Adding...' : 'Add'}
-                                      </button>
+                                      <div className="flex shrink-0 items-center gap-1">
+                                        <button
+                                          onClick={() => void openBrowseUnmatched(row)}
+                                          className="rounded-md border border-emerald-400/50 bg-emerald-900/30 px-2 py-1 text-xs font-semibold text-emerald-100 hover:bg-emerald-900/45"
+                                        >
+                                          Browse
+                                        </button>
+                                        <button
+                                          disabled={resolvingTrackKey === candidate.track_key}
+                                          onClick={() => void addUnmatchedCandidate(row, candidate)}
+                                          className={`rounded-md border px-2 py-1 text-xs font-semibold ${
+                                            resolvingTrackKey === candidate.track_key
+                                              ? 'cursor-not-allowed border-[#3d4a65] bg-[#1f2a41] text-[#8094b9]'
+                                              : 'border-[#5f9bff] bg-[#1f4f89] text-white hover:bg-[#2866b1]'
+                                          }`}
+                                        >
+                                          {resolvingTrackKey === candidate.track_key ? 'Adding...' : 'Add'}
+                                        </button>
+                                      </div>
                                     </div>
                                   );
                                 })}
@@ -2432,6 +2511,7 @@ export function PlaylistStudioModal({
                               <div className="mt-2 space-y-1">
                                 {row.candidates.slice(0, 4).map((candidate) => {
                                   const meta: string[] = [];
+                                  if (candidate.album_title) meta.push(candidate.album_title);
                                   if (candidate.inventory_id) meta.push(`#${candidate.inventory_id}`);
                                   if (candidate.position) meta.push(candidate.position);
                                   return (
@@ -2448,17 +2528,25 @@ export function PlaylistStudioModal({
                                           Match {Math.round(candidate.score * 100)}%
                                         </div>
                                       </div>
-                                      <button
-                                        disabled={resolvingTrackKey === candidate.track_key}
-                                        onClick={() => void addUnmatchedCandidate(row, candidate)}
-                                        className={`shrink-0 rounded-md border px-2 py-1 text-xs font-semibold ${
-                                          resolvingTrackKey === candidate.track_key
-                                            ? 'cursor-not-allowed border-[#3d4a65] bg-[#1f2a41] text-[#8094b9]'
-                                            : 'border-[#5f9bff] bg-[#1f4f89] text-white hover:bg-[#2866b1]'
-                                        }`}
-                                      >
-                                        {resolvingTrackKey === candidate.track_key ? 'Adding...' : 'Add'}
-                                      </button>
+                                      <div className="flex shrink-0 items-center gap-1">
+                                        <button
+                                          onClick={() => void openBrowseUnmatched(row)}
+                                          className="rounded-md border border-amber-400/50 bg-amber-900/30 px-2 py-1 text-xs font-semibold text-amber-100 hover:bg-amber-900/45"
+                                        >
+                                          Browse
+                                        </button>
+                                        <button
+                                          disabled={resolvingTrackKey === candidate.track_key}
+                                          onClick={() => void addUnmatchedCandidate(row, candidate)}
+                                          className={`rounded-md border px-2 py-1 text-xs font-semibold ${
+                                            resolvingTrackKey === candidate.track_key
+                                              ? 'cursor-not-allowed border-[#3d4a65] bg-[#1f2a41] text-[#8094b9]'
+                                              : 'border-[#5f9bff] bg-[#1f4f89] text-white hover:bg-[#2866b1]'
+                                          }`}
+                                        >
+                                          {resolvingTrackKey === candidate.track_key ? 'Adding...' : 'Add'}
+                                        </button>
+                                      </div>
                                     </div>
                                   );
                                 })}
@@ -2469,6 +2557,103 @@ export function PlaylistStudioModal({
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {browseUnmatchedRow && (
+                <div className="fixed inset-0 z-[30030] bg-black/75 p-3 sm:p-6" onClick={() => setBrowseUnmatchedRow(null)}>
+                  <div
+                    className="mx-auto h-full max-h-[780px] w-full max-w-[980px] overflow-hidden rounded-2xl border border-[#2b3f61] bg-[#0f1728]"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between border-b border-[#2b3f61] px-4 py-3">
+                      <div>
+                        <div className="text-xs uppercase tracking-[0.16em] text-[#8faddd]">Browse For Match</div>
+                        <div className="text-sm text-white">
+                          <span className="font-semibold">{browseUnmatchedRow.title || '(no title)'}</span>
+                          {browseUnmatchedRow.artist ? ` - ${browseUnmatchedRow.artist}` : ''}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setBrowseUnmatchedRow(null)}
+                        className="rounded-md border border-[#3b4f73] bg-[#1a2842] px-2.5 py-1 text-xs text-[#c8d8f5] hover:bg-[#243652]"
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    <div className="border-b border-[#2b3f61] px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <input
+                          value={browseUnmatchedQuery}
+                          onChange={(event) => setBrowseUnmatchedQuery(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              void runBrowseUnmatchedSearch();
+                            }
+                          }}
+                          placeholder="Search inventory title, artist, album"
+                          className="w-full rounded-md border border-[#314764] bg-[#101a2d] px-3 py-2 text-sm text-white outline-none focus:border-[#5f9bff]"
+                        />
+                        <button
+                          onClick={() => void runBrowseUnmatchedSearch()}
+                          disabled={browseUnmatchedSearching}
+                          className={`rounded-md border px-2.5 py-2 text-xs font-semibold ${
+                            browseUnmatchedSearching
+                              ? 'cursor-not-allowed border-[#3d4a65] bg-[#1f2a41] text-[#8094b9]'
+                              : 'border-[#5f9bff] bg-[#1f4f89] text-white hover:bg-[#2866b1]'
+                          }`}
+                        >
+                          {browseUnmatchedSearching ? 'Searching...' : 'Search'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="h-[calc(100%-132px)] overflow-y-auto px-4 py-3">
+                      {browseUnmatchedResults.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-[#36527a] bg-[#0e1729] px-4 py-8 text-center text-sm text-[#9eb4db]">
+                          No inventory matches yet. Search by title, artist, or album.
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {browseUnmatchedResults.map((candidate) => {
+                            const meta = [
+                              candidate.artist,
+                              candidate.album_title ?? null,
+                              candidate.inventory_id ? `#${candidate.inventory_id}` : null,
+                              candidate.position ?? null,
+                            ].filter(Boolean);
+                            return (
+                              <div
+                                key={`browse-${browseUnmatchedRow.row_id}-${candidate.track_key}`}
+                                className="flex items-center justify-between gap-2 rounded-md border border-[#324968] bg-[#101a2f] px-3 py-2"
+                              >
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-medium text-white">{candidate.title}</div>
+                                  {meta.length > 0 && (
+                                    <div className="truncate text-xs text-[#9db5de]">{meta.join(' • ')}</div>
+                                  )}
+                                  <div className="text-[11px] text-[#9db5de]">Match {Math.round(candidate.score * 100)}%</div>
+                                </div>
+                                <button
+                                  disabled={resolvingTrackKey === candidate.track_key}
+                                  onClick={() => void addUnmatchedCandidate(browseUnmatchedRow, candidate)}
+                                  className={`shrink-0 rounded-md border px-2 py-1 text-xs font-semibold ${
+                                    resolvingTrackKey === candidate.track_key
+                                      ? 'cursor-not-allowed border-[#3d4a65] bg-[#1f2a41] text-[#8094b9]'
+                                      : 'border-[#5f9bff] bg-[#1f4f89] text-white hover:bg-[#2866b1]'
+                                  }`}
+                                >
+                                  {resolvingTrackKey === candidate.track_key ? 'Adding...' : 'Add'}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

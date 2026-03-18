@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
 import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
@@ -71,7 +71,6 @@ function parseEntries(lines: string): EntryDraft[] {
 }
 
 export default function BracketBattleSetupPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const eventIdFromUrl = Number(searchParams.get("eventId"));
 
@@ -202,7 +201,7 @@ export default function BracketBattleSetupPage() {
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error ?? "Failed to create session");
 
-      router.push(`/admin/games/bracket-battle/host?sessionId=${payload.id}`);
+      window.open(`/admin/games/bracket-battle/host?sessionId=${payload.id}`, "_blank", "noopener,noreferrer");
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to create session");
     } finally {
@@ -354,11 +353,11 @@ export default function BracketBattleSetupPage() {
                   <div className="text-sm">{session.session_code} · {session.title} · Round {session.current_round} · Matchups {session.matchups_total}</div>
                   <div className="text-xs text-stone-400">Event: {session.event_title ?? "(none)"} · Bracket: {session.bracket_size} · Vote: {session.vote_method} · Status: {session.status}</div>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/bracket-battle/host?sessionId=${session.id}`)}>Host</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/bracket-battle/assistant?sessionId=${session.id}`)}>Assistant</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push(`/admin/games/bracket-battle/jumbotron?sessionId=${session.id}`)}>Jumbotron</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/bracket-battle/host?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Host</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/bracket-battle/assistant?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Assistant</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/bracket-battle/jumbotron?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Jumbotron</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadGamePullListPdf({ gameSlug: "bracket-battle", gameTitle: "Bracket Battle", sessionId: session.id, sessionCode: session.session_code, accentRgb: [29, 78, 216] })}>Pull List PDF</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => router.push("/admin/games/bracket-battle/history")}>History</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open("/admin/games/bracket-battle/history", "_blank", "noopener,noreferrer")}>History</button>
                   </div>
                 </div>
               ))}

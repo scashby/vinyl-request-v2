@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import GameEventSelect from "src/components/GameEventSelect";
 import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
@@ -70,7 +70,6 @@ function parsePairs(lines: string): PairDraft[] {
 }
 
 export default function BackToBackConnectionSetupPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const eventIdFromUrl = Number(searchParams.get("eventId"));
 
@@ -202,7 +201,7 @@ export default function BackToBackConnectionSetupPage() {
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error ?? "Failed to create session");
 
-      router.push(`/admin/games/back-to-back-connection/host?sessionId=${payload.id}`);
+      window.open(`/admin/games/back-to-back-connection/host?sessionId=${payload.id}`, "_blank", "noopener,noreferrer");
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to create session");
     } finally {
@@ -359,11 +358,11 @@ export default function BackToBackConnectionSetupPage() {
                   <p>{session.session_code} · {session.title}</p>
                   <p className="text-stone-400">Event: {session.event_title ?? "(none)"} · Round: {session.current_round}/{session.round_count} · Calls: {session.calls_scored}/{session.calls_total} scored · Status: {session.status}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <button className="rounded border border-stone-600 px-2 py-1 text-xs" onClick={() => router.push(`/admin/games/back-to-back-connection/host?sessionId=${session.id}`)}>Host</button>
-                    <button className="rounded border border-stone-600 px-2 py-1 text-xs" onClick={() => router.push(`/admin/games/back-to-back-connection/assistant?sessionId=${session.id}`)}>Assistant</button>
-                    <button className="rounded border border-stone-600 px-2 py-1 text-xs" onClick={() => router.push(`/admin/games/back-to-back-connection/jumbotron?sessionId=${session.id}`)}>Jumbotron</button>
+                    <button className="rounded border border-stone-600 px-2 py-1 text-xs" onClick={() => window.open(`/admin/games/back-to-back-connection/host?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Host</button>
+                    <button className="rounded border border-stone-600 px-2 py-1 text-xs" onClick={() => window.open(`/admin/games/back-to-back-connection/assistant?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Assistant</button>
+                    <button className="rounded border border-stone-600 px-2 py-1 text-xs" onClick={() => window.open(`/admin/games/back-to-back-connection/jumbotron?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Jumbotron</button>
                     <button className="rounded border border-stone-600 px-2 py-1 text-xs" onClick={() => downloadGamePullListPdf({ gameSlug: "back-to-back-connection", gameTitle: "Back-to-Back Connection", sessionId: session.id, sessionCode: session.session_code, accentRgb: [217, 119, 6] })}>Pull List PDF</button>
-                    <button className="rounded border border-stone-600 px-2 py-1 text-xs" onClick={() => router.push("/admin/games/back-to-back-connection/history")}>History</button>
+                    <button className="rounded border border-stone-600 px-2 py-1 text-xs" onClick={() => window.open("/admin/games/back-to-back-connection/history", "_blank", "noopener,noreferrer")}>History</button>
                   </div>
                 </div>
               ))}

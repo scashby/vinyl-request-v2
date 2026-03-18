@@ -10,6 +10,7 @@ import {
 export type SourceRow = {
   title?: string;
   artist?: string;
+  album?: string;
   isrc?: string;
   spotifyUri?: string;
   spotifyTrackId?: string;
@@ -27,6 +28,7 @@ export type MatchCandidate = {
   inventory_id: number | null;
   title: string;
   artist: string;
+  album_title: string | null;
   side: string | null;
   position: string | null;
   score: number;
@@ -66,6 +68,7 @@ type InventoryTrack = {
   inventoryId: number;
   title: string;
   artist: string;
+  albumTitle: string | null;
   side: string | null;
   position: string | null;
   isrc: string | null;
@@ -73,8 +76,10 @@ type InventoryTrack = {
   formatDetails: string[];
   canonTitle: string;
   canonArtist: string;
+  canonAlbum: string;
   titleTokens: Set<string>;
   artistTokens: Set<string>;
+  albumTokens: Set<string>;
 };
 
 type NormalizedImportMatchFilters = {
@@ -86,8 +91,10 @@ type NormalizedImportMatchFilters = {
 type InventoryIndex = {
   byIsrc: Map<string, InventoryTrack[]>;
   byExact: Map<string, InventoryTrack[]>;
+  byExactAlbum: Map<string, InventoryTrack[]>;
   byTitle: Map<string, InventoryTrack[]>;
   byArtist: Map<string, InventoryTrack[]>;
+  byAlbum: Map<string, InventoryTrack[]>;
   byToken: Map<string, InventoryTrack[]>;
   byTrackKey: Map<string, InventoryTrack>;
 };
@@ -97,6 +104,7 @@ type ScoredTrack = {
   score: number;
   titleScore: number;
   artistScore: number;
+  albumScore: number;
   titleTokenOverlap: number;
 };
 
@@ -118,6 +126,16 @@ const ARTIST_KEYS = [
   "performer",
   "band",
   "album_artist",
+];
+
+const ALBUM_KEYS = [
+  "album",
+  "album_title",
+  "release",
+  "record",
+  "lp",
+  "record_title",
+  "release_title",
 ];
 
 const ISRC_KEYS = ["isrc", "isrc_code", "track_isrc"];
@@ -337,6 +355,21 @@ const canonicalArtist = (value: string) => {
   return tokens.join(" ").trim();
 };
 
+const canonicalAlbum = (value: string) => {
+  const lowered = normalizedTitleValue(value);
+  if (!lowered) return "";
+  return lowered
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .filter((token) => {
+      const year = Number(token);
+      return !(Number.isInteger(year) && year >= 1900 && year <= 2099);
+    })
+    .join(" ")
+    .trim();
+};
+
 const tokenSet = (value: string) => {
   const tokens = value
     .split(/\s+/)
@@ -392,28 +425,40 @@ const similarity = (a: string, b: string) => {
   return Math.max(setDice(aTokens, bTokens), charDice(a, b));
 };
 
-const scoreCandidate = (rowTitle: string, rowArtist: string, track: InventoryTrack): ScoredTrack => {
+const scoreCandidate = (rowTitle: string, rowArtist: string, rowAlbum: string, track: InventoryTrack): ScoredTrack => {
   const rowTitleTokens = tokenSet(rowTitle);
   const titleScore = similarity(rowTitle, track.canonTitle);
   const artistScore = rowArtist ? similarity(rowArtist, track.canonArtist) : 0;
+  const albumScore = rowAlbum ? similarity(rowAlbum, track.canonAlbum) : 0;
   const titleTokenOverlap = setDice(rowTitleTokens, track.titleTokens);
 
   const titleExact = rowTitle.length > 0 && rowTitle === track.canonTitle ? 0.12 : 0;
   const artistExact = rowArtist.length > 0 && rowArtist === track.canonArtist ? 0.08 : 0;
-  const artistWeight = rowArtist ? 0.28 : 0;
-  const titleWeight = 1 - artistWeight;
-  let score = titleScore * titleWeight + artistScore * artistWeight + titleExact + artistExact;
+  const albumExact = rowAlbum.length > 0 && rowAlbum === track.canonAlbum ? 0.07 : 0;
+  const albumWeight = rowAlbum ? 0.2 : 0;
+  const artistWeight = rowArtist ? (rowAlbum ? 0.25 : 0.28) : 0;
+  const titleWeight = Math.max(0.3, 1 - artistWeight - albumWeight);
+  let score =
+    titleScore * titleWeight +
+    artistScore * artistWeight +
+    albumScore * albumWeight +
+    titleExact +
+    artistExact +
+    albumExact;
 
   const titleTokenDelta = Math.abs(rowTitleTokens.size - track.titleTokens.size);
   if (titleTokenDelta >= 5) score -= 0.06;
   if (rowArtist && artistScore >= 0.9 && titleTokenOverlap < 0.18) score -= 0.18;
   if (rowArtist && artistScore >= 0.95 && titleTokenOverlap < 0.1) score -= 0.08;
   if (rowArtist && artistScore >= 0.9 && titleTokenOverlap >= 0.45) score += 0.06;
+  if (rowAlbum && albumScore >= 0.9) score += 0.04;
+  if (rowAlbum && albumScore < 0.2 && titleScore < 0.45) score -= 0.08;
 
   return {
     track,
     titleScore,
     artistScore,
+    albumScore,
     titleTokenOverlap,
     score: Math.max(0, Math.min(1, score)),
   };
@@ -424,6 +469,7 @@ const toCandidate = (scored: ScoredTrack): MatchCandidate => ({
   inventory_id: scored.track.inventoryId,
   title: scored.track.title,
   artist: scored.track.artist,
+  album_title: scored.track.albumTitle,
   side: scored.track.side,
   position: scored.track.position,
   score: Number(scored.score.toFixed(3)),
@@ -451,18 +497,24 @@ const rowFromArray = (cells: string[]): SourceRow => {
 
   let title = "";
   let artist = "";
+  let album = "";
   let spotifyUri = maybeSpotifyUri(c0);
   let spotifyTrackId = trackIdFromSpotifyUri(c0);
 
   if (spotifyUri && c1) {
     title = c1;
     artist = c2;
+    album = c3;
   } else {
     title = c0;
     artist = c1;
+    album = c2;
     if (!spotifyUri) {
       spotifyUri = maybeSpotifyUri(c2) || maybeSpotifyUri(c3);
       if (!spotifyTrackId) spotifyTrackId = trackIdFromSpotifyUri(c2) || trackIdFromSpotifyUri(c3);
+      if (maybeSpotifyUri(c2)) {
+        album = c3;
+      }
     }
   }
 
@@ -471,6 +523,7 @@ const rowFromArray = (cells: string[]): SourceRow => {
   return {
     title: title || undefined,
     artist: artist || undefined,
+    album: album || undefined,
     isrc: isrcCandidate || undefined,
     spotifyUri: spotifyUri || undefined,
     spotifyTrackId: spotifyTrackId || undefined,
@@ -494,6 +547,7 @@ export const parseCsvRows = (csvText: string): SourceRow[] => {
   const hasRecognizedHeaders =
     fields.some((field) => TITLE_KEYS.includes(field)) ||
     fields.some((field) => ARTIST_KEYS.includes(field)) ||
+    fields.some((field) => ALBUM_KEYS.includes(field)) ||
     fields.some((field) => ISRC_KEYS.includes(field)) ||
     fields.some((field) => URI_KEYS.includes(field));
 
@@ -505,6 +559,7 @@ export const parseCsvRows = (csvText: string): SourceRow[] => {
 
       const title = firstFromKeys(record, TITLE_KEYS);
       const artist = firstFromKeys(record, ARTIST_KEYS);
+      const album = firstFromKeys(record, ALBUM_KEYS);
       const isrc = normalizeIsrc(firstFromKeys(record, ISRC_KEYS));
       const spotifyUri = maybeSpotifyUri(firstFromKeys(record, URI_KEYS));
 
@@ -519,6 +574,7 @@ export const parseCsvRows = (csvText: string): SourceRow[] => {
       const row: SourceRow = {
         title: title || fallback.title,
         artist: artist || fallback.artist,
+        album: album || fallback.album,
         isrc: isrc || fallback.isrc,
         spotifyUri: spotifyUri || fallback.spotifyUri,
         spotifyTrackId: spotifyTrackId || fallback.spotifyTrackId,
@@ -560,12 +616,15 @@ const loadInventoryTracks = async (authHeader?: string): Promise<InventoryTrack[
     const inventoryId = typeof row.inventory_id === "number" ? row.inventory_id : null;
     const title = typeof row.title === "string" ? row.title.trim() : "";
     const artistRaw = typeof row.artist === "string" ? row.artist.trim() : "";
+    const albumRaw = typeof row.album_title === "string" ? row.album_title.trim() : "";
     const positionRaw = typeof row.position === "string" ? row.position.trim() : "";
     if (!inventoryId || !title || !positionRaw) continue;
 
     const artist = artistRaw || "Unknown Artist";
+    const albumTitle = albumRaw || null;
     const canonTitle = canonicalTitle(title);
     const canonArtist = canonicalArtist(artist);
+    const canonAlbum = canonicalAlbum(albumTitle ?? "");
     if (!canonTitle) continue;
 
     tracks.push({
@@ -573,6 +632,7 @@ const loadInventoryTracks = async (authHeader?: string): Promise<InventoryTrack[
       inventoryId,
       title,
       artist,
+      albumTitle,
       side: typeof row.side === "string" ? row.side.trim() || null : null,
       position: positionRaw,
       isrc: null,
@@ -584,8 +644,10 @@ const loadInventoryTracks = async (authHeader?: string): Promise<InventoryTrack[
         : [],
       canonTitle,
       canonArtist,
+      canonAlbum,
       titleTokens: tokenSet(canonTitle),
       artistTokens: tokenSet(canonArtist),
+      albumTokens: tokenSet(canonAlbum),
     });
   }
 
@@ -602,19 +664,25 @@ const loadInventoryTracks = async (authHeader?: string): Promise<InventoryTrack[
 const buildIndex = (tracks: InventoryTrack[]): InventoryIndex => {
   const byIsrc = new Map<string, InventoryTrack[]>();
   const byExact = new Map<string, InventoryTrack[]>();
+  const byExactAlbum = new Map<string, InventoryTrack[]>();
   const byTitle = new Map<string, InventoryTrack[]>();
   const byArtist = new Map<string, InventoryTrack[]>();
+  const byAlbum = new Map<string, InventoryTrack[]>();
   const byToken = new Map<string, InventoryTrack[]>();
   const byTrackKey = new Map<string, InventoryTrack>();
 
   for (const track of tracks) {
     const exactKey = `${track.canonTitle}::${track.canonArtist}`;
     addMapList(byExact, exactKey, track);
+    if (track.canonAlbum) {
+      addMapList(byExactAlbum, `${exactKey}::${track.canonAlbum}`, track);
+      addMapList(byAlbum, track.canonAlbum, track);
+    }
     addMapList(byTitle, track.canonTitle, track);
     addMapList(byArtist, track.canonArtist, track);
     byTrackKey.set(track.trackKey, track);
 
-    for (const token of new Set([...track.titleTokens, ...track.artistTokens])) {
+    for (const token of new Set([...track.titleTokens, ...track.artistTokens, ...track.albumTokens])) {
       addMapList(byToken, token, track);
     }
 
@@ -623,10 +691,10 @@ const buildIndex = (tracks: InventoryTrack[]): InventoryIndex => {
     }
   }
 
-  return { byIsrc, byExact, byTitle, byArtist, byToken, byTrackKey };
+  return { byIsrc, byExact, byExactAlbum, byTitle, byArtist, byAlbum, byToken, byTrackKey };
 };
 
-const collectCandidates = (rowTitle: string, rowArtist: string, index: InventoryIndex): InventoryTrack[] => {
+const collectCandidates = (rowTitle: string, rowArtist: string, rowAlbum: string, index: InventoryIndex): InventoryTrack[] => {
   const pool = new Map<string, InventoryTrack>();
 
   const artistMatches = rowArtist ? index.byArtist.get(rowArtist) ?? [] : [];
@@ -641,7 +709,13 @@ const collectCandidates = (rowTitle: string, rowArtist: string, index: Inventory
     if (pool.size >= 900) break;
   }
 
-  const rowTokens = new Set([...tokenSet(rowTitle), ...tokenSet(rowArtist)]);
+  const albumMatches = rowAlbum ? index.byAlbum.get(rowAlbum) ?? [] : [];
+  for (const track of albumMatches) {
+    pool.set(track.trackKey, track);
+    if (pool.size >= 900) break;
+  }
+
+  const rowTokens = new Set([...tokenSet(rowTitle), ...tokenSet(rowArtist), ...tokenSet(rowAlbum)]);
   for (const token of rowTokens) {
     const tracks = index.byToken.get(token) ?? [];
     for (const track of tracks) {
@@ -668,6 +742,7 @@ const collectCandidates = (rowTitle: string, rowArtist: string, index: Inventory
 const chooseFromTitleMatches = (
   rowTitle: string,
   rowArtist: string,
+  rowAlbum: string,
   titleMatches: InventoryTrack[],
   mode: MatchingMode
 ) => {
@@ -685,7 +760,7 @@ const chooseFromTitleMatches = (
 
   if (mode === "review") return null;
 
-  const scored = titleMatches.map((track) => scoreCandidate(rowTitle, rowArtist, track)).sort((a, b) => b.score - a.score);
+  const scored = titleMatches.map((track) => scoreCandidate(rowTitle, rowArtist, rowAlbum, track)).sort((a, b) => b.score - a.score);
 
   const best = scored[0];
   const second = scored[1];
@@ -726,6 +801,7 @@ const shouldAutoMatch = (best: ScoredTrack, second: ScoredTrack | undefined, mod
     if (best.score >= 0.95) return true;
     if (best.score >= 0.9 && margin >= 0.08) return true;
     if (best.titleScore >= 0.97 && best.artistScore >= 0.7 && margin >= 0.1) return true;
+    if (best.albumScore >= 0.95 && best.titleScore >= 0.8 && margin >= 0.08) return true;
     return false;
   }
 
@@ -735,12 +811,14 @@ const shouldAutoMatch = (best: ScoredTrack, second: ScoredTrack | undefined, mod
     if (best.artistScore >= 0.9 && best.titleTokenOverlap >= 0.4 && margin >= 0.02) return true;
     if (best.artistScore >= 0.95 && best.titleScore >= 0.48) return true;
     if (best.titleScore >= 0.93 && best.artistScore >= 0.34 && margin >= 0.04) return true;
+    if (best.albumScore >= 0.92 && best.titleScore >= 0.62 && margin >= 0.04) return true;
     return false;
   }
 
   if (best.score >= 0.92) return true;
   if (best.score >= 0.86 && margin >= 0.06) return true;
   if (best.titleScore >= 0.96 && best.artistScore >= 0.62 && margin >= 0.08) return true;
+  if (best.albumScore >= 0.95 && best.titleScore >= 0.7 && margin >= 0.06) return true;
   return false;
 };
 
@@ -819,8 +897,10 @@ const matchRows = async (
   for (const row of rows) {
     const rawTitle = strip(row.title);
     const rawArtist = strip(row.artist);
+    const rawAlbum = strip(row.album);
     const normTitle = canonicalTitle(rawTitle);
     const normArtist = canonicalArtist(rawArtist);
+    const normAlbum = canonicalAlbum(rawAlbum);
     const normIsrc = normalizeIsrc(row.isrc);
 
     if (!normTitle) continue;
@@ -833,6 +913,14 @@ const matchRows = async (
       }
     }
 
+    if (normAlbum) {
+      const exactAlbumHits = index.byExactAlbum.get(`${normTitle}::${normArtist}::${normAlbum}`) ?? [];
+      if (exactAlbumHits.length > 0) {
+        matchedTrackKeys.push(exactAlbumHits[0].trackKey);
+        continue;
+      }
+    }
+
     const exactHits = index.byExact.get(`${normTitle}::${normArtist}`) ?? [];
     if (exactHits.length > 0) {
       matchedTrackKeys.push(exactHits[0].trackKey);
@@ -840,7 +928,7 @@ const matchRows = async (
     }
 
     const titleMatches = index.byTitle.get(normTitle) ?? [];
-    const chosenByTitle = chooseFromTitleMatches(normTitle, normArtist, titleMatches, mode);
+    const chosenByTitle = chooseFromTitleMatches(normTitle, normArtist, normAlbum, titleMatches, mode);
     if (chosenByTitle) {
       matchedTrackKeys.push(chosenByTitle.trackKey);
       fuzzyMatchedCount += 1;
@@ -848,8 +936,8 @@ const matchRows = async (
     }
 
     const minCandidateScore = mode === "strict" ? 0.38 : mode === "aggressive" ? 0.26 : 0.34;
-    const scoredCandidates = collectCandidates(normTitle, normArtist, index)
-      .map((track) => scoreCandidate(normTitle, normArtist, track))
+    const scoredCandidates = collectCandidates(normTitle, normArtist, normAlbum, index)
+      .map((track) => scoreCandidate(normTitle, normArtist, normAlbum, track))
       .filter((scored) => scored.score >= minCandidateScore)
       .sort((a, b) => b.score - a.score)
       .slice(0, 10);
@@ -870,7 +958,7 @@ const matchRows = async (
         if (!key) return null;
         const mappedTrack = index.byTrackKey.get(key);
         if (mappedTrack) {
-          const rescored = scoreCandidate(normTitle, normArtist, mappedTrack);
+          const rescored = scoreCandidate(normTitle, normArtist, normAlbum, mappedTrack);
           return toCandidate(rescored);
         }
         if (hasActiveFilters) return null;
@@ -879,6 +967,7 @@ const matchRows = async (
           inventory_id: candidate.inventory_id ?? null,
           title: candidate.title,
           artist: candidate.artist,
+          album_title: candidate.album_title ?? null,
           side: candidate.side ?? null,
           position: candidate.position ?? null,
           score: Number(candidate.score.toFixed(3)),
@@ -963,6 +1052,7 @@ export const importRowsToPlaylist = async (options: ImportOptions): Promise<Impo
     .map((row) => ({
       title: strip(row.title),
       artist: strip(row.artist) || undefined,
+      album: strip(row.album) || undefined,
       isrc: normalizeIsrc(row.isrc) || undefined,
       spotifyUri: maybeSpotifyUri(row.spotifyUri) || undefined,
       spotifyTrackId: strip(row.spotifyTrackId) || trackIdFromSpotifyUri(row.spotifyUri) || undefined,
