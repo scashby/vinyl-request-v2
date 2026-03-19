@@ -1,7 +1,7 @@
 // src/app/edit-collection/components/CollectionInfoPanel.tsx
 'use client';
 
-import { memo } from 'react';
+import { memo, useEffect, useState } from 'react';
 import Image from 'next/image';
 import type { Album } from '../../../types/album';
 import { toSafeStringArray } from '../../../types/album';
@@ -12,13 +12,77 @@ interface CollectionInfoPanelProps {
 }
 
 const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }: CollectionInfoPanelProps) {
+  type ReleaseTrack = NonNullable<NonNullable<Album['release']>['release_tracks']>[number];
+
+  const [liveReleaseTracks, setLiveReleaseTracks] = useState<ReleaseTrack[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchTracks = async () => {
+      if (!album?.id) {
+        setLiveReleaseTracks(null);
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/library/albums/${album.id}/tracks`, { cache: 'no-store' });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok || !Array.isArray((payload as { items?: unknown[] }).items)) {
+          if (!cancelled) setLiveReleaseTracks(null);
+          return;
+        }
+
+        const mapped = ((payload as { items: Array<Record<string, unknown>> }).items ?? [])
+          .map((item) => {
+            const rawRecording = item.recording;
+            const recording = Array.isArray(rawRecording)
+              ? (rawRecording[0] as Record<string, unknown> | undefined)
+              : (rawRecording as Record<string, unknown> | undefined);
+
+            return {
+              id: typeof item.id === 'number' ? item.id : 0,
+              release_id: typeof item.release_id === 'number' ? item.release_id : null,
+              recording_id: typeof item.recording_id === 'number' ? item.recording_id : null,
+              position: typeof item.position === 'string' ? item.position : '',
+              side: typeof item.side === 'string' ? item.side : null,
+              title_override: typeof item.title_override === 'string' ? item.title_override : null,
+              recording: recording
+                ? {
+                    id: typeof recording.id === 'number' ? recording.id : 0,
+                    title: typeof recording.title === 'string' ? recording.title : null,
+                    duration_seconds: typeof recording.duration_seconds === 'number' ? recording.duration_seconds : null,
+                    credits: (recording.credits as Album['release'] extends { release_tracks: Array<infer T> } ? T extends { recording?: { credits?: infer C } } ? C : unknown : unknown) ?? null,
+                    notes: typeof recording.notes === 'string' ? recording.notes : null,
+                    lyrics: typeof recording.lyrics === 'string' ? recording.lyrics : null,
+                    lyrics_url: typeof recording.lyrics_url === 'string' ? recording.lyrics_url : null,
+                    track_artist: typeof recording.track_artist === 'string' ? recording.track_artist : null,
+                  }
+                : null,
+            } as ReleaseTrack;
+          })
+          .filter((item) => item.id > 0 && item.position);
+
+        if (!cancelled) {
+          setLiveReleaseTracks(mapped);
+        }
+      } catch {
+        if (!cancelled) setLiveReleaseTracks(null);
+      }
+    };
+
+    void fetchTracks();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [album?.id]);
+
   if (!album) {
     return <div className="py-20 text-center text-gray-400 text-sm italic">Select an album to view details</div>;
   }
 
-  type ReleaseTrack = NonNullable<NonNullable<Album['release']>['release_tracks']>[number];
-
-  const releaseTracks = album.release?.release_tracks ?? [];
+  const releaseTracks = liveReleaseTracks ?? album.release?.release_tracks ?? [];
   const fallbackTracks = album.tracks ?? [];
 
   const formatDuration = (totalSeconds: number | null): string => {
