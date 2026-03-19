@@ -822,6 +822,18 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
 
         if (editedAlbum.release_id) {
           const trackCount = tracksData?.tracks?.filter((track) => track.type === 'track').length;
+          const nextDiscMetadata =
+            tracksData?.disc_metadata && tracksData.disc_metadata.length > 0
+              ? tracksData.disc_metadata
+              : (editedAlbum.disc_metadata ?? null);
+          const nextMatrixNumbers =
+            tracksData?.matrix_numbers && Object.keys(tracksData.matrix_numbers).length > 0
+              ? tracksData.matrix_numbers
+              : (editedAlbum.matrix_numbers ?? null);
+          const inferredDiscQty = Array.isArray(nextDiscMetadata) && nextDiscMetadata.length > 0
+            ? nextDiscMetadata.length
+            : null;
+
           const releaseUpdate: Database['public']['Tables']['releases']['Update'] = {
             label: editedAlbum.labels?.[0] ?? editedAlbum.label ?? null,
             catalog_number: editedAlbum.cat_no ?? editedAlbum.catalog_number ?? null,
@@ -844,11 +856,11 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             box_set: editedAlbum.box_set ?? null,
             sound: editedAlbum.sound ?? null,
             studio: editedAlbum.studio ?? null,
-            disc_metadata: editedAlbum.disc_metadata
-              ? (editedAlbum.disc_metadata as Database['public']['Tables']['releases']['Update']['disc_metadata'])
+            disc_metadata: nextDiscMetadata
+              ? (nextDiscMetadata as Database['public']['Tables']['releases']['Update']['disc_metadata'])
               : null,
-            matrix_numbers: editedAlbum.matrix_numbers
-              ? (editedAlbum.matrix_numbers as Database['public']['Tables']['releases']['Update']['matrix_numbers'])
+            matrix_numbers: nextMatrixNumbers
+              ? (nextMatrixNumbers as Database['public']['Tables']['releases']['Update']['matrix_numbers'])
               : null,
           };
 
@@ -857,7 +869,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             : null;
           const resolvedMediaType = parsedFormat?.media_type ?? editedAlbum.release?.media_type ?? null;
           const resolvedFormatDetails = parsedFormat?.format_details ?? editedAlbum.release?.format_details ?? null;
-          const resolvedQty = parsedFormat?.qty ?? editedAlbum.discs ?? editedAlbum.release?.qty ?? null;
+          const resolvedQty = parsedFormat?.qty ?? inferredDiscQty ?? editedAlbum.discs ?? editedAlbum.release?.qty ?? null;
 
           if (resolvedMediaType) {
             releaseUpdate.media_type = resolvedMediaType;
