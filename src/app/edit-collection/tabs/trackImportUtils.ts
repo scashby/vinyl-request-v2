@@ -21,6 +21,7 @@ interface DiscogsTrack {
   duration?: string;
   artists?: { name: string }[];
   type_?: string;
+  sub_tracks?: DiscogsTrack[];
 }
 
 // Spotify API track interface
@@ -93,9 +94,9 @@ export async function importTracksFromDiscogs(
     const tracks: Track[] = [];
     let position = 1;
 
-    // Discogs tracklist format: array of track objects
+    // Discogs tracklist format: array of track objects; nested suites are exposed via sub_tracks.
     if (data.tracklist && Array.isArray(data.tracklist)) {
-      data.tracklist.forEach((track: DiscogsTrack) => {
+      const appendTrack = (track: DiscogsTrack) => {
         // Determine disc number from position (e.g., "A1", "B1", "C1" or "1-1", "2-1")
         const positionStr = normalizeDiscogsPosition(track.position);
         let discNumber = 1;
@@ -119,8 +120,9 @@ export async function importTracksFromDiscogs(
           }
         }
 
-        // Check if this is a heading/header (only if Discogs explicitly marks it)
-        const isHeader = track.type_ === 'heading';
+        // Mark Discogs headings/suite containers as headers so child sub_tracks can be imported below.
+        const hasSubTracks = Array.isArray(track.sub_tracks) && track.sub_tracks.length > 0;
+        const isHeader = track.type_ === 'heading' || (!positionStr && hasSubTracks);
 
         tracks.push({
           id: generateTrackId(),
@@ -135,6 +137,16 @@ export async function importTracksFromDiscogs(
         });
         
         position++; // Increment fallback counter
+
+        if (hasSubTracks) {
+          track.sub_tracks!.forEach((subTrack) => {
+            appendTrack(subTrack);
+          });
+        }
+      };
+
+      data.tracklist.forEach((track: DiscogsTrack) => {
+        appendTrack(track);
       });
     }
 
