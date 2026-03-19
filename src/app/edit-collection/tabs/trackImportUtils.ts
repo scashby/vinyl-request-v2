@@ -33,6 +33,18 @@ interface SpotifyTrack {
 }
 
 /**
+ * Discogs sometimes prefixes track positions with marker glyphs (e.g. arrows for sub-tracks).
+ * Strip any leading non-alphanumeric markers so side/disc parsing still works.
+ */
+function normalizeDiscogsPosition(position: string | undefined): string {
+  if (!position) return '';
+  return position
+    .trim()
+    .replace(/^[^A-Za-z0-9]+/, '')
+    .trim();
+}
+
+/**
  * Parse duration from various formats to MM:SS
  */
 function parseDuration(duration: string | number | undefined): string {
@@ -85,7 +97,7 @@ export async function importTracksFromDiscogs(
     if (data.tracklist && Array.isArray(data.tracklist)) {
       data.tracklist.forEach((track: DiscogsTrack) => {
         // Determine disc number from position (e.g., "A1", "B1", "C1" or "1-1", "2-1")
-        const positionStr = track.position || '';
+        const positionStr = normalizeDiscogsPosition(track.position);
         let discNumber = 1;
         let side = '';
         let trackPosition = position; // Fallback to sequential
