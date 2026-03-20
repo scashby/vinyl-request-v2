@@ -133,7 +133,6 @@ export default function BingoTransportLane({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className={`text-sm font-bold uppercase tracking-wide ${headingToneClass}`}>Transport Lane</h2>
         <div className="flex items-center gap-3">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-stone-400">Pull · Cue · Call</p>
           {headerRight}
         </div>
       </div>

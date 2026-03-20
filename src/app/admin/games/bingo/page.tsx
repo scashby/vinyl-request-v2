@@ -37,10 +37,27 @@ function computeMinimumPlaylistTracks(roundCount: number, cardCount: number): nu
   return base + densityBuffer;
 }
 
-function formatScientific(value: number): string {
+function formatEnglishMagnitude(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return "0";
-  if (value < 1_000_000_000) return Math.floor(value).toLocaleString();
-  return value.toExponential(2);
+
+  const units: Array<{ threshold: number; label: string }> = [
+    { threshold: 1_000_000_000_000_000, label: "quadrillion" },
+    { threshold: 1_000_000_000_000, label: "trillion" },
+    { threshold: 1_000_000_000, label: "billion" },
+    { threshold: 1_000_000, label: "million" },
+    { threshold: 1_000, label: "thousand" },
+  ];
+
+  const whole = Math.floor(value);
+  for (const unit of units) {
+    if (whole >= unit.threshold) {
+      const compact = whole / unit.threshold;
+      const rounded = compact >= 100 ? Math.round(compact) : Math.round(compact * 10) / 10;
+      return `${rounded.toLocaleString()} ${unit.label}`;
+    }
+  }
+
+  return whole.toLocaleString();
 }
 
 const GAME_MODE_OPTIONS = [
@@ -228,7 +245,7 @@ export default function BingoSetupPage() {
             Minimum playlist size: <span className="font-semibold text-amber-300">{minimumTracksForSetup}</span> tracks for {Math.max(1, roundCount)} round(s) with {Math.max(1, cardCount)} cards.
           </p>
           <p className="mt-1 text-xs text-stone-400">
-            Estimated unique card layouts available: <span className="font-semibold text-emerald-300">{formatScientific(estimatedUniqueCardsAcrossRounds)}</span> across configured rounds.
+            Estimated unique card layouts available: <span className="font-semibold text-emerald-300">{formatEnglishMagnitude(estimatedUniqueCardsAcrossRounds)}</span> across configured rounds.
           </p>
           {selectedPlaylist ? (
             <p className={`mt-1 text-xs ${selectedPlaylist.track_count >= minimumTracksForSetup ? "text-emerald-300" : "text-rose-300"}`}>

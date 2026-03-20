@@ -34,9 +34,11 @@ export default function BingoHostPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
   const [remaining, setRemaining] = useState(0);
-  const [revealDelayInput, setRevealDelayInput] = useState<number>(3);
+  const [revealDelayInput, setRevealDelayInput] = useState<number>(5);
   const [intermissionLengthSeconds, setIntermissionLengthSeconds] = useState<number>(180);
+  const [secondsToNextCallInput, setSecondsToNextCallInput] = useState<number>(0);
   const [autoCallEnabled, setAutoCallEnabled] = useState(false);
+  const [resetCounter, setResetCounter] = useState(0);
   const [savingOverlay, setSavingOverlay] = useState(false);
   const currentCallRowRef = useRef<HTMLTableRowElement>(null);
   const autoCallLockRef = useRef(false);
@@ -44,15 +46,14 @@ export default function BingoHostPage() {
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
     const [sRes, cRes] = await Promise.all([
-      fetch(`/api/games/bingo/sessions/${sessionId}`),
-      fetch(`/api/games/bingo/sessions/${sessionId}/calls`),
+      fetch(`/api/games/bingo/sessions/${sessionId}`, { cache: 'no-store' }),
+      fetch(`/api/games/bingo/sessions/${sessionId}/calls`, { cache: 'no-store' }),
     ]);
 
     if (sRes.ok) {
       const payload = await sRes.json();
       setSession(payload);
-      setRevealDelayInput(payload.call_reveal_delay_seconds ?? 3);
-      setRemaining(payload.seconds_to_next_call ?? 0);
+      setRevealDelayInput(payload.call_reveal_delay_seconds ?? 5);      setSecondsToNextCallInput(payload.seconds_to_next_call ?? 0);      setRemaining(payload.seconds_to_next_call ?? 0);
     }
 
     if (cRes.ok) {
@@ -107,7 +108,12 @@ export default function BingoHostPage() {
 
   const openWindow = useCallback((url: string, name: string, features: string) => {
     const opened = window.open(url, name, features);
-    if (opened) opened.focus();
+    if (opened) {
+      opened.focus();
+    } else {
+      // Fallback for stricter popup policies
+      window.open(url, "_blank");
+    }
   }, []);
 
   const patchSession = useCallback(
@@ -129,29 +135,26 @@ export default function BingoHostPage() {
 
   const resume = async () => {
     await fetch(`/api/games/bingo/sessions/${sessionId}/resume`, { method: "POST" });
-    load();
-  };
-
-  const skip = async () => {
-    await fetch(`/api/games/bingo/sessions/${sessionId}/skip`, { method: "POST" });
-    load();
-  };
-
-  const replace = async () => {
-    await fetch(`/api/games/bingo/sessions/${sessionId}/replace`, { method: "POST" });
+    await patchSession({ bingo_overlay: "none" });
     load();
   };
 
   const resetGame = async () => {
-    const confirmed = window.confirm("Reset this game to a fresh start? This will clear all called state.");
+    const confirmed = window.confirm("Reset this round to a fresh start? All calls will be cleared.");
     if (!confirmed) return;
     await fetch(`/api/games/bingo/sessions/${sessionId}/reset`, { method: "POST" });
     setAutoCallEnabled(false);
+    setRevealDelayInput(5);
+    setSecondsToNextCallInput(0);
+    setRemaining(0);
+    setResetCounter((v) => v + 1);
     load();
   };
 
   const saveRevealDelay = async () => {
-    await patchSession({ call_reveal_delay_seconds: revealDelayInput });
+    const updatedDelay = Math.max(0, Math.min(15, revealDelayInput));
+    setRevealDelayInput(updatedDelay);
+    await patchSession({ call_reveal_delay_seconds: updatedDelay });
   };
 
   const nextRound = async () => {
@@ -175,12 +178,14 @@ export default function BingoHostPage() {
       return;
     }
     setAutoCallEnabled(false);
+    await patchSession({ bingo_overlay: "none" });
     await load();
   };
 
   const endGame = async () => {
     await patchSession({ status: "completed", ended_at: new Date().toISOString(), bingo_overlay: "none" });
     setAutoCallEnabled(false);
+    await load();
   };
 
   const setOverlay = async (overlay: "none" | "pending" | "winner") => {
@@ -214,7 +219,6 @@ export default function BingoHostPage() {
         <header className="rounded-2xl border border-red-900/40 bg-black/60 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-[0.25em] text-amber-300">Host Console</p>
               <h1 className="text-3xl font-black uppercase">Music Bingo Host</h1>
               <p className="text-sm text-stone-400">{session?.playlist_name} · {session?.session_code}</p>
             </div>
@@ -224,7 +228,7 @@ export default function BingoHostPage() {
                 <p className="text-[11px] uppercase tracking-[0.15em] text-stone-400">Time Until Next Call</p>
                 <p
                   className={`text-4xl font-black leading-none tabular-nums ${
-                    remaining <= 10 ? "text-red-400" : remaining <= 20 ? "text-amber-400" : "text-emerald-400"
+                    remaining < 0 || remaining <= 10 ? "text-red-400" : remaining <= 20 ? "text-amber-400" : "text-emerald-400"
                   }`}
                 >
                   {remaining}s
@@ -239,7 +243,7 @@ export default function BingoHostPage() {
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
             <button
               className="rounded border border-stone-600 px-2 py-1"
-              onClick={() => openWindow(`/admin/games/bingo/assistant?sessionId=${sessionId}`, "bingo_assistant", "width=1024,height=800,left=1300,top=0,noopener,noreferrer")}
+              onClick={() => openWindow(`/admin/games/bingo/assistant?sessionId=${sessionId}`, "bingo_assistant", "width=1024,height=800,left=1300,top=0")}
             >
               Assistant
             </button>
@@ -262,64 +266,80 @@ export default function BingoHostPage() {
         </header>
 
         <section className="rounded-2xl border border-stone-700 bg-black/45 p-3">
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <button onClick={pause} className="rounded border border-stone-600 px-2 py-1 hover:border-stone-400">Pause</button>
-            <button onClick={resume} className="rounded border border-stone-600 px-2 py-1 hover:border-stone-400">Resume</button>
-            <button onClick={skip} className="rounded border border-stone-600 px-2 py-1 hover:border-stone-400">Skip</button>
-            <button onClick={replace} className="rounded border border-stone-600 px-2 py-1 hover:border-stone-400">Replace</button>
+          <div className="grid grid-cols-3 gap-3">
+            {/* Left column: Round controls */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <label className="text-stone-400 whitespace-nowrap">Intermission (sec)</label>
+              <input
+                type="number"
+                min={0}
+                value={intermissionLengthSeconds}
+                onChange={(e) => setIntermissionLengthSeconds(Math.max(0, Number(e.target.value) || 0))}
+                className="w-16 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
+              />
+              <button onClick={nextRound} className="rounded border border-sky-700 px-3 py-1 text-sky-300 hover:bg-sky-900/20">Next Round</button>
+              <button onClick={endGame} className="rounded border border-red-700 px-3 py-1 text-red-300 hover:bg-red-900/20">End Game</button>
+              <button onClick={resetGame} className="rounded border border-red-700 bg-red-900/40 px-3 py-1 text-red-100 hover:bg-red-900/60">Reset Round</button>
+            </div>
 
-            <span className="mx-2 h-5 w-px bg-stone-700" />
+            {/* Middle column: Overlay + Reveal Delay */}
+            <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
+              <button
+                onClick={() => {
+                  setOverlay("pending");
+                }}
+                disabled={savingOverlay}
+                className="rounded border border-yellow-700 bg-yellow-900/30 px-3 py-1 font-bold text-yellow-200 hover:bg-yellow-900/60 disabled:opacity-50"
+              >
+                Bingo Pending
+              </button>
+              <button
+                onClick={() => {
+                  setOverlay("winner");
+                }}
+                disabled={savingOverlay}
+                className="rounded border border-emerald-700 bg-emerald-900/30 px-3 py-1 font-bold text-emerald-200 hover:bg-emerald-900/60 disabled:opacity-50"
+              >
+                Bingo Winner!
+              </button>
+              <div className="flex items-center gap-1">
+                <label className="text-stone-400 whitespace-nowrap">Reveal Delay (sec)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={15}
+                  value={revealDelayInput}
+                  onChange={(e) => setRevealDelayInput(Math.max(0, Math.min(15, Number(e.target.value) || 0)))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      saveRevealDelay();
+                    }
+                  }}
+                  className="w-14 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
+                />
+              </div>
+            </div>
 
-            <label className="text-stone-400 whitespace-nowrap">Reveal Delay</label>
-            <input
-              type="number"
-              min={0}
-              max={15}
-              value={revealDelayInput}
-              onChange={(e) => setRevealDelayInput(Math.max(0, Math.min(15, Number(e.target.value) || 0)))}
-              className="w-16 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
-            />
-            <button onClick={saveRevealDelay} className="rounded border border-amber-700 px-2 py-1 text-amber-300 hover:bg-amber-900/30">
-              Save
-            </button>
-
-            <span className="mx-2 h-5 w-px bg-stone-700" />
-
-            <button
-              onClick={() => setOverlay("pending")}
-              disabled={savingOverlay}
-              className="rounded border border-yellow-700 bg-yellow-900/30 px-3 py-1 font-bold text-yellow-200 hover:bg-yellow-900/60 disabled:opacity-50"
-            >
-              Bingo Pending
-            </button>
-            <button
-              onClick={() => setOverlay("winner")}
-              disabled={savingOverlay}
-              className="rounded border border-emerald-700 bg-emerald-900/30 px-3 py-1 font-bold text-emerald-200 hover:bg-emerald-900/60 disabled:opacity-50"
-            >
-              Bingo Winner!
-            </button>
-            <button
-              onClick={() => setOverlay("none")}
-              disabled={savingOverlay}
-              className="rounded border border-stone-600 px-3 py-1 text-stone-300 hover:border-stone-400 disabled:opacity-50"
-            >
-              Clear Overlay
-            </button>
-
-            <span className="mx-2 h-5 w-px bg-stone-700" />
-
-            <label className="text-stone-400 whitespace-nowrap">Intermission Length (sec)</label>
-            <input
-              type="number"
-              min={0}
-              value={intermissionLengthSeconds}
-              onChange={(e) => setIntermissionLengthSeconds(Math.max(0, Number(e.target.value) || 0))}
-              className="w-20 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
-            />
-            <button onClick={nextRound} className="rounded border border-sky-700 px-3 py-1 text-sky-300 hover:bg-sky-900/20">Next Round</button>
-            <button onClick={endGame} className="rounded border border-red-700 px-3 py-1 text-red-300 hover:bg-red-900/20">End Game</button>
-            <button onClick={resetGame} className="rounded border border-red-700 bg-red-900/40 px-3 py-1 text-red-100 hover:bg-red-900/60">Reset Game</button>
+            {/* Right column: Pause/Resume + Interval to Next Call */}
+            <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
+              <button onClick={pause} className="rounded border border-stone-600 px-2 py-1 hover:border-stone-400">Pause</button>
+              <button onClick={resume} className="rounded border border-stone-600 px-2 py-1 hover:border-stone-400">Resume</button>
+              <span className="mx-1 h-5 w-px bg-stone-700" />
+              <label className="text-stone-400 whitespace-nowrap">Seconds to Next Call</label>
+              <input
+                type="number"
+                min={0}
+                max={300}
+                value={secondsToNextCallInput}
+                onChange={(e) => setSecondsToNextCallInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    patchSession({ seconds_to_next_call: secondsToNextCallInput });
+                  }
+                }}
+                className="w-16 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
+              />
+            </div>
           </div>
         </section>
 
@@ -385,6 +405,7 @@ export default function BingoHostPage() {
           </section>
 
           <BingoTransportLane
+            key={`transport-lane-${resetCounter}`}
             sessionId={sessionId}
             calls={calls}
             currentCallIndex={session?.current_call_index ?? 0}

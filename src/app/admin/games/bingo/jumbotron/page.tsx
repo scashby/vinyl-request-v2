@@ -72,7 +72,7 @@ export default function BingoJumbotronPage() {
       setNow(Date.now());
       setRemaining((value) => {
         if (!session || session.status === "paused" || session.status === "completed") return value;
-        return Math.max(0, value - 1);
+        return value - 1;
       });
     }, 1000);
     return () => clearInterval(tick);
@@ -119,11 +119,13 @@ export default function BingoJumbotronPage() {
     return now >= new Date(session.call_reveal_at).getTime();
   }, [session?.call_reveal_at, now]);
 
-  const rotatingColumn = COLUMN_ROTATION[columnRotationIndex] ?? "B";
-  const calledForRotatingColumn = useMemo(
-    () => called.filter((call) => call.column_letter === rotatingColumn).slice(-14).reverse(),
-    [called, rotatingColumn]
-  );
+  const calledByColumn = useMemo(() => {
+    const byCol: Record<string, typeof called> = {};
+    for (const col of COLUMN_ROTATION) {
+      byCol[col] = called.filter((c) => c.column_letter === col);
+    }
+    return byCol;
+  }, [called]);
 
   const intermissionSecondsLeft = useMemo(() => {
     if (!session?.next_game_scheduled_at) return null;
@@ -133,7 +135,7 @@ export default function BingoJumbotronPage() {
 
   const showIntermission = session?.status === "paused" && intermissionSecondsLeft !== null && intermissionSecondsLeft > 0;
 
-  const statusLabel = session?.status === "paused" ? "Paused" : session?.status === "completed" ? "Completed" : "Running";
+  const statusLabel = session?.status === "paused" ? "Paused" : null;
 
   return (
     <div
@@ -181,7 +183,7 @@ export default function BingoJumbotronPage() {
             ) : (
               <>
                 <p className={`font-black leading-none ${current && callIsRevealed ? getBingoColumnTextClass(current.column_letter, current.ball_number) : "text-stone-500"}`} style={{ fontSize: "16vw" }}>
-                  {current && callIsRevealed ? current.column_letter : "?"}
+                  {current && callIsRevealed ? current.column_letter : current ? current.column_letter : "?"}
                 </p>
                 <p className="mt-[0.4vw] font-black leading-tight text-amber-100" style={{ fontSize: "4.5vw" }}>
                   {current && callIsRevealed ? current.track_title : "..."}
@@ -189,24 +191,36 @@ export default function BingoJumbotronPage() {
                 <p className="mt-[0.2vw] font-semibold text-stone-300" style={{ fontSize: "2.7vw" }}>
                   {current && callIsRevealed ? current.artist_name : ""}
                 </p>
-                <p className="mt-[1vw] text-[1.1vw] text-stone-500">
-                  {current && callIsRevealed ? asContestantLine(current) : "Column ? - ... - ..."}
-                </p>
               </>
             )}
           </div>
 
           <aside className="rounded-3xl border border-stone-700 bg-black/45 p-[1vw]">
             <p className="text-[0.95vw] font-semibold uppercase tracking-[0.18em] text-stone-400">
-              Already Called ({rotatingColumn})
+              Already Called
             </p>
             <div className="mt-[0.6vw] max-h-[58vh] space-y-[0.35vw] overflow-y-auto pr-1">
-              {calledForRotatingColumn.map((call) => (
-                <p key={call.id} className="text-[0.95vw] text-stone-300">
-                  Column {call.column_letter} - {call.track_title} - {call.artist_name}
-                </p>
-              ))}
-              {calledForRotatingColumn.length === 0 ? <p className="text-[0.9vw] text-stone-500">No called songs yet.</p> : null}
+              {called.length === 0 ? (
+                <p className="text-[0.9vw] text-stone-500">No called songs yet.</p>
+              ) : (
+                COLUMN_ROTATION.map((col, colIndex) => (
+                  <div key={col}>
+                    {calledByColumn[col] && calledByColumn[col].length > 0 && (
+                      <>
+                        {colIndex > 0 && <div className="my-[0.3vw] border-t border-stone-600/30" />}
+                        {calledByColumn[col].map((call) => (
+                          <p
+                            key={call.id}
+                            className={`text-[0.9vw] py-[0.15vw] ${getBingoColumnTextClass(call.column_letter, call.ball_number)}`}
+                          >
+                            {call.track_title} - {call.artist_name}
+                          </p>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </aside>
         </section>
@@ -214,10 +228,17 @@ export default function BingoJumbotronPage() {
         <footer className="rounded-3xl border border-stone-700 bg-black/45 px-[2vw] py-[0.8vw]">
           <div className="grid grid-cols-3 items-center">
             <div className="text-left">
-              {session?.show_countdown ? <p className="text-[3.2vw] font-black leading-none text-amber-300 tabular-nums">{remaining}s</p> : null}
+              <p className="text-[0.8vw] uppercase tracking-[0.1em] text-stone-400">Time Until Next Call</p>
+              {session?.show_countdown ? (
+                remaining <= 0 ? (
+                  <p className="text-[3.2vw] font-black leading-none text-amber-300">Next Call Upcoming</p>
+                ) : (
+                  <p className="text-[3.2vw] font-black leading-none text-amber-300 tabular-nums">{remaining}s</p>
+                )
+              ) : null}
             </div>
             <div className="text-center">
-              <p className="text-[1.6vw] font-semibold uppercase tracking-[0.14em] text-stone-200">{statusLabel}</p>
+              {statusLabel && <p className="text-[1.6vw] font-semibold uppercase tracking-[0.14em] text-amber-300">{statusLabel}</p>}
             </div>
             <div className="text-right">
               <p className="text-[1.6vw] font-semibold text-stone-300">Round {session?.current_round} of {session?.round_count}</p>
