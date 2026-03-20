@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
-import { generateCards, generateSessionCalls, type GameMode } from "src/lib/bingoEngine";
+import {
+  computeMinimumPlaylistTracks,
+  generateCards,
+  generateSessionCalls,
+  getPlaylistTrackCount,
+  type GameMode,
+} from "src/lib/bingoEngine";
 import { generateBingoSessionCode } from "src/lib/bingoSessionCode";
 
 export const runtime = "nodejs";
@@ -102,6 +108,19 @@ export async function POST(request: NextRequest) {
     }
 
     const gameMode = body.game_mode ?? "single_line";
+    const cardCount = Math.max(1, Math.floor(body.card_count ?? 40));
+    const roundCount = Math.max(1, Math.floor(body.round_count ?? 3));
+    const requiredTrackCount = computeMinimumPlaylistTracks(roundCount, cardCount);
+    const availableTrackCount = await getPlaylistTrackCount(db, playlistId);
+    if (availableTrackCount < requiredTrackCount) {
+      return NextResponse.json(
+        {
+          error: `Playlist must contain at least ${requiredTrackCount} tracks for ${roundCount} round(s) and ${cardCount} cards.`,
+        },
+        { status: 400 }
+      );
+    }
+
     const code = await generateUniqueSessionCode();
     const removeResleeveSeconds = body.remove_resleeve_seconds ?? 20;
     const placeVinylSeconds = body.place_vinyl_seconds ?? 8;
@@ -124,10 +143,10 @@ export async function POST(request: NextRequest) {
         playlist_id: playlistId,
         session_code: code,
         game_mode: gameMode,
-        card_count: body.card_count ?? 40,
+        card_count: cardCount,
         card_layout: body.card_layout ?? "2-up",
         card_label_mode: body.card_label_mode ?? "track_artist",
-        round_count: body.round_count ?? 3,
+        round_count: roundCount,
         current_round: 1,
         round_end_policy: "open_until_winner",
         tie_break_policy: "one_song_playoff",
@@ -154,7 +173,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await generateSessionCalls(db, session.id, playlistId);
+      await generateSessionCalls(db, session.id, playlistId, { roundNumber: 1 });
       await generateCards(db, session.id, session.card_count, session.card_label_mode as "track_artist" | "track_only");
     } catch (error) {
       await db.from("bingo_sessions").delete().eq("id", session.id);

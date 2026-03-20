@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { formatBallLabel, getBingoColumnTextClass } from "src/lib/bingoBall";
 
 export type BingoTransportCall = {
@@ -42,6 +42,9 @@ type BingoTransportLaneProps = {
   onChanged: () => Promise<void> | void;
   accent: "host" | "assistant";
   maxRows?: number;
+  className?: string;
+  callsContainerClassName?: string;
+  headerRight?: ReactNode;
 };
 
 export default function BingoTransportLane({
@@ -52,6 +55,9 @@ export default function BingoTransportLane({
   onChanged,
   accent,
   maxRows = 5,
+  className = "",
+  callsContainerClassName = "",
+  headerRight,
 }: BingoTransportLaneProps) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -123,15 +129,18 @@ export default function BingoTransportLane({
   const headingToneClass = accent === "assistant" ? "text-cyan-200" : "text-amber-200";
 
   return (
-    <section className={`rounded-2xl border p-4 ${sectionToneClass}`}>
+    <section className={`rounded-2xl border p-4 ${sectionToneClass} ${className}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className={`text-sm font-bold uppercase tracking-wide ${headingToneClass}`}>Transport Lane</h2>
-        <p className="text-[11px] uppercase tracking-[0.2em] text-stone-400">Pull · Cue · Call</p>
+        <div className="flex items-center gap-3">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-stone-400">Pull · Cue · Call</p>
+          {headerRight}
+        </div>
       </div>
 
       {errorMessage ? <p className="mt-2 rounded border border-red-700/60 bg-red-950/30 px-2 py-1 text-xs text-red-200">{errorMessage}</p> : null}
 
-      <div className="mt-3 space-y-2">
+      <div className={`mt-3 space-y-2 ${callsContainerClassName}`}>
         {laneCalls.map((call) => {
           const isCurrent = currentCall?.id === call.id;
           const queueRank = queueRankById.get(call.id);

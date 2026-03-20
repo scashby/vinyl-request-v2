@@ -101,6 +101,10 @@ type SessionCallRow = {
   column_letter: string;
   track_title: string;
   artist_name: string;
+  playlist_track_key?: string;
+  album_name?: string | null;
+  side?: string | null;
+  position?: string | null;
 };
 
 export type ResolvedTrackKey = {
@@ -151,6 +155,98 @@ export function parseTrackKey(trackKey: string): ParsedTrackKey {
 }
 
 const GAME_BALL_COUNT = 75;
+
+export function computeMinimumPlaylistTracks(roundCount: number, cardCount: number): number {
+  const normalizedRounds = Math.max(1, Math.floor(roundCount || 1));
+  const normalizedCards = Math.max(1, Math.floor(cardCount || 1));
+  const base = GAME_BALL_COUNT * normalizedRounds;
+  const densityBuffer = Math.max(0, Math.ceil((normalizedCards - 40) / 20)) * 5;
+  return base + densityBuffer;
+}
+
+type PlannedSessionCall = {
+  playlist_track_key: string;
+  call_index: number;
+  ball_number: number;
+  column_letter: BingoColumn;
+  track_title: string;
+  artist_name: string;
+  album_name: string | null;
+  side: string | null;
+  position: string | null;
+};
+
+function hashString(value: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function stableRoundSort<T>(items: T[], seed: string, keyForItem: (item: T) => string): T[] {
+  return [...items]
+    .map((item, index) => ({
+      item,
+      index,
+      sortKey: hashString(`${seed}::${keyForItem(item)}::${index}`),
+    }))
+    .sort((a, b) => {
+      if (a.sortKey !== b.sortKey) return a.sortKey - b.sortKey;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.item);
+}
+
+function getRoundTrackPool(tracks: ResolvedPlaylistTrack[], sessionId: number, roundNumber: number): ResolvedPlaylistTrack[] {
+  const normalizedRound = Math.max(1, Math.floor(roundNumber || 1));
+  const seed = `session:${sessionId}:playlist-order:v1`;
+  const ordered = stableRoundSort(tracks, seed, (track) => track.trackKey);
+  const start = (normalizedRound - 1) * GAME_BALL_COUNT;
+  return ordered.slice(start, start + GAME_BALL_COUNT);
+}
+
+export function planRoundSessionCalls(
+  tracks: ResolvedPlaylistTrack[],
+  sessionId: number,
+  roundNumber: number
+): PlannedSessionCall[] {
+  const normalizedRound = Math.max(1, Math.floor(roundNumber || 1));
+  const roundTracks = getRoundTrackPool(tracks, sessionId, normalizedRound);
+
+  if (roundTracks.length < GAME_BALL_COUNT) {
+    throw new Error(`Playlist must contain at least ${normalizedRound * GAME_BALL_COUNT} tracks to support round ${normalizedRound}.`);
+  }
+
+  const boardSlots = roundTracks.map((track, index) => {
+    const ballNumber = index + 1;
+    return {
+      ballNumber,
+      columnLetter: getColumnLetterForBallNumber(ballNumber),
+      track,
+    };
+  });
+
+  const drawSeed = `session:${sessionId}:round:${normalizedRound}:draw-order:v1`;
+  const drawOrder = stableRoundSort(
+    boardSlots,
+    drawSeed,
+    (slot) => `${slot.track.trackKey}:${slot.ballNumber}`
+  );
+
+  return drawOrder.map((entry, drawIndex) => ({
+    playlist_track_key: entry.track.trackKey,
+    call_index: drawIndex + 1,
+    ball_number: entry.ballNumber,
+    column_letter: entry.columnLetter,
+    track_title: entry.track.trackTitle,
+    artist_name: entry.track.artistName,
+    album_name: entry.track.albumName,
+    side: entry.track.side,
+    position: entry.track.position,
+  }));
+}
 
 function canonicalizeFormatFacet(value: string): string | null {
   const token = value.trim().toLowerCase();
@@ -740,31 +836,23 @@ export async function getPlaylistTrackCount(db: BingoDbClient, playlistId: numbe
 export async function generateSessionCalls(
   db: BingoDbClient,
   sessionId: number,
-  playlistId: number
+  playlistId: number,
+  options?: { roundNumber?: number }
 ): Promise<number> {
+  const roundNumber = options?.roundNumber ?? 1;
   const tracks = await resolvePlaylistTracks(db, playlistId);
 
-  if (tracks.length < GAME_BALL_COUNT) {
-    throw new Error(`Playlist must contain at least ${GAME_BALL_COUNT} tracks for this game mode.`);
-  }
-
-  // 1) Slot the playlist into a standard 75-ball board (B1..O75).
-  // 2) Randomize the draw order (call_index) to simulate ball tumbling.
-  const boardTracks = shuffle(tracks).slice(0, GAME_BALL_COUNT);
-  const boardSlots = boardTracks.map((track, index) => ({ ballNumber: index + 1, track }));
-  const drawOrder = shuffle(boardSlots);
-
-  const rows = drawOrder.map(({ ballNumber, track }, drawIndex) => ({
+  const rows = planRoundSessionCalls(tracks, sessionId, roundNumber).map((entry) => ({
     session_id: sessionId,
-    playlist_track_key: track.trackKey,
-    call_index: drawIndex + 1,
-    ball_number: ballNumber,
-    column_letter: getColumnLetterForBallNumber(ballNumber),
-    track_title: track.trackTitle,
-    artist_name: track.artistName,
-    album_name: track.albumName,
-    side: track.side,
-    position: track.position,
+    playlist_track_key: entry.playlist_track_key,
+    call_index: entry.call_index,
+    ball_number: entry.ball_number,
+    column_letter: entry.column_letter,
+    track_title: entry.track_title,
+    artist_name: entry.artist_name,
+    album_name: entry.album_name,
+    side: entry.side,
+    position: entry.position,
     status: "pending",
   }));
 
@@ -798,8 +886,9 @@ export async function generateCards(
   };
 
   const cards: Array<{ session_id: number; card_number: number; has_free_space: boolean; grid: BingoCardCell[] }> = [];
+  const signatures = new Set<string>();
 
-  for (let cardNum = 1; cardNum <= cardCount; cardNum += 1) {
+  function buildCardGrid(): BingoCardCell[] {
     const picked = {
       B: shuffle(byColumn.B).slice(0, 5),
       I: shuffle(byColumn.I).slice(0, 5),
@@ -840,6 +929,40 @@ export async function generateCards(
         });
       }
     }
+
+    return grid;
+  }
+
+  function buildCardSignature(grid: BingoCardCell[]): string {
+    return grid
+      .filter((cell) => !cell.free)
+      .sort((a, b) => {
+        if (a.row !== b.row) return a.row - b.row;
+        return a.col - b.col;
+      })
+      .map((cell) => `${cell.column_letter}:${cell.call_id ?? 0}`)
+      .join("|");
+  }
+
+  for (let cardNum = 1; cardNum <= cardCount; cardNum += 1) {
+    let grid: BingoCardCell[] = [];
+    let signature = "";
+    let generatedUnique = false;
+
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+      grid = buildCardGrid();
+      signature = buildCardSignature(grid);
+      if (!signatures.has(signature)) {
+        generatedUnique = true;
+        break;
+      }
+    }
+
+    if (!generatedUnique) {
+      throw new Error("Unable to generate enough unique bingo cards for this session. Increase playlist size or reduce card count.");
+    }
+
+    signatures.add(signature);
 
     cards.push({
       session_id: sessionId,

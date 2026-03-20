@@ -27,6 +27,22 @@ type Session = {
   round_count: number;
 };
 
+const GAME_BALL_COUNT = 75;
+
+function computeMinimumPlaylistTracks(roundCount: number, cardCount: number): number {
+  const normalizedRounds = Math.max(1, Math.floor(roundCount || 1));
+  const normalizedCards = Math.max(1, Math.floor(cardCount || 1));
+  const base = GAME_BALL_COUNT * normalizedRounds;
+  const densityBuffer = Math.max(0, Math.ceil((normalizedCards - 40) / 20)) * 5;
+  return base + densityBuffer;
+}
+
+function formatScientific(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "0";
+  if (value < 1_000_000_000) return Math.floor(value).toLocaleString();
+  return value.toExponential(2);
+}
+
 const GAME_MODE_OPTIONS = [
   { value: "single_line", label: "Single Line" },
   { value: "double_line", label: "Double Line" },
@@ -61,7 +77,23 @@ export default function BingoSetupPage() {
   const [sonosDelayMs, setSonosDelayMs] = useState(75);
 
   const [creating, setCreating] = useState(false);
-  const minTracksForMode = 75;
+  const minimumTracksForSetup = useMemo(() => computeMinimumPlaylistTracks(roundCount, cardCount), [roundCount, cardCount]);
+  const selectedPlaylist = useMemo(() => playlists.find((entry) => entry.id === playlistId) ?? null, [playlists, playlistId]);
+  const roundsSupportedByPlaylist = selectedPlaylist ? Math.floor(selectedPlaylist.track_count / GAME_BALL_COUNT) : 0;
+  const effectiveRoundCapacity = Math.min(Math.max(1, roundCount), Math.max(1, roundsSupportedByPlaylist));
+  const isPlaylistEligible = selectedPlaylist ? selectedPlaylist.track_count >= minimumTracksForSetup : false;
+  const perRoundCardCapacityEstimate = useMemo(() => {
+    const choose = (n: number, k: number) => {
+      if (k < 0 || k > n) return 0;
+      let result = 1;
+      for (let i = 1; i <= k; i += 1) {
+        result = (result * (n - (k - i))) / i;
+      }
+      return result;
+    };
+    return choose(15, 5) ** 4 * choose(15, 4);
+  }, []);
+  const estimatedUniqueCardsAcrossRounds = perRoundCardCapacityEstimate * effectiveRoundCapacity;
   const derivedSecondsToNextCall = useMemo(
     () =>
       removeResleeveSeconds +
@@ -152,6 +184,16 @@ export default function BingoSetupPage() {
     }
   };
 
+  const openGameWindow = (url: string, name: string, features: string) => {
+    const opened = window.open(url, name, features);
+    if (opened) {
+      opened.focus();
+      return;
+    }
+    // Popup fallback for stricter browser policies
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   const downloadCards = async (sessionId: number, layout: "2-up" | "4-up") => {
     const res = await fetch(`/api/games/bingo/cards?sessionId=${sessionId}`);
     if (!res.ok) return;
@@ -160,20 +202,22 @@ export default function BingoSetupPage() {
     doc.save(`bingo-${sessionId}-cards-${layout}.pdf`);
   };
 
-  const downloadCallSheet = async (sessionId: number) => {
-    const res = await fetch(`/api/games/bingo/sessions/${sessionId}/calls`);
+  const downloadCallSheet = async (sessionId: number, round?: number) => {
+    const roundSuffix = round ? `?round=${round}` : "";
+    const res = await fetch(`/api/games/bingo/sessions/${sessionId}/calls${roundSuffix}`);
     if (!res.ok) return;
     const payload = await res.json();
-    const doc = generateBingoCallSheetPdf(payload.data ?? [], `Music Bingo Session ${sessionId}`);
-    doc.save(`bingo-${sessionId}-call-sheet.pdf`);
+    const title = round ? `Music Bingo Session ${sessionId} Round ${round}` : `Music Bingo Session ${sessionId}`;
+    const doc = generateBingoCallSheetPdf(payload.data ?? [], title);
+    const filename = round ? `bingo-${sessionId}-round-${round}-call-sheet.pdf` : `bingo-${sessionId}-call-sheet.pdf`;
+    doc.save(filename);
   };
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,#3f130f,transparent_40%),linear-gradient(180deg,#171717,#090909)] p-6 text-stone-100">
       <div className="mx-auto max-w-6xl space-y-6">
         <header className="rounded-3xl border border-amber-900/50 bg-black/45 p-6">
-          <p className="text-xs uppercase tracking-[0.28em] text-amber-300">Dive Bar Console</p>
-          <h1 className="mt-1 text-4xl font-black uppercase text-amber-100">Vinyl Bingo Setup</h1>
+          <h1 className="text-4xl font-black uppercase text-amber-100">Vinyl Bingo Setup</h1>
           <p className="mt-2 text-sm text-stone-300">Music Bingo uses songs instead of numbers: as tracks play, teams mark matching squares, and the first team to complete the winning pattern wins.</p>
           <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="bingo" /></div>
         </header>
@@ -181,8 +225,16 @@ export default function BingoSetupPage() {
         <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-amber-100">Create Session</h2>
           <p className="mt-1 text-xs text-stone-400">
-            Minimum playlist size: <span className="font-semibold text-amber-300">{minTracksForMode}</span> tracks for this game.
+            Minimum playlist size: <span className="font-semibold text-amber-300">{minimumTracksForSetup}</span> tracks for {Math.max(1, roundCount)} round(s) with {Math.max(1, cardCount)} cards.
           </p>
+          <p className="mt-1 text-xs text-stone-400">
+            Estimated unique card layouts available: <span className="font-semibold text-emerald-300">{formatScientific(estimatedUniqueCardsAcrossRounds)}</span> across configured rounds.
+          </p>
+          {selectedPlaylist ? (
+            <p className={`mt-1 text-xs ${selectedPlaylist.track_count >= minimumTracksForSetup ? "text-emerald-300" : "text-rose-300"}`}>
+              Selected playlist has {selectedPlaylist.track_count} tracks and supports up to {roundsSupportedByPlaylist} full round(s) of 75 unique calls.
+            </p>
+          ) : null}
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <label className="text-sm">Event (optional) <InlineFieldHelp label="Event (optional)" />
               <select
@@ -262,7 +314,7 @@ export default function BingoSetupPage() {
             Derived time to next call: <span className="font-semibold text-amber-300">{derivedSecondsToNextCall}s</span> (includes Sonos delay).
           </p>
 
-          <button disabled={!playlistId || creating} onClick={createSession} className="mt-5 rounded bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+          <button disabled={!playlistId || creating || !isPlaylistEligible} onClick={createSession} className="mt-5 rounded bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
             {creating ? "Creating..." : "Create Session"}
           </button>
         </section>
@@ -284,12 +336,21 @@ export default function BingoSetupPage() {
                     <div className="mt-1 text-xs text-stone-400">Event: {session.event_title}</div>
                   ) : null}
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/bingo/host?sessionId=${session.id}`, "bingo_host", "width=1280,height=960,left=0,top=0,noopener,noreferrer")}>Host</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/bingo/assistant?sessionId=${session.id}`, "bingo_assistant", "width=1024,height=800,left=1300,top=0,noopener,noreferrer")}>Assistant</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/bingo/jumbotron?sessionId=${session.id}`, "bingo_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/host?sessionId=${session.id}`, "bingo_host", "width=1280,height=960,left=0,top=0,noopener,noreferrer")}>Host</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/assistant?sessionId=${session.id}`, "bingo_assistant", "width=1024,height=800,left=1300,top=0,noopener,noreferrer")}>Assistant</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/jumbotron?sessionId=${session.id}`, "bingo_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "2-up")}>Cards 2-up</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "4-up")}>Cards 4-up</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCallSheet(session.id)}>Call Sheet</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCallSheet(session.id)}>Call Sheet (Live)</button>
+                    {Array.from({ length: session.round_count }, (_, index) => index + 1).map((round) => (
+                      <button
+                        key={`${session.id}-round-sheet-${round}`}
+                        className="rounded border border-sky-700/70 px-2 py-1 text-sky-200"
+                        onClick={() => downloadCallSheet(session.id, round)}
+                      >
+                        Round {round} Sheet
+                      </button>
+                    ))}
                     <button className="rounded border border-red-800/60 bg-red-950/30 px-2 py-1 text-red-200" onClick={() => deleteSession(session.id, session.session_code)}>Delete</button>
                   </div>
                 </div>

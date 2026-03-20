@@ -73,6 +73,11 @@ export default function BingoAssistantPage() {
     return [...calls].reverse().find((call) => call.status === "called") ?? null;
   }, [calls, session?.current_call_index]);
 
+  const openWindow = (url: string, name: string, features: string) => {
+    const opened = window.open(url, name, features);
+    if (opened) opened.focus();
+  };
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#141414,#090909)] p-6 text-stone-100">
       <div className="mx-auto max-w-6xl space-y-4">
@@ -98,6 +103,24 @@ export default function BingoAssistantPage() {
                 <p className="text-xs text-red-400 font-semibold uppercase">Paused</p>
               )}
             </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+            <button
+              className="rounded border border-stone-600 px-2 py-1"
+              onClick={() => openWindow(`/admin/games/bingo/host?sessionId=${sessionId}`, "bingo_host", "width=1280,height=960,left=0,top=0,noopener,noreferrer")}
+            >
+              Host
+            </button>
+            <button
+              className="rounded border border-stone-600 px-2 py-1"
+              onClick={() => openWindow(`/admin/games/bingo/jumbotron?sessionId=${sessionId}`, "bingo_jumbotron", "width=1920,height=1080,noopener,noreferrer")}
+            >
+              Jumbotron
+            </button>
+            <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open("/admin/games/bingo", "_blank", "noopener,noreferrer")}>
+              Setup
+            </button>
+            <button className="rounded border border-stone-600 px-2 py-1" onClick={() => (window.location.href = "/admin/games")}>Main</button>
           </div>
         </header>
 
