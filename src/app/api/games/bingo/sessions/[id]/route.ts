@@ -177,6 +177,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const body = (await request.json()) as Record<string, unknown>;
 
   const allowedFields = new Set([
+    "event_id",
+    "game_mode",
+    "round_count",
+    "remove_resleeve_seconds",
+    "place_vinyl_seconds",
+    "cue_seconds",
+    "start_slide_seconds",
+    "host_buffer_seconds",
+    "sonos_output_delay_ms",
     "current_round",
     "recent_calls_limit",
     "show_title",

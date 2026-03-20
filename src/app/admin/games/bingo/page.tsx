@@ -18,6 +18,8 @@ type EventRow = {
 };
 type Session = {
   id: number;
+  event_id: number | null;
+  playlist_id: number;
   session_code: string;
   game_mode: string;
   playlist_name: string;
@@ -25,6 +27,44 @@ type Session = {
   status: string;
   current_round: number;
   round_count: number;
+};
+
+type SessionDetail = {
+  id: number;
+  event_id: number | null;
+  playlist_id: number;
+  game_mode: string;
+  round_count: number;
+  remove_resleeve_seconds: number;
+  place_vinyl_seconds: number;
+  cue_seconds: number;
+  start_slide_seconds: number;
+  host_buffer_seconds: number;
+  sonos_output_delay_ms: number;
+  call_reveal_delay_seconds: number;
+  recent_calls_limit: number;
+  show_title: boolean;
+  show_logo: boolean;
+  show_rounds: boolean;
+  show_countdown: boolean;
+};
+
+type EditForm = {
+  event_id: number | null;
+  game_mode: string;
+  round_count: number;
+  remove_resleeve_seconds: number;
+  place_vinyl_seconds: number;
+  cue_seconds: number;
+  start_slide_seconds: number;
+  host_buffer_seconds: number;
+  sonos_output_delay_ms: number;
+  call_reveal_delay_seconds: number;
+  recent_calls_limit: number;
+  show_title: boolean;
+  show_logo: boolean;
+  show_rounds: boolean;
+  show_countdown: boolean;
 };
 
 const GAME_BALL_COUNT = 75;
@@ -94,6 +134,9 @@ export default function BingoSetupPage() {
   const [sonosDelayMs, setSonosDelayMs] = useState(75);
 
   const [creating, setCreating] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<EditForm | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
   const minimumTracksForSetup = useMemo(() => computeMinimumPlaylistTracks(roundCount, cardCount), [roundCount, cardCount]);
   const selectedPlaylist = useMemo(() => playlists.find((entry) => entry.id === playlistId) ?? null, [playlists, playlistId]);
   const roundsSupportedByPlaylist = selectedPlaylist ? Math.floor(selectedPlaylist.track_count / GAME_BALL_COUNT) : 0;
@@ -155,6 +198,70 @@ export default function BingoSetupPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const openEditSession = async (sessionId: number) => {
+    if (editingSessionId === sessionId) {
+      setEditingSessionId(null);
+      setEditForm(null);
+      return;
+    }
+    const res = await fetch(`/api/games/bingo/sessions/${sessionId}`);
+    if (!res.ok) {
+      alert("Failed to load session details");
+      return;
+    }
+    const data = (await res.json()) as SessionDetail;
+    setEditForm({
+      event_id: data.event_id,
+      game_mode: data.game_mode,
+      round_count: data.round_count,
+      remove_resleeve_seconds: data.remove_resleeve_seconds,
+      place_vinyl_seconds: data.place_vinyl_seconds,
+      cue_seconds: data.cue_seconds,
+      start_slide_seconds: data.start_slide_seconds,
+      host_buffer_seconds: data.host_buffer_seconds,
+      sonos_output_delay_ms: data.sonos_output_delay_ms,
+      call_reveal_delay_seconds: data.call_reveal_delay_seconds,
+      recent_calls_limit: data.recent_calls_limit,
+      show_title: data.show_title,
+      show_logo: data.show_logo,
+      show_rounds: data.show_rounds,
+      show_countdown: data.show_countdown,
+    });
+    setEditingSessionId(sessionId);
+  };
+
+  const saveEditSession = async () => {
+    if (!editingSessionId || !editForm) return;
+    setEditSaving(true);
+    try {
+      const derivedSeconds =
+        editForm.remove_resleeve_seconds +
+        editForm.place_vinyl_seconds +
+        editForm.cue_seconds +
+        editForm.start_slide_seconds +
+        editForm.host_buffer_seconds +
+        Math.ceil(editForm.sonos_output_delay_ms / 1000);
+      const res = await fetch(`/api/games/bingo/sessions/${editingSessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...editForm,
+          seconds_to_next_call: derivedSeconds,
+        }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        alert((payload as { error?: string }).error ?? "Failed to save session");
+        return;
+      }
+      setEditingSessionId(null);
+      setEditForm(null);
+      await load();
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   const deleteSession = async (sessionId: number, code: string) => {
     if (!confirm(`Delete session ${code}? This cannot be undone.`)) return;
@@ -222,7 +329,11 @@ export default function BingoSetupPage() {
   const downloadCallSheet = async (sessionId: number, round?: number) => {
     const roundSuffix = round ? `?round=${round}` : "";
     const res = await fetch(`/api/games/bingo/sessions/${sessionId}/calls${roundSuffix}`);
-    if (!res.ok) return;
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}));
+      alert((payload as { error?: string }).error ?? "Failed to download call sheet");
+      return;
+    }
     const payload = await res.json();
     const title = round ? `Music Bingo Session ${sessionId} Round ${round}` : `Music Bingo Session ${sessionId}`;
     const doc = generateBingoCallSheetPdf(payload.data ?? [], title);
@@ -368,8 +479,177 @@ export default function BingoSetupPage() {
                         Round {round} Sheet
                       </button>
                     ))}
+                    <button
+                      className={`rounded border px-2 py-1 ${editingSessionId === session.id ? "border-amber-600 bg-amber-950/40 text-amber-200" : "border-stone-600 text-stone-200"}`}
+                      onClick={() => openEditSession(session.id)}
+                    >
+                      {editingSessionId === session.id ? "Cancel Edit" : "Edit"}
+                    </button>
                     <button className="rounded border border-red-800/60 bg-red-950/30 px-2 py-1 text-red-200" onClick={() => deleteSession(session.id, session.session_code)}>Delete</button>
                   </div>
+
+                  {editingSessionId === session.id && editForm ? (
+                    <div className="mt-4 border-t border-stone-700 pt-4">
+                      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-amber-300">Edit Session Settings</p>
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-xs">
+                        <label className="flex flex-col gap-1">
+                          <span className="text-stone-400">Event</span>
+                          <select
+                            className="rounded border border-stone-700 bg-stone-900 px-2 py-1"
+                            value={editForm.event_id ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, event_id: Number(e.target.value) || null })}
+                          >
+                            <option value="">No linked event</option>
+                            {events.map((ev) => (
+                              <option key={ev.id} value={ev.id}>{ev.date} — {ev.title}</option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="flex flex-col gap-1">
+                          <span className="text-stone-400">Game Mode</span>
+                          <select
+                            className="rounded border border-stone-700 bg-stone-900 px-2 py-1"
+                            value={editForm.game_mode}
+                            onChange={(e) => setEditForm({ ...editForm, game_mode: e.target.value })}
+                          >
+                            {GAME_MODE_OPTIONS.map((m) => (
+                              <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="flex flex-col gap-1">
+                          <span className="text-stone-400">Round Count</span>
+                          <input
+                            type="number" min={1}
+                            className="rounded border border-stone-700 bg-stone-900 px-2 py-1"
+                            value={editForm.round_count}
+                            onChange={(e) => setEditForm({ ...editForm, round_count: Math.max(1, Number(e.target.value) || 1) })}
+                          />
+                        </label>
+
+                        <label className="flex flex-col gap-1">
+                          <span className="text-stone-400">Remove + Resleeve (sec)</span>
+                          <input
+                            type="number" min={0}
+                            className="rounded border border-stone-700 bg-stone-900 px-2 py-1"
+                            value={editForm.remove_resleeve_seconds}
+                            onChange={(e) => setEditForm({ ...editForm, remove_resleeve_seconds: Math.max(0, Number(e.target.value) || 0) })}
+                          />
+                        </label>
+
+                        <label className="flex flex-col gap-1">
+                          <span className="text-stone-400">Place New Vinyl (sec)</span>
+                          <input
+                            type="number" min={0}
+                            className="rounded border border-stone-700 bg-stone-900 px-2 py-1"
+                            value={editForm.place_vinyl_seconds}
+                            onChange={(e) => setEditForm({ ...editForm, place_vinyl_seconds: Math.max(0, Number(e.target.value) || 0) })}
+                          />
+                        </label>
+
+                        <label className="flex flex-col gap-1">
+                          <span className="text-stone-400">Cue Track (sec)</span>
+                          <input
+                            type="number" min={0}
+                            className="rounded border border-stone-700 bg-stone-900 px-2 py-1"
+                            value={editForm.cue_seconds}
+                            onChange={(e) => setEditForm({ ...editForm, cue_seconds: Math.max(0, Number(e.target.value) || 0) })}
+                          />
+                        </label>
+
+                        <label className="flex flex-col gap-1">
+                          <span className="text-stone-400">Press Start + Slide (sec)</span>
+                          <input
+                            type="number" min={0}
+                            className="rounded border border-stone-700 bg-stone-900 px-2 py-1"
+                            value={editForm.start_slide_seconds}
+                            onChange={(e) => setEditForm({ ...editForm, start_slide_seconds: Math.max(0, Number(e.target.value) || 0) })}
+                          />
+                        </label>
+
+                        <label className="flex flex-col gap-1">
+                          <span className="text-stone-400">Host Buffer (sec)</span>
+                          <input
+                            type="number" min={0}
+                            className="rounded border border-stone-700 bg-stone-900 px-2 py-1"
+                            value={editForm.host_buffer_seconds}
+                            onChange={(e) => setEditForm({ ...editForm, host_buffer_seconds: Math.max(0, Number(e.target.value) || 0) })}
+                          />
+                        </label>
+
+                        <label className="flex flex-col gap-1">
+                          <span className="text-stone-400">Sonos Output Delay (ms)</span>
+                          <input
+                            type="number" min={0}
+                            className="rounded border border-stone-700 bg-stone-900 px-2 py-1"
+                            value={editForm.sonos_output_delay_ms}
+                            onChange={(e) => setEditForm({ ...editForm, sonos_output_delay_ms: Math.max(0, Number(e.target.value) || 0) })}
+                          />
+                        </label>
+
+                        <label className="flex flex-col gap-1">
+                          <span className="text-stone-400">Call Reveal Delay (sec)</span>
+                          <input
+                            type="number" min={0} max={15}
+                            className="rounded border border-stone-700 bg-stone-900 px-2 py-1"
+                            value={editForm.call_reveal_delay_seconds}
+                            onChange={(e) => setEditForm({ ...editForm, call_reveal_delay_seconds: Math.max(0, Math.min(15, Number(e.target.value) || 0)) })}
+                          />
+                        </label>
+
+                        <label className="flex flex-col gap-1">
+                          <span className="text-stone-400">Recent Calls Limit</span>
+                          <input
+                            type="number" min={1} max={20}
+                            className="rounded border border-stone-700 bg-stone-900 px-2 py-1"
+                            value={editForm.recent_calls_limit}
+                            onChange={(e) => setEditForm({ ...editForm, recent_calls_limit: Math.max(1, Math.min(20, Number(e.target.value) || 5)) })}
+                          />
+                        </label>
+
+                        <div className="flex flex-col gap-1">
+                          <span className="text-stone-400">Jumbotron Display</span>
+                          <div className="flex flex-wrap gap-3">
+                            {(["show_title", "show_logo", "show_rounds", "show_countdown"] as const).map((key) => (
+                              <label key={key} className="flex items-center gap-1 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={editForm[key]}
+                                  onChange={(e) => setEditForm({ ...editForm, [key]: e.target.checked })}
+                                />
+                                <span className="capitalize">{key.replace("show_", "")}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <p className="mt-2 text-xs text-stone-500">
+                        Derived time to next call:{" "}
+                        <span className="text-amber-300 font-semibold">
+                          {editForm.remove_resleeve_seconds + editForm.place_vinyl_seconds + editForm.cue_seconds + editForm.start_slide_seconds + editForm.host_buffer_seconds + Math.ceil(editForm.sonos_output_delay_ms / 1000)}s
+                        </span>
+                      </p>
+
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={saveEditSession}
+                          disabled={editSaving}
+                          className="rounded bg-amber-700 px-3 py-1 text-xs font-bold text-white hover:bg-amber-600 disabled:opacity-50"
+                        >
+                          {editSaving ? "Saving…" : "Save Changes"}
+                        </button>
+                        <button
+                          onClick={() => { setEditingSessionId(null); setEditForm(null); }}
+                          className="rounded border border-stone-600 px-3 py-1 text-xs text-stone-300"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>

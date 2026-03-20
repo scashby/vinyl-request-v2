@@ -42,30 +42,38 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: `Round must be between 1 and ${roundCount}` }, { status: 400 });
     }
 
-    const playlistId = Number(typedSession.playlist_id);
-    const tracks = await resolvePlaylistTracks(db, playlistId);
-    const rows = planRoundSessionCalls(tracks, sessionId, requestedRound).map((call, index) => ({
-      id: -(index + 1),
-      session_id: sessionId,
-      playlist_track_key: call.playlist_track_key,
-      call_index: call.call_index,
-      ball_number: call.ball_number,
-      column_letter: call.column_letter,
-      track_title: call.track_title,
-      artist_name: call.artist_name,
-      album_name: call.album_name,
-      side: call.side,
-      position: call.position,
-      metadata_locked: false,
-      metadata_synced_at: null,
-      status: "pending",
-      prep_started_at: null,
-      called_at: null,
-      completed_at: null,
-      created_at: new Date(0).toISOString(),
-    }));
+    if (!typedSession.playlist_id) {
+      return NextResponse.json({ error: "Session playlist has been deleted and cannot generate a round sheet." }, { status: 400 });
+    }
 
-    return NextResponse.json({ data: rows }, { status: 200 });
+    try {
+      const playlistId = Number(typedSession.playlist_id);
+      const tracks = await resolvePlaylistTracks(db, playlistId);
+      const rows = planRoundSessionCalls(tracks, sessionId, requestedRound).map((call, index) => ({
+        id: -(index + 1),
+        session_id: sessionId,
+        playlist_track_key: call.playlist_track_key,
+        call_index: call.call_index,
+        ball_number: call.ball_number,
+        column_letter: call.column_letter,
+        track_title: call.track_title,
+        artist_name: call.artist_name,
+        album_name: call.album_name,
+        side: call.side,
+        position: call.position,
+        metadata_locked: false,
+        metadata_synced_at: null,
+        status: "pending",
+        prep_started_at: null,
+        called_at: null,
+        completed_at: null,
+        created_at: new Date(0).toISOString(),
+      }));
+      return NextResponse.json({ data: rows }, { status: 200 });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to generate round call sheet";
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
   }
 
   try {
