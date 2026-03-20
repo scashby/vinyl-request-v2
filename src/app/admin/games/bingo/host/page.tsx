@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { formatBallLabel, getBingoColumnTextClass } from "src/lib/bingoBall";
 import InlineEditableCell from "../../_components/InlineEditableCell";
@@ -16,6 +15,11 @@ type Session = {
   round_count: number;
   status: string;
   transport_queue_call_ids?: number[];
+  seconds_to_next_call: number;
+  call_reveal_delay_seconds: number;
+  next_game_scheduled_at: string | null;
+  next_game_rules_text: string | null;
+  bingo_overlay: string;
 };
 
 type Call = BingoTransportCall & {
@@ -30,6 +34,14 @@ export default function BingoHostPage() {
 
   const [session, setSession] = useState<Session | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
+  const [remaining, setRemaining] = useState(0);
+  const [revealDelayInput, setRevealDelayInput] = useState<number>(3);
+  const [scheduleInput, setScheduleInput] = useState("");
+  const [rulesInput, setRulesInput] = useState("");
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [savingOverlay, setSavingOverlay] = useState(false);
+  const [syncedSessionId, setSyncedSessionId] = useState<number | null>(null);
+  const currentCallRowRef = useRef<HTMLTableRowElement>(null);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -44,6 +56,37 @@ export default function BingoHostPage() {
       setCalls(payload.data ?? []);
     }
   }, [sessionId]);
+
+  // Sync form inputs from session data once per session id
+  useEffect(() => {
+    if (!session || session.id === syncedSessionId) return;
+    setSyncedSessionId(session.id);
+    setRevealDelayInput(session.call_reveal_delay_seconds ?? 3);
+    setRulesInput(session.next_game_rules_text ?? "");
+    if (session.next_game_scheduled_at) {
+      const d = new Date(session.next_game_scheduled_at);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      setScheduleInput(
+        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+      );
+    }
+  }, [session, syncedSessionId]);
+
+  // Sync remaining from poll
+  useEffect(() => {
+    if (session?.seconds_to_next_call != null) {
+      setRemaining(session.seconds_to_next_call);
+    }
+  }, [session?.seconds_to_next_call]);
+
+  // Countdown tick
+  useEffect(() => {
+    const tick = setInterval(() => {
+      if (!session || session.status === "paused") return;
+      setRemaining((v) => Math.max(0, v - 1));
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [session]);
 
   useEffect(() => {
     load();
@@ -60,12 +103,17 @@ export default function BingoHostPage() {
   );
 
   const currentCall = useMemo(() => {
-    const byCurrentIndex = calls.find((call) => call.call_index === (session?.current_call_index ?? 0) && call.status === "called");
+    const byCurrentIndex = calls.find(
+      (call) => call.call_index === (session?.current_call_index ?? 0) && call.status === "called"
+    );
     if (byCurrentIndex) return byCurrentIndex;
     return [...calls].reverse().find((call) => call.status === "called") ?? null;
   }, [calls, session?.current_call_index]);
 
-  const previous = useMemo(() => called.slice(Math.max(0, called.length - 5), called.length - 1), [called]);
+  // Auto-scroll current call row into view
+  useEffect(() => {
+    currentCallRowRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [currentCall?.id]);
 
   const pause = async () => {
     await fetch(`/api/games/bingo/sessions/${sessionId}/pause`, { method: "POST" });
@@ -84,6 +132,53 @@ export default function BingoHostPage() {
 
   const replace = async () => {
     await fetch(`/api/games/bingo/sessions/${sessionId}/replace`, { method: "POST" });
+    load();
+  };
+
+  const saveRevealDelay = async () => {
+    await fetch(`/api/games/bingo/sessions/${sessionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ call_reveal_delay_seconds: revealDelayInput }),
+    });
+    load();
+  };
+
+  const saveSchedule = async () => {
+    setSavingSchedule(true);
+    await fetch(`/api/games/bingo/sessions/${sessionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        next_game_scheduled_at: scheduleInput ? new Date(scheduleInput).toISOString() : null,
+        next_game_rules_text: rulesInput || null,
+      }),
+    });
+    setSavingSchedule(false);
+    load();
+  };
+
+  const clearSchedule = async () => {
+    setSavingSchedule(true);
+    setScheduleInput("");
+    setRulesInput("");
+    await fetch(`/api/games/bingo/sessions/${sessionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ next_game_scheduled_at: null, next_game_rules_text: null }),
+    });
+    setSavingSchedule(false);
+    load();
+  };
+
+  const setOverlay = async (overlay: "none" | "pending" | "winner") => {
+    setSavingOverlay(true);
+    await fetch(`/api/games/bingo/sessions/${sessionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bingo_overlay: overlay }),
+    });
+    setSavingOverlay(false);
     load();
   };
 
@@ -115,34 +210,28 @@ export default function BingoHostPage() {
               <p className="text-xs uppercase tracking-[0.25em] text-amber-300">Host Console</p>
               <h1 className="text-3xl font-black uppercase">Music Bingo Host</h1>
               <p className="text-sm text-stone-400">
-                {session?.playlist_name} · {session?.session_code} · Round {session?.current_round} of {session?.round_count}
+                {session?.playlist_name} · {session?.session_code} · Round {session?.current_round} of{" "}
+                {session?.round_count}
               </p>
             </div>
-            <div className="flex flex-wrap gap-2 text-xs">
-              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/bingo/assistant?sessionId=${sessionId}`}>
-                Assistant
-              </Link>
-              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/bingo/jumbotron?sessionId=${sessionId}`}>
-                Jumbotron
-              </Link>
-              <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/bingo/history">
-                History
-              </Link>
-            </div>
+            <span className="rounded border border-stone-700 px-2 py-1 text-xs text-stone-400 capitalize">
+              {session?.status ?? "—"}
+            </span>
           </div>
         </header>
 
         <div className="grid gap-4 lg:grid-cols-[1.3fr,1fr]">
+          {/* LEFT: Scrollable call crate */}
           <section className="rounded-2xl border border-stone-700 bg-black/50 p-4">
             <h2 className="text-sm font-bold uppercase tracking-wide text-amber-200">Crate (Call Order)</h2>
-            <div className="mt-3 overflow-x-auto">
+            <div className="mt-3 overflow-x-auto overflow-y-auto max-h-[65vh]">
               <table className="w-full text-left text-xs">
-                <thead>
+                <thead className="sticky top-0 bg-[#111] z-10">
                   <tr className="text-stone-300">
-                    <th className="pb-2">Draw</th>
-                    <th className="pb-2">Ball</th>
-                    <th className="pb-2">Track</th>
-                    <th className="pb-2">Artist</th>
+                    <th className="pb-2 pr-2">Draw</th>
+                    <th className="pb-2 pr-2">Ball</th>
+                    <th className="pb-2 pr-2">Track</th>
+                    <th className="pb-2 pr-2">Artist</th>
                     <th className="pb-2">Album</th>
                   </tr>
                 </thead>
@@ -150,18 +239,32 @@ export default function BingoHostPage() {
                   {calls.map((call) => {
                     const ballLabel = formatBallLabel(call.ball_number, call.column_letter);
                     const ballToneClass = getBingoColumnTextClass(call.column_letter, call.ball_number);
+                    const isCurrent = call.id === currentCall?.id;
+                    const isDone = call.status === "completed" || call.status === "skipped";
 
                     return (
-                      <tr key={call.id} className="border-t border-stone-800 align-top">
-                        <td className="py-2 text-stone-400">{call.call_index}</td>
-                        <td className={`py-2 font-bold ${ballToneClass}`}>{ballLabel}</td>
-                        <td className="py-1">
+                      <tr
+                        key={call.id}
+                        ref={isCurrent ? currentCallRowRef : undefined}
+                        className={`border-t border-stone-800 align-top transition-colors ${
+                          isCurrent
+                            ? "bg-amber-900/30 ring-1 ring-inset ring-amber-500/60"
+                            : isDone
+                            ? "opacity-40"
+                            : ""
+                        }`}
+                      >
+                        <td className="py-2 pr-2 text-stone-400">{call.call_index}</td>
+                        <td className={`py-2 pr-2 font-bold ${ballToneClass} ${isDone ? "line-through" : ""}`}>
+                          {ballLabel}
+                        </td>
+                        <td className="py-1 pr-2">
                           <InlineEditableCell
                             onSave={(nextValue) => patchCallMetadata(call.id, { track_title: nextValue })}
                             value={call.track_title}
                           />
                         </td>
-                        <td className="py-1">
+                        <td className="py-1 pr-2">
                           <InlineEditableCell
                             onSave={(nextValue) => patchCallMetadata(call.id, { artist_name: nextValue })}
                             value={call.artist_name}
@@ -179,76 +282,132 @@ export default function BingoHostPage() {
                 </tbody>
               </table>
             </div>
+            <p className="mt-2 text-[11px] text-stone-500">
+              Click Track / Artist / Album to edit inline. Press Enter to save. Current call highlighted in amber.
+            </p>
           </section>
 
+          {/* RIGHT: Timer + Controls */}
           <section className="space-y-4">
+            {/* Timer */}
+            <div className="rounded-2xl border border-stone-700 bg-black/50 p-4">
+              <p className="text-xs uppercase text-amber-300">Time Until Next Call</p>
+              <p
+                className={`mt-1 text-5xl font-black leading-none tabular-nums ${
+                  remaining <= 10 ? "text-red-400" : remaining <= 20 ? "text-amber-400" : "text-emerald-400"
+                }`}
+              >
+                {remaining}s
+              </p>
+              {session?.status === "paused" && (
+                <p className="mt-1 text-xs font-semibold text-red-400 uppercase tracking-wide">Paused</p>
+              )}
+            </div>
+
+            {/* Session Controls */}
             <div className="rounded-2xl border border-stone-700 bg-black/50 p-4">
               <p className="text-xs uppercase text-amber-300">Session Controls</p>
               <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                <button onClick={pause} className="rounded border border-stone-600 px-2 py-1">
-                  Pause
+                <button onClick={pause} className="rounded border border-stone-600 px-2 py-1 hover:border-stone-400">Pause</button>
+                <button onClick={resume} className="rounded border border-stone-600 px-2 py-1 hover:border-stone-400">Resume</button>
+                <button onClick={skip} className="rounded border border-stone-600 px-2 py-1 hover:border-stone-400">Skip</button>
+                <button onClick={replace} className="rounded border border-stone-600 px-2 py-1 hover:border-stone-400">Replace with Next</button>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                <label className="text-stone-400 whitespace-nowrap">Reveal Delay</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={15}
+                  value={revealDelayInput}
+                  onChange={(e) => setRevealDelayInput(Math.max(0, Math.min(15, Number(e.target.value) || 0)))}
+                  className="w-16 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
+                />
+                <span className="text-stone-500">s</span>
+                <button
+                  onClick={saveRevealDelay}
+                  className="rounded border border-amber-700 px-2 py-1 text-amber-300 hover:bg-amber-900/30"
+                >
+                  Save
                 </button>
-                <button onClick={resume} className="rounded border border-stone-600 px-2 py-1">
-                  Resume
+                <span className="text-stone-600">delay before jumbotron reveals call</span>
+              </div>
+            </div>
+
+            {/* Bingo Overlay */}
+            <div className="rounded-2xl border border-stone-700 bg-black/50 p-4">
+              <p className="text-xs uppercase text-amber-300">Bingo Overlay</p>
+              <p className="mt-1 text-xs text-stone-500">
+                Active: <span className="font-semibold text-stone-300 capitalize">{session?.bingo_overlay ?? "none"}</span>
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                <button
+                  onClick={() => setOverlay("pending")}
+                  disabled={savingOverlay}
+                  className="rounded border border-yellow-700 bg-yellow-900/30 px-3 py-1.5 font-bold text-yellow-200 hover:bg-yellow-900/60 disabled:opacity-50"
+                >
+                  Bingo Pending
                 </button>
-                <button onClick={skip} className="rounded border border-stone-600 px-2 py-1">
-                  Skip
+                <button
+                  onClick={() => setOverlay("winner")}
+                  disabled={savingOverlay}
+                  className="rounded border border-emerald-700 bg-emerald-900/30 px-3 py-1.5 font-bold text-emerald-200 hover:bg-emerald-900/60 disabled:opacity-50"
+                >
+                  Bingo Winner!
                 </button>
-                <button onClick={replace} className="rounded border border-stone-600 px-2 py-1">
-                  Replace with Next
+                <button
+                  onClick={() => setOverlay("none")}
+                  disabled={savingOverlay}
+                  className="rounded border border-stone-600 px-3 py-1.5 text-stone-300 hover:border-stone-400 disabled:opacity-50"
+                >
+                  Clear Overlay
                 </button>
               </div>
             </div>
 
+            {/* Schedule Next Game */}
             <div className="rounded-2xl border border-stone-700 bg-black/50 p-4">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-amber-200">Call Card</h2>
-              <div className="mt-3 rounded border border-red-700/50 bg-red-950/30 p-3">
-                <p className="text-xs uppercase text-red-300">Current</p>
-                <p className="text-lg font-black">
-                  {currentCall ? (
-                    <>
-                      <span className={getBingoColumnTextClass(currentCall.column_letter, currentCall.ball_number)}>
-                        {formatBallLabel(currentCall.ball_number, currentCall.column_letter)}
-                      </span>{" "}
-                      - {currentCall.track_title}
-                    </>
-                  ) : (
-                    "No call yet"
-                  )}
-                </p>
-                <p className="text-sm text-stone-300">{currentCall ? `${currentCall.artist_name} · ${currentCall.album_name ?? ""}` : ""}</p>
-              </div>
-              <div className="mt-3 text-xs">
-                <p className="font-semibold text-stone-300">Previous Calls</p>
-                <ul className="mt-1 space-y-1 text-stone-400">
-                  {previous.map((call) => {
-                    const ballLabel = formatBallLabel(call.ball_number, call.column_letter);
-                    const ballToneClass = getBingoColumnTextClass(call.column_letter, call.ball_number);
-                    return (
-                      <li key={call.id}>
-                        <span className={ballToneClass}>{ballLabel}</span> - {call.track_title}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-              <div className="mt-3 text-xs">
-                <p className="font-semibold text-stone-300">Full Called Order</p>
-                <div className="mt-1 max-h-24 overflow-auto text-stone-400">
-                  {called.map((call) => {
-                    const ballLabel = formatBallLabel(call.ball_number, call.column_letter);
-                    const ballToneClass = getBingoColumnTextClass(call.column_letter, call.ball_number);
-                    return (
-                      <div key={call.id}>
-                        {call.call_index}. <span className={ballToneClass}>{ballLabel}</span> - {call.track_title}
-                      </div>
-                    );
-                  })}
+              <p className="text-xs uppercase text-amber-300">Schedule Next Game</p>
+              <p className="mt-1 text-xs text-stone-500">
+                Displays a countdown + rules on the jumbotron when the session is pending.
+              </p>
+              <div className="mt-3 space-y-2 text-xs">
+                <label className="block text-stone-400">
+                  Start Time
+                  <input
+                    type="datetime-local"
+                    value={scheduleInput}
+                    onChange={(e) => setScheduleInput(e.target.value)}
+                    className="mt-1 block w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-stone-200"
+                  />
+                </label>
+                <label className="block text-stone-400">
+                  Rules / How to Play
+                  <textarea
+                    rows={3}
+                    value={rulesInput}
+                    onChange={(e) => setRulesInput(e.target.value)}
+                    placeholder="See a staff member for a bingo card. Any five in a row wins!"
+                    className="mt-1 block w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-stone-200 placeholder:text-stone-600 resize-none"
+                  />
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={saveSchedule}
+                    disabled={savingSchedule || !scheduleInput}
+                    className="rounded border border-amber-700 px-3 py-1 text-amber-300 hover:bg-amber-900/30 disabled:opacity-50"
+                  >
+                    {savingSchedule ? "Saving..." : "Save Schedule"}
+                  </button>
+                  <button
+                    onClick={clearSchedule}
+                    disabled={savingSchedule}
+                    className="rounded border border-stone-600 px-3 py-1 text-stone-400 hover:border-stone-400 disabled:opacity-50"
+                  >
+                    Clear
+                  </button>
                 </div>
               </div>
-              <p className="mt-1 text-[11px] text-stone-500">
-                Click Track/Artist/Album in Crate to edit inline. Press Enter to save.
-              </p>
             </div>
 
             <BingoTransportLane

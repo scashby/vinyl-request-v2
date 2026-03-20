@@ -16,6 +16,7 @@ type SessionRow = {
   id: number;
   current_call_index: number;
   started_at: string | null;
+  call_reveal_delay_seconds: number;
 };
 
 type CallRow = {
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const db = getBingoDb();
   const { data: session, error: sessionError } = await db
     .from("bingo_sessions")
-    .select("id, current_call_index, started_at")
+    .select("id, current_call_index, started_at, call_reveal_delay_seconds")
     .eq("id", sessionId)
     .maybeSingle();
 
@@ -238,6 +239,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .eq("id", typedTarget.id);
   if (callError) return NextResponse.json({ error: callError.message }, { status: 500 });
 
+  const revealDelay = typedSession.call_reveal_delay_seconds ?? 0;
+  const revealAt = revealDelay > 0
+    ? new Date(Date.now() + revealDelay * 1000).toISOString()
+    : now;
+
   const { error: sessionUpdateError } = await db
     .from("bingo_sessions")
     .update({
@@ -247,6 +253,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       paused_at: null,
       paused_remaining_seconds: null,
       started_at: typedSession.started_at ?? now,
+      call_reveal_at: revealAt,
     })
     .eq("id", sessionId);
   if (sessionUpdateError) return NextResponse.json({ error: sessionUpdateError.message }, { status: 500 });

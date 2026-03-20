@@ -1,0 +1,25 @@
+<!-- Bingo Pending: spinning vinyl record placeholder.
+     Replace this file with a real asset — dimensions and filename stay the same. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" aria-label="Bingo pending — verifying winner">
+  <style>
+    .spin { animation: spin 2s linear infinite; transform-origin: 100px 100px; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  </style>
+  <g class="spin">
+    <!-- Outer record body -->
+    <circle cx="100" cy="100" r="95" fill="#1a1a1a" stroke="#444" stroke-width="2"/>
+    <!-- Groove rings -->
+    <circle cx="100" cy="100" r="85" fill="none" stroke="#2a2a2a" stroke-width="1.5"/>
+    <circle cx="100" cy="100" r="75" fill="none" stroke="#2a2a2a" stroke-width="1.5"/>
+    <circle cx="100" cy="100" r="65" fill="none" stroke="#2a2a2a" stroke-width="1.5"/>
+    <circle cx="100" cy="100" r="55" fill="none" stroke="#2a2a2a" stroke-width="1.5"/>
+    <circle cx="100" cy="100" r="45" fill="none" stroke="#2a2a2a" stroke-width="1.5"/>
+    <!-- Label -->
+    <circle cx="100" cy="100" r="30" fill="#d97706"/>
+    <!-- Center hole -->
+    <circle cx="100" cy="100" r="4" fill="#0a0a0a"/>
+    <!-- Label text -->
+    <text x="100" y="96" text-anchor="middle" font-family="sans-serif" font-size="7" font-weight="bold" fill="#1a1a1a">BINGO</text>
+    <text x="100" y="107" text-anchor="middle" font-family="sans-serif" font-size="6" fill="#1a1a1a">PENDING</text>
+  </g>
+</svg>

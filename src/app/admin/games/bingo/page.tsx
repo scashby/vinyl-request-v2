@@ -284,9 +284,9 @@ export default function BingoSetupPage() {
                     <div className="mt-1 text-xs text-stone-400">Event: {session.event_title}</div>
                   ) : null}
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/bingo/host?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Host</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/bingo/assistant?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Assistant</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/bingo/jumbotron?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Jumbotron</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/bingo/host?sessionId=${session.id}`, "bingo_host", "width=1280,height=960,left=0,top=0,noopener,noreferrer")}>Host</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/bingo/assistant?sessionId=${session.id}`, "bingo_assistant", "width=1024,height=800,left=1300,top=0,noopener,noreferrer")}>Assistant</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/bingo/jumbotron?sessionId=${session.id}`, "bingo_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "2-up")}>Cards 2-up</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "4-up")}>Cards 4-up</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCallSheet(session.id)}>Call Sheet</button>

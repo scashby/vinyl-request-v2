@@ -11,7 +11,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const db = getBingoDb();
   const { data: session } = await db
     .from("bingo_sessions")
-    .select("id, current_call_index, started_at")
+    .select("id, current_call_index, started_at, call_reveal_delay_seconds")
     .eq("id", sessionId)
     .maybeSingle();
 
@@ -45,6 +45,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!replacement) return NextResponse.json({ error: "No replacement call available" }, { status: 409 });
 
   const now = new Date().toISOString();
+  const revealDelay = (session.call_reveal_delay_seconds as number | null) ?? 0;
+  const revealAt = revealDelay > 0
+    ? new Date(Date.now() + revealDelay * 1000).toISOString()
+    : now;
+
   await db.from("bingo_session_calls").update({ status: "called", called_at: now }).eq("id", replacement.id);
   await db
     .from("bingo_sessions")
@@ -55,6 +60,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       paused_remaining_seconds: null,
       status: "running",
       started_at: session.started_at ?? now,
+      call_reveal_at: revealAt,
     })
     .eq("id", sessionId);
 

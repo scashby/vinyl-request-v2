@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { formatBallLabel, getBingoColumnTextClass } from "src/lib/bingoBall";
@@ -13,6 +12,8 @@ type Session = {
   current_round: number;
   round_count: number;
   transport_queue_call_ids?: number[];
+  status: string;
+  seconds_to_next_call: number;
 };
 type Call = BingoTransportCall;
 
@@ -20,6 +21,8 @@ export default function BingoAssistantPage() {
   const sessionId = Number(useSearchParams().get("sessionId"));
   const [session, setSession] = useState<Session | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
+
+  const [remaining, setRemaining] = useState(0);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -33,6 +36,22 @@ export default function BingoAssistantPage() {
       setCalls(payload.data ?? []);
     }
   }, [sessionId]);
+
+  // Sync remaining from poll
+  useEffect(() => {
+    if (session?.seconds_to_next_call != null) {
+      setRemaining(session.seconds_to_next_call);
+    }
+  }, [session?.seconds_to_next_call]);
+
+  // Countdown tick
+  useEffect(() => {
+    const tick = setInterval(() => {
+      if (!session || session.status === "paused") return;
+      setRemaining((v) => Math.max(0, v - 1));
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [session]);
 
   useEffect(() => {
     load();
@@ -66,9 +85,19 @@ export default function BingoAssistantPage() {
                 {session?.playlist_name} · {session?.session_code} · Round {session?.current_round} of {session?.round_count}
               </p>
             </div>
-            <Link href={`/admin/games/bingo/host?sessionId=${sessionId}`} className="rounded border border-stone-700 px-3 py-1 text-xs">
-              Back to Host
-            </Link>
+            <div className="text-right">
+              <p className="text-xs text-stone-500 uppercase">Next Call In</p>
+              <p
+                className={`text-3xl font-black tabular-nums ${
+                  remaining <= 10 ? "text-red-400" : remaining <= 20 ? "text-amber-400" : "text-cyan-300"
+                }`}
+              >
+                {remaining}s
+              </p>
+              {session?.status === "paused" && (
+                <p className="text-xs text-red-400 font-semibold uppercase">Paused</p>
+              )}
+            </div>
           </div>
         </header>
 

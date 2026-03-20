@@ -13,6 +13,10 @@ function RequireAuth({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Game display windows (host/assistant/jumbotron) should render without the
+  // admin shell — no sidebar, no hamburger, no content offset margin.
+  const isGameDisplay = /\/admin\/games\/bingo\/(host|assistant|jumbotron)(\?|$)/.test(pathname);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsLoading(false);
@@ -43,6 +47,11 @@ function RequireAuth({ children }: { children: ReactNode }) {
   }
 
   if (!isLoginPage && session === null) return null;
+
+  // Game display windows render without admin chrome
+  if (isGameDisplay) {
+    return <div className="min-h-screen">{children}</div>;
+  }
 
   return (
     <div className="relative min-h-screen bg-white text-gray-900">

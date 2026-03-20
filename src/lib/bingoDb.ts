@@ -218,6 +218,11 @@ export type BingoDatabase = {
           created_at: string;
           started_at: string | null;
           ended_at: string | null;
+          next_game_scheduled_at: string | null;
+          next_game_rules_text: string | null;
+          call_reveal_delay_seconds: number;
+          call_reveal_at: string | null;
+          bingo_overlay: string;
         };
         Insert: {
           id?: number;
@@ -253,6 +258,11 @@ export type BingoDatabase = {
           created_at?: string;
           started_at?: string | null;
           ended_at?: string | null;
+          next_game_scheduled_at?: string | null;
+          next_game_rules_text?: string | null;
+          call_reveal_delay_seconds?: number;
+          call_reveal_at?: string | null;
+          bingo_overlay?: string;
         };
         Update: {
           id?: number;
@@ -288,6 +298,11 @@ export type BingoDatabase = {
           created_at?: string;
           started_at?: string | null;
           ended_at?: string | null;
+          next_game_scheduled_at?: string | null;
+          next_game_rules_text?: string | null;
+          call_reveal_delay_seconds?: number;
+          call_reveal_at?: string | null;
+          bingo_overlay?: string;
         };
         Relationships: [];
       };
