@@ -59,6 +59,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Session call rows are not initialized for round activation" }, { status: 400 });
   }
 
+  // First pass: move rows to a temporary safe state to avoid unique collisions
+  // on call_index/ball_number while we remap the round ordering.
+  const prepErrors = await Promise.all(
+    typedExisting.map(async (existing, index) => {
+      const { error } = await db
+        .from("bingo_session_calls")
+        .update({
+          call_index: 1000 + index + 1,
+          ball_number: null,
+          status: "pending",
+          called_at: null,
+          completed_at: null,
+        })
+        .eq("id", existing.id);
+
+      return error?.message ?? null;
+    })
+  );
+
+  const firstPrepError = prepErrors.find((message) => !!message);
+  if (firstPrepError) {
+    return NextResponse.json({ error: firstPrepError }, { status: 500 });
+  }
+
   const now = new Date();
   const intermissionSecondsRaw = Number(body.intermission_seconds);
   const intermissionSeconds = Number.isFinite(intermissionSecondsRaw) ? Math.max(0, intermissionSecondsRaw) : 0;
@@ -96,6 +120,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (firstUpdateError) {
     return NextResponse.json({ error: firstUpdateError }, { status: 500 });
   }
+
+  // Reset queue/cue history so transport lane starts clean for the new round.
+  const { error: clearEventsError } = await db
+    .from("bingo_session_events")
+    .delete()
+    .eq("session_id", sessionId);
+
+  if (clearEventsError) return NextResponse.json({ error: clearEventsError.message }, { status: 500 });
 
   const { error: updateSessionError } = await db
     .from("bingo_sessions")

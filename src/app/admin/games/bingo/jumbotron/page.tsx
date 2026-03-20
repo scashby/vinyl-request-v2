@@ -6,6 +6,7 @@ import { getBingoColumnTextClass } from "src/lib/bingoBall";
 
 type Session = {
   session_code: string;
+  current_call_index: number;
   current_round: number;
   round_count: number;
   seconds_to_next_call: number;
@@ -13,6 +14,7 @@ type Session = {
   recent_calls_limit: number;
   show_countdown: boolean;
   next_game_scheduled_at: string | null;
+  next_game_rules_text: string | null;
   call_reveal_at: string | null;
   bingo_overlay: string;
 };
@@ -40,13 +42,12 @@ export default function BingoJumbotronPage() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [remaining, setRemaining] = useState(0);
   const [now, setNow] = useState(() => Date.now());
-  const [columnRotationIndex, setColumnRotationIndex] = useState(0);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
     const [sRes, cRes] = await Promise.all([
-      fetch(`/api/games/bingo/sessions/${sessionId}`),
-      fetch(`/api/games/bingo/sessions/${sessionId}/calls`),
+      fetch(`/api/games/bingo/sessions/${sessionId}`, { cache: "no-store" }),
+      fetch(`/api/games/bingo/sessions/${sessionId}/calls`, { cache: "no-store" }),
     ]);
 
     if (sRes.ok) {
@@ -78,14 +79,6 @@ export default function BingoJumbotronPage() {
     return () => clearInterval(tick);
   }, [session]);
 
-  // Rotate called-history column every 6 seconds so contestants can still catch up.
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setColumnRotationIndex((index) => (index + 1) % COLUMN_ROTATION.length);
-    }, 6000);
-    return () => clearInterval(timer);
-  }, []);
-
   // F key shortcut for fullscreen. Keep control hidden on-screen.
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -112,7 +105,7 @@ export default function BingoJumbotronPage() {
   );
 
   const current = called.at(-1) ?? null;
-  const previous = called.at(-2) ?? null;
+  const lastCalled = useMemo(() => called.slice(Math.max(0, called.length - 5)).reverse(), [called]);
 
   const callIsRevealed = useMemo(() => {
     if (!session?.call_reveal_at) return true;
@@ -134,6 +127,7 @@ export default function BingoJumbotronPage() {
   }, [session?.next_game_scheduled_at, now]);
 
   const showIntermission = session?.status === "paused" && intermissionSecondsLeft !== null && intermissionSecondsLeft > 0;
+  const showIntroSplash = !showIntermission && called.length === 0 && (session?.status === "pending" || session?.status === "paused" || session?.status === "running");
 
   const statusLabel = session?.status === "paused" ? "Paused" : null;
 
@@ -160,13 +154,17 @@ export default function BingoJumbotronPage() {
         <section className="grid min-h-0 grid-cols-[20vw_1fr_26vw] gap-[1vw]">
           <aside className="rounded-3xl border border-stone-700 bg-black/45 p-[1vw]">
             <p className="text-[1vw] font-semibold uppercase tracking-[0.2em] text-stone-400">Last Called</p>
-            {previous ? (
-              <div className="mt-[0.8vw] space-y-[0.5vw]">
-                <p className={`text-[3.2vw] font-black leading-none ${getBingoColumnTextClass(previous.column_letter, previous.ball_number)}`}>
-                  {previous.column_letter}
-                </p>
-                <p className="text-[1.2vw] font-bold text-amber-100">{previous.track_title}</p>
-                <p className="text-[1vw] text-stone-300">{previous.artist_name}</p>
+            {lastCalled.length > 0 ? (
+              <div className="mt-[0.8vw] space-y-[0.35vw]">
+                {lastCalled.map((call) => (
+                  <div key={call.id} className="rounded-xl border border-stone-700/70 bg-black/25 px-[0.6vw] py-[0.45vw]">
+                    <p className={`text-[1.2vw] font-black leading-none ${getBingoColumnTextClass(call.column_letter, call.ball_number)}`}>
+                      {call.column_letter}
+                    </p>
+                    <p className="text-[0.95vw] font-semibold leading-tight text-amber-100">{call.track_title}</p>
+                    <p className="text-[0.82vw] text-stone-300">{call.artist_name}</p>
+                  </div>
+                ))}
               </div>
             ) : (
               <p className="mt-[0.8vw] text-[1vw] text-stone-500">Waiting for first call...</p>
@@ -208,13 +206,13 @@ export default function BingoJumbotronPage() {
                     {calledByColumn[col] && calledByColumn[col].length > 0 && (
                       <>
                         {colIndex > 0 && <div className="my-[0.3vw] border-t border-stone-600/30" />}
+                        <p className={`text-[0.85vw] font-black uppercase tracking-[0.14em] ${getBingoColumnTextClass(col, null)}`}>Column {col}</p>
                         {calledByColumn[col].map((call) => (
-                          <p
-                            key={call.id}
-                            className={`text-[0.9vw] py-[0.15vw] ${getBingoColumnTextClass(call.column_letter, call.ball_number)}`}
-                          >
-                            {call.track_title} - {call.artist_name}
-                          </p>
+                          <div key={call.id} className="py-[0.2vw] leading-tight">
+                            <p className={`text-[0.9vw] font-black ${getBingoColumnTextClass(call.column_letter, call.ball_number)}`}>{call.column_letter}</p>
+                            <p className="text-[0.84vw] font-semibold text-amber-100">{call.track_title}</p>
+                            <p className="text-[0.78vw] text-stone-300">{call.artist_name}</p>
+                          </div>
                         ))}
                       </>
                     )}
@@ -263,14 +261,28 @@ export default function BingoJumbotronPage() {
       {session?.bingo_overlay === "winner" ? (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-black/80 text-center">
           <img
-            src="/images/bingo/bingo-winner.svg"
-            alt="Bingo winner"
-            className="animate-bounce"
+            src="/images/bingo/bingo-jackpot.svg"
+            alt="Bingo jackpot winner"
+            className="animate-pulse"
             style={{ width: "35vw", maxWidth: "480px" }}
           />
           <p className="text-[8vw] font-black uppercase leading-none text-amber-300" style={{ textShadow: "0 0 40px #f59e0b" }}>
             WE HAVE A WINNER!
           </p>
+        </div>
+      ) : null}
+
+      {showIntroSplash ? (
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-[1.2vw] bg-black/88 px-[3vw] text-center">
+          <h2 className="text-[6vw] font-black uppercase leading-none tracking-[0.12em] text-amber-300">Welcome To Vinyl Music Bingo</h2>
+          <p className="max-w-[70vw] text-[1.9vw] text-stone-200">Listen for each track. If the song is on your card, mark that square. Get five in a row to call BINGO.</p>
+          <div className="max-w-[72vw] rounded-2xl border border-amber-700/40 bg-amber-950/20 px-[1.8vw] py-[1.3vw]">
+            <p className="text-[1.6vw] font-semibold uppercase tracking-[0.08em] text-amber-200">How To Play</p>
+            <p className="mt-[0.6vw] text-[1.25vw] text-stone-200">1) Keep your bingo card visible.</p>
+            <p className="text-[1.25vw] text-stone-200">2) Match each called song to your card and mark it.</p>
+            <p className="text-[1.25vw] text-stone-200">3) When you have five in a row, shout BINGO.</p>
+          </div>
+          {session?.next_game_rules_text ? <p className="max-w-[70vw] text-[1.1vw] text-stone-400">{session.next_game_rules_text}</p> : null}
         </div>
       ) : null}
     </div>

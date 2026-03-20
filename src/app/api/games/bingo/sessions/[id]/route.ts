@@ -187,6 +187,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "paused_at",
     "paused_remaining_seconds",
     "countdown_started_at",
+    "seconds_to_next_call",
     "current_call_index",
     "started_at",
     "ended_at",

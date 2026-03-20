@@ -53,7 +53,9 @@ export default function BingoHostPage() {
     if (sRes.ok) {
       const payload = await sRes.json();
       setSession(payload);
-      setRevealDelayInput(payload.call_reveal_delay_seconds ?? 5);      setSecondsToNextCallInput(payload.seconds_to_next_call ?? 0);      setRemaining(payload.seconds_to_next_call ?? 0);
+      setRevealDelayInput(payload.call_reveal_delay_seconds ?? 5);
+      setSecondsToNextCallInput(payload.seconds_to_next_call ?? 0);
+      setRemaining(payload.seconds_to_next_call ?? 0);
     }
 
     if (cRes.ok) {
@@ -139,16 +141,54 @@ export default function BingoHostPage() {
     load();
   };
 
+  const startRound = async () => {
+    if (!session) return;
+
+    const activateResponse = await fetch(`/api/games/bingo/sessions/${sessionId}/activate-round`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        round: 1,
+        intermission_seconds: 0,
+      }),
+    });
+
+    if (!activateResponse.ok) {
+      const payload = (await activateResponse.json().catch(() => null)) as { error?: string } | null;
+      alert(payload?.error ?? "Failed to start round 1");
+      return;
+    }
+
+    await fetch(`/api/games/bingo/sessions/${sessionId}/resume`, { method: "POST" });
+    setAutoCallEnabled(false);
+    autoCallLockRef.current = false;
+    await patchSession({ bingo_overlay: "none", next_game_scheduled_at: null, next_game_rules_text: null });
+    await load();
+  };
+
   const resetGame = async () => {
     const confirmed = window.confirm("Reset this round to a fresh start? All calls will be cleared.");
     if (!confirmed) return;
-    await fetch(`/api/games/bingo/sessions/${sessionId}/reset`, { method: "POST" });
     setAutoCallEnabled(false);
+    autoCallLockRef.current = false;
+    await fetch(`/api/games/bingo/sessions/${sessionId}/reset`, { method: "POST" });
     setRevealDelayInput(5);
     setSecondsToNextCallInput(0);
     setRemaining(0);
     setResetCounter((v) => v + 1);
-    load();
+    await load();
+  };
+
+  const saveSecondsToNextCall = async () => {
+    const updatedSeconds = Math.max(0, Math.min(300, secondsToNextCallInput));
+    setSecondsToNextCallInput(updatedSeconds);
+    setRemaining(updatedSeconds);
+
+    await patchSession({
+      seconds_to_next_call: updatedSeconds,
+      countdown_started_at: new Date().toISOString(),
+      paused_remaining_seconds: session?.status === "paused" ? updatedSeconds : null,
+    });
   };
 
   const saveRevealDelay = async () => {
@@ -190,6 +230,11 @@ export default function BingoHostPage() {
 
   const setOverlay = async (overlay: "none" | "pending" | "winner") => {
     setSavingOverlay(true);
+    if (overlay === "pending" && session?.status === "running") {
+      setAutoCallEnabled(false);
+      autoCallLockRef.current = false;
+      await fetch(`/api/games/bingo/sessions/${sessionId}/pause`, { method: "POST" });
+    }
     await patchSession({ bingo_overlay: overlay });
     setSavingOverlay(false);
   };
@@ -267,19 +312,24 @@ export default function BingoHostPage() {
 
         <section className="rounded-2xl border border-stone-700 bg-black/45 p-3">
           <div className="grid grid-cols-3 gap-3">
-            {/* Left column: Round controls */}
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <label className="text-stone-400 whitespace-nowrap">Intermission (sec)</label>
-              <input
-                type="number"
-                min={0}
-                value={intermissionLengthSeconds}
-                onChange={(e) => setIntermissionLengthSeconds(Math.max(0, Number(e.target.value) || 0))}
-                className="w-16 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
-              />
-              <button onClick={nextRound} className="rounded border border-sky-700 px-3 py-1 text-sky-300 hover:bg-sky-900/20">Next Round</button>
-              <button onClick={endGame} className="rounded border border-red-700 px-3 py-1 text-red-300 hover:bg-red-900/20">End Game</button>
-              <button onClick={resetGame} className="rounded border border-red-700 bg-red-900/40 px-3 py-1 text-red-100 hover:bg-red-900/60">Reset Round</button>
+            {/* Left column: Start/intermission (top), game controls (bottom) */}
+            <div className="space-y-2 text-xs">
+              <div className="flex flex-wrap items-center gap-2">
+                <button onClick={startRound} className="rounded border border-emerald-700 bg-emerald-900/35 px-3 py-1 font-bold text-emerald-200 hover:bg-emerald-900/55">Start</button>
+                <label className="text-stone-400 whitespace-nowrap">Intermission (sec)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={intermissionLengthSeconds}
+                  onChange={(e) => setIntermissionLengthSeconds(Math.max(0, Number(e.target.value) || 0))}
+                  className="w-16 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button onClick={endGame} className="rounded border border-red-700 px-3 py-1 text-red-300 hover:bg-red-900/20">End Game</button>
+                <button onClick={resetGame} className="rounded border border-red-700 bg-red-900/40 px-3 py-1 text-red-100 hover:bg-red-900/60">Reset Round</button>
+                <button onClick={nextRound} className="rounded border border-sky-700 px-3 py-1 text-sky-300 hover:bg-sky-900/20">Next Round</button>
+              </div>
             </div>
 
             {/* Middle column: Overlay + Reveal Delay */}
@@ -320,25 +370,28 @@ export default function BingoHostPage() {
               </div>
             </div>
 
-            {/* Right column: Pause/Resume + Interval to Next Call */}
-            <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
-              <button onClick={pause} className="rounded border border-stone-600 px-2 py-1 hover:border-stone-400">Pause</button>
-              <button onClick={resume} className="rounded border border-stone-600 px-2 py-1 hover:border-stone-400">Resume</button>
-              <span className="mx-1 h-5 w-px bg-stone-700" />
-              <label className="text-stone-400 whitespace-nowrap">Seconds to Next Call</label>
-              <input
-                type="number"
-                min={0}
-                max={300}
-                value={secondsToNextCallInput}
-                onChange={(e) => setSecondsToNextCallInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)))}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    patchSession({ seconds_to_next_call: secondsToNextCallInput });
-                  }
-                }}
-                className="w-16 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
-              />
+            {/* Right column: Next Call (sec) on top, Pause/Resume below */}
+            <div className="ml-auto space-y-2 text-xs">
+              <div className="flex items-center justify-end gap-2">
+                <label className="text-stone-400 whitespace-nowrap">Next Call (sec)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={300}
+                  value={secondsToNextCallInput}
+                  onChange={(e) => setSecondsToNextCallInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      saveSecondsToNextCall();
+                    }
+                  }}
+                  className="w-16 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <button onClick={pause} className="rounded border border-stone-600 px-2 py-1 hover:border-stone-400">Pause</button>
+                <button onClick={resume} className="rounded border border-stone-600 px-2 py-1 hover:border-stone-400">Resume</button>
+              </div>
             </div>
           </div>
         </section>
