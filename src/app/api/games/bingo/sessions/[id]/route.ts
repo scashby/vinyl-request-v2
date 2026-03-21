@@ -3,7 +3,7 @@ import { getBingoDb } from "src/lib/bingoDb";
 import {
   computeMinimumPlaylistTracks,
   computeRemainingSeconds,
-  getPlaylistTrackCount,
+  getPlaylistTrackCountForPlaylists,
   type GameMode,
 } from "src/lib/bingoEngine";
 import { computeTransportQueueIds, type TransportQueueEvent } from "src/lib/transportQueue";
@@ -14,6 +14,7 @@ type SessionRow = {
   id: number;
   event_id: number | null;
   playlist_id: number;
+  playlist_ids: number[] | null;
   session_code: string;
   game_mode: string;
   card_count: number;
@@ -85,17 +86,35 @@ function parseEventCallId(raw: unknown): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
+function normalizePlaylistIds(input: unknown, fallbackPlaylistId?: number): number[] {
+  const fromArray = Array.isArray(input)
+    ? input.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0)
+    : [];
+
+  const normalized = fromArray.length > 0
+    ? fromArray
+    : Number.isFinite(fallbackPlaylistId)
+      ? [Number(fallbackPlaylistId)]
+      : [];
+
+  return Array.from(new Set(normalized));
+}
+
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const sessionId = parseSessionId(id);
   if (!sessionId) return NextResponse.json({ error: "Invalid session id" }, { status: 400 });
 
   const db = getBingoDb();
-  const { data, error } = await db
+  const sessionQuery = (db
     .from("bingo_sessions")
-    .select("id, event_id, playlist_id, session_code, game_mode, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, seconds_to_next_call, sonos_output_delay_ms, countdown_started_at, paused_remaining_seconds, paused_at, current_call_index, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at, next_game_scheduled_at, next_game_rules_text, call_reveal_delay_seconds, call_reveal_at, bingo_overlay")
-    .eq("id", sessionId)
-    .maybeSingle();
+    .select("id, event_id, playlist_id, playlist_ids, session_code, game_mode, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, seconds_to_next_call, sonos_output_delay_ms, countdown_started_at, paused_remaining_seconds, paused_at, current_call_index, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at, next_game_scheduled_at, next_game_rules_text, call_reveal_delay_seconds, call_reveal_at, bingo_overlay") as unknown as {
+      eq: (column: string, value: number) => {
+        maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
+      };
+    });
+
+  const { data, error } = await sessionQuery.eq("id", sessionId).maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Session not found" }, { status: 404 });
@@ -200,6 +219,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const allowedFields = new Set([
     "event_id",
     "playlist_id",
+    "playlist_ids",
     "game_mode",
     "card_count",
     "round_count",
@@ -235,27 +255,41 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const db = getBingoDb();
 
   // Ensure updates that impact call-generation requirements are valid.
-  const requiresTrackValidation = ["playlist_id", "round_count", "card_count"].some((key) => key in patch);
+  const requiresTrackValidation = ["playlist_id", "playlist_ids", "round_count", "card_count"].some((key) => key in patch);
   if (requiresTrackValidation) {
-    const { data: existing, error: existingError } = await db
+    const validationQuery = (db
       .from("bingo_sessions")
-      .select("playlist_id, round_count, card_count")
-      .eq("id", sessionId)
-      .maybeSingle();
+      .select("playlist_id, playlist_ids, round_count, card_count") as unknown as {
+        eq: (column: string, value: number) => {
+          maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
+        };
+      });
+
+    const { data: existing, error: existingError } = await validationQuery.eq("id", sessionId).maybeSingle();
 
     if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 });
     if (!existing) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
-    const playlistId = Number(patch.playlist_id ?? existing.playlist_id);
-    const roundCount = Math.max(1, Math.floor(Number(patch.round_count ?? existing.round_count)));
-    const cardCount = Math.max(1, Math.floor(Number(patch.card_count ?? existing.card_count)));
+    const existingRow = existing as {
+      playlist_id: number;
+      playlist_ids: number[] | null;
+      round_count: number;
+      card_count: number;
+    };
 
-    if (!Number.isFinite(playlistId)) {
-      return NextResponse.json({ error: "playlist_id must be a valid number" }, { status: 400 });
+    const selectedPlaylistIds = normalizePlaylistIds(
+      patch.playlist_ids,
+      Number(patch.playlist_id ?? (Array.isArray(existingRow.playlist_ids) && existingRow.playlist_ids.length > 0 ? existingRow.playlist_ids[0] : existingRow.playlist_id))
+    );
+    const roundCount = Math.max(1, Math.floor(Number(patch.round_count ?? existingRow.round_count)));
+    const cardCount = Math.max(1, Math.floor(Number(patch.card_count ?? existingRow.card_count)));
+
+    if (selectedPlaylistIds.length === 0) {
+      return NextResponse.json({ error: "At least one playlist is required" }, { status: 400 });
     }
 
     const requiredTrackCount = computeMinimumPlaylistTracks(roundCount, cardCount);
-    const availableTrackCount = await getPlaylistTrackCount(db, playlistId);
+    const availableTrackCount = await getPlaylistTrackCountForPlaylists(db, selectedPlaylistIds);
     if (availableTrackCount < requiredTrackCount) {
       return NextResponse.json(
         {
@@ -268,6 +302,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   if (patch.playlist_id !== undefined) {
     patch.playlist_id = Number(patch.playlist_id);
+    if (!("playlist_ids" in patch) && Number.isFinite(Number(patch.playlist_id))) {
+      patch.playlist_ids = [Number(patch.playlist_id)];
+    }
+  }
+  if (patch.playlist_ids !== undefined) {
+    const primaryPlaylistId = Number(patch.playlist_id);
+    const selectedPlaylistIds = normalizePlaylistIds(patch.playlist_ids, Number.isFinite(primaryPlaylistId) ? primaryPlaylistId : undefined);
+    patch.playlist_ids = selectedPlaylistIds;
+    if (!("playlist_id" in patch) && selectedPlaylistIds.length > 0) {
+      patch.playlist_id = selectedPlaylistIds[0];
+    }
   }
   if (patch.game_mode !== undefined) {
     patch.game_mode = String(patch.game_mode) as GameMode;

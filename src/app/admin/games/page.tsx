@@ -4,6 +4,8 @@ import { supabaseAdmin } from "src/lib/supabaseAdmin";
 import { gameBlueprints, type GameBlueprint, type GameStatus } from "src/lib/gameBlueprints";
 import GamesHub from "./_components/GamesHub";
 
+export const dynamic = "force-dynamic";
+
 type GameOverride = {
   title?: string;
   status?: GameStatus;
@@ -12,10 +14,26 @@ type GameOverride = {
 };
 
 async function getMergedBlueprints() {
-  const { data: rows } = await supabaseAdmin
-    .from("admin_settings")
-    .select("key, value")
-    .like("key", "game:blueprint:%");
+  let rows: Array<{ key: string; value: string }> | null = null;
+  try {
+    const settingsQuery = supabaseAdmin
+      .from("admin_settings")
+      .select("key, value")
+      .like("key", "game:blueprint:%");
+
+    const result = await Promise.race([
+      settingsQuery,
+      new Promise<{ data: null; error: Error }>((resolve) =>
+        setTimeout(() => resolve({ data: null, error: new Error("admin_settings query timeout") }), 5000)
+      ),
+    ]);
+
+    if (result && "data" in result) {
+      rows = (result.data as Array<{ key: string; value: string }> | null) ?? null;
+    }
+  } catch {
+    rows = null;
+  }
 
   const overrideMap = new Map<string, GameOverride>();
   for (const row of rows ?? []) {

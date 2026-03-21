@@ -20,6 +20,8 @@ type Session = {
   id: number;
   event_id: number | null;
   playlist_id: number;
+  playlist_ids: number[] | null;
+  playlist_names?: string[];
   session_code: string;
   game_mode: string;
   card_count: number;
@@ -96,7 +98,7 @@ export default function BingoSetupPage() {
   const [eventId, setEventId] = useState<number | null>(Number.isFinite(eventIdFromUrl) ? eventIdFromUrl : null);
   const [showCreateEventModal, setShowCreateEventModal] = useState(false);
 
-  const [playlistId, setPlaylistId] = useState<number | null>(null);
+  const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<number[]>([]);
   const [gameMode, setGameMode] = useState("single_line");
   const [cardCount, setCardCount] = useState(40);
   const [roundCount, setRoundCount] = useState(3);
@@ -109,10 +111,17 @@ export default function BingoSetupPage() {
 
   const [creating, setCreating] = useState(false);
   const minimumTracksForSetup = useMemo(() => computeMinimumPlaylistTracks(roundCount, cardCount), [roundCount, cardCount]);
-  const selectedPlaylist = useMemo(() => playlists.find((entry) => entry.id === playlistId) ?? null, [playlists, playlistId]);
-  const roundsSupportedByPlaylist = selectedPlaylist ? Math.floor(selectedPlaylist.track_count / GAME_BALL_COUNT) : 0;
+  const selectedPlaylist = useMemo(
+    () => playlists.find((entry) => entry.id === selectedPlaylistIds[0]) ?? null,
+    [playlists, selectedPlaylistIds]
+  );
+  const selectedPlaylistTrackCount = useMemo(
+    () => selectedPlaylistIds.reduce((sum, id) => sum + (playlists.find((entry) => entry.id === id)?.track_count ?? 0), 0),
+    [playlists, selectedPlaylistIds]
+  );
+  const roundsSupportedByPlaylist = selectedPlaylistTrackCount ? Math.floor(selectedPlaylistTrackCount / GAME_BALL_COUNT) : 0;
   const effectiveRoundCapacity = Math.min(Math.max(1, roundCount), Math.max(1, roundsSupportedByPlaylist));
-  const isPlaylistEligible = selectedPlaylist ? selectedPlaylist.track_count >= minimumTracksForSetup : false;
+  const hasSelectedPlaylists = selectedPlaylistIds.length > 0;
   const perRoundCardCapacityEstimate = useMemo(() => {
     const choose = (n: number, k: number) => {
       if (k < 0 || k > n) return 0;
@@ -181,8 +190,19 @@ export default function BingoSetupPage() {
     load();
   };
 
+  const resetSession = async (sessionId: number, code: string) => {
+    if (!confirm(`Reset session ${code}? This will clear call progress and return to welcome screen.`)) return;
+    const res = await fetch(`/api/games/bingo/sessions/${sessionId}/reset`, { method: "POST" });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert((payload as { error?: string }).error ?? "Failed to reset session");
+      return;
+    }
+    void load();
+  };
+
   const createSession = async () => {
-    if (!playlistId) return;
+    if (!hasSelectedPlaylists) return;
     setCreating(true);
     try {
       const res = await fetch("/api/games/bingo/sessions", {
@@ -190,7 +210,8 @@ export default function BingoSetupPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           event_id: eventId ? Number(eventId) : null,
-          playlist_id: playlistId,
+          playlist_id: selectedPlaylistIds[0],
+          playlist_ids: selectedPlaylistIds,
           game_mode: gameMode,
           card_count: cardCount,
           round_count: roundCount,
@@ -265,9 +286,9 @@ export default function BingoSetupPage() {
           <p className="mt-1 text-xs text-stone-400">
             Estimated unique card layouts available: <span className="font-semibold text-emerald-300">{formatEnglishMagnitude(estimatedUniqueCardsAcrossRounds)}</span> across configured rounds.
           </p>
-          {selectedPlaylist ? (
-            <p className={`mt-1 text-xs ${selectedPlaylist.track_count >= minimumTracksForSetup ? "text-emerald-300" : "text-rose-300"}`}>
-              Selected playlist has {selectedPlaylist.track_count} tracks and supports up to {roundsSupportedByPlaylist} full round(s) of 75 unique calls.
+          {hasSelectedPlaylists ? (
+            <p className={`mt-1 text-xs ${selectedPlaylistTrackCount >= minimumTracksForSetup ? "text-emerald-300" : "text-rose-300"}`}>
+              Selected playlists have {selectedPlaylistTrackCount} combined tracks and support up to {roundsSupportedByPlaylist} full round(s) of 75 unique calls.
             </p>
           ) : null}
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -292,9 +313,19 @@ export default function BingoSetupPage() {
               </select>
             </label>
 
-            <label className="text-sm">Playlist <InlineFieldHelp label="Playlist" />
-              <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={playlistId ?? ""} onChange={(e) => setPlaylistId(Number(e.target.value) || null)}>
-                <option value="">Select playlist</option>
+            <label className="text-sm">Playlists (select one or more) <InlineFieldHelp label="Playlist" />
+              <select
+                multiple
+                size={6}
+                className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                value={selectedPlaylistIds.map(String)}
+                onChange={(e) => {
+                  const values = Array.from(e.target.selectedOptions)
+                    .map((option) => Number(option.value))
+                    .filter((value) => Number.isFinite(value));
+                  setSelectedPlaylistIds(values);
+                }}
+              >
                 {playlists.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.track_count})</option>)}
               </select>
               <a
@@ -349,7 +380,7 @@ export default function BingoSetupPage() {
             Derived time to next call: <span className="font-semibold text-amber-300">{derivedSecondsToNextCall}s</span> (includes Sonos delay).
           </p>
 
-          <button disabled={!playlistId || creating || !isPlaylistEligible} onClick={createSession} className="mt-5 rounded bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+          <button disabled={!hasSelectedPlaylists || creating} onClick={createSession} className="mt-5 rounded bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
             {creating ? "Creating..." : "Create Session"}
           </button>
         </section>
@@ -366,7 +397,7 @@ export default function BingoSetupPage() {
             <div className="space-y-3">
               {sessions.map((session) => (
                 <div key={session.id} className="rounded-xl border border-stone-700 bg-stone-950/70 p-3">
-                  <div className="text-sm">{session.session_code} · {session.playlist_name} · {session.game_mode} · Round {session.current_round} of {session.round_count}</div>
+                  <div className="text-sm">{session.session_code} · {(session.playlist_names?.length ? session.playlist_names.join(" + ") : session.playlist_name)} · {session.game_mode} · Round {session.current_round} of {session.round_count}</div>
                   {session.event_title ? (
                     <div className="mt-1 text-xs text-stone-400">Event: {session.event_title}</div>
                   ) : null}
@@ -378,6 +409,7 @@ export default function BingoSetupPage() {
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "2-up")}>Cards 2-up</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "4-up")}>Cards 4-up</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCallSheet(session.id)}>Call Sheet (Live)</button>
+                    <button className="rounded border border-amber-700/70 bg-amber-950/30 px-2 py-1 text-amber-200" onClick={() => resetSession(session.id, session.session_code)}>Reset Game</button>
                     {Array.from({ length: session.round_count }, (_, index) => index + 1).map((round) => (
                       <button
                         key={`${session.id}-round-sheet-${round}`}

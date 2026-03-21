@@ -17,6 +17,7 @@ type Session = {
   id: number;
   event_id: number | null;
   playlist_id: number;
+  playlist_ids: number[] | null;
   session_code: string;
   game_mode: string;
   card_count: number;
@@ -52,7 +53,7 @@ export default function BingoEditSessionPage() {
   const [sessionCode, setSessionCode] = useState("");
 
   const [eventId, setEventId] = useState<number | null>(null);
-  const [playlistId, setPlaylistId] = useState<number | null>(null);
+  const [playlistIds, setPlaylistIds] = useState<number[]>([]);
   const [gameMode, setGameMode] = useState("single_line");
   const [cardCount, setCardCount] = useState(40);
   const [roundCount, setRoundCount] = useState(3);
@@ -112,7 +113,13 @@ export default function BingoEditSessionPage() {
       setSessionCode(sessionPayload.session_code ?? "");
 
       setEventId(sessionPayload.event_id ?? null);
-      setPlaylistId(sessionPayload.playlist_id ?? null);
+      setPlaylistIds(
+        Array.isArray(sessionPayload.playlist_ids) && sessionPayload.playlist_ids.length > 0
+          ? sessionPayload.playlist_ids
+          : sessionPayload.playlist_id
+            ? [sessionPayload.playlist_id]
+            : []
+      );
       setGameMode(sessionPayload.game_mode ?? "single_line");
       setCardCount(sessionPayload.card_count ?? 40);
       setRoundCount(sessionPayload.round_count ?? 3);
@@ -138,8 +145,8 @@ export default function BingoEditSessionPage() {
   }, [load]);
 
   const save = async () => {
-    if (!Number.isFinite(sessionId) || !playlistId) {
-      setError("Playlist is required.");
+    if (!Number.isFinite(sessionId) || playlistIds.length === 0) {
+      setError("At least one playlist is required.");
       return;
     }
 
@@ -151,7 +158,8 @@ export default function BingoEditSessionPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           event_id: eventId,
-          playlist_id: playlistId,
+          playlist_id: playlistIds[0],
+          playlist_ids: playlistIds,
           game_mode: gameMode,
           card_count: cardCount,
           round_count: roundCount,
@@ -173,6 +181,23 @@ export default function BingoEditSessionPage() {
       if (!res.ok) throw new Error((payload as { error?: string }).error ?? "Failed to save session");
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Failed to save session");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetGame = async () => {
+    if (!Number.isFinite(sessionId)) return;
+    if (!confirm(`Reset session ${sessionCode}? This will clear call progress and return to welcome screen.`)) return;
+
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/games/bingo/sessions/${sessionId}/reset`, { method: "POST" });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((payload as { error?: string }).error ?? "Failed to reset session");
+    } catch (resetError) {
+      setError(resetError instanceof Error ? resetError.message : "Failed to reset session");
     } finally {
       setSaving(false);
     }
@@ -212,9 +237,19 @@ export default function BingoEditSessionPage() {
                   </select>
                 </label>
 
-                <label className="text-sm">Playlist
-                  <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={playlistId ?? ""} onChange={(e) => setPlaylistId(Number(e.target.value) || null)}>
-                    <option value="">Select playlist</option>
+                <label className="text-sm">Playlists (select one or more)
+                  <select
+                    multiple
+                    size={6}
+                    className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                    value={playlistIds.map(String)}
+                    onChange={(e) => {
+                      const values = Array.from(e.target.selectedOptions)
+                        .map((option) => Number(option.value))
+                        .filter((value) => Number.isFinite(value));
+                      setPlaylistIds(values);
+                    }}
+                  >
                     {playlists.map((playlist) => (
                       <option key={playlist.id} value={playlist.id}>{playlist.name} ({playlist.track_count})</option>
                     ))}
@@ -286,8 +321,9 @@ export default function BingoEditSessionPage() {
               {error ? <p className="text-sm text-red-400">{error}</p> : null}
 
               <div className="flex justify-end gap-3">
+                <button onClick={resetGame} disabled={saving} className="rounded border border-amber-700/70 bg-amber-950/30 px-4 py-2 text-sm text-amber-200 disabled:opacity-50">Reset Game</button>
                 <Link href="/admin/games/bingo" className="rounded border border-stone-600 px-4 py-2 text-sm">Cancel</Link>
-                <button onClick={save} disabled={saving || !playlistId} className="rounded bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+                <button onClick={save} disabled={saving || playlistIds.length === 0} className="rounded bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
                   {saving ? "Saving..." : "Save Changes"}
                 </button>
               </div>

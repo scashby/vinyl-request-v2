@@ -681,6 +681,37 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
   });
 }
 
+export async function resolvePlaylistTracksForPlaylists(
+  db: BingoDbClient,
+  playlistIds: number[]
+): Promise<ResolvedPlaylistTrack[]> {
+  const normalized = Array.from(
+    new Set(
+      (playlistIds ?? [])
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id) && id > 0)
+    )
+  );
+
+  if (normalized.length === 0) {
+    throw new Error("At least one playlist is required.");
+  }
+
+  const tracksByPlaylist = await Promise.all(normalized.map((playlistId) => resolvePlaylistTracks(db, playlistId)));
+  const deduped = new Map<string, ResolvedPlaylistTrack>();
+
+  // Keep first-seen order by playlist selection order, then playlist sort order.
+  for (const tracks of tracksByPlaylist) {
+    for (const track of tracks) {
+      if (!deduped.has(track.trackKey)) {
+        deduped.set(track.trackKey, track);
+      }
+    }
+  }
+
+  return Array.from(deduped.values());
+}
+
 export async function resolveTrackKeys(db: BingoDbClient, trackKeys: string[]): Promise<Map<string, ResolvedTrackKey>> {
   const uniqueKeys = Array.from(new Set(trackKeys.map((k) => String(k ?? "").trim()).filter(Boolean)));
   if (uniqueKeys.length === 0) return new Map();
@@ -833,14 +864,19 @@ export async function getPlaylistTrackCount(db: BingoDbClient, playlistId: numbe
   return tracks.length;
 }
 
+export async function getPlaylistTrackCountForPlaylists(db: BingoDbClient, playlistIds: number[]): Promise<number> {
+  const tracks = await resolvePlaylistTracksForPlaylists(db, playlistIds);
+  return tracks.length;
+}
+
 export async function generateSessionCalls(
   db: BingoDbClient,
   sessionId: number,
-  playlistId: number,
+  playlistIds: number[],
   options?: { roundNumber?: number }
 ): Promise<number> {
   const roundNumber = options?.roundNumber ?? 1;
-  const tracks = await resolvePlaylistTracks(db, playlistId);
+  const tracks = await resolvePlaylistTracksForPlaylists(db, playlistIds);
 
   const rows = planRoundSessionCalls(tracks, sessionId, roundNumber).map((entry) => ({
     session_id: sessionId,

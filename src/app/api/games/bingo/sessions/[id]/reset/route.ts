@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
-import { planRoundSessionCalls, resolvePlaylistTracks } from "src/lib/bingoEngine";
+import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
 
 export const runtime = "nodejs";
 
 type SessionRow = {
   id: number;
   playlist_id: number;
+  playlist_ids: number[] | null;
 };
+
+function resolveSessionPlaylistIds(session: SessionRow): number[] {
+  if (Array.isArray(session.playlist_ids) && session.playlist_ids.length > 0) {
+    return session.playlist_ids;
+  }
+  return [session.playlist_id];
+}
 
 type ExistingCallRow = {
   id: number;
@@ -21,17 +29,21 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
   const db = getBingoDb();
   const now = new Date().toISOString();
 
-  const { data: session, error: sessionReadError } = await db
+  const sessionQuery = (db
     .from("bingo_sessions")
-    .select("id, playlist_id")
-    .eq("id", sessionId)
-    .maybeSingle();
+    .select("id, playlist_id, playlist_ids") as unknown as {
+      eq: (column: string, value: number) => {
+        maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
+      };
+    });
+
+  const { data: session, error: sessionReadError } = await sessionQuery.eq("id", sessionId).maybeSingle();
 
   if (sessionReadError) return NextResponse.json({ error: sessionReadError.message }, { status: 500 });
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
   const typedSession = session as SessionRow;
-  const tracks = await resolvePlaylistTracks(db, typedSession.playlist_id);
+  const tracks = await resolvePlaylistTracksForPlaylists(db, resolveSessionPlaylistIds(typedSession));
   const plannedCalls = planRoundSessionCalls(tracks, sessionId, 1);
 
   const { data: existingCalls, error: existingError } = await db
@@ -118,7 +130,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
       countdown_started_at: now,
       transport_queue_call_ids: [],
       call_reveal_at: null,
-      bingo_overlay: "none",
+      bingo_overlay: "welcome",
       next_game_scheduled_at: null,
       next_game_rules_text: null,
     })

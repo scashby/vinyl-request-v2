@@ -4,7 +4,7 @@ import {
   computeMinimumPlaylistTracks,
   generateCards,
   generateSessionCalls,
-  getPlaylistTrackCount,
+  getPlaylistTrackCountForPlaylists,
   type GameMode,
 } from "src/lib/bingoEngine";
 import { generateBingoSessionCode } from "src/lib/bingoSessionCode";
@@ -14,6 +14,7 @@ export const runtime = "nodejs";
 type CreateSessionBody = {
   event_id?: number | null;
   playlist_id?: number;
+  playlist_ids?: number[];
   game_mode?: GameMode;
   card_count?: number;
   card_layout?: "2-up" | "4-up";
@@ -36,6 +37,7 @@ type SessionListRow = {
   id: number;
   event_id: number | null;
   playlist_id: number;
+  playlist_ids: number[] | null;
   session_code: string;
   game_mode: string;
   card_count: number;
@@ -59,6 +61,20 @@ type SessionListRow = {
 type PlaylistRow = { id: number; name: string };
 type EventRow = { id: number; title: string };
 
+function normalizePlaylistIds(input: unknown, fallbackPlaylistId?: number): number[] {
+  const fromArray = Array.isArray(input)
+    ? input.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0)
+    : [];
+
+  const normalized = fromArray.length > 0
+    ? fromArray
+    : Number.isFinite(fallbackPlaylistId)
+      ? [Number(fallbackPlaylistId)]
+      : [];
+
+  return Array.from(new Set(normalized));
+}
+
 async function generateUniqueSessionCode() {
   const db = getBingoDb();
   for (let i = 0; i < 15; i += 1) {
@@ -73,18 +89,34 @@ export async function GET(request: NextRequest) {
   const db = getBingoDb();
   const eventId = request.nextUrl.searchParams.get("eventId");
 
-  let query = db
+  const queryBase = (db
     .from("bingo_sessions")
-    .select("id, event_id, playlist_id, session_code, game_mode, card_count, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, created_at")
-    .order("created_at", { ascending: false });
+    .select("id, event_id, playlist_id, playlist_ids, session_code, game_mode, card_count, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, created_at") as unknown as {
+      order: (column: string, options: { ascending: boolean }) => {
+        eq: (column: string, value: number) => Promise<{ data: unknown; error: { message: string } | null }>;
+        then?: unknown;
+      } & Promise<{ data: unknown; error: { message: string } | null }>;
+    });
 
-  if (eventId) query = query.eq("event_id", Number(eventId));
+  const orderedQuery = queryBase.order("created_at", { ascending: false });
+  const result = eventId
+    ? await orderedQuery.eq("event_id", Number(eventId))
+    : await (orderedQuery as unknown as Promise<{ data: unknown; error: { message: string } | null }>);
 
-  const { data, error } = await query;
+  const { data, error } = result;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const sessions = (data ?? []) as SessionListRow[];
-  const playlistIds = Array.from(new Set(sessions.map((row) => row.playlist_id)));
+  const playlistIds = Array.from(
+    new Set(
+      sessions.flatMap((row) => {
+        const selected = Array.isArray(row.playlist_ids) && row.playlist_ids.length > 0
+          ? row.playlist_ids
+          : [row.playlist_id];
+        return selected.filter((value) => Number.isFinite(value));
+      })
+    )
+  );
   const eventIds = Array.from(new Set(sessions.map((row) => row.event_id).filter((value): value is number => Number.isFinite(value))));
 
   const { data: playlists } = playlistIds.length
@@ -102,6 +134,8 @@ export async function GET(request: NextRequest) {
       data: sessions.map((row) => ({
         ...row,
         playlist_name: playlistById.get(row.playlist_id) ?? "Unknown Playlist",
+        playlist_names: (Array.isArray(row.playlist_ids) && row.playlist_ids.length > 0 ? row.playlist_ids : [row.playlist_id])
+          .map((id) => playlistById.get(id) ?? `Playlist ${id}`),
         event_title: row.event_id ? eventsById.get(row.event_id)?.title ?? null : null,
       })),
     },
@@ -115,15 +149,16 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as CreateSessionBody;
 
     const playlistId = Number(body.playlist_id);
-    if (!Number.isFinite(playlistId)) {
-      return NextResponse.json({ error: "playlist_id is required" }, { status: 400 });
+    const selectedPlaylistIds = normalizePlaylistIds(body.playlist_ids, playlistId);
+    if (selectedPlaylistIds.length === 0) {
+      return NextResponse.json({ error: "At least one playlist is required" }, { status: 400 });
     }
 
     const gameMode = body.game_mode ?? "single_line";
     const cardCount = Math.max(1, Math.floor(body.card_count ?? 40));
     const roundCount = Math.max(1, Math.floor(body.round_count ?? 3));
     const requiredTrackCount = computeMinimumPlaylistTracks(roundCount, cardCount);
-    const availableTrackCount = await getPlaylistTrackCount(db, playlistId);
+    const availableTrackCount = await getPlaylistTrackCountForPlaylists(db, selectedPlaylistIds);
     if (availableTrackCount < requiredTrackCount) {
       return NextResponse.json(
         {
@@ -152,7 +187,9 @@ export async function POST(request: NextRequest) {
       .from("bingo_sessions")
       .insert({
         event_id: body.event_id ?? null,
-        playlist_id: playlistId,
+        // Keep primary playlist_id for backwards compatibility in existing views.
+        playlist_id: selectedPlaylistIds[0],
+        playlist_ids: selectedPlaylistIds,
         session_code: code,
         game_mode: gameMode,
         card_count: cardCount,
@@ -185,7 +222,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await generateSessionCalls(db, session.id, playlistId, { roundNumber: 1 });
+      await generateSessionCalls(db, session.id, selectedPlaylistIds, { roundNumber: 1 });
       await generateCards(db, session.id, session.card_count, session.card_label_mode as "track_artist" | "track_only");
     } catch (error) {
       await db.from("bingo_sessions").delete().eq("id", session.id);

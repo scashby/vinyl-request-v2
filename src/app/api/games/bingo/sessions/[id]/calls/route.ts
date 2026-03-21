@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
-import { planRoundSessionCalls, resolvePlaylistTracks } from "src/lib/bingoEngine";
+import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
 import { autoSyncSessionPlaylistMetadata } from "src/lib/playlistMetadataSync";
 
 export const runtime = "nodejs";
@@ -8,8 +8,16 @@ export const runtime = "nodejs";
 type SessionRow = {
   id: number;
   playlist_id: number;
+  playlist_ids: number[] | null;
   round_count: number;
 };
+
+function resolveSessionPlaylistIds(session: SessionRow): number[] {
+  if (Array.isArray(session.playlist_ids) && session.playlist_ids.length > 0) {
+    return session.playlist_ids;
+  }
+  return [session.playlist_id];
+}
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,11 +30,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const db = getBingoDb();
 
-  const { data: session, error: sessionError } = await db
+  const sessionQuery = (db
     .from("bingo_sessions")
-    .select("id, playlist_id, round_count")
-    .eq("id", sessionId)
-    .maybeSingle();
+    .select("id, playlist_id, playlist_ids, round_count") as unknown as {
+      eq: (column: string, value: number) => {
+        maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
+      };
+    });
+
+  const { data: session, error: sessionError } = await sessionQuery.eq("id", sessionId).maybeSingle();
 
   if (sessionError) return NextResponse.json({ error: sessionError.message }, { status: 500 });
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
@@ -47,8 +59,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     try {
-      const playlistId = Number(typedSession.playlist_id);
-      const tracks = await resolvePlaylistTracks(db, playlistId);
+      const tracks = await resolvePlaylistTracksForPlaylists(db, resolveSessionPlaylistIds(typedSession));
       const rows = planRoundSessionCalls(tracks, sessionId, requestedRound).map((call, index) => ({
         id: -(index + 1),
         session_id: sessionId,

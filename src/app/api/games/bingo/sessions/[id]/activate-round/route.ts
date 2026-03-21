@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
-import { planRoundSessionCalls, resolvePlaylistTracks } from "src/lib/bingoEngine";
+import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
 
 export const runtime = "nodejs";
 
 type SessionRow = {
   id: number;
   playlist_id: number;
+  playlist_ids: number[] | null;
   round_count: number;
 };
+
+function resolveSessionPlaylistIds(session: SessionRow): number[] {
+  if (Array.isArray(session.playlist_ids) && session.playlist_ids.length > 0) {
+    return session.playlist_ids;
+  }
+  return [session.playlist_id];
+}
 
 type ExistingCallRow = {
   id: number;
@@ -29,11 +37,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const db = getBingoDb();
 
-  const { data: session, error: sessionError } = await db
+  const sessionQuery = (db
     .from("bingo_sessions")
-    .select("id, playlist_id, round_count")
-    .eq("id", sessionId)
-    .maybeSingle();
+    .select("id, playlist_id, playlist_ids, round_count") as unknown as {
+      eq: (column: string, value: number) => {
+        maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
+      };
+    });
+
+  const { data: session, error: sessionError } = await sessionQuery.eq("id", sessionId).maybeSingle();
 
   if (sessionError) return NextResponse.json({ error: sessionError.message }, { status: 500 });
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
@@ -43,7 +55,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: `round must be between 1 and ${typedSession.round_count}` }, { status: 400 });
   }
 
-  const tracks = await resolvePlaylistTracks(db, typedSession.playlist_id);
+  const tracks = await resolvePlaylistTracksForPlaylists(db, resolveSessionPlaylistIds(typedSession));
   const plannedCalls = planRoundSessionCalls(tracks, sessionId, requestedRound);
 
   const { data: existingCalls, error: existingError } = await db
