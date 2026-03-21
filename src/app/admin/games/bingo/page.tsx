@@ -19,13 +19,21 @@ type EventRow = {
 type Session = {
   id: number;
   event_id: number | null;
+  playlist_id: number;
   session_code: string;
   game_mode: string;
+  card_count: number;
   playlist_name: string;
   event_title: string | null;
   status: string;
   current_round: number;
   round_count: number;
+  remove_resleeve_seconds: number;
+  place_vinyl_seconds: number;
+  cue_seconds: number;
+  start_slide_seconds: number;
+  host_buffer_seconds: number;
+  sonos_output_delay_ms: number;
   seconds_to_next_call: number;
   call_reveal_delay_seconds: number;
   show_countdown: boolean;
@@ -106,11 +114,37 @@ export default function BingoSetupPage() {
 
   // Edit form state (populated when modal opens)
   const [editEventId, setEditEventId] = useState<number | null>(null);
-  const [editSecondsToNextCall, setEditSecondsToNextCall] = useState(0);
+  const [editPlaylistId, setEditPlaylistId] = useState<number | null>(null);
+  const [editGameMode, setEditGameMode] = useState("single_line");
+  const [editCardCount, setEditCardCount] = useState(40);
+  const [editRoundCount, setEditRoundCount] = useState(3);
+  const [editRemoveResleeveSeconds, setEditRemoveResleeveSeconds] = useState(20);
+  const [editPlaceVinylSeconds, setEditPlaceVinylSeconds] = useState(8);
+  const [editCueSeconds, setEditCueSeconds] = useState(12);
+  const [editStartSlideSeconds, setEditStartSlideSeconds] = useState(5);
+  const [editHostBufferSeconds, setEditHostBufferSeconds] = useState(2);
+  const [editSonosDelayMs, setEditSonosDelayMs] = useState(75);
   const [editCallRevealDelay, setEditCallRevealDelay] = useState(0);
   const [editShowCountdown, setEditShowCountdown] = useState(true);
   const [editRecentCallsLimit, setEditRecentCallsLimit] = useState(5);
   const [editNextGameRulesText, setEditNextGameRulesText] = useState("");
+  const editDerivedSecondsToNextCall = useMemo(
+    () =>
+      editRemoveResleeveSeconds +
+      editPlaceVinylSeconds +
+      editCueSeconds +
+      editStartSlideSeconds +
+      editHostBufferSeconds +
+      Math.ceil(editSonosDelayMs / 1000),
+    [
+      editCueSeconds,
+      editHostBufferSeconds,
+      editPlaceVinylSeconds,
+      editRemoveResleeveSeconds,
+      editSonosDelayMs,
+      editStartSlideSeconds,
+    ]
+  );
   const minimumTracksForSetup = useMemo(() => computeMinimumPlaylistTracks(roundCount, cardCount), [roundCount, cardCount]);
   const selectedPlaylist = useMemo(() => playlists.find((entry) => entry.id === playlistId) ?? null, [playlists, playlistId]);
   const roundsSupportedByPlaylist = selectedPlaylist ? Math.floor(selectedPlaylist.track_count / GAME_BALL_COUNT) : 0;
@@ -221,7 +255,16 @@ export default function BingoSetupPage() {
   const openEditModal = (session: Session) => {
     setEditingSession(session);
     setEditEventId(session.event_id);
-    setEditSecondsToNextCall(session.seconds_to_next_call);
+    setEditPlaylistId(session.playlist_id);
+    setEditGameMode(session.game_mode);
+    setEditCardCount(session.card_count);
+    setEditRoundCount(session.round_count);
+    setEditRemoveResleeveSeconds(session.remove_resleeve_seconds);
+    setEditPlaceVinylSeconds(session.place_vinyl_seconds);
+    setEditCueSeconds(session.cue_seconds);
+    setEditStartSlideSeconds(session.start_slide_seconds);
+    setEditHostBufferSeconds(session.host_buffer_seconds);
+    setEditSonosDelayMs(session.sonos_output_delay_ms);
     setEditCallRevealDelay(session.call_reveal_delay_seconds);
     setEditShowCountdown(session.show_countdown);
     setEditRecentCallsLimit(session.recent_calls_limit);
@@ -236,6 +279,10 @@ export default function BingoSetupPage() {
 
   const saveEditSession = async () => {
     if (!editingSession) return;
+    if (!editPlaylistId) {
+      setEditError("Playlist is required.");
+      return;
+    }
     setEditSaving(true);
     setEditError(null);
     try {
@@ -244,7 +291,17 @@ export default function BingoSetupPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           event_id: editEventId,
-          seconds_to_next_call: editSecondsToNextCall,
+          playlist_id: editPlaylistId,
+          game_mode: editGameMode,
+          card_count: editCardCount,
+          round_count: editRoundCount,
+          remove_resleeve_seconds: editRemoveResleeveSeconds,
+          place_vinyl_seconds: editPlaceVinylSeconds,
+          cue_seconds: editCueSeconds,
+          start_slide_seconds: editStartSlideSeconds,
+          host_buffer_seconds: editHostBufferSeconds,
+          sonos_output_delay_ms: editSonosDelayMs,
+          seconds_to_next_call: editDerivedSecondsToNextCall,
           call_reveal_delay_seconds: editCallRevealDelay,
           show_countdown: editShowCountdown,
           recent_calls_limit: editRecentCallsLimit,
@@ -447,72 +504,167 @@ export default function BingoSetupPage() {
         <>
           <div className="fixed inset-0 z-[60000] bg-black/70" onClick={closeEditModal} />
           <div className="fixed inset-0 z-[60001] flex items-center justify-center p-4">
-            <div className="w-full max-w-xl rounded-3xl border border-amber-900/50 bg-[#0e0e0e] p-6 text-stone-100 shadow-2xl">
+            <div className="w-full max-w-4xl rounded-3xl border border-amber-900/50 bg-[#0e0e0e] p-6 text-stone-100 shadow-2xl">
               <div className="mb-5 flex items-center justify-between">
                 <h2 className="text-xl font-black uppercase text-amber-100">Edit Session {editingSession.session_code}</h2>
                 <button onClick={closeEditModal} className="text-stone-400 hover:text-stone-100" aria-label="Close">✕</button>
               </div>
 
               <div className="space-y-4">
-                <label className="block text-sm">
-                  Linked Event
-                  <select
-                    className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
-                    value={editEventId ?? ""}
-                    onChange={(e) => setEditEventId(Number(e.target.value) || null)}
-                  >
-                    <option value="">No linked event</option>
-                    {events.map((event) => (
-                      <option key={event.id} value={event.id}>{event.date} – {event.title}</option>
-                    ))}
-                  </select>
-                </label>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="text-sm">Event (optional)
+                    <select
+                      className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                      value={editEventId ?? ""}
+                      onChange={(e) => setEditEventId(Number(e.target.value) || null)}
+                    >
+                      <option value="">No linked event</option>
+                      {events.map((event) => (
+                        <option key={event.id} value={event.id}>{event.date} - {event.title}</option>
+                      ))}
+                    </select>
+                  </label>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <label className="block text-sm">
-                    Seconds to Next Call
+                  <label className="text-sm">Playlist
+                    <select
+                      className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                      value={editPlaylistId ?? ""}
+                      onChange={(e) => setEditPlaylistId(Number(e.target.value) || null)}
+                    >
+                      <option value="">Select playlist</option>
+                      {playlists.map((playlist) => (
+                        <option key={playlist.id} value={playlist.id}>{playlist.name} ({playlist.track_count})</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="text-sm">Game Mode
+                    <select
+                      className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                      value={editGameMode}
+                      onChange={(e) => setEditGameMode(e.target.value)}
+                    >
+                      {GAME_MODE_OPTIONS.map((mode) => (
+                        <option key={mode.value} value={mode.value}>{mode.label}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="text-sm">Card Count
                     <input
                       type="number"
                       min={1}
                       className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
-                      value={editSecondsToNextCall}
-                      onChange={(e) => setEditSecondsToNextCall(Math.max(1, Number(e.target.value)))}
+                      value={editCardCount}
+                      onChange={(e) => setEditCardCount(Math.max(1, Number(e.target.value) || 1))}
                     />
                   </label>
 
-                  <label className="block text-sm">
-                    Call Reveal Delay (sec)
+                  <label className="text-sm">Rounds
+                    <input
+                      type="number"
+                      min={1}
+                      className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                      value={editRoundCount}
+                      onChange={(e) => setEditRoundCount(Math.max(1, Number(e.target.value) || 1))}
+                    />
+                  </label>
+
+                  <label className="text-sm">Call Reveal Delay (sec)
                     <input
                       type="number"
                       min={0}
                       className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
                       value={editCallRevealDelay}
-                      onChange={(e) => setEditCallRevealDelay(Math.max(0, Number(e.target.value)))}
+                      onChange={(e) => setEditCallRevealDelay(Math.max(0, Number(e.target.value) || 0))}
                     />
                   </label>
 
-                  <label className="block text-sm">
-                    Recent Calls Limit
+                  <label className="text-sm">Remove + Resleeve (sec)
+                    <input
+                      type="number"
+                      min={0}
+                      className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                      value={editRemoveResleeveSeconds}
+                      onChange={(e) => setEditRemoveResleeveSeconds(Math.max(0, Number(e.target.value) || 0))}
+                    />
+                  </label>
+
+                  <label className="text-sm">Place New Vinyl (sec)
+                    <input
+                      type="number"
+                      min={0}
+                      className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                      value={editPlaceVinylSeconds}
+                      onChange={(e) => setEditPlaceVinylSeconds(Math.max(0, Number(e.target.value) || 0))}
+                    />
+                  </label>
+
+                  <label className="text-sm">Cue Track (sec)
+                    <input
+                      type="number"
+                      min={0}
+                      className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                      value={editCueSeconds}
+                      onChange={(e) => setEditCueSeconds(Math.max(0, Number(e.target.value) || 0))}
+                    />
+                  </label>
+
+                  <label className="text-sm">Press Start + Slide (sec)
+                    <input
+                      type="number"
+                      min={0}
+                      className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                      value={editStartSlideSeconds}
+                      onChange={(e) => setEditStartSlideSeconds(Math.max(0, Number(e.target.value) || 0))}
+                    />
+                  </label>
+
+                  <label className="text-sm">Host Buffer (sec)
+                    <input
+                      type="number"
+                      min={0}
+                      className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                      value={editHostBufferSeconds}
+                      onChange={(e) => setEditHostBufferSeconds(Math.max(0, Number(e.target.value) || 0))}
+                    />
+                  </label>
+
+                  <label className="text-sm">Sonos Output Delay (ms)
+                    <input
+                      type="number"
+                      min={0}
+                      className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                      value={editSonosDelayMs}
+                      onChange={(e) => setEditSonosDelayMs(Math.max(0, Number(e.target.value) || 0))}
+                    />
+                  </label>
+
+                  <label className="text-sm">Recent Calls Limit
                     <input
                       type="number"
                       min={1}
                       max={20}
                       className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
                       value={editRecentCallsLimit}
-                      onChange={(e) => setEditRecentCallsLimit(Math.max(1, Number(e.target.value)))}
+                      onChange={(e) => setEditRecentCallsLimit(Math.max(1, Number(e.target.value) || 1))}
                     />
-                  </label>
-
-                  <label className="flex items-center gap-3 pt-5 text-sm">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4"
-                      checked={editShowCountdown}
-                      onChange={(e) => setEditShowCountdown(e.target.checked)}
-                    />
-                    Show Countdown
                   </label>
                 </div>
+
+                <p className="text-xs text-stone-400">
+                  Derived time to next call: <span className="font-semibold text-amber-300">{editDerivedSecondsToNextCall}s</span> (includes Sonos delay).
+                </p>
+
+                <label className="flex items-center gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={editShowCountdown}
+                    onChange={(e) => setEditShowCountdown(e.target.checked)}
+                  />
+                  Show Countdown
+                </label>
 
                 <label className="block text-sm">
                   Welcome Screen Rules Text
@@ -532,7 +684,7 @@ export default function BingoSetupPage() {
                 <button onClick={closeEditModal} className="rounded border border-stone-600 px-4 py-2 text-sm">Cancel</button>
                 <button
                   onClick={saveEditSession}
-                  disabled={editSaving}
+                  disabled={editSaving || !editPlaylistId}
                   className="rounded bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
                 >
                   {editSaving ? "Saving..." : "Save Changes"}

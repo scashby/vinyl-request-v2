@@ -38,9 +38,16 @@ type SessionListRow = {
   playlist_id: number;
   session_code: string;
   game_mode: string;
+  card_count: number;
   status: string;
   current_round: number;
   round_count: number;
+  remove_resleeve_seconds: number;
+  place_vinyl_seconds: number;
+  cue_seconds: number;
+  start_slide_seconds: number;
+  host_buffer_seconds: number;
+  sonos_output_delay_ms: number;
   seconds_to_next_call: number;
   call_reveal_delay_seconds: number;
   show_countdown: boolean;
@@ -68,7 +75,7 @@ export async function GET(request: NextRequest) {
 
   let query = db
     .from("bingo_sessions")
-    .select("id, event_id, playlist_id, session_code, game_mode, status, current_round, round_count, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, created_at")
+    .select("id, event_id, playlist_id, session_code, game_mode, card_count, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, created_at")
     .order("created_at", { ascending: false });
 
   if (eventId) query = query.eq("event_id", Number(eventId));

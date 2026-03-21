@@ -321,6 +321,23 @@ const isTransientSupabaseError = (error: unknown): boolean => {
   );
 };
 
+const isSupabaseOutageError = (error: unknown): boolean => {
+  const msg = error instanceof Error
+    ? error.message
+    : error && typeof error === 'object' && 'message' in error
+      ? String((error as { message?: unknown }).message ?? '')
+      : String(error ?? '');
+  const lower = msg.toLowerCase();
+  return (
+    isTransientSupabaseError(error) ||
+    lower.includes('no access-control-allow-origin') ||
+    lower.includes('failed to fetch') ||
+    lower.includes('net::err_failed') ||
+    lower.includes('pgrst002') ||
+    lower.includes('schema cache')
+  );
+};
+
 const chunkRows = <T,>(rows: T[], size: number): T[][] => {
   if (size <= 0 || rows.length <= size) return [rows];
   const chunks: T[][] = [];
@@ -1051,8 +1068,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [patternFindingsError, setPatternFindingsError] = useState<string | null>(null);
   const historyWriteModeRef = useRef<'upsert' | 'insert' | 'disabled'>('upsert');
   const historyDisabledRef = useRef(false);
+  const historyReadDisabledRef = useRef(false);
   const auditDisabledRef = useRef(false);
   const fieldDiagDisabledRef = useRef(false);
+  const supabaseOutageDetectedRef = useRef(false);
   const runIdRef = useRef<string | null>(null);
 
   // Loop Control Refs
@@ -1083,8 +1102,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       setPatternFindingsError(null);
       historyWriteModeRef.current = 'upsert';
       historyDisabledRef.current = false;
+      historyReadDisabledRef.current = false;
       auditDisabledRef.current = false;
       fieldDiagDisabledRef.current = false;
+      supabaseOutageDetectedRef.current = false;
       runIdRef.current = null;
     }
   }, [isOpen]);
@@ -1898,14 +1919,25 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const selectedLyricsProviders = LYRICS_SERVICE_IDS.filter((service) => !!activeServices[service]);
     const runLyricsEnrichment = wantsLyrics && selectedLyricsProviders.length > 0;
 
+    let resolutions: ResolutionHistory[] | null = null;
     const albumIds = results.map(r => r.album.id);
-    const { data: resolutions, error: resError } = await supabase
-      .from('import_conflict_resolutions')
-      .select('album_id, field_name, source')
-      .in('album_id', albumIds)
-      .limit(10000);
-      
-    if (resError) console.error('Error fetching history:', resError);
+    if (!historyReadDisabledRef.current) {
+      const { data, error: resError } = await supabase
+        .from('import_conflict_resolutions')
+        .select('album_id, field_name, source')
+        .in('album_id', albumIds)
+        .limit(10000);
+
+      if (resError) {
+        console.error('Error fetching history:', resError);
+        if (isSupabaseOutageError(resError)) {
+          historyReadDisabledRef.current = true;
+          addLog('System', 'skipped', `Temporarily disabled conflict history reads due to Supabase outage signals: ${resError.message || 'Unknown error'}`);
+        }
+      } else {
+        resolutions = (data ?? []) as ResolutionHistory[];
+      }
+    }
 
     const autoUpdates: { album: Album; fields: Record<string, unknown> }[] = [];
     const newConflicts: ExtendedFieldConflict[] = [];
@@ -2091,7 +2123,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                }
             }
 
-            const alreadySeen = (resolutions as ResolutionHistory[] | null)?.some(r => 
+            const alreadySeen = resolutions?.some(r => 
                r.album_id === album.id && r.field_name === key && r.source === source
             );
             const isStillMissing = isFieldMissingOnAlbum(albumRecord, key);
@@ -2116,7 +2148,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
          const tracks = sourceData.tracks;
          if (Array.isArray(tracks) && tracks.length > 0) {
-            const trackDot = (resolutions as ResolutionHistory[] | null)?.some(r => 
+            const trackDot = resolutions?.some(r => 
                r.album_id === album.id && r.field_name === 'track_data' && r.source === source
             );
             if (!trackDot) {
@@ -2451,15 +2483,24 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const appliedUpdatesByAlbumId = new Set<number>();
     if (autoUpdates.length > 0) {
       const applyResults = await Promise.allSettled(autoUpdates.map(u => applyAlbumUpdates(u.album, u.fields)));
+      let outageApplyFailures = 0;
       applyResults.forEach((res, index) => {
         const albumId = autoUpdates[index].album.id;
         if (res.status === 'fulfilled') {
           appliedUpdatesByAlbumId.add(albumId);
         } else {
           failedAutoApplyAlbumIds.add(albumId);
+          if (isSupabaseOutageError(res.reason)) {
+            outageApplyFailures += 1;
+          }
           addLog(formatAlbumLogLabel(autoUpdates[index].album), 'skipped', `Auto-save failed: ${res.reason instanceof Error ? res.reason.message : 'Unknown error'}`);
         }
       });
+
+      if (outageApplyFailures > 0 && outageApplyFailures === applyResults.length) {
+        supabaseOutageDetectedRef.current = true;
+        throw new Error('Supabase appears temporarily unavailable (503/504/CORS gateway). Scan stopped to avoid repeated failed writes. Retry when Supabase stabilizes.');
+      }
     }
 
     if (pendingFieldDiagnosticRows.length > 0) {

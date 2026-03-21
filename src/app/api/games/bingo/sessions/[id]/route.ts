@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
-import { computeRemainingSeconds } from "src/lib/bingoEngine";
+import {
+  computeMinimumPlaylistTracks,
+  computeRemainingSeconds,
+  getPlaylistTrackCount,
+  type GameMode,
+} from "src/lib/bingoEngine";
 import { computeTransportQueueIds, type TransportQueueEvent } from "src/lib/transportQueue";
 
 export const runtime = "nodejs";
@@ -194,6 +199,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const allowedFields = new Set([
     "event_id",
+    "playlist_id",
+    "game_mode",
+    "card_count",
+    "round_count",
+    "remove_resleeve_seconds",
+    "place_vinyl_seconds",
+    "cue_seconds",
+    "start_slide_seconds",
+    "host_buffer_seconds",
+    "sonos_output_delay_ms",
     "current_round",
     "recent_calls_limit",
     "show_title",
@@ -215,9 +230,109 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "bingo_overlay",
   ]);
 
-  const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key)));
+  const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key))) as Record<string, unknown>;
 
   const db = getBingoDb();
+
+  // Ensure updates that impact call-generation requirements are valid.
+  const requiresTrackValidation = ["playlist_id", "round_count", "card_count"].some((key) => key in patch);
+  if (requiresTrackValidation) {
+    const { data: existing, error: existingError } = await db
+      .from("bingo_sessions")
+      .select("playlist_id, round_count, card_count")
+      .eq("id", sessionId)
+      .maybeSingle();
+
+    if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 });
+    if (!existing) return NextResponse.json({ error: "Session not found" }, { status: 404 });
+
+    const playlistId = Number(patch.playlist_id ?? existing.playlist_id);
+    const roundCount = Math.max(1, Math.floor(Number(patch.round_count ?? existing.round_count)));
+    const cardCount = Math.max(1, Math.floor(Number(patch.card_count ?? existing.card_count)));
+
+    if (!Number.isFinite(playlistId)) {
+      return NextResponse.json({ error: "playlist_id must be a valid number" }, { status: 400 });
+    }
+
+    const requiredTrackCount = computeMinimumPlaylistTracks(roundCount, cardCount);
+    const availableTrackCount = await getPlaylistTrackCount(db, playlistId);
+    if (availableTrackCount < requiredTrackCount) {
+      return NextResponse.json(
+        {
+          error: `Playlist must contain at least ${requiredTrackCount} tracks for ${roundCount} round(s) and ${cardCount} cards.`,
+        },
+        { status: 400 }
+      );
+    }
+  }
+
+  if (patch.playlist_id !== undefined) {
+    patch.playlist_id = Number(patch.playlist_id);
+  }
+  if (patch.game_mode !== undefined) {
+    patch.game_mode = String(patch.game_mode) as GameMode;
+  }
+  if (patch.card_count !== undefined) {
+    patch.card_count = Math.max(1, Math.floor(Number(patch.card_count)));
+  }
+  if (patch.round_count !== undefined) {
+    patch.round_count = Math.max(1, Math.floor(Number(patch.round_count)));
+  }
+  if (patch.remove_resleeve_seconds !== undefined) {
+    patch.remove_resleeve_seconds = Math.max(0, Math.floor(Number(patch.remove_resleeve_seconds)));
+  }
+  if (patch.place_vinyl_seconds !== undefined) {
+    patch.place_vinyl_seconds = Math.max(0, Math.floor(Number(patch.place_vinyl_seconds)));
+  }
+  if (patch.cue_seconds !== undefined) {
+    patch.cue_seconds = Math.max(0, Math.floor(Number(patch.cue_seconds)));
+  }
+  if (patch.start_slide_seconds !== undefined) {
+    patch.start_slide_seconds = Math.max(0, Math.floor(Number(patch.start_slide_seconds)));
+  }
+  if (patch.host_buffer_seconds !== undefined) {
+    patch.host_buffer_seconds = Math.max(0, Math.floor(Number(patch.host_buffer_seconds)));
+  }
+  if (patch.sonos_output_delay_ms !== undefined) {
+    patch.sonos_output_delay_ms = Math.max(0, Math.floor(Number(patch.sonos_output_delay_ms)));
+  }
+
+  const timingKeys = [
+    "remove_resleeve_seconds",
+    "place_vinyl_seconds",
+    "cue_seconds",
+    "start_slide_seconds",
+    "host_buffer_seconds",
+    "sonos_output_delay_ms",
+  ] as const;
+
+  const hasTimingUpdate = timingKeys.some((key) => key in patch);
+  if (hasTimingUpdate && !("seconds_to_next_call" in patch)) {
+    const { data: existing, error: existingError } = await db
+      .from("bingo_sessions")
+      .select("remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms")
+      .eq("id", sessionId)
+      .maybeSingle();
+
+    if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 });
+    if (!existing) return NextResponse.json({ error: "Session not found" }, { status: 404 });
+
+    const removeResleeveSeconds = Number(patch.remove_resleeve_seconds ?? existing.remove_resleeve_seconds);
+    const placeVinylSeconds = Number(patch.place_vinyl_seconds ?? existing.place_vinyl_seconds);
+    const cueSeconds = Number(patch.cue_seconds ?? existing.cue_seconds);
+    const startSlideSeconds = Number(patch.start_slide_seconds ?? existing.start_slide_seconds);
+    const hostBufferSeconds = Number(patch.host_buffer_seconds ?? existing.host_buffer_seconds);
+    const sonosDelayMs = Number(patch.sonos_output_delay_ms ?? existing.sonos_output_delay_ms);
+
+    patch.seconds_to_next_call =
+      removeResleeveSeconds +
+      placeVinylSeconds +
+      cueSeconds +
+      startSlideSeconds +
+      hostBufferSeconds +
+      Math.ceil(sonosDelayMs / 1000);
+  }
+
   const { error } = await db.from("bingo_sessions").update(patch).eq("id", sessionId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
