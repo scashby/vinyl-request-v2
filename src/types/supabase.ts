@@ -493,6 +493,7 @@ export type Database = {
           time: string | null;
           location: string | null;
           image_url: string | null;
+            venue_logo_url: string | null;
           info: string | null;
           info_url: string | null;
           has_queue: boolean | null;
@@ -514,6 +515,7 @@ export type Database = {
           time?: string | null;
           location?: string | null;
           image_url?: string | null;
+            venue_logo_url?: string | null;
           info?: string | null;
           info_url?: string | null;
           has_queue?: boolean | null;
@@ -535,6 +537,7 @@ export type Database = {
           time?: string | null;
           location?: string | null;
           image_url?: string | null;
+            venue_logo_url?: string | null;
           info?: string | null;
           info_url?: string | null;
           has_queue?: boolean | null;

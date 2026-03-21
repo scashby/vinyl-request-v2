@@ -18,6 +18,11 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'bntoivaipesuovselglg.supabase.co',
+        pathname: '/storage/v1/object/public/venue-logos/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'bntoivaipesuovselglg.supabase.co',
         pathname: '/storage/v1/object/public/album-art/**',
       },
       // Spotify CDN for album covers

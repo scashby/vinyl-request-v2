@@ -8,6 +8,7 @@ import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from 'src/lib/supabaseClient';
 import { uploadEventImage } from 'src/lib/uploadEventImage';
+import { uploadVenueLogo } from 'src/lib/uploadVenueLogo';
 import type { Crate, SmartRules } from 'src/types/crate';
 import type { Database } from 'types/supabase';
 import {
@@ -23,7 +24,7 @@ const EVENT_TYPE_SETTINGS_KEY = 'event_type_config';
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
 const EVENT_SUBTYPE_TAG_PREFIX = 'event_subtype:';
 
-const TEMPLATE_FIELDS = ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'queue', 'recurrence', 'crate', 'formats'];
+const TEMPLATE_FIELDS = ['date', 'time', 'location', 'image_url', 'venue_logo_url', 'info', 'info_url', 'queue', 'recurrence', 'crate', 'formats'];
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 const GOOGLE_MAPS_LIBRARIES = 'places';
 let googleMapsScriptPromise: Promise<void> | null = null;
@@ -87,6 +88,7 @@ interface EventData {
   time: string;
   location: string;
   image_url: string;
+  venue_logo_url: string;
   info: string;
   info_url: string;
   has_queue: boolean;
@@ -222,6 +224,7 @@ function buildEventDataFromDbEvent(dbEvent: DbEvent): EventData {
     time: dbEvent.time ?? '',
     location: dbEvent.location ?? '',
     image_url: dbEvent.image_url ?? '',
+    venue_logo_url: dbEvent.venue_logo_url ?? '',
     info: dbEvent.info ?? '',
     info_url: dbEvent.info_url ?? '',
     has_queue: !!dbEvent.has_queue,
@@ -248,6 +251,7 @@ const OVERRIDE_FIELDS: Array<{
   { key: 'time', label: 'Time' },
   { key: 'location', label: 'Location' },
   { key: 'image_url', label: 'Image URL' },
+  { key: 'venue_logo_url', label: 'Venue Logo URL' },
   { key: 'info', label: 'Info' },
   { key: 'info_url', label: 'Info URL' },
   { key: 'has_queue', label: 'Queue Enabled' },
@@ -319,6 +323,7 @@ export default function EditEventForm({
   } | null>(null);
   const [isRegeneratingChildren, setIsRegeneratingChildren] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingVenueLogo, setUploadingVenueLogo] = useState(false);
   const [selectedGameSlug, setSelectedGameSlug] = useState<string>(EVENT_GAME_OPTIONS[0]?.slug ?? 'bingo');
   const [eventTypeConfig, setEventTypeConfig] = useState<EventTypeConfigState>(() =>
     normalizeEventTypeConfig(defaultEventTypeConfig)
@@ -332,6 +337,7 @@ export default function EditEventForm({
     time: '',
     location: '',
     image_url: '',
+    venue_logo_url: '',
     info: '',
     info_url: '',
     has_queue: false,
@@ -364,6 +370,8 @@ export default function EditEventForm({
   const showLocation = isFieldEnabled('location');
   const showInfo = isFieldEnabled('info');
   const showInfoUrl = isFieldEnabled('info_url');
+  const showEventImage = isFieldEnabled('image_url');
+  const showVenueLogo = true;
   const locationInputRef = useRef<HTMLInputElement | null>(null);
 
   // Fetch Available Crates
@@ -579,7 +587,7 @@ export default function EditEventForm({
             ? (value === '' ? null : parseInt(value))
             : name === 'crate_id'
               ? (value === '' ? null : parseInt(value))
-              : name === 'image_url'
+              : name === 'image_url' || name === 'venue_logo_url'
                 ? value.trim()
                 : value,
       ...(name === 'event_type' ? { event_subtype: '' } : {}),
@@ -740,6 +748,7 @@ export default function EditEventForm({
         time: event.time,
         location: event.location,
         image_url: event.image_url || null,
+        venue_logo_url: event.venue_logo_url || null,
         info: event.info,
         info_url: event.info_url,
         has_queue: event.has_queue,
@@ -817,6 +826,9 @@ export default function EditEventForm({
       ...(enabledFields.includes('time') && defaults.time ? { time: defaults.time } : {}),
       ...(enabledFields.includes('location') && defaults.location ? { location: defaults.location } : {}),
       ...(enabledFields.includes('image_url') && defaults.image_url ? { image_url: defaults.image_url } : {}),
+      ...(enabledFields.includes('venue_logo_url') && defaults.venue_logo_url
+        ? { venue_logo_url: defaults.venue_logo_url }
+        : {}),
       ...(enabledFields.includes('formats') && defaults.allowed_formats
         ? { allowed_formats: defaults.allowed_formats }
         : {}),
@@ -867,6 +879,34 @@ export default function EditEventForm({
     input.click();
   };
 
+  const handleVenueLogoUpload = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      try {
+        setUploadingVenueLogo(true);
+        const { publicUrl } = await uploadVenueLogo(file);
+
+        setEventData((prev) => ({
+          ...prev,
+          venue_logo_url: publicUrl.trim(),
+        }));
+      } catch (error) {
+        console.error('Error uploading venue logo:', error);
+        alert(error instanceof Error ? error.message : 'Failed to upload venue logo. Please try again.');
+      } finally {
+        setUploadingVenueLogo(false);
+      }
+    };
+
+    input.click();
+  };
+
   const linkableEventId = selectedSeriesEventId ?? editEventId;
   const canOpenGameSetup = Number.isFinite(linkableEventId ?? NaN);
 
@@ -895,6 +935,7 @@ export default function EditEventForm({
         .map((type) => type.trim())
         .filter(Boolean);
       const normalizedImageUrl = eventData.image_url.trim();
+      const normalizedVenueLogoUrl = eventData.venue_logo_url.trim();
       
       const payload: EventInsert = {
         allowed_tags: allowedTags.length > 0 ? allowedTags : null,
@@ -903,6 +944,7 @@ export default function EditEventForm({
         time: eventData.time,
         location: eventData.location,
         image_url: normalizedImageUrl || null,
+        venue_logo_url: normalizedVenueLogoUrl || null,
         info: eventData.info,
         info_url: eventData.info_url,
         has_queue: eventData.has_queue,
@@ -1082,6 +1124,7 @@ export default function EditEventForm({
           time: event.time,
           location: event.location,
           image_url: event.image_url || null,
+          venue_logo_url: event.venue_logo_url || null,
           info: event.info,
           info_url: event.info_url,
           has_queue: event.has_queue,
@@ -1484,44 +1527,93 @@ export default function EditEventForm({
           </div>
 
           <div className="space-y-6">
-            {isFieldEnabled('image_url') && (
+            {(showEventImage || showVenueLogo) && (
               <div className="p-5 border border-gray-200 rounded-2xl bg-white shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Event media</h3>
-              <div className="flex flex-col gap-4">
-                <div className="relative w-full aspect-[4/3] rounded-xl border border-dashed border-gray-300 bg-gray-50 overflow-hidden">
-                  {eventData.image_url ? (
-                    <Image
-                      src={eventData.image_url}
-                      alt="Event"
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
-                  ) : (
-                    <div className="h-full w-full flex items-center justify-center text-sm text-gray-400">
-                      Upload a featured image
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Event media</h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {showEventImage && (
+                    <div className="flex flex-col gap-3">
+                      <p className="text-sm font-semibold text-gray-700">Featured Event Image</p>
+                      <div className="relative w-full aspect-[4/3] rounded-xl border border-dashed border-gray-300 bg-gray-50 overflow-hidden">
+                        {eventData.image_url ? (
+                          <Image
+                            src={eventData.image_url}
+                            alt="Event"
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center text-sm text-gray-400">
+                            Upload a featured image
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleImageUpload}
+                        disabled={uploadingImage}
+                        className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                      >
+                        {uploadingImage ? 'Uploading…' : 'Upload image'}
+                      </button>
+                      <input
+                        name="image_url"
+                        value={eventData.image_url}
+                        onChange={handleChange}
+                        placeholder="Paste image URL"
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
+                        disabled={!showEventImage}
+                      />
+                    </div>
+                  )}
+
+                  {showVenueLogo && (
+                    <div className="flex flex-col gap-3">
+                      <p className="text-sm font-semibold text-gray-700">Venue Logo (used on bingo non-game screens)</p>
+                      <div className="relative w-full aspect-[4/3] rounded-xl border border-dashed border-gray-300 bg-gray-50 overflow-hidden">
+                        {eventData.venue_logo_url ? (
+                          <Image
+                            src={eventData.venue_logo_url}
+                            alt="Venue logo"
+                            fill
+                            className="object-contain p-4"
+                            unoptimized
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center text-sm text-gray-400">
+                            Upload a venue logo
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={handleVenueLogoUpload}
+                          disabled={uploadingVenueLogo}
+                          className="inline-flex flex-1 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                        >
+                          {uploadingVenueLogo ? 'Uploading…' : 'Upload venue logo'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEventData((prev) => ({ ...prev, venue_logo_url: '' }))}
+                          className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <input
+                        name="venue_logo_url"
+                        value={eventData.venue_logo_url}
+                        onChange={handleChange}
+                        placeholder="Paste venue logo URL"
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
+                        disabled={!showVenueLogo}
+                      />
                     </div>
                   )}
                 </div>
-                <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={handleImageUpload}
-                    disabled={uploadingImage}
-                    className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-                  >
-                    {uploadingImage ? 'Uploading…' : 'Upload image'}
-                  </button>
-                  <input
-                    name="image_url"
-                    value={eventData.image_url}
-                    onChange={handleChange}
-                    placeholder="Paste image URL"
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
-                    disabled={!isFieldEnabled('image_url')}
-                  />
-                </div>
-              </div>
               </div>
             )}
 

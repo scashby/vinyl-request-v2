@@ -17,6 +17,11 @@ type Session = {
   next_game_rules_text: string | null;
   call_reveal_at: string | null;
   bingo_overlay: string;
+  event?: {
+    id: number;
+    title: string | null;
+    venue_logo_url: string | null;
+  } | null;
 };
 
 type Call = {
@@ -111,6 +116,29 @@ function VinylCascade() {
         ))}
       </div>
     </>
+  );
+}
+
+function BrandingLogos({ venueLogoUrl, venueName }: { venueLogoUrl?: string | null; venueName?: string | null }) {
+  return (
+    <div className="relative z-10 flex flex-wrap items-center justify-center gap-4">
+      <div className="rounded-2xl border border-amber-700/40 bg-black/35 px-5 py-3">
+        <img
+          src="/images/dwd-logo.PNG"
+          alt="Dead Wax Dialogues"
+          className="h-[5.8vw] min-h-[52px] max-h-[96px] w-auto object-contain"
+        />
+      </div>
+      {venueLogoUrl ? (
+        <div className="rounded-2xl border border-stone-700 bg-black/35 px-5 py-3">
+          <img
+            src={venueLogoUrl}
+            alt={venueName ? `${venueName} logo` : "Venue logo"}
+            className="h-[5.8vw] min-h-[52px] max-h-[96px] w-auto object-contain"
+          />
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -231,6 +259,10 @@ export default function BingoJumbotronPage() {
         /* ── WINNER SCREEN — full-page replace, NOT an overlay ── */
         <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2.5vw] px-8 text-center">
           <VinylCascade />
+          <BrandingLogos
+            venueLogoUrl={session?.event?.venue_logo_url}
+            venueName={session?.event?.title ?? null}
+          />
           <p
             className="relative z-10 font-black uppercase leading-none tracking-tight text-amber-300"
             style={{ fontSize: "13vw", textShadow: "0 0 60px #f59e0b, 0 0 120px #d97706" }}
@@ -245,6 +277,10 @@ export default function BingoJumbotronPage() {
         /* ── THANKS SCREEN — full-page replace, NOT an overlay ── */
         <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2vw] px-8 text-center">
           <VinylCascade />
+          <BrandingLogos
+            venueLogoUrl={session?.event?.venue_logo_url}
+            venueName={session?.event?.title ?? null}
+          />
           <h2
             className="relative z-10 font-black uppercase leading-none tracking-[0.06em] text-amber-300"
             style={{ fontSize: "8vw" }}
@@ -291,6 +327,10 @@ export default function BingoJumbotronPage() {
               <div className="rounded-3xl border border-stone-700 bg-black/45 p-[1.4vw] text-center">
                 {showWelcome ? (
                   <div className="flex h-full flex-col items-center justify-center gap-[1.2vw] px-[1vw]">
+                    <BrandingLogos
+                      venueLogoUrl={session?.event?.venue_logo_url}
+                      venueName={session?.event?.title ?? null}
+                    />
                     <h2 className="text-[4vw] font-black uppercase leading-none tracking-[0.12em] text-amber-300">
                       Welcome To Vinyl Music Bingo
                     </h2>
@@ -309,6 +349,10 @@ export default function BingoJumbotronPage() {
                   </div>
                 ) : showIntermission ? (
                   <div className="flex h-full flex-col items-center justify-center gap-[1vw]">
+                    <BrandingLogos
+                      venueLogoUrl={session?.event?.venue_logo_url}
+                      venueName={session?.event?.title ?? null}
+                    />
                     <p className="text-[2.2vw] font-semibold uppercase tracking-[0.2em] text-amber-300">Intermission</p>
                     <p className="text-[1.6vw] text-stone-300">
                       Round {session!.current_round} of {session!.round_count} begins in

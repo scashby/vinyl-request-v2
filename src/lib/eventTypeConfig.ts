@@ -7,6 +7,7 @@ export type EventSubtypeDefaults = {
   time?: string;
   location?: string;
   image_url?: string;
+  venue_logo_url?: string;
   has_queue?: boolean;
   queue_types?: string[];
   is_recurring?: boolean;
@@ -47,6 +48,7 @@ export const defaultEventTypeConfig: EventTypeConfigState = {
         'time',
         'location',
         'image_url',
+        'venue_logo_url',
         'info',
         'info_url',
         'queue',

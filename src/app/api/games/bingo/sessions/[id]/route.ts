@@ -56,6 +56,12 @@ type SessionCallRow = {
   status: string;
 };
 
+type EventRow = {
+  id: number;
+  title: string | null;
+  venue_logo_url: string | null;
+};
+
 type TransportEventRow = {
   event_type: string;
   payload: { call_id?: unknown; after_call_id?: unknown } | null;
@@ -90,11 +96,20 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   if (!data) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
   const session = data as SessionRow;
-  const { data: playlist } = await db
-    .from("collection_playlists")
-    .select("name")
-    .eq("id", session.playlist_id)
-    .maybeSingle();
+  const [{ data: playlist }, { data: event }] = await Promise.all([
+    db
+      .from("collection_playlists")
+      .select("name")
+      .eq("id", session.playlist_id)
+      .maybeSingle(),
+    session.event_id
+      ? db
+          .from("events")
+          .select("id, title, venue_logo_url")
+          .eq("id", session.event_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
 
   const [{ data: pullEvent }, { data: promoteEvents }, { data: calls }, { data: transportEvents }] = await Promise.all([
     db
@@ -159,6 +174,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   return NextResponse.json(
     {
       ...session,
+      event: (event ?? null) as EventRow | null,
       playlist_name: playlist?.name ?? "Unknown Playlist",
       seconds_to_next_call: computeRemainingSeconds(session),
       pull_call_id: pullCallId,
