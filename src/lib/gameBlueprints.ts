@@ -1,4 +1,4 @@
-export type GameStatus = "in_development" | "undeveloped" | "needs_workshopping";
+export type GameStatus = "in_production" | "in_development" | "undeveloped" | "needs_workshopping";
 
 export type GameBlueprint = {
   slug: string;

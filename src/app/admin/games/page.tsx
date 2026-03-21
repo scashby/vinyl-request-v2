@@ -1,30 +1,43 @@
 import path from "node:path";
 import { existsSync } from "node:fs";
-import Link from "next/link";
-import PromptCopyButton from "src/components/PromptCopyButton";
-import { gameBlueprints, getGameBuildPrompt } from "src/lib/gameBlueprints";
+import { supabaseAdmin } from "src/lib/supabaseAdmin";
+import { gameBlueprints, type GameBlueprint, type GameStatus } from "src/lib/gameBlueprints";
+import GamesHub from "./_components/GamesHub";
 
-export default function GamesHomePage() {
-  const hasConcreteModule = (slug: string) =>
-    existsSync(path.join(process.cwd(), "src", "app", "admin", "games", slug, "page.tsx"));
+type GameOverride = {
+  title?: string;
+  status?: GameStatus;
+  notes?: string;
+  pullSizeGuidance?: string;
+};
 
-  const resolvedGames = gameBlueprints.map((game) => {
-    if (game.status === "undeveloped" && hasConcreteModule(game.slug)) {
-      return { ...game, status: "in_development" as const };
+async function getMergedBlueprints() {
+  const { data: rows } = await supabaseAdmin
+    .from("admin_settings")
+    .select("key, value")
+    .like("key", "game:blueprint:%");
+
+  const overrideMap = new Map<string, GameOverride>();
+  for (const row of rows ?? []) {
+    const slug = (row.key as string).replace("game:blueprint:", "");
+    try {
+      overrideMap.set(slug, JSON.parse(row.value as string) as GameOverride);
+    } catch {
+      // Ignore malformed overrides
     }
-    return game;
-  });
+  }
 
-  const inDevelopmentModules = resolvedGames
-    .filter((game) => game.status === "in_development")
-    .map((game) => ({
-      slug: game.slug,
-      title: game.title,
-      description: game.setup,
-      pullSizeGuidance: game.pullSizeGuidance,
-    }));
-  const needsWorkshop = resolvedGames.filter((game) => game.status === "needs_workshopping");
-  const undeveloped = resolvedGames.filter((game) => game.status === "undeveloped");
+  return gameBlueprints.map((blueprint: GameBlueprint) => {
+    const override = overrideMap.get(blueprint.slug) ?? {};
+    const hasConcreteModule = existsSync(
+      path.join(process.cwd(), "src", "app", "admin", "games", blueprint.slug, "page.tsx")
+    );
+    return { ...blueprint, ...override, hasConcreteModule };
+  });
+}
+
+export default async function GamesHomePage() {
+  const initialGames = await getMergedBlueprints();
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,#4a1f16,transparent_40%),radial-gradient(circle_at_80%_0%,#1f3c42,transparent_35%),linear-gradient(180deg,#121212,#1b1b1b)] p-6 text-stone-100">
@@ -46,106 +59,7 @@ export default function GamesHomePage() {
             Vinyl-first control room. Printed play, live host orchestration, and big-screen display scenes.
           </p>
 
-          <h2 className="mt-10 text-xl font-black uppercase tracking-[0.08em] text-amber-200">In Production</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <div className="rounded-xl border border-stone-700 bg-stone-950/40 p-4 text-sm text-stone-300">
-              No games are in production yet.
-            </div>
-          </div>
-
-          <h2 className="mt-10 text-xl font-black uppercase tracking-[0.08em] text-amber-200">In Development</h2>
-          <div className="mt-4 grid gap-4">
-            {inDevelopmentModules.map((module) => (
-              <section key={module.slug} className="rounded-2xl border border-amber-900/50 bg-amber-950/20 p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Testing Module</p>
-                    <h3 className="text-2xl font-black text-amber-100">{module.title}</h3>
-                  </div>
-                  <Link
-                    className="rounded border border-amber-700 px-3 py-1 text-xs uppercase tracking-[0.15em] hover:border-amber-400 hover:text-amber-200"
-                    href={`/admin/games/${module.slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Open Module
-                  </Link>
-                </div>
-                <p className="mt-3 text-sm text-amber-100/90">{module.description}</p>
-                <p className="mt-2 text-xs text-amber-200/90">Pull target: {module.pullSizeGuidance}</p>
-              </section>
-            ))}
-          </div>
-
-          <h2 className="mt-10 text-xl font-black uppercase tracking-[0.08em] text-amber-200">Undeveloped Games</h2>
-          <div className="mt-4 grid gap-4">
-            {undeveloped.map((game, index) => (
-              <section key={game.slug} className="rounded-2xl border border-stone-700 bg-stone-950/60 p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-stone-400">Game {index + 1}</p>
-                    <h3 className="text-2xl font-black text-stone-100">{game.title}</h3>
-                  </div>
-                  <Link
-                    className="rounded border border-stone-600 px-3 py-1 text-xs uppercase tracking-[0.15em] hover:border-amber-400 hover:text-amber-200"
-                    href={`/admin/games/${game.slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Open Skeleton
-                  </Link>
-                </div>
-
-                <p className="mt-3 text-sm text-stone-300">{game.coreMechanic}</p>
-                <p className="mt-2 text-xs text-stone-400">Pull target: {game.pullSizeGuidance}</p>
-
-                <details className="mt-4 rounded border border-stone-700 bg-black/40 p-3">
-                  <summary className="cursor-pointer text-sm font-semibold text-amber-200">Prompt for Build/Plan</summary>
-                  <div className="mt-3">
-                    <PromptCopyButton prompt={getGameBuildPrompt(game)} />
-                  </div>
-                  <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded border border-stone-700 bg-stone-950 p-3 text-xs leading-6 text-stone-200">
-                    {getGameBuildPrompt(game)}
-                  </pre>
-                </details>
-              </section>
-            ))}
-          </div>
-
-          <h2 className="mt-10 text-xl font-black uppercase tracking-[0.08em] text-amber-200">Needs Workshopping</h2>
-          <div className="mt-4 grid gap-4">
-            {needsWorkshop.map((game, index) => (
-              <section key={game.slug} className="rounded-2xl border border-amber-900/50 bg-amber-950/20 p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Workshop {index + 1}</p>
-                    <h3 className="text-2xl font-black text-amber-100">{game.title}</h3>
-                  </div>
-                  <Link
-                    className="rounded border border-amber-700 px-3 py-1 text-xs uppercase tracking-[0.15em] hover:border-amber-400 hover:text-amber-200"
-                    href={`/admin/games/${game.slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Open Skeleton
-                  </Link>
-                </div>
-
-                <p className="mt-3 text-sm text-amber-100/90">{game.coreMechanic}</p>
-                <p className="mt-2 text-xs text-amber-200/90">Pull target: {game.pullSizeGuidance}</p>
-
-                <details className="mt-4 rounded border border-amber-800/70 bg-black/30 p-3">
-                  <summary className="cursor-pointer text-sm font-semibold text-amber-200">Prompt for Build/Plan</summary>
-                  <div className="mt-3">
-                    <PromptCopyButton prompt={getGameBuildPrompt(game)} />
-                  </div>
-                  <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded border border-amber-800/60 bg-stone-950 p-3 text-xs leading-6 text-amber-100">
-                    {getGameBuildPrompt(game)}
-                  </pre>
-                </details>
-              </section>
-            ))}
-          </div>
+          <GamesHub initialGames={initialGames} />
         </div>
       </div>
     </div>
