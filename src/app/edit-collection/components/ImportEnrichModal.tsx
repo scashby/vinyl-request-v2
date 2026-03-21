@@ -1276,6 +1276,61 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }]);
   }
 
+  const downloadSessionLog = () => {
+    if (sessionLog.length === 0) return;
+    const rows = sessionLog.map((entry) => {
+      const time = entry.timestamp.toLocaleTimeString();
+      return `${time} | ${entry.action} | ${entry.album}: ${entry.details}`;
+    });
+    const content = rows.join('\n');
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `enrichment-session-log-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
+
+  const csvEscape = (value: unknown): string => {
+    if (value === null || value === undefined) return '';
+    const raw = String(value);
+    if (/[",\n]/.test(raw)) {
+      return `"${raw.replace(/"/g, '""')}"`;
+    }
+    return raw;
+  };
+
+  const downloadPatternFindings = () => {
+    if (patternFindings.length === 0) return;
+    const header = ['run_id', 'field', 'source', 'outcome', 'pct', 'sample_size', 'dominant_count', 'root_cause', 'action_code', 'action_text'];
+    const rows = patternFindings.map((pattern) => [
+      pattern.runId,
+      pattern.field,
+      pattern.source,
+      pattern.dominantOutcome,
+      pattern.dominantPct.toFixed(1),
+      pattern.sampleSize,
+      pattern.dominantCount,
+      pattern.rootCause,
+      pattern.recommendedActionCode,
+      pattern.recommendedActionText
+    ].map(csvEscape).join(','));
+
+    const csv = [header.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `enrichment-pattern-findings-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
+
   const formatAlbumLogLabel = (album: { artist: string; title: string; id?: number | null }) =>
     `${album.artist} - ${album.title}${typeof album.id === 'number' ? ` (#${album.id})` : ''}`;
 
@@ -3116,8 +3171,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               {/* 4. SESSION LOG */}
               {sessionLog.length > 0 && (
                 <div className="mb-4 border border-gray-200 rounded-md overflow-hidden">
-                  <div className="px-3 py-2 bg-gray-100 border-b border-gray-200 text-xs font-semibold text-gray-700">
-                    Session Activity ({sessionLog.length})
+                  <div className="px-3 py-2 bg-gray-100 border-b border-gray-200 text-xs font-semibold text-gray-700 flex items-center justify-between gap-2">
+                    <span>Session Activity ({sessionLog.length})</span>
+                    <button
+                      type="button"
+                      onClick={downloadSessionLog}
+                      disabled={sessionLog.length === 0}
+                      className="px-2 py-1 rounded border border-gray-300 bg-white text-gray-700 text-[11px] font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      ↓ Download
+                    </button>
                   </div>
                   <div className="max-h-[280px] overflow-y-auto p-2 bg-white">
                     {sessionLog.map(log => (
@@ -3138,8 +3201,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
               {(patternFindingsLoading || patternFindingsError || patternFindings.length > 0) && (
                 <div className="mb-4 border border-blue-200 rounded-md overflow-hidden">
-                  <div className="px-3 py-2 bg-blue-50 border-b border-blue-200 text-xs font-semibold text-blue-900">
-                    Pattern Findings {currentRunId ? `(run ${currentRunId.slice(0, 8)})` : ''}
+                  <div className="px-3 py-2 bg-blue-50 border-b border-blue-200 text-xs font-semibold text-blue-900 flex items-center justify-between gap-2">
+                    <span>Pattern Findings {currentRunId ? `(run ${currentRunId.slice(0, 8)})` : ''}</span>
+                    <button
+                      type="button"
+                      onClick={downloadPatternFindings}
+                      disabled={patternFindings.length === 0}
+                      className="px-2 py-1 rounded border border-blue-300 bg-white text-blue-900 text-[11px] font-semibold hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      ↓ Download CSV
+                    </button>
                   </div>
                   <div className="p-3 bg-white">
                     {patternFindingsLoading && (

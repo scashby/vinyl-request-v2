@@ -1261,13 +1261,6 @@ export async function fetchDiscogsData(
   opts?: { oauth?: DiscogsOAuthCredentials | null }
 ): Promise<EnrichmentResult> {
   try {
-    if (!opts?.oauth) {
-      return {
-        success: false,
-        source: 'discogs',
-        error: 'Missing Discogs OAuth cookie. Reconnect Discogs.',
-      };
-    }
     let releaseId = album.discogs_release_id;
     const searchArtist = stripDiscogsDisambiguationSuffix(album.artist) || album.artist;
 
@@ -1276,7 +1269,7 @@ export async function fetchDiscogsData(
       const searchData = await fetchDiscogsJson<{ results?: Array<{ id?: string | number }> }>(
         `https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release`,
         USER_AGENT,
-        { oauth: opts?.oauth, oauthOnly: true }
+        { oauth: opts?.oauth, oauthOnly: false }
       );
       const foundId = searchData.results?.[0]?.id;
       if (foundId !== null && foundId !== undefined) {
@@ -1290,7 +1283,7 @@ export async function fetchDiscogsData(
     const data = await fetchDiscogsJson<DiscogsRelease>(
       `https://api.discogs.com/releases/${releaseId}`,
       USER_AGENT,
-      { oauth: opts?.oauth, oauthOnly: true }
+      { oauth: opts?.oauth, oauthOnly: false }
     );
 
     const formatString = buildDiscogsFormatString(data.formats as Array<{ name?: string; qty?: string | number; descriptions?: string[] }> | undefined);
@@ -1302,7 +1295,7 @@ export async function fetchDiscogsData(
         masterData = await fetchDiscogsJson<{ year?: number }>(
           `https://api.discogs.com/masters/${data.master_id}`,
           USER_AGENT,
-          { oauth: opts?.oauth, oauthOnly: true }
+          { oauth: opts?.oauth, oauthOnly: false }
         );
     }
 

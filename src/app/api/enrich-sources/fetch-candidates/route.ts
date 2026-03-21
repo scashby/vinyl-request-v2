@@ -27,6 +27,16 @@ import {
 import { FIELD_TO_SERVICES } from "lib/enrichment-data-mapping";
 import { getDiscogsOAuthFromCookieHeader } from "lib/discogsAuth";
 
+const hasDiscogsServerCredentials = () => {
+  const hasConsumerCreds = Boolean(process.env.DISCOGS_CONSUMER_KEY && process.env.DISCOGS_CONSUMER_SECRET);
+  const hasToken = Boolean(
+    process.env.DISCOGS_TOKEN ??
+      process.env.DISCOGS_ACCESS_TOKEN ??
+      process.env.NEXT_PUBLIC_DISCOGS_TOKEN
+  );
+  return hasConsumerCreds || hasToken;
+};
+
 // Helper to chunk arrays for concurrency control
 const chunkArray = <T>(array: T[], size: number): T[][] => {
   const chunked: T[][] = [];
@@ -142,7 +152,8 @@ export async function POST(req: Request) {
     });
 
     const unavailableServices = new Set<string>();
-    const discogsAvailable = Boolean(discogsOAuth);
+    const discogsServerCredentialsPresent = hasDiscogsServerCredentials();
+    const discogsAvailable = Boolean(discogsOAuth) || discogsServerCredentialsPresent;
     if (requiredServices.has('discogs') && !discogsAvailable) {
       unavailableServices.add('discogs');
     }
@@ -561,7 +572,9 @@ export async function POST(req: Request) {
                   ? (
                     discogsOAuth
                       ? 'discogs auth: oauth cookie present'
-                      : 'discogs auth: oauth cookie missing'
+                        : (discogsServerCredentialsPresent
+                          ? 'discogs auth: oauth cookie missing, using server credentials'
+                          : 'discogs auth: oauth cookie missing')
                   )
                   : null;
                 sourceDiagnostics[task.source] = {
@@ -577,7 +590,9 @@ export async function POST(req: Request) {
                 ? (
                   discogsOAuth
                     ? 'discogs auth: oauth cookie present'
-                    : 'discogs auth: oauth cookie missing'
+                      : (discogsServerCredentialsPresent
+                        ? 'discogs auth: oauth cookie missing, using server credentials'
+                        : 'discogs auth: oauth cookie missing')
                 )
                 : null;
               sourceDiagnostics[task.source] = {
@@ -624,7 +639,7 @@ export async function POST(req: Request) {
         unavailableServices: Array.from(unavailableServices),
         requiredServices: Array.from(requiredServices),
         discogsOAuthPresent: Boolean(discogsOAuth),
-        discogsServerCredentialsPresent: false,
+        discogsServerCredentialsPresent,
       }
     });
 
