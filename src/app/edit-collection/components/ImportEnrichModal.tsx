@@ -2765,18 +2765,37 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       return releaseTrackRows.length;
     }
 
+    const matchedEnrichedIndexes = new Set<number>();
+    const existingPositionSet = new Set(
+      releaseTracks
+        .map((track) => String(track.position ?? '').trim().toUpperCase())
+        .filter((value) => value.length > 0)
+    );
+    const existingTitleSet = new Set(
+      releaseTracks
+        .map((track) => {
+          const recording = toSingle(track.recording);
+          const title = track.title_override || recording?.title || '';
+          return normalize(title);
+        })
+        .filter((value) => value.length > 0)
+    );
+
     for (const track of releaseTracks) {
       const recording = toSingle(track.recording);
       if (!recording?.id) continue;
       const title = track.title_override || recording.title || '';
 
-      const match = enriched.find((et) => {
+      const matchIndex = enriched.findIndex((et) => {
         const etTitle = normalize(et.title);
-        const etPos = et.position ? String(et.position) : '';
-        return (etTitle && etTitle === normalize(title)) || (etPos && etPos === track.position);
+        const etPos = String(et.position ?? '').trim();
+        const dbPos = String(track.position ?? '').trim();
+        return (etTitle && etTitle === normalize(title)) || (etPos && dbPos && etPos === dbPos);
       });
 
-      if (!match) continue;
+      if (matchIndex < 0) continue;
+      matchedEnrichedIndexes.add(matchIndex);
+      const match = enriched[matchIndex];
 
       const currentCredits = (recording.credits && typeof recording.credits === 'object' && !Array.isArray(recording.credits))
         ? (recording.credits as Record<string, unknown>)
@@ -2802,11 +2821,89 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       );
     }
 
+    let totalSaved = 0;
+
     if (updates.length > 0) {
       await Promise.all(updates);
-      return updates.length;
+      totalSaved += updates.length;
     }
-    return 0;
+
+    if (release?.id) {
+      const appendedPositionSet = new Set<string>();
+      const appendedTitleSet = new Set<string>();
+      const tracksToInsert = enriched
+        .filter((_, index) => !matchedEnrichedIndexes.has(index))
+        .map((track, index) => {
+          const title = String(track.title ?? '').trim();
+          if (!title) return null;
+          const titleKey = normalize(title);
+          const position = String(track.position ?? '').trim();
+          const positionKey = position.toUpperCase();
+
+          const duplicateByPosition = positionKey.length > 0 && (existingPositionSet.has(positionKey) || appendedPositionSet.has(positionKey));
+          const duplicateByTitle = titleKey.length > 0 && (existingTitleSet.has(titleKey) || appendedTitleSet.has(titleKey));
+          if (duplicateByPosition || duplicateByTitle) return null;
+
+          if (positionKey.length > 0) appendedPositionSet.add(positionKey);
+          if (titleKey.length > 0) appendedTitleSet.add(titleKey);
+
+          return {
+            sourceTrack: track,
+            recordingPayload: {
+              title,
+              duration_seconds: parseDurationToSeconds(track.duration),
+              track_artist: normalizeArtistDisplay(track.artist ? String(track.artist) : null),
+              lyrics: track.lyrics ? String(track.lyrics) : null,
+              lyrics_url: track.lyrics_url ? String(track.lyrics_url) : null,
+              is_cover: typeof track.is_cover === 'boolean' ? track.is_cover : null,
+              original_artist: track.original_artist ? String(track.original_artist) : null,
+              credits: (() => {
+                const credits = buildTrackCredits(track);
+                return Object.keys(credits).length > 0
+                  ? (credits as unknown as import('types/supabase').Json)
+                  : undefined;
+              })(),
+            },
+            fallbackPosition: String(index + 1),
+          };
+        })
+        .filter((entry) => entry !== null) as Array<{
+          sourceTrack: Record<string, unknown>;
+          recordingPayload: Record<string, unknown>;
+          fallbackPosition: string;
+        }>;
+
+      if (tracksToInsert.length > 0) {
+        const { data: insertedRecordings, error: insertRecordingsError } = await supabase
+          .from('recordings')
+          .insert(tracksToInsert.map((entry) => entry.recordingPayload))
+          .select('id');
+
+        if (!insertRecordingsError && insertedRecordings) {
+          const newReleaseTrackRows = insertedRecordings.map((recording, index) => {
+            const sourceTrack = tracksToInsert[index].sourceTrack;
+            const position = String(sourceTrack.position ?? tracksToInsert[index].fallbackPosition);
+            return {
+              release_id: release.id,
+              recording_id: recording.id,
+              position,
+              side: extractSide(position),
+              title_override: null,
+            };
+          });
+
+          const { error: insertReleaseTracksError } = await supabase
+            .from('release_tracks')
+            .insert(newReleaseTrackRows);
+
+          if (!insertReleaseTracksError) {
+            totalSaved += newReleaseTrackRows.length;
+          }
+        }
+      }
+    }
+
+    return totalSaved;
   }
 
   // --- NEW: SKIP HANDLER (SNOOZE) ---
