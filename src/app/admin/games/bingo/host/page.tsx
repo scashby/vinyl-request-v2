@@ -141,6 +141,10 @@ export default function BingoHostPage() {
     load();
   };
 
+  const startGame = async () => {
+    await patchSession({ bingo_overlay: "welcome" });
+  };
+
   const startRound = async () => {
     if (!session) return;
 
@@ -223,14 +227,14 @@ export default function BingoHostPage() {
   };
 
   const endGame = async () => {
-    await patchSession({ status: "completed", ended_at: new Date().toISOString(), bingo_overlay: "none" });
+    await patchSession({ status: "completed", ended_at: new Date().toISOString(), bingo_overlay: "thanks" });
     setAutoCallEnabled(false);
     await load();
   };
 
   const setOverlay = async (overlay: "none" | "pending" | "winner") => {
     setSavingOverlay(true);
-    if (overlay === "pending" && session?.status === "running") {
+    if ((overlay === "pending" || overlay === "winner") && session?.status === "running") {
       setAutoCallEnabled(false);
       autoCallLockRef.current = false;
       await fetch(`/api/games/bingo/sessions/${sessionId}/pause`, { method: "POST" });
@@ -315,7 +319,8 @@ export default function BingoHostPage() {
             {/* Left column: Start/intermission (top), game controls (bottom) */}
             <div className="space-y-2 text-xs">
               <div className="flex flex-wrap items-center gap-2">
-                <button onClick={startRound} className="rounded border border-emerald-700 bg-emerald-900/35 px-3 py-1 font-bold text-emerald-200 hover:bg-emerald-900/55">Start</button>
+                <button onClick={startGame} className="rounded border border-violet-700 bg-violet-900/35 px-3 py-1 font-bold text-violet-200 hover:bg-violet-900/55">Start Game</button>
+                <button onClick={startRound} className="rounded border border-emerald-700 bg-emerald-900/35 px-3 py-1 font-bold text-emerald-200 hover:bg-emerald-900/55">Start Round</button>
                 <label className="text-stone-400 whitespace-nowrap">Intermission (sec)</label>
                 <input
                   type="number"

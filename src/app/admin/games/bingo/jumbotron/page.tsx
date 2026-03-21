@@ -31,6 +31,14 @@ type Call = {
 
 const COLUMN_ROTATION = ["B", "I", "N", "G", "O"];
 
+function formatMinSec(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  if (m === 0) return `${s}s`;
+  if (s === 0) return `${m}m`;
+  return `${m}m ${s}s`;
+}
+
 function asContestantLine(call: Call) {
   return `Column ${call.column_letter} - ${call.track_title} - ${call.artist_name}`;
 }
@@ -73,6 +81,7 @@ export default function BingoJumbotronPage() {
       setNow(Date.now());
       setRemaining((value) => {
         if (!session || session.status === "paused" || session.status === "completed") return value;
+        if (session.bingo_overlay === "pending" || session.bingo_overlay === "winner") return value;
         return value - 1;
       });
     }, 1000);
@@ -127,7 +136,8 @@ export default function BingoJumbotronPage() {
   }, [session?.next_game_scheduled_at, now]);
 
   const showIntermission = session?.status === "paused" && intermissionSecondsLeft !== null && intermissionSecondsLeft > 0;
-  const showIntroSplash = !showIntermission && called.length === 0 && (session?.status === "pending" || session?.status === "paused" || session?.status === "running");
+  const showWelcome = !showIntermission && session?.bingo_overlay === "welcome";
+  const showThanks = session?.bingo_overlay === "thanks";
 
   const statusLabel = session?.status === "paused" ? "Paused" : null;
 
@@ -175,7 +185,10 @@ export default function BingoJumbotronPage() {
             {showIntermission ? (
               <div className="flex h-full flex-col items-center justify-center gap-[1vw]">
                 <p className="text-[2.2vw] font-semibold uppercase tracking-[0.2em] text-amber-300">Intermission</p>
-                <p className="text-[10vw] font-black leading-none text-amber-200 tabular-nums">{intermissionSecondsLeft}s</p>
+                <p className="text-[1.6vw] text-stone-300">
+                  Round {session!.current_round} of {session!.round_count} begins in
+                </p>
+                <p className="text-[10vw] font-black leading-none text-amber-200 tabular-nums">{formatMinSec(intermissionSecondsLeft!)}</p>
                 <p className="text-[1.4vw] text-stone-300">Crate reset in progress. Next round starts shortly.</p>
               </div>
             ) : (
@@ -272,7 +285,7 @@ export default function BingoJumbotronPage() {
         </div>
       ) : null}
 
-      {showIntroSplash ? (
+      {showWelcome ? (
         <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-[1.2vw] bg-black/88 px-[3vw] text-center">
           <h2 className="text-[6vw] font-black uppercase leading-none tracking-[0.12em] text-amber-300">Welcome To Vinyl Music Bingo</h2>
           <p className="max-w-[70vw] text-[1.9vw] text-stone-200">Listen for each track. If the song is on your card, mark that square. Get five in a row to call BINGO.</p>
@@ -283,6 +296,18 @@ export default function BingoJumbotronPage() {
             <p className="text-[1.25vw] text-stone-200">3) When you have five in a row, shout BINGO.</p>
           </div>
           {session?.next_game_rules_text ? <p className="max-w-[70vw] text-[1.1vw] text-stone-400">{session.next_game_rules_text}</p> : null}
+        </div>
+      ) : null}
+
+      {showThanks ? (
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-[1.5vw] bg-black/90 px-[3vw] text-center">
+          <h2 className="text-[7vw] font-black uppercase leading-none tracking-[0.1em] text-amber-300">Thank You For Playing!</h2>
+          <p className="text-[3vw] font-semibold text-amber-100">Vinyl Music Bingo</p>
+          {session ? (
+            <p className="text-[1.6vw] text-stone-400">
+              Round {session.current_round} of {session.round_count} · {called.length} songs called
+            </p>
+          ) : null}
         </div>
       ) : null}
     </div>
