@@ -1838,6 +1838,22 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
   }
 
+  const stopEnrichment = () => {
+    hasMoreRef.current = false;
+    isLoopingRef.current = false;
+    specificAlbumQueueRef.current = null;
+    setEnriching(false);
+    setStatus('Enrichment stopped by user.');
+    addLog('System', 'skipped', 'Enrichment stopped by user.');
+  };
+
+  const handleCloseRequest = () => {
+    if (enriching || isLoopingRef.current) {
+      stopEnrichment();
+    }
+    onClose();
+  };
+
   const applyAlbumUpdates = async (album: Album, updates: Record<string, unknown>) => {
     const { inventoryUpdates, releaseUpdates, masterUpdates, albumCredits, tagNames } = splitV3Updates(updates);
     const operations: Promise<unknown>[] = [];
@@ -3265,7 +3281,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         {/* HEADER */}
         <div className="bg-[#2A2A2A] text-white px-6 py-3.5 flex items-center justify-between shrink-0">
           <h2 className="text-base font-medium text-white">⚡ Collection Data Enrichment</h2>
-          <button onClick={onClose} disabled={enriching} className="bg-transparent border-none text-white text-[28px] cursor-pointer leading-none p-0 hover:text-gray-300">×</button>
+          <button onClick={handleCloseRequest} className="bg-transparent border-none text-white text-[28px] cursor-pointer leading-none p-0 hover:text-gray-300">×</button>
         </div>
 
         <div className="flex-1 overflow-auto p-5">
@@ -3521,11 +3537,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         {/* FOOTER */}
         <div className="p-4 border-t border-gray-200 flex justify-center gap-3">
           <button 
-            onClick={onClose} 
-            disabled={enriching} 
+            onClick={handleCloseRequest} 
             className="bg-white text-gray-900 border-2 border-[#D8D8D8] px-8 py-3 rounded-md text-[15px] font-medium cursor-pointer transition-all hover:border-[#4FC3F7] hover:bg-[#F0F9FF]"
           >
-            Close
+            {enriching ? 'Stop & Close' : 'Close'}
           </button>
           <button 
             onClick={() => startEnrichment()} 
