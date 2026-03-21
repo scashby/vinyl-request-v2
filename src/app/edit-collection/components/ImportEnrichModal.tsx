@@ -299,6 +299,37 @@ const isTransientFetchError = (error: unknown): boolean => {
   );
 };
 
+const isTransientSupabaseError = (error: unknown): boolean => {
+  const msg = error instanceof Error
+    ? error.message
+    : error && typeof error === 'object' && 'message' in error
+      ? String((error as { message?: unknown }).message ?? '')
+      : String(error ?? '');
+  const lower = msg.toLowerCase();
+  return (
+    isTransientFetchError(error) ||
+    lower.includes('gateway timeout') ||
+    lower.includes('statement timeout') ||
+    lower.includes('timed out') ||
+    lower.includes('timeout') ||
+    lower.includes('http 504') ||
+    lower.includes('504') ||
+    lower.includes('http 503') ||
+    lower.includes('503') ||
+    lower.includes('too many requests') ||
+    lower.includes('rate limit')
+  );
+};
+
+const chunkRows = <T,>(rows: T[], size: number): T[][] => {
+  if (size <= 0 || rows.length <= size) return [rows];
+  const chunks: T[][] = [];
+  for (let index = 0; index < rows.length; index += size) {
+    chunks.push(rows.slice(index, index + size));
+  }
+  return chunks;
+};
+
 const checkedSourcesFromActiveServices = (activeServices: ActiveServiceMap): string[] => {
   return Object.entries(activeServices)
     .filter(([, enabled]) => !!enabled)
@@ -1143,42 +1174,101 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     addLog('System', 'skipped', `Disabled conflict history writes (${context}): ${message}`);
   }
 
+  async function writeRowsWithRetry<T>(
+    rows: T[],
+    context: string,
+    chunkSize: number,
+    writeChunk: (chunk: T[]) => Promise<{ error: { message?: string | null } | null }>,
+    onPermanentFailure: (error: { message?: string | null } | null, failedContext: string) => void,
+  ) {
+    const chunks = chunkRows(rows, chunkSize);
+    for (let index = 0; index < chunks.length; index += 1) {
+      const chunk = chunks[index];
+      const chunkContext = chunks.length > 1
+        ? `${context} chunk ${index + 1}/${chunks.length}`
+        : context;
+
+      let lastError: { message?: string | null } | null = null;
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        const { error } = await writeChunk(chunk);
+        if (!error) {
+          lastError = null;
+          break;
+        }
+
+        lastError = error;
+        if (attempt < 3 && isTransientSupabaseError(error)) {
+          addLog('System', 'info', `Retrying ${chunkContext} (${attempt}/3) after transient Supabase error: ${error.message || 'Unknown error'}`);
+          await wait(400 * attempt);
+          continue;
+        }
+
+        onPermanentFailure(error, chunkContext);
+        return;
+      }
+
+      if (lastError) {
+        onPermanentFailure(lastError, chunkContext);
+        return;
+      }
+    }
+  }
+
   async function persistConflictResolutionHistory(rows: ConflictResolutionWriteRow[], context: string) {
     if (rows.length === 0 || historyWriteModeRef.current === 'disabled' || historyDisabledRef.current) return;
 
     if (historyWriteModeRef.current === 'upsert') {
-      const { error } = await supabase
-        .from('import_conflict_resolutions')
-        .upsert(rows, { onConflict: 'album_id,field_name,source' });
+      let upsertFailed = false;
+      await writeRowsWithRetry(
+        rows,
+        `${context} upsert`,
+        200,
+        async (chunk) => await supabase
+          .from('import_conflict_resolutions')
+          .upsert(chunk, { onConflict: 'album_id,field_name,source' }),
+        (error, failedContext) => {
+          const message = error?.message || '';
+          if (message.toLowerCase().includes('no unique or exclusion constraint')) {
+            historyWriteModeRef.current = 'insert';
+            addLog('System', 'info', `Conflict history fallback: switching to insert mode (${failedContext}).`);
+            return;
+          }
+          upsertFailed = true;
+          disableHistoryWrites(failedContext, error);
+        }
+      );
 
-      if (!error) return;
-
-      const message = error.message || '';
-      if (message.toLowerCase().includes('no unique or exclusion constraint')) {
-        historyWriteModeRef.current = 'insert';
-        addLog('System', 'info', `Conflict history fallback: switching to insert mode (${context}).`);
-      } else {
-        disableHistoryWrites(context, error);
+      if (historyWriteModeRef.current === 'upsert' && !upsertFailed) {
         return;
       }
     }
 
     if (historyWriteModeRef.current === 'insert') {
-      const { error } = await supabase.from('import_conflict_resolutions').insert(rows);
-      if (error) {
-        disableHistoryWrites(`${context} (insert fallback)`, error);
-      }
+      await writeRowsWithRetry(
+        rows,
+        `${context} insert fallback`,
+        200,
+        async (chunk) => await supabase.from('import_conflict_resolutions').insert(chunk),
+        (error, failedContext) => {
+          disableHistoryWrites(failedContext, error);
+        }
+      );
     }
   }
 
   async function persistEnrichmentRunLogs(rows: EnrichmentRunLogInsert[]) {
     if (!auditLogWriteEnabled || auditDisabledRef.current || rows.length === 0) return;
-    const { error } = await supabase.from('enrichment_run_logs').insert(rows);
-    if (error) {
-      auditDisabledRef.current = true;
-      setAuditLogWriteEnabled(false);
-      addLog('System', 'skipped', `Disabled enrichment run logging: ${error.message}`);
-    }
+    await writeRowsWithRetry(
+      rows,
+      'enrichment run logging',
+      100,
+      async (chunk) => await supabase.from('enrichment_run_logs').insert(chunk),
+      (error) => {
+        auditDisabledRef.current = true;
+        setAuditLogWriteEnabled(false);
+        addLog('System', 'skipped', `Disabled enrichment run logging: ${error?.message || 'Unknown error'}`);
+      }
+    );
   }
 
   async function persistEnrichmentFieldDiagnostics(rows: EnrichmentFieldDiagnosticInsert[]) {
@@ -1186,12 +1276,17 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const sb = supabase as unknown as {
       from: (table: string) => { insert: (payload: unknown) => Promise<{ error: { message: string } | null }> };
     };
-    const { error } = await sb.from('enrichment_field_diagnostics').insert(rows);
-    if (error) {
-      fieldDiagDisabledRef.current = true;
-      setFieldDiagnosticWriteEnabled(false);
-      addLog('System', 'skipped', `Disabled field diagnostics logging: ${error.message}`);
-    }
+    await writeRowsWithRetry(
+      rows,
+      'field diagnostics logging',
+      250,
+      async (chunk) => await sb.from('enrichment_field_diagnostics').insert(chunk),
+      (error) => {
+        fieldDiagDisabledRef.current = true;
+        setFieldDiagnosticWriteEnabled(false);
+        addLog('System', 'skipped', `Disabled field diagnostics logging: ${error?.message || 'Unknown error'}`);
+      }
+    );
   }
 
   async function loadPatternFindings(runId: string) {
@@ -2494,24 +2589,62 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
   
   async function saveTrackData(albumId: number, enrichedTracks: unknown[]) {
-    const { data: inventoryRow, error } = await supabase
-      .from('inventory')
-      .select(`
-        id,
-        release:releases (
-          id,
-          release_tracks:release_tracks (
-            id,
-            position,
-            title_override,
-            recording:recordings ( id, title, credits )
-          )
-        )
-      `)
-      .eq('id', albumId)
-      .single();
+    let inventoryRow: {
+      id: number;
+      release?: {
+        id?: number;
+        release_tracks?: Array<{
+          id: number;
+          position: string | null;
+          title_override: string | null;
+          recording?: { id?: number; title?: string | null; credits?: unknown } | Array<{ id?: number; title?: string | null; credits?: unknown }> | null;
+        }> | null;
+      } | Array<{
+        id?: number;
+        release_tracks?: Array<{
+          id: number;
+          position: string | null;
+          title_override: string | null;
+          recording?: { id?: number; title?: string | null; credits?: unknown } | Array<{ id?: number; title?: string | null; credits?: unknown }> | null;
+        }> | null;
+      }> | null;
+    } | null = null;
+    let inventoryError: { message?: string | null } | null = null;
 
-    if (error || !inventoryRow) return 0;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const { data, error } = await supabase
+        .from('inventory')
+        .select(`
+          id,
+          release:releases (
+            id,
+            release_tracks:release_tracks (
+              id,
+              position,
+              title_override,
+              recording:recordings ( id, title, credits )
+            )
+          )
+        `)
+        .eq('id', albumId)
+        .single();
+
+      if (!error && data) {
+        inventoryRow = data as typeof inventoryRow;
+        inventoryError = null;
+        break;
+      }
+
+      inventoryError = error;
+      if (attempt < 3 && isTransientSupabaseError(error)) {
+        addLog('System', 'info', `Retrying track context load for album ${albumId} (${attempt}/3) after transient Supabase error: ${error?.message || 'Unknown error'}`);
+        await wait(400 * attempt);
+        continue;
+      }
+      break;
+    }
+
+    if (inventoryError || !inventoryRow) return 0;
     const release = toSingle(inventoryRow.release);
     const releaseTracks = release?.release_tracks ?? [];
 
