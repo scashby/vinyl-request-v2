@@ -18,6 +18,7 @@ type EventRow = {
 };
 type Session = {
   id: number;
+  event_id: number | null;
   session_code: string;
   game_mode: string;
   playlist_name: string;
@@ -25,6 +26,11 @@ type Session = {
   status: string;
   current_round: number;
   round_count: number;
+  seconds_to_next_call: number;
+  call_reveal_delay_seconds: number;
+  show_countdown: boolean;
+  recent_calls_limit: number;
+  next_game_rules_text: string | null;
 };
 
 const GAME_BALL_COUNT = 75;
@@ -94,6 +100,17 @@ export default function BingoSetupPage() {
   const [sonosDelayMs, setSonosDelayMs] = useState(75);
 
   const [creating, setCreating] = useState(false);
+  const [editingSession, setEditingSession] = useState<Session | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Edit form state (populated when modal opens)
+  const [editEventId, setEditEventId] = useState<number | null>(null);
+  const [editSecondsToNextCall, setEditSecondsToNextCall] = useState(0);
+  const [editCallRevealDelay, setEditCallRevealDelay] = useState(0);
+  const [editShowCountdown, setEditShowCountdown] = useState(true);
+  const [editRecentCallsLimit, setEditRecentCallsLimit] = useState(5);
+  const [editNextGameRulesText, setEditNextGameRulesText] = useState("");
   const minimumTracksForSetup = useMemo(() => computeMinimumPlaylistTracks(roundCount, cardCount), [roundCount, cardCount]);
   const selectedPlaylist = useMemo(() => playlists.find((entry) => entry.id === playlistId) ?? null, [playlists, playlistId]);
   const roundsSupportedByPlaylist = selectedPlaylist ? Math.floor(selectedPlaylist.track_count / GAME_BALL_COUNT) : 0;
@@ -198,6 +215,50 @@ export default function BingoSetupPage() {
     } finally {
       setCreating(false);
       load();
+    }
+  };
+
+  const openEditModal = (session: Session) => {
+    setEditingSession(session);
+    setEditEventId(session.event_id);
+    setEditSecondsToNextCall(session.seconds_to_next_call);
+    setEditCallRevealDelay(session.call_reveal_delay_seconds);
+    setEditShowCountdown(session.show_countdown);
+    setEditRecentCallsLimit(session.recent_calls_limit);
+    setEditNextGameRulesText(session.next_game_rules_text ?? "");
+    setEditError(null);
+  };
+
+  const closeEditModal = () => {
+    setEditingSession(null);
+    setEditError(null);
+  };
+
+  const saveEditSession = async () => {
+    if (!editingSession) return;
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      const res = await fetch(`/api/games/bingo/sessions/${editingSession.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event_id: editEventId,
+          seconds_to_next_call: editSecondsToNextCall,
+          call_reveal_delay_seconds: editCallRevealDelay,
+          show_countdown: editShowCountdown,
+          recent_calls_limit: editRecentCallsLimit,
+          next_game_rules_text: editNextGameRulesText.trim() || null,
+        }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((payload as { error?: string }).error ?? "Failed to save");
+      closeEditModal();
+      void load();
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -357,6 +418,7 @@ export default function BingoSetupPage() {
                     <div className="mt-1 text-xs text-stone-400">Event: {session.event_title}</div>
                   ) : null}
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    <button className="rounded border border-amber-700/70 bg-amber-950/30 px-2 py-1 text-amber-200" onClick={() => openEditModal(session)}>Edit</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/host?sessionId=${session.id}`, "bingo_host", "width=1280,height=960,left=0,top=0,noopener,noreferrer")}>Host</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/assistant?sessionId=${session.id}`, "bingo_assistant", "width=1024,height=800,left=1300,top=0,noopener,noreferrer")}>Assistant</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/jumbotron?sessionId=${session.id}`, "bingo_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
@@ -380,6 +442,106 @@ export default function BingoSetupPage() {
           )}
         </section>
       </div>
+
+      {editingSession ? (
+        <>
+          <div className="fixed inset-0 z-[60000] bg-black/70" onClick={closeEditModal} />
+          <div className="fixed inset-0 z-[60001] flex items-center justify-center p-4">
+            <div className="w-full max-w-xl rounded-3xl border border-amber-900/50 bg-[#0e0e0e] p-6 text-stone-100 shadow-2xl">
+              <div className="mb-5 flex items-center justify-between">
+                <h2 className="text-xl font-black uppercase text-amber-100">Edit Session {editingSession.session_code}</h2>
+                <button onClick={closeEditModal} className="text-stone-400 hover:text-stone-100" aria-label="Close">✕</button>
+              </div>
+
+              <div className="space-y-4">
+                <label className="block text-sm">
+                  Linked Event
+                  <select
+                    className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                    value={editEventId ?? ""}
+                    onChange={(e) => setEditEventId(Number(e.target.value) || null)}
+                  >
+                    <option value="">No linked event</option>
+                    {events.map((event) => (
+                      <option key={event.id} value={event.id}>{event.date} – {event.title}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <label className="block text-sm">
+                    Seconds to Next Call
+                    <input
+                      type="number"
+                      min={1}
+                      className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                      value={editSecondsToNextCall}
+                      onChange={(e) => setEditSecondsToNextCall(Math.max(1, Number(e.target.value)))}
+                    />
+                  </label>
+
+                  <label className="block text-sm">
+                    Call Reveal Delay (sec)
+                    <input
+                      type="number"
+                      min={0}
+                      className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                      value={editCallRevealDelay}
+                      onChange={(e) => setEditCallRevealDelay(Math.max(0, Number(e.target.value)))}
+                    />
+                  </label>
+
+                  <label className="block text-sm">
+                    Recent Calls Limit
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                      value={editRecentCallsLimit}
+                      onChange={(e) => setEditRecentCallsLimit(Math.max(1, Number(e.target.value)))}
+                    />
+                  </label>
+
+                  <label className="flex items-center gap-3 pt-5 text-sm">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={editShowCountdown}
+                      onChange={(e) => setEditShowCountdown(e.target.checked)}
+                    />
+                    Show Countdown
+                  </label>
+                </div>
+
+                <label className="block text-sm">
+                  Welcome Screen Rules Text
+                  <textarea
+                    rows={3}
+                    placeholder="Optional rules or notes shown on the welcome screen..."
+                    className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm"
+                    value={editNextGameRulesText}
+                    onChange={(e) => setEditNextGameRulesText(e.target.value)}
+                  />
+                </label>
+              </div>
+
+              {editError ? <p className="mt-3 text-sm text-red-400">{editError}</p> : null}
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button onClick={closeEditModal} className="rounded border border-stone-600 px-4 py-2 text-sm">Cancel</button>
+                <button
+                  onClick={saveEditSession}
+                  disabled={editSaving}
+                  className="rounded bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                >
+                  {editSaving ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : null}
 
       {showCreateEventModal ? (
         <>

@@ -193,6 +193,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const body = (await request.json()) as Record<string, unknown>;
 
   const allowedFields = new Set([
+    "event_id",
     "current_round",
     "recent_calls_limit",
     "show_title",

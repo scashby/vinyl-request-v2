@@ -1,4 +1,4 @@
-const DEFAULT_USER_AGENT = 'DeadwaxDialogues/1.0 (https://deadwaxdialogues.com)';
+const DEFAULT_USER_AGENT = 'vinyl-request-v2/1.0 (+https://github.com/scashby/vinyl-request-v2)';
 
 const DISCOGS_TOKEN =
   process.env.DISCOGS_TOKEN ??

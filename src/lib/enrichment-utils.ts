@@ -512,7 +512,7 @@ interface CAAImage {
   image: string;
 }
 
-const USER_AGENT = 'DeadwaxDialogues/1.0 (https://deadwaxdialogues.com)';
+const USER_AGENT = 'vinyl-request-v2/1.0 (+https://github.com/scashby/vinyl-request-v2)';
 
 // Helper to force HTTPS
 const toHttps = (url: string | undefined | null) => {

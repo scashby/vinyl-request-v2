@@ -71,8 +71,7 @@ export async function GET(request: Request) {
 
   try {
     const baseSelect = `
-          id,
-          release:releases (
+          id,          location,          release:releases (
             id,
             barcode,
             label,
@@ -128,8 +127,7 @@ export async function GET(request: Request) {
 
     // Fallback select for environments where some optional columns/relations are not yet present.
     const fallbackSelect = `
-          id,
-          release:releases (
+          id,          location,          release:releases (
             id,
             barcode,
             label,
@@ -173,8 +171,7 @@ export async function GET(request: Request) {
 
     // Star-select fallback is resilient to column additions/removals while preserving relation-based stats.
     const wildcardSelect = `
-          id,
-          release:releases (
+          id,          location,          release:releases (
             *,
             master:masters (
               *
@@ -192,8 +189,7 @@ export async function GET(request: Request) {
 
     // Last-resort fallback if nested track relation is unavailable.
     const minimalSelect = `
-          id,
-          release:releases (
+          id,          location,          release:releases (
             *,
             master:masters (
               *
@@ -202,11 +198,12 @@ export async function GET(request: Request) {
         `;
 
     // Absolute fallback so stats UI can still render instead of hard-failing.
-    const inventoryOnlySelect = `id`;
+    const inventoryOnlySelect = `id, location`;
 
     const fetchAlbumsPaginated = async (selectClause: string) => {
       const rows: Array<{
         id: string | number;
+        location?: string | null;
         release?: ReleaseRow | ReleaseRow[] | null;
       }> = [];
       const batchSize = 1000;
@@ -222,6 +219,7 @@ export async function GET(request: Request) {
         if (error) throw error;
         const typedBatch = ((batch ?? []) as unknown) as Array<{
           id: string | number;
+          location?: string | null;
           release?: ReleaseRow | ReleaseRow[] | null;
         }>;
         if (typedBatch.length === 0) break;
@@ -247,6 +245,7 @@ export async function GET(request: Request) {
 
     let albums: Array<{
       id: string | number;
+      location?: string | null;
       release?: ReleaseRow | ReleaseRow[] | null;
     }> | null = null;
 
@@ -375,6 +374,9 @@ export async function GET(request: Request) {
 
     albums.forEach(album => {
       const albumIdStr = String(album.id);
+      if (typeof album.location === 'string' && album.location.trim()) {
+        folders.add(album.location.trim());
+      }
       const release = toSingle<ReleaseRow>(album.release);
       const master = toSingle<MasterRow>(release?.master ?? null);
       const rawReleaseTracks = release?.release_tracks;
