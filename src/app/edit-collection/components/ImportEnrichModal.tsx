@@ -1624,16 +1624,19 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       return;
     }
 
-    const hasExplicitTargets = Array.isArray(specificAlbumIds) && specificAlbumIds.length > 0;
-    if (!advancedScanEnabled && !hasExplicitTargets) {
-      alert('Targeted mode is enabled. Open a category and run enrichment for selected albums, or enable Advanced full scan mode.');
-      return;
-    }
-
     const parsedStart = Number.parseInt(startEntry, 10);
     const parsedEnd = endEntry.trim().length > 0 ? Number.parseInt(endEntry, 10) : null;
     const safeStart = Number.isFinite(parsedStart) && parsedStart > 0 ? parsedStart : 1;
     const safeEnd = parsedEnd !== null && Number.isFinite(parsedEnd) && parsedEnd > 0 ? parsedEnd : null;
+    const hasSpecificAlbums = Array.isArray(specificAlbumIds) && specificAlbumIds.length > 0;
+    const hasFolderScope = folderFilter.trim().length > 0;
+    const hasRangeScope = safeStart > 1 || safeEnd !== null;
+    const hasExplicitTargets = hasSpecificAlbums || hasFolderScope || hasRangeScope;
+    if (!advancedScanEnabled && !hasExplicitTargets) {
+      alert('Targeted mode needs an explicit scope. Choose selected albums, a folder, or an entry range, or enable Advanced full scan mode.');
+      return;
+    }
+
     if (safeEnd !== null && safeEnd < safeStart) {
       alert('End entry must be greater than or equal to start entry.');
       return;
