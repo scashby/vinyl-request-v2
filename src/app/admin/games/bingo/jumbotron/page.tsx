@@ -24,6 +24,14 @@ type Session = {
   } | null;
 };
 
+type UpcomingEvent = {
+  id: number;
+  title: string;
+  date: string;
+  time: string | null;
+  location: string | null;
+};
+
 type Call = {
   id: number;
   call_index: number;
@@ -164,6 +172,7 @@ export default function BingoJumbotronPage() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [remaining, setRemaining] = useState(0);
   const [now, setNow] = useState(() => Date.now());
+  const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -183,6 +192,22 @@ export default function BingoJumbotronPage() {
       setCalls(payload.data ?? []);
     }
   }, [sessionId]);
+
+  // Fetch upcoming events once when the Thanks screen appears.
+  useEffect(() => {
+    if (session?.bingo_overlay !== "thanks") return;
+    const today = new Date().toISOString().split("T")[0]!;
+    fetch("/api/games/bingo/events", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data: { data?: UpcomingEvent[] }) => {
+        const upcoming = (data.data ?? [])
+          .filter((e) => e.date >= today)
+          .sort((a, b) => a.date.localeCompare(b.date))
+          .slice(0, 4);
+        setUpcomingEvents(upcoming);
+      })
+      .catch(() => undefined);
+  }, [session?.bingo_overlay]);
 
   useEffect(() => {
     load();
@@ -343,7 +368,7 @@ export default function BingoJumbotronPage() {
           </div>
         </div>
       ) : showThanks ? (
-        <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2vw] px-8 text-center">
+        <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2.2vw] px-[4vw] py-[4vh] text-center">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_14%,rgba(251,191,36,0.2),transparent_26%),radial-gradient(circle_at_78%_70%,rgba(120,53,15,0.1),transparent_24%)]" />
           <BrandingLogos
             venueLogoUrl={session?.event?.venue_logo_url}
@@ -352,15 +377,51 @@ export default function BingoJumbotronPage() {
           />
           <h2
             className="relative z-10 font-black uppercase leading-none tracking-[0.06em] text-amber-700"
-            style={{ fontSize: "8vw" }}
+            style={{ fontSize: "7.5vw" }}
           >
             Thank You For Playing!
           </h2>
-          <p className="relative z-10 text-[3.5vw] font-semibold text-stone-700">Vinyl Music Bingo</p>
-          {session ? (
-            <p className="relative z-10 text-[1.8vw] text-stone-600">
-              Round {session.current_round} of {session.round_count} &middot; {called.length} songs called
-            </p>
+          <p className="relative z-10 text-[3vw] font-semibold text-stone-700">Vinyl Music Bingo</p>
+
+          {upcomingEvents.length > 0 ? (
+            <div className="relative z-10 w-full max-w-[80vw]">
+              <p className="mb-[1.4vw] text-[1.6vw] font-semibold uppercase tracking-[0.26em] text-amber-800">
+                Find Us Next At
+              </p>
+              <div className={`grid gap-[1.2vw] ${
+                upcomingEvents.length === 1 ? "grid-cols-1" :
+                upcomingEvents.length === 2 ? "grid-cols-2" :
+                "grid-cols-2 lg:grid-cols-4"
+              }`}>
+                {upcomingEvents.map((event) => {
+                  const [year, month, day] = event.date.split("-");
+                  const dateObj = new Date(Number(year), Number(month) - 1, Number(day));
+                  const dateLabel = dateObj.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+                  const [hourRaw, minuteRaw] = (event.time ?? "").split(":");
+                  let timeLabel: string | null = null;
+                  if (hourRaw && minuteRaw) {
+                    const h = Number(hourRaw);
+                    const m = minuteRaw;
+                    const ampm = h >= 12 ? "pm" : "am";
+                    const hour12 = h % 12 || 12;
+                    timeLabel = `${hour12}:${m}${ampm}`;
+                  }
+                  return (
+                    <div
+                      key={event.id}
+                      className="rounded-[1.5rem] border border-amber-300/70 bg-white/76 px-[1.6vw] py-[1.4vw] shadow-[0_18px_40px_rgba(120,53,15,0.1)] text-left"
+                    >
+                      <p className="text-[1.1vw] font-semibold uppercase tracking-[0.16em] text-amber-700">{dateLabel}</p>
+                      {timeLabel ? <p className="mt-[0.2vw] text-[1vw] text-stone-500">{timeLabel}</p> : null}
+                      <p className="mt-[0.5vw] text-[1.4vw] font-black leading-snug text-stone-900">{event.title}</p>
+                      {event.location ? (
+                        <p className="mt-[0.3vw] text-[1vw] text-stone-600">{event.location}</p>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           ) : null}
         </div>
       ) : (
