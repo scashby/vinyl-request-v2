@@ -150,7 +150,6 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
       paused_at: null,
       paused_remaining_seconds: null,
       countdown_started_at: now,
-      transport_queue_call_ids: [],
       call_reveal_at: null,
       bingo_overlay: "welcome",
       next_game_scheduled_at: null,
