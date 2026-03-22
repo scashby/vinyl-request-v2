@@ -2801,6 +2801,23 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         .replace(/[^\w\s]/g, '')
         .trim();
 
+    const isFallbackTrackTitle = (title: string, position: string | null | undefined) => {
+      const trimmedTitle = String(title ?? '').trim();
+      if (!trimmedTitle) return true;
+
+      const normalizedTitle = normalize(trimmedTitle);
+      const normalizedPosition = String(position ?? '').trim().toLowerCase();
+      const compactPosition = normalizedPosition.replace(/[^a-z0-9]/g, '');
+
+      if (normalizedTitle === 'untitled') return true;
+      if (normalizedPosition && normalizedTitle === normalizedPosition) return true;
+      if (compactPosition && normalizedTitle === compactPosition) return true;
+      if (/^track\s+[a-z]?\d+[a-z]?$/i.test(trimmedTitle)) return true;
+      if (compactPosition && normalizedTitle === `track ${compactPosition}`) return true;
+
+      return false;
+    };
+
     const buildTrackCredits = (track: Record<string, unknown>) => {
       const credits: Record<string, unknown> = {};
       if (track.tempo_bpm) credits.tempo_bpm = track.tempo_bpm;
@@ -2914,6 +2931,13 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       if (typeof match.is_cover === 'boolean') updatePayload.is_cover = match.is_cover;
       if (match.original_artist) updatePayload.original_artist = String(match.original_artist);
 
+      const incomingTitle = String(match.title ?? '').trim();
+      const currentTitle = String(title ?? '').trim();
+      const shouldApplyTrackTitle =
+        incomingTitle.length > 0 &&
+        normalize(incomingTitle) !== normalize(currentTitle) &&
+        (Boolean(track.title_override) || isFallbackTrackTitle(currentTitle, track.position));
+
       updates.push(
         Promise.resolve(
           supabase
@@ -2922,6 +2946,17 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             .eq('id', recording.id)
         )
       );
+
+      if (shouldApplyTrackTitle) {
+        updates.push(
+          Promise.resolve(
+            supabase
+              .from('release_tracks')
+              .update({ title_override: incomingTitle })
+              .eq('id', track.id)
+          )
+        );
+      }
     }
 
     let totalSaved = 0;
