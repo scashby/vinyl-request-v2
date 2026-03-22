@@ -1034,7 +1034,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [startEntry, setStartEntry] = useState('1');
   const [endEntry, setEndEntry] = useState('');
   const [sourceSelection, setSourceSelection] = useState<EnrichmentService[]>([]);
-  const [advancedScanEnabled, setAdvancedScanEnabled] = useState(false);
   const [autoSnooze, setAutoSnooze] = useState(false); // Scan-level option (off by default)
   const [missingDataOnly, setMissingDataOnly] = useState(false);
   
@@ -1045,7 +1044,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     if (isOpen) {
       setFieldConfig({});
       setSourceSelection([]);
-      setAdvancedScanEnabled(false);
     }
   }, [isOpen]);
   
@@ -1613,6 +1611,32 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
   // --- MAIN LOOP LOGIC ---
 
+  function getConfiguredRunScope() {
+    const parsedStart = Number.parseInt(startEntry, 10);
+    const parsedEnd = endEntry.trim().length > 0 ? Number.parseInt(endEntry, 10) : null;
+    const safeStart = Number.isFinite(parsedStart) && parsedStart > 0 ? parsedStart : 1;
+    const safeEnd = parsedEnd !== null && Number.isFinite(parsedEnd) && parsedEnd > 0 ? parsedEnd : null;
+    const hasFolderScope = folderFilter.trim().length > 0;
+    const hasRangeScope = safeStart > 1 || safeEnd !== null;
+
+    let summary = 'Scope: all folders, all entries';
+    if (hasFolderScope && hasRangeScope) {
+      summary = `Scope: folder ${folderFilter}, entries ${safeStart}${safeEnd !== null ? `-${safeEnd}` : '+'}`;
+    } else if (hasFolderScope) {
+      summary = `Scope: folder ${folderFilter}`;
+    } else if (hasRangeScope) {
+      summary = `Scope: entries ${safeStart}${safeEnd !== null ? `-${safeEnd}` : '+'}`;
+    }
+
+    return {
+      safeStart,
+      safeEnd,
+      hasFolderScope,
+      hasRangeScope,
+      summary,
+    };
+  }
+
   async function startEnrichment(specificAlbumIds?: number[]) {
     const effectiveFieldConfig = getEffectiveFieldConfig();
     if (sourceSelection.length === 0) {
@@ -1624,18 +1648,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       return;
     }
 
-    const parsedStart = Number.parseInt(startEntry, 10);
-    const parsedEnd = endEntry.trim().length > 0 ? Number.parseInt(endEntry, 10) : null;
-    const safeStart = Number.isFinite(parsedStart) && parsedStart > 0 ? parsedStart : 1;
-    const safeEnd = parsedEnd !== null && Number.isFinite(parsedEnd) && parsedEnd > 0 ? parsedEnd : null;
-    const hasSpecificAlbums = Array.isArray(specificAlbumIds) && specificAlbumIds.length > 0;
-    const hasFolderScope = folderFilter.trim().length > 0;
-    const hasRangeScope = safeStart > 1 || safeEnd !== null;
-    const hasExplicitTargets = hasSpecificAlbums || hasFolderScope || hasRangeScope;
-    if (!advancedScanEnabled && !hasExplicitTargets) {
-      alert('Targeted mode needs an explicit scope. Choose selected albums, a folder, or an entry range, or enable Advanced full scan mode.');
-      return;
-    }
+    const { safeStart, safeEnd } = getConfiguredRunScope();
 
     if (safeEnd !== null && safeEnd < safeStart) {
       alert('End entry must be greater than or equal to start entry.');
@@ -3557,18 +3570,12 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                     (skip albums reviewed in last 30 days)
                   </span>
                 </label>
-                <label className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-                  <input
-                    type="checkbox"
-                    checked={advancedScanEnabled}
-                    onChange={(e) => setAdvancedScanEnabled(e.target.checked)}
-                    disabled={enriching}
-                  />
-                  Advanced full scan mode
-                  <span className="text-[11px] font-medium text-amber-700">
-                    (higher DB usage)
+                <div className="text-xs font-medium text-sky-800 bg-sky-50 border border-sky-200 rounded px-2.5 py-2">
+                  {getConfiguredRunScope().summary}
+                  <span className="ml-1 text-[11px] text-sky-700">
+                    (large runs can increase DB usage)
                   </span>
-                </label>
+                </div>
                 <label className="flex items-center gap-2 text-sm font-semibold text-gray-900">
                   <input
                     type="checkbox"
@@ -3703,7 +3710,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                 : 'bg-[#4FC3F7] hover:bg-[#29B6F6] hover:shadow-md'
             }`}
           >
-            {enriching ? 'Scanning...' : (advancedScanEnabled ? '⚡ Start Full Enrichment Run' : '⚡ Start Targeted Enrichment')}
+            {enriching ? 'Scanning...' : '⚡ Start Enrichment'}
           </button>
         </div>
         </div>
