@@ -1015,11 +1015,12 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [enriching, setEnriching] = useState(false);
   const [status, setStatus] = useState('');
   const [folderFilter, setFolderFilter] = useState('');
-  const [batchSize, setBatchSize] = useState('10');
+  const [batchSize, setBatchSize] = useState('25');
   const [startEntry, setStartEntry] = useState('1');
   const [endEntry, setEndEntry] = useState('');
-  const [enrichmentMode, setEnrichmentMode] = useState<EnrichmentMode>('content');
+  const [enrichmentMode, setEnrichmentMode] = useState<EnrichmentMode>('source');
   const [sourceSelection, setSourceSelection] = useState<EnrichmentService[]>([]);
+  const [advancedScanEnabled, setAdvancedScanEnabled] = useState(false);
   const [autoSnooze, setAutoSnooze] = useState(false); // Scan-level option (off by default)
   const [missingDataOnly, setMissingDataOnly] = useState(false);
   
@@ -1044,8 +1045,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         });
       });
       setFieldConfig(initialConfig);
-      setEnrichmentMode('content');
+      setEnrichmentMode('source');
       setSourceSelection([]);
+      setAdvancedScanEnabled(false);
     }
   }, [isOpen]);
   
@@ -1060,9 +1062,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const logEndRef = useRef<HTMLDivElement>(null);
   const [batchSummary, setBatchSummary] = useState<{album: string, field: string, action: string}[] | null>(null);
   const [currentRunId, setCurrentRunId] = useState<string | null>(null);
-  const [historyWriteEnabled, setHistoryWriteEnabled] = useState(true);
-  const [auditLogWriteEnabled, setAuditLogWriteEnabled] = useState(true);
-  const [fieldDiagnosticWriteEnabled, setFieldDiagnosticWriteEnabled] = useState(true);
+  const [historyWriteEnabled, setHistoryWriteEnabled] = useState(false);
+  const [auditLogWriteEnabled, setAuditLogWriteEnabled] = useState(false);
+  const [fieldDiagnosticWriteEnabled, setFieldDiagnosticWriteEnabled] = useState(false);
   const [patternFindings, setPatternFindings] = useState<PatternFinding[]>([]);
   const [patternFindingsLoading, setPatternFindingsLoading] = useState(false);
   const [patternFindingsError, setPatternFindingsError] = useState<string | null>(null);
@@ -1095,9 +1097,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   useEffect(() => {
     if (isOpen) {
       setCurrentRunId(null);
-      setHistoryWriteEnabled(true);
-      setAuditLogWriteEnabled(true);
-      setFieldDiagnosticWriteEnabled(true);
+      setHistoryWriteEnabled(false);
+      setAuditLogWriteEnabled(false);
+      setFieldDiagnosticWriteEnabled(false);
       setPatternFindings([]);
       setPatternFindingsError(null);
       historyWriteModeRef.current = 'upsert';
@@ -1565,6 +1567,12 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       return;
     }
 
+    const hasExplicitTargets = Array.isArray(specificAlbumIds) && specificAlbumIds.length > 0;
+    if (!advancedScanEnabled && !hasExplicitTargets) {
+      alert('Targeted mode is enabled. Open a category and run enrichment for selected albums, or enable Advanced full scan mode.');
+      return;
+    }
+
     const parsedStart = Number.parseInt(startEntry, 10);
     const parsedEnd = endEntry.trim().length > 0 ? Number.parseInt(endEntry, 10) : null;
     const safeStart = Number.isFinite(parsedStart) && parsedStart > 0 ? parsedStart : 1;
@@ -1756,8 +1764,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
         const candidates = result.results || [];
         processedDuringScanRef.current += Number(result.processedCount || candidates.length || 0);
-        if (processedDuringScanRef.current >= nextStatsRefreshAtRef.current) {
-          void loadStats(true);
+        while (processedDuringScanRef.current >= nextStatsRefreshAtRef.current) {
           nextStatsRefreshAtRef.current += 25;
         }
         if (specificAlbumQueueRef.current && specificAlbumQueueRef.current.length > 0) {
@@ -1786,13 +1793,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           break; 
         }
 
-        let batchConflicts: ExtendedFieldConflict[] = [];
-        let batchSummaryItems: {album: string, field: string, action: string}[] = [];
-        for (const candidate of candidates) {
-          const albumResult = await processBatchAndSave([candidate], runFieldConfigRef.current);
-          batchConflicts = [...batchConflicts, ...albumResult.conflicts];
-          batchSummaryItems = [...batchSummaryItems, ...(albumResult.summary || [])];
-        }
+        const albumResult = await processBatchAndSave(candidates, runFieldConfigRef.current);
+        const batchConflicts: ExtendedFieldConflict[] = [...albumResult.conflicts];
+        const batchSummaryItems: {album: string, field: string, action: string}[] = [...(albumResult.summary || [])];
         
         collectedConflicts = [...collectedConflicts, ...batchConflicts];
         if (batchSummaryItems && batchSummaryItems.length > 0) {
@@ -1932,12 +1935,13 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const selectedFields = Object.keys(activeFieldConfig).filter((field) => !NON_ENRICHABLE_FIELDS.has(field));
     const runId = getOrCreateRunId();
     const wantsLyrics = !!activeFieldConfig['tracks.lyrics'] || !!activeFieldConfig['tracks.lyrics_url'];
+    const wantsTrackData = !!activeFieldConfig.tracks || !!activeFieldConfig.tracklist || !!activeFieldConfig.tracklists;
     const selectedLyricsProviders = LYRICS_SERVICE_IDS.filter((service) => !!activeServices[service]);
     const runLyricsEnrichment = wantsLyrics && selectedLyricsProviders.length > 0;
 
     let resolutions: ResolutionHistory[] | null = null;
     const albumIds = results.map(r => r.album.id);
-    if (!historyReadDisabledRef.current) {
+    if (historyWriteEnabled && !historyReadDisabledRef.current) {
       const { data, error: resError } = await supabase
         .from('import_conflict_resolutions')
         .select('album_id, field_name, source')
@@ -2162,8 +2166,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             }
          });
 
-         const tracks = sourceData.tracks;
-         if (Array.isArray(tracks) && tracks.length > 0) {
+        const tracks = sourceData.tracks;
+        if (wantsTrackData && Array.isArray(tracks) && tracks.length > 0) {
             const trackDot = resolutions?.some(r => 
                r.album_id === album.id && r.field_name === 'track_data' && r.source === source
             );
@@ -3404,6 +3408,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                   <select value={batchSize} onChange={(e) => setBatchSize(e.target.value)} disabled={enriching} className="p-1.5 rounded border border-gray-300 text-gray-900">
                     <option value="10">10 (Safe)</option>
                     <option value="25">25 (Standard)</option>
+                    <option value="50">50 (Fast)</option>
                   </select>
                 </div>
                 <div className="flex items-center gap-2">
@@ -3451,6 +3456,54 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                   Snooze recently reviewed
                   <span className="text-[11px] font-medium text-gray-500">
                     (skip albums reviewed in last 30 days)
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                  <input
+                    type="checkbox"
+                    checked={advancedScanEnabled}
+                    onChange={(e) => setAdvancedScanEnabled(e.target.checked)}
+                    disabled={enriching}
+                  />
+                  Advanced full scan mode
+                  <span className="text-[11px] font-medium text-amber-700">
+                    (higher DB usage)
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                  <input
+                    type="checkbox"
+                    checked={auditLogWriteEnabled}
+                    onChange={(e) => setAuditLogWriteEnabled(e.target.checked)}
+                    disabled={enriching}
+                  />
+                  Write enrichment audit logs
+                  <span className="text-[11px] font-medium text-gray-500">
+                    (optional, extra DB writes)
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                  <input
+                    type="checkbox"
+                    checked={historyWriteEnabled}
+                    onChange={(e) => setHistoryWriteEnabled(e.target.checked)}
+                    disabled={enriching}
+                  />
+                  Use conflict history
+                  <span className="text-[11px] font-medium text-gray-500">
+                    (optional, extra DB reads/writes)
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                  <input
+                    type="checkbox"
+                    checked={fieldDiagnosticWriteEnabled}
+                    onChange={(e) => setFieldDiagnosticWriteEnabled(e.target.checked)}
+                    disabled={enriching}
+                  />
+                  Write field diagnostics
+                  <span className="text-[11px] font-medium text-gray-500">
+                    (optional, extra DB writes)
                   </span>
                 </label>
               </div>
@@ -3551,7 +3604,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                 : 'bg-[#4FC3F7] hover:bg-[#29B6F6] hover:shadow-md'
             }`}
           >
-            {enriching ? 'Scanning...' : (enrichmentMode === 'source' ? '⚡ Start Source Scan' : '⚡ Start Scan & Review')}
+            {enriching
+              ? 'Scanning...'
+              : advancedScanEnabled
+                ? (enrichmentMode === 'source' ? '⚡ Start Source Scan' : '⚡ Start Scan & Review')
+                : '⚡ Start Targeted Enrichment'}
           </button>
         </div>
         </div>

@@ -145,11 +145,23 @@ export async function POST(req: Request) {
     const selectedFields = Array.isArray(fields)
       ? fields.filter((value): value is string => typeof value === 'string' && value.length > 0)
       : [];
+    const trackRelationFields = new Set([
+      'tracks',
+      'tracklist',
+      'tracklists',
+      'tracks.lyrics',
+      'tracks.lyrics_url',
+      'disc_metadata',
+      'matrix_numbers',
+    ]);
+    const needsTrackRelations = selectedFields.some((field) => trackRelationFields.has(field));
     const requiredServices = new Set<string>();
     selectedFields.forEach((field) => {
       const serviceList = FIELD_TO_SERVICES[field] ?? FIELD_TO_SERVICES[field.split('.')[0]] ?? [];
       serviceList.forEach((svc) => requiredServices.add(svc));
     });
+    const selectedRootFields = new Set(selectedFields.map((field) => field.split('.')[0]));
+    const targetedFieldRun = missingDataOnly && selectedFields.length > 0;
 
     const unavailableServices = new Set<string>();
     const discogsServerCredentialsPresent = hasDiscogsServerCredentials();
@@ -160,6 +172,67 @@ export async function POST(req: Request) {
 
     let targetAlbums: Record<string, unknown>[] = [];
     let nextCursor = null;
+    const releaseTrackSelect = needsTrackRelations
+      ? `,
+          release_tracks:release_tracks (
+            id,
+            recording:recordings ( credits )
+          )`
+      : '';
+
+    const needsMasterTags = !targetedFieldRun || selectedRootFields.has('tags');
+    const needsMasterGenres = !targetedFieldRun || selectedRootFields.has('genres');
+    const needsMasterStyles = !targetedFieldRun || selectedRootFields.has('styles');
+    const needsMasterSimilarAlbums = !targetedFieldRun || selectedRootFields.has('lastfm_similar_albums');
+    const needsMasterNotes = !targetedFieldRun || selectedRootFields.has('master_notes');
+    const needsMasterOriginalYear = !targetedFieldRun || selectedRootFields.has('year');
+    const needsMasterRecordingDate = !targetedFieldRun || selectedRootFields.has('recording_date');
+    const needsMasterWikipediaUrl = !targetedFieldRun || selectedRootFields.has('wikipedia_url');
+    const needsMasterAppleMusicUrl = !targetedFieldRun || selectedRootFields.has('apple_music_url');
+    const needsMasterLastFmUrl = !targetedFieldRun || selectedRootFields.has('lastfm_url');
+    const needsMasterNarrative =
+      !targetedFieldRun ||
+      selectedRootFields.has('cultural_significance') ||
+      selectedRootFields.has('recording_location') ||
+      selectedRootFields.has('critical_reception') ||
+      selectedRootFields.has('pitchfork_score') ||
+      selectedRootFields.has('chart_positions') ||
+      selectedRootFields.has('awards') ||
+      selectedRootFields.has('certifications');
+
+    const masterColumns: string[] = [
+      'id',
+      'title',
+      'cover_image_url',
+      'discogs_master_id',
+      'musicbrainz_release_group_id',
+      'artist:artists (name)',
+    ];
+    if (needsMasterGenres) masterColumns.push('genres');
+    if (needsMasterStyles) masterColumns.push('styles');
+    if (needsMasterSimilarAlbums) masterColumns.push('lastfm_similar_albums');
+    if (needsMasterNotes) masterColumns.push('notes');
+    if (needsMasterOriginalYear) masterColumns.push('original_release_year');
+    if (needsMasterRecordingDate) masterColumns.push('recording_date');
+    if (needsMasterWikipediaUrl) masterColumns.push('wikipedia_url');
+    if (needsMasterAppleMusicUrl) masterColumns.push('apple_music_url');
+    if (needsMasterLastFmUrl) masterColumns.push('lastfm_url');
+    if (needsMasterNarrative) {
+      masterColumns.push(
+        'cultural_significance',
+        'recording_location',
+        'critical_reception',
+        'pitchfork_score',
+        'chart_positions',
+        'awards',
+        'certifications'
+      );
+    }
+
+    const masterSelect = `
+          master:masters (
+            ${masterColumns.join(',\n            ')}${needsMasterTags ? ',\n            master_tag_links:master_tag_links (\n              tag:master_tags ( name )\n            )' : ''}
+          )`;
 
     const baseQuery = supabase
       .from('inventory')
@@ -179,40 +252,9 @@ export async function POST(req: Request) {
           notes,
           media_type,
           format_details,
-          qty,
-          master:masters (
-            id,
-            title,
-            cover_image_url,
-            discogs_master_id,
-            musicbrainz_release_group_id,
-            genres,
-            styles,
-            lastfm_similar_albums,
-            notes,
-            original_release_year,
-            recording_date,
-            wikipedia_url,
-            apple_music_url,
-            lastfm_url,
-            cultural_significance,
-            recording_location,
-            critical_reception,
-            pitchfork_score,
-            chart_positions,
-            awards,
-            certifications,
-            artist:artists (name),
-            master_tag_links:master_tag_links (
-              tag:master_tags ( name )
-            )
-          ),
-          release_tracks:release_tracks (
-            id,
-            recording:recordings ( credits )
-          )
+          qty,${masterSelect}${releaseTrackSelect}
         )
-      `);
+      `) as any;
 
     if (albumIds && albumIds.length > 0) {
       const { data, error } = await baseQuery.in('id', albumIds);
