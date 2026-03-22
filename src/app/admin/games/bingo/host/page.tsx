@@ -170,8 +170,40 @@ export default function BingoHostPage() {
     await load();
   };
 
+  const resetRound = async () => {
+    if (!session) return;
+
+    const confirmed = window.confirm(`Reset round ${session.current_round} to the beginning? Calls from this round will be cleared and the round will restart.`);
+    if (!confirmed) return;
+
+    const activateResponse = await fetch(`/api/games/bingo/sessions/${sessionId}/activate-round`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        round: Math.max(1, session.current_round || 1),
+        intermission_seconds: 0,
+      }),
+    });
+
+    if (!activateResponse.ok) {
+      const payload = (await activateResponse.json().catch(() => null)) as { error?: string } | null;
+      alert(payload?.error ?? "Failed to reset round");
+      return;
+    }
+
+    await fetch(`/api/games/bingo/sessions/${sessionId}/resume`, { method: "POST" });
+    setAutoCallEnabled(false);
+    autoCallLockRef.current = false;
+    setRevealDelayInput(5);
+    setSecondsToNextCallInput(0);
+    setRemaining(0);
+    setResetCounter((v) => v + 1);
+    await patchSession({ bingo_overlay: "none", next_game_scheduled_at: null });
+    await load();
+  };
+
   const resetGame = async () => {
-    const confirmed = window.confirm("Reset this round to a fresh start? All calls will be cleared.");
+    const confirmed = window.confirm("Reset this game to a fresh start? All calls will be cleared and the session will return to the welcome screen.");
     if (!confirmed) return;
     setAutoCallEnabled(false);
     autoCallLockRef.current = false;
@@ -332,7 +364,8 @@ export default function BingoHostPage() {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <button onClick={endGame} className="rounded border border-red-700 px-3 py-1 text-red-300 hover:bg-red-900/20">End Game</button>
-                <button onClick={resetGame} className="rounded border border-red-700 bg-red-900/40 px-3 py-1 text-red-100 hover:bg-red-900/60">Reset Round</button>
+                <button onClick={resetRound} className="rounded border border-red-700 bg-red-900/40 px-3 py-1 text-red-100 hover:bg-red-900/60">Reset Round</button>
+                <button onClick={resetGame} className="rounded border border-amber-700 bg-amber-900/40 px-3 py-1 text-amber-100 hover:bg-amber-900/60">Reset Game</button>
                 <button onClick={nextRound} className="rounded border border-sky-700 px-3 py-1 text-sky-300 hover:bg-sky-900/20">Next Round</button>
               </div>
             </div>

@@ -119,10 +119,25 @@ function VinylCascade() {
   );
 }
 
-function BrandingLogos({ venueLogoUrl, venueName }: { venueLogoUrl?: string | null; venueName?: string | null }) {
+function BrandingLogos({
+  venueLogoUrl,
+  venueName,
+  tone = "dark",
+}: {
+  venueLogoUrl?: string | null;
+  venueName?: string | null;
+  tone?: "dark" | "light";
+}) {
+  const deadWaxShellClass = tone === "light"
+    ? "rounded-2xl border border-amber-400/60 bg-white/70 px-5 py-3 shadow-[0_20px_50px_rgba(245,158,11,0.18)] backdrop-blur-sm"
+    : "rounded-2xl border border-amber-700/40 bg-black/35 px-5 py-3";
+  const venueShellClass = tone === "light"
+    ? "rounded-2xl border border-stone-300 bg-white/65 px-5 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm"
+    : "rounded-2xl border border-stone-700 bg-black/35 px-5 py-3";
+
   return (
     <div className="relative z-10 flex flex-wrap items-center justify-center gap-4">
-      <div className="rounded-2xl border border-amber-700/40 bg-black/35 px-5 py-3">
+      <div className={deadWaxShellClass}>
         <img
           src="/images/dwd-logo.PNG"
           alt="Dead Wax Dialogues"
@@ -130,7 +145,7 @@ function BrandingLogos({ venueLogoUrl, venueName }: { venueLogoUrl?: string | nu
         />
       </div>
       {venueLogoUrl ? (
-        <div className="rounded-2xl border border-stone-700 bg-black/35 px-5 py-3">
+        <div className={venueShellClass}>
           <img
             src={venueLogoUrl}
             alt={venueName ? `${venueName} logo` : "Venue logo"}
@@ -239,13 +254,19 @@ export default function BingoJumbotronPage() {
   const showWelcome = !showIntermission && session?.bingo_overlay === "welcome";
   const showWinner = session?.bingo_overlay === "winner";
   const showThanks = session?.bingo_overlay === "thanks";
+  const showGame = !showWelcome && !showWinner && !showThanks && !showIntermission;
+  const useLightScreenTheme = showWelcome || showWinner || showThanks || showIntermission;
 
   const statusLabel = session?.status === "paused" ? "Paused" : null;
 
   return (
     <div
       ref={containerRef}
-      className="relative min-h-screen w-full overflow-hidden bg-[radial-gradient(circle_at_50%_0%,#5a180e,transparent_35%),linear-gradient(180deg,#0a0a0a,#101010)] text-white"
+      className={`relative min-h-screen w-full overflow-hidden ${
+        useLightScreenTheme
+          ? "bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.34),transparent_30%),linear-gradient(180deg,#fff8e8,#fde8c6_45%,#f8d7aa)] text-stone-950"
+          : "bg-[radial-gradient(circle_at_50%_0%,#5a180e,transparent_35%),linear-gradient(180deg,#0a0a0a,#101010)] text-white"
+      }`}
     >
       {/* Hidden fullscreen hotspot — always present regardless of screen state */}
       <button
@@ -255,47 +276,97 @@ export default function BingoJumbotronPage() {
         title="Toggle fullscreen (F)"
       />
 
-      {showWinner ? (
-        /* ── WINNER SCREEN — full-page replace, NOT an overlay ── */
-        <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2.5vw] px-8 text-center">
+      {showWelcome ? (
+        <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2vw] px-8 py-[4vh] text-center">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(245,158,11,0.12),transparent_26%),radial-gradient(circle_at_80%_30%,rgba(120,53,15,0.12),transparent_24%)]" />
           <VinylCascade />
           <BrandingLogos
             venueLogoUrl={session?.event?.venue_logo_url}
             venueName={session?.event?.title ?? null}
+            tone="light"
+          />
+          <div className="relative z-10 max-w-[78vw] rounded-[2.5rem] border border-amber-400/60 bg-white/72 px-[4vw] py-[3vw] shadow-[0_30px_80px_rgba(120,53,15,0.16)] backdrop-blur-sm">
+            <p className="text-[1.4vw] font-semibold uppercase tracking-[0.34em] text-amber-800">Welcome Screen</p>
+            <h2 className="mt-[1vw] text-[5.5vw] font-black uppercase leading-[0.92] tracking-[0.08em] text-amber-600">
+              Welcome To Vinyl Music Bingo
+            </h2>
+            <p className="mx-auto mt-[1.4vw] max-w-[54vw] text-[1.65vw] leading-relaxed text-stone-700">
+              Listen for each track. If the song is on your card, mark that square. Get five in a row to call BINGO.
+            </p>
+            <div className="mx-auto mt-[1.8vw] max-w-[44vw] rounded-[2rem] border border-amber-300/70 bg-amber-50/85 px-[2vw] py-[1.5vw] text-left shadow-[0_18px_40px_rgba(245,158,11,0.12)]">
+              <p className="text-[1.45vw] font-semibold uppercase tracking-[0.08em] text-amber-800">How To Play</p>
+              <p className="mt-[0.5vw] text-[1.2vw] text-stone-700">1) Keep your bingo card visible.</p>
+              <p className="text-[1.2vw] text-stone-700">2) Match each called song to your card and mark it.</p>
+              <p className="text-[1.2vw] text-stone-700">3) When you have five in a row, shout BINGO.</p>
+            </div>
+            {session?.next_game_rules_text ? (
+              <p className="mx-auto mt-[1.5vw] max-w-[52vw] text-[1.05vw] text-stone-600">{session.next_game_rules_text}</p>
+            ) : null}
+          </div>
+          <p className="relative z-10 text-[1.5vw] font-semibold text-stone-700">
+            Round {session?.current_round ?? 1} of {session?.round_count ?? 1}
+          </p>
+        </div>
+      ) : showWinner ? (
+        <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2.5vw] px-8 text-center">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_16%,rgba(251,191,36,0.24),transparent_28%),radial-gradient(circle_at_14%_72%,rgba(120,53,15,0.12),transparent_26%),radial-gradient(circle_at_84%_24%,rgba(146,64,14,0.14),transparent_22%)]" />
+          <VinylCascade />
+          <BrandingLogos
+            venueLogoUrl={session?.event?.venue_logo_url}
+            venueName={session?.event?.title ?? null}
+            tone="light"
           />
           <p
-            className="relative z-10 font-black uppercase leading-none tracking-tight text-amber-300"
-            style={{ fontSize: "13vw", textShadow: "0 0 60px #f59e0b, 0 0 120px #d97706" }}
+            className="relative z-10 font-black uppercase leading-none tracking-tight text-amber-600"
+            style={{ fontSize: "13vw", textShadow: "0 10px 35px rgba(245,158,11,0.28)" }}
           >
             WE HAVE A<br />WINNER!
           </p>
-          <p className="relative z-10 text-[2.5vw] font-semibold text-amber-100">
+          <p className="relative z-10 text-[2.5vw] font-semibold text-stone-700">
             Round {session!.current_round} of {session!.round_count} &middot; {called.length} songs called
           </p>
         </div>
-      ) : showThanks ? (
-        /* ── THANKS SCREEN — full-page replace, NOT an overlay ── */
-        <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2vw] px-8 text-center">
+      ) : showIntermission ? (
+        <div className="relative flex min-h-screen flex-col items-center justify-center gap-[1.5vw] px-8 text-center">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(251,191,36,0.2),transparent_26%),radial-gradient(circle_at_20%_78%,rgba(120,53,15,0.08),transparent_24%)]" />
           <VinylCascade />
           <BrandingLogos
             venueLogoUrl={session?.event?.venue_logo_url}
             venueName={session?.event?.title ?? null}
+            tone="light"
+          />
+          <div className="relative z-10 w-full max-w-[74vw] rounded-[2.5rem] border border-amber-300/70 bg-white/76 px-[4vw] py-[3vw] shadow-[0_30px_80px_rgba(120,53,15,0.14)] backdrop-blur-sm">
+            <p className="text-[1.5vw] font-semibold uppercase tracking-[0.28em] text-amber-800">Intermission</p>
+            <p className="mt-[1vw] text-[2.1vw] text-stone-700">
+              Round {session!.current_round} of {session!.round_count} begins in
+            </p>
+            <p className="mt-[0.8vw] text-[10vw] font-black leading-none text-amber-600 tabular-nums">{formatMinSec(intermissionSecondsLeft!)}</p>
+            <p className="mt-[0.8vw] text-[1.45vw] text-stone-600">Crate reset in progress. Next round starts shortly.</p>
+          </div>
+        </div>
+      ) : showThanks ? (
+        <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2vw] px-8 text-center">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_14%,rgba(251,191,36,0.2),transparent_26%),radial-gradient(circle_at_78%_70%,rgba(120,53,15,0.1),transparent_24%)]" />
+          <VinylCascade />
+          <BrandingLogos
+            venueLogoUrl={session?.event?.venue_logo_url}
+            venueName={session?.event?.title ?? null}
+            tone="light"
           />
           <h2
-            className="relative z-10 font-black uppercase leading-none tracking-[0.06em] text-amber-300"
+            className="relative z-10 font-black uppercase leading-none tracking-[0.06em] text-amber-700"
             style={{ fontSize: "8vw" }}
           >
             Thank You For Playing!
           </h2>
-          <p className="relative z-10 text-[3.5vw] font-semibold text-amber-100">Vinyl Music Bingo</p>
+          <p className="relative z-10 text-[3.5vw] font-semibold text-stone-700">Vinyl Music Bingo</p>
           {session ? (
-            <p className="relative z-10 text-[1.8vw] text-stone-400">
+            <p className="relative z-10 text-[1.8vw] text-stone-600">
               Round {session.current_round} of {session.round_count} &middot; {called.length} songs called
             </p>
           ) : null}
         </div>
       ) : (
-        /* ── NORMAL GAME LAYOUT (welcome + running game) ── */
         <>
           <div className="grid min-h-screen grid-rows-[auto_1fr_auto] gap-[1.2vw] p-[1.6vw]">
             <header className="rounded-3xl border border-amber-700/40 bg-black/35 px-[2.2vw] py-[1vw]">
@@ -325,42 +396,7 @@ export default function BingoJumbotronPage() {
               </aside>
 
               <div className="rounded-3xl border border-stone-700 bg-black/45 p-[1.4vw] text-center">
-                {showWelcome ? (
-                  <div className="flex h-full flex-col items-center justify-center gap-[1.2vw] px-[1vw]">
-                    <BrandingLogos
-                      venueLogoUrl={session?.event?.venue_logo_url}
-                      venueName={session?.event?.title ?? null}
-                    />
-                    <h2 className="text-[4vw] font-black uppercase leading-none tracking-[0.12em] text-amber-300">
-                      Welcome To Vinyl Music Bingo
-                    </h2>
-                    <p className="text-[1.5vw] text-stone-200">
-                      Listen for each track. If the song is on your card, mark that square. Get five in a row to call BINGO.
-                    </p>
-                    <div className="mt-[0.5vw] rounded-2xl border border-amber-700/40 bg-amber-950/20 px-[1.4vw] py-[1vw] text-left">
-                      <p className="text-[1.4vw] font-semibold uppercase tracking-[0.08em] text-amber-200">How To Play</p>
-                      <p className="mt-[0.4vw] text-[1.15vw] text-stone-200">1) Keep your bingo card visible.</p>
-                      <p className="text-[1.15vw] text-stone-200">2) Match each called song to your card and mark it.</p>
-                      <p className="text-[1.15vw] text-stone-200">3) When you have five in a row, shout BINGO.</p>
-                    </div>
-                    {session?.next_game_rules_text ? (
-                      <p className="text-[1vw] text-stone-400">{session.next_game_rules_text}</p>
-                    ) : null}
-                  </div>
-                ) : showIntermission ? (
-                  <div className="flex h-full flex-col items-center justify-center gap-[1vw]">
-                    <BrandingLogos
-                      venueLogoUrl={session?.event?.venue_logo_url}
-                      venueName={session?.event?.title ?? null}
-                    />
-                    <p className="text-[2.2vw] font-semibold uppercase tracking-[0.2em] text-amber-300">Intermission</p>
-                    <p className="text-[1.6vw] text-stone-300">
-                      Round {session!.current_round} of {session!.round_count} begins in
-                    </p>
-                    <p className="text-[10vw] font-black leading-none text-amber-200 tabular-nums">{formatMinSec(intermissionSecondsLeft!)}</p>
-                    <p className="text-[1.4vw] text-stone-300">Crate reset in progress. Next round starts shortly.</p>
-                  </div>
-                ) : (
+                {showGame ? (
                   <>
                     <p
                       className={`font-black leading-none ${current && callIsRevealed ? getBingoColumnTextClass(current.column_letter, current.ball_number) : "text-stone-500"}`}
@@ -375,7 +411,7 @@ export default function BingoJumbotronPage() {
                       {current && callIsRevealed ? current.artist_name : ""}
                     </p>
                   </>
-                )}
+                ) : null}
               </div>
 
               <aside className="rounded-3xl border border-stone-700 bg-black/45 p-[1vw]">
