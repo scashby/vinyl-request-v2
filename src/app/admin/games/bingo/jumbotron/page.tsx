@@ -279,7 +279,6 @@ export default function BingoJumbotronPage() {
       {showWelcome ? (
         <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2vw] px-8 py-[4vh] text-center">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(245,158,11,0.12),transparent_26%),radial-gradient(circle_at_80%_30%,rgba(120,53,15,0.12),transparent_24%)]" />
-          <VinylCascade />
           <BrandingLogos
             venueLogoUrl={session?.event?.venue_logo_url}
             venueName={session?.event?.title ?? null}
@@ -329,7 +328,6 @@ export default function BingoJumbotronPage() {
       ) : showIntermission ? (
         <div className="relative flex min-h-screen flex-col items-center justify-center gap-[1.5vw] px-8 text-center">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(251,191,36,0.2),transparent_26%),radial-gradient(circle_at_20%_78%,rgba(120,53,15,0.08),transparent_24%)]" />
-          <VinylCascade />
           <BrandingLogos
             venueLogoUrl={session?.event?.venue_logo_url}
             venueName={session?.event?.title ?? null}
@@ -347,7 +345,6 @@ export default function BingoJumbotronPage() {
       ) : showThanks ? (
         <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2vw] px-8 text-center">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_14%,rgba(251,191,36,0.2),transparent_26%),radial-gradient(circle_at_78%_70%,rgba(120,53,15,0.1),transparent_24%)]" />
-          <VinylCascade />
           <BrandingLogos
             venueLogoUrl={session?.event?.venue_logo_url}
             venueName={session?.event?.title ?? null}
