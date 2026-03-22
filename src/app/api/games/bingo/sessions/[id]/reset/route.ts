@@ -56,59 +56,81 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
 
   const typedExisting = (existingCalls ?? []) as ExistingCallRow[];
   if (typedExisting.length !== plannedCalls.length) {
-    return NextResponse.json({ error: "Session call rows are not initialized for reset" }, { status: 400 });
+    const { error: deleteCallsError } = await db
+      .from("bingo_session_calls")
+      .delete()
+      .eq("session_id", sessionId);
+
+    if (deleteCallsError) return NextResponse.json({ error: deleteCallsError.message }, { status: 500 });
+
+    const rebuiltRows = plannedCalls.map((planned) => ({
+      session_id: sessionId,
+      playlist_track_key: planned.playlist_track_key,
+      call_index: planned.call_index,
+      ball_number: planned.ball_number,
+      column_letter: planned.column_letter,
+      track_title: planned.track_title,
+      artist_name: planned.artist_name,
+      album_name: planned.album_name,
+      side: planned.side,
+      position: planned.position,
+      status: "pending",
+    }));
+
+    const { error: insertCallsError } = await db.from("bingo_session_calls").insert(rebuiltRows);
+    if (insertCallsError) return NextResponse.json({ error: insertCallsError.message }, { status: 500 });
+  } else {
+    // First pass: neutralize unique key conflicts before rewriting round 1 mapping.
+    const prepErrors = await Promise.all(
+      typedExisting.map(async (existing, index) => {
+        const { error } = await db
+          .from("bingo_session_calls")
+          .update({
+            call_index: 1000 + index + 1,
+            ball_number: null,
+            status: "pending",
+            called_at: null,
+            completed_at: null,
+          })
+          .eq("id", existing.id);
+
+        return error?.message ?? null;
+      })
+    );
+
+    const firstPrepError = prepErrors.find((message) => !!message);
+    if (firstPrepError) return NextResponse.json({ error: firstPrepError }, { status: 500 });
+
+    const updateErrors = await Promise.all(
+      plannedCalls.map(async (planned, index) => {
+        const callId = typedExisting[index]?.id;
+        if (!callId) return "Call row mismatch while resetting round";
+
+        const { error } = await db
+          .from("bingo_session_calls")
+          .update({
+            playlist_track_key: planned.playlist_track_key,
+            call_index: planned.call_index,
+            ball_number: planned.ball_number,
+            column_letter: planned.column_letter,
+            track_title: planned.track_title,
+            artist_name: planned.artist_name,
+            album_name: planned.album_name,
+            side: planned.side,
+            position: planned.position,
+            status: "pending",
+            called_at: null,
+            completed_at: null,
+          })
+          .eq("id", callId);
+
+        return error?.message ?? null;
+      })
+    );
+
+    const firstUpdateError = updateErrors.find((message) => !!message);
+    if (firstUpdateError) return NextResponse.json({ error: firstUpdateError }, { status: 500 });
   }
-
-  // First pass: neutralize unique key conflicts before rewriting round 1 mapping.
-  const prepErrors = await Promise.all(
-    typedExisting.map(async (existing, index) => {
-      const { error } = await db
-        .from("bingo_session_calls")
-        .update({
-          call_index: 1000 + index + 1,
-          ball_number: null,
-          status: "pending",
-          called_at: null,
-          completed_at: null,
-        })
-        .eq("id", existing.id);
-
-      return error?.message ?? null;
-    })
-  );
-
-  const firstPrepError = prepErrors.find((message) => !!message);
-  if (firstPrepError) return NextResponse.json({ error: firstPrepError }, { status: 500 });
-
-  const updateErrors = await Promise.all(
-    plannedCalls.map(async (planned, index) => {
-      const callId = typedExisting[index]?.id;
-      if (!callId) return "Call row mismatch while resetting round";
-
-      const { error } = await db
-        .from("bingo_session_calls")
-        .update({
-          playlist_track_key: planned.playlist_track_key,
-          call_index: planned.call_index,
-          ball_number: planned.ball_number,
-          column_letter: planned.column_letter,
-          track_title: planned.track_title,
-          artist_name: planned.artist_name,
-          album_name: planned.album_name,
-          side: planned.side,
-          position: planned.position,
-          status: "pending",
-          called_at: null,
-          completed_at: null,
-        })
-        .eq("id", callId);
-
-      return error?.message ?? null;
-    })
-  );
-
-  const firstUpdateError = updateErrors.find((message) => !!message);
-  if (firstUpdateError) return NextResponse.json({ error: firstUpdateError }, { status: 500 });
 
   const { error: clearEventsError } = await db
     .from("bingo_session_events")

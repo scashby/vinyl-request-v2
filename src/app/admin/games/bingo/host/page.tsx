@@ -207,7 +207,12 @@ export default function BingoHostPage() {
     if (!confirmed) return;
     setAutoCallEnabled(false);
     autoCallLockRef.current = false;
-    await fetch(`/api/games/bingo/sessions/${sessionId}/reset`, { method: "POST" });
+    const resetResponse = await fetch(`/api/games/bingo/sessions/${sessionId}/reset`, { method: "POST" });
+    if (!resetResponse.ok) {
+      const payload = (await resetResponse.json().catch(() => null)) as { error?: string } | null;
+      alert(payload?.error ?? "Failed to reset game");
+      return;
+    }
     setRevealDelayInput(5);
     setSecondsToNextCallInput(0);
     setRemaining(0);
