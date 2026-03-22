@@ -237,6 +237,20 @@ const NON_ENRICHABLE_FIELDS = new Set<string>([
   'sampled_by',
 ]);
 
+const TRACKLIST_FIELD_ALIASES = new Set(['tracks', 'tracklist', 'tracklists']);
+
+const normalizeEnrichmentFieldKey = (field: string): string => {
+  if (TRACKLIST_FIELD_ALIASES.has(field)) return 'tracks';
+  return field;
+};
+
+const ENRICHMENT_FIELD_LABELS: Record<string, string> = {
+  tracks: 'release_tracks.recording.title',
+  disc_metadata: 'releases.disc_metadata',
+  'tracks.lyrics': 'recordings.lyrics',
+  'tracks.lyrics_url': 'recordings.lyrics_url',
+};
+
 const candidateKeysForField = (field: string): string[] => {
   const aliases = CANDIDATE_FIELD_ALIASES[field];
   if (aliases) return aliases;
@@ -1151,16 +1165,26 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const getCompatibleServicesForField = (field: string, selectedSources = sourceSelection): EnrichmentService[] => {
     if (selectedSources.length === 0) return [];
     const selected = new Set(selectedSources);
-    return (FIELD_TO_SERVICES[field] || []).filter((service): service is EnrichmentService => selected.has(service as EnrichmentService));
+    const normalizedField = normalizeEnrichmentFieldKey(field);
+    const serviceUnion = normalizedField === 'tracks'
+      ? Array.from(new Set([
+          ...(FIELD_TO_SERVICES.tracks || []),
+          ...(FIELD_TO_SERVICES.tracklist || []),
+          ...(FIELD_TO_SERVICES.tracklists || []),
+        ]))
+      : (FIELD_TO_SERVICES[normalizedField] || []);
+    return serviceUnion.filter((service): service is EnrichmentService => selected.has(service as EnrichmentService));
   };
 
   const buildAvailableFieldConfig = (): FieldConfigMap => {
     const config: FieldConfigMap = {};
     Object.keys(FIELD_TO_SERVICES).forEach((field) => {
-      if (!ALLOWED_COLUMNS.has(field) || NON_ENRICHABLE_FIELDS.has(field)) return;
-      const matched = getCompatibleServicesForField(field);
+      const normalizedField = normalizeEnrichmentFieldKey(field);
+      if (!ALLOWED_COLUMNS.has(normalizedField) || NON_ENRICHABLE_FIELDS.has(normalizedField)) return;
+      const matched = getCompatibleServicesForField(normalizedField);
       if (matched.length > 0) {
-        config[field] = new Set(matched);
+        const existing = config[normalizedField] ? Array.from(config[normalizedField]) : [];
+        config[normalizedField] = new Set([...existing, ...matched]);
       }
     });
     return config;
@@ -1350,33 +1374,35 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
 
   const toggleField = (field: string) => {
-    if (NON_ENRICHABLE_FIELDS.has(field)) return;
+    const normalizedField = normalizeEnrichmentFieldKey(field);
+    if (NON_ENRICHABLE_FIELDS.has(normalizedField)) return;
     setFieldConfig(prev => {
       const next = { ...prev };
-      if (next[field]) {
-        delete next[field];
+      if (next[normalizedField]) {
+        delete next[normalizedField];
       } else {
-        const defaults = getCompatibleServicesForField(field);
+        const defaults = getCompatibleServicesForField(normalizedField);
         if (defaults.length === 0) return prev;
-        next[field] = new Set(defaults);
+        next[normalizedField] = new Set(defaults);
       }
       return next;
     });
   };
 
   const toggleFieldSource = (field: string, service: string) => {
+    const normalizedField = normalizeEnrichmentFieldKey(field);
     setFieldConfig(prev => {
-      if (!prev[field]) return prev;
+      if (!prev[normalizedField]) return prev;
       if (!sourceSelection.includes(service as EnrichmentService)) return prev;
-      const nextSources = new Set(prev[field]);
+      const nextSources = new Set(prev[normalizedField]);
       if (nextSources.has(service)) nextSources.delete(service);
       else nextSources.add(service);
       if (nextSources.size === 0) {
         const next = { ...prev };
-        delete next[field];
+        delete next[normalizedField];
         return next;
       }
-      return { ...prev, [field]: nextSources };
+      return { ...prev, [normalizedField]: nextSources };
     });
   };
 
@@ -1389,16 +1415,17 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   };
 
   const toggleCategory = (category: DataCategory) => {
-    const fields = DATA_CATEGORY_CHECK_FIELDS[category] || [];
+    const fields = (DATA_CATEGORY_CHECK_FIELDS[category] || []).map(normalizeEnrichmentFieldKey);
     const validFields = fields.filter((field) => {
       if (!ALLOWED_COLUMNS.has(field) || NON_ENRICHABLE_FIELDS.has(field)) return false;
       return getCompatibleServicesForField(field).length > 0;
     });
-    const allEnabled = validFields.every(f => !!fieldConfig[f]);
+    const dedupedFields = Array.from(new Set(validFields));
+    const allEnabled = dedupedFields.every(f => !!fieldConfig[f]);
 
     setFieldConfig(prev => {
       const next = { ...prev };
-      validFields.forEach(f => {
+      dedupedFields.forEach(f => {
         if (allEnabled) {
           delete next[f];
         } else {
@@ -3278,59 +3305,28 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     Object.entries(availableFieldConfig).map(([field, services]) => [field, Array.from(services)])
   );
   const effectiveFieldConfig = getEffectiveFieldConfig();
+  const availableFieldEntries = Object.keys(availableFieldConfig)
+    .map((field) => ({
+      field,
+      label: ENRICHMENT_FIELD_LABELS[field] || field,
+      services: availableServicesByField[field] || [],
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
   const hasSelectedSources = sourceSelection.length > 0;
   const availableFieldCount = Object.keys(availableFieldConfig).length;
   const selectedFieldCount = Object.keys(effectiveFieldConfig).length;
+  const getFieldMissingCount = (field: string): number => {
+    if (!stats) return 0;
+    if (field === 'tracks') return stats.missingTracklists;
+    const direct = stats.fieldMissing?.[field];
+    return typeof direct === 'number' ? direct : 0;
+  };
   const selectAllAvailableFields = () => {
     setFieldConfig(buildAvailableFieldConfig());
   };
   const clearSelectedFields = () => {
     setFieldConfig({});
   };
-
-  const hasRunnableCategory = (category: DataCategory) => {
-    const validFields = (DATA_CATEGORY_CHECK_FIELDS[category] || []).filter(f => ALLOWED_COLUMNS.has(f));
-    if (validFields.length === 0) return false;
-    return validFields.some((field) => Object.prototype.hasOwnProperty.call(availableFieldConfig, field));
-  };
-
-  // --- UPDATED CONFIG WITH NEW CATEGORIES ---
-  const rawCategoryConfig: { category: DataCategory; count: number; subcounts?: { label: string; count: number }[] }[] = stats ? [
-    { category: 'artwork', count: stats.missingArtwork, subcounts: [
-        { label: 'Back covers', count: stats.missingBackCover },
-        { label: 'Spine', count: stats.missingSpine || 0 },
-    ]},
-    { category: 'credits', count: stats.missingCredits, subcounts: [
-        { label: 'Musicians', count: stats.missingMusicians },
-        { label: 'Producers', count: stats.missingProducers },
-    ]},
-    { category: 'tracklists', count: stats.missingTracklists, subcounts: [
-        { label: 'Missing Durations', count: stats.missingDurations || 0 }
-    ]},
-    { category: 'sonic_domain', count: stats.missingAudioAnalysis, subcounts: [
-        { label: 'Tempo', count: stats.missingTempo },
-        { label: 'Key', count: stats.missingMusicalKey || 0 },
-    ]},
-    { category: 'genres', count: stats.missingGenres, subcounts: [
-        { label: 'Styles', count: stats.missingStyles || 0 }
-    ]},
-    { category: 'streaming_links', count: stats.missingStreamingLinks, subcounts: [
-        { label: 'Spotify', count: stats.missingSpotify },
-    ]},
-    { category: 'release_metadata', count: stats.missingReleaseMetadata, subcounts: [
-        { label: 'Barcodes', count: stats.missingBarcode || 0 },
-        { label: 'Labels', count: stats.missingLabels || 0 },
-    ]},
-    { category: 'lyrics', count: stats.missingLyrics || 0, subcounts: [] },
-    { category: 'reviews', count: stats.missingReviews || 0, subcounts: [] },
-    { category: 'chart_data', count: stats.missingChartData || 0, subcounts: [] },
-    { category: 'cultural_context', count: stats.missingContext || 0, subcounts: [] },
-    { category: 'similar_albums', count: stats.missingSimilar || 0, subcounts: [] },
-  ] : [];
-  const dataCategoriesConfig = rawCategoryConfig.filter(({ category }) => hasRunnableCategory(category));
-  const deferredCategories = rawCategoryConfig
-    .map(({ category }) => category)
-    .filter((category) => !hasRunnableCategory(category));
 
   return (
     <div className="fixed inset-0 bg-white z-[10000] flex flex-col overflow-hidden">
@@ -3391,9 +3387,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               <div className="bg-white border-2 border-[#D8D8D8] rounded-md p-5 mb-6">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                   <div>
-                    <h3 className="flex items-center gap-2 text-[15px] font-semibold text-green-700">Step 2: Choose Enrichments</h3>
+                    <h3 className="flex items-center gap-2 text-[15px] font-semibold text-green-700">Step 2: Choose Fields</h3>
                     <div className="text-xs text-gray-600 mt-1">
-                      Only enrichments supported by your selected sources are shown here.
+                      This is a flat field list filtered by your selected sources.
                     </div>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
@@ -3417,45 +3413,75 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                 </div>
                 {!hasSelectedSources ? (
                   <div className="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-                    Pick at least one source first to see the enrichments available from that source selection.
+                    Pick at least one source first to see the fields available from that source selection.
                   </div>
                 ) : (
                   <>
-                    {deferredCategories.length > 0 && (
-                      <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                        <span className="font-semibold">Not available from the current source selection:</span>{' '}
-                        {deferredCategories.map((category) => DATA_CATEGORY_LABELS[category]).join(', ')}.
-                        {deferredCategories
-                          .map((category) => DEFERRED_CATEGORY_REASONS[category])
-                          .filter((reason): reason is string => !!reason)
-                          .map((reason, index) => (
-                            <span key={`${reason}-${index}`}> {reason}</span>
-                          ))}
-                      </div>
-                    )}
                     {availableFieldCount === 0 ? (
                       <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                        None of the selected sources currently map to runnable enrichment fields.
+                        None of the selected sources currently map to enrichable fields.
                       </div>
                     ) : (
                       <>
                         <div className="mb-3 text-xs text-gray-500">
                           Available fields from selection: {availableFieldCount} | Selected fields: {selectedFieldCount}
                         </div>
-                        <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-3">
-                          {dataCategoriesConfig.map(({ category }) => (
-                            <DataCategoryCard
-                              key={category}
-                              category={category}
-                              stats={stats}
-                              fieldConfig={effectiveFieldConfig}
-                              availableServicesByField={availableServicesByField}
-                              onToggleCategory={() => toggleCategory(category)}
-                              onToggleField={toggleField}
-                              onToggleFieldSource={toggleFieldSource}
-                              disabled={enriching}
-                            />
-                          ))}
+                        <div className="max-h-[340px] overflow-y-auto border border-gray-200 rounded-md">
+                          <table className="w-full text-xs text-left border-collapse">
+                            <thead className="sticky top-0 bg-gray-50 z-10">
+                              <tr>
+                                <th className="p-2 border-b border-gray-200">Use</th>
+                                <th className="p-2 border-b border-gray-200">Field</th>
+                                <th className="p-2 border-b border-gray-200">Missing</th>
+                                <th className="p-2 border-b border-gray-200">Sources</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {availableFieldEntries.map(({ field, label, services }) => {
+                                const isEnabled = !!effectiveFieldConfig[field];
+                                const activeSources = effectiveFieldConfig[field] || new Set<string>();
+                                const missing = getFieldMissingCount(field);
+                                return (
+                                  <tr key={field} className="border-b border-gray-100 last:border-none align-top">
+                                    <td className="p-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={isEnabled}
+                                        onChange={() => toggleField(field)}
+                                        disabled={enriching}
+                                      />
+                                    </td>
+                                    <td className="p-2 font-mono text-[11px] text-gray-900">{label}</td>
+                                    <td className="p-2">
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${missing > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                        {missing}
+                                      </span>
+                                    </td>
+                                    <td className="p-2">
+                                      <div className="flex flex-wrap gap-1">
+                                        {services.map((srv) => {
+                                          const isActive = activeSources.has(srv);
+                                          return (
+                                            <label key={`${field}-${srv}`} className={`flex items-center px-1.5 py-0.5 rounded border text-[10px] cursor-pointer select-none ${isActive ? 'bg-white border-blue-400 text-blue-700 shadow-sm' : 'bg-gray-100 border-gray-200 text-gray-500 opacity-60 hover:opacity-100'}`}>
+                                              <input
+                                                type="checkbox"
+                                                checked={isActive}
+                                                onChange={() => toggleFieldSource(field, srv)}
+                                                disabled={enriching || !isEnabled}
+                                                className="hidden"
+                                              />
+                                              <span>{SERVICE_ICONS[srv as EnrichmentService]}</span>
+                                              <span className="ml-1">{SERVICE_DISPLAY_NAMES[srv as EnrichmentService] || srv}</span>
+                                            </label>
+                                          );
+                                        })}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
                         </div>
                       </>
                     )}
@@ -3753,21 +3779,22 @@ function DataCategoryCard({
   onToggleFieldSource: (f: string, s: string) => void;
   disabled: boolean; 
 }) {
-  const fields = DATA_CATEGORY_CHECK_FIELDS[category] || [];
+  const fields = (DATA_CATEGORY_CHECK_FIELDS[category] || []).map(normalizeEnrichmentFieldKey);
   const validFields = fields.filter((field) => {
     if (!ALLOWED_COLUMNS.has(field) || NON_ENRICHABLE_FIELDS.has(field)) return false;
     if (!availableServicesByField) return true;
     return (availableServicesByField[field] || []).length > 0;
   });
-  const selectableFields = validFields.filter((field) => !NON_ENRICHABLE_FIELDS.has(field));
+  const dedupedValidFields = Array.from(new Set(validFields));
+  const selectableFields = dedupedValidFields.filter((field) => !NON_ENRICHABLE_FIELDS.has(field));
   
-  if (validFields.length === 0) return null;
+  if (dedupedValidFields.length === 0) return null;
 
   const activeCount = selectableFields.filter(f => !!fieldConfig[f]).length;
   const isAllSelected = selectableFields.length > 0 && activeCount === selectableFields.length;
   const isIndeterminate = activeCount > 0 && !isAllSelected;
 
-  const formatLabel = (f: string) => f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  const formatLabel = (f: string) => ENRICHMENT_FIELD_LABELS[f] || f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 
   const getCategoryMissing = () => {
     if (!stats) return 0;
@@ -3807,7 +3834,7 @@ function DataCategoryCard({
     && Object.prototype.hasOwnProperty.call(stats.fieldMissing, field);
 
   const isCategoryTracked = () =>
-    validFields.every((field) => isFieldTracked(field));
+    dedupedValidFields.every((field) => isFieldTracked(field));
 
   const getMissing = (field: string) => {
     if (!stats) return 0;
@@ -3873,7 +3900,7 @@ function DataCategoryCard({
 
       {/* FIELD ROWS (Dashboard Style) */}
       <div className="flex flex-col gap-2">
-         {validFields.map(field => {
+         {dedupedValidFields.map(field => {
             const isUnsupported = NON_ENRICHABLE_FIELDS.has(field);
             const isEnabled = !!fieldConfig[field];
             const activeSources = fieldConfig[field] || new Set();
