@@ -135,6 +135,7 @@ export async function POST(req: Request) {
       limit = 10,
       maxId,
       location, // FIXED: Expect 'location' not 'folder'
+      selectedSources = [],
       services,
       autoSnooze = false,
       fields = [],
@@ -145,6 +146,10 @@ export async function POST(req: Request) {
     const selectedFields = Array.isArray(fields)
       ? fields.filter((value): value is string => typeof value === 'string' && value.length > 0)
       : [];
+    const selectedSourceIds = Array.isArray(selectedSources)
+      ? selectedSources.filter((value): value is string => typeof value === 'string' && value.length > 0)
+      : [];
+    const selectedSourceSet = new Set(selectedSourceIds);
     const trackRelationFields = new Set([
       'tracks',
       'tracklist',
@@ -156,9 +161,21 @@ export async function POST(req: Request) {
     ]);
     const needsTrackRelations = selectedFields.some((field) => trackRelationFields.has(field));
     const requiredServices = new Set<string>();
+    const availableFields = Object.keys(FIELD_TO_SERVICES).filter((field) => {
+      if (selectedSourceSet.size === 0) return true;
+      return (FIELD_TO_SERVICES[field] ?? []).some((service) => selectedSourceSet.has(service));
+    });
+    const incompatibleFields = selectedFields.filter((field) => {
+      if (selectedSourceSet.size === 0) return false;
+      const serviceList = FIELD_TO_SERVICES[field] ?? FIELD_TO_SERVICES[field.split('.')[0]] ?? [];
+      return !serviceList.some((svc) => selectedSourceSet.has(svc));
+    });
     selectedFields.forEach((field) => {
       const serviceList = FIELD_TO_SERVICES[field] ?? FIELD_TO_SERVICES[field.split('.')[0]] ?? [];
-      serviceList.forEach((svc) => requiredServices.add(svc));
+      const applicableServices = selectedSourceSet.size > 0
+        ? serviceList.filter((svc) => selectedSourceSet.has(svc))
+        : serviceList;
+      applicableServices.forEach((svc) => requiredServices.add(svc));
     });
     const selectedRootFields = new Set(selectedFields.map((field) => field.split('.')[0]));
     const targetedFieldRun = missingDataOnly && selectedFields.length > 0;
@@ -168,6 +185,23 @@ export async function POST(req: Request) {
     const discogsAvailable = Boolean(discogsOAuth) || discogsServerCredentialsPresent;
     if (requiredServices.has('discogs') && !discogsAvailable) {
       unavailableServices.add('discogs');
+    }
+
+    if (incompatibleFields.length > 0) {
+      return NextResponse.json({
+        success: true,
+        results: [],
+        nextCursor: cursor,
+        processedCount: 0,
+        preflight: {
+          availableFields,
+          incompatibleFields,
+          unavailableServices: Array.from(unavailableServices),
+          requiredServices: Array.from(requiredServices),
+          discogsOAuthPresent: Boolean(discogsOAuth),
+          discogsServerCredentialsPresent,
+        }
+      });
     }
 
     let targetAlbums: Record<string, unknown>[] = [];
@@ -678,6 +712,8 @@ export async function POST(req: Request) {
       nextCursor: nextCursor,
       processedCount: targetAlbums.length,
       preflight: {
+        availableFields,
+        incompatibleFields,
         unavailableServices: Array.from(unavailableServices),
         requiredServices: Array.from(requiredServices),
         discogsOAuthPresent: Boolean(discogsOAuth),

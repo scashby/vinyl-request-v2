@@ -72,7 +72,6 @@ interface ImportEnrichModalProps {
 
 // Map: FieldName -> Set of Allowed Service IDs
 export type FieldConfigMap = Record<string, Set<string>>;
-type EnrichmentMode = 'content' | 'source';
 
 type EnrichmentStats = {
   total: number;
@@ -148,6 +147,8 @@ type FetchCandidatesResponse = {
   preflight?: {
     unavailableServices?: string[];
     requiredServices?: string[];
+    availableFields?: string[];
+    incompatibleFields?: string[];
     discogsOAuthPresent?: boolean;
     discogsServerCredentialsPresent?: boolean;
   };
@@ -1018,7 +1019,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [batchSize, setBatchSize] = useState('25');
   const [startEntry, setStartEntry] = useState('1');
   const [endEntry, setEndEntry] = useState('');
-  const [enrichmentMode, setEnrichmentMode] = useState<EnrichmentMode>('source');
   const [sourceSelection, setSourceSelection] = useState<EnrichmentService[]>([]);
   const [advancedScanEnabled, setAdvancedScanEnabled] = useState(false);
   const [autoSnooze, setAutoSnooze] = useState(false); // Scan-level option (off by default)
@@ -1029,23 +1029,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   // Initialize Default State on Load
   useEffect(() => {
     if (isOpen) {
-      const initialConfig: FieldConfigMap = {};
-      // Default enabled categories
-      const defaultCats: DataCategory[] = ['artwork', 'credits', 'tracklists', 'genres', 'sonic_domain'];
-      
-      defaultCats.forEach(cat => {
-        const fields = DATA_CATEGORY_CHECK_FIELDS[cat] || [];
-        fields.forEach(field => {
-          if (ALLOWED_COLUMNS.has(field) && !NON_ENRICHABLE_FIELDS.has(field)) {
-            const services = FIELD_TO_SERVICES[field] || [];
-            if (services.length > 0) {
-              initialConfig[field] = new Set(services);
-            }
-          }
-        });
-      });
-      setFieldConfig(initialConfig);
-      setEnrichmentMode('source');
+      setFieldConfig({});
       setSourceSelection([]);
       setAdvancedScanEnabled(false);
     }
@@ -1164,12 +1148,17 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
   }
 
-  const buildSourceModeFieldConfig = (): FieldConfigMap => {
-    const selected = new Set(sourceSelection);
+  const getCompatibleServicesForField = (field: string, selectedSources = sourceSelection): EnrichmentService[] => {
+    if (selectedSources.length === 0) return [];
+    const selected = new Set(selectedSources);
+    return (FIELD_TO_SERVICES[field] || []).filter((service): service is EnrichmentService => selected.has(service as EnrichmentService));
+  };
+
+  const buildAvailableFieldConfig = (): FieldConfigMap => {
     const config: FieldConfigMap = {};
-    Object.entries(FIELD_TO_SERVICES).forEach(([field, services]) => {
+    Object.keys(FIELD_TO_SERVICES).forEach((field) => {
       if (!ALLOWED_COLUMNS.has(field) || NON_ENRICHABLE_FIELDS.has(field)) return;
-      const matched = services.filter((service) => selected.has(service));
+      const matched = getCompatibleServicesForField(field);
       if (matched.length > 0) {
         config[field] = new Set(matched);
       }
@@ -1178,9 +1167,36 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   };
 
   const getEffectiveFieldConfig = (): FieldConfigMap => {
-    if (enrichmentMode === 'source') return buildSourceModeFieldConfig();
-    return fieldConfig;
+    const effective: FieldConfigMap = {};
+    Object.entries(fieldConfig).forEach(([field, services]) => {
+      const compatible = getCompatibleServicesForField(field).filter((service) => services.has(service));
+      if (compatible.length > 0) {
+        effective[field] = new Set(compatible);
+      }
+    });
+    return effective;
   };
+
+  useEffect(() => {
+    setFieldConfig((prev) => {
+      const next: FieldConfigMap = {};
+      let changed = false;
+
+      Object.entries(prev).forEach(([field, services]) => {
+        const compatible = getCompatibleServicesForField(field).filter((service) => services.has(service));
+        if (compatible.length > 0) {
+          next[field] = new Set(compatible);
+          if (compatible.length !== services.size) {
+            changed = true;
+          }
+          return;
+        }
+        changed = true;
+      });
+
+      return changed ? next : prev;
+    });
+  }, [sourceSelection]);
 
   function getServicesForSelection(configOverride?: FieldConfigMap) {
     return getServicesForSelectionFromConfig(configOverride ?? getEffectiveFieldConfig());
@@ -1340,7 +1356,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       if (next[field]) {
         delete next[field];
       } else {
-        const defaults = FIELD_TO_SERVICES[field] || [];
+        const defaults = getCompatibleServicesForField(field);
+        if (defaults.length === 0) return prev;
         next[field] = new Set(defaults);
       }
       return next;
@@ -1350,9 +1367,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const toggleFieldSource = (field: string, service: string) => {
     setFieldConfig(prev => {
       if (!prev[field]) return prev;
+      if (!sourceSelection.includes(service as EnrichmentService)) return prev;
       const nextSources = new Set(prev[field]);
       if (nextSources.has(service)) nextSources.delete(service);
       else nextSources.add(service);
+      if (nextSources.size === 0) {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      }
       return { ...prev, [field]: nextSources };
     });
   };
@@ -1367,7 +1390,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
   const toggleCategory = (category: DataCategory) => {
     const fields = DATA_CATEGORY_CHECK_FIELDS[category] || [];
-    const validFields = fields.filter(f => ALLOWED_COLUMNS.has(f) && !NON_ENRICHABLE_FIELDS.has(f));
+    const validFields = fields.filter((field) => {
+      if (!ALLOWED_COLUMNS.has(field) || NON_ENRICHABLE_FIELDS.has(field)) return false;
+      return getCompatibleServicesForField(field).length > 0;
+    });
     const allEnabled = validFields.every(f => !!fieldConfig[f]);
 
     setFieldConfig(prev => {
@@ -1376,7 +1402,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         if (allEnabled) {
           delete next[f];
         } else {
-          const defaults = FIELD_TO_SERVICES[f] || [];
+          const defaults = getCompatibleServicesForField(f);
           next[f] = new Set(defaults);
         }
       });
@@ -1562,6 +1588,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
   async function startEnrichment(specificAlbumIds?: number[]) {
     const effectiveFieldConfig = getEffectiveFieldConfig();
+    if (sourceSelection.length === 0) {
+      alert('Please select at least one source first.');
+      return;
+    }
     if (Object.keys(effectiveFieldConfig).length === 0) {
       alert('Please select at least one field to enrich');
       return;
@@ -1643,6 +1673,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           // FIXED: Renamed folder to location in API call if necessary, or just don't pass it if it's dead
           // Assuming the API expects 'folder' to filter by location:
           location: folderFilter || undefined, 
+          selectedSources: sourceSelection,
           services: getServicesForSelection(runFieldConfigRef.current),
           fields: Object.keys(runFieldConfigRef.current).filter((field) => !NON_ENRICHABLE_FIELDS.has(field)),
           autoSnooze: autoSnooze, // PASSED TO SERVER
@@ -1734,6 +1765,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         }
 
         const unavailable = result.preflight?.unavailableServices ?? [];
+        const incompatibleFields = result.preflight?.incompatibleFields ?? [];
+        if (incompatibleFields.length > 0) {
+          setEnriching(false);
+          isLoopingRef.current = false;
+          const msg = `Selected sources cannot provide: ${incompatibleFields.join(', ')}`;
+          setStatus(`❌ ${msg}`);
+          addLog('System', 'skipped', msg);
+          return;
+        }
         const discogsSelected = !!getServicesForSelection(runFieldConfigRef.current).discogs;
         if (discogsSelected && unavailable.includes('discogs')) {
           const hasServerCreds = !!result.preflight?.discogsServerCredentialsPresent;
@@ -3233,10 +3273,25 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     );
   }
 
+  const availableFieldConfig = buildAvailableFieldConfig();
+  const availableServicesByField = Object.fromEntries(
+    Object.entries(availableFieldConfig).map(([field, services]) => [field, Array.from(services)])
+  );
+  const effectiveFieldConfig = getEffectiveFieldConfig();
+  const hasSelectedSources = sourceSelection.length > 0;
+  const availableFieldCount = Object.keys(availableFieldConfig).length;
+  const selectedFieldCount = Object.keys(effectiveFieldConfig).length;
+  const selectAllAvailableFields = () => {
+    setFieldConfig(buildAvailableFieldConfig());
+  };
+  const clearSelectedFields = () => {
+    setFieldConfig({});
+  };
+
   const hasRunnableCategory = (category: DataCategory) => {
     const validFields = (DATA_CATEGORY_CHECK_FIELDS[category] || []).filter(f => ALLOWED_COLUMNS.has(f));
     if (validFields.length === 0) return false;
-    return validFields.some((field) => (FIELD_TO_SERVICES[field] || []).length > 0);
+    return validFields.some((field) => Object.prototype.hasOwnProperty.call(availableFieldConfig, field));
   };
 
   // --- UPDATED CONFIG WITH NEW CATEGORIES ---
@@ -3303,42 +3358,72 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                 </div>
               </div>
 
-              {/* 2. ENRICHMENT MODE */}
-              <div className="mb-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEnrichmentMode('content')}
-                  disabled={enriching}
-                  className={`px-3 py-1.5 rounded text-xs font-semibold border ${
-                    enrichmentMode === 'content'
-                      ? 'bg-[#4FC3F7] text-white border-[#4FC3F7]'
-                      : 'bg-white text-gray-700 border-gray-300'
-                  }`}
-                >
-                  By Content
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEnrichmentMode('source')}
-                  disabled={enriching}
-                  className={`px-3 py-1.5 rounded text-xs font-semibold border ${
-                    enrichmentMode === 'source'
-                      ? 'bg-[#4FC3F7] text-white border-[#4FC3F7]'
-                      : 'bg-white text-gray-700 border-gray-300'
-                  }`}
-                >
-                  By Source
-                </button>
+              {/* 2. SOURCE SELECTION */}
+              <div className="bg-white border-2 border-[#D8D8D8] rounded-md p-5 mb-6">
+                <h3 className="flex items-center gap-2 text-[15px] font-semibold text-green-700 mb-2">Step 1: Choose Sources</h3>
+                <div className="mb-3 text-xs text-gray-600">
+                  Choose the source providers first. Step 2 will only show enrichments available from the sources you select here.
+                </div>
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-2">
+                  {availableSourceIds.map((source) => {
+                    const selected = sourceSelection.includes(source);
+                    return (
+                      <label key={source} className={`flex items-center gap-2 px-2 py-1.5 rounded border text-xs font-medium cursor-pointer ${
+                        selected ? 'border-[#4FC3F7] bg-[#F0F9FF] text-[#0369A1]' : 'border-gray-200 text-gray-700'
+                      }`}>
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => toggleSourceSelection(source)}
+                          disabled={enriching}
+                        />
+                        <span>{SERVICE_ICONS[source] || '🔗'} {SERVICE_DISPLAY_NAMES[source] || source}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 text-xs text-gray-500">
+                  Selected sources: {sourceSelection.length}
+                </div>
               </div>
 
-              {/* 3. DATA SELECTION */}
+              {/* 3. FIELD SELECTION */}
               <div className="bg-white border-2 border-[#D8D8D8] rounded-md p-5 mb-6">
-                {enrichmentMode === 'content' ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                  <div>
+                    <h3 className="flex items-center gap-2 text-[15px] font-semibold text-green-700">Step 2: Choose Enrichments</h3>
+                    <div className="text-xs text-gray-600 mt-1">
+                      Only enrichments supported by your selected sources are shown here.
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={selectAllAvailableFields}
+                      disabled={enriching || !hasSelectedSources || availableFieldCount === 0}
+                      className="px-2.5 py-1 rounded border border-gray-300 bg-white text-gray-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Select All Available
+                    </button>
+                    <button
+                      type="button"
+                      onClick={clearSelectedFields}
+                      disabled={enriching || selectedFieldCount === 0}
+                      className="px-2.5 py-1 rounded border border-gray-300 bg-white text-gray-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+                {!hasSelectedSources ? (
+                  <div className="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                    Pick at least one source first to see the enrichments available from that source selection.
+                  </div>
+                ) : (
                   <>
-                    <h3 className="flex items-center gap-2 text-[15px] font-semibold text-green-700 mb-2">Select Data to Enrich</h3>
                     {deferredCategories.length > 0 && (
                       <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                        <span className="font-semibold">Temporarily unavailable:</span>{' '}
+                        <span className="font-semibold">Not available from the current source selection:</span>{' '}
                         {deferredCategories.map((category) => DATA_CATEGORY_LABELS[category]).join(', ')}.
                         {deferredCategories
                           .map((category) => DEFERRED_CATEGORY_REASONS[category])
@@ -3348,54 +3433,39 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                           ))}
                       </div>
                     )}
-                    <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-3">
-                      {dataCategoriesConfig.map(({ category }) => (
-                        <DataCategoryCard
-                          key={category} 
-                          category={category} 
-                          stats={stats}
-                          fieldConfig={fieldConfig}
-                          onToggleCategory={() => toggleCategory(category)}
-                          onToggleField={toggleField}
-                          onToggleFieldSource={toggleFieldSource}
-                          disabled={enriching}
-                        />
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="flex items-center gap-2 text-[15px] font-semibold text-green-700 mb-2">Select Sources to Enrich From</h3>
-                    <div className="mb-3 text-xs text-gray-600">
-                      Only data from the checked sources will be fetched and applied.
-                    </div>
-                    <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-2">
-                      {availableSourceIds.map((source) => {
-                        const selected = sourceSelection.includes(source);
-                        return (
-                          <label key={source} className={`flex items-center gap-2 px-2 py-1.5 rounded border text-xs font-medium cursor-pointer ${
-                            selected ? 'border-[#4FC3F7] bg-[#F0F9FF] text-[#0369A1]' : 'border-gray-200 text-gray-700'
-                          }`}>
-                            <input
-                              type="checkbox"
-                              checked={selected}
-                              onChange={() => toggleSourceSelection(source)}
+                    {availableFieldCount === 0 ? (
+                      <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        None of the selected sources currently map to runnable enrichment fields.
+                      </div>
+                    ) : (
+                      <>
+                        <div className="mb-3 text-xs text-gray-500">
+                          Available fields from selection: {availableFieldCount} | Selected fields: {selectedFieldCount}
+                        </div>
+                        <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-3">
+                          {dataCategoriesConfig.map(({ category }) => (
+                            <DataCategoryCard
+                              key={category}
+                              category={category}
+                              stats={stats}
+                              fieldConfig={effectiveFieldConfig}
+                              availableServicesByField={availableServicesByField}
+                              onToggleCategory={() => toggleCategory(category)}
+                              onToggleField={toggleField}
+                              onToggleFieldSource={toggleFieldSource}
                               disabled={enriching}
                             />
-                            <span>{SERVICE_ICONS[source] || '🔗'} {SERVICE_DISPLAY_NAMES[source] || source}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                    <div className="mt-3 text-xs text-gray-500">
-                      Selected sources: {sourceSelection.length} | Runnable fields from selection: {Object.keys(getEffectiveFieldConfig()).length}
-                    </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </>
                 )}
               </div>
 
-              {/* 4. FILTERS */}
+              {/* 4. RUN SETTINGS */}
               <div className="bg-white border-2 border-[#D8D8D8] rounded-md p-5 mb-6 flex gap-4 flex-wrap items-center">
+                <div className="w-full text-[15px] font-semibold text-green-700">Step 3: Run Settings</div>
                 <div className="flex items-center gap-2">
                   <label className="font-semibold text-sm">Folder:</label>
                   <select value={folderFilter} onChange={(e) => setFolderFilter(e.target.value)} disabled={enriching} className="p-1.5 rounded border border-gray-300 text-gray-900">
@@ -3597,18 +3667,14 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           </button>
           <button 
             onClick={() => startEnrichment()} 
-            disabled={enriching || !stats || Object.keys(getEffectiveFieldConfig()).length === 0} 
+            disabled={enriching || !stats || !hasSelectedSources || selectedFieldCount === 0} 
             className={`text-white border-none px-8 py-3 rounded-md text-[15px] font-medium cursor-pointer shadow transition-all ${
               enriching 
                 ? 'bg-gray-300 cursor-not-allowed' 
                 : 'bg-[#4FC3F7] hover:bg-[#29B6F6] hover:shadow-md'
             }`}
           >
-            {enriching
-              ? 'Scanning...'
-              : advancedScanEnabled
-                ? (enrichmentMode === 'source' ? '⚡ Start Source Scan' : '⚡ Start Scan & Review')
-                : '⚡ Start Targeted Enrichment'}
+            {enriching ? 'Scanning...' : (advancedScanEnabled ? '⚡ Start Full Enrichment Run' : '⚡ Start Targeted Enrichment')}
           </button>
         </div>
         </div>
@@ -3672,6 +3738,7 @@ function DataCategoryCard({
   category, 
   stats,
   fieldConfig,
+  availableServicesByField,
   onToggleCategory,
   onToggleField,
   onToggleFieldSource,
@@ -3680,13 +3747,18 @@ function DataCategoryCard({
   category: DataCategory; 
   stats: EnrichmentStats | null;
   fieldConfig: FieldConfigMap;
+  availableServicesByField?: Record<string, string[]>;
   onToggleCategory: () => void;
   onToggleField: (f: string) => void;
   onToggleFieldSource: (f: string, s: string) => void;
   disabled: boolean; 
 }) {
   const fields = DATA_CATEGORY_CHECK_FIELDS[category] || [];
-  const validFields = fields.filter(f => ALLOWED_COLUMNS.has(f) && !NON_ENRICHABLE_FIELDS.has(f));
+  const validFields = fields.filter((field) => {
+    if (!ALLOWED_COLUMNS.has(field) || NON_ENRICHABLE_FIELDS.has(field)) return false;
+    if (!availableServicesByField) return true;
+    return (availableServicesByField[field] || []).length > 0;
+  });
   const selectableFields = validFields.filter((field) => !NON_ENRICHABLE_FIELDS.has(field));
   
   if (validFields.length === 0) return null;
@@ -3805,7 +3877,7 @@ function DataCategoryCard({
             const isUnsupported = NON_ENRICHABLE_FIELDS.has(field);
             const isEnabled = !!fieldConfig[field];
             const activeSources = fieldConfig[field] || new Set();
-            const services = FIELD_TO_SERVICES[field] || [];
+            const services = availableServicesByField?.[field] || FIELD_TO_SERVICES[field] || [];
             const missing = getMissing(field);
             const badgeText = isUnsupported ? 'N/A' : String(missing);
             const badgeClass = isUnsupported
