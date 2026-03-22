@@ -381,7 +381,7 @@ export default function BingoJumbotronPage() {
           >
             Thank You For Playing!
           </h2>
-          <p className="relative z-10 text-[3vw] font-semibold text-stone-700">Vinyl Music Bingo</p>
+          <p className="relative z-10 text-[4vw] font-black uppercase tracking-[0.12em] text-amber-700">Vinyl Music Bingo</p>
 
           {upcomingEvents.length > 0 ? (
             <div className="relative z-10 w-full max-w-[80vw]">
