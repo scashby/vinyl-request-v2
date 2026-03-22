@@ -210,7 +210,9 @@ export async function POST(req: Request) {
       ? `,
           release_tracks:release_tracks (
             id,
-            recording:recordings ( credits )
+            position,
+            title_override,
+            recording:recordings ( title, credits )
           )`
       : '';
 
@@ -356,7 +358,9 @@ export async function POST(req: Request) {
         notes?: string | null;
         release_tracks?: {
           id?: number | null;
-          recording?: { credits?: unknown } | { credits?: unknown }[] | null;
+          position?: string | null;
+          title_override?: string | null;
+          recording?: { title?: string | null; credits?: unknown } | { title?: string | null; credits?: unknown }[] | null;
         }[] | null;
         master?: {
           id?: number | null;
@@ -408,6 +412,39 @@ export async function POST(req: Request) {
       return [];
     };
 
+    const hasUsableTrackTitle = (track: NonNullable<CandidateAlbumRow['release']>['release_tracks'] extends (infer T)[] | null ? T : never): boolean => {
+      const recording = track.recording
+        ? (Array.isArray(track.recording) ? track.recording[0] : track.recording)
+        : null;
+      return Boolean(asString(track.title_override) || asString(recording?.title));
+    };
+
+    const getTrackSideToken = (position: unknown): string | null => {
+      if (typeof position !== 'string') return null;
+      const trimmed = position.trim().toUpperCase();
+      if (!trimmed) return null;
+      const match = trimmed.match(/^([A-Z]+)/);
+      return match ? match[1] : null;
+    };
+
+    const hasExpectedSideCoverage = (release: CandidateAlbumRow['release'], releaseTracks: NonNullable<CandidateAlbumRow['release']>['release_tracks'] extends (infer T)[] | null ? T[] : never): boolean => {
+      const qty = typeof release?.qty === 'number' && Number.isFinite(release.qty) ? release.qty : 1;
+      if (qty <= 1) return true;
+      const mediaType = typeof release?.media_type === 'string' ? release.media_type.trim().toLowerCase() : '';
+      if (mediaType && mediaType !== 'vinyl') return true;
+
+      const presentSides = new Set(
+        releaseTracks
+          .map((track) => getTrackSideToken(track.position))
+          .filter((side): side is string => !!side)
+      );
+
+      if (presentSides.size === 0) return true;
+
+      const expectedSides = Array.from({ length: qty * 2 }, (_, index) => String.fromCharCode(65 + index));
+      return expectedSides.every((side) => presentSides.has(side));
+    };
+
     const getAlbumCredits = (credits: unknown) => {
       const record = asRecord(credits);
       const albumPeople = asRecord(record.album_people ?? record.albumPeople);
@@ -433,6 +470,10 @@ export async function POST(req: Request) {
           return asRecord(recording?.credits);
         })
         .filter((credit) => Object.keys(credit).length > 0);
+      const hasCompleteTrackTitles =
+        releaseTracks.length > 0
+        && releaseTracks.every((track) => hasUsableTrackTitle(track))
+        && hasExpectedSideCoverage(release, releaseTracks);
       const hasLyricsUrl = trackCredits.some((credit) => typeof credit.lyrics_url === 'string' && credit.lyrics_url.trim().length > 0);
       const hasLyrics = trackCredits.some((credit) => typeof credit.lyrics === 'string' && credit.lyrics.trim().length > 0);
       const creditsInfo = getAlbumCredits(firstRecording?.credits);
@@ -501,8 +542,8 @@ export async function POST(req: Request) {
         wikipedia_url: asString(master?.wikipedia_url) ?? asString(links.wikipedia_url),
         apple_music_url: asString(master?.apple_music_url) ?? asString(links.apple_music_url),
         lastfm_url: asString(master?.lastfm_url) ?? asString(links.lastfm_url),
-        tracks: releaseTracks.length > 0 ? ['has_tracks'] : [],
-        tracklists: releaseTracks.length > 0 ? ['has_tracks'] : [],
+        tracks: hasCompleteTrackTitles ? ['has_tracks'] : [],
+        tracklists: hasCompleteTrackTitles ? ['has_tracks'] : [],
         tracks_lyrics_url: hasLyricsUrl ? ['has_lyrics_url'] : [],
         tracks_lyrics: hasLyrics ? ['has_lyrics'] : [],
         disc_metadata: albumDetails.disc_metadata ?? null,

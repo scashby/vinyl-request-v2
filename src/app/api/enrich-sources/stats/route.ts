@@ -10,6 +10,7 @@ const NON_ENRICHABLE_FIELDS = new Set<string>([
 ]);
 
 type RecordingRow = {
+  title?: string | null;
   duration_seconds: number | null;
   credits: unknown;
   lyrics: string | null;
@@ -17,6 +18,8 @@ type RecordingRow = {
 };
 
 type ReleaseTrackRow = {
+  position?: string | null;
+  title_override?: string | null;
   recording?: RecordingRow | RecordingRow[] | null;
 };
 
@@ -51,6 +54,8 @@ type MasterRow = {
 
 type ReleaseRow = {
   id?: number | string | null;
+  media_type?: string | null;
+  qty?: number | null;
   barcode?: string | null;
   label?: string | null;
   catalog_number?: string | null;
@@ -73,6 +78,8 @@ export async function GET(request: Request) {
     const baseSelect = `
           id,          location,          release:releases (
             id,
+            media_type,
+            qty,
             barcode,
             label,
             catalog_number,
@@ -115,7 +122,11 @@ export async function GET(request: Request) {
               )
             ),
             release_tracks:release_tracks (
+              position,
+              position,
+              title_override,
               recording:recordings (
+                title,
                 duration_seconds,
                 credits,
                 lyrics,
@@ -129,6 +140,8 @@ export async function GET(request: Request) {
     const fallbackSelect = `
           id,          location,          release:releases (
             id,
+            media_type,
+            qty,
             barcode,
             label,
             catalog_number,
@@ -159,7 +172,11 @@ export async function GET(request: Request) {
               lastfm_url
             ),
             release_tracks:release_tracks (
+              position,
+              position,
+              title_override,
               recording:recordings (
+                title,
                 duration_seconds,
                 credits,
                 lyrics,
@@ -177,7 +194,10 @@ export async function GET(request: Request) {
               *
             ),
             release_tracks:release_tracks (
+              position,
+              title_override,
               recording:recordings (
+                title,
                 duration_seconds,
                 credits,
                 lyrics,
@@ -372,6 +392,37 @@ export async function GET(request: Request) {
       return { albumPeople, classical, artwork, albumDetails, links };
     };
 
+    const hasUsableTrackTitle = (track: ReleaseTrackRow): boolean => {
+      const recording = toSingle<RecordingRow>(track.recording ?? null);
+      return hasString(track.title_override) || hasString(recording?.title);
+    };
+
+    const getTrackSideToken = (position: unknown): string | null => {
+      if (typeof position !== 'string') return null;
+      const trimmed = position.trim().toUpperCase();
+      if (!trimmed) return null;
+      const match = trimmed.match(/^([A-Z]+)/);
+      return match ? match[1] : null;
+    };
+
+    const hasExpectedSideCoverage = (release: ReleaseRow | null | undefined, releaseTracks: ReleaseTrackRow[]): boolean => {
+      const qty = typeof release?.qty === 'number' && Number.isFinite(release.qty) ? release.qty : 1;
+      if (qty <= 1) return true;
+      const mediaType = typeof release?.media_type === 'string' ? release.media_type.trim().toLowerCase() : '';
+      if (mediaType && mediaType !== 'vinyl') return true;
+
+      const presentSides = new Set(
+        releaseTracks
+          .map((track) => getTrackSideToken(track.position))
+          .filter((side): side is string => !!side)
+      );
+
+      if (presentSides.size === 0) return true;
+
+      const expectedSides = Array.from({ length: qty * 2 }, (_, index) => String.fromCharCode(65 + index));
+      return expectedSides.every((side) => presentSides.has(side));
+    };
+
     albums.forEach(album => {
       const albumIdStr = String(album.id);
       if (typeof album.location === 'string' && album.location.trim()) {
@@ -391,7 +442,13 @@ export async function GET(request: Request) {
       const firstRecording = toSingle<RecordingRow>(releaseTracks[0]?.recording ?? null);
       const creditInfo = getAlbumCredits(firstRecording?.credits);
 
-      if (releaseTracks.length > 0) {
+      const hasTrackRows = releaseTracks.length > 0;
+      const hasCompleteTrackTitles =
+        hasTrackRows
+        && releaseTracks.every((track) => hasUsableTrackTitle(track))
+        && hasExpectedSideCoverage(release, releaseTracks);
+
+      if (hasCompleteTrackTitles) {
         albumsWithTracks.add(albumIdStr);
       }
 
