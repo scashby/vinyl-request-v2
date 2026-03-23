@@ -261,7 +261,13 @@ export default function BingoJumbotronPage() {
 
   const revealPhase = useMemo<RevealPhase>(() => {
     const delaySeconds = Math.max(0, session?.call_reveal_delay_seconds ?? 0);
-    if (!session?.call_reveal_at || delaySeconds <= 0) return "full";
+    if (delaySeconds <= 0) return "full";
+
+    // If the calls realtime update arrived before the session update, session.current_call_index
+    // will lag behind current.call_index. Treat this as "hidden" to prevent a flash of unblurred text.
+    if (current !== null && (session?.current_call_index ?? -1) < current.call_index) return "hidden";
+
+    if (!session?.call_reveal_at) return "hidden";
 
     const artistRevealAt = new Date(session.call_reveal_at).getTime();
     if (!Number.isFinite(artistRevealAt)) return "full";
@@ -272,7 +278,7 @@ export default function BingoJumbotronPage() {
     if (now < titleRevealAt) return "artist";
 
     return "full";
-  }, [session?.call_reveal_at, session?.call_reveal_delay_seconds, now]);
+  }, [session?.call_reveal_at, session?.call_reveal_delay_seconds, session?.current_call_index, current, now]);
 
   const artistHidden = revealPhase === "hidden";
   const titleHidden = revealPhase !== "full";
