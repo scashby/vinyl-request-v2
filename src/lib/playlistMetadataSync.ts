@@ -23,15 +23,16 @@ type SyncOptions = {
 
 type GameConfig = {
   callTable: string;
+  titleField: string;
 };
 
 type DbJson = string | number | boolean | null | { [key: string]: DbJson | undefined } | DbJson[];
 
 const GAME_CONFIG: Record<PlaylistSeededGameSlug, GameConfig> = {
-  bingo: { callTable: "bingo_session_calls" },
-  trivia: { callTable: "trivia_session_calls" },
-  "name-that-tune": { callTable: "ntt_session_calls" },
-  "genre-imposter": { callTable: "gi_session_calls" },
+  bingo: { callTable: "bingo_session_calls", titleField: "track_title" },
+  trivia: { callTable: "trivia_session_calls", titleField: "source_title" },
+  "name-that-tune": { callTable: "ntt_session_calls", titleField: "title_answer" },
+  "genre-imposter": { callTable: "gi_session_calls", titleField: "title" },
 };
 
 function normalizeSide(value: string | null | undefined): string | null {
@@ -251,6 +252,8 @@ export async function syncSessionPlaylistMetadata(
   };
 }
 
+const PLACEHOLDER_TITLE_RE = /^track\s+[a-z]?\d+[a-z]?$/i;
+
 export async function autoSyncSessionPlaylistMetadata(game: PlaylistSeededGameSlug, sessionId: number): Promise<void> {
   const config = GAME_CONFIG[game];
   const db = getBingoDb();
@@ -258,15 +261,20 @@ export async function autoSyncSessionPlaylistMetadata(game: PlaylistSeededGameSl
   const dbAny = db as any;
   const { data, error } = await dbAny
     .from(config.callTable)
-    .select("id")
+    .select(`id, ${config.titleField}, metadata_synced_at`)
     .eq("session_id", sessionId)
     .eq("metadata_locked", false)
-    .is("metadata_synced_at", null)
-    .not("playlist_track_key", "is", null)
-    .limit(1);
+    .not("playlist_track_key", "is", null);
 
   if (error) throw new Error(error.message);
   if (!Array.isArray(data) || data.length === 0) return;
+
+  const needsSync = (data as Array<Record<string, unknown>>).some((row) => {
+    if (!row.metadata_synced_at) return true;
+    return PLACEHOLDER_TITLE_RE.test(String(row[config.titleField] ?? "").trim());
+  });
+
+  if (!needsSync) return;
 
   await syncSessionPlaylistMetadata(game, sessionId, { dryRun: false });
 }

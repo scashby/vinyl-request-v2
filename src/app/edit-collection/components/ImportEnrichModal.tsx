@@ -2903,9 +2903,56 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     for (const track of releaseTracks) {
       const recording = toSingle(track.recording);
-      if (!recording?.id) continue;
-      const title = track.title_override || recording.title || '';
+      const title = track.title_override || recording?.title || '';
 
+      // Tracks without a linked recording: match by position only, create recording + link
+      if (!recording?.id) {
+        const dbPos = String(track.position ?? '').trim();
+        if (!dbPos) continue;
+        const matchIndex = enriched.findIndex((et) => {
+          const etPos = String(et.position ?? '').trim();
+          return etPos && dbPos && etPos === dbPos;
+        });
+        if (matchIndex < 0) continue;
+        matchedEnrichedIndexes.add(matchIndex);
+        const match = enriched[matchIndex];
+        const incomingTitle = String(match.title ?? '').trim();
+        if (!incomingTitle) continue;
+
+        const recordingPayload: Record<string, unknown> = {
+          title: incomingTitle,
+          duration_seconds: parseDurationToSeconds(match.duration),
+          track_artist: normalizeArtistDisplay(match.artist ? String(match.artist) : null),
+          lyrics: match.lyrics ? String(match.lyrics) : null,
+          lyrics_url: match.lyrics_url ? String(match.lyrics_url) : null,
+          is_cover: typeof match.is_cover === 'boolean' ? match.is_cover : null,
+          original_artist: match.original_artist ? String(match.original_artist) : null,
+        };
+        const builtCredits = buildTrackCredits(match);
+        if (Object.keys(builtCredits).length > 0) {
+          recordingPayload.credits = builtCredits as unknown as import('types/supabase').Json;
+        }
+
+        const trackId = track.id;
+        updates.push(
+          (async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { data: newRec, error: recErr } = await (supabase as any)
+              .from('recordings')
+              .insert(recordingPayload)
+              .select('id')
+              .single();
+            if (recErr || !newRec) return;
+            await supabase
+              .from('release_tracks')
+              .update({ recording_id: (newRec as { id: number }).id, title_override: null })
+              .eq('id', trackId);
+          })()
+        );
+        continue;
+      }
+
+      // Track has a linked recording — proceed with the standard update path
       const matchIndex = enriched.findIndex((et) => {
         const etTitle = normalize(et.title);
         const etPos = String(et.position ?? '').trim();
