@@ -233,7 +233,7 @@ export default function BingoHostPage() {
   };
 
   const saveRevealDelay = async () => {
-    const updatedDelay = Math.max(0, Math.min(15, revealDelayInput));
+    const updatedDelay = Math.max(0, Math.min(300, revealDelayInput));
     setRevealDelayInput(updatedDelay);
     await patchSession({ call_reveal_delay_seconds: updatedDelay });
   };
@@ -392,9 +392,9 @@ export default function BingoHostPage() {
                 <input
                   type="number"
                   min={0}
-                  max={15}
+                  max={300}
                   value={revealDelayInput}
-                  onChange={(e) => setRevealDelayInput(Math.max(0, Math.min(15, Number(e.target.value) || 0)))}
+                  onChange={(e) => setRevealDelayInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)))}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       saveRevealDelay();

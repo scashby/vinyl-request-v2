@@ -272,8 +272,8 @@ export default function BingoEditSessionPage() {
                   <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={1} value={roundCount} onChange={(e) => setRoundCount(Math.max(1, Number(e.target.value) || 1))} />
                 </label>
 
-                <label className="text-sm">Call Reveal Delay (sec)
-                  <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={callRevealDelay} onChange={(e) => setCallRevealDelay(Math.max(0, Number(e.target.value) || 0))} />
+                <label className="text-sm">Call Reveal Step (sec)
+                  <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} max={300} value={callRevealDelay} onChange={(e) => setCallRevealDelay(Math.max(0, Math.min(300, Number(e.target.value) || 0)))} />
                 </label>
 
                 <label className="text-sm">Remove + Resleeve (sec)

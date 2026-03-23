@@ -10,6 +10,7 @@ type Session = {
   current_round: number;
   round_count: number;
   seconds_to_next_call: number;
+  call_reveal_delay_seconds: number;
   status: string;
   recent_calls_limit: number;
   show_countdown: boolean;
@@ -41,6 +42,8 @@ type Call = {
   artist_name: string;
   status: string;
 };
+
+type RevealPhase = "hidden" | "artist" | "full";
 
 const COLUMN_ROTATION = ["B", "I", "N", "G", "O"];
 
@@ -256,10 +259,25 @@ export default function BingoJumbotronPage() {
   const current = called.at(-1) ?? null;
   const lastCalled = useMemo(() => called.slice(Math.max(0, called.length - 5)).reverse(), [called]);
 
-  const callIsRevealed = useMemo(() => {
-    if (!session?.call_reveal_at) return true;
-    return now >= new Date(session.call_reveal_at).getTime();
-  }, [session?.call_reveal_at, now]);
+  const revealPhase = useMemo<RevealPhase>(() => {
+    const delaySeconds = Math.max(0, session?.call_reveal_delay_seconds ?? 0);
+    if (!session?.call_reveal_at || delaySeconds <= 0) return "full";
+
+    const artistRevealAt = new Date(session.call_reveal_at).getTime();
+    if (!Number.isFinite(artistRevealAt)) return "full";
+
+    if (now < artistRevealAt) return "hidden";
+
+    const titleRevealAt = artistRevealAt + delaySeconds * 1000;
+    if (now < titleRevealAt) return "artist";
+
+    return "full";
+  }, [session?.call_reveal_at, session?.call_reveal_delay_seconds, now]);
+
+  const artistHidden = revealPhase === "hidden";
+  const titleHidden = revealPhase !== "full";
+
+  const maskTextClass = (hidden: boolean) => (hidden ? "blur-[0.28em] select-none opacity-80 transition-all duration-500" : "transition-all duration-500");
 
   const calledByColumn = useMemo(() => {
     const byCol: Record<string, typeof called> = {};
@@ -438,15 +456,18 @@ export default function BingoJumbotronPage() {
                 <p className="text-[1vw] font-semibold uppercase tracking-[0.2em] text-stone-400">Last Called</p>
                 {lastCalled.length > 0 ? (
                   <div className="mt-[0.8vw] space-y-[0.35vw]">
-                    {lastCalled.map((call) => (
-                      <div key={call.id} className="rounded-xl border border-stone-700/70 bg-black/25 px-[0.6vw] py-[0.45vw]">
-                        <p className={`text-[1.2vw] font-black leading-none ${getBingoColumnTextClass(call.column_letter, call.ball_number)}`}>
-                          {call.column_letter}
-                        </p>
-                        <p className="text-[0.95vw] font-semibold leading-tight text-amber-100">{call.track_title}</p>
-                        <p className="text-[0.82vw] text-stone-300">{call.artist_name}</p>
-                      </div>
-                    ))}
+                    {lastCalled.map((call) => {
+                      const isCurrent = call.id === current?.id;
+                      return (
+                        <div key={call.id} className="rounded-xl border border-stone-700/70 bg-black/25 px-[0.6vw] py-[0.45vw]">
+                          <p className={`text-[1.2vw] font-black leading-none ${getBingoColumnTextClass(call.column_letter, call.ball_number)}`}>
+                            {call.column_letter}
+                          </p>
+                          <p className={`text-[0.95vw] font-semibold leading-tight text-amber-100 ${maskTextClass(isCurrent && titleHidden)}`}>{call.track_title}</p>
+                          <p className={`text-[0.82vw] text-stone-300 ${maskTextClass(isCurrent && artistHidden)}`}>{call.artist_name}</p>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="mt-[0.8vw] text-[1vw] text-stone-500">Waiting for first call...</p>
@@ -457,16 +478,16 @@ export default function BingoJumbotronPage() {
                 {showGame ? (
                   <>
                     <p
-                      className={`font-black leading-none ${current && callIsRevealed ? getBingoColumnTextClass(current.column_letter, current.ball_number) : "text-stone-500"}`}
+                      className={`font-black leading-none ${current ? getBingoColumnTextClass(current.column_letter, current.ball_number) : "text-stone-500"}`}
                       style={{ fontSize: "16vw" }}
                     >
-                      {current && callIsRevealed ? current.column_letter : current ? current.column_letter : "?"}
+                      {current ? current.column_letter : "?"}
                     </p>
-                    <p className="mt-[0.4vw] font-black leading-tight text-amber-100" style={{ fontSize: "4.5vw" }}>
-                      {current && callIsRevealed ? current.track_title : "..."}
+                    <p className={`mt-[0.4vw] font-black leading-tight text-amber-100 ${maskTextClass(titleHidden)}`} style={{ fontSize: "4.5vw" }}>
+                      {current ? current.track_title : "..."}
                     </p>
-                    <p className="mt-[0.2vw] font-semibold text-stone-300" style={{ fontSize: "2.7vw" }}>
-                      {current && callIsRevealed ? current.artist_name : ""}
+                    <p className={`mt-[0.2vw] font-semibold text-stone-300 ${maskTextClass(artistHidden)}`} style={{ fontSize: "2.7vw" }}>
+                      {current ? current.artist_name : ""}
                     </p>
                   </>
                 ) : null}
@@ -486,13 +507,16 @@ export default function BingoJumbotronPage() {
                           <>
                             {colIndex > 0 && <div className="my-[0.3vw] border-t border-stone-600/30" />}
                             <p className={`text-[0.85vw] font-black uppercase tracking-[0.14em] ${getBingoColumnTextClass(col, null)}`}>Column {col}</p>
-                            {calledByColumn[col].map((call) => (
-                              <div key={call.id} className="py-[0.2vw] leading-tight">
-                                <p className={`text-[0.9vw] font-black ${getBingoColumnTextClass(call.column_letter, call.ball_number)}`}>{call.column_letter}</p>
-                                <p className="text-[0.84vw] font-semibold text-amber-100">{call.track_title}</p>
-                                <p className="text-[0.78vw] text-stone-300">{call.artist_name}</p>
-                              </div>
-                            ))}
+                            {calledByColumn[col].map((call) => {
+                              const isCurrent = call.id === current?.id;
+                              return (
+                                <div key={call.id} className="py-[0.2vw] leading-tight">
+                                  <p className={`text-[0.9vw] font-black ${getBingoColumnTextClass(call.column_letter, call.ball_number)}`}>{call.column_letter}</p>
+                                  <p className={`text-[0.84vw] font-semibold text-amber-100 ${maskTextClass(isCurrent && titleHidden)}`}>{call.track_title}</p>
+                                  <p className={`text-[0.78vw] text-stone-300 ${maskTextClass(isCurrent && artistHidden)}`}>{call.artist_name}</p>
+                                </div>
+                              );
+                            })}
                           </>
                         )}
                       </div>
