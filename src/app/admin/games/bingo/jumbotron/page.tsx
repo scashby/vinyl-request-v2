@@ -283,7 +283,7 @@ export default function BingoJumbotronPage() {
   const artistHidden = revealPhase === "hidden";
   const titleHidden = revealPhase !== "full";
 
-  const maskTextClass = (hidden: boolean) => (hidden ? "blur-[0.28em] select-none opacity-80 transition-all duration-500" : "transition-all duration-500");
+  const maskTextClass = (hidden: boolean) => (hidden ? "blur-[0.28em] select-none opacity-80" : "transition-all duration-500");
 
   const calledByColumn = useMemo(() => {
     const byCol: Record<string, typeof called> = {};
