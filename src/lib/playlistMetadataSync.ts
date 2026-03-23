@@ -35,6 +35,12 @@ const GAME_CONFIG: Record<PlaylistSeededGameSlug, GameConfig> = {
   "genre-imposter": { callTable: "gi_session_calls", titleField: "title" },
 };
 
+const PLACEHOLDER_TITLE_RE = /^track\s+[a-z]?\d+[a-z]?$/i;
+
+function isPlaceholderTitle(value: unknown): boolean {
+  return PLACEHOLDER_TITLE_RE.test(String(value ?? "").trim());
+}
+
 function normalizeSide(value: string | null | undefined): string | null {
   const side = String(value ?? "").trim().toUpperCase();
   return side.length > 0 ? side : null;
@@ -202,7 +208,7 @@ export async function syncSessionPlaylistMetadata(
   const keys = Array.from(
     new Set(
       rows
-        .filter((row) => row.metadata_locked !== true)
+        .filter((row) => row.metadata_locked !== true || isPlaceholderTitle(row[config.titleField]))
         .map((row) => normalizeText(row.playlist_track_key))
         .filter((value): value is string => Boolean(value))
     )
@@ -212,7 +218,8 @@ export async function syncSessionPlaylistMetadata(
 
   for (const row of rows) {
     const callId = row.id as number;
-    if (row.metadata_locked === true) {
+    const lockedPlaceholder = row.metadata_locked === true && isPlaceholderTitle(row[config.titleField]);
+    if (row.metadata_locked === true && !lockedPlaceholder) {
       skippedLockedCount += 1;
       continue;
     }
@@ -252,8 +259,6 @@ export async function syncSessionPlaylistMetadata(
   };
 }
 
-const PLACEHOLDER_TITLE_RE = /^track\s+[a-z]?\d+[a-z]?$/i;
-
 export async function autoSyncSessionPlaylistMetadata(game: PlaylistSeededGameSlug, sessionId: number): Promise<void> {
   const config = GAME_CONFIG[game];
   const db = getBingoDb();
@@ -263,7 +268,6 @@ export async function autoSyncSessionPlaylistMetadata(game: PlaylistSeededGameSl
     .from(config.callTable)
     .select(`id, ${config.titleField}, metadata_synced_at`)
     .eq("session_id", sessionId)
-    .eq("metadata_locked", false)
     .not("playlist_track_key", "is", null);
 
   if (error) throw new Error(error.message);
@@ -271,7 +275,7 @@ export async function autoSyncSessionPlaylistMetadata(game: PlaylistSeededGameSl
 
   const needsSync = (data as Array<Record<string, unknown>>).some((row) => {
     if (!row.metadata_synced_at) return true;
-    return PLACEHOLDER_TITLE_RE.test(String(row[config.titleField] ?? "").trim());
+    return isPlaceholderTitle(row[config.titleField]);
   });
 
   if (!needsSync) return;
