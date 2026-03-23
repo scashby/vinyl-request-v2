@@ -353,29 +353,21 @@ export default function BingoHostPage() {
 
         <section className="rounded-2xl border border-stone-700 bg-black/45 p-3">
           <div className="grid grid-cols-3 gap-3">
-            {/* Left column: Start/intermission (top), game controls (bottom) */}
+            {/* Left column: Game controls (top), round controls (bottom) */}
             <div className="space-y-2 text-xs">
               <div className="flex flex-wrap items-center gap-2">
                 <button onClick={startGame} className="rounded border border-violet-700 bg-violet-900/35 px-3 py-1 font-bold text-violet-200 hover:bg-violet-900/55">Start Game</button>
-                <button onClick={startRound} className="rounded border border-emerald-700 bg-emerald-900/35 px-3 py-1 font-bold text-emerald-200 hover:bg-emerald-900/55">Start Round</button>
-                <label className="text-stone-400 whitespace-nowrap">Intermission (sec)</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={intermissionLengthSeconds}
-                  onChange={(e) => setIntermissionLengthSeconds(Math.max(0, Number(e.target.value) || 0))}
-                  className="w-16 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
-                />
+                <button onClick={resetGame} className="rounded border border-amber-700 bg-amber-900/40 px-3 py-1 text-amber-100 hover:bg-amber-900/60">Reset Game</button>
+                <button onClick={endGame} className="rounded border border-red-700 px-3 py-1 text-red-300 hover:bg-red-900/20">End Game</button>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <button onClick={endGame} className="rounded border border-red-700 px-3 py-1 text-red-300 hover:bg-red-900/20">End Game</button>
+                <button onClick={startRound} className="rounded border border-emerald-700 bg-emerald-900/35 px-3 py-1 font-bold text-emerald-200 hover:bg-emerald-900/55">Start Round</button>
                 <button onClick={resetRound} className="rounded border border-red-700 bg-red-900/40 px-3 py-1 text-red-100 hover:bg-red-900/60">Reset Round</button>
-                <button onClick={resetGame} className="rounded border border-amber-700 bg-amber-900/40 px-3 py-1 text-amber-100 hover:bg-amber-900/60">Reset Game</button>
-                <button onClick={nextRound} className="rounded border border-sky-700 px-3 py-1 text-sky-300 hover:bg-sky-900/20">Next Round</button>
+                <button onClick={nextRound} className="rounded border border-sky-700 px-3 py-1 text-sky-300 hover:bg-sky-900/20">End Round</button>
               </div>
             </div>
 
-            {/* Middle column: Overlay + Reveal Delay */}
+            {/* Middle column: Overlay + timing controls */}
             <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
               <button
                 onClick={() => {
@@ -409,6 +401,16 @@ export default function BingoHostPage() {
                     }
                   }}
                   className="w-14 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <label className="text-stone-400 whitespace-nowrap">Intermission (sec)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={intermissionLengthSeconds}
+                  onChange={(e) => setIntermissionLengthSeconds(Math.max(0, Number(e.target.value) || 0))}
+                  className="w-16 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
                 />
               </div>
             </div>
