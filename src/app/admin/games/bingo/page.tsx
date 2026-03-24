@@ -313,19 +313,38 @@ export default function BingoSetupPage() {
   };
 
   const openJumbotronPreview = useCallback((screen: "welcome" | "intermission" | "thanks") => {
-    const previewSessionId = sessions[0]?.id;
+    const previewSessionId = (eventId
+      ? sessions.find((session) => session.event_id === eventId)?.id
+      : null) ?? sessions[0]?.id;
     if (!previewSessionId) {
       alert("Create a session first, then use preview.");
       return;
     }
 
-    const url = `/admin/games/bingo/jumbotron?sessionId=${previewSessionId}&preview=${screen}&previewIntermissionSeconds=${defaultIntermissionSeconds}`;
+    const selectedEvent = eventId ? events.find((entry) => entry.id === eventId) : null;
+    const params = new URLSearchParams({
+      sessionId: String(previewSessionId),
+      preview: screen,
+      previewIntermissionSeconds: String(defaultIntermissionSeconds),
+    });
+
+    if (welcomeHostNote.trim()) {
+      params.set("previewWelcomeText", welcomeHostNote.trim());
+    }
+    if (selectedEvent?.venue_logo_url) {
+      params.set("previewVenueLogo", selectedEvent.venue_logo_url);
+    }
+    if (selectedEvent?.title) {
+      params.set("previewVenueName", selectedEvent.title);
+    }
+
+    const url = `/admin/games/bingo/jumbotron?${params.toString()}`;
     openGameWindow(
       url,
       `bingo_jumbotron_preview_${screen}`,
       "width=1920,height=1080,noopener,noreferrer"
     );
-  }, [defaultIntermissionSeconds, sessions]);
+  }, [defaultIntermissionSeconds, eventId, events, sessions, welcomeHostNote]);
 
   const downloadCards = async (sessionId: number, layout: "2-up" | "4-up") => {
     const res = await fetch(`/api/games/bingo/cards?sessionId=${sessionId}`);
@@ -525,11 +544,11 @@ export default function BingoSetupPage() {
               >
                 Preview Welcome
               </button>
-              <label className="mt-3 block text-sm text-stone-300">Host Note (optional)
+              <label className="mt-3 block text-sm text-stone-300">Welcome Message (optional override)
                 <textarea
                   className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs text-stone-200 placeholder:text-stone-600"
                   rows={3}
-                  placeholder="Extra instructions shown to players on the welcome screen…"
+                  placeholder="Override the default welcome message shown to players..."
                   value={welcomeHostNote}
                   onChange={(e) => setWelcomeHostNote(e.target.value)}
                 />

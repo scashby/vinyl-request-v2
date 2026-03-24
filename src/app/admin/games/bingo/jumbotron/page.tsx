@@ -184,6 +184,9 @@ export default function BingoJumbotronPage() {
   const previewIntermissionSeconds = Number.isFinite(previewIntermissionSecondsRaw)
     ? Math.max(0, Math.floor(previewIntermissionSecondsRaw))
     : 180;
+  const previewWelcomeText = searchParams.get("previewWelcomeText")?.trim() || null;
+  const previewVenueLogo = searchParams.get("previewVenueLogo")?.trim() || null;
+  const previewVenueName = searchParams.get("previewVenueName")?.trim() || null;
   const containerRef = useRef<HTMLDivElement>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
@@ -333,6 +336,14 @@ export default function BingoJumbotronPage() {
     });
   }, [session]);
 
+  const welcomeIntroText = previewWelcomeText
+    ?? session?.next_game_rules_text?.trim()
+    ?? welcomeContent?.intro
+    ?? "Listen for each track. If the song is on your card, mark that square. Get five in a row to call BINGO.";
+
+  const effectiveVenueLogo = previewVenueLogo ?? session?.event?.venue_logo_url ?? null;
+  const effectiveVenueName = previewVenueName ?? session?.event?.title ?? null;
+
   const statusLabel = session?.status === "paused" ? "Paused" : null;
 
   return (
@@ -356,28 +367,26 @@ export default function BingoJumbotronPage() {
         <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2vw] px-8 py-[4vh] text-center">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(245,158,11,0.12),transparent_26%),radial-gradient(circle_at_80%_30%,rgba(120,53,15,0.12),transparent_24%)]" />
           <BrandingLogos
-            venueLogoUrl={session?.event?.venue_logo_url}
-            venueName={session?.event?.title ?? null}
+            venueLogoUrl={effectiveVenueLogo}
+            venueName={effectiveVenueName}
             tone="light"
           />
           <div className="relative z-10 max-w-[78vw] rounded-[2.5rem] border border-amber-400/60 bg-white/72 px-[4vw] py-[3vw] shadow-[0_30px_80px_rgba(120,53,15,0.16)] backdrop-blur-sm">
-            <p className="text-[1.4vw] font-semibold uppercase tracking-[0.34em] text-amber-800">Welcome Screen</p>
-            <h2 className="mt-[1vw] text-[5.5vw] font-black uppercase leading-[0.92] tracking-[0.08em] text-amber-600">
+            <h2 className="text-[5.5vw] font-black uppercase leading-[0.92] tracking-[0.08em] text-amber-600">
               Welcome To Vinyl Music Bingo
             </h2>
             <p className="mx-auto mt-[1.4vw] max-w-[54vw] text-[1.65vw] leading-relaxed text-stone-700">
-              {welcomeContent?.intro ?? "Listen for each track. If the song is on your card, mark that square. Get five in a row to call BINGO."}
+              {welcomeIntroText}
             </p>
             <div className="mx-auto mt-[1.8vw] max-w-[44vw] rounded-[2rem] border border-amber-300/70 bg-amber-50/85 px-[2vw] py-[1.5vw] text-left shadow-[0_18px_40px_rgba(245,158,11,0.12)]">
               <p className="text-[1.45vw] font-semibold uppercase tracking-[0.08em] text-amber-800">Round Rules</p>
-              {(welcomeContent?.modeRules ?? []).map((line, index) => (
-                <p key={index} className={`text-[1.06vw] text-stone-700 ${index === 0 ? "mt-[0.5vw]" : "mt-[0.2vw]"}`}>{line}</p>
-              ))}
-              {welcomeContent?.tieBreak ? <p className="mt-[0.6vw] text-[1.06vw] font-medium text-stone-700">{welcomeContent.tieBreak}</p> : null}
+              <ol className="mt-[0.7vw] list-decimal space-y-[0.35vw] pl-[1.3vw]">
+                {(welcomeContent?.modeRules ?? []).map((line, index) => (
+                  <li key={index} className="text-[1.06vw] leading-relaxed text-stone-700">{line}</li>
+                ))}
+              </ol>
+              {welcomeContent?.tieBreak ? <p className="mt-[0.9vw] border-t border-amber-300/80 pt-[0.6vw] text-[1.03vw] font-semibold text-stone-700">{welcomeContent.tieBreak}</p> : null}
             </div>
-            {welcomeContent?.hostNote ? (
-              <p className="mx-auto mt-[1.5vw] max-w-[52vw] text-[1.05vw] text-stone-600">{welcomeContent.hostNote}</p>
-            ) : null}
           </div>
           <p className="relative z-10 text-[1.5vw] font-semibold text-stone-700">
             Round {session?.current_round ?? 1} of {session?.round_count ?? 1}
@@ -388,8 +397,8 @@ export default function BingoJumbotronPage() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_16%,rgba(251,191,36,0.24),transparent_28%),radial-gradient(circle_at_14%_72%,rgba(120,53,15,0.12),transparent_26%),radial-gradient(circle_at_84%_24%,rgba(146,64,14,0.14),transparent_22%)]" />
           <VinylCascade />
           <BrandingLogos
-            venueLogoUrl={session?.event?.venue_logo_url}
-            venueName={session?.event?.title ?? null}
+            venueLogoUrl={effectiveVenueLogo}
+            venueName={effectiveVenueName}
             tone="light"
           />
           <p
@@ -406,8 +415,8 @@ export default function BingoJumbotronPage() {
         <div className="relative flex min-h-screen flex-col items-center justify-center gap-[1.5vw] px-8 text-center">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(251,191,36,0.2),transparent_26%),radial-gradient(circle_at_20%_78%,rgba(120,53,15,0.08),transparent_24%)]" />
           <BrandingLogos
-            venueLogoUrl={session?.event?.venue_logo_url}
-            venueName={session?.event?.title ?? null}
+            venueLogoUrl={effectiveVenueLogo}
+            venueName={effectiveVenueName}
             tone="light"
           />
           <div className="relative z-10 w-full max-w-[74vw] rounded-[2.5rem] border border-amber-300/70 bg-white/76 px-[4vw] py-[3vw] shadow-[0_30px_80px_rgba(120,53,15,0.14)] backdrop-blur-sm">
@@ -423,8 +432,8 @@ export default function BingoJumbotronPage() {
         <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2.2vw] px-[4vw] py-[4vh] text-center">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_14%,rgba(251,191,36,0.2),transparent_26%),radial-gradient(circle_at_78%_70%,rgba(120,53,15,0.1),transparent_24%)]" />
           <BrandingLogos
-            venueLogoUrl={session?.event?.venue_logo_url}
-            venueName={session?.event?.title ?? null}
+            venueLogoUrl={effectiveVenueLogo}
+            venueName={effectiveVenueName}
             tone="light"
           />
           <h2
