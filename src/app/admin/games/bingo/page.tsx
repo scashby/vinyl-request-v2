@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { generateBingoCardsPdf } from "src/lib/bingoCardsPdf";
 import { generateBingoCallSheetPdf } from "src/lib/bingoCallSheetPdf";
 import type { GameMode } from "src/lib/bingoEngine";
-import { GAME_MODE_OPTIONS } from "src/lib/bingoModes";
+import { GAME_MODE_OPTIONS, type RoundModesEntry } from "src/lib/bingoModes";
 import EditEventForm from "src/components/EditEventForm";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
@@ -93,6 +93,7 @@ export default function BingoSetupPage() {
 
   const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<number[]>([]);
   const [gameMode, setGameMode] = useState<GameMode>("single_line");
+  const [roundModes, setRoundModes] = useState<RoundModesEntry[]>([]);
   const [cardCount, setCardCount] = useState(40);
   const [roundCount, setRoundCount] = useState(3);
   const [removeResleeveSeconds, setRemoveResleeveSeconds] = useState(20);
@@ -136,6 +137,34 @@ export default function BingoSetupPage() {
       hostBufferSeconds +
       Math.ceil(sonosDelayMs / 1000),
     [cueSeconds, hostBufferSeconds, placeVinylSeconds, removeResleeveSeconds, sonosDelayMs, startSlideSeconds]
+  );
+
+  useEffect(() => {
+    setRoundModes((current) => current.filter((entry) => entry.round <= roundCount));
+  }, [roundCount]);
+
+  const getModesForRound = useCallback(
+    (round: number) => roundModes.find((entry) => entry.round === round)?.modes ?? [gameMode],
+    [roundModes, gameMode]
+  );
+
+  const toggleRoundMode = useCallback(
+    (round: number, mode: GameMode) => {
+      setRoundModes((current) => {
+        const existingModes = current.find((entry) => entry.round === round)?.modes ?? [];
+        const hasMode = existingModes.includes(mode);
+        const nextModes = hasMode ? existingModes.filter((value) => value !== mode) : [...existingModes, mode];
+
+        if (nextModes.length === 0) {
+          return current.filter((entry) => entry.round !== round);
+        }
+
+        const updatedEntry: RoundModesEntry = { round, modes: nextModes };
+        const rest = current.filter((entry) => entry.round !== round);
+        return [...rest, updatedEntry].sort((a, b) => a.round - b.round);
+      });
+    },
+    []
   );
 
   const load = useCallback(async () => {
@@ -206,10 +235,7 @@ export default function BingoSetupPage() {
           playlist_id: selectedPlaylistIds[0],
           playlist_ids: selectedPlaylistIds,
           game_mode: gameMode,
-          round_modes: Array.from({ length: Math.max(1, roundCount) }, (_, index) => ({
-            round: index + 1,
-            modes: [gameMode],
-          })),
+          round_modes: roundModes,
           card_count: cardCount,
           round_count: roundCount,
           remove_resleeve_seconds: removeResleeveSeconds,
@@ -376,6 +402,41 @@ export default function BingoSetupPage() {
           <p className="mt-2 text-xs text-stone-400">
             Derived time to next call: <span className="font-semibold text-amber-300">{derivedSecondsToNextCall}s</span> (includes Sonos delay).
           </p>
+
+          <div className="mt-4 rounded border border-stone-700 bg-stone-950/40 p-3">
+            <p className="text-sm font-semibold text-amber-200">Round Win Modes</p>
+            <p className="mt-1 text-xs text-stone-400">Set one or more modes per round. If a round has no selection, it uses the Default Game Mode.</p>
+            <div className="mt-3 space-y-3">
+              {Array.from({ length: Math.max(1, roundCount) }, (_, index) => {
+                const round = index + 1;
+                const activeModes = getModesForRound(round);
+                const explicit = roundModes.some((entry) => entry.round === round);
+                return (
+                  <div key={round} className="rounded border border-stone-700/70 bg-black/40 p-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-stone-300">
+                      Round {round} {explicit ? "(custom)" : "(default)"}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {GAME_MODE_OPTIONS.map((mode) => {
+                        const checked = activeModes.includes(mode.value);
+                        return (
+                          <label key={mode.value} className={`cursor-pointer rounded border px-2 py-1 text-xs ${checked ? "border-amber-500 bg-amber-900/30 text-amber-100" : "border-stone-700 bg-stone-900 text-stone-300"}`}>
+                            <input
+                              type="checkbox"
+                              className="mr-1"
+                              checked={checked}
+                              onChange={() => toggleRoundMode(round, mode.value)}
+                            />
+                            {mode.label}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           <button disabled={!hasSelectedPlaylists || creating} onClick={createSession} className="mt-5 rounded bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
             {creating ? "Creating..." : "Create Session"}
