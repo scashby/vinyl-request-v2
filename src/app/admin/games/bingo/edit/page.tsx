@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import type { GameMode } from "src/lib/bingoEngine";
+import { GAME_MODE_OPTIONS, type RoundModesEntry, normalizeRoundModes } from "src/lib/bingoModes";
 
 type Playlist = { id: number; name: string; track_count: number };
 type EventRow = {
@@ -20,6 +22,7 @@ type Session = {
   playlist_ids: number[] | null;
   session_code: string;
   game_mode: string;
+  round_modes: RoundModesEntry[] | null;
   card_count: number;
   round_count: number;
   remove_resleeve_seconds: number;
@@ -35,16 +38,6 @@ type Session = {
   next_game_rules_text: string | null;
 };
 
-const GAME_MODE_OPTIONS = [
-  { value: "single_line", label: "Single Line" },
-  { value: "double_line", label: "Double Line" },
-  { value: "triple_line", label: "Triple Line" },
-  { value: "criss_cross", label: "Criss-Cross" },
-  { value: "four_corners", label: "Four Corners" },
-  { value: "blackout", label: "Blackout" },
-  { value: "death", label: "Death" },
-] as const;
-
 export default function BingoEditSessionPage() {
   const sessionId = Number(useSearchParams().get("sessionId"));
 
@@ -54,7 +47,8 @@ export default function BingoEditSessionPage() {
 
   const [eventId, setEventId] = useState<number | null>(null);
   const [playlistIds, setPlaylistIds] = useState<number[]>([]);
-  const [gameMode, setGameMode] = useState("single_line");
+  const [gameMode, setGameMode] = useState<GameMode>("single_line");
+  const [roundModes, setRoundModes] = useState<RoundModesEntry[]>([]);
   const [cardCount, setCardCount] = useState(40);
   const [roundCount, setRoundCount] = useState(3);
   const [removeResleeveSeconds, setRemoveResleeveSeconds] = useState(20);
@@ -120,7 +114,12 @@ export default function BingoEditSessionPage() {
             ? [sessionPayload.playlist_id]
             : []
       );
-      setGameMode(sessionPayload.game_mode ?? "single_line");
+      setGameMode((sessionPayload.game_mode as GameMode) ?? "single_line");
+      try {
+        setRoundModes(normalizeRoundModes(sessionPayload.round_modes, sessionPayload.round_count ?? 3));
+      } catch {
+        setRoundModes([]);
+      }
       setCardCount(sessionPayload.card_count ?? 40);
       setRoundCount(sessionPayload.round_count ?? 3);
       setRemoveResleeveSeconds(sessionPayload.remove_resleeve_seconds ?? 20);
@@ -139,6 +138,34 @@ export default function BingoEditSessionPage() {
       setLoading(false);
     }
   }, [sessionId]);
+
+  useEffect(() => {
+    setRoundModes((current) => current.filter((entry) => entry.round <= roundCount));
+  }, [roundCount]);
+
+  const getModesForRound = useCallback(
+    (round: number) => roundModes.find((entry) => entry.round === round)?.modes ?? [gameMode],
+    [roundModes, gameMode]
+  );
+
+  const toggleRoundMode = useCallback(
+    (round: number, mode: GameMode) => {
+      setRoundModes((current) => {
+        const existing = current.find((entry) => entry.round === round)?.modes ?? [];
+        const hasMode = existing.includes(mode);
+        const nextModes = hasMode ? existing.filter((value) => value !== mode) : [...existing, mode];
+
+        if (nextModes.length === 0) {
+          return current.filter((entry) => entry.round !== round);
+        }
+
+        const nextEntry: RoundModesEntry = { round, modes: nextModes };
+        const rest = current.filter((entry) => entry.round !== round);
+        return [...rest, nextEntry].sort((a, b) => a.round - b.round);
+      });
+    },
+    []
+  );
 
   useEffect(() => {
     void load();
@@ -161,6 +188,7 @@ export default function BingoEditSessionPage() {
           playlist_id: playlistIds[0],
           playlist_ids: playlistIds,
           game_mode: gameMode,
+          round_modes: roundModes,
           card_count: cardCount,
           round_count: roundCount,
           remove_resleeve_seconds: removeResleeveSeconds,
@@ -256,8 +284,8 @@ export default function BingoEditSessionPage() {
                   </select>
                 </label>
 
-                <label className="text-sm">Game Mode
-                  <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={gameMode} onChange={(e) => setGameMode(e.target.value)}>
+                <label className="text-sm">Default Game Mode
+                  <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={gameMode} onChange={(e) => setGameMode(e.target.value as GameMode)}>
                     {GAME_MODE_OPTIONS.map((mode) => (
                       <option key={mode.value} value={mode.value}>{mode.label}</option>
                     ))}
@@ -309,13 +337,48 @@ export default function BingoEditSessionPage() {
                 Derived time to next call: <span className="font-semibold text-amber-300">{derivedSecondsToNextCall}s</span> (includes Sonos delay).
               </p>
 
+              <div className="rounded border border-stone-700 bg-stone-950/40 p-3">
+                <p className="text-sm font-semibold text-amber-200">Round Win Modes</p>
+                <p className="mt-1 text-xs text-stone-400">Set one or more modes per round. If a round has none selected, it uses the default mode.</p>
+                <div className="mt-3 space-y-3">
+                  {Array.from({ length: roundCount }, (_, index) => {
+                    const round = index + 1;
+                    const activeModes = getModesForRound(round);
+                    const explicit = roundModes.some((entry) => entry.round === round);
+                    return (
+                      <div key={round} className="rounded border border-stone-700/70 bg-black/40 p-2">
+                        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-stone-300">
+                          Round {round} {explicit ? "(custom)" : "(default)"}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {GAME_MODE_OPTIONS.map((mode) => {
+                            const checked = activeModes.includes(mode.value);
+                            return (
+                              <label key={mode.value} className={`cursor-pointer rounded border px-2 py-1 text-xs ${checked ? "border-amber-500 bg-amber-900/30 text-amber-100" : "border-stone-700 bg-stone-900 text-stone-300"}`}>
+                                <input
+                                  type="checkbox"
+                                  className="mr-1"
+                                  checked={checked}
+                                  onChange={() => toggleRoundMode(round, mode.value)}
+                                />
+                                {mode.label}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               <label className="flex items-center gap-3 text-sm">
                 <input type="checkbox" className="h-4 w-4" checked={showCountdown} onChange={(e) => setShowCountdown(e.target.checked)} />
                 Show Countdown
               </label>
 
-              <label className="block text-sm">Welcome Screen Rules Text
-                <textarea rows={3} className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm" value={nextGameRulesText} onChange={(e) => setNextGameRulesText(e.target.value)} placeholder="Optional rules or notes shown on the welcome screen..." />
+              <label className="block text-sm">Welcome Screen Host Note (optional)
+                <textarea rows={3} className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm" value={nextGameRulesText} onChange={(e) => setNextGameRulesText(e.target.value)} placeholder="Optional extra note shown below the generated mode rules..." />
               </label>
 
               {error ? <p className="text-sm text-red-400">{error}</p> : null}

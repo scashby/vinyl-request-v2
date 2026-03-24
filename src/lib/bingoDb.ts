@@ -220,6 +220,7 @@ export type BingoDatabase = {
           ended_at: string | null;
           next_game_scheduled_at: string | null;
           next_game_rules_text: string | null;
+          round_modes: { round: number; modes: string[] }[] | null;
           call_reveal_delay_seconds: number;
           call_reveal_at: string | null;
           bingo_overlay: string;
@@ -260,6 +261,7 @@ export type BingoDatabase = {
           ended_at?: string | null;
           next_game_scheduled_at?: string | null;
           next_game_rules_text?: string | null;
+          round_modes?: { round: number; modes: string[] }[] | null;
           call_reveal_delay_seconds?: number;
           call_reveal_at?: string | null;
           bingo_overlay?: string;
@@ -300,6 +302,7 @@ export type BingoDatabase = {
           ended_at?: string | null;
           next_game_scheduled_at?: string | null;
           next_game_rules_text?: string | null;
+          round_modes?: { round: number; modes: string[] }[] | null;
           call_reveal_delay_seconds?: number;
           call_reveal_at?: string | null;
           bingo_overlay?: string;

@@ -2,10 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import type { GameMode } from "src/lib/bingoEngine";
 import { getBingoColumnTextClass } from "src/lib/bingoBall";
+import { buildWelcomeRulesContent, type RoundModesEntry } from "src/lib/bingoModes";
 
 type Session = {
   session_code: string;
+  game_mode: GameMode;
+  round_modes: RoundModesEntry[] | null;
   current_call_index: number;
   current_round: number;
   round_count: number;
@@ -306,6 +310,16 @@ export default function BingoJumbotronPage() {
   const showGame = !showWelcome && !showWinner && !showThanks && !showIntermission;
   const useLightScreenTheme = showWelcome || showWinner || showThanks || showIntermission;
 
+  const welcomeContent = useMemo(() => {
+    if (!session) return null;
+    return buildWelcomeRulesContent({
+      round: session.current_round,
+      gameMode: session.game_mode,
+      roundModes: session.round_modes,
+      hostNote: session.next_game_rules_text,
+    });
+  }, [session]);
+
   const statusLabel = session?.status === "paused" ? "Paused" : null;
 
   return (
@@ -339,16 +353,17 @@ export default function BingoJumbotronPage() {
               Welcome To Vinyl Music Bingo
             </h2>
             <p className="mx-auto mt-[1.4vw] max-w-[54vw] text-[1.65vw] leading-relaxed text-stone-700">
-              Listen for each track. If the song is on your card, mark that square. Get five in a row to call BINGO.
+              {welcomeContent?.intro ?? "Listen for each track. If the song is on your card, mark that square. Get five in a row to call BINGO."}
             </p>
             <div className="mx-auto mt-[1.8vw] max-w-[44vw] rounded-[2rem] border border-amber-300/70 bg-amber-50/85 px-[2vw] py-[1.5vw] text-left shadow-[0_18px_40px_rgba(245,158,11,0.12)]">
-              <p className="text-[1.45vw] font-semibold uppercase tracking-[0.08em] text-amber-800">How To Play</p>
-              <p className="mt-[0.5vw] text-[1.2vw] text-stone-700">1) Keep your bingo card visible.</p>
-              <p className="text-[1.2vw] text-stone-700">2) Match each called song to your card and mark it.</p>
-              <p className="text-[1.2vw] text-stone-700">3) When you have five in a row, shout BINGO.</p>
+              <p className="text-[1.45vw] font-semibold uppercase tracking-[0.08em] text-amber-800">Round Rules</p>
+              {(welcomeContent?.modeRules ?? []).map((line, index) => (
+                <p key={index} className={`text-[1.06vw] text-stone-700 ${index === 0 ? "mt-[0.5vw]" : "mt-[0.2vw]"}`}>{line}</p>
+              ))}
+              {welcomeContent?.tieBreak ? <p className="mt-[0.6vw] text-[1.06vw] font-medium text-stone-700">{welcomeContent.tieBreak}</p> : null}
             </div>
-            {session?.next_game_rules_text ? (
-              <p className="mx-auto mt-[1.5vw] max-w-[52vw] text-[1.05vw] text-stone-600">{session.next_game_rules_text}</p>
+            {welcomeContent?.hostNote ? (
+              <p className="mx-auto mt-[1.5vw] max-w-[52vw] text-[1.05vw] text-stone-600">{welcomeContent.hostNote}</p>
             ) : null}
           </div>
           <p className="relative z-10 text-[1.5vw] font-semibold text-stone-700">

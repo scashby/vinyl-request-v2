@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS public.bingo_sessions (
   playlist_id bigint REFERENCES public.collection_playlists(id) ON DELETE SET NULL,
   session_code text NOT NULL UNIQUE,
   game_mode text NOT NULL,
+  round_modes jsonb,
   card_count integer NOT NULL DEFAULT 40,
   card_layout text NOT NULL DEFAULT '2-up',
   card_label_mode text NOT NULL DEFAULT 'track_artist',
@@ -69,7 +70,8 @@ ALTER TABLE public.bingo_sessions
   ADD COLUMN IF NOT EXISTS start_slide_seconds integer NOT NULL DEFAULT 5,
   ADD COLUMN IF NOT EXISTS host_buffer_seconds integer NOT NULL DEFAULT 2,
   ADD COLUMN IF NOT EXISTS seconds_to_next_call integer NOT NULL DEFAULT 45,
-  ADD COLUMN IF NOT EXISTS sonos_output_delay_ms integer NOT NULL DEFAULT 75;
+  ADD COLUMN IF NOT EXISTS sonos_output_delay_ms integer NOT NULL DEFAULT 75,
+  ADD COLUMN IF NOT EXISTS round_modes jsonb;
 
 CREATE TABLE IF NOT EXISTS public.bingo_session_calls (
   id bigserial PRIMARY KEY,

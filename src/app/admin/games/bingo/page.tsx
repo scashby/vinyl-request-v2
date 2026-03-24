@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { generateBingoCardsPdf } from "src/lib/bingoCardsPdf";
 import { generateBingoCallSheetPdf } from "src/lib/bingoCallSheetPdf";
+import type { GameMode } from "src/lib/bingoEngine";
+import { GAME_MODE_OPTIONS } from "src/lib/bingoModes";
 import EditEventForm from "src/components/EditEventForm";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
@@ -24,6 +26,7 @@ type Session = {
   playlist_names?: string[];
   session_code: string;
   game_mode: string;
+  round_modes: { round: number; modes: GameMode[] }[] | null;
   card_count: number;
   playlist_name: string;
   event_title: string | null;
@@ -76,16 +79,6 @@ function formatEnglishMagnitude(value: number): string {
   return whole.toLocaleString();
 }
 
-const GAME_MODE_OPTIONS = [
-  { value: "single_line", label: "Single Line" },
-  { value: "double_line", label: "Double Line" },
-  { value: "triple_line", label: "Triple Line" },
-  { value: "criss_cross", label: "Criss-Cross" },
-  { value: "four_corners", label: "Four Corners" },
-  { value: "blackout", label: "Blackout" },
-  { value: "death", label: "Death" },
-] as const;
-
 const CREATE_EVENT_OPTION = "__create_new_event__";
 
 export default function BingoSetupPage() {
@@ -99,7 +92,7 @@ export default function BingoSetupPage() {
   const [showCreateEventModal, setShowCreateEventModal] = useState(false);
 
   const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<number[]>([]);
-  const [gameMode, setGameMode] = useState("single_line");
+  const [gameMode, setGameMode] = useState<GameMode>("single_line");
   const [cardCount, setCardCount] = useState(40);
   const [roundCount, setRoundCount] = useState(3);
   const [removeResleeveSeconds, setRemoveResleeveSeconds] = useState(20);
@@ -213,6 +206,10 @@ export default function BingoSetupPage() {
           playlist_id: selectedPlaylistIds[0],
           playlist_ids: selectedPlaylistIds,
           game_mode: gameMode,
+          round_modes: Array.from({ length: Math.max(1, roundCount) }, (_, index) => ({
+            round: index + 1,
+            modes: [gameMode],
+          })),
           card_count: cardCount,
           round_count: roundCount,
           remove_resleeve_seconds: removeResleeveSeconds,
@@ -339,7 +336,7 @@ export default function BingoSetupPage() {
             </label>
 
             <label className="text-sm">Game Mode <InlineFieldHelp label="Game Mode" />
-              <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={gameMode} onChange={(e) => setGameMode(e.target.value)}>
+              <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={gameMode} onChange={(e) => setGameMode(e.target.value as GameMode)}>
                 {GAME_MODE_OPTIONS.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}
               </select>
             </label>

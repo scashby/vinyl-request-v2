@@ -6,6 +6,7 @@ import {
   getPlaylistTrackCountForPlaylists,
   type GameMode,
 } from "src/lib/bingoEngine";
+import { GAME_MODE_OPTIONS, normalizeRoundModes } from "src/lib/bingoModes";
 import { computeTransportQueueIds, type TransportQueueEvent } from "src/lib/transportQueue";
 
 export const runtime = "nodejs";
@@ -17,6 +18,7 @@ type SessionRow = {
   playlist_ids: number[] | null;
   session_code: string;
   game_mode: string;
+  round_modes: { round: number; modes: GameMode[] }[] | null;
   card_count: number;
   card_layout: string;
   card_label_mode: string;
@@ -74,6 +76,7 @@ type TransportEventRow = {
 };
 
 const DONE_STATUSES = new Set(["called", "completed", "skipped"]);
+const GAME_MODE_SET = new Set<GameMode>(GAME_MODE_OPTIONS.map((option) => option.value));
 
 function parseSessionId(id: string) {
   const sessionId = Number(id);
@@ -108,7 +111,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const db = getBingoDb();
   const sessionQuery = (db
     .from("bingo_sessions")
-    .select("id, event_id, playlist_id, playlist_ids, session_code, game_mode, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, seconds_to_next_call, sonos_output_delay_ms, countdown_started_at, paused_remaining_seconds, paused_at, current_call_index, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at, next_game_scheduled_at, next_game_rules_text, call_reveal_delay_seconds, call_reveal_at, bingo_overlay") as unknown as {
+    .select("id, event_id, playlist_id, playlist_ids, session_code, game_mode, round_modes, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, seconds_to_next_call, sonos_output_delay_ms, countdown_started_at, paused_remaining_seconds, paused_at, current_call_index, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at, next_game_scheduled_at, next_game_rules_text, call_reveal_delay_seconds, call_reveal_at, bingo_overlay") as unknown as {
       eq: (column: string, value: number) => {
         maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
       };
@@ -221,6 +224,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "playlist_id",
     "playlist_ids",
     "game_mode",
+    "round_modes",
     "card_count",
     "round_count",
     "remove_resleeve_seconds",
@@ -315,13 +319,47 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
   }
   if (patch.game_mode !== undefined) {
-    patch.game_mode = String(patch.game_mode) as GameMode;
+    const gameMode = String(patch.game_mode) as GameMode;
+    if (!GAME_MODE_SET.has(gameMode)) {
+      return NextResponse.json({ error: "Unsupported game mode" }, { status: 400 });
+    }
+    patch.game_mode = gameMode;
   }
   if (patch.card_count !== undefined) {
     patch.card_count = Math.max(1, Math.floor(Number(patch.card_count)));
   }
   if (patch.round_count !== undefined) {
     patch.round_count = Math.max(1, Math.floor(Number(patch.round_count)));
+  }
+
+  if ("round_modes" in patch || "round_count" in patch) {
+    const { data: existing, error: existingError } = await db
+      .from("bingo_sessions")
+      .select("round_count, round_modes")
+      .eq("id", sessionId)
+      .maybeSingle();
+
+    if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 });
+    if (!existing) return NextResponse.json({ error: "Session not found" }, { status: 404 });
+
+    const nextRoundCount = Math.max(1, Math.floor(Number(patch.round_count ?? existing.round_count)));
+    const existingRoundModes = Array.isArray(existing.round_modes) ? existing.round_modes : [];
+    const rawRoundModes = patch.round_modes !== undefined
+      ? patch.round_modes
+      : existingRoundModes.filter((entry) => {
+          const round = Number((entry as { round?: unknown }).round);
+          return Number.isFinite(round) && round >= 1 && round <= nextRoundCount;
+        });
+
+    try {
+      const normalizedRoundModes = normalizeRoundModes(rawRoundModes, nextRoundCount);
+      patch.round_modes = normalizedRoundModes.length > 0 ? normalizedRoundModes : null;
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Invalid round_modes payload" },
+        { status: 400 }
+      );
+    }
   }
   if (patch.remove_resleeve_seconds !== undefined) {
     patch.remove_resleeve_seconds = Math.max(0, Math.floor(Number(patch.remove_resleeve_seconds)));

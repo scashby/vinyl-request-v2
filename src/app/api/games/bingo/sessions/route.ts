@@ -7,6 +7,7 @@ import {
   getPlaylistTrackCountForPlaylists,
   type GameMode,
 } from "src/lib/bingoEngine";
+import { normalizeRoundModes } from "src/lib/bingoModes";
 import { generateBingoSessionCode } from "src/lib/bingoSessionCode";
 
 export const runtime = "nodejs";
@@ -16,6 +17,7 @@ type CreateSessionBody = {
   playlist_id?: number;
   playlist_ids?: number[];
   game_mode?: GameMode;
+  round_modes?: { round: number; modes: GameMode[] }[];
   card_count?: number;
   card_layout?: "2-up" | "4-up";
   card_label_mode?: "track_artist" | "track_only";
@@ -40,6 +42,7 @@ type SessionListRow = {
   playlist_ids: number[] | null;
   session_code: string;
   game_mode: string;
+  round_modes: { round: number; modes: GameMode[] }[] | null;
   card_count: number;
   status: string;
   current_round: number;
@@ -91,7 +94,7 @@ export async function GET(request: NextRequest) {
 
   const queryBase = (db
     .from("bingo_sessions")
-    .select("id, event_id, playlist_id, playlist_ids, session_code, game_mode, card_count, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, created_at") as unknown as {
+    .select("id, event_id, playlist_id, playlist_ids, session_code, game_mode, round_modes, card_count, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, created_at") as unknown as {
       order: (column: string, options: { ascending: boolean }) => {
         eq: (column: string, value: number) => Promise<{ data: unknown; error: { message: string } | null }>;
         then?: unknown;
@@ -157,6 +160,7 @@ export async function POST(request: NextRequest) {
     const gameMode = body.game_mode ?? "single_line";
     const cardCount = Math.max(1, Math.floor(body.card_count ?? 40));
     const roundCount = Math.max(1, Math.floor(body.round_count ?? 3));
+    const roundModes = normalizeRoundModes(body.round_modes, roundCount);
     const requiredTrackCount = computeMinimumPlaylistTracks(roundCount, cardCount);
     const availableTrackCount = await getPlaylistTrackCountForPlaylists(db, selectedPlaylistIds);
     if (availableTrackCount < requiredTrackCount) {
@@ -192,6 +196,7 @@ export async function POST(request: NextRequest) {
         playlist_ids: selectedPlaylistIds,
         session_code: code,
         game_mode: gameMode,
+        round_modes: roundModes.length > 0 ? roundModes : null,
         card_count: cardCount,
         card_layout: body.card_layout ?? "2-up",
         card_label_mode: body.card_label_mode ?? "track_artist",

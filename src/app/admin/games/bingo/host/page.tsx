@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { formatBallLabel, getBingoColumnTextClass } from "src/lib/bingoBall";
+import type { GameMode } from "src/lib/bingoEngine";
+import { GAME_MODE_OPTIONS, getModesForRound, normalizeRoundModes } from "src/lib/bingoModes";
 import InlineEditableCell from "../../_components/InlineEditableCell";
 import BingoTransportLane, { type BingoTransportCall } from "../_components/BingoTransportLane";
 
@@ -10,6 +12,9 @@ type Session = {
   id: number;
   session_code: string;
   playlist_name: string;
+  game_mode: GameMode;
+  round_modes: { round: number; modes: GameMode[] }[] | null;
+  next_game_rules_text: string | null;
   current_call_index: number;
   current_round: number;
   round_count: number;
@@ -85,6 +90,11 @@ export default function BingoHostPage() {
     if (byCurrentIndex) return byCurrentIndex;
     return [...calls].reverse().find((call) => call.status === "called") ?? null;
   }, [calls, session?.current_call_index]);
+
+  const activeRoundModes = useMemo(() => {
+    if (!session) return [] as GameMode[];
+    return getModesForRound(session.round_modes ?? [], session.current_round, session.game_mode);
+  }, [session]);
 
   useEffect(() => {
     currentCallRowRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -166,8 +176,24 @@ export default function BingoHostPage() {
     await fetch(`/api/games/bingo/sessions/${sessionId}/resume`, { method: "POST" });
     setAutoCallEnabled(false);
     autoCallLockRef.current = false;
-    await patchSession({ bingo_overlay: "none", next_game_scheduled_at: null, next_game_rules_text: null });
+    await patchSession({ bingo_overlay: "none", next_game_scheduled_at: null });
     await load();
+  };
+
+  const setModeForActiveRound = async (mode: GameMode) => {
+    if (!session) return;
+    const hasMode = activeRoundModes.includes(mode);
+    const nextModes = hasMode
+      ? activeRoundModes.filter((value) => value !== mode)
+      : [...activeRoundModes, mode];
+
+    const existing = normalizeRoundModes(session.round_modes, session.round_count);
+    const withoutCurrentRound = existing.filter((entry) => entry.round !== session.current_round);
+    const nextRoundModes = nextModes.length > 0
+      ? [...withoutCurrentRound, { round: session.current_round, modes: nextModes }].sort((a, b) => a.round - b.round)
+      : withoutCurrentRound;
+
+    await patchSession({ round_modes: nextRoundModes });
   };
 
   const resetRound = async () => {
@@ -413,6 +439,26 @@ export default function BingoHostPage() {
                   className="w-16 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
                 />
               </div>
+              {session ? (
+                <div className="w-full rounded border border-stone-700/80 bg-stone-950/40 p-2">
+                  <p className="text-[11px] uppercase tracking-[0.08em] text-stone-400">Round {session.current_round} win modes (any mode wins)</p>
+                  <div className="mt-1 flex flex-wrap justify-center gap-2">
+                    {GAME_MODE_OPTIONS.map((mode) => {
+                      const selected = activeRoundModes.includes(mode.value);
+                      return (
+                        <button
+                          key={mode.value}
+                          type="button"
+                          onClick={() => setModeForActiveRound(mode.value)}
+                          className={`rounded border px-2 py-1 text-[11px] ${selected ? "border-amber-500 bg-amber-900/30 text-amber-100" : "border-stone-700 text-stone-300 hover:border-stone-500"}`}
+                        >
+                          {mode.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             {/* Right column: Next Call (sec) on top, Pause/Resume below */}
