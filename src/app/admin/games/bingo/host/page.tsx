@@ -24,6 +24,7 @@ type Session = {
   call_reveal_delay_seconds: number;
   next_game_scheduled_at: string | null;
   bingo_overlay: string;
+    default_intermission_seconds: number;
 };
 
 type Call = BingoTransportCall & {
@@ -61,6 +62,7 @@ export default function BingoHostPage() {
       setRevealDelayInput(payload.call_reveal_delay_seconds ?? 5);
       setSecondsToNextCallInput(payload.seconds_to_next_call ?? 0);
       setRemaining(payload.seconds_to_next_call ?? 0);
+        setIntermissionLengthSeconds(payload.default_intermission_seconds ?? 180);
     }
 
     if (cRes.ok) {

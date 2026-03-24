@@ -9,6 +9,8 @@ import { GAME_MODE_OPTIONS, type RoundModesEntry } from "src/lib/bingoModes";
 import EditEventForm from "src/components/EditEventForm";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
+import { uploadVenueLogo } from "src/lib/uploadVenueLogo";
+import { supabase } from "src/lib/supabaseClient";
 
 type Playlist = { id: number; name: string; track_count: number };
 type EventRow = {
@@ -17,6 +19,7 @@ type EventRow = {
   date: string;
   time: string | null;
   location: string | null;
+  venue_logo_url: string | null;
 };
 type Session = {
   id: number;
@@ -92,7 +95,6 @@ export default function BingoSetupPage() {
   const [showCreateEventModal, setShowCreateEventModal] = useState(false);
 
   const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<number[]>([]);
-  const [gameMode, setGameMode] = useState<GameMode>("single_line");
   const [roundModes, setRoundModes] = useState<RoundModesEntry[]>([]);
   const [cardCount, setCardCount] = useState(40);
   const [roundCount, setRoundCount] = useState(3);
@@ -102,8 +104,13 @@ export default function BingoSetupPage() {
   const [startSlideSeconds, setStartSlideSeconds] = useState(5);
   const [hostBufferSeconds, setHostBufferSeconds] = useState(2);
   const [sonosDelayMs, setSonosDelayMs] = useState(75);
+    const [callRevealDelaySeconds, setCallRevealDelaySeconds] = useState(3);
+    const [defaultIntermissionSeconds, setDefaultIntermissionSeconds] = useState(180);
+    const [welcomeHostNote, setWelcomeHostNote] = useState("");
+    const [venueLogoUrl, setVenueLogoUrl] = useState<string | null>(null);
+    const [uploadingVenueLogo, setUploadingVenueLogo] = useState(false);
 
-  const [creating, setCreating] = useState(false);
+    const [creating, setCreating] = useState(false);
   const minimumTracksForSetup = useMemo(() => computeMinimumPlaylistTracks(roundCount, cardCount), [roundCount, cardCount]);
   const selectedPlaylist = useMemo(
     () => playlists.find((entry) => entry.id === selectedPlaylistIds[0]) ?? null,
@@ -144,8 +151,8 @@ export default function BingoSetupPage() {
   }, [roundCount]);
 
   const getModesForRound = useCallback(
-    (round: number) => roundModes.find((entry) => entry.round === round)?.modes ?? [gameMode],
-    [roundModes, gameMode]
+     (round: number): GameMode[] => roundModes.find((entry) => entry.round === round)?.modes ?? [],
+     [roundModes]
   );
 
   const toggleRoundMode = useCallback(
@@ -166,6 +173,39 @@ export default function BingoSetupPage() {
     },
     []
   );
+
+  const derivedGameMode = useMemo<GameMode>(
+    () => roundModes[0]?.modes[0] ?? "single_line",
+    [roundModes]
+  );
+
+  useEffect(() => {
+    if (!eventId) { setVenueLogoUrl(null); return; }
+    const found = events.find((e) => e.id === eventId);
+    setVenueLogoUrl(found?.venue_logo_url ?? null);
+  }, [eventId, events]);
+
+  const handleVenueLogoUpload = useCallback(async () => {
+    if (!eventId) return;
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      setUploadingVenueLogo(true);
+      try {
+        const { publicUrl } = await uploadVenueLogo(file);
+        await supabase.from("events").update({ venue_logo_url: publicUrl }).eq("id", eventId);
+        setVenueLogoUrl(publicUrl);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Failed to upload venue logo");
+      } finally {
+        setUploadingVenueLogo(false);
+      }
+    };
+    input.click();
+  }, [eventId]);
 
   const load = useCallback(async () => {
     const [eRes, pRes, sRes] = await Promise.all([
@@ -234,7 +274,7 @@ export default function BingoSetupPage() {
           event_id: eventId ? Number(eventId) : null,
           playlist_id: selectedPlaylistIds[0],
           playlist_ids: selectedPlaylistIds,
-          game_mode: gameMode,
+            game_mode: derivedGameMode,
           round_modes: roundModes,
           card_count: cardCount,
           round_count: roundCount,
@@ -244,6 +284,9 @@ export default function BingoSetupPage() {
           start_slide_seconds: startSlideSeconds,
           host_buffer_seconds: hostBufferSeconds,
           sonos_output_delay_ms: sonosDelayMs,
+            call_reveal_delay_seconds: callRevealDelaySeconds,
+            default_intermission_seconds: defaultIntermissionSeconds,
+            next_game_rules_text: welcomeHostNote || null,
         }),
       });
 
@@ -301,20 +344,23 @@ export default function BingoSetupPage() {
           <div className="mt-3 flex justify-end"><GameSetupInfoButton gameSlug="bingo" /></div>
         </header>
 
+        {/* ── SECTION 1: Session Setup ─────────────────────────────── */}
         <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-          <h2 className="text-xl font-black uppercase text-amber-100">Create Session</h2>
+          <h2 className="text-xl font-black uppercase text-amber-100">1. Session Setup</h2>
           <p className="mt-1 text-xs text-stone-400">
-            Minimum playlist size: <span className="font-semibold text-amber-300">{minimumTracksForSetup}</span> tracks for {Math.max(1, roundCount)} round(s) with {Math.max(1, cardCount)} cards.
+            Minimum playlist size: <span className="font-semibold text-amber-300">{minimumTracksForSetup}</span> tracks for {Math.max(1, roundCount)} round(s) with {Math.max(1, cardCount)} players.
           </p>
           <p className="mt-1 text-xs text-stone-400">
-            Estimated unique card layouts available: <span className="font-semibold text-emerald-300">{formatEnglishMagnitude(estimatedUniqueCardsAcrossRounds)}</span> across configured rounds.
+            Estimated unique card layouts: <span className="font-semibold text-emerald-300">{formatEnglishMagnitude(estimatedUniqueCardsAcrossRounds)}</span> across configured rounds.
           </p>
           {hasSelectedPlaylists ? (
             <p className={`mt-1 text-xs ${selectedPlaylistTrackCount >= minimumTracksForSetup ? "text-emerald-300" : "text-rose-300"}`}>
-              Selected playlists have {selectedPlaylistTrackCount} combined tracks and support up to {roundsSupportedByPlaylist} full round(s) of 75 unique calls.
+              Selected playlists: {selectedPlaylistTrackCount} tracks · supports up to {roundsSupportedByPlaylist} round(s) of 75 unique calls.
             </p>
           ) : null}
-          <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+
+          {/* Event + Players */}
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
             <label className="text-sm">Event (optional) <InlineFieldHelp label="Event (optional)" />
               <select
                 className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
@@ -335,11 +381,17 @@ export default function BingoSetupPage() {
                 ))}
               </select>
             </label>
+            <label className="text-sm">Estimated # of Players <InlineFieldHelp label="Card Count" />
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={1} value={cardCount} onChange={(e) => setCardCount(Number(e.target.value) || 1)} />
+            </label>
+          </div>
 
-            <label className="text-sm">Playlists (select one or more) <InlineFieldHelp label="Playlist" />
+          {/* Playlists */}
+          <div className="mt-4">
+            <label className="block text-sm">Playlists (select one or more) <InlineFieldHelp label="Playlist" />
               <select
                 multiple
-                size={6}
+                size={5}
                 className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
                 value={selectedPlaylistIds.map(String)}
                 onChange={(e) => {
@@ -360,87 +412,146 @@ export default function BingoSetupPage() {
                 Open Playlist Editor
               </a>
             </label>
-
-            <label className="text-sm">Game Mode <InlineFieldHelp label="Game Mode" />
-              <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={gameMode} onChange={(e) => setGameMode(e.target.value as GameMode)}>
-                {GAME_MODE_OPTIONS.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}
-              </select>
-            </label>
-
-            <label className="text-sm">Card Count <InlineFieldHelp label="Card Count" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={1} value={cardCount} onChange={(e) => setCardCount(Number(e.target.value) || 1)} />
-            </label>
-
-            <label className="text-sm">Rounds <InlineFieldHelp label="Rounds" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={1} value={roundCount} onChange={(e) => setRoundCount(Number(e.target.value) || 1)} />
-            </label>
-
-            <label className="text-sm">Remove + Resleeve (sec) <InlineFieldHelp label="Remove + Resleeve (sec)" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={removeResleeveSeconds} onChange={(e) => setRemoveResleeveSeconds(Number(e.target.value) || 0)} />
-            </label>
-
-            <label className="text-sm">Place New Vinyl (sec) <InlineFieldHelp label="Place New Vinyl (sec)" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={placeVinylSeconds} onChange={(e) => setPlaceVinylSeconds(Number(e.target.value) || 0)} />
-            </label>
-
-            <label className="text-sm">Cue Track (sec) <InlineFieldHelp label="Cue Track (sec)" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={cueSeconds} onChange={(e) => setCueSeconds(Number(e.target.value) || 0)} />
-            </label>
-
-            <label className="text-sm">Press Start + Slide (sec) <InlineFieldHelp label="Press Start + Slide (sec)" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={startSlideSeconds} onChange={(e) => setStartSlideSeconds(Number(e.target.value) || 0)} />
-            </label>
-
-            <label className="text-sm">Host Buffer (sec) <InlineFieldHelp label="Host Buffer (sec)" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={hostBufferSeconds} onChange={(e) => setHostBufferSeconds(Number(e.target.value) || 0)} />
-            </label>
-
-            <label className="text-sm">Sonos Output Delay (ms) <InlineFieldHelp label="Sonos Output Delay (ms)" />
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={sonosDelayMs} onChange={(e) => setSonosDelayMs(Number(e.target.value) || 0)} />
-            </label>
           </div>
-          <p className="mt-2 text-xs text-stone-400">
-            Derived time to next call: <span className="font-semibold text-amber-300">{derivedSecondsToNextCall}s</span> (includes Sonos delay).
-          </p>
 
-          <div className="mt-4 rounded border border-stone-700 bg-stone-950/40 p-3">
-            <p className="text-sm font-semibold text-amber-200">Round Win Modes</p>
-            <p className="mt-1 text-xs text-stone-400">Set one or more modes per round. If a round has no selection, it uses the Default Game Mode.</p>
-            <div className="mt-3 space-y-3">
+          {/* Rounds with inline per-round game modes */}
+          <div className="mt-5">
+            <div className="flex items-center gap-4">
+              <label className="text-sm">Rounds <InlineFieldHelp label="Rounds" />
+                <input className="mt-1 w-24 rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={1} value={roundCount} onChange={(e) => setRoundCount(Number(e.target.value) || 1)} />
+              </label>
+            </div>
+            <div className="mt-3 space-y-2">
               {Array.from({ length: Math.max(1, roundCount) }, (_, index) => {
                 const round = index + 1;
                 const activeModes = getModesForRound(round);
-                const explicit = roundModes.some((entry) => entry.round === round);
                 return (
                   <div key={round} className="rounded border border-stone-700/70 bg-black/40 p-2">
                     <p className="text-xs font-semibold uppercase tracking-[0.08em] text-stone-300">
-                      Round {round} {explicit ? "(custom)" : "(default)"}
+                      Round {round} — Game Mode{activeModes.length !== 1 ? "s" : ""}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {GAME_MODE_OPTIONS.map((mode) => {
                         const checked = activeModes.includes(mode.value);
                         return (
                           <label key={mode.value} className={`cursor-pointer rounded border px-2 py-1 text-xs ${checked ? "border-amber-500 bg-amber-900/30 text-amber-100" : "border-stone-700 bg-stone-900 text-stone-300"}`}>
-                            <input
-                              type="checkbox"
-                              className="mr-1"
-                              checked={checked}
-                              onChange={() => toggleRoundMode(round, mode.value)}
-                            />
+                            <input type="checkbox" className="mr-1" checked={checked} onChange={() => toggleRoundMode(round, mode.value)} />
                             {mode.label}
                           </label>
                         );
                       })}
                     </div>
+                    {activeModes.length === 0 ? (
+                      <p className="mt-1 text-[11px] text-stone-500">No mode selected — defaults to Single Line</p>
+                    ) : null}
                   </div>
                 );
               })}
             </div>
           </div>
 
-          <button disabled={!hasSelectedPlaylists || creating} onClick={createSession} className="mt-5 rounded bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+          <button
+            disabled={!hasSelectedPlaylists || creating}
+            onClick={createSession}
+            className="mt-6 rounded bg-red-700 px-5 py-2 text-sm font-bold text-white hover:bg-red-600 disabled:opacity-50"
+          >
             {creating ? "Creating..." : "Create Session"}
           </button>
+        </section>
+
+        {/* ── SECTION 2: Gameplay Timing ────────────────────────── */}
+        <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-amber-100">2. Gameplay Timing</h2>
+          <p className="mt-1 text-xs text-stone-400">These values set the session defaults. The host can adjust timing live during the game.</p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <label className="text-sm">Sonos Output Delay (ms) <InlineFieldHelp label="Sonos Output Delay (ms)" />
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={sonosDelayMs} onChange={(e) => setSonosDelayMs(Number(e.target.value) || 0)} />
+            </label>
+            <label className="text-sm">Place New Vinyl (sec) <InlineFieldHelp label="Place New Vinyl (sec)" />
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={placeVinylSeconds} onChange={(e) => setPlaceVinylSeconds(Number(e.target.value) || 0)} />
+            </label>
+            <label className="text-sm">Cue Track (sec) <InlineFieldHelp label="Cue Track (sec)" />
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={cueSeconds} onChange={(e) => setCueSeconds(Number(e.target.value) || 0)} />
+            </label>
+            <label className="text-sm">Remove &amp; Resleeve (sec) <InlineFieldHelp label="Remove + Resleeve (sec)" />
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={removeResleeveSeconds} onChange={(e) => setRemoveResleeveSeconds(Number(e.target.value) || 0)} />
+            </label>
+            <label className="text-sm">Start Delay (sec) <InlineFieldHelp label="Press Start + Slide (sec)" />
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={startSlideSeconds} onChange={(e) => setStartSlideSeconds(Number(e.target.value) || 0)} />
+            </label>
+            <label className="text-sm">Host Buffer (sec) <InlineFieldHelp label="Host Buffer (sec)" />
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={hostBufferSeconds} onChange={(e) => setHostBufferSeconds(Number(e.target.value) || 0)} />
+            </label>
+            <label className="text-sm">Reveal Delay (sec)
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={callRevealDelaySeconds} onChange={(e) => setCallRevealDelaySeconds(Number(e.target.value) || 0)} />
+            </label>
+            <label className="text-sm">Intermission (sec)
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={defaultIntermissionSeconds} onChange={(e) => setDefaultIntermissionSeconds(Number(e.target.value) || 0)} />
+            </label>
+          </div>
+          <p className="mt-3 text-xs text-stone-400">
+            Time until next call: <span className="font-semibold text-amber-300">{derivedSecondsToNextCall}s</span> (Sonos delay + vinyl handling timing).
+          </p>
+        </section>
+
+        {/* ── SECTION 3: Jumbotron Content ───────────────────────── */}
+        <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
+          <h2 className="text-xl font-black uppercase text-amber-100">3. Jumbotron Content</h2>
+          <p className="mt-1 text-xs text-stone-400">Customize what appears on each jumbotron screen state.</p>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            {/* Welcome Screen */}
+            <div className="rounded-xl border border-amber-900/40 bg-stone-950/50 p-4">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-amber-200">Welcome Screen</h3>
+              <p className="mt-1 text-xs text-stone-400">Shown before each round. Rule text is generated automatically from the round modes above.</p>
+              <label className="mt-3 block text-sm text-stone-300">Host Note (optional)
+                <textarea
+                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs text-stone-200 placeholder:text-stone-600"
+                  rows={3}
+                  placeholder="Extra instructions shown to players on the welcome screen…"
+                  value={welcomeHostNote}
+                  onChange={(e) => setWelcomeHostNote(e.target.value)}
+                />
+              </label>
+              <div className="mt-3">
+                <p className="text-sm text-stone-300">Venue Logo</p>
+                {eventId ? (
+                  <div className="mt-2">
+                    {venueLogoUrl ? (
+                      <img src={venueLogoUrl} alt="Venue logo" className="mb-2 h-12 rounded object-contain" />
+                    ) : (
+                      <p className="mb-2 text-xs text-stone-500">No logo set for this event.</p>
+                    )}
+                    <button
+                      type="button"
+                      disabled={uploadingVenueLogo}
+                      onClick={handleVenueLogoUpload}
+                      className="rounded border border-stone-600 px-3 py-1 text-xs text-stone-300 hover:border-amber-500 hover:text-amber-200 disabled:opacity-50"
+                    >
+                      {uploadingVenueLogo ? "Uploading…" : venueLogoUrl ? "Replace Logo" : "Upload Logo"}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-stone-500">Link an event above to upload a venue logo.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Intermission Screen */}
+            <div className="rounded-xl border border-amber-900/40 bg-stone-950/50 p-4">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-amber-200">Intermission Screen</h3>
+              <p className="mt-2 text-xs text-stone-400">
+                Shown between rounds. Displays a countdown from the intermission duration set above (<span className="text-amber-300">{defaultIntermissionSeconds}s</span>).
+              </p>
+              <p className="mt-2 text-xs text-stone-400">Displays branding and venue logo during the break. No additional setup required.</p>
+            </div>
+
+            {/* Thank You Screen */}
+            <div className="rounded-xl border border-amber-900/40 bg-stone-950/50 p-4">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-amber-200">Thank You Screen</h3>
+              <p className="mt-2 text-xs text-stone-400">Shown when the game ends. Automatically displays upcoming events from your schedule and venue branding.</p>
+              <p className="mt-2 text-xs text-stone-400">No additional setup required.</p>
+            </div>
+          </div>
         </section>
 
         <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">

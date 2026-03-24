@@ -52,6 +52,7 @@ type SessionRow = {
   call_reveal_delay_seconds: number;
   call_reveal_at: string | null;
   bingo_overlay: string;
+    default_intermission_seconds: number;
 };
 
 type SessionEventRow = {
@@ -111,7 +112,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const db = getBingoDb();
   const sessionQuery = (db
     .from("bingo_sessions")
-    .select("id, event_id, playlist_id, playlist_ids, session_code, game_mode, round_modes, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, seconds_to_next_call, sonos_output_delay_ms, countdown_started_at, paused_remaining_seconds, paused_at, current_call_index, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at, next_game_scheduled_at, next_game_rules_text, call_reveal_delay_seconds, call_reveal_at, bingo_overlay") as unknown as {
+    .select("id, event_id, playlist_id, playlist_ids, session_code, game_mode, round_modes, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, seconds_to_next_call, sonos_output_delay_ms, countdown_started_at, paused_remaining_seconds, paused_at, current_call_index, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at, next_game_scheduled_at, next_game_rules_text, call_reveal_delay_seconds, call_reveal_at, bingo_overlay, default_intermission_seconds") as unknown as {
       eq: (column: string, value: number) => {
         maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
       };
@@ -252,6 +253,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "call_reveal_delay_seconds",
     "call_reveal_at",
     "bingo_overlay",
+      "default_intermission_seconds",
   ]);
 
   const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key))) as Record<string, unknown>;

@@ -224,10 +224,13 @@ export type BingoDatabase = {
           call_reveal_delay_seconds: number;
           call_reveal_at: string | null;
           bingo_overlay: string;
+          default_intermission_seconds: number;
         };
         Insert: {
           id?: number;
           event_id?: number | null;
+          playlist_ids?: number[] | null;
+          default_intermission_seconds?: number;
           playlist_id: number;
           session_code: string;
           game_mode: string;
@@ -269,6 +272,8 @@ export type BingoDatabase = {
         Update: {
           id?: number;
           event_id?: number | null;
+          playlist_ids?: number[] | null;
+          default_intermission_seconds?: number;
           playlist_id?: number;
           session_code?: string;
           game_mode?: string;
