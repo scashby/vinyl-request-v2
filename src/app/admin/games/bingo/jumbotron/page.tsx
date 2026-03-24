@@ -173,7 +173,17 @@ function BrandingLogos({
 }
 
 export default function BingoJumbotronPage() {
-  const sessionId = Number(useSearchParams().get("sessionId"));
+  const searchParams = useSearchParams();
+  const sessionId = Number(searchParams.get("sessionId"));
+  const previewParam = searchParams.get("preview");
+  const previewScreen: "welcome" | "intermission" | "thanks" | null =
+    previewParam === "welcome" || previewParam === "intermission" || previewParam === "thanks"
+      ? previewParam
+      : null;
+  const previewIntermissionSecondsRaw = Number(searchParams.get("previewIntermissionSeconds"));
+  const previewIntermissionSeconds = Number.isFinite(previewIntermissionSecondsRaw)
+    ? Math.max(0, Math.floor(previewIntermissionSecondsRaw))
+    : 180;
   const containerRef = useRef<HTMLDivElement>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
@@ -202,7 +212,7 @@ export default function BingoJumbotronPage() {
 
   // Fetch upcoming events once when the Thanks screen appears.
   useEffect(() => {
-    if (session?.bingo_overlay !== "thanks") return;
+    if (session?.bingo_overlay !== "thanks" && previewScreen !== "thanks") return;
     const today = new Date().toISOString().split("T")[0]!;
     fetch("/api/games/bingo/events", { cache: "no-store" })
       .then((res) => res.json())
@@ -214,7 +224,7 @@ export default function BingoJumbotronPage() {
         setUpcomingEvents(upcoming);
       })
       .catch(() => undefined);
-  }, [session?.bingo_overlay]);
+  }, [session?.bingo_overlay, previewScreen]);
 
   useEffect(() => {
     load();
@@ -298,15 +308,18 @@ export default function BingoJumbotronPage() {
   }, [called]);
 
   const intermissionSecondsLeft = useMemo(() => {
+    if (previewScreen === "intermission") {
+      return previewIntermissionSeconds;
+    }
     if (!session?.next_game_scheduled_at) return null;
     const diff = Math.ceil((new Date(session.next_game_scheduled_at).getTime() - now) / 1000);
     return Math.max(0, diff);
-  }, [session?.next_game_scheduled_at, now]);
+  }, [session?.next_game_scheduled_at, now, previewIntermissionSeconds, previewScreen]);
 
-  const showIntermission = session?.status === "paused" && intermissionSecondsLeft !== null && intermissionSecondsLeft > 0;
-  const showWelcome = !showIntermission && session?.bingo_overlay === "welcome";
-  const showWinner = session?.bingo_overlay === "winner";
-  const showThanks = session?.bingo_overlay === "thanks";
+  const showIntermission = previewScreen === "intermission" || (session?.status === "paused" && intermissionSecondsLeft !== null && intermissionSecondsLeft > 0);
+  const showWelcome = previewScreen === "welcome" || (!showIntermission && previewScreen === null && session?.bingo_overlay === "welcome");
+  const showWinner = previewScreen === null && session?.bingo_overlay === "winner";
+  const showThanks = previewScreen === "thanks" || (previewScreen === null && session?.bingo_overlay === "thanks");
   const showGame = !showWelcome && !showWinner && !showThanks && !showIntermission;
   const useLightScreenTheme = showWelcome || showWinner || showThanks || showIntermission;
 

@@ -312,6 +312,21 @@ export default function BingoSetupPage() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
+  const openJumbotronPreview = useCallback((screen: "welcome" | "intermission" | "thanks") => {
+    const previewSessionId = sessions[0]?.id;
+    if (!previewSessionId) {
+      alert("Create a session first, then use preview.");
+      return;
+    }
+
+    const url = `/admin/games/bingo/jumbotron?sessionId=${previewSessionId}&preview=${screen}&previewIntermissionSeconds=${defaultIntermissionSeconds}`;
+    openGameWindow(
+      url,
+      `bingo_jumbotron_preview_${screen}`,
+      "width=1920,height=1080,noopener,noreferrer"
+    );
+  }, [defaultIntermissionSeconds, sessions]);
+
   const downloadCards = async (sessionId: number, layout: "2-up" | "4-up") => {
     const res = await fetch(`/api/games/bingo/cards?sessionId=${sessionId}`);
     if (!res.ok) return;
@@ -503,6 +518,13 @@ export default function BingoSetupPage() {
             <div className="rounded-xl border border-amber-900/40 bg-stone-950/50 p-4">
               <h3 className="text-sm font-bold uppercase tracking-wide text-amber-200">Welcome Screen</h3>
               <p className="mt-1 text-xs text-stone-400">Shown before each round. Rule text is generated automatically from the round modes above.</p>
+              <button
+                type="button"
+                onClick={() => openJumbotronPreview("welcome")}
+                className="mt-3 rounded border border-amber-700/70 bg-amber-950/30 px-3 py-1 text-xs font-semibold text-amber-200 hover:border-amber-500"
+              >
+                Preview Welcome
+              </button>
               <label className="mt-3 block text-sm text-stone-300">Host Note (optional)
                 <textarea
                   className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs text-stone-200 placeholder:text-stone-600"
@@ -539,6 +561,13 @@ export default function BingoSetupPage() {
             {/* Intermission Screen */}
             <div className="rounded-xl border border-amber-900/40 bg-stone-950/50 p-4">
               <h3 className="text-sm font-bold uppercase tracking-wide text-amber-200">Intermission Screen</h3>
+              <button
+                type="button"
+                onClick={() => openJumbotronPreview("intermission")}
+                className="mt-2 rounded border border-amber-700/70 bg-amber-950/30 px-3 py-1 text-xs font-semibold text-amber-200 hover:border-amber-500"
+              >
+                Preview Intermission
+              </button>
               <p className="mt-2 text-xs text-stone-400">
                 Shown between rounds. Displays a countdown from the intermission duration set above (<span className="text-amber-300">{defaultIntermissionSeconds}s</span>).
               </p>
@@ -548,6 +577,13 @@ export default function BingoSetupPage() {
             {/* Thank You Screen */}
             <div className="rounded-xl border border-amber-900/40 bg-stone-950/50 p-4">
               <h3 className="text-sm font-bold uppercase tracking-wide text-amber-200">Thank You Screen</h3>
+              <button
+                type="button"
+                onClick={() => openJumbotronPreview("thanks")}
+                className="mt-2 rounded border border-amber-700/70 bg-amber-950/30 px-3 py-1 text-xs font-semibold text-amber-200 hover:border-amber-500"
+              >
+                Preview Thank You
+              </button>
               <p className="mt-2 text-xs text-stone-400">Shown when the game ends. Automatically displays upcoming events from your schedule and venue branding.</p>
               <p className="mt-2 text-xs text-stone-400">No additional setup required.</p>
             </div>
