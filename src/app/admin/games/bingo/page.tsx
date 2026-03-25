@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { generateBingoCardsPdf } from "src/lib/bingoCardsPdf";
 import { generateBingoCallSheetPdf } from "src/lib/bingoCallSheetPdf";
 import type { GameMode } from "src/lib/bingoEngine";
-import { GAME_MODE_OPTIONS, type RoundModesEntry } from "src/lib/bingoModes";
+import { buildWelcomeRulesContent, GAME_MODE_OPTIONS, type RoundModesEntry } from "src/lib/bingoModes";
 import EditEventForm from "src/components/EditEventForm";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
@@ -104,13 +104,16 @@ export default function BingoSetupPage() {
   const [startSlideSeconds, setStartSlideSeconds] = useState(5);
   const [hostBufferSeconds, setHostBufferSeconds] = useState(2);
   const [sonosDelayMs, setSonosDelayMs] = useState(75);
-    const [callRevealDelaySeconds, setCallRevealDelaySeconds] = useState(3);
-    const [defaultIntermissionSeconds, setDefaultIntermissionSeconds] = useState(180);
-    const [welcomeHostNote, setWelcomeHostNote] = useState("");
-    const [venueLogoUrl, setVenueLogoUrl] = useState<string | null>(null);
-    const [uploadingVenueLogo, setUploadingVenueLogo] = useState(false);
+  const [callRevealDelaySeconds, setCallRevealDelaySeconds] = useState(3);
+  const [defaultIntermissionSeconds, setDefaultIntermissionSeconds] = useState(180);
+  const [welcomeHeadingText, setWelcomeHeadingText] = useState("Welcome To Vinyl Music Bingo");
+  const [welcomeMessageText, setWelcomeMessageText] = useState("");
+  const [welcomeRulesText, setWelcomeRulesText] = useState("");
+  const [welcomeTieBreakText, setWelcomeTieBreakText] = useState("");
+  const [venueLogoUrl, setVenueLogoUrl] = useState<string | null>(null);
+  const [uploadingVenueLogo, setUploadingVenueLogo] = useState(false);
 
-    const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(false);
   const minimumTracksForSetup = useMemo(() => computeMinimumPlaylistTracks(roundCount, cardCount), [roundCount, cardCount]);
   const selectedPlaylist = useMemo(
     () => playlists.find((entry) => entry.id === selectedPlaylistIds[0]) ?? null,
@@ -178,6 +181,26 @@ export default function BingoSetupPage() {
     () => roundModes[0]?.modes[0] ?? "single_line",
     [roundModes]
   );
+  const welcomePreviewContent = useMemo(() => {
+    const content = buildWelcomeRulesContent({
+      round: 1,
+      gameMode: derivedGameMode,
+      roundModes,
+      hostNote: null,
+    });
+
+    const customRules = welcomeRulesText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    return {
+      heading: welcomeHeadingText.trim() || "Welcome To Vinyl Music Bingo",
+      intro: welcomeMessageText || content.intro,
+      modeRules: customRules.length > 0 ? customRules : content.modeRules,
+      tieBreak: welcomeTieBreakText || content.tieBreak,
+    };
+  }, [derivedGameMode, roundModes, welcomeHeadingText, welcomeMessageText, welcomeRulesText, welcomeTieBreakText]);
 
   useEffect(() => {
     if (!eventId) { setVenueLogoUrl(null); return; }
@@ -284,9 +307,9 @@ export default function BingoSetupPage() {
           start_slide_seconds: startSlideSeconds,
           host_buffer_seconds: hostBufferSeconds,
           sonos_output_delay_ms: sonosDelayMs,
-            call_reveal_delay_seconds: callRevealDelaySeconds,
-            default_intermission_seconds: defaultIntermissionSeconds,
-            next_game_rules_text: welcomeHostNote || null,
+          call_reveal_delay_seconds: callRevealDelaySeconds,
+          default_intermission_seconds: defaultIntermissionSeconds,
+          next_game_rules_text: welcomePreviewContent.intro || null,
         }),
       });
 
@@ -326,10 +349,13 @@ export default function BingoSetupPage() {
       sessionId: String(previewSessionId),
       preview: screen,
       previewIntermissionSeconds: String(defaultIntermissionSeconds),
+      previewWelcomeHeading: welcomePreviewContent.heading,
+      previewWelcomeText: welcomePreviewContent.intro,
+      previewWelcomeRules: welcomePreviewContent.modeRules.join("\n"),
     });
 
-    if (welcomeHostNote.trim()) {
-      params.set("previewWelcomeText", welcomeHostNote.trim());
+    if (welcomePreviewContent.tieBreak.trim()) {
+      params.set("previewWelcomeTieBreak", welcomePreviewContent.tieBreak.trim());
     }
     if (selectedEvent?.venue_logo_url) {
       params.set("previewVenueLogo", selectedEvent.venue_logo_url);
@@ -344,7 +370,7 @@ export default function BingoSetupPage() {
       `bingo_jumbotron_preview_${screen}`,
       "width=1920,height=1080,noopener,noreferrer"
     );
-  }, [defaultIntermissionSeconds, eventId, events, sessions, welcomeHostNote]);
+  }, [defaultIntermissionSeconds, eventId, events, sessions, welcomePreviewContent]);
 
   const downloadCards = async (sessionId: number, layout: "2-up" | "4-up") => {
     const res = await fetch(`/api/games/bingo/cards?sessionId=${sessionId}`);
@@ -544,15 +570,54 @@ export default function BingoSetupPage() {
               >
                 Preview Welcome
               </button>
-              <label className="mt-3 block text-sm text-stone-300">Welcome Message (optional override)
-                <textarea
-                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs text-stone-200 placeholder:text-stone-600"
-                  rows={3}
-                  placeholder="Override the default welcome message shown to players..."
-                  value={welcomeHostNote}
-                  onChange={(e) => setWelcomeHostNote(e.target.value)}
+              <label className="mt-3 block text-sm text-stone-300">Welcome Heading
+                <input
+                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs text-stone-200"
+                  value={welcomeHeadingText}
+                  onChange={(e) => setWelcomeHeadingText(e.target.value)}
                 />
               </label>
+              <label className="mt-3 block text-sm text-stone-300">Welcome Message
+                <textarea
+                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs text-stone-200 placeholder:text-stone-600"
+                  rows={4}
+                  placeholder="Edit the welcome message shown to players (line breaks supported)..."
+                  value={welcomeMessageText}
+                  onChange={(e) => setWelcomeMessageText(e.target.value)}
+                />
+              </label>
+              <label className="mt-3 block text-sm text-stone-300">Round Rules (one per line)
+                <textarea
+                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs text-stone-200 placeholder:text-stone-600"
+                  rows={5}
+                  placeholder="Type each rule on a new line..."
+                  value={welcomeRulesText}
+                  onChange={(e) => setWelcomeRulesText(e.target.value)}
+                />
+              </label>
+              <label className="mt-3 block text-sm text-stone-300">Tie-break Line
+                <textarea
+                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs text-stone-200 placeholder:text-stone-600"
+                  rows={2}
+                  placeholder="Edit tie-break text..."
+                  value={welcomeTieBreakText}
+                  onChange={(e) => setWelcomeTieBreakText(e.target.value)}
+                />
+              </label>
+              <div className="mt-3 rounded-lg border border-amber-900/50 bg-black/40 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-300">Live Welcome Preview</p>
+                <p className="mt-2 text-sm font-bold text-amber-100">{welcomePreviewContent.heading}</p>
+                <p className="mt-2 whitespace-pre-line text-xs leading-relaxed text-stone-300">{welcomePreviewContent.intro}</p>
+                <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-300">Round Rules</p>
+                <ol className="mt-1 list-decimal space-y-1 pl-4 text-xs text-stone-300">
+                  {welcomePreviewContent.modeRules.map((line, index) => (
+                    <li key={`welcome-rule-${index}`}>{line}</li>
+                  ))}
+                </ol>
+                {welcomePreviewContent.tieBreak ? (
+                  <p className="mt-2 border-t border-stone-700 pt-2 text-xs font-medium text-stone-300">{welcomePreviewContent.tieBreak}</p>
+                ) : null}
+              </div>
               <div className="mt-3">
                 <p className="text-sm text-stone-300">Venue Logo</p>
                 {eventId ? (

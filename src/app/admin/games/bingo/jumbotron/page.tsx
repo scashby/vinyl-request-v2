@@ -184,7 +184,13 @@ export default function BingoJumbotronPage() {
   const previewIntermissionSeconds = Number.isFinite(previewIntermissionSecondsRaw)
     ? Math.max(0, Math.floor(previewIntermissionSecondsRaw))
     : 180;
+  const previewWelcomeHeading = searchParams.get("previewWelcomeHeading")?.trim() || null;
   const previewWelcomeText = searchParams.get("previewWelcomeText")?.trim() || null;
+  const previewWelcomeRules = (searchParams.get("previewWelcomeRules") ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  const previewWelcomeTieBreak = searchParams.get("previewWelcomeTieBreak")?.trim() || null;
   const previewVenueLogo = searchParams.get("previewVenueLogo")?.trim() || null;
   const previewVenueName = searchParams.get("previewVenueName")?.trim() || null;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -340,6 +346,9 @@ export default function BingoJumbotronPage() {
     ?? session?.next_game_rules_text?.trim()
     ?? welcomeContent?.intro
     ?? "Listen for each track. If the song is on your card, mark that square. Get five in a row to call BINGO.";
+  const welcomeHeadingText = previewWelcomeHeading ?? "Welcome To Vinyl Music Bingo";
+  const welcomeRulesLines = previewWelcomeRules.length > 0 ? previewWelcomeRules : (welcomeContent?.modeRules ?? []);
+  const welcomeTieBreakLine = previewWelcomeTieBreak ?? welcomeContent?.tieBreak ?? null;
 
   const effectiveVenueLogo = previewVenueLogo ?? session?.event?.venue_logo_url ?? null;
   const effectiveVenueName = previewVenueName ?? session?.event?.title ?? null;
@@ -373,19 +382,19 @@ export default function BingoJumbotronPage() {
           />
           <div className="relative z-10 max-w-[78vw] rounded-[2.5rem] border border-amber-400/60 bg-white/72 px-[4vw] py-[3vw] shadow-[0_30px_80px_rgba(120,53,15,0.16)] backdrop-blur-sm">
             <h2 className="text-[5.5vw] font-black uppercase leading-[0.92] tracking-[0.08em] text-amber-600">
-              Welcome To Vinyl Music Bingo
+              {welcomeHeadingText}
             </h2>
-            <p className="mx-auto mt-[1.4vw] max-w-[54vw] text-[1.65vw] leading-relaxed text-stone-700">
+            <p className="mx-auto mt-[1.4vw] max-w-[54vw] whitespace-pre-line text-[1.65vw] leading-relaxed text-stone-700">
               {welcomeIntroText}
             </p>
             <div className="mx-auto mt-[1.8vw] max-w-[44vw] rounded-[2rem] border border-amber-300/70 bg-amber-50/85 px-[2vw] py-[1.5vw] text-left shadow-[0_18px_40px_rgba(245,158,11,0.12)]">
               <p className="text-[1.45vw] font-semibold uppercase tracking-[0.08em] text-amber-800">Round Rules</p>
               <ol className="mt-[0.7vw] list-decimal space-y-[0.35vw] pl-[1.3vw]">
-                {(welcomeContent?.modeRules ?? []).map((line, index) => (
+                {welcomeRulesLines.map((line, index) => (
                   <li key={index} className="text-[1.06vw] leading-relaxed text-stone-700">{line}</li>
                 ))}
               </ol>
-              {welcomeContent?.tieBreak ? <p className="mt-[0.9vw] border-t border-amber-300/80 pt-[0.6vw] text-[1.03vw] font-semibold text-stone-700">{welcomeContent.tieBreak}</p> : null}
+              {welcomeTieBreakLine ? <p className="mt-[0.9vw] border-t border-amber-300/80 pt-[0.6vw] text-[1.03vw] font-semibold text-stone-700">{welcomeTieBreakLine}</p> : null}
             </div>
           </div>
           <p className="relative z-10 text-[1.5vw] font-semibold text-stone-700">
