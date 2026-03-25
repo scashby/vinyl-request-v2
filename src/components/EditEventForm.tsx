@@ -561,6 +561,7 @@ export default function EditEventForm({
           event_type: getTagValue(normalizedTags, EVENT_TYPE_TAG_PREFIX),
           event_subtype: getTagValue(normalizedTags, EVENT_SUBTYPE_TAG_PREFIX),
           allowed_formats: normalizeStringArray(copiedEvent?.allowed_formats),
+          has_queue: !!copiedEvent?.has_queue,
           queue_types: Array.isArray(copiedEvent?.queue_types) ? copiedEvent!.queue_types : [],
           crate_id: copiedEvent?.crate_id || null,
           title: copiedEvent?.title ? `${copiedEvent.title} (Copy)` : '',
@@ -593,6 +594,7 @@ export default function EditEventForm({
             event_type: getTagValue(normalizedTags, EVENT_TYPE_TAG_PREFIX),
             event_subtype: getTagValue(normalizedTags, EVENT_SUBTYPE_TAG_PREFIX),
             allowed_formats: normalizeStringArray(dbEvent.allowed_formats),
+            has_queue: !!dbEvent.has_queue,
             queue_types: Array.isArray(dbEvent.queue_types) ? dbEvent.queue_types : [],
             crate_id: dbEvent.crate_id || null,
             title: dbEvent.title ?? '',
@@ -625,6 +627,10 @@ export default function EditEventForm({
             !!dbEvent.is_recurring ||
             hasSeriesChildren ||
             relatedSeriesEvents.length > 1;
+          const isInferredOrphanSeries =
+            !dbEvent.parent_event_id &&
+            !dbEvent.is_recurring &&
+            appearsRecurringSeries;
 
           let resolvedSeriesEvents = relatedSeriesEvents;
           if (!appearsRecurringSeries) {
@@ -647,6 +653,10 @@ export default function EditEventForm({
 
           setIsPartOfSeries(appearsRecurringSeries);
           setIsParentEvent(appearsRecurringSeries && !dbEvent.parent_event_id);
+          if (isInferredOrphanSeries) {
+            // Safety default: prevent accidentally applying one row's date/queue settings to an inferred series.
+            setEditMode('single');
+          }
           if (appearsRecurringSeries && dbEvent.parent_event_id && editMode === 'all') {
             setEditMode('future');
           }
@@ -701,6 +711,7 @@ export default function EditEventForm({
         event_type: getTagValue(normalizedTags, EVENT_TYPE_TAG_PREFIX),
         event_subtype: getTagValue(normalizedTags, EVENT_SUBTYPE_TAG_PREFIX),
         allowed_formats: normalizeStringArray(dbEvent.allowed_formats),
+        has_queue: !!dbEvent.has_queue,
         queue_types: Array.isArray(dbEvent.queue_types) ? dbEvent.queue_types : [],
         crate_id: dbEvent.crate_id || null,
         title: dbEvent.title ?? '',
@@ -1102,10 +1113,11 @@ export default function EditEventForm({
              }).filter(Boolean) as Array<{ id: number; title: string; date: string; diffs: Array<{ key: string; label: string; baseValue: unknown; currentValue: unknown }> }>;
 
              if (overrideEntries.length > 0) {
+               const riskyFields = new Set(['date', 'has_queue', 'queue_types']);
                const selections: Record<number, Record<string, boolean>> = {};
                overrideEntries.forEach((entry) => {
                  selections[entry.id] = entry.diffs.reduce((acc, diff) => {
-                   acc[diff.key] = true;
+                   acc[diff.key] = !riskyFields.has(diff.key);
                    return acc;
                  }, {} as Record<string, boolean>);
                });
@@ -1169,10 +1181,11 @@ export default function EditEventForm({
              }).filter(Boolean) as Array<{ id: number; title: string; date: string; diffs: Array<{ key: string; label: string; baseValue: unknown; currentValue: unknown }> }>;
 
              if (overrideEntries.length > 0) {
+               const riskyFields = new Set(['date', 'has_queue', 'queue_types']);
                const selections: Record<number, Record<string, boolean>> = {};
                overrideEntries.forEach((entry) => {
                  selections[entry.id] = entry.diffs.reduce((acc, diff) => {
-                   acc[diff.key] = true;
+                   acc[diff.key] = !riskyFields.has(diff.key);
                    return acc;
                  }, {} as Record<string, boolean>);
                });
