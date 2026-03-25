@@ -191,6 +191,12 @@ export default function BingoJumbotronPage() {
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
   const previewWelcomeTieBreak = searchParams.get("previewWelcomeTieBreak")?.trim() || null;
+  const previewIntermissionHeading = searchParams.get("previewIntermissionHeading")?.trim() || null;
+  const previewIntermissionText = searchParams.get("previewIntermissionText")?.trim() || null;
+  const previewIntermissionFooter = searchParams.get("previewIntermissionFooter")?.trim() || null;
+  const previewThanksHeading = searchParams.get("previewThanksHeading")?.trim() || null;
+  const previewThanksSubheading = searchParams.get("previewThanksSubheading")?.trim() || null;
+  const previewThanksEventsHeading = searchParams.get("previewThanksEventsHeading")?.trim() || null;
   const previewVenueLogo = searchParams.get("previewVenueLogo")?.trim() || null;
   const previewVenueName = searchParams.get("previewVenueName")?.trim() || null;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -350,6 +356,22 @@ export default function BingoJumbotronPage() {
   const welcomeRulesLines = previewWelcomeRules.length > 0 ? previewWelcomeRules : (welcomeContent?.modeRules ?? []);
   const welcomeTieBreakLine = previewWelcomeTieBreak ?? welcomeContent?.tieBreak ?? null;
 
+  const replaceRoundTokens = useCallback(
+    (value: string) => value
+      .replaceAll("{round}", String(session?.current_round ?? 1))
+      .replaceAll("{roundCount}", String(session?.round_count ?? 1)),
+    [session?.current_round, session?.round_count]
+  );
+
+  const intermissionHeadingText = previewIntermissionHeading || "Intermission";
+  const intermissionLeadText = replaceRoundTokens(
+    previewIntermissionText || "Round {round} of {roundCount} begins in"
+  );
+  const intermissionFooterText = previewIntermissionFooter || "Crate reset in progress. Next round starts shortly.";
+  const thanksHeadingText = previewThanksHeading || "Thank You For Playing!";
+  const thanksSubheadingText = previewThanksSubheading || "Vinyl Music Bingo";
+  const thanksEventsHeadingText = previewThanksEventsHeading || "Find Us Next At";
+
   const effectiveVenueLogo = previewVenueLogo ?? session?.event?.venue_logo_url ?? null;
   const effectiveVenueName = previewVenueName ?? session?.event?.title ?? null;
 
@@ -429,12 +451,10 @@ export default function BingoJumbotronPage() {
             tone="light"
           />
           <div className="relative z-10 w-full max-w-[74vw] rounded-[2.5rem] border border-amber-300/70 bg-white/76 px-[4vw] py-[3vw] shadow-[0_30px_80px_rgba(120,53,15,0.14)] backdrop-blur-sm">
-            <p className="text-[1.5vw] font-semibold uppercase tracking-[0.28em] text-amber-800">Intermission</p>
-            <p className="mt-[1vw] text-[2.1vw] text-stone-700">
-              Round {session!.current_round} of {session!.round_count} begins in
-            </p>
+            <p className="text-[1.5vw] font-semibold uppercase tracking-[0.28em] text-amber-800">{intermissionHeadingText}</p>
+            <p className="mt-[1vw] whitespace-pre-line text-[2.1vw] text-stone-700">{intermissionLeadText}</p>
             <p className="mt-[0.8vw] text-[10vw] font-black leading-none text-amber-600 tabular-nums">{formatMinSec(intermissionSecondsLeft!)}</p>
-            <p className="mt-[0.8vw] text-[1.45vw] text-stone-600">Crate reset in progress. Next round starts shortly.</p>
+            <p className="mt-[0.8vw] whitespace-pre-line text-[1.45vw] text-stone-600">{intermissionFooterText}</p>
           </div>
         </div>
       ) : showThanks ? (
@@ -449,14 +469,14 @@ export default function BingoJumbotronPage() {
             className="relative z-10 font-black uppercase leading-none tracking-[0.06em] text-amber-700"
             style={{ fontSize: "6vw" }}
           >
-            Thank You For Playing!
+            {thanksHeadingText}
           </h2>
-          <p className="relative z-10 text-[5.5vw] font-black uppercase tracking-[0.12em] text-sky-600">Vinyl Music Bingo</p>
+          <p className="relative z-10 text-[5.5vw] font-black uppercase tracking-[0.12em] text-sky-600">{thanksSubheadingText}</p>
 
           {upcomingEvents.length > 0 ? (
             <div className="relative z-10 w-full max-w-[80vw]">
               <p className="mb-[1.4vw] text-[1.6vw] font-semibold uppercase tracking-[0.26em] text-amber-800">
-                Find Us Next At
+                {thanksEventsHeadingText}
               </p>
               <div className={`grid gap-[1.2vw] ${
                 upcomingEvents.length === 1 ? "grid-cols-1" :

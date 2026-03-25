@@ -87,6 +87,12 @@ function formatEnglishMagnitude(value: number): string {
 }
 
 const CREATE_EVENT_OPTION = "__create_new_event__";
+const INITIAL_WELCOME_CONTENT = buildWelcomeRulesContent({
+  round: 1,
+  gameMode: "single_line",
+  roundModes: [],
+  hostNote: null,
+});
 
 export default function BingoSetupPage() {
   const searchParams = useSearchParams();
@@ -113,9 +119,15 @@ export default function BingoSetupPage() {
   const [callRevealDelaySeconds, setCallRevealDelaySeconds] = useState(3);
   const [defaultIntermissionSeconds, setDefaultIntermissionSeconds] = useState(180);
   const [welcomeHeadingText, setWelcomeHeadingText] = useState("Welcome To Vinyl Music Bingo");
-  const [welcomeMessageText, setWelcomeMessageText] = useState("");
-  const [welcomeRulesText, setWelcomeRulesText] = useState("");
-  const [welcomeTieBreakText, setWelcomeTieBreakText] = useState("");
+  const [welcomeMessageText, setWelcomeMessageText] = useState(INITIAL_WELCOME_CONTENT.intro);
+  const [welcomeRulesText, setWelcomeRulesText] = useState(INITIAL_WELCOME_CONTENT.modeRules.join("\n"));
+  const [welcomeTieBreakText, setWelcomeTieBreakText] = useState(INITIAL_WELCOME_CONTENT.tieBreak);
+  const [intermissionHeadingText, setIntermissionHeadingText] = useState("Intermission");
+  const [intermissionMessageText, setIntermissionMessageText] = useState("Round {round} of {roundCount} begins in");
+  const [intermissionFooterText, setIntermissionFooterText] = useState("Crate reset in progress. Next round starts shortly.");
+  const [thankYouHeadingText, setThankYouHeadingText] = useState("Thank You For Playing!");
+  const [thankYouSubheadingText, setThankYouSubheadingText] = useState("Vinyl Music Bingo");
+  const [thankYouEventsHeadingText, setThankYouEventsHeadingText] = useState("Find Us Next At");
   const [venueLogoUrl, setVenueLogoUrl] = useState<string | null>(null);
   const [uploadingVenueLogo, setUploadingVenueLogo] = useState(false);
 
@@ -409,6 +421,12 @@ export default function BingoSetupPage() {
       previewWelcomeHeading: welcomePreviewContent.heading,
       previewWelcomeText: welcomePreviewContent.intro,
       previewWelcomeRules: welcomePreviewContent.modeRules.join("\n"),
+      previewIntermissionHeading: intermissionHeadingText.trim(),
+      previewIntermissionText: intermissionMessageText.trim(),
+      previewIntermissionFooter: intermissionFooterText.trim(),
+      previewThanksHeading: thankYouHeadingText.trim(),
+      previewThanksSubheading: thankYouSubheadingText.trim(),
+      previewThanksEventsHeading: thankYouEventsHeadingText.trim(),
     });
 
     if (welcomePreviewContent.tieBreak.trim()) {
@@ -427,7 +445,19 @@ export default function BingoSetupPage() {
       `bingo_jumbotron_preview_${screen}`,
       "width=1920,height=1080,noopener,noreferrer"
     );
-  }, [defaultIntermissionSeconds, eventId, events, sessions, welcomePreviewContent]);
+  }, [
+    defaultIntermissionSeconds,
+    eventId,
+    events,
+    intermissionFooterText,
+    intermissionHeadingText,
+    intermissionMessageText,
+    sessions,
+    thankYouEventsHeadingText,
+    thankYouHeadingText,
+    thankYouSubheadingText,
+    welcomePreviewContent,
+  ]);
 
   const downloadCards = async (sessionId: number, layout: "2-up" | "4-up") => {
     const res = await fetch(`/api/games/bingo/cards?sessionId=${sessionId}`);
@@ -718,20 +748,6 @@ export default function BingoSetupPage() {
                   onChange={(e) => setWelcomeTieBreakText(e.target.value)}
                 />
               </label>
-              <div className="mt-3 rounded-lg border border-amber-900/50 bg-black/40 p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-300">Live Welcome Preview</p>
-                <p className="mt-2 text-sm font-bold text-amber-100">{welcomePreviewContent.heading}</p>
-                <p className="mt-2 whitespace-pre-line text-xs leading-relaxed text-stone-300">{welcomePreviewContent.intro}</p>
-                <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-300">Round Rules</p>
-                <ol className="mt-1 list-decimal space-y-1 pl-4 text-xs text-stone-300">
-                  {welcomePreviewContent.modeRules.map((line, index) => (
-                    <li key={`welcome-rule-${index}`}>{line}</li>
-                  ))}
-                </ol>
-                {welcomePreviewContent.tieBreak ? (
-                  <p className="mt-2 border-t border-stone-700 pt-2 text-xs font-medium text-stone-300">{welcomePreviewContent.tieBreak}</p>
-                ) : null}
-              </div>
               <div className="mt-3">
                 <p className="text-sm text-stone-300">Venue Logo</p>
                 {eventId ? (
@@ -769,7 +785,31 @@ export default function BingoSetupPage() {
               <p className="mt-2 text-xs text-stone-400">
                 Shown between rounds. Displays a countdown from the intermission duration set above (<span className="text-amber-300">{defaultIntermissionSeconds}s</span>).
               </p>
-              <p className="mt-2 text-xs text-stone-400">Displays branding and venue logo during the break. No additional setup required.</p>
+              <label className="mt-3 block text-sm text-stone-300">Intermission Heading
+                <input
+                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs text-stone-200"
+                  value={intermissionHeadingText}
+                  onChange={(e) => setIntermissionHeadingText(e.target.value)}
+                />
+              </label>
+              <label className="mt-3 block text-sm text-stone-300">Intermission Message
+                <textarea
+                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs text-stone-200 placeholder:text-stone-600"
+                  rows={3}
+                  placeholder="Shown above countdown. Use {round} and {roundCount} tokens if needed."
+                  value={intermissionMessageText}
+                  onChange={(e) => setIntermissionMessageText(e.target.value)}
+                />
+              </label>
+              <label className="mt-3 block text-sm text-stone-300">Intermission Footer
+                <textarea
+                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs text-stone-200 placeholder:text-stone-600"
+                  rows={2}
+                  placeholder="Shown below countdown..."
+                  value={intermissionFooterText}
+                  onChange={(e) => setIntermissionFooterText(e.target.value)}
+                />
+              </label>
             </div>
 
             {/* Thank You Screen */}
@@ -782,8 +822,28 @@ export default function BingoSetupPage() {
               >
                 Preview Thank You
               </button>
-              <p className="mt-2 text-xs text-stone-400">Shown when the game ends. Automatically displays upcoming events from your schedule and venue branding.</p>
-              <p className="mt-2 text-xs text-stone-400">No additional setup required.</p>
+              <p className="mt-2 text-xs text-stone-400">Shown when the game ends with upcoming events from your schedule and venue branding.</p>
+              <label className="mt-3 block text-sm text-stone-300">Thank You Heading
+                <input
+                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs text-stone-200"
+                  value={thankYouHeadingText}
+                  onChange={(e) => setThankYouHeadingText(e.target.value)}
+                />
+              </label>
+              <label className="mt-3 block text-sm text-stone-300">Thank You Subheading
+                <input
+                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs text-stone-200"
+                  value={thankYouSubheadingText}
+                  onChange={(e) => setThankYouSubheadingText(e.target.value)}
+                />
+              </label>
+              <label className="mt-3 block text-sm text-stone-300">Upcoming Events Heading
+                <input
+                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs text-stone-200"
+                  value={thankYouEventsHeadingText}
+                  onChange={(e) => setThankYouEventsHeadingText(e.target.value)}
+                />
+              </label>
             </div>
           </div>
         </section>
