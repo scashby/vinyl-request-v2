@@ -219,6 +219,12 @@ function normalizeOptionalText(value: unknown): string {
   return value.trim();
 }
 
+function getSortableDateValue(dateValue: string | null | undefined): number {
+  if (!dateValue) return Number.MAX_SAFE_INTEGER;
+  const parsed = Date.parse(dateValue);
+  return Number.isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed;
+}
+
 function buildEventDataFromDbEvent(dbEvent: DbEvent): EventData {
   const normalizedTags = normalizeStringArray(dbEvent.allowed_tags);
   return {
@@ -507,6 +513,34 @@ export default function EditEventForm({
     return [];
   };
 
+  const inferSeriesEventsForOrphan = async (dbEvent: DbEvent): Promise<DbEvent[]> => {
+    const normalizedTags = normalizeStringArray(dbEvent.allowed_tags);
+    const subtypeTag = buildTag(EVENT_SUBTYPE_TAG_PREFIX, getTagValue(normalizedTags, EVENT_SUBTYPE_TAG_PREFIX));
+    const normalizedTitle = normalizeOptionalText(dbEvent.title);
+    const normalizedLocation = normalizeOptionalText(dbEvent.location);
+    const normalizedTime = normalizeOptionalText(dbEvent.time);
+
+    if (!normalizedTitle) return [];
+
+    let query = supabase
+      .from('events')
+      .select('*')
+      .eq('title', normalizedTitle)
+      .order('date', { ascending: true });
+
+    if (normalizedLocation) query = query.eq('location', normalizedLocation);
+    if (normalizedTime) query = query.eq('time', normalizedTime);
+    if (subtypeTag) query = query.contains('allowed_tags', [subtypeTag]);
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('Error inferring series events for orphan row:', error);
+      return [];
+    }
+
+    return (data as DbEvent[]) || [];
+  };
+
   // Fetch Event Data
   useEffect(() => {
     const fetchEvent = async () => {
@@ -586,11 +620,30 @@ export default function EditEventForm({
           const hasSeriesChildren = relatedSeriesEvents.some(
             (event) => event.parent_event_id === parentId
           );
-          const appearsRecurringSeries =
+          let appearsRecurringSeries =
             !!dbEvent.parent_event_id ||
             !!dbEvent.is_recurring ||
             hasSeriesChildren ||
             relatedSeriesEvents.length > 1;
+
+          let resolvedSeriesEvents = relatedSeriesEvents;
+          if (!appearsRecurringSeries) {
+            const inferredSeriesEvents = await inferSeriesEventsForOrphan(dbEvent);
+            if (inferredSeriesEvents.length > 1) {
+              resolvedSeriesEvents = inferredSeriesEvents;
+              appearsRecurringSeries = true;
+            }
+          }
+
+          if (resolvedSeriesEvents.length > 0) {
+            const sorted = [...resolvedSeriesEvents].sort(
+              (a, b) => getSortableDateValue(a.date) - getSortableDateValue(b.date)
+            );
+            const inferredParentId =
+              sorted.find((event) => event.is_recurring || !event.parent_event_id)?.id ?? sorted[0]?.id ?? parentId;
+            setSeriesEvents(sorted);
+            setSeriesParentId(inferredParentId);
+          }
 
           setIsPartOfSeries(appearsRecurringSeries);
           setIsParentEvent(appearsRecurringSeries && !dbEvent.parent_event_id);
@@ -1063,11 +1116,18 @@ export default function EditEventForm({
                return;
              }
            }
-           await supabase
-             .from('events')
-             .update(payload)
-             .or(`id.eq.${targetEventId},parent_event_id.eq.${parentId}`)
-             .gte('date', eventData.date);
+           const explicitTargetEvents =
+             targetEvents.length > 0
+               ? targetEvents
+               : seriesEvents.filter((event) => event.id === targetEventId || event.parent_event_id === parentId);
+           const fallbackIds = explicitTargetEvents
+             .filter((event) => event.date >= eventData.date)
+             .map((event) => event.id);
+           const eventIdsToUpdate = fallbackIds.length > 0 ? fallbackIds : [targetEventId];
+           for (const eventId of eventIdsToUpdate) {
+             const { error } = await supabase.from('events').update(payload as EventUpdate).eq('id', eventId);
+             if (error) throw error;
+           }
            savedEventSummary = {
              id: targetEventId,
              title: eventData.title,
@@ -1123,7 +1183,14 @@ export default function EditEventForm({
                return;
              }
            }
-           await supabase.from('events').update(payload as EventUpdate).or(`id.eq.${parentId},parent_event_id.eq.${parentId}`);
+           const eventIdsToUpdate =
+             targetEvents.length > 0
+               ? targetEvents.map((event) => event.id)
+               : [parentId];
+           for (const eventId of eventIdsToUpdate) {
+             const { error } = await supabase.from('events').update(payload as EventUpdate).eq('id', eventId);
+             if (error) throw error;
+           }
            savedEventSummary = {
              id: parentId,
              title: eventData.title,
