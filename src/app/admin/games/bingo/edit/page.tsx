@@ -52,6 +52,7 @@ export default function BingoEditSessionPage() {
   const [gameMode, setGameMode] = useState<GameMode>("single_line");
   const [roundModes, setRoundModes] = useState<RoundModesEntry[]>([]);
   const [roundPlaylistIds, setRoundPlaylistIds] = useState<RoundPlaylistEntry[]>([]);
+  const [roundPlaylistOverrideRounds, setRoundPlaylistOverrideRounds] = useState<number[]>([]);
   const [cardCount, setCardCount] = useState(40);
   const [roundCount, setRoundCount] = useState(3);
   const [removeResleeveSeconds, setRemoveResleeveSeconds] = useState(20);
@@ -118,9 +119,12 @@ export default function BingoEditSessionPage() {
             : []
       );
       try {
-        setRoundPlaylistIds(normalizeRoundPlaylistIds(sessionPayload.round_playlist_ids, sessionPayload.round_count ?? 3));
+        const normalizedRoundPlaylistIds = normalizeRoundPlaylistIds(sessionPayload.round_playlist_ids, sessionPayload.round_count ?? 3);
+        setRoundPlaylistIds(normalizedRoundPlaylistIds);
+        setRoundPlaylistOverrideRounds(normalizedRoundPlaylistIds.map((entry) => entry.round));
       } catch {
         setRoundPlaylistIds([]);
+        setRoundPlaylistOverrideRounds([]);
       }
       setGameMode((sessionPayload.game_mode as GameMode) ?? "single_line");
       try {
@@ -155,6 +159,10 @@ export default function BingoEditSessionPage() {
     setRoundPlaylistIds((current) => current.filter((entry) => entry.round <= roundCount));
   }, [roundCount]);
 
+  useEffect(() => {
+    setRoundPlaylistOverrideRounds((current) => current.filter((round) => round <= roundCount));
+  }, [roundCount]);
+
   const getModesForRound = useCallback(
     (round: number) => roundModes.find((entry) => entry.round === round)?.modes ?? [gameMode],
     [roundModes, gameMode]
@@ -176,6 +184,20 @@ export default function BingoEditSessionPage() {
       return [...remaining, { round, playlist_ids: normalizedIds }].sort((left, right) => left.round - right.round);
     });
   }, []);
+
+  const setRoundPlaylistOverrideEnabled = useCallback((round: number, enabled: boolean) => {
+    setRoundPlaylistOverrideRounds((current) => {
+      if (enabled) {
+        if (current.includes(round)) return current;
+        return [...current, round].sort((left, right) => left - right);
+      }
+      return current.filter((value) => value !== round);
+    });
+
+    if (!enabled) {
+      setPlaylistIdsForRound(round, []);
+    }
+  }, [setPlaylistIdsForRound]);
 
   const missingPlaylistRounds = useMemo(
     () => playlistIds.length > 0
@@ -391,7 +413,8 @@ export default function BingoEditSessionPage() {
                     const activeModes = getModesForRound(round);
                     const explicit = roundModes.some((entry) => entry.round === round);
                     const roundPlaylistSelection = getPlaylistIdsForRound(round);
-                    const hasPlaylistOverride = roundPlaylistSelection.length > 0;
+                    const overrideEnabled = roundPlaylistOverrideRounds.includes(round);
+                    const hasPlaylistOverride = overrideEnabled && roundPlaylistSelection.length > 0;
                     return (
                       <div key={round} className="rounded border border-stone-700/70 bg-black/40 p-2">
                         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-stone-300">
@@ -414,35 +437,46 @@ export default function BingoEditSessionPage() {
                           })}
                         </div>
                         <div className="mt-3 border-t border-stone-800 pt-3">
-                          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-stone-300">
-                            Round {round} Playlist Override {hasPlaylistOverride ? "(custom)" : "(uses master crate)"}
-                          </p>
-                          <select
-                            multiple
-                            size={5}
-                            className="mt-2 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs"
-                            value={roundPlaylistSelection.map(String)}
-                            onChange={(e) => {
-                              const values = Array.from(e.target.selectedOptions)
-                                .map((option) => Number(option.value))
-                                .filter((value) => Number.isFinite(value));
-                              setPlaylistIdsForRound(round, values);
-                            }}
-                          >
-                            {playlists.map((playlist) => (
-                              <option key={`${round}-${playlist.id}`} value={playlist.id}>{playlist.name} ({playlist.track_count})</option>
-                            ))}
-                          </select>
-                          <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-stone-400">
-                            <button
-                              type="button"
-                              onClick={() => setPlaylistIdsForRound(round, [])}
-                              className="rounded border border-stone-700 px-2 py-1 text-stone-300 hover:border-amber-500 hover:text-amber-200"
-                            >
-                              Clear Override
-                            </button>
-                            <span>{hasPlaylistOverride ? "This round uses only the selected playlists." : "Leave empty to use the master playlist selection."}</span>
-                          </div>
+                          <label className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-stone-300">
+                            <input
+                              type="checkbox"
+                              checked={overrideEnabled}
+                              onChange={(event) => setRoundPlaylistOverrideEnabled(round, event.target.checked)}
+                            />
+                            Use Playlist Override For Round {round}
+                          </label>
+                          {overrideEnabled ? (
+                            <>
+                              <select
+                                multiple
+                                size={5}
+                                className="mt-2 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs"
+                                value={roundPlaylistSelection.map(String)}
+                                onChange={(e) => {
+                                  const values = Array.from(e.target.selectedOptions)
+                                    .map((option) => Number(option.value))
+                                    .filter((value) => Number.isFinite(value));
+                                  setPlaylistIdsForRound(round, values);
+                                }}
+                              >
+                                {playlists.map((playlist) => (
+                                  <option key={`${round}-${playlist.id}`} value={playlist.id}>{playlist.name} ({playlist.track_count})</option>
+                                ))}
+                              </select>
+                              <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-stone-400">
+                                <button
+                                  type="button"
+                                  onClick={() => setPlaylistIdsForRound(round, [])}
+                                  className="rounded border border-stone-700 px-2 py-1 text-stone-300 hover:border-amber-500 hover:text-amber-200"
+                                >
+                                  Clear Override
+                                </button>
+                                <span>{hasPlaylistOverride ? "This round uses only the selected playlists." : "Select one or more playlists for this round override."}</span>
+                              </div>
+                            </>
+                          ) : (
+                            <p className="mt-2 text-[11px] text-stone-500">Using master playlist selection for this round.</p>
+                          )}
                         </div>
                       </div>
                     );

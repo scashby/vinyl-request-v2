@@ -101,6 +101,7 @@ export default function BingoSetupPage() {
   const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<number[]>([]);
   const [roundModes, setRoundModes] = useState<RoundModesEntry[]>([]);
   const [roundPlaylistIds, setRoundPlaylistIds] = useState<RoundPlaylistEntry[]>([]);
+  const [roundPlaylistOverrideRounds, setRoundPlaylistOverrideRounds] = useState<number[]>([]);
   const [cardCount, setCardCount] = useState(40);
   const [roundCount, setRoundCount] = useState(3);
   const [removeResleeveSeconds, setRemoveResleeveSeconds] = useState(20);
@@ -163,6 +164,10 @@ export default function BingoSetupPage() {
     setRoundPlaylistIds((current) => current.filter((entry) => entry.round <= roundCount));
   }, [roundCount]);
 
+  useEffect(() => {
+    setRoundPlaylistOverrideRounds((current) => current.filter((round) => round <= roundCount));
+  }, [roundCount]);
+
   const getModesForRound = useCallback(
      (round: number): GameMode[] => roundModes.find((entry) => entry.round === round)?.modes ?? [],
      [roundModes]
@@ -184,6 +189,20 @@ export default function BingoSetupPage() {
       return [...remaining, { round, playlist_ids: normalizedIds }].sort((left, right) => left.round - right.round);
     });
   }, []);
+
+  const setRoundPlaylistOverrideEnabled = useCallback((round: number, enabled: boolean) => {
+    setRoundPlaylistOverrideRounds((current) => {
+      if (enabled) {
+        if (current.includes(round)) return current;
+        return [...current, round].sort((left, right) => left - right);
+      }
+      return current.filter((value) => value !== round);
+    });
+
+    if (!enabled) {
+      setPlaylistsForRound(round, []);
+    }
+  }, [setPlaylistsForRound]);
 
   const missingPlaylistRounds = useMemo(
     () => hasSelectedPlaylists
@@ -529,7 +548,8 @@ export default function BingoSetupPage() {
                 const round = index + 1;
                 const activeModes = getModesForRound(round);
                 const roundPlaylistSelection = getPlaylistIdsForRound(round);
-                const usesOverride = roundPlaylistSelection.length > 0;
+                const overrideEnabled = roundPlaylistOverrideRounds.includes(round);
+                const usesOverride = overrideEnabled && roundPlaylistSelection.length > 0;
                 const roundTrackCount = getTrackCountForPlaylistIds(roundPlaylistSelection);
                 return (
                   <div key={round} className="rounded border border-stone-700/70 bg-black/40 p-2">
@@ -551,41 +571,52 @@ export default function BingoSetupPage() {
                       <p className="mt-1 text-[11px] text-stone-500">No mode selected — defaults to Single Line</p>
                     ) : null}
                     <div className="mt-3 border-t border-stone-800 pt-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-stone-300">
-                        Round {round} Playlist Override {usesOverride ? "(custom)" : "(uses master crate)"}
-                      </p>
-                      <select
-                        multiple
-                        size={4}
-                        className="mt-2 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs"
-                        value={roundPlaylistSelection.map(String)}
-                        onChange={(e) => {
-                          const values = Array.from(e.target.selectedOptions)
-                            .map((option) => Number(option.value))
-                            .filter((value) => Number.isFinite(value));
-                          setPlaylistsForRound(round, values);
-                        }}
-                      >
-                        {playlists.map((playlist) => (
-                          <option key={`${round}-${playlist.id}`} value={playlist.id}>
-                            {playlist.name} ({playlist.track_count})
-                          </option>
-                        ))}
-                      </select>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-                        <button
-                          type="button"
-                          onClick={() => setPlaylistsForRound(round, [])}
-                          className="rounded border border-stone-700 px-2 py-1 text-stone-300 hover:border-amber-500 hover:text-amber-200"
-                        >
-                          Clear Override
-                        </button>
-                        <span className={usesOverride ? (roundTrackCount >= minimumTracksForSetup ? "text-emerald-300" : "text-rose-300") : "text-stone-500"}>
-                          {usesOverride
-                            ? `${roundTrackCount} tracks selected${roundTrackCount >= minimumTracksForSetup ? " · enough for this round crate." : ` · need at least ${minimumTracksForSetup} tracks.`}`
-                            : "Leave empty to use the master playlist selection."}
-                        </span>
-                      </div>
+                      <label className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-stone-300">
+                        <input
+                          type="checkbox"
+                          checked={overrideEnabled}
+                          onChange={(event) => setRoundPlaylistOverrideEnabled(round, event.target.checked)}
+                        />
+                        Use Playlist Override For Round {round}
+                      </label>
+                      {overrideEnabled ? (
+                        <>
+                          <select
+                            multiple
+                            size={4}
+                            className="mt-2 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs"
+                            value={roundPlaylistSelection.map(String)}
+                            onChange={(e) => {
+                              const values = Array.from(e.target.selectedOptions)
+                                .map((option) => Number(option.value))
+                                .filter((value) => Number.isFinite(value));
+                              setPlaylistsForRound(round, values);
+                            }}
+                          >
+                            {playlists.map((playlist) => (
+                              <option key={`${round}-${playlist.id}`} value={playlist.id}>
+                                {playlist.name} ({playlist.track_count})
+                              </option>
+                            ))}
+                          </select>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                            <button
+                              type="button"
+                              onClick={() => setPlaylistsForRound(round, [])}
+                              className="rounded border border-stone-700 px-2 py-1 text-stone-300 hover:border-amber-500 hover:text-amber-200"
+                            >
+                              Clear Override
+                            </button>
+                            <span className={usesOverride ? (roundTrackCount >= minimumTracksForSetup ? "text-emerald-300" : "text-rose-300") : "text-stone-500"}>
+                              {usesOverride
+                                ? `${roundTrackCount} tracks selected${roundTrackCount >= minimumTracksForSetup ? " · enough for this round crate." : ` · need at least ${minimumTracksForSetup} tracks.`}`
+                                : "Select one or more playlists for this round override."}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="mt-2 text-[11px] text-stone-500">Using master playlist selection for this round.</p>
+                      )}
                     </div>
                   </div>
                 );
