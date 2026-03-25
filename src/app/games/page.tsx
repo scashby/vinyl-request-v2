@@ -1,14 +1,21 @@
 import Link from "next/link";
 import { Container } from "components/ui/Container";
-import { gameBlueprints, type GameBlueprint } from "src/lib/gameBlueprints";
+import {
+  gameBlueprints,
+  type GameBlueprint,
+  type GameStatus,
+} from "src/lib/gameBlueprints";
+import { supabaseAdmin } from "src/lib/supabaseAdmin";
+import ComingSoonSelector from "./ComingSoonSelector";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Games | Dead Wax Dialogues",
   description:
     "A vinyl-first catalog of Dead Wax Dialogues games: what they are and how to play.",
 };
-
-type StatusMeta = { label: string; className: string };
 
 type GamePublicCopy = {
   tagline: string;
@@ -21,26 +28,207 @@ type GamePublicCopy = {
   bestFor?: string;
 };
 
-const getStatusMeta = (status: GameBlueprint["status"]): StatusMeta => {
-  switch (status) {
-    case "in_development":
-      return {
-        label: "In development",
-        className:
-          "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/30",
-      };
-    case "needs_workshopping":
-      return {
-        label: "Needs workshopping",
-        className: "bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/30",
-      };
-    default:
-      return {
-        label: "Undeveloped",
-        className: "bg-zinc-500/15 text-zinc-200 ring-1 ring-white/15",
-      };
-  }
+type GameBlueprintOverride = {
+  title?: string;
+  status?: GameStatus;
+  notes?: string;
+  pullSizeGuidance?: string;
 };
+
+type PublicGame = GameBlueprint & {
+  publicCopy?: GamePublicCopy;
+};
+
+type GameNightEvent = {
+  id: number;
+  title: string;
+  date: string;
+  time: string | null;
+  location: string | null;
+  image_url: string | null;
+  linkedGameTitles: string[];
+};
+
+type DynamicEventIdQuery = {
+  from: (table: string) => {
+    select: (columns: string) => {
+      not: (column: string, operator: string, value: null) => {
+        limit: (count: number) => Promise<{
+          data: Array<{ event_id: number | null }> | null;
+          error: { message: string } | null;
+        }>;
+      };
+    };
+  };
+};
+
+const ALLOWED_PUBLIC_STATUSES: GameStatus[] = [
+  "in_production",
+  "in_development",
+];
+
+const SESSION_TABLE_BY_SLUG: Partial<Record<string, string>> = {
+  bingo: "bingo_sessions",
+  "music-trivia": "trivia_sessions",
+  "name-that-tune": "ntt_sessions",
+  "bracket-battle": "bb_sessions",
+  "needle-drop-roulette": "ndr_sessions",
+  "lyric-gap-relay": "lgr_sessions",
+  "genre-imposter": "gi_sessions",
+  "decade-dash": "dd_sessions",
+  "cover-art-clue-chase": "cacc_sessions",
+  "crate-categories": "ccat_sessions",
+  "wrong-lyric-challenge": "wlc_sessions",
+  "sample-detective": "sd_sessions",
+  "artist-alias": "aa_sessions",
+  "original-or-cover": "ooc_sessions",
+  "back-to-back-connection": "b2bc_sessions",
+};
+
+const isGameStatus = (value: unknown): value is GameStatus =>
+  value === "in_production" ||
+  value === "in_development" ||
+  value === "needs_workshopping" ||
+  value === "undeveloped";
+
+const isTbaDate = (date: string | null | undefined): boolean =>
+  !date || date === "9999-12-31";
+
+async function loadPublicGames(): Promise<PublicGame[]> {
+  const { data: rows, error } = await supabaseAdmin
+    .from("admin_settings")
+    .select("key, value")
+    .like("key", "game:blueprint:%");
+
+  if (error) {
+    console.error("Failed to load game blueprint overrides", error.message);
+  }
+
+  const overridesBySlug = new Map<string, GameBlueprintOverride>();
+  for (const row of rows ?? []) {
+    const slug = (row.key as string).replace("game:blueprint:", "");
+    try {
+      const parsed = JSON.parse((row.value as string) ?? "{}") as Record<
+        string,
+        unknown
+      >;
+      overridesBySlug.set(slug, {
+        title:
+          typeof parsed.title === "string" && parsed.title.trim().length > 0
+            ? parsed.title.trim()
+            : undefined,
+        status: isGameStatus(parsed.status) ? parsed.status : undefined,
+        notes: typeof parsed.notes === "string" ? parsed.notes : undefined,
+        pullSizeGuidance:
+          typeof parsed.pullSizeGuidance === "string"
+            ? parsed.pullSizeGuidance
+            : undefined,
+      });
+    } catch {
+      // Ignore malformed overrides.
+    }
+  }
+
+  return gameBlueprints
+    .map((blueprint) => {
+      const override = overridesBySlug.get(blueprint.slug);
+      const merged: GameBlueprint = {
+        ...blueprint,
+        ...(override ?? {}),
+      };
+      return {
+        ...merged,
+        publicCopy: publicCopyBySlug[merged.slug],
+      };
+    })
+    .filter((game) => ALLOWED_PUBLIC_STATUSES.includes(game.status));
+}
+
+async function loadProductionGameNights(
+  productionGames: PublicGame[]
+): Promise<GameNightEvent[]> {
+  const tableEntries = productionGames
+    .map((game) => {
+      const table = SESSION_TABLE_BY_SLUG[game.slug];
+      if (!table) return null;
+      return { slug: game.slug, title: game.title, table };
+    })
+    .filter((entry): entry is { slug: string; title: string; table: string } =>
+      Boolean(entry)
+    );
+
+  if (tableEntries.length === 0) return [];
+
+  const db = supabaseAdmin as unknown as DynamicEventIdQuery;
+
+  const linkedEventRows = await Promise.all(
+    tableEntries.map(async (entry) => {
+      const { data, error } = await db
+        .from(entry.table)
+        .select("event_id")
+        .not("event_id", "is", null)
+        .limit(1000);
+
+      if (error) {
+        console.error(
+          `Failed to load linked events from ${entry.table}`,
+          error.message
+        );
+        return [] as Array<{ event_id: number; gameTitle: string }>;
+      }
+
+      return ((data ?? []) as Array<{ event_id: number | null }>)
+        .filter((row) => Number.isFinite(row.event_id))
+        .map((row) => ({
+          event_id: row.event_id as number,
+          gameTitle: entry.title,
+        }));
+    })
+  );
+
+  const allLinkedRows = linkedEventRows.flat();
+  const uniqueEventIds = Array.from(
+    new Set(allLinkedRows.map((row) => row.event_id))
+  );
+
+  if (uniqueEventIds.length === 0) return [];
+
+  const linkedGameTitlesByEventId = new Map<number, Set<string>>();
+  for (const row of allLinkedRows) {
+    const current =
+      linkedGameTitlesByEventId.get(row.event_id) ?? new Set<string>();
+    current.add(row.gameTitle);
+    linkedGameTitlesByEventId.set(row.event_id, current);
+  }
+
+  const { data: events, error: eventsError } = await supabaseAdmin
+    .from("events")
+    .select("id, title, date, time, location, image_url")
+    .in("id", uniqueEventIds);
+
+  if (eventsError) {
+    console.error("Failed to load game night events", eventsError.message);
+    return [];
+  }
+
+  return ((events ?? []) as Array<
+    Omit<GameNightEvent, "linkedGameTitles">
+  >)
+    .map((event) => ({
+      ...event,
+      linkedGameTitles: Array.from(
+        linkedGameTitlesByEventId.get(event.id) ?? []
+      ).sort((a, b) => a.localeCompare(b)),
+    }))
+    .sort((a, b) => {
+      const aIsTba = isTbaDate(a.date);
+      const bIsTba = isTbaDate(b.date);
+      if (aIsTba && !bIsTba) return 1;
+      if (!aIsTba && bIsTba) return -1;
+      if (aIsTba && bIsTba) return a.title.localeCompare(b.title);
+      return (a.date ?? "").localeCompare(b.date ?? "");
+    });
+}
 
 const publicCopyBySlug: Record<string, GamePublicCopy> = {
   bingo: {
@@ -374,10 +562,117 @@ const publicCopyBySlug: Record<string, GamePublicCopy> = {
   },
 };
 
-export default function GamesPage() {
-  const games = [...gameBlueprints].sort((a, b) =>
-    a.title.localeCompare(b.title),
+function ProductionGameCard({ game }: { game: PublicGame }) {
+  const publicCopy = game.publicCopy;
+
+  return (
+    <article className="group relative overflow-hidden rounded-2xl bg-zinc-950/70 ring-1 ring-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] hover:ring-[#00c4ff]/30 transition-colors">
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[radial-gradient(circle_at_30%_20%,rgba(0,196,255,0.18),transparent_55%)]" />
+      <div className="relative p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h3 className="text-xl font-bold tracking-tight truncate">{game.title}</h3>
+            <p className="mt-2 text-zinc-300/85 leading-relaxed">
+              {publicCopy?.tagline ?? game.coreMechanic}
+            </p>
+          </div>
+          <span className="shrink-0 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-[#00c4ff]/15 text-[#b8efff] ring-1 ring-[#00c4ff]/35">
+            In production
+          </span>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-4">
+          <div className="rounded-xl bg-black/30 ring-1 ring-white/10 p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-zinc-400">
+              Player experience (what it feels like)
+            </div>
+            <p className="mt-3 text-sm text-zinc-200/90 leading-relaxed">
+              {publicCopy?.playerExperience ??
+                "You play in teams at tables, lock in answers, and get fast reveals with score updates."}
+            </p>
+            <div className="mt-4 grid grid-cols-1 gap-4">
+              <div className="rounded-xl bg-black/25 ring-1 ring-white/10 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-zinc-400">
+                  What you do
+                </div>
+                {publicCopy?.whatYouDo?.length ? (
+                  <ul className="mt-3 space-y-2 text-sm text-zinc-200/90 leading-relaxed list-disc list-inside">
+                    {publicCopy.whatYouDo.map((step) => (
+                      <li key={step}>{step}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+              <div className="rounded-xl bg-black/25 ring-1 ring-white/10 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-zinc-400">
+                  Example round
+                </div>
+                {publicCopy?.exampleRound?.length ? (
+                  <ul className="mt-3 space-y-2 text-sm text-zinc-200/90 leading-relaxed list-disc list-inside">
+                    {publicCopy.exampleRound.map((step) => (
+                      <li key={step}>{step}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-black/30 ring-1 ring-white/10 p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-zinc-400">
+              Booker notes
+            </div>
+            {publicCopy?.howYouWin ? (
+              <p className="mt-2 text-sm text-zinc-200/90 leading-relaxed">
+                <span className="font-semibold text-zinc-200">How you win:</span>{" "}
+                {publicCopy.howYouWin}
+              </p>
+            ) : null}
+            <p className="mt-2 text-sm text-zinc-200/90 leading-relaxed">
+              <span className="font-semibold text-zinc-200">Scoring:</span>{" "}
+              {publicCopy?.scoring ?? game.scoring}
+            </p>
+            {publicCopy?.bestFor ? (
+              <p className="mt-3 text-sm text-zinc-200/90 leading-relaxed">
+                <span className="font-semibold text-zinc-200">Best for:</span>{" "}
+                {publicCopy.bestFor}
+              </p>
+            ) : null}
+            {publicCopy?.whatYouNeed ? (
+              <p className="mt-2 text-sm text-zinc-200/90 leading-relaxed">
+                <span className="font-semibold text-zinc-200">What we bring/need:</span>{" "}
+                {publicCopy.whatYouNeed}
+              </p>
+            ) : null}
+            <p className="mt-3 text-sm text-zinc-200/90 leading-relaxed">
+              <span className="font-semibold text-zinc-200">Why it works:</span>{" "}
+              {game.whyItWorks}
+            </p>
+            {game.notes ? (
+              <p className="mt-3 text-sm text-zinc-300/75 leading-relaxed">
+                <span className="font-semibold text-zinc-200">Note:</span>{" "}
+                {game.notes}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </article>
   );
+}
+
+export default async function GamesPage() {
+  const publicGames = await loadPublicGames();
+
+  const productionGames = publicGames
+    .filter((game) => game.status === "in_production")
+    .sort((a, b) => a.title.localeCompare(b.title));
+
+  const comingSoonGames = publicGames
+    .filter((game) => game.status === "in_development")
+    .sort((a, b) => a.title.localeCompare(b.title));
+
+  const gameNights = await loadProductionGameNights(productionGames);
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -418,16 +713,14 @@ export default function GamesPage() {
           <div className="flex items-end justify-between gap-6 flex-wrap mb-8">
             <div>
               <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
-                Pick your vibe
+                Live game formats
               </h2>
               <p className="mt-2 text-zinc-300/80 max-w-2xl">
-                Each game below has a short “what it feels like” + a quick
-                runthrough that shows exactly what you do at your table and how
-                the reveal/scoring works.
+                We only list in-production games below. Coming Soon includes in-development formats. Any other status stays off this page.
               </p>
             </div>
             <div className="text-sm text-zinc-300/70">
-              {games.length} games in the library
+              {productionGames.length} production games
             </div>
           </div>
 
@@ -470,126 +763,83 @@ export default function GamesPage() {
             </div>
           </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {games.map((game) => {
-              const status = getStatusMeta(game.status);
-              const publicCopy = publicCopyBySlug[game.slug];
+          <section>
+            <div className="flex items-end justify-between gap-6 flex-wrap mb-6">
+              <h3 className="text-xl md:text-2xl font-bold tracking-tight">In Production</h3>
+              <div className="text-sm text-zinc-300/70">{productionGames.length} live now</div>
+            </div>
 
-              return (
-                <article
-                  key={game.slug}
-                  className="group relative overflow-hidden rounded-2xl bg-zinc-950/70 ring-1 ring-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] hover:ring-[#00c4ff]/30 transition-colors"
-                >
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[radial-gradient(circle_at_30%_20%,rgba(0,196,255,0.18),transparent_55%)]" />
-                  <div className="relative p-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <h3 className="text-xl font-bold tracking-tight truncate">
-                          {game.title}
-                        </h3>
-                        <p className="mt-2 text-zinc-300/85 leading-relaxed">
-                          {publicCopy?.tagline ?? game.coreMechanic}
-                        </p>
-                      </div>
-                      <span
-                        className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${status.className}`}
-                      >
-                        {status.label}
-                      </span>
-                    </div>
+            {productionGames.length === 0 ? (
+              <div className="rounded-2xl bg-zinc-950/70 ring-1 ring-white/10 p-6 text-zinc-300/80">
+                No production games listed yet.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {productionGames.map((game) => (
+                  <ProductionGameCard key={game.slug} game={game} />
+                ))}
+              </div>
+            )}
+          </section>
 
-                    <div className="mt-5 grid grid-cols-1 gap-4">
-                      <div className="rounded-xl bg-black/30 ring-1 ring-white/10 p-4">
-                        <div className="text-xs uppercase tracking-[0.18em] text-zinc-400">
-                          Player experience (what it feels like)
-                        </div>
-                        <p className="mt-3 text-sm text-zinc-200/90 leading-relaxed">
-                          {publicCopy?.playerExperience ??
-                            "You play in teams at tables, lock in answers, and get fast reveals with score updates."}
-                        </p>
-                        <div className="mt-4 grid grid-cols-1 gap-4">
-                          <div className="rounded-xl bg-black/25 ring-1 ring-white/10 p-4">
-                            <div className="text-xs uppercase tracking-[0.18em] text-zinc-400">
-                              What you do
-                            </div>
-                            {publicCopy?.whatYouDo?.length ? (
-                              <ul className="mt-3 space-y-2 text-sm text-zinc-200/90 leading-relaxed list-disc list-inside">
-                                {publicCopy.whatYouDo.map((step) => (
-                                  <li key={step}>{step}</li>
-                                ))}
-                              </ul>
-                            ) : null}
-                          </div>
-                          <div className="rounded-xl bg-black/25 ring-1 ring-white/10 p-4">
-                            <div className="text-xs uppercase tracking-[0.18em] text-zinc-400">
-                              Example round
-                            </div>
-                            {publicCopy?.exampleRound?.length ? (
-                              <ul className="mt-3 space-y-2 text-sm text-zinc-200/90 leading-relaxed list-disc list-inside">
-                                {publicCopy.exampleRound.map((step) => (
-                                  <li key={step}>{step}</li>
-                                ))}
-                              </ul>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
+          <section className="mt-12">
+            <div className="flex items-end justify-between gap-6 flex-wrap mb-6">
+              <h3 className="text-xl md:text-2xl font-bold tracking-tight">Game Nights</h3>
+              <div className="text-sm text-zinc-300/70">
+                Events linked to production game sessions
+              </div>
+            </div>
 
-                      <div className="rounded-xl bg-black/30 ring-1 ring-white/10 p-4">
-                        <div className="text-xs uppercase tracking-[0.18em] text-zinc-400">
-                          Booker notes
-                        </div>
-                        {publicCopy?.howYouWin ? (
-                          <p className="mt-2 text-sm text-zinc-200/90 leading-relaxed">
-                            <span className="font-semibold text-zinc-200">
-                              How you win:
-                            </span>{" "}
-                            {publicCopy.howYouWin}
-                          </p>
-                        ) : null}
-                        <p className="mt-2 text-sm text-zinc-200/90 leading-relaxed">
-                          <span className="font-semibold text-zinc-200">
-                            Scoring:
-                          </span>{" "}
-                          {publicCopy?.scoring ?? game.scoring}
-                        </p>
-                        {publicCopy?.bestFor ? (
-                          <p className="mt-3 text-sm text-zinc-200/90 leading-relaxed">
-                            <span className="font-semibold text-zinc-200">
-                              Best for:
-                            </span>{" "}
-                            {publicCopy.bestFor}
-                          </p>
-                        ) : null}
-                        {publicCopy?.whatYouNeed ? (
-                          <p className="mt-2 text-sm text-zinc-200/90 leading-relaxed">
-                            <span className="font-semibold text-zinc-200">
-                              What we bring/need:
-                            </span>{" "}
-                            {publicCopy.whatYouNeed}
-                          </p>
-                        ) : null}
-                        <p className="mt-3 text-sm text-zinc-200/90 leading-relaxed">
-                          <span className="font-semibold text-zinc-200">
-                            Why it works:
-                          </span>{" "}
-                          {game.whyItWorks}
-                        </p>
-                        {game.notes ? (
-                          <p className="mt-3 text-sm text-zinc-300/75 leading-relaxed">
-                            <span className="font-semibold text-zinc-200">
-                              Note:
-                            </span>{" "}
-                            {game.notes}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+            {gameNights.length === 0 ? (
+              <div className="rounded-2xl bg-zinc-950/70 ring-1 ring-white/10 p-6 text-zinc-300/80">
+                No upcoming game nights yet.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {gameNights.map((event) => (
+                  <Link
+                    key={event.id}
+                    href={`/events/event-detail/${event.id}`}
+                    className="rounded-2xl bg-zinc-950/70 ring-1 ring-white/10 p-5 hover:ring-[#00c4ff]/30 transition-colors"
+                  >
+                    <p className="text-xs uppercase tracking-[0.18em] text-zinc-400">
+                      {isTbaDate(event.date)
+                        ? "Date TBA"
+                        : new Date(`${event.date}T00:00:00`).toLocaleDateString(
+                            "en-US",
+                            {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            }
+                          )}
+                    </p>
+                    <h4 className="mt-2 text-lg font-bold tracking-tight">{event.title}</h4>
+                    {event.location ? (
+                      <p className="mt-1 text-sm text-zinc-300/80">{event.location}</p>
+                    ) : null}
+                    {event.linkedGameTitles.length > 0 ? (
+                      <p className="mt-3 text-sm text-zinc-200/90 leading-relaxed">
+                        <span className="font-semibold text-zinc-100">Games:</span>{" "}
+                        {event.linkedGameTitles.join(" | ")}
+                      </p>
+                    ) : null}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {comingSoonGames.length > 0 ? (
+            <section className="mt-12">
+              <div className="flex items-end justify-between gap-6 flex-wrap mb-6">
+                <h3 className="text-xl md:text-2xl font-bold tracking-tight">Coming Soon</h3>
+                <div className="text-sm text-zinc-300/70">In-development game previews</div>
+              </div>
+              <ComingSoonSelector games={comingSoonGames} />
+            </section>
+          ) : null}
         </Container>
       </main>
     </div>
