@@ -6,6 +6,7 @@ import { generateBingoCardsPdf } from "src/lib/bingoCardsPdf";
 import { generateBingoCallSheetPdf } from "src/lib/bingoCallSheetPdf";
 import type { GameMode } from "src/lib/bingoEngine";
 import { buildWelcomeRulesContent, GAME_MODE_OPTIONS, type RoundModesEntry } from "src/lib/bingoModes";
+import type { RoundPlaylistEntry } from "src/lib/bingoRoundPlaylists";
 import EditEventForm from "src/components/EditEventForm";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
 import InlineFieldHelp from "src/components/InlineFieldHelp";
@@ -26,6 +27,7 @@ type Session = {
   event_id: number | null;
   playlist_id: number;
   playlist_ids: number[] | null;
+  round_playlist_ids?: RoundPlaylistEntry[] | null;
   playlist_names?: string[];
   session_code: string;
   game_mode: string;
@@ -52,17 +54,19 @@ type Session = {
 const GAME_BALL_COUNT = 75;
 
 function computeMinimumPlaylistTracks(roundCount: number, cardCount: number): number {
-  const normalizedRounds = Math.max(1, Math.floor(roundCount || 1));
-  const normalizedCards = Math.max(1, Math.floor(cardCount || 1));
-  const base = GAME_BALL_COUNT * normalizedRounds;
-  const densityBuffer = Math.max(0, Math.ceil((normalizedCards - 40) / 20)) * 5;
-  return base + densityBuffer;
+  void roundCount;
+  void cardCount;
+  return GAME_BALL_COUNT;
 }
 
 function formatEnglishMagnitude(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return "0";
 
   const units: Array<{ threshold: number; label: string }> = [
+    { threshold: 1_000_000_000_000_000_000_000_000_000, label: "octillion" },
+    { threshold: 1_000_000_000_000_000_000_000_000, label: "septillion" },
+    { threshold: 1_000_000_000_000_000_000_000, label: "sextillion" },
+    { threshold: 1_000_000_000_000_000_000, label: "quintillion" },
     { threshold: 1_000_000_000_000_000, label: "quadrillion" },
     { threshold: 1_000_000_000_000, label: "trillion" },
     { threshold: 1_000_000_000, label: "billion" },
@@ -96,6 +100,7 @@ export default function BingoSetupPage() {
 
   const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<number[]>([]);
   const [roundModes, setRoundModes] = useState<RoundModesEntry[]>([]);
+  const [roundPlaylistIds, setRoundPlaylistIds] = useState<RoundPlaylistEntry[]>([]);
   const [cardCount, setCardCount] = useState(40);
   const [roundCount, setRoundCount] = useState(3);
   const [removeResleeveSeconds, setRemoveResleeveSeconds] = useState(20);
@@ -115,29 +120,30 @@ export default function BingoSetupPage() {
 
   const [creating, setCreating] = useState(false);
   const minimumTracksForSetup = useMemo(() => computeMinimumPlaylistTracks(roundCount, cardCount), [roundCount, cardCount]);
-  const selectedPlaylist = useMemo(
-    () => playlists.find((entry) => entry.id === selectedPlaylistIds[0]) ?? null,
-    [playlists, selectedPlaylistIds]
+  const trackCountByPlaylistId = useMemo(
+    () => new Map(playlists.map((playlist) => [playlist.id, playlist.track_count])),
+    [playlists]
   );
   const selectedPlaylistTrackCount = useMemo(
-    () => selectedPlaylistIds.reduce((sum, id) => sum + (playlists.find((entry) => entry.id === id)?.track_count ?? 0), 0),
-    [playlists, selectedPlaylistIds]
+    () => selectedPlaylistIds.reduce((sum, id) => sum + (trackCountByPlaylistId.get(id) ?? 0), 0),
+    [selectedPlaylistIds, trackCountByPlaylistId]
   );
-  const roundsSupportedByPlaylist = selectedPlaylistTrackCount ? Math.floor(selectedPlaylistTrackCount / GAME_BALL_COUNT) : 0;
-  const effectiveRoundCapacity = Math.min(Math.max(1, roundCount), Math.max(1, roundsSupportedByPlaylist));
   const hasSelectedPlaylists = selectedPlaylistIds.length > 0;
+  const getTrackCountForPlaylistIds = useCallback(
+    (playlistIds: number[]) => playlistIds.reduce((sum, id) => sum + (trackCountByPlaylistId.get(id) ?? 0), 0),
+    [trackCountByPlaylistId]
+  );
   const perRoundCardCapacityEstimate = useMemo(() => {
-    const choose = (n: number, k: number) => {
+    const permute = (n: number, k: number) => {
       if (k < 0 || k > n) return 0;
       let result = 1;
       for (let i = 1; i <= k; i += 1) {
-        result = (result * (n - (k - i))) / i;
+        result *= n - (i - 1);
       }
       return result;
     };
-    return choose(15, 5) ** 4 * choose(15, 4);
+    return permute(15, 5) ** 4 * permute(15, 4);
   }, []);
-  const estimatedUniqueCardsAcrossRounds = perRoundCardCapacityEstimate * effectiveRoundCapacity;
   const derivedSecondsToNextCall = useMemo(
     () =>
       removeResleeveSeconds +
@@ -153,10 +159,41 @@ export default function BingoSetupPage() {
     setRoundModes((current) => current.filter((entry) => entry.round <= roundCount));
   }, [roundCount]);
 
+  useEffect(() => {
+    setRoundPlaylistIds((current) => current.filter((entry) => entry.round <= roundCount));
+  }, [roundCount]);
+
   const getModesForRound = useCallback(
      (round: number): GameMode[] => roundModes.find((entry) => entry.round === round)?.modes ?? [],
      [roundModes]
   );
+
+  const getPlaylistIdsForRound = useCallback(
+    (round: number) => roundPlaylistIds.find((entry) => entry.round === round)?.playlist_ids ?? [],
+    [roundPlaylistIds]
+  );
+
+  const setPlaylistsForRound = useCallback((round: number, playlistIds: number[]) => {
+    setRoundPlaylistIds((current) => {
+      const normalizedIds = Array.from(new Set(playlistIds.filter((value) => Number.isFinite(value) && value > 0)));
+      const remaining = current.filter((entry) => entry.round !== round);
+      if (normalizedIds.length === 0) {
+        return remaining.sort((left, right) => left.round - right.round);
+      }
+
+      return [...remaining, { round, playlist_ids: normalizedIds }].sort((left, right) => left.round - right.round);
+    });
+  }, []);
+
+  const missingPlaylistRounds = useMemo(
+    () => hasSelectedPlaylists
+      ? []
+      : Array.from({ length: Math.max(1, roundCount) }, (_, index) => index + 1).filter(
+          (round) => getPlaylistIdsForRound(round).length === 0
+        ),
+    [getPlaylistIdsForRound, hasSelectedPlaylists, roundCount]
+  );
+  const hasUsablePlaylistConfiguration = hasSelectedPlaylists || missingPlaylistRounds.length === 0;
 
   const toggleRoundMode = useCallback(
     (round: number, mode: GameMode) => {
@@ -287,7 +324,7 @@ export default function BingoSetupPage() {
   };
 
   const createSession = async () => {
-    if (!hasSelectedPlaylists) return;
+    if (!hasUsablePlaylistConfiguration) return;
     setCreating(true);
     try {
       const res = await fetch("/api/games/bingo/sessions", {
@@ -297,7 +334,8 @@ export default function BingoSetupPage() {
           event_id: eventId ? Number(eventId) : null,
           playlist_id: selectedPlaylistIds[0],
           playlist_ids: selectedPlaylistIds,
-            game_mode: derivedGameMode,
+          round_playlist_ids: roundPlaylistIds,
+          game_mode: derivedGameMode,
           round_modes: roundModes,
           card_count: cardCount,
           round_count: roundCount,
@@ -408,16 +446,20 @@ export default function BingoSetupPage() {
         <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-amber-100">1. Session Setup</h2>
           <p className="mt-1 text-xs text-stone-400">
-            Minimum playlist size: <span className="font-semibold text-amber-300">{minimumTracksForSetup}</span> tracks for {Math.max(1, roundCount)} round(s) with {Math.max(1, cardCount)} players.
+            Minimum playlist size: <span className="font-semibold text-amber-300">{minimumTracksForSetup}</span> tracks to build one bingo crate for this game.
           </p>
           <p className="mt-1 text-xs text-stone-400">
-            Estimated unique card layouts: <span className="font-semibold text-emerald-300">{formatEnglishMagnitude(estimatedUniqueCardsAcrossRounds)}</span> across configured rounds.
+            Estimated exact card layouts from one 75-track crate: <span className="font-semibold text-emerald-300">{formatEnglishMagnitude(perRoundCardCapacityEstimate)}</span> before an exact duplicate.
           </p>
           {hasSelectedPlaylists ? (
             <p className={`mt-1 text-xs ${selectedPlaylistTrackCount >= minimumTracksForSetup ? "text-emerald-300" : "text-rose-300"}`}>
-              Selected playlists: {selectedPlaylistTrackCount} tracks · supports up to {roundsSupportedByPlaylist} round(s) of 75 unique calls.
+              Selected playlists: {selectedPlaylistTrackCount} tracks {selectedPlaylistTrackCount >= minimumTracksForSetup ? "· enough to build the game crate and reshuffle it each round." : `· need at least ${minimumTracksForSetup} tracks to build the game crate.`}
             </p>
-          ) : null}
+          ) : (
+            <p className={`mt-1 text-xs ${hasUsablePlaylistConfiguration ? "text-amber-300" : "text-rose-300"}`}>
+              No master playlist selected {hasUsablePlaylistConfiguration ? "· each round will use its own override playlists." : `· add round-specific playlists for rounds ${missingPlaylistRounds.join(", ")}.`}
+            </p>
+          )}
 
           {/* Event + Players */}
           <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -448,7 +490,7 @@ export default function BingoSetupPage() {
 
           {/* Playlists */}
           <div className="mt-4">
-            <label className="block text-sm">Playlists (select one or more) <InlineFieldHelp label="Playlist" />
+            <label className="block text-sm">Master Playlists (optional if every round has its own override) <InlineFieldHelp label="Playlist" />
               <select
                 multiple
                 size={5}
@@ -463,6 +505,7 @@ export default function BingoSetupPage() {
               >
                 {playlists.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.track_count})</option>)}
               </select>
+              <p className="mt-2 text-xs text-stone-500">Leave this empty if each round below should use its own themed playlist set.</p>
               <a
                 href="/edit-collection?playlistStudio=1&playlistView=manual&viewMode=playlist&trackSource=playlists&folderMode=playlists"
                 target="_blank"
@@ -485,6 +528,9 @@ export default function BingoSetupPage() {
               {Array.from({ length: Math.max(1, roundCount) }, (_, index) => {
                 const round = index + 1;
                 const activeModes = getModesForRound(round);
+                const roundPlaylistSelection = getPlaylistIdsForRound(round);
+                const usesOverride = roundPlaylistSelection.length > 0;
+                const roundTrackCount = getTrackCountForPlaylistIds(roundPlaylistSelection);
                 return (
                   <div key={round} className="rounded border border-stone-700/70 bg-black/40 p-2">
                     <p className="text-xs font-semibold uppercase tracking-[0.08em] text-stone-300">
@@ -504,6 +550,43 @@ export default function BingoSetupPage() {
                     {activeModes.length === 0 ? (
                       <p className="mt-1 text-[11px] text-stone-500">No mode selected — defaults to Single Line</p>
                     ) : null}
+                    <div className="mt-3 border-t border-stone-800 pt-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-stone-300">
+                        Round {round} Playlist Override {usesOverride ? "(custom)" : "(uses master crate)"}
+                      </p>
+                      <select
+                        multiple
+                        size={4}
+                        className="mt-2 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs"
+                        value={roundPlaylistSelection.map(String)}
+                        onChange={(e) => {
+                          const values = Array.from(e.target.selectedOptions)
+                            .map((option) => Number(option.value))
+                            .filter((value) => Number.isFinite(value));
+                          setPlaylistsForRound(round, values);
+                        }}
+                      >
+                        {playlists.map((playlist) => (
+                          <option key={`${round}-${playlist.id}`} value={playlist.id}>
+                            {playlist.name} ({playlist.track_count})
+                          </option>
+                        ))}
+                      </select>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={() => setPlaylistsForRound(round, [])}
+                          className="rounded border border-stone-700 px-2 py-1 text-stone-300 hover:border-amber-500 hover:text-amber-200"
+                        >
+                          Clear Override
+                        </button>
+                        <span className={usesOverride ? (roundTrackCount >= minimumTracksForSetup ? "text-emerald-300" : "text-rose-300") : "text-stone-500"}>
+                          {usesOverride
+                            ? `${roundTrackCount} tracks selected${roundTrackCount >= minimumTracksForSetup ? " · enough for this round crate." : ` · need at least ${minimumTracksForSetup} tracks.`}`
+                            : "Leave empty to use the master playlist selection."}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 );
               })}
@@ -511,7 +594,7 @@ export default function BingoSetupPage() {
           </div>
 
           <button
-            disabled={!hasSelectedPlaylists || creating}
+            disabled={!hasUsablePlaylistConfiguration || creating}
             onClick={createSession}
             className="mt-6 rounded bg-red-700 px-5 py-2 text-sm font-bold text-white hover:bg-red-600 disabled:opacity-50"
           >

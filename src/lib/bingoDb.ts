@@ -188,6 +188,7 @@ export type BingoDatabase = {
           id: number;
           event_id: number | null;
           playlist_id: number;
+          playlist_ids: number[] | null;
           session_code: string;
           game_mode: string;
           card_count: number;
@@ -221,6 +222,7 @@ export type BingoDatabase = {
           next_game_scheduled_at: string | null;
           next_game_rules_text: string | null;
           round_modes: { round: number; modes: string[] }[] | null;
+          round_playlist_ids: { round: number; playlist_ids: number[] }[] | null;
           call_reveal_delay_seconds: number;
           call_reveal_at: string | null;
           bingo_overlay: string;
@@ -265,6 +267,7 @@ export type BingoDatabase = {
           next_game_scheduled_at?: string | null;
           next_game_rules_text?: string | null;
           round_modes?: { round: number; modes: string[] }[] | null;
+          round_playlist_ids?: { round: number; playlist_ids: number[] }[] | null;
           call_reveal_delay_seconds?: number;
           call_reveal_at?: string | null;
           bingo_overlay?: string;
@@ -308,6 +311,7 @@ export type BingoDatabase = {
           next_game_scheduled_at?: string | null;
           next_game_rules_text?: string | null;
           round_modes?: { round: number; modes: string[] }[] | null;
+          round_playlist_ids?: { round: number; playlist_ids: number[] }[] | null;
           call_reveal_delay_seconds?: number;
           call_reveal_at?: string | null;
           bingo_overlay?: string;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
 import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
+import { resolveRoundPlaylistIds, type RoundPlaylistEntry } from "src/lib/bingoRoundPlaylists";
 
 export const runtime = "nodejs";
 
@@ -8,15 +9,9 @@ type SessionRow = {
   id: number;
   playlist_id: number;
   playlist_ids: number[] | null;
+  round_playlist_ids: RoundPlaylistEntry[] | null;
   round_count: number;
 };
-
-function resolveSessionPlaylistIds(session: SessionRow): number[] {
-  if (Array.isArray(session.playlist_ids) && session.playlist_ids.length > 0) {
-    return session.playlist_ids;
-  }
-  return [session.playlist_id];
-}
 
 type ExistingCallRow = {
   id: number;
@@ -39,7 +34,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const sessionQuery = (db
     .from("bingo_sessions")
-    .select("id, playlist_id, playlist_ids, round_count") as unknown as {
+    .select("id, playlist_id, playlist_ids, round_playlist_ids, round_count") as unknown as {
       eq: (column: string, value: number) => {
         maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
       };
@@ -55,7 +50,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: `round must be between 1 and ${typedSession.round_count}` }, { status: 400 });
   }
 
-  const tracks = await resolvePlaylistTracksForPlaylists(db, resolveSessionPlaylistIds(typedSession));
+  const tracks = await resolvePlaylistTracksForPlaylists(db, resolveRoundPlaylistIds(typedSession, requestedRound));
   const plannedCalls = planRoundSessionCalls(tracks, sessionId, requestedRound);
 
   const { data: existingCalls, error: existingError } = await db

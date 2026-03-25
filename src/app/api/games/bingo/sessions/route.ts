@@ -8,6 +8,12 @@ import {
   type GameMode,
 } from "src/lib/bingoEngine";
 import { normalizeRoundModes } from "src/lib/bingoModes";
+import {
+  collectResolvedPlaylistIdsByRound,
+  findPrimaryPlaylistId,
+  normalizePlaylistIds,
+  normalizeRoundPlaylistIds,
+} from "src/lib/bingoRoundPlaylists";
 import { generateBingoSessionCode } from "src/lib/bingoSessionCode";
 
 export const runtime = "nodejs";
@@ -16,6 +22,7 @@ type CreateSessionBody = {
   event_id?: number | null;
   playlist_id?: number;
   playlist_ids?: number[];
+  round_playlist_ids?: { round: number; playlist_ids: number[] }[];
   game_mode?: GameMode;
   round_modes?: { round: number; modes: GameMode[] }[];
   card_count?: number;
@@ -43,6 +50,7 @@ type SessionListRow = {
   event_id: number | null;
   playlist_id: number;
   playlist_ids: number[] | null;
+  round_playlist_ids: { round: number; playlist_ids: number[] }[] | null;
   session_code: string;
   game_mode: string;
   round_modes: { round: number; modes: GameMode[] }[] | null;
@@ -67,20 +75,6 @@ type SessionListRow = {
 type PlaylistRow = { id: number; name: string };
 type EventRow = { id: number; title: string };
 
-function normalizePlaylistIds(input: unknown, fallbackPlaylistId?: number): number[] {
-  const fromArray = Array.isArray(input)
-    ? input.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0)
-    : [];
-
-  const normalized = fromArray.length > 0
-    ? fromArray
-    : Number.isFinite(fallbackPlaylistId)
-      ? [Number(fallbackPlaylistId)]
-      : [];
-
-  return Array.from(new Set(normalized));
-}
-
 async function generateUniqueSessionCode() {
   const db = getBingoDb();
   for (let i = 0; i < 15; i += 1) {
@@ -97,7 +91,7 @@ export async function GET(request: NextRequest) {
 
   const queryBase = (db
     .from("bingo_sessions")
-    .select("id, event_id, playlist_id, playlist_ids, session_code, game_mode, round_modes, card_count, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, created_at") as unknown as {
+    .select("id, event_id, playlist_id, playlist_ids, round_playlist_ids, session_code, game_mode, round_modes, card_count, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, created_at") as unknown as {
       order: (column: string, options: { ascending: boolean }) => {
         eq: (column: string, value: number) => Promise<{ data: unknown; error: { message: string } | null }>;
         then?: unknown;
@@ -164,15 +158,49 @@ export async function POST(request: NextRequest) {
     const cardCount = Math.max(1, Math.floor(body.card_count ?? 40));
     const roundCount = Math.max(1, Math.floor(body.round_count ?? 3));
     const roundModes = normalizeRoundModes(body.round_modes, roundCount);
+    const roundPlaylistIds = normalizeRoundPlaylistIds(body.round_playlist_ids, roundCount);
+    const resolvedPlaylistsByRound = collectResolvedPlaylistIdsByRound(
+      {
+        playlist_id: selectedPlaylistIds[0] ?? null,
+        playlist_ids: selectedPlaylistIds,
+        round_playlist_ids: roundPlaylistIds,
+      },
+      roundCount
+    );
+
+    for (let round = 1; round <= roundCount; round += 1) {
+      if ((resolvedPlaylistsByRound.get(round) ?? []).length === 0) {
+        return NextResponse.json(
+          { error: `Round ${round} needs at least one playlist or a master playlist selection.` },
+          { status: 400 }
+        );
+      }
+    }
+
     const requiredTrackCount = computeMinimumPlaylistTracks(roundCount, cardCount);
-    const availableTrackCount = await getPlaylistTrackCountForPlaylists(db, selectedPlaylistIds);
-    if (availableTrackCount < requiredTrackCount) {
-      return NextResponse.json(
-        {
-          error: `Playlist must contain at least ${requiredTrackCount} tracks for ${roundCount} round(s) and ${cardCount} cards.`,
-        },
-        { status: 400 }
-      );
+    const trackCountCache = new Map<string, number>();
+    for (let round = 1; round <= roundCount; round += 1) {
+      const playlistIdsForRound = resolvedPlaylistsByRound.get(round) ?? [];
+      const cacheKey = playlistIdsForRound.join(",");
+      let availableTrackCount = trackCountCache.get(cacheKey);
+      if (availableTrackCount === undefined) {
+        availableTrackCount = await getPlaylistTrackCountForPlaylists(db, playlistIdsForRound);
+        trackCountCache.set(cacheKey, availableTrackCount);
+      }
+
+      if (availableTrackCount < requiredTrackCount) {
+        return NextResponse.json(
+          {
+            error: `Round ${round} playlist selection must contain at least ${requiredTrackCount} tracks to build one bingo crate.`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    const primaryPlaylistId = findPrimaryPlaylistId(selectedPlaylistIds, roundPlaylistIds);
+    if (!primaryPlaylistId) {
+      return NextResponse.json({ error: "At least one playlist is required" }, { status: 400 });
     }
 
     const code = await generateUniqueSessionCode();
@@ -197,8 +225,9 @@ export async function POST(request: NextRequest) {
       .insert({
         event_id: body.event_id ?? null,
         // Keep primary playlist_id for backwards compatibility in existing views.
-        playlist_id: selectedPlaylistIds[0],
-        playlist_ids: selectedPlaylistIds,
+        playlist_id: primaryPlaylistId,
+        playlist_ids: selectedPlaylistIds.length > 0 ? selectedPlaylistIds : null,
+        round_playlist_ids: roundPlaylistIds.length > 0 ? roundPlaylistIds : null,
         session_code: code,
         game_mode: gameMode,
         round_modes: roundModes.length > 0 ? roundModes : null,
@@ -235,7 +264,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await generateSessionCalls(db, session.id, selectedPlaylistIds, { roundNumber: 1 });
+      await generateSessionCalls(db, session.id, resolvedPlaylistsByRound.get(1) ?? [], { roundNumber: 1 });
       await generateCards(db, session.id, session.card_count, session.card_label_mode as "track_artist" | "track_only");
     } catch (error) {
       await db.from("bingo_sessions").delete().eq("id", session.id);

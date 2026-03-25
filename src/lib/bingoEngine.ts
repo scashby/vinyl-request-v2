@@ -157,11 +157,9 @@ export function parseTrackKey(trackKey: string): ParsedTrackKey {
 const GAME_BALL_COUNT = 75;
 
 export function computeMinimumPlaylistTracks(roundCount: number, cardCount: number): number {
-  const normalizedRounds = Math.max(1, Math.floor(roundCount || 1));
-  const normalizedCards = Math.max(1, Math.floor(cardCount || 1));
-  const base = GAME_BALL_COUNT * normalizedRounds;
-  const densityBuffer = Math.max(0, Math.ceil((normalizedCards - 40) / 20)) * 5;
-  return base + densityBuffer;
+  void roundCount;
+  void cardCount;
+  return GAME_BALL_COUNT;
 }
 
 type PlannedSessionCall = {
@@ -200,11 +198,10 @@ function stableRoundSort<T>(items: T[], seed: string, keyForItem: (item: T) => s
 }
 
 function getRoundTrackPool(tracks: ResolvedPlaylistTrack[], sessionId: number, roundNumber: number): ResolvedPlaylistTrack[] {
-  const normalizedRound = Math.max(1, Math.floor(roundNumber || 1));
+  void roundNumber;
   const seed = `session:${sessionId}:playlist-order:v1`;
   const ordered = stableRoundSort(tracks, seed, (track) => track.trackKey);
-  const start = (normalizedRound - 1) * GAME_BALL_COUNT;
-  return ordered.slice(start, start + GAME_BALL_COUNT);
+  return ordered.slice(0, GAME_BALL_COUNT);
 }
 
 export function planRoundSessionCalls(
@@ -216,7 +213,7 @@ export function planRoundSessionCalls(
   const roundTracks = getRoundTrackPool(tracks, sessionId, normalizedRound);
 
   if (roundTracks.length < GAME_BALL_COUNT) {
-    throw new Error(`Playlist must contain at least ${normalizedRound * GAME_BALL_COUNT} tracks to support round ${normalizedRound}.`);
+    throw new Error(`Playlist must contain at least ${GAME_BALL_COUNT} tracks to build a bingo crate.`);
   }
 
   const boardSlots = roundTracks.map((track, index) => {
