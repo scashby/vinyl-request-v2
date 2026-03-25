@@ -214,6 +214,11 @@ function buildTag(prefix: string, value?: string) {
   return `${prefix}${value}`;
 }
 
+function normalizeOptionalText(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  return value.trim();
+}
+
 function buildEventDataFromDbEvent(dbEvent: DbEvent): EventData {
   const normalizedTags = normalizeStringArray(dbEvent.allowed_tags);
   return {
@@ -485,7 +490,7 @@ export default function EditEventForm({
     })();
   }, []);
 
-  const fetchSeriesEvents = async (parentId: number) => {
+  const fetchSeriesEvents = async (parentId: number): Promise<DbEvent[]> => {
     const { data: seriesData, error: seriesError } = await supabase
       .from('events')
       .select('*')
@@ -493,11 +498,13 @@ export default function EditEventForm({
       .order('date', { ascending: true });
     if (seriesError) {
       console.error('Error fetching series events:', seriesError);
-      return;
+      return [];
     }
     if (seriesData) {
       setSeriesEvents(seriesData as DbEvent[]);
+      return seriesData as DbEvent[];
     }
+    return [];
   };
 
   // Fetch Event Data
@@ -523,6 +530,12 @@ export default function EditEventForm({
           queue_types: Array.isArray(copiedEvent?.queue_types) ? copiedEvent!.queue_types : [],
           crate_id: copiedEvent?.crate_id || null,
           title: copiedEvent?.title ? `${copiedEvent.title} (Copy)` : '',
+          time: copiedEvent?.time ?? '',
+          location: copiedEvent?.location ?? '',
+          image_url: copiedEvent?.image_url ?? '',
+          venue_logo_url: copiedEvent?.venue_logo_url ?? '',
+          info: copiedEvent?.info ?? '',
+          info_url: copiedEvent?.info_url ?? '',
           is_recurring: false
         }));
       } else if (editEventId) {
@@ -548,6 +561,13 @@ export default function EditEventForm({
             allowed_formats: normalizeStringArray(dbEvent.allowed_formats),
             queue_types: Array.isArray(dbEvent.queue_types) ? dbEvent.queue_types : [],
             crate_id: dbEvent.crate_id || null,
+            title: dbEvent.title ?? '',
+            time: dbEvent.time ?? '',
+            location: dbEvent.location ?? '',
+            image_url: dbEvent.image_url ?? '',
+            venue_logo_url: dbEvent.venue_logo_url ?? '',
+            info: dbEvent.info ?? '',
+            info_url: dbEvent.info_url ?? '',
             
             is_recurring: dbEvent.is_recurring || false,
             recurrence_pattern: dbEvent.recurrence_pattern || 'weekly',
@@ -559,13 +579,23 @@ export default function EditEventForm({
             featured_priority: dbEvent.featured_priority ?? null,
           });
           
-          setIsParentEvent(dbEvent.is_recurring === true);
-          setIsPartOfSeries(!!dbEvent.parent_event_id);
           setSeriesParentId(parentId);
           setSelectedSeriesEventId(dbEvent.id);
 
-          if (dbEvent.is_recurring || dbEvent.parent_event_id) {
-            await fetchSeriesEvents(parentId);
+          const relatedSeriesEvents = await fetchSeriesEvents(parentId);
+          const hasSeriesChildren = relatedSeriesEvents.some(
+            (event) => event.parent_event_id === parentId
+          );
+          const appearsRecurringSeries =
+            !!dbEvent.parent_event_id ||
+            !!dbEvent.is_recurring ||
+            hasSeriesChildren ||
+            relatedSeriesEvents.length > 1;
+
+          setIsPartOfSeries(appearsRecurringSeries);
+          setIsParentEvent(appearsRecurringSeries && !dbEvent.parent_event_id);
+          if (appearsRecurringSeries && dbEvent.parent_event_id && editMode === 'all') {
+            setEditMode('future');
           }
         }
       }
@@ -620,6 +650,13 @@ export default function EditEventForm({
         allowed_formats: normalizeStringArray(dbEvent.allowed_formats),
         queue_types: Array.isArray(dbEvent.queue_types) ? dbEvent.queue_types : [],
         crate_id: dbEvent.crate_id || null,
+        title: dbEvent.title ?? '',
+        time: dbEvent.time ?? '',
+        location: dbEvent.location ?? '',
+        image_url: dbEvent.image_url ?? '',
+        venue_logo_url: dbEvent.venue_logo_url ?? '',
+        info: dbEvent.info ?? '',
+        info_url: dbEvent.info_url ?? '',
         is_recurring: dbEvent.is_recurring || false,
         recurrence_pattern: dbEvent.recurrence_pattern || 'weekly',
         recurrence_interval: dbEvent.recurrence_interval || 1,
@@ -866,7 +903,7 @@ export default function EditEventForm({
 
         setEventData((prev) => ({
           ...prev,
-          image_url: publicUrl.trim(),
+          image_url: normalizeOptionalText(publicUrl),
         }));
       } catch (error) {
         console.error('Error uploading event image:', error);
@@ -894,7 +931,7 @@ export default function EditEventForm({
 
         setEventData((prev) => ({
           ...prev,
-          venue_logo_url: publicUrl.trim(),
+          venue_logo_url: normalizeOptionalText(publicUrl),
         }));
       } catch (error) {
         console.error('Error uploading venue logo:', error);
@@ -934,8 +971,8 @@ export default function EditEventForm({
       const normalizedQueueTypes = eventData.queue_types
         .map((type) => type.trim())
         .filter(Boolean);
-      const normalizedImageUrl = eventData.image_url.trim();
-      const normalizedVenueLogoUrl = eventData.venue_logo_url.trim();
+      const normalizedImageUrl = normalizeOptionalText(eventData.image_url);
+      const normalizedVenueLogoUrl = normalizeOptionalText(eventData.venue_logo_url);
       
       const payload: EventInsert = {
         allowed_tags: allowedTags.length > 0 ? allowedTags : null,
