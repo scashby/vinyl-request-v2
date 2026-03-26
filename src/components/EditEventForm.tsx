@@ -6,9 +6,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
+import AdminImageSelectorModal from 'src/components/admin/AdminImageSelectorModal';
 import { supabase } from 'src/lib/supabaseClient';
-import { uploadEventImage } from 'src/lib/uploadEventImage';
-import { uploadVenueLogo } from 'src/lib/uploadVenueLogo';
 import type { Crate, SmartRules } from 'src/types/crate';
 import type { Database } from 'types/supabase';
 import {
@@ -333,8 +332,8 @@ export default function EditEventForm({
     targetEvents: DbEvent[];
   } | null>(null);
   const [isRegeneratingChildren, setIsRegeneratingChildren] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [uploadingVenueLogo, setUploadingVenueLogo] = useState(false);
+  const [showImageSelector, setShowImageSelector] = useState(false);
+  const [showVenueLogoSelector, setShowVenueLogoSelector] = useState(false);
   const [selectedGameSlug, setSelectedGameSlug] = useState<string>(EVENT_GAME_OPTIONS[0]?.slug ?? 'bingo');
   const [eventTypeConfig, setEventTypeConfig] = useState<EventTypeConfigState>(() =>
     normalizeEventTypeConfig(defaultEventTypeConfig)
@@ -950,62 +949,6 @@ export default function EditEventForm({
         ? { recurrence_interval: defaults.recurrence_interval }
         : {}),
     }));
-  };
-
-  const handleImageUpload = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-
-      try {
-        setUploadingImage(true);
-        const { publicUrl } = await uploadEventImage(file);
-
-        setEventData((prev) => ({
-          ...prev,
-          image_url: normalizeOptionalText(publicUrl),
-        }));
-      } catch (error) {
-        console.error('Error uploading event image:', error);
-        alert(error instanceof Error ? error.message : 'Failed to upload image. Please try again.');
-      } finally {
-        setUploadingImage(false);
-      }
-    };
-
-    input.click();
-  };
-
-  const handleVenueLogoUpload = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-
-      try {
-        setUploadingVenueLogo(true);
-        const { publicUrl } = await uploadVenueLogo(file);
-
-        setEventData((prev) => ({
-          ...prev,
-          venue_logo_url: normalizeOptionalText(publicUrl),
-        }));
-      } catch (error) {
-        console.error('Error uploading venue logo:', error);
-        alert(error instanceof Error ? error.message : 'Failed to upload venue logo. Please try again.');
-      } finally {
-        setUploadingVenueLogo(false);
-      }
-    };
-
-    input.click();
   };
 
   const linkableEventId = selectedSeriesEventId ?? editEventId;
@@ -1666,14 +1609,22 @@ export default function EditEventForm({
                           </div>
                         )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={handleImageUpload}
-                        disabled={uploadingImage}
-                        className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-                      >
-                        {uploadingImage ? 'Uploading…' : 'Upload image'}
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowImageSelector(true)}
+                          className="inline-flex flex-1 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                        >
+                          Choose or upload image
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEventData((prev) => ({ ...prev, image_url: '' }))}
+                          className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                        >
+                          Clear
+                        </button>
+                      </div>
                       <input
                         name="image_url"
                         value={eventData.image_url}
@@ -1706,11 +1657,10 @@ export default function EditEventForm({
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={handleVenueLogoUpload}
-                          disabled={uploadingVenueLogo}
+                          onClick={() => setShowVenueLogoSelector(true)}
                           className="inline-flex flex-1 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
                         >
-                          {uploadingVenueLogo ? 'Uploading…' : 'Upload venue logo'}
+                          Choose or upload logo
                         </button>
                         <button
                           type="button"
@@ -1920,6 +1870,34 @@ export default function EditEventForm({
             className={overrideBackdropClassName}
             onClick={handleCloseOverrideModal}
           />
+
+      <AdminImageSelectorModal
+        isOpen={showImageSelector}
+        imageKind="eventImage"
+        title="Select featured event image"
+        selectedUrl={eventData.image_url}
+        onClose={() => setShowImageSelector(false)}
+        onSelect={(publicUrl) =>
+          setEventData((prev) => ({
+            ...prev,
+            image_url: normalizeOptionalText(publicUrl),
+          }))
+        }
+      />
+
+      <AdminImageSelectorModal
+        isOpen={showVenueLogoSelector}
+        imageKind="venueLogo"
+        title="Select venue logo"
+        selectedUrl={eventData.venue_logo_url}
+        onClose={() => setShowVenueLogoSelector(false)}
+        onSelect={(publicUrl) =>
+          setEventData((prev) => ({
+            ...prev,
+            venue_logo_url: normalizeOptionalText(publicUrl),
+          }))
+        }
+      />
           <div className={overridePanelClassName}>
             <div className="w-full max-w-3xl rounded-2xl bg-white shadow-xl border border-gray-200 max-h-[80vh] overflow-hidden flex flex-col">
               <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-4">

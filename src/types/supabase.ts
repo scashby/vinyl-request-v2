@@ -84,6 +84,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      image_assets: {
+        Row: {
+          id: number;
+          image_kind: string;
+          source_type: string;
+          public_url: string;
+          storage_path: string | null;
+          bucket_name: string | null;
+          label: string | null;
+          archived: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          image_kind: string;
+          source_type: string;
+          public_url: string;
+          storage_path?: string | null;
+          bucket_name?: string | null;
+          label?: string | null;
+          archived?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          image_kind?: string;
+          source_type?: string;
+          public_url?: string;
+          storage_path?: string | null;
+          bucket_name?: string | null;
+          label?: string | null;
+          archived?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       album_suggestions: {
         Row: {
           id: number;

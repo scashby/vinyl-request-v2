@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { supabase } from "lib/supabaseClient";
 import { Container } from "components/ui/Container";
 import { Button } from "components/ui/Button";
-import { uploadEventImage } from "src/lib/uploadEventImage";
+import AdminImageSelectorModal from "src/components/admin/AdminImageSelectorModal";
 import {
   defaultEventTypeConfig,
   type EventSubtypeConfig,
@@ -248,6 +249,8 @@ export default function Page() {
   const [selectedSubtypeId, setSelectedSubtypeId] = useState<string>("");
   const [typePrefillToAdd, setTypePrefillToAdd] = useState("");
   const [subtypePrefillToAdd, setSubtypePrefillToAdd] = useState("");
+  const [imageSelectorOpen, setImageSelectorOpen] = useState(false);
+  const templateImageUpdateRef = useRef<((url: string) => void) | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -599,27 +602,6 @@ export default function Page() {
       }))
     : [];
 
-  const handleTemplateImageUpload = async (onUpdate: (url: string) => void) => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-
-    input.onchange = async (event) => {
-      const file = (event.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-
-      try {
-        const { publicUrl } = await uploadEventImage(file);
-        onUpdate(publicUrl);
-      } catch (error) {
-        console.error("Error uploading template image:", error);
-        alert(error instanceof Error ? error.message : "Failed to upload image. Please try again.");
-      }
-    };
-
-    input.click();
-  };
-
   const renderPrefillField = (
     fieldId: string,
     defaults: EventSubtypeConfig["defaults"],
@@ -695,19 +677,38 @@ export default function Page() {
         )}
         {fieldId === "image_url" && (
           <div className="space-y-2">
+            {defaults?.image_url && (
+              <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+                <Image
+                  src={defaults.image_url}
+                  alt="Template image preview"
+                  fill
+                  unoptimized
+                  className="object-cover"
+                />
+              </div>
+            )}
             <input
               value={defaults?.image_url || ""}
               onChange={(e) => onUpdate({ image_url: e.target.value })}
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
               placeholder="https://..."
             />
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => handleTemplateImageUpload((url) => onUpdate({ image_url: url }))}
-            >
-              Upload image
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  templateImageUpdateRef.current = (url: string) => onUpdate({ image_url: url });
+                  setImageSelectorOpen(true);
+                }}
+              >
+                Choose or upload image
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => onUpdate({ image_url: "" })}>
+                Clear
+              </Button>
+            </div>
           </div>
         )}
         {fieldId === "queue" && (
@@ -1109,6 +1110,20 @@ export default function Page() {
           )}
         </div>
       )}
+      <AdminImageSelectorModal
+        isOpen={imageSelectorOpen}
+        imageKind="eventImage"
+        title="Select event type default image"
+        onClose={() => {
+          setImageSelectorOpen(false);
+          templateImageUpdateRef.current = null;
+        }}
+        onSelect={(publicUrl) => {
+          templateImageUpdateRef.current?.(publicUrl);
+          setImageSelectorOpen(false);
+          templateImageUpdateRef.current = null;
+        }}
+      />
     </Container>
   );
 }

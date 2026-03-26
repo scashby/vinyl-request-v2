@@ -20,7 +20,7 @@ ORDER BY id;
 UPDATE events
 SET
   date = (
-    DATE '2026-03-29' + ((id - 9) * 7)
+    DATE '2026-03-29' + (((id - 9) * 7)::int)
   )::date,
   has_queue = true,
   -- Keep existing queue_types when present, otherwise provide a safe default.
