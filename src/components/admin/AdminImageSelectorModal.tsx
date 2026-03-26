@@ -30,6 +30,7 @@ export default function AdminImageSelectorModal({
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewAsset, setPreviewAsset] = useState<AdminImageAsset | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -56,6 +57,10 @@ export default function AdminImageSelectorModal({
       cancelled = true;
     };
   }, [imageKind, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) setPreviewAsset(null);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -147,7 +152,11 @@ export default function AdminImageSelectorModal({
                     isSelected ? "border-blue-400 ring-2 ring-blue-100" : "border-gray-200"
                   }`}
                 >
-                  <div className="relative aspect-[4/3] bg-gray-100">
+                  <button
+                    type="button"
+                    className="relative block aspect-[4/3] w-full bg-gray-100"
+                    onClick={() => setPreviewAsset(asset)}
+                  >
                     <Image
                       src={asset.publicUrl}
                       alt={asset.label}
@@ -155,7 +164,10 @@ export default function AdminImageSelectorModal({
                       unoptimized
                       className={asset.imageKind === "venueLogo" ? "object-contain p-5" : "object-cover"}
                     />
-                  </div>
+                    <span className="absolute bottom-2 right-2 rounded-full bg-black/70 px-2 py-1 text-[11px] font-semibold text-white">
+                      Preview
+                    </span>
+                  </button>
                   <div className="space-y-3 px-4 py-4">
                     <div className="flex flex-wrap gap-2">
                       <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
@@ -188,6 +200,30 @@ export default function AdminImageSelectorModal({
           </div>
         </div>
       </div>
+
+      {previewAsset && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/75" onClick={() => setPreviewAsset(null)} />
+          <div className="relative z-[131] w-full max-w-6xl overflow-hidden rounded-2xl bg-black">
+            <button
+              type="button"
+              onClick={() => setPreviewAsset(null)}
+              className="absolute right-3 top-3 z-10 rounded-full bg-white/90 px-3 py-1 text-sm font-semibold text-gray-900"
+            >
+              Close
+            </button>
+            <div className="relative h-[80vh] w-full">
+              <Image
+                src={previewAsset.publicUrl}
+                alt={previewAsset.label}
+                fill
+                unoptimized
+                className="object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
