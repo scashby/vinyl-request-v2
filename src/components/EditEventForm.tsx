@@ -1864,13 +1864,6 @@ export default function EditEventForm({
         </button>
       </form>
 
-      {showOverrideModal && (
-        <>
-          <div
-            className={overrideBackdropClassName}
-            onClick={handleCloseOverrideModal}
-          />
-
       <AdminImageSelectorModal
         isOpen={showImageSelector}
         imageKind="eventImage"
@@ -1898,6 +1891,13 @@ export default function EditEventForm({
           }))
         }
       />
+
+      {showOverrideModal && (
+        <>
+          <div
+            className={overrideBackdropClassName}
+            onClick={handleCloseOverrideModal}
+          />
           <div className={overridePanelClassName}>
             <div className="w-full max-w-3xl rounded-2xl bg-white shadow-xl border border-gray-200 max-h-[80vh] overflow-hidden flex flex-col">
               <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-4">
