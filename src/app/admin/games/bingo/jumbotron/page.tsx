@@ -25,6 +25,7 @@ type Session = {
   event?: {
     id: number;
     title: string | null;
+    date: string;
     venue_logo_url: string | null;
   } | null;
 };
@@ -228,18 +229,18 @@ export default function BingoJumbotronPage() {
   // Fetch upcoming events once when the Thanks screen appears.
   useEffect(() => {
     if (session?.bingo_overlay !== "thanks" && previewScreen !== "thanks") return;
-    const today = new Date().toISOString().split("T")[0]!;
+    const baselineDate = session?.event?.date ?? new Date().toISOString().split("T")[0]!;
     fetch("/api/games/bingo/events", { cache: "no-store" })
       .then((res) => res.json())
       .then((data: { data?: UpcomingEvent[] }) => {
         const upcoming = (data.data ?? [])
-          .filter((e) => e.date >= today)
+          .filter((e) => e.date > baselineDate)
           .sort((a, b) => a.date.localeCompare(b.date))
           .slice(0, 4);
         setUpcomingEvents(upcoming);
       })
       .catch(() => undefined);
-  }, [session?.bingo_overlay, previewScreen]);
+  }, [session?.bingo_overlay, session?.event?.date, previewScreen]);
 
   useEffect(() => {
     load();

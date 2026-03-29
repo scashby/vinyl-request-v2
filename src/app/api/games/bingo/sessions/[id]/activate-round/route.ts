@@ -18,58 +18,59 @@ type ExistingCallRow = {
 };
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const sessionId = Number(id);
-  if (!Number.isFinite(sessionId)) {
-    return NextResponse.json({ error: "Invalid session id" }, { status: 400 });
-  }
+  try {
+    const { id } = await params;
+    const sessionId = Number(id);
+    if (!Number.isFinite(sessionId)) {
+      return NextResponse.json({ error: "Invalid session id" }, { status: 400 });
+    }
 
-  const body = (await request.json().catch(() => ({}))) as { round?: unknown; intermission_seconds?: unknown };
-  const requestedRound = Number(body.round);
-  if (!Number.isFinite(requestedRound) || requestedRound < 1) {
-    return NextResponse.json({ error: "round is required" }, { status: 400 });
-  }
+    const body = (await request.json().catch(() => ({}))) as { round?: unknown; intermission_seconds?: unknown };
+    const requestedRound = Number(body.round);
+    if (!Number.isFinite(requestedRound) || requestedRound < 1) {
+      return NextResponse.json({ error: "round is required" }, { status: 400 });
+    }
 
-  const db = getBingoDb();
+    const db = getBingoDb();
 
-  const sessionQuery = (db
-    .from("bingo_sessions")
-    .select("id, playlist_id, playlist_ids, round_playlist_ids, round_count") as unknown as {
-      eq: (column: string, value: number) => {
-        maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
-      };
-    });
+    const sessionQuery = (db
+      .from("bingo_sessions")
+      .select("id, playlist_id, playlist_ids, round_playlist_ids, round_count") as unknown as {
+        eq: (column: string, value: number) => {
+          maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
+        };
+      });
 
-  const { data: session, error: sessionError } = await sessionQuery.eq("id", sessionId).maybeSingle();
+    const { data: session, error: sessionError } = await sessionQuery.eq("id", sessionId).maybeSingle();
 
-  if (sessionError) return NextResponse.json({ error: sessionError.message }, { status: 500 });
-  if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    if (sessionError) return NextResponse.json({ error: sessionError.message }, { status: 500 });
+    if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
-  const typedSession = session as SessionRow;
-  if (requestedRound > typedSession.round_count) {
-    return NextResponse.json({ error: `round must be between 1 and ${typedSession.round_count}` }, { status: 400 });
-  }
+    const typedSession = session as SessionRow;
+    if (requestedRound > typedSession.round_count) {
+      return NextResponse.json({ error: `round must be between 1 and ${typedSession.round_count}` }, { status: 400 });
+    }
 
-  const tracks = await resolvePlaylistTracksForPlaylists(db, resolveRoundPlaylistIds(typedSession, requestedRound));
-  const plannedCalls = planRoundSessionCalls(tracks, sessionId, requestedRound);
+    const tracks = await resolvePlaylistTracksForPlaylists(db, resolveRoundPlaylistIds(typedSession, requestedRound));
+    const plannedCalls = planRoundSessionCalls(tracks, sessionId, requestedRound);
 
-  const { data: existingCalls, error: existingError } = await db
-    .from("bingo_session_calls")
-    .select("id")
-    .eq("session_id", sessionId)
-    .order("id", { ascending: true });
+    const { data: existingCalls, error: existingError } = await db
+      .from("bingo_session_calls")
+      .select("id")
+      .eq("session_id", sessionId)
+      .order("id", { ascending: true });
 
-  if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 });
+    if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 });
 
-  const typedExisting = (existingCalls ?? []) as ExistingCallRow[];
-  if (typedExisting.length !== plannedCalls.length) {
-    return NextResponse.json({ error: "Session call rows are not initialized for round activation" }, { status: 400 });
-  }
+    const typedExisting = (existingCalls ?? []) as ExistingCallRow[];
+    if (typedExisting.length !== plannedCalls.length) {
+      return NextResponse.json({ error: "Session call rows are not initialized for round activation" }, { status: 400 });
+    }
 
-  // First pass: move rows to a temporary safe state to avoid unique collisions
-  // on call_index/ball_number while we remap the round ordering.
-  const prepErrors = await Promise.all(
-    typedExisting.map(async (existing, index) => {
+    // First pass: move rows to a temporary safe state to avoid unique collisions
+    // on call_index/ball_number while we remap the round ordering.
+    for (let index = 0; index < typedExisting.length; index += 1) {
+      const existing = typedExisting[index];
       const { error } = await db
         .from("bingo_session_calls")
         .update({
@@ -81,26 +82,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         })
         .eq("id", existing.id);
 
-      return error?.message ?? null;
-    })
-  );
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    }
 
-  const firstPrepError = prepErrors.find((message) => !!message);
-  if (firstPrepError) {
-    return NextResponse.json({ error: firstPrepError }, { status: 500 });
-  }
+    const now = new Date();
+    const intermissionSecondsRaw = Number(body.intermission_seconds);
+    const intermissionSeconds = Number.isFinite(intermissionSecondsRaw) ? Math.max(0, intermissionSecondsRaw) : 0;
+    const nextGameAt = intermissionSeconds > 0
+      ? new Date(now.getTime() + intermissionSeconds * 1000).toISOString()
+      : null;
 
-  const now = new Date();
-  const intermissionSecondsRaw = Number(body.intermission_seconds);
-  const intermissionSeconds = Number.isFinite(intermissionSecondsRaw) ? Math.max(0, intermissionSecondsRaw) : 0;
-  const nextGameAt = intermissionSeconds > 0
-    ? new Date(now.getTime() + intermissionSeconds * 1000).toISOString()
-    : null;
-
-  const updateErrors = await Promise.all(
-    plannedCalls.map(async (planned, index) => {
+    for (let index = 0; index < plannedCalls.length; index += 1) {
+      const planned = plannedCalls[index];
       const callId = typedExisting[index]?.id;
-      if (!callId) return "Call row mismatch while activating round";
+      if (!callId) {
+        return NextResponse.json({ error: "Call row mismatch while activating round" }, { status: 500 });
+      }
+
       const { error } = await db
         .from("bingo_session_calls")
         .update({
@@ -119,39 +119,39 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         })
         .eq("id", callId);
 
-      return error?.message ?? null;
-    })
-  );
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    }
 
-  const firstUpdateError = updateErrors.find((message) => !!message);
-  if (firstUpdateError) {
-    return NextResponse.json({ error: firstUpdateError }, { status: 500 });
+    // Reset queue/cue history so transport lane starts clean for the new round.
+    const { error: clearEventsError } = await db
+      .from("bingo_session_events")
+      .delete()
+      .eq("session_id", sessionId);
+
+    if (clearEventsError) return NextResponse.json({ error: clearEventsError.message }, { status: 500 });
+
+    const { error: updateSessionError } = await db
+      .from("bingo_sessions")
+      .update({
+        current_round: requestedRound,
+        current_call_index: 0,
+        status: "paused",
+        paused_at: now.toISOString(),
+        paused_remaining_seconds: null,
+        countdown_started_at: now.toISOString(),
+        call_reveal_at: null,
+        bingo_overlay: "none",
+        next_game_scheduled_at: nextGameAt,
+      })
+      .eq("id", sessionId);
+
+    if (updateSessionError) return NextResponse.json({ error: updateSessionError.message }, { status: 500 });
+
+    return NextResponse.json({ ok: true }, { status: 200 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to activate round";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  // Reset queue/cue history so transport lane starts clean for the new round.
-  const { error: clearEventsError } = await db
-    .from("bingo_session_events")
-    .delete()
-    .eq("session_id", sessionId);
-
-  if (clearEventsError) return NextResponse.json({ error: clearEventsError.message }, { status: 500 });
-
-  const { error: updateSessionError } = await db
-    .from("bingo_sessions")
-    .update({
-      current_round: requestedRound,
-      current_call_index: 0,
-      status: "paused",
-      paused_at: now.toISOString(),
-      paused_remaining_seconds: null,
-      countdown_started_at: now.toISOString(),
-      call_reveal_at: null,
-      bingo_overlay: "none",
-      next_game_scheduled_at: nextGameAt,
-    })
-    .eq("id", sessionId);
-
-  if (updateSessionError) return NextResponse.json({ error: updateSessionError.message }, { status: 500 });
-
-  return NextResponse.json({ ok: true }, { status: 200 });
 }

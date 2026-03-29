@@ -76,6 +76,7 @@ type SessionCallRow = {
 type EventRow = {
   id: number;
   title: string | null;
+  date: string;
   venue_logo_url: string | null;
 };
 
@@ -127,7 +128,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     session.event_id
       ? db
           .from("events")
-          .select("id, title, venue_logo_url")
+          .select("id, title, date, venue_logo_url")
           .eq("id", session.event_id)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),

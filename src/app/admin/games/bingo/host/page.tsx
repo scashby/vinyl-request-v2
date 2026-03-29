@@ -288,6 +288,7 @@ export default function BingoHostPage() {
     });
     if (!response.ok) {
       const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      console.error("Failed to activate next round", { sessionId, nextRoundValue, status: response.status, payload });
       alert(payload?.error ?? "Failed to activate next round");
       return;
     }
