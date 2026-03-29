@@ -132,6 +132,7 @@ export default function BingoSetupPage() {
   const [uploadingVenueLogo, setUploadingVenueLogo] = useState(false);
 
   const [creating, setCreating] = useState(false);
+  const [downloadingRoundsSessionId, setDownloadingRoundsSessionId] = useState<number | null>(null);
   const minimumTracksForSetup = useMemo(() => computeMinimumPlaylistTracks(roundCount, cardCount), [roundCount, cardCount]);
   const trackCountByPlaylistId = useMemo(
     () => new Map(playlists.map((playlist) => [playlist.id, playlist.track_count])),
@@ -467,19 +468,46 @@ export default function BingoSetupPage() {
     doc.save(`bingo-${sessionId}-cards-${layout}.pdf`);
   };
 
-  const downloadCallSheet = async (sessionId: number, round?: number) => {
+  const downloadCallSheet = async (
+    sessionId: number,
+    round?: number,
+    options?: { suppressErrorAlert?: boolean }
+  ): Promise<boolean> => {
     const roundSuffix = round ? `?round=${round}` : "";
     const res = await fetch(`/api/games/bingo/sessions/${sessionId}/calls${roundSuffix}`);
     if (!res.ok) {
       const payload = await res.json().catch(() => ({}));
-      alert((payload as { error?: string }).error ?? "Failed to download call sheet");
-      return;
+      if (!options?.suppressErrorAlert) {
+        alert((payload as { error?: string }).error ?? "Failed to download call sheet");
+      }
+      return false;
     }
     const payload = await res.json();
     const title = round ? `Music Bingo Session ${sessionId} Round ${round}` : `Music Bingo Session ${sessionId}`;
     const doc = generateBingoCallSheetPdf(payload.data ?? [], title);
     const filename = round ? `bingo-${sessionId}-round-${round}-call-sheet.pdf` : `bingo-${sessionId}-call-sheet.pdf`;
     doc.save(filename);
+    return true;
+  };
+
+  const downloadAllRoundSheets = async (session: Session) => {
+    if (downloadingRoundsSessionId !== null) return;
+    setDownloadingRoundsSessionId(session.id);
+
+    try {
+      for (let round = 1; round <= Math.max(1, session.round_count); round += 1) {
+        const ok = await downloadCallSheet(session.id, round, { suppressErrorAlert: true });
+        if (!ok) {
+          alert(`Failed to download round ${round} sheet. Stopped bulk download.`);
+          return;
+        }
+        await new Promise<void>((resolve) => {
+          window.setTimeout(() => resolve(), 120);
+        });
+      }
+    } finally {
+      setDownloadingRoundsSessionId(null);
+    }
   };
 
   return (
@@ -872,6 +900,13 @@ export default function BingoSetupPage() {
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "2-up")}>Cards 2-up</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "4-up")}>Cards 4-up</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCallSheet(session.id)}>Call Sheet (Live)</button>
+                    <button
+                      className="rounded border border-sky-700/70 px-2 py-1 text-sky-200 disabled:cursor-not-allowed disabled:opacity-60"
+                      onClick={() => void downloadAllRoundSheets(session)}
+                      disabled={downloadingRoundsSessionId !== null}
+                    >
+                      {downloadingRoundsSessionId === session.id ? "Downloading Round Sheets..." : "All Round Sheets"}
+                    </button>
                     <button className="rounded border border-amber-700/70 bg-amber-950/30 px-2 py-1 text-amber-200" onClick={() => resetSession(session.id, session.session_code)}>Reset Game</button>
                     {Array.from({ length: session.round_count }, (_, index) => index + 1).map((round) => (
                       <button

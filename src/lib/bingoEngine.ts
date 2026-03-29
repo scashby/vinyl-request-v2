@@ -75,6 +75,7 @@ export type BingoCardCell = {
 };
 
 type DbPlaylistItem = {
+  id: number;
   playlist_id: number;
   track_key: string;
   sort_order: number;
@@ -145,11 +146,15 @@ export function parseTrackKey(trackKey: string): ParsedTrackKey {
 
   const releaseTrackPart = parts[1] ?? "";
   const releaseTrackId = /^\d+$/.test(releaseTrackPart) ? Number.parseInt(releaseTrackPart, 10) : null;
-  const fallbackPosition = releaseTrackPart.startsWith("p:") ? releaseTrackPart.slice(2) : null;
+  const fallbackPosition = releaseTrackPart.startsWith("p:")
+    ? releaseTrackPart.slice(2)
+    : releaseTrackId === null && releaseTrackPart.trim().length > 0
+      ? releaseTrackPart.trim()
+      : null;
 
   const recordingPart = parts[2] ?? "";
   const recordingIdRaw = /^\d+$/.test(recordingPart) ? Number.parseInt(recordingPart, 10) : null;
-  const recordingId = releaseTrackId === null && fallbackPosition ? null : recordingIdRaw;
+  const recordingId = recordingIdRaw;
 
   return { inventoryId, releaseTrackId, recordingId, fallbackPosition };
 }
@@ -536,7 +541,7 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
 
   const { data: playlistItems, error: itemError } = await db
     .from("collection_playlist_items")
-    .select("playlist_id, track_key, sort_order")
+    .select("id, playlist_id, track_key, sort_order")
     .eq("playlist_id", playlistId)
     .order("sort_order", { ascending: true });
 
@@ -638,8 +643,17 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
     : { data: [] as DbArtist[] };
   const artistById = new Map<number, DbArtist>(((artists ?? []) as DbArtist[]).map((row) => [row.id, row]));
 
-  return parsedRows.map(({ item, parsed }, index) => {
+  const resolved: ResolvedPlaylistTrack[] = [];
+  const staleItemIds: number[] = [];
+
+  for (const { item, parsed } of parsedRows) {
     const inventory = parsed.inventoryId ? inventoryById.get(parsed.inventoryId) : undefined;
+    if (!inventory?.release_id) {
+      // Skip stale playlist rows that no longer map to a real inventory item/release.
+      staleItemIds.push(item.id);
+      continue;
+    }
+
     const release = inventory?.release_id ? releaseById.get(inventory.release_id) : undefined;
     const master = release?.master_id ? masterById.get(release.master_id) : undefined;
     const releaseTrack =
@@ -657,8 +671,14 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
     const recordingId = releaseTrack?.recording_id ?? parsed.recordingId ?? null;
     const recording = recordingId ? recordingById.get(recordingId) : undefined;
 
+    if (!releaseTrack && !recording) {
+      // Keep games faithful to the playlist by dropping unresolvable ghost rows.
+      staleItemIds.push(item.id);
+      continue;
+    }
+
     const position = releaseTrack?.position ?? parsed.fallbackPosition ?? null;
-    const fallbackTitle = position ? `Track ${position}` : `Track ${index + 1}`;
+    const fallbackTitle = position ? `Track ${position}` : `Track ${item.sort_order + 1}`;
     const trackTitle = releaseTrack?.title_override ?? recording?.title ?? fallbackTitle;
     const artistName = resolveTrackArtist({
       trackArtist: recording?.track_artist,
@@ -666,7 +686,7 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
       albumArtist: master?.main_artist_id ? artistById.get(master.main_artist_id)?.name : undefined,
     });
 
-    return {
+    resolved.push({
       trackKey: item.track_key,
       sortOrder: item.sort_order,
       trackTitle,
@@ -674,8 +694,18 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
       albumName: master?.title ?? null,
       side: releaseTrack?.side ?? null,
       position: releaseTrack?.position ?? parsed.fallbackPosition,
-    };
-  });
+    });
+  }
+
+  if (staleItemIds.length > 0) {
+    try {
+      await db.from("collection_playlist_items").delete().in("id", staleItemIds);
+    } catch {
+      // Non-fatal: unresolved rows are still excluded from gameplay even if pruning fails.
+    }
+  }
+
+  return resolved;
 }
 
 export async function resolvePlaylistTracksForPlaylists(
@@ -809,6 +839,8 @@ export async function resolveTrackKeys(db: BingoDbClient, trackKeys: string[]): 
   const result = new Map<string, ResolvedTrackKey>();
   parsedRows.forEach(({ track_key, parsed }, index) => {
     const inventory = parsed.inventoryId ? inventoryById.get(parsed.inventoryId) : undefined;
+    if (!inventory?.release_id) return;
+
     const release = inventory?.release_id ? releaseById.get(inventory.release_id) : undefined;
     const master = release?.master_id ? masterById.get(release.master_id) : undefined;
     const releaseTrack =
@@ -825,6 +857,8 @@ export async function resolveTrackKeys(db: BingoDbClient, trackKeys: string[]): 
 
     const recordingId = releaseTrack?.recording_id ?? parsed.recordingId ?? null;
     const recording = recordingId ? recordingById.get(recordingId) : undefined;
+
+    if (!releaseTrack && !recording) return;
 
     const position = releaseTrack?.position ?? parsed.fallbackPosition ?? null;
     const fallbackTitle = position ? `Track ${position}` : `Track ${index + 1}`;
@@ -848,15 +882,7 @@ export async function resolveTrackKeys(db: BingoDbClient, trackKeys: string[]): 
 }
 
 export async function getPlaylistTrackCount(db: BingoDbClient, playlistId: number): Promise<number> {
-  const playlist = await getPlaylistConfig(db, playlistId);
-  if (!playlist.is_smart) {
-    const { count } = await db
-      .from("collection_playlist_items")
-      .select("id", { count: "exact", head: true })
-      .eq("playlist_id", playlistId);
-    return count ?? 0;
-  }
-
+  // Count only tracks that can actually resolve to collection metadata.
   const tracks = await resolvePlaylistTracks(db, playlistId);
   return tracks.length;
 }
