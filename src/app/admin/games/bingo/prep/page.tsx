@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { computeAutomaticCardOverage, type PrintableCard } from "src/lib/bingoCardPrintPack";
 import { generateBingoCardsPdf } from "src/lib/bingoCardsPdf";
 import { generateBingoCallSheetPdf } from "src/lib/bingoCallSheetPdf";
 import { formatBallLabel, getBingoColumnTextClass } from "src/lib/bingoBall";
@@ -11,6 +12,7 @@ type Session = {
   id: number;
   session_code: string;
   playlist_name: string;
+  card_count: number;
   current_round: number;
   round_count: number;
   card_layout: "2-up" | "4-up";
@@ -80,26 +82,26 @@ export default function BingoPrepPage() {
   };
 
   const downloadCards = async (layout: "2-up" | "4-up") => {
-    const res = await fetch(`/api/games/bingo/cards?sessionId=${sessionId}`);
-    if (!res.ok) return;
-    const payload = await res.json();
+    const roundCopies = Math.max(1, session?.round_count ?? 1);
+    const desiredCount = Math.max(1, session?.card_count ?? 1) * roundCopies + computeAutomaticCardOverage(Math.max(1, session?.card_count ?? 1), roundCopies);
+    const cardsRes = await fetch(`/api/games/bingo/cards?sessionId=${sessionId}&fresh=true&count=${desiredCount}`);
+    if (!cardsRes.ok) return;
+    const payload = await cardsRes.json();
     const apiRows = (payload.data ?? []) as ApiCardRow[];
-    const cards = apiRows.map((row) => {
-      const gridSource = Array.isArray(row.grid) ? row.grid : [];
-      const grid = gridSource
-        .filter((cell) => typeof cell === "object" && cell !== null)
-        .map((cell) => {
-          const typed = cell as Record<string, unknown>;
-          return {
-            row: Number(typed.row ?? 0),
-            col: Number(typed.col ?? 0),
-            label: String(typed.label ?? ""),
-          };
-        });
-      return { card_number: row.card_number, grid };
-    });
+    const baseCards = apiRows.map((row) => ({
+      card_number: row.card_number,
+      grid: Array.isArray(row.grid)
+        ? (row.grid as Array<Record<string, unknown>>)
+            .filter((cell) => typeof cell === "object" && cell !== null)
+            .map((cell) => ({
+              row: Number(cell.row ?? 0),
+              col: Number(cell.col ?? 0),
+              label: String(cell.label ?? ""),
+            }))
+        : [],
+    })) as PrintableCard[];
 
-    const doc = generateBingoCardsPdf(cards, layout, `Music Bingo · ${session?.session_code ?? sessionId}`);
+    const doc = generateBingoCardsPdf(baseCards, layout, `Music Bingo · ${session?.session_code ?? sessionId}`);
     doc.save(`bingo-${sessionId}-cards-${layout}.pdf`);
   };
 
@@ -174,8 +176,8 @@ export default function BingoPrepPage() {
               <h2 className="text-sm font-bold uppercase tracking-wide text-amber-200">Downloads</h2>
               <div className="mt-3 flex flex-wrap gap-2 text-xs">
                 <button onClick={downloadCratePullSheet} className="rounded bg-amber-700 px-3 py-2">Crate Pull PDF</button>
-                <button onClick={() => downloadCards("2-up")} className="rounded bg-stone-800 px-3 py-2">Cards PDF (2-up)</button>
-                <button onClick={() => downloadCards("4-up")} className="rounded bg-stone-800 px-3 py-2">Cards PDF (4-up)</button>
+                <button onClick={() => downloadCards("2-up")} className="rounded bg-stone-800 px-3 py-2">Cards Pack PDF (2-up)</button>
+                <button onClick={() => downloadCards("4-up")} className="rounded bg-stone-800 px-3 py-2">Cards Pack PDF (4-up)</button>
               </div>
               <p className="mt-3 text-xs text-stone-400">
                 Prep goal: pull and stack records by <span className="font-semibold text-stone-200">Draw</span> order (1 → 75). The <span className="font-semibold text-stone-200">Ball</span> label is what you announce/show during gameplay.

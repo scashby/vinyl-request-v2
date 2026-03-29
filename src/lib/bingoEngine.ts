@@ -926,6 +926,18 @@ export async function generateCards(
   cardCount: number,
   labelMode: "track_artist" | "track_only"
 ): Promise<void> {
+  const cards = await generateCardRows(db, sessionId, cardCount, labelMode);
+
+  const { error: insertError } = await db.from("bingo_cards").insert(cards);
+  if (insertError) throw new Error(insertError.message);
+}
+
+export async function generateCardRows(
+  db: BingoDbClient,
+  sessionId: number,
+  cardCount: number,
+  labelMode: "track_artist" | "track_only"
+): Promise<Array<{ session_id: number; card_number: number; has_free_space: boolean; grid: BingoCardCell[] }>> {
   const { data, error } = await db
     .from("bingo_session_calls")
     .select("id, call_index, ball_number, column_letter, track_title, artist_name")
@@ -1031,8 +1043,7 @@ export async function generateCards(
     });
   }
 
-  const { error: insertError } = await db.from("bingo_cards").insert(cards);
-  if (insertError) throw new Error(insertError.message);
+  return cards;
 }
 
 export function computeRemainingSeconds(

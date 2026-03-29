@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
+import { generateCardRows } from "src/lib/bingoEngine";
 import { autoSyncSessionPlaylistMetadata } from "src/lib/playlistMetadataSync";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   const sessionId = Number(request.nextUrl.searchParams.get("sessionId"));
+  const fresh = request.nextUrl.searchParams.get("fresh") === "true";
+  const requestedCount = Number(request.nextUrl.searchParams.get("count"));
   if (!Number.isFinite(sessionId)) {
     return NextResponse.json({ error: "sessionId is required" }, { status: 400 });
   }
@@ -18,11 +21,25 @@ export async function GET(request: NextRequest) {
   }
   const { data: session } = await db
     .from("bingo_sessions")
-    .select("id, card_label_mode")
+    .select("id, card_label_mode, card_count")
     .eq("id", sessionId)
     .maybeSingle();
 
   const labelMode = (session?.card_label_mode ?? "track_artist") as "track_artist" | "track_only";
+
+  if (fresh) {
+    const cardCount = Number.isFinite(requestedCount) && requestedCount > 0
+      ? Math.floor(requestedCount)
+      : Math.max(1, Math.floor(Number(session?.card_count ?? 1)));
+
+    try {
+      const generated = await generateCardRows(db, sessionId, cardCount, labelMode);
+      return NextResponse.json({ data: generated }, { status: 200 });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to generate fresh cards";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+  }
 
   const { data: calls } = await db
     .from("bingo_session_calls")
