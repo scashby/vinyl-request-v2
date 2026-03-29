@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import { BINGO_COLUMNS } from "src/lib/bingoBall";
+import { BINGO_COLUMNS, BINGO_COLUMN_RGB, type BingoColumn } from "src/lib/bingoBall";
 
 type Card = {
   card_number: number;
@@ -154,7 +154,7 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
     return { lines, fontSize: minFont, _meta: { titleLines, artistLines, titleLineH, artistLineH, sepLineH, sepGap } };
   }
 
-  function renderCellText(label: string, cellX: number, cellY: number, cellW: number, cellH: number) {
+  function renderCellText(label: string, columnLetter: BingoColumn, cellX: number, cellY: number, cellW: number, cellH: number) {
     const baseLabel = normalizePdfText(label);
     if (!baseLabel) return;
 
@@ -196,8 +196,10 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
     const centerX = innerX + innerW / 2;
     const centerY = innerY + innerH / 2;
     const startY = centerY - totalH / 2;
+    const titleColor = BINGO_COLUMN_RGB[columnLetter];
 
     // Title (top block)
+    doc.setTextColor(...titleColor);
     titleLines.forEach((line, index) => {
       doc.text(line, centerX, startY + titleLineH * index, { align: "center", baseline: "top" });
     });
@@ -210,14 +212,19 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
       const lineY = cursorY + sepLineH / 2;
       const lineX1 = innerX + innerW * 0.15;
       const lineX2 = innerX + innerW * 0.85;
+      doc.setDrawColor(...titleColor);
       doc.setLineWidth(Math.min(1.0, Math.max(0.5, sepLineH)));
       doc.line(lineX1, lineY, lineX2, lineY);
       cursorY += sepLineH + sepGap;
 
+      doc.setTextColor(0, 0, 0);
       artistLines.forEach((line, index) => {
         doc.text(line, centerX, cursorY + artistLineH * index, { align: "center", baseline: "top" });
       });
     }
+
+    doc.setTextColor(0, 0, 0);
+    doc.setDrawColor(0, 0, 0);
   }
 
   cards.forEach((card, index) => {
@@ -242,8 +249,10 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
     const columnHeaderY = baseY + headerH + headerGap + columnHeaderH / 2;
     for (let c = 0; c < 5; c += 1) {
       const letter = BINGO_COLUMNS[c];
+      doc.setTextColor(...BINGO_COLUMN_RGB[letter]);
       doc.text(letter, gridX + c * cellW + cellW / 2, columnHeaderY, { align: "center", baseline: "middle" });
     }
+    doc.setTextColor(0, 0, 0);
 
     for (let r = 0; r < 5; r += 1) {
       for (let c = 0; c < 5; c += 1) {
@@ -253,7 +262,7 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
 
         const match = card.grid.find((cell) => cell.row === r && cell.col === c);
         const label = match?.label ?? "";
-        renderCellText(label, x, y, cellW, cellH);
+        renderCellText(label, BINGO_COLUMNS[c], x, y, cellW, cellH);
       }
     }
   });

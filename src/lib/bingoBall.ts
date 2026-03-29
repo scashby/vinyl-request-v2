@@ -1,6 +1,14 @@
 export const BINGO_COLUMNS = ["B", "I", "N", "G", "O"] as const;
 export type BingoColumn = (typeof BINGO_COLUMNS)[number];
 
+export const BINGO_COLUMN_RGB: Record<BingoColumn, [number, number, number]> = {
+  B: [125, 211, 252],
+  I: [240, 171, 252],
+  N: [110, 231, 183],
+  G: [252, 211, 77],
+  O: [253, 164, 175],
+};
+
 const BINGO_COLUMN_TEXT_CLASSES: Record<BingoColumn, string> = {
   B: "text-sky-300",
   I: "text-fuchsia-300",
