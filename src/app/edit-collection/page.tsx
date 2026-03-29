@@ -3404,6 +3404,26 @@ function CollectionBrowserPage() {
     }
   }, [loadPlaylists, playlists, selectedTrackKeys]);
 
+  const handleRemoveFromPlaylist = useCallback(async () => {
+    if (selectedTrackKeys.size === 0 || !selectedPlaylistId) return;
+
+    try {
+      const trackKeys = Array.from(selectedTrackKeys);
+      const { error } = await supabase
+        .from('collection_playlist_items')
+        .delete()
+        .eq('playlist_id', selectedPlaylistId)
+        .in('track_key', trackKeys);
+      if (error) throw error;
+
+      await loadPlaylists();
+      setSelectedTrackKeys(new Set());
+    } catch (err) {
+      console.error('Failed to remove tracks from playlist:', err);
+      alert('Failed to remove tracks from playlist. Please try again.');
+    }
+  }, [loadPlaylists, selectedPlaylistId, selectedTrackKeys]);
+
   const resolvedAlbumTrackColumns = useMemo<TrackViewColumnId[]>(() => {
     const deduped = albumTrackVisibleColumns
       .filter((id, index, arr) => arr.indexOf(id) === index)
@@ -3898,6 +3918,9 @@ function CollectionBrowserPage() {
             <button onClick={() => setSelectedTrackKeys(new Set())} title="Clear selection" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">✕ Cancel</button>
             <button onClick={() => setSelectedTrackKeys(new Set(filteredTrackRows.map((row) => row.key)))} title="Select all tracks" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">☑ All</button>
             <button onClick={() => setShowAddToPlaylistModal(true)} title="Add selected tracks to playlist(s)" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">🎵 Add to Playlist</button>
+            {viewMode === 'playlist' && selectedPlaylistId && (
+              <button onClick={handleRemoveFromPlaylist} title="Remove selected tracks from this playlist" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">🗑 Remove from Playlist</button>
+            )}
             <button
               onClick={() => openCratePicker(selectedTrackInventoryIds, { itemLabel: 'Media Item', actionLabel: 'Pull to Crate' })}
               title="Pull the source media for the selected tracks into crate(s)"
