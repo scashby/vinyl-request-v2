@@ -40,7 +40,7 @@ export default function BingoHostPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
   const [remaining, setRemaining] = useState(0);
-  const [revealDelayInput, setRevealDelayInput] = useState<number>(5);
+  const [revealDelayInput, setRevealDelayInput] = useState<number>(10);
   const [intermissionLengthSeconds, setIntermissionLengthSeconds] = useState<number>(180);
   const [secondsToNextCallInput, setSecondsToNextCallInput] = useState<number>(0);
   const [autoCallEnabled, setAutoCallEnabled] = useState(false);
@@ -48,6 +48,7 @@ export default function BingoHostPage() {
   const [savingOverlay, setSavingOverlay] = useState(false);
   const currentCallRowRef = useRef<HTMLTableRowElement>(null);
   const autoCallLockRef = useRef(false);
+  const revealDelayEditingRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -59,7 +60,9 @@ export default function BingoHostPage() {
     if (sRes.ok) {
       const payload = await sRes.json();
       setSession(payload);
-      setRevealDelayInput(payload.call_reveal_delay_seconds ?? 5);
+      if (!revealDelayEditingRef.current) {
+        setRevealDelayInput(payload.call_reveal_delay_seconds ?? 10);
+      }
       setSecondsToNextCallInput(payload.seconds_to_next_call ?? 0);
       setRemaining(payload.seconds_to_next_call ?? 0);
         setIntermissionLengthSeconds(payload.default_intermission_seconds ?? 180);
@@ -222,7 +225,7 @@ export default function BingoHostPage() {
     await fetch(`/api/games/bingo/sessions/${sessionId}/resume`, { method: "POST" });
     setAutoCallEnabled(false);
     autoCallLockRef.current = false;
-    setRevealDelayInput(5);
+    setRevealDelayInput(10);
     setSecondsToNextCallInput(0);
     setRemaining(0);
     setResetCounter((v) => v + 1);
@@ -241,7 +244,7 @@ export default function BingoHostPage() {
       alert(payload?.error ?? "Failed to reset game");
       return;
     }
-    setRevealDelayInput(5);
+    setRevealDelayInput(10);
     setSecondsToNextCallInput(0);
     setRemaining(0);
     setResetCounter((v) => v + 1);
@@ -263,6 +266,7 @@ export default function BingoHostPage() {
   const saveRevealDelay = async () => {
     const updatedDelay = Math.max(0, Math.min(300, revealDelayInput));
     setRevealDelayInput(updatedDelay);
+    revealDelayEditingRef.current = false;
     await patchSession({ call_reveal_delay_seconds: updatedDelay });
   };
 
@@ -422,10 +426,19 @@ export default function BingoHostPage() {
                   min={0}
                   max={300}
                   value={revealDelayInput}
-                  onChange={(e) => setRevealDelayInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)))}
+                  onFocus={() => {
+                    revealDelayEditingRef.current = true;
+                  }}
+                  onBlur={() => {
+                    void saveRevealDelay();
+                  }}
+                  onChange={(e) => {
+                    revealDelayEditingRef.current = true;
+                    setRevealDelayInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)));
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
-                      saveRevealDelay();
+                      void saveRevealDelay();
                     }
                   }}
                   className="w-14 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"

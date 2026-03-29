@@ -210,8 +210,8 @@ export async function POST(request: NextRequest) {
     const startSlideSeconds = body.start_slide_seconds ?? 5;
     const hostBufferSeconds = body.host_buffer_seconds ?? 2;
     const sonosDelayMs = body.sonos_output_delay_ms ?? 75;
-      const callRevealDelaySeconds = body.call_reveal_delay_seconds ?? 3;
-      const defaultIntermissionSeconds = body.default_intermission_seconds ?? 180;
+    const callRevealDelaySeconds = body.call_reveal_delay_seconds ?? 10;
+    const defaultIntermissionSeconds = body.default_intermission_seconds ?? 180;
     const secondsToNextCall =
       removeResleeveSeconds +
       placeVinylSeconds +
@@ -252,9 +252,9 @@ export async function POST(request: NextRequest) {
         show_rounds: body.show_rounds ?? true,
         show_countdown: body.show_countdown ?? true,
         status: "pending",
-          call_reveal_delay_seconds: callRevealDelaySeconds,
-          default_intermission_seconds: defaultIntermissionSeconds,
-          next_game_rules_text: body.next_game_rules_text ?? null,
+        call_reveal_delay_seconds: callRevealDelaySeconds,
+        default_intermission_seconds: defaultIntermissionSeconds,
+        next_game_rules_text: body.next_game_rules_text ?? null,
       })
       .select("id, session_code, playlist_id, card_count, card_label_mode")
       .single();

@@ -117,7 +117,7 @@ export default function BingoSetupPage() {
   const [startSlideSeconds, setStartSlideSeconds] = useState(5);
   const [hostBufferSeconds, setHostBufferSeconds] = useState(2);
   const [sonosDelayMs, setSonosDelayMs] = useState(75);
-  const [callRevealDelaySeconds, setCallRevealDelaySeconds] = useState(3);
+  const [callRevealDelaySeconds, setCallRevealDelaySeconds] = useState(10);
   const [defaultIntermissionSeconds, setDefaultIntermissionSeconds] = useState(180);
   const [welcomeHeadingText, setWelcomeHeadingText] = useState("Welcome To Vinyl Music Bingo");
   const [welcomeMessageText, setWelcomeMessageText] = useState(INITIAL_WELCOME_CONTENT.intro);
