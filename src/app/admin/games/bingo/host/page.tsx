@@ -41,7 +41,7 @@ export default function BingoHostPage() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [remaining, setRemaining] = useState(0);
   const [revealDelayInput, setRevealDelayInput] = useState<number>(10);
-  const [intermissionLengthSeconds, setIntermissionLengthSeconds] = useState<number>(180);
+  const [intermissionLengthSeconds, setIntermissionLengthSeconds] = useState<number>(600);
   const [secondsToNextCallInput, setSecondsToNextCallInput] = useState<number>(0);
   const [autoCallEnabled, setAutoCallEnabled] = useState(false);
   const [resetCounter, setResetCounter] = useState(0);
@@ -49,6 +49,7 @@ export default function BingoHostPage() {
   const currentCallRowRef = useRef<HTMLTableRowElement>(null);
   const autoCallLockRef = useRef(false);
   const revealDelayEditingRef = useRef(false);
+  const intermissionEditingRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -65,7 +66,9 @@ export default function BingoHostPage() {
       }
       setSecondsToNextCallInput(payload.seconds_to_next_call ?? 0);
       setRemaining(payload.seconds_to_next_call ?? 0);
-        setIntermissionLengthSeconds(payload.default_intermission_seconds ?? 180);
+      if (!intermissionEditingRef.current) {
+        setIntermissionLengthSeconds(payload.default_intermission_seconds ?? 600);
+      }
     }
 
     if (cRes.ok) {
@@ -452,6 +455,8 @@ export default function BingoHostPage() {
                   type="number"
                   min={0}
                   value={intermissionLengthSeconds}
+                  onFocus={() => { intermissionEditingRef.current = true; }}
+                  onBlur={() => { intermissionEditingRef.current = false; }}
                   onChange={(e) => setIntermissionLengthSeconds(Math.max(0, Number(e.target.value) || 0))}
                   className="w-16 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
                 />

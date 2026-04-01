@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
     const hostBufferSeconds = body.host_buffer_seconds ?? 2;
     const sonosDelayMs = body.sonos_output_delay_ms ?? 75;
     const callRevealDelaySeconds = body.call_reveal_delay_seconds ?? 10;
-    const defaultIntermissionSeconds = body.default_intermission_seconds ?? 180;
+    const defaultIntermissionSeconds = body.default_intermission_seconds ?? 600;
     const secondsToNextCall =
       removeResleeveSeconds +
       placeVinylSeconds +
