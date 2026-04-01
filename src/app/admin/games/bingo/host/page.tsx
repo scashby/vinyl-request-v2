@@ -165,24 +165,13 @@ export default function BingoHostPage() {
 
   const startRound = async () => {
     if (!session) return;
-    const round = session.current_round;
-
-    const activateResponse = await fetch(`/api/games/bingo/sessions/${sessionId}/activate-round`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        round,
-        intermission_seconds: 0,
-      }),
-    });
-
-    if (!activateResponse.ok) {
-      const payload = (await activateResponse.json().catch(() => null)) as { error?: string } | null;
-      alert(payload?.error ?? `Failed to start round ${round}`);
+    const resumeResponse = await fetch(`/api/games/bingo/sessions/${sessionId}/resume`, { method: "POST" });
+    if (!resumeResponse.ok) {
+      const payload = (await resumeResponse.json().catch(() => null)) as { error?: string } | null;
+      alert(payload?.error ?? `Failed to start round ${session.current_round}`);
       return;
     }
 
-    await fetch(`/api/games/bingo/sessions/${sessionId}/resume`, { method: "POST" });
     setAutoCallEnabled(false);
     autoCallLockRef.current = false;
     await patchSession({ bingo_overlay: "none", next_game_scheduled_at: null });
