@@ -337,7 +337,9 @@ export default function BingoJumbotronPage() {
   const showWelcome = previewScreen === "welcome" || (!showIntermission && previewScreen === null && session?.bingo_overlay === "welcome");
   const showWinner = previewScreen === null && session?.bingo_overlay === "winner";
   const showThanks = previewScreen === "thanks" || (previewScreen === null && session?.bingo_overlay === "thanks");
-  const showGame = !showWelcome && !showWinner && !showThanks && !showIntermission;
+  const showCountdown = previewScreen === null && session?.bingo_overlay === "countdown";
+  const showTiebreaker = previewScreen === null && session?.bingo_overlay === "tiebreaker";
+  const showGame = !showWelcome && !showWinner && !showThanks && !showIntermission && !showCountdown && !showTiebreaker;
   const useLightScreenTheme = showWelcome || showWinner || showThanks || showIntermission;
 
   const welcomeContent = useMemo(() => {
@@ -515,6 +517,49 @@ export default function BingoJumbotronPage() {
               </div>
             </div>
           ) : null}
+        </div>
+      ) : showCountdown ? (
+        <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2vw] px-8 text-center">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(56,189,248,0.18),transparent_35%),linear-gradient(180deg,#050a14,#0a1428)]" />
+          <BrandingLogos venueLogoUrl={effectiveVenueLogo} venueName={effectiveVenueName} />
+          <div className="relative z-10 space-y-[1.5vw]">
+            <p className="text-[2vw] font-semibold uppercase tracking-[0.5em] text-sky-300">
+              Round {session?.current_round ?? 1} of {session?.round_count ?? 1}
+            </p>
+            <p
+              className="font-black uppercase leading-none tracking-tight text-white"
+              style={{ fontSize: "9vw", textShadow: "0 8px 40px rgba(56,189,248,0.35)" }}
+            >
+              GET READY
+            </p>
+            {intermissionSecondsLeft !== null && intermissionSecondsLeft > 0 ? (
+              <p className="text-[8vw] font-black tabular-nums text-sky-300 leading-none">
+                {formatMinSec(intermissionSecondsLeft)}
+              </p>
+            ) : null}
+            <p className="text-[1.8vw] text-sky-100/70">Round begins shortly — stand by</p>
+          </div>
+        </div>
+      ) : showTiebreaker ? (
+        <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2vw] px-8 text-center">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(244,63,94,0.22),transparent_38%),linear-gradient(180deg,#0d050a,#1a070e)]" />
+          <BrandingLogos venueLogoUrl={effectiveVenueLogo} venueName={effectiveVenueName} />
+          <div className="relative z-10 space-y-[1.5vw]">
+            <p
+              className="font-black uppercase leading-none tracking-tight text-rose-400"
+              style={{ fontSize: "10vw", textShadow: "0 8px 40px rgba(244,63,94,0.35)" }}
+            >
+              TIEBREAKER
+            </p>
+            <p className="text-[2vw] text-rose-100/80">
+              {session?.next_game_rules_text?.trim()
+                ? session.next_game_rules_text.trim()
+                : "The host will announce the tiebreaker rules."}
+            </p>
+            <p className="text-[1.5vw] text-stone-400 uppercase tracking-[0.3em]">
+              Round {session?.current_round ?? 1} · Stand by
+            </p>
+          </div>
         </div>
       ) : (
         <>

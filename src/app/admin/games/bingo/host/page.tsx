@@ -24,7 +24,17 @@ type Session = {
   call_reveal_delay_seconds: number;
   next_game_scheduled_at: string | null;
   bingo_overlay: string;
-    default_intermission_seconds: number;
+  default_intermission_seconds: number;
+  active_crate_letter_by_round: { round: number; letter: string }[] | null;
+};
+
+type BingoCrate = {
+  id: number;
+  session_id: number;
+  round_number: number;
+  crate_name: string;
+  crate_letter: string;
+  created_at: string;
 };
 
 type Call = BingoTransportCall & {
@@ -51,13 +61,16 @@ export default function BingoHostPage() {
 
   const [session, setSession] = useState<Session | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
+  const [crates, setCrates] = useState<BingoCrate[]>([]);
   const [remaining, setRemaining] = useState(0);
   const [revealDelayInput, setRevealDelayInput] = useState<number>(10);
-  const [intermissionLengthSeconds, setIntermissionLengthSeconds] = useState<number>(600);
+  // Stored as minutes for display; converted to seconds for persistence
+  const [intermissionLengthMinutes, setIntermissionLengthMinutes] = useState<number>(10);
   const [secondsToNextCallInput, setSecondsToNextCallInput] = useState<number>(0);
   const [autoCallEnabled, setAutoCallEnabled] = useState(false);
   const [resetCounter, setResetCounter] = useState(0);
   const [savingOverlay, setSavingOverlay] = useState(false);
+  const [switchingCrate, setSwitchingCrate] = useState(false);
   const [winnerCheckInput, setWinnerCheckInput] = useState("");
   const [winnerCheckResult, setWinnerCheckResult] = useState<CardValidationResponse | null>(null);
   const [winnerCheckError, setWinnerCheckError] = useState<string | null>(null);
@@ -69,9 +82,10 @@ export default function BingoHostPage() {
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
-    const [sRes, cRes] = await Promise.all([
+    const [sRes, cRes, cratesRes] = await Promise.all([
       fetch(`/api/games/bingo/sessions/${sessionId}`, { cache: 'no-store' }),
       fetch(`/api/games/bingo/sessions/${sessionId}/calls`, { cache: 'no-store' }),
+      fetch(`/api/games/bingo/sessions/${sessionId}/crates`, { cache: 'no-store' }),
     ]);
 
     if (sRes.ok) {
@@ -83,13 +97,19 @@ export default function BingoHostPage() {
       setSecondsToNextCallInput(payload.seconds_to_next_call ?? 0);
       setRemaining(payload.seconds_to_next_call ?? 0);
       if (!intermissionEditingRef.current) {
-        setIntermissionLengthSeconds(payload.default_intermission_seconds ?? 600);
+        // Convert stored seconds to minutes for display
+        setIntermissionLengthMinutes(Math.round((payload.default_intermission_seconds ?? 600) / 60));
       }
     }
 
     if (cRes.ok) {
       const payload = await cRes.json();
       setCalls(payload.data ?? []);
+    }
+
+    if (cratesRes.ok) {
+      const payload = await cratesRes.json();
+      setCrates(payload.data ?? []);
     }
   }, [sessionId]);
 
@@ -175,8 +195,14 @@ export default function BingoHostPage() {
     load();
   };
 
+  const toggleWelcome = async () => {
+    const next = session?.bingo_overlay === "welcome" ? "none" : "welcome";
+    await patchSession({ bingo_overlay: next });
+  };
+
   const startGame = async () => {
-    await patchSession({ bingo_overlay: "welcome" });
+    // Show countdown screen on jumbotron; host starts the round when ready
+    await patchSession({ bingo_overlay: "countdown" });
   };
 
   const startRound = async () => {
@@ -286,12 +312,13 @@ export default function BingoHostPage() {
       alert("Already on the final round.");
       return;
     }
+    const intermissionSeconds = Math.max(0, intermissionLengthMinutes * 60);
     const response = await fetch(`/api/games/bingo/sessions/${sessionId}/activate-round`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         round: nextRoundValue,
-        intermission_seconds: Math.max(0, intermissionLengthSeconds),
+        intermission_seconds: intermissionSeconds,
       }),
     });
     if (!response.ok) {
@@ -311,7 +338,7 @@ export default function BingoHostPage() {
     await load();
   };
 
-  const setOverlay = async (overlay: "none" | "pending" | "winner") => {
+  const setOverlay = async (overlay: "none" | "pending" | "winner" | "tiebreaker") => {
     setSavingOverlay(true);
     if ((overlay === "pending" || overlay === "winner") && session?.status === "running") {
       setAutoCallEnabled(false);
@@ -321,6 +348,21 @@ export default function BingoHostPage() {
     await patchSession({ bingo_overlay: overlay });
     setSavingOverlay(false);
   };
+
+  const switchCrate = useCallback(async (crateLetter: string) => {
+    if (!session) return;
+    setSwitchingCrate(true);
+    try {
+      await fetch(`/api/games/bingo/sessions/${sessionId}/crates`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ round_number: session.current_round, crate_letter: crateLetter }),
+      });
+      await load();
+    } finally {
+      setSwitchingCrate(false);
+    }
+  }, [session, sessionId, load]);
 
   const patchCallMetadata = useCallback(
     async (callId: number, patch: Record<string, unknown>) => {
@@ -365,6 +407,28 @@ export default function BingoHostPage() {
     }
   }, [sessionId, winnerCheckInput]);
 
+  // Derive crate state for current round
+  const currentRoundCrates = useMemo(
+    () => crates.filter((c) => c.round_number === (session?.current_round ?? 1)),
+    [crates, session?.current_round]
+  );
+
+  const activeCrateLetter = useMemo(() => {
+    if (!session?.active_crate_letter_by_round) return null;
+    return session.active_crate_letter_by_round.find((e) => e.round === session.current_round)?.letter ?? null;
+  }, [session]);
+
+  const roundIsStarted = useMemo(() => {
+    const calledCount = calls.filter((c) => ["called", "completed", "skipped"].includes(c.status)).length;
+    return calledCount > 0;
+  }, [calls]);
+
+  const resetRoundDisabled = useMemo(() => {
+    const calledCount = calls.filter((c) => ["called", "completed", "skipped"].includes(c.status)).length;
+    // Disabled if more than 10 calls have been made in this round (re-enabled when round changes)
+    return calledCount > 10;
+  }, [calls]);
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#0c0c0c,#1b1b1b)] p-5 text-stone-100">
       <div className="mx-auto max-w-[1600px] space-y-3">
@@ -375,21 +439,9 @@ export default function BingoHostPage() {
               <p className="text-sm text-stone-400">{session?.playlist_name} · {session?.session_code}</p>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="rounded border border-stone-700 bg-black/40 px-3 py-2 text-right">
-                <p className="text-[11px] uppercase tracking-[0.15em] text-stone-400">Time Until Next Call</p>
-                <p
-                  className={`text-4xl font-black leading-none tabular-nums ${
-                    remaining < 0 || remaining <= 10 ? "text-red-400" : remaining <= 20 ? "text-amber-400" : "text-emerald-400"
-                  }`}
-                >
-                  {remaining}s
-                </p>
-              </div>
-              <span className="rounded border border-stone-700 px-2 py-1 text-xs text-stone-400 capitalize">
-                {session?.status ?? "—"}
-              </span>
-            </div>
+            <span className="rounded border border-stone-700 px-2 py-1 text-xs text-stone-400 capitalize">
+              {session?.status ?? "—"}
+            </span>
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
@@ -417,131 +469,114 @@ export default function BingoHostPage() {
           </div>
         </header>
 
+        {/* ─── Control Panel ──────────────────────────────────────────────────── */}
         <section className="rounded-2xl border border-stone-700 bg-black/45 p-3">
-          <div className="grid grid-cols-3 gap-3">
-            {/* Left column: Game controls (top), round controls (bottom) */}
-            <div className="space-y-2 text-xs">
-              <div className="flex flex-wrap items-center gap-2">
-                <button onClick={startGame} className="rounded border border-violet-700 bg-violet-900/35 px-3 py-1 font-bold text-violet-200 hover:bg-violet-900/55">Start Game</button>
-                <button onClick={resetGame} className="rounded border border-amber-700 bg-amber-900/40 px-3 py-1 text-amber-100 hover:bg-amber-900/60">Reset Game</button>
-                <button onClick={endGame} className="rounded border border-red-700 px-3 py-1 text-red-300 hover:bg-red-900/20">End Game</button>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <button onClick={startRound} className="rounded border border-emerald-700 bg-emerald-900/35 px-3 py-1 font-bold text-emerald-200 hover:bg-emerald-900/55">Start Round</button>
-                <button onClick={resetRound} className="rounded border border-red-700 bg-red-900/40 px-3 py-1 text-red-100 hover:bg-red-900/60">Reset Round</button>
-                <button onClick={nextRound} className="rounded border border-sky-700 px-3 py-1 text-sky-300 hover:bg-sky-900/20">End Round</button>
-              </div>
-            </div>
+          <div className="flex flex-wrap gap-4">
 
-            {/* Middle column: Overlay + timing controls */}
-            <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
-              <button
-                onClick={() => {
-                  setOverlay("pending");
-                }}
-                disabled={savingOverlay}
-                className="rounded border border-yellow-700 bg-yellow-900/30 px-3 py-1 font-bold text-yellow-200 hover:bg-yellow-900/60 disabled:opacity-50"
-              >
-                Bingo Pending
-              </button>
-              <button
-                onClick={() => {
-                  setOverlay("winner");
-                }}
-                disabled={savingOverlay}
-                className="rounded border border-emerald-700 bg-emerald-900/30 px-3 py-1 font-bold text-emerald-200 hover:bg-emerald-900/60 disabled:opacity-50"
-              >
-                Bingo Winner!
-              </button>
-              <div className="flex items-center gap-1 rounded border border-stone-700/80 bg-stone-950/50 px-2 py-1">
+            {/* ── Left block: Game flow + Bingo area + Load Crate ── */}
+            <div className="flex-1 min-w-[260px] space-y-2 text-xs">
+
+              {/* Row 1: Welcome toggle + Start Game */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => void toggleWelcome()}
+                  className={`rounded border px-3 py-1 font-bold transition ${
+                    session?.bingo_overlay === "welcome"
+                      ? "border-violet-400 bg-violet-800/60 text-violet-100"
+                      : "border-violet-700 bg-violet-900/25 text-violet-300 hover:bg-violet-900/45"
+                  }`}
+                >
+                  {session?.bingo_overlay === "welcome" ? "Welcome ✓" : "Welcome"}
+                </button>
+                <button
+                  onClick={() => void startGame()}
+                  className="rounded border border-sky-700 bg-sky-900/35 px-3 py-1 font-bold text-sky-200 hover:bg-sky-900/55"
+                >
+                  Start Game
+                </button>
+              </div>
+
+              {/* Row 2: Reset Game */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button onClick={() => void resetGame()} className="rounded border border-amber-700 bg-amber-900/40 px-3 py-1 text-amber-100 hover:bg-amber-900/60">Reset Game</button>
+              </div>
+
+              {/* Row 3: Start Round + Reset Round (Start Round triggers Bingo Winner → next round flow) */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button onClick={() => void startRound()} className="rounded border border-emerald-700 bg-emerald-900/35 px-3 py-1 font-bold text-emerald-200 hover:bg-emerald-900/55">Start Round</button>
+                <button
+                  onClick={() => void resetRound()}
+                  disabled={resetRoundDisabled}
+                  title={resetRoundDisabled ? "Disabled after 10 calls — re-enables next round" : "Reset current round"}
+                  className="rounded border border-red-700 bg-red-900/40 px-3 py-1 text-red-100 hover:bg-red-900/60 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Reset Round
+                </button>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-stone-800" />
+
+              {/* Row 4: Bingo area — Pending + Check + Tie + Winner */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => void setOverlay("pending")}
+                  disabled={savingOverlay}
+                  className="rounded border border-yellow-700 bg-yellow-900/30 px-3 py-1 font-bold text-yellow-200 hover:bg-yellow-900/60 disabled:opacity-50"
+                >
+                  Bingo Pending
+                </button>
+                <button
+                  onClick={() => void setOverlay("tiebreaker")}
+                  disabled={savingOverlay}
+                  className={`rounded border px-3 py-1 font-bold transition disabled:opacity-50 ${
+                    session?.bingo_overlay === "tiebreaker"
+                      ? "border-pink-400 bg-pink-800/60 text-pink-100"
+                      : "border-pink-700 bg-pink-900/25 text-pink-300 hover:bg-pink-900/45"
+                  }`}
+                >
+                  Tie
+                </button>
+                <button
+                  onClick={() => void setOverlay("winner")}
+                  disabled={savingOverlay}
+                  className="rounded border border-emerald-700 bg-emerald-900/30 px-3 py-1 font-bold text-emerald-200 hover:bg-emerald-900/60 disabled:opacity-50"
+                >
+                  Bingo Winner!
+                </button>
+              </div>
+
+              {/* Check Winner input */}
+              <div className="flex flex-wrap items-center gap-1 rounded border border-stone-700/80 bg-stone-950/50 px-2 py-1">
                 <label className="text-stone-400 whitespace-nowrap">Check Winner</label>
                 <input
                   type="text"
                   value={winnerCheckInput}
                   onChange={(e) => setWinnerCheckInput(e.target.value.toUpperCase())}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      void checkWinner();
-                    }
+                    if (e.key === "Enter") void checkWinner();
                   }}
                   placeholder="CARD ID"
                   className="w-28 rounded border border-stone-700 bg-black px-2 py-1 text-center uppercase tracking-[0.08em]"
                 />
                 <button
                   type="button"
-                  onClick={() => {
-                    void checkWinner();
-                  }}
+                  onClick={() => void checkWinner()}
                   disabled={checkingWinner}
                   className="rounded border border-sky-700 px-2 py-1 text-sky-300 hover:bg-sky-900/20 disabled:opacity-50"
                 >
                   {checkingWinner ? "Checking" : "Run"}
                 </button>
               </div>
-              <div className="flex items-center gap-1">
-                <label className="text-stone-400 whitespace-nowrap">Reveal Delay (sec)</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={300}
-                  value={revealDelayInput}
-                  onFocus={() => {
-                    revealDelayEditingRef.current = true;
-                  }}
-                  onBlur={() => {
-                    void saveRevealDelay();
-                  }}
-                  onChange={(e) => {
-                    revealDelayEditingRef.current = true;
-                    setRevealDelayInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)));
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      void saveRevealDelay();
-                    }
-                  }}
-                  className="w-14 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
-                />
-              </div>
-              <div className="flex items-center gap-1">
-                <label className="text-stone-400 whitespace-nowrap">Intermission (sec)</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={intermissionLengthSeconds}
-                  onFocus={() => { intermissionEditingRef.current = true; }}
-                  onBlur={() => { intermissionEditingRef.current = false; }}
-                  onChange={(e) => setIntermissionLengthSeconds(Math.max(0, Number(e.target.value) || 0))}
-                  className="w-16 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
-                />
-              </div>
-              {session ? (
-                <div className="w-full rounded border border-stone-700/80 bg-stone-950/40 p-2">
-                  <p className="text-[11px] uppercase tracking-[0.08em] text-stone-400">Round {session.current_round} win modes (any mode wins)</p>
-                  <div className="mt-1 flex flex-wrap justify-center gap-2">
-                    {GAME_MODE_OPTIONS.map((mode) => {
-                      const selected = activeRoundModes.includes(mode.value);
-                      return (
-                        <button
-                          key={mode.value}
-                          type="button"
-                          onClick={() => setModeForActiveRound(mode.value)}
-                          className={`rounded border px-2 py-1 text-[11px] ${selected ? "border-amber-500 bg-amber-900/30 text-amber-100" : "border-stone-700 text-stone-300 hover:border-stone-500"}`}
-                        >
-                          {mode.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : null}
+
+              {/* Winner check result */}
               {winnerCheckError ? (
-                <div className="w-full rounded border border-red-900/70 bg-red-950/40 p-2 text-[11px] text-red-200">
+                <div className="rounded border border-red-900/70 bg-red-950/40 p-2 text-[11px] text-red-200">
                   {winnerCheckError}
                 </div>
               ) : null}
               {winnerCheckResult ? (
-                <div className={`w-full rounded border p-2 text-[11px] ${winnerCheckResult.is_winner ? "border-emerald-800/70 bg-emerald-950/30 text-emerald-100" : "border-amber-800/70 bg-amber-950/30 text-amber-100"}`}>
+                <div className={`rounded border p-2 text-[11px] ${winnerCheckResult.is_winner ? "border-emerald-800/70 bg-emerald-950/30 text-emerald-100" : "border-amber-800/70 bg-amber-950/30 text-amber-100"}`}>
                   <p className="font-bold uppercase tracking-[0.08em]">
                     {winnerCheckResult.card_identifier} · {winnerCheckResult.is_winner ? "Winner" : "Not Yet Winning"}
                   </p>
@@ -565,11 +600,54 @@ export default function BingoHostPage() {
                   ) : null}
                 </div>
               ) : null}
+
+              {/* Divider */}
+              <div className="border-t border-stone-800" />
+
+              {/* Load Crate dropdown — locked once round is started */}
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-stone-400 whitespace-nowrap">Load Crate</label>
+                {currentRoundCrates.length === 0 ? (
+                  <span className="text-stone-500 italic">No crates generated yet</span>
+                ) : (
+                  <select
+                    value={activeCrateLetter ?? ""}
+                    disabled={roundIsStarted || switchingCrate}
+                    onChange={(e) => {
+                      if (e.target.value) void switchCrate(e.target.value);
+                    }}
+                    className="rounded border border-stone-600 bg-stone-950 px-2 py-1 text-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="">— select —</option>
+                    {currentRoundCrates.map((crate) => (
+                      <option key={crate.crate_letter} value={crate.crate_letter}>
+                        {crate.crate_name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {roundIsStarted ? (
+                  <span className="text-[10px] text-stone-500 italic">Locked (round started)</span>
+                ) : null}
+              </div>
+
+              {/* Bingo Winner → Next Round */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => void nextRound()}
+                  className="rounded border border-sky-700 px-3 py-1 text-sky-300 hover:bg-sky-900/20"
+                >
+                  Bingo Winner → Next Round
+                </button>
+              </div>
             </div>
 
-            {/* Right column: Next Call (sec) on top, Pause/Resume below */}
-            <div className="ml-auto space-y-2 text-xs">
-              <div className="flex items-center justify-end gap-2">
+            {/* ── Right block: Timing Section ── */}
+            <div className="w-48 shrink-0 space-y-3 text-xs">
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-stone-400">Timing</p>
+
+              {/* Next Call input */}
+              <div className="space-y-1">
                 <label className="text-stone-400 whitespace-nowrap">Next Call (sec)</label>
                 <input
                   type="number"
@@ -578,16 +656,66 @@ export default function BingoHostPage() {
                   value={secondsToNextCallInput}
                   onChange={(e) => setSecondsToNextCallInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)))}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      saveSecondsToNextCall();
-                    }
+                    if (e.key === "Enter") void saveSecondsToNextCall();
                   }}
-                  className="w-16 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
+                  className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
+                />
+                <button
+                  onClick={() => void saveSecondsToNextCall()}
+                  className="w-full rounded border border-stone-600 px-2 py-1 hover:border-stone-400"
+                >
+                  Set
+                </button>
+              </div>
+
+              {/* Reveal Delay */}
+              <div className="space-y-1">
+                <label className="text-stone-400 whitespace-nowrap">Reveal Delay (sec)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={300}
+                  value={revealDelayInput}
+                  onFocus={() => { revealDelayEditingRef.current = true; }}
+                  onBlur={() => { void saveRevealDelay(); }}
+                  onChange={(e) => {
+                    revealDelayEditingRef.current = true;
+                    setRevealDelayInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)));
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void saveRevealDelay();
+                  }}
+                  className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
                 />
               </div>
-              <div className="flex items-center justify-end gap-2">
-                <button onClick={pause} className="rounded border border-stone-600 px-2 py-1 hover:border-stone-400">Pause</button>
-                <button onClick={resume} className="rounded border border-stone-600 px-2 py-1 hover:border-stone-400">Resume</button>
+
+              {/* Intermission in minutes */}
+              <div className="space-y-1">
+                <label className="text-stone-400 whitespace-nowrap">Intermission (min)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={intermissionLengthMinutes}
+                  onFocus={() => { intermissionEditingRef.current = true; }}
+                  onBlur={() => { intermissionEditingRef.current = false; }}
+                  onChange={(e) => setIntermissionLengthMinutes(Math.max(0, Number(e.target.value) || 0))}
+                  className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
+                />
+              </div>
+
+              {/* Pause / Resume toggle */}
+              <div className="space-y-1">
+                <label className="text-stone-400 whitespace-nowrap">Playback</label>
+                <button
+                  onClick={() => void (session?.status === "paused" ? resume() : pause())}
+                  className={`w-full rounded border px-2 py-1 font-bold transition ${
+                    session?.status === "paused"
+                      ? "border-emerald-600 bg-emerald-900/40 text-emerald-200 hover:bg-emerald-900/60"
+                      : "border-amber-600 bg-amber-900/30 text-amber-200 hover:bg-amber-900/50"
+                  }`}
+                >
+                  {session?.status === "paused" ? "▶ Resume" : "⏸ Pause"}
+                </button>
               </div>
             </div>
           </div>
@@ -595,7 +723,9 @@ export default function BingoHostPage() {
 
         <div className="grid gap-3 lg:grid-cols-[1.55fr,1fr]">
           <section className="flex h-[68vh] flex-col rounded-2xl border border-stone-700 bg-black/50 p-4">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-amber-200">Crate (Call Order)</h2>
+            <h2 className="text-sm font-bold uppercase tracking-wide text-amber-200">
+              Crate (Call Order){activeCrateLetter ? ` · Loaded: Crate ${activeCrateLetter}` : ""}
+            </h2>
             <div className="mt-3 flex-1 overflow-x-auto overflow-y-auto">
               <table className="w-full text-left text-xs">
                 <thead className="sticky top-0 z-10 bg-[#111]">
@@ -665,6 +795,7 @@ export default function BingoHostPage() {
             maxRows={7}
             className="h-[68vh]"
             callsContainerClassName="max-h-[58vh] overflow-y-auto pr-1"
+            secondsToNextCall={remaining}
             headerRight={
               <div className="flex items-center gap-2 rounded border border-stone-700 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-stone-300">
                 <span>Auto-Call</span>

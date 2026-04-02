@@ -231,6 +231,7 @@ export type BingoDatabase = {
           default_intermission_seconds: number;
           is_favorite: boolean;
           favorite_note: string | null;
+          active_crate_letter_by_round: { round: number; letter: string }[] | null;
         };
         Insert: {
           id?: number;
@@ -279,6 +280,7 @@ export type BingoDatabase = {
           bingo_overlay?: string;
           is_favorite?: boolean;
           favorite_note?: string | null;
+          active_crate_letter_by_round?: { round: number; letter: string }[] | null;
         };
         Update: {
           id?: number;
@@ -327,6 +329,37 @@ export type BingoDatabase = {
           bingo_overlay?: string;
           is_favorite?: boolean;
           favorite_note?: string | null;
+          active_crate_letter_by_round?: { round: number; letter: string }[] | null;
+        };
+        Relationships: [];
+      };
+      bingo_session_crates: {
+        Row: {
+          id: number;
+          session_id: number;
+          round_number: number;
+          crate_name: string;
+          crate_letter: string;
+          call_order: Record<string, unknown>[];
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          session_id: number;
+          round_number: number;
+          crate_name: string;
+          crate_letter: string;
+          call_order: Record<string, unknown>[];
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          session_id?: number;
+          round_number?: number;
+          crate_name?: string;
+          crate_letter?: string;
+          call_order?: Record<string, unknown>[];
+          created_at?: string;
         };
         Relationships: [];
       };

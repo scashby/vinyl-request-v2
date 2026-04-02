@@ -45,6 +45,7 @@ type BingoTransportLaneProps = {
   className?: string;
   callsContainerClassName?: string;
   headerRight?: ReactNode;
+  secondsToNextCall?: number;
 };
 
 export default function BingoTransportLane({
@@ -58,6 +59,7 @@ export default function BingoTransportLane({
   className = "",
   callsContainerClassName = "",
   headerRight,
+  secondsToNextCall,
 }: BingoTransportLaneProps) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -133,6 +135,19 @@ export default function BingoTransportLane({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className={`text-sm font-bold uppercase tracking-wide ${headingToneClass}`}>Transport Lane</h2>
         <div className="flex items-center gap-3">
+          {secondsToNextCall !== undefined ? (
+            <span
+              className={`rounded border px-2 py-0.5 text-xs font-bold tabular-nums ${
+                secondsToNextCall <= 10
+                  ? "border-red-700 text-red-300"
+                  : secondsToNextCall <= 20
+                    ? "border-amber-600 text-amber-300"
+                    : "border-stone-600 text-stone-300"
+              }`}
+            >
+              Next: {secondsToNextCall}s
+            </span>
+          ) : null}
           {headerRight}
         </div>
       </div>
@@ -195,10 +210,22 @@ export default function BingoTransportLane({
             queueRank < 3;
 
           return (
-            <div key={call.id} className="rounded border border-stone-700 bg-stone-950/70 p-3 text-xs">
+            <div key={call.id} className={`rounded border bg-stone-950/70 p-3 ${isCurrent ? "border-amber-500/70 ring-1 ring-inset ring-amber-500/40" : "border-stone-700"}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-semibold text-stone-100">
-                  #{call.call_index} · <span className={getBingoColumnTextClass(call.column_letter, call.ball_number)}>{formatBallLabel(call.ball_number, call.column_letter)}</span> - {call.track_title}
+                <p className={isCurrent ? "font-black text-stone-100" : "text-xs font-semibold text-stone-100"}>
+                  {isCurrent ? (
+                    <>
+                      <span className={`text-2xl font-black ${getBingoColumnTextClass(call.column_letter, call.ball_number)}`}>{formatBallLabel(call.ball_number, call.column_letter)}</span>
+                      <span className="ml-2 text-base font-bold">{call.track_title}</span>
+                    </>
+                  ) : isCue ? (
+                    <>
+                      <span className={`text-base font-bold ${getBingoColumnTextClass(call.column_letter, call.ball_number)}`}>{formatBallLabel(call.ball_number, call.column_letter)}</span>
+                      <span className="ml-2 text-sm font-semibold"> - {call.track_title}</span>
+                    </>
+                  ) : (
+                    <>#{call.call_index} · <span className={getBingoColumnTextClass(call.column_letter, call.ball_number)}>{formatBallLabel(call.ball_number, call.column_letter)}</span> - {call.track_title}</>
+                  )}
                 </p>
                 <span className="rounded border border-stone-700 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-stone-300">{queueStatusLabel}</span>
               </div>
