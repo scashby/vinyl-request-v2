@@ -70,6 +70,7 @@ export default function BingoHostPage() {
   const [resetCounter, setResetCounter] = useState(0);
   const [savingOverlay, setSavingOverlay] = useState(false);
   const [switchingCrate, setSwitchingCrate] = useState(false);
+  const [creatingCrate, setCreatingCrate] = useState(false);
   const [winnerCheckInput, setWinnerCheckInput] = useState("");
   const [winnerCheckResult, setWinnerCheckResult] = useState<CardValidationResponse | null>(null);
   const [winnerCheckError, setWinnerCheckError] = useState<string | null>(null);
@@ -330,6 +331,21 @@ export default function BingoHostPage() {
     }
   };
 
+  const createCrate = useCallback(async () => {
+    if (!session) return;
+    setCreatingCrate(true);
+    try {
+      await fetch(`/api/games/bingo/sessions/${sessionId}/crates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ round_number: session.current_round }),
+      });
+      await load();
+    } finally {
+      setCreatingCrate(false);
+    }
+  }, [session, sessionId, load]);
+
   const switchCrate = useCallback(async (crateLetter: string) => {
     if (!session) return;
     setSwitchingCrate(true);
@@ -394,6 +410,20 @@ export default function BingoHostPage() {
     [crates, session?.current_round]
   );
 
+  const allRoundCrateSummary = useMemo(() => {
+    if (!session) return "";
+    const maxRounds = Math.max(1, session.round_count || 1);
+    const parts: string[] = [];
+    for (let round = 1; round <= maxRounds; round += 1) {
+      const letters = crates
+        .filter((crate) => crate.round_number === round)
+        .map((crate) => crate.crate_letter)
+        .sort();
+      parts.push(`R${round}: ${letters.length > 0 ? letters.join(",") : "none"}`);
+    }
+    return parts.join(" · ");
+  }, [crates, session]);
+
   const activeCrateLetter = useMemo(() => {
     if (!session?.active_crate_letter_by_round) return null;
     return session.active_crate_letter_by_round.find((e) => e.round === session.current_round)?.letter ?? null;
@@ -452,7 +482,74 @@ export default function BingoHostPage() {
 
         {/* ─── Control Panel ──────────────────────────────────────────────────── */}
         <section className="rounded-2xl border border-stone-700 bg-black/45 p-3">
-          <div className="grid gap-3 lg:grid-cols-[1fr,1fr,0.9fr]">
+
+          {/* Timing row */}
+          <div className="mb-3 grid grid-cols-4 gap-3 border-b border-stone-800 pb-3 text-xs">
+            <div className="space-y-1">
+              <label className="text-stone-400 whitespace-nowrap">Next Call (sec)</label>
+              <input
+                type="number"
+                min={0}
+                max={300}
+                value={secondsToNextCallInput}
+                onChange={(e) => setSecondsToNextCallInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)))}
+                onBlur={() => { void saveSecondsToNextCall(); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void saveSecondsToNextCall();
+                }}
+                className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-stone-400 whitespace-nowrap">Reveal Delay (sec)</label>
+              <input
+                type="number"
+                min={0}
+                max={300}
+                value={revealDelayInput}
+                onFocus={() => { revealDelayEditingRef.current = true; }}
+                onBlur={() => { void saveRevealDelay(); }}
+                onChange={(e) => {
+                  revealDelayEditingRef.current = true;
+                  setRevealDelayInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)));
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void saveRevealDelay();
+                }}
+                className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-stone-400 whitespace-nowrap">Intermission (min)</label>
+              <input
+                type="number"
+                min={0}
+                value={intermissionLengthMinutes}
+                onFocus={() => { intermissionEditingRef.current = true; }}
+                onBlur={() => { void saveIntermissionMinutes(); }}
+                onChange={(e) => setIntermissionLengthMinutes(Math.max(0, Number(e.target.value) || 0))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void saveIntermissionMinutes();
+                }}
+                className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-stone-400 whitespace-nowrap">Playback</label>
+              <button
+                onClick={() => void (session?.status === "paused" ? resume() : pause())}
+                className={`w-full rounded border px-2 py-1 font-bold transition ${
+                  session?.status === "paused"
+                    ? "border-emerald-600 bg-emerald-900/40 text-emerald-200 hover:bg-emerald-900/60"
+                    : "border-amber-600 bg-amber-900/30 text-amber-200 hover:bg-amber-900/50"
+                }`}
+              >
+                {session?.status === "paused" ? "▶ Resume" : "⏸ Pause"}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-2">
 
             {/* Left column: CSV-required host controls */}
             <div className="space-y-2 text-xs">
@@ -495,9 +592,7 @@ export default function BingoHostPage() {
               <div className="border-t border-stone-800 pt-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <label className="text-stone-400 whitespace-nowrap">Load Crate</label>
-                  {currentRoundCrates.length === 0 ? (
-                    <span className="text-stone-500 italic">No crates generated yet</span>
-                  ) : (
+                  {currentRoundCrates.length > 0 && (
                     <select
                       value={activeCrateLetter ?? ""}
                       disabled={roundIsStarted || switchingCrate}
@@ -514,8 +609,16 @@ export default function BingoHostPage() {
                       ))}
                     </select>
                   )}
+                  <button
+                    onClick={() => void createCrate()}
+                    disabled={creatingCrate}
+                    className="rounded border border-stone-600 px-2 py-1 text-stone-300 hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {creatingCrate ? "Creating…" : currentRoundCrates.length === 0 ? "Create Crate" : "+ New"}
+                  </button>
                   {roundIsStarted ? <span className="text-[10px] text-stone-500 italic">Locked (round started)</span> : null}
                 </div>
+                <p className="mt-2 text-[10px] text-stone-500">All rounds: {allRoundCrateSummary || "none"}</p>
               </div>
             </div>
 
@@ -603,77 +706,6 @@ export default function BingoHostPage() {
               ) : null}
             </div>
 
-            {/* Right column: Timing section */}
-            <div className="space-y-2 text-xs">
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-stone-400">Timing</p>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <label className="text-stone-400 whitespace-nowrap">Next Call (sec)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={300}
-                    value={secondsToNextCallInput}
-                    onChange={(e) => setSecondsToNextCallInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)))}
-                    onBlur={() => { void saveSecondsToNextCall(); }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void saveSecondsToNextCall();
-                    }}
-                    className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-stone-400 whitespace-nowrap">Reveal Delay (sec)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={300}
-                    value={revealDelayInput}
-                    onFocus={() => { revealDelayEditingRef.current = true; }}
-                    onBlur={() => { void saveRevealDelay(); }}
-                    onChange={(e) => {
-                      revealDelayEditingRef.current = true;
-                      setRevealDelayInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)));
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void saveRevealDelay();
-                    }}
-                    className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-stone-400 whitespace-nowrap">Intermission (min)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={intermissionLengthMinutes}
-                    onFocus={() => { intermissionEditingRef.current = true; }}
-                    onBlur={() => { void saveIntermissionMinutes(); }}
-                    onChange={(e) => setIntermissionLengthMinutes(Math.max(0, Number(e.target.value) || 0))}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void saveIntermissionMinutes();
-                    }}
-                    className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-stone-400 whitespace-nowrap">Playback</label>
-                  <button
-                    onClick={() => void (session?.status === "paused" ? resume() : pause())}
-                    className={`w-full rounded border px-2 py-1 font-bold transition ${
-                      session?.status === "paused"
-                        ? "border-emerald-600 bg-emerald-900/40 text-emerald-200 hover:bg-emerald-900/60"
-                        : "border-amber-600 bg-amber-900/30 text-amber-200 hover:bg-amber-900/50"
-                    }`}
-                  >
-                    {session?.status === "paused" ? "▶ Resume" : "⏸ Pause"}
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
         </section>
 
