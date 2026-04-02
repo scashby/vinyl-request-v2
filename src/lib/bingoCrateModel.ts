@@ -41,6 +41,43 @@ type SessionCrateBackfillRow = {
   active_crate_letter_by_round: { round: number; letter: string }[] | null;
 };
 
+async function deriveRoundCallOrder(
+  db: ReturnType<typeof getBingoDb>,
+  sessionId: number,
+  roundNumber: number,
+  currentRound: number
+): Promise<CrateCallEntry[]> {
+  const snapshotTracks = await getRoundSnapshotTracks(db, sessionId, roundNumber);
+  if (snapshotTracks.length > 0) {
+    const planned = planRoundSessionCalls(snapshotTracks, sessionId, roundNumber);
+    return planned.map((row, index) => ({
+      id: -(index + 1),
+      call_index: row.call_index,
+      ball_number: row.ball_number,
+      column_letter: row.column_letter,
+      track_title: row.track_title,
+      artist_name: row.artist_name,
+      album_name: row.album_name,
+      side: row.side,
+      position: row.position,
+      status: "pending",
+    }));
+  }
+
+  if (roundNumber === currentRound) {
+    const { data: currentRoundCalls, error: callsError } = await db
+      .from("bingo_session_calls")
+      .select("id, call_index, ball_number, column_letter, track_title, artist_name, album_name, side, position, status")
+      .eq("session_id", sessionId)
+      .order("call_index", { ascending: true });
+
+    if (callsError) throw new Error(callsError.message);
+    return ((currentRoundCalls ?? []) as CrateCallEntry[]).map((row) => ({ ...row }));
+  }
+
+  return [];
+}
+
 /** Return the next available crate letter for a session (across all rounds). */
 async function getNextCrateLetter(
   db: ReturnType<typeof getBingoDb>,
@@ -159,33 +196,7 @@ export async function backfillMissingLegacyCrates(
     const alreadyHasCrates = existingCrates.some((crate) => crate.round_number === round);
     if (alreadyHasCrates) continue;
 
-    let callOrder: CrateCallEntry[] = [];
-
-    const snapshotTracks = await getRoundSnapshotTracks(db, sessionId, round);
-    if (snapshotTracks.length > 0) {
-      const planned = planRoundSessionCalls(snapshotTracks, sessionId, round);
-      callOrder = planned.map((row, index) => ({
-        id: -(index + 1),
-        call_index: row.call_index,
-        ball_number: row.ball_number,
-        column_letter: row.column_letter,
-        track_title: row.track_title,
-        artist_name: row.artist_name,
-        album_name: row.album_name,
-        side: row.side,
-        position: row.position,
-        status: "pending",
-      }));
-    } else if (round === typedSession.current_round) {
-      const { data: currentRoundCalls, error: callsError } = await db
-        .from("bingo_session_calls")
-        .select("id, call_index, ball_number, column_letter, track_title, artist_name, album_name, side, position, status")
-        .eq("session_id", sessionId)
-        .order("call_index", { ascending: true });
-
-      if (callsError) throw new Error(callsError.message);
-      callOrder = ((currentRoundCalls ?? []) as CrateCallEntry[]).map((row) => ({ ...row }));
-    }
+    const callOrder = await deriveRoundCallOrder(db, sessionId, round, typedSession.current_round);
 
     if (callOrder.length === 0) continue;
 
@@ -206,6 +217,31 @@ export async function backfillMissingLegacyCrates(
       await setActiveCrateForRound(db, sessionId, round, firstRoundCrate.crate_letter);
     }
   }
+}
+
+/**
+ * Create a new crate for a round from existing immutable session data.
+ * Returns null when no source call-order data is available for the requested round.
+ */
+export async function createCrateFromRoundData(
+  db: ReturnType<typeof getBingoDb>,
+  sessionId: number,
+  roundNumber: number
+): Promise<BingoSessionCrate | null> {
+  const { data: session, error } = await db
+    .from("bingo_sessions")
+    .select("current_round")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!session) return null;
+
+  const currentRound = Number((session as { current_round: number }).current_round || 1);
+  const callOrder = await deriveRoundCallOrder(db, sessionId, roundNumber, currentRound);
+  if (callOrder.length === 0) return null;
+
+  return saveCrateForRound(db, sessionId, roundNumber, callOrder);
 }
 
 /**

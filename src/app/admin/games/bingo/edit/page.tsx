@@ -37,11 +37,20 @@ type Session = {
   seconds_to_next_call: number;
   call_reveal_delay_seconds: number;
   default_intermission_seconds: number;
+  active_crate_letter_by_round: { round: number; letter: string }[] | null;
   show_countdown: boolean;
   recent_calls_limit: number;
   next_game_rules_text: string | null;
   is_favorite?: boolean;
   favorite_note?: string | null;
+};
+
+type BingoCrate = {
+  id: number;
+  session_id: number;
+  round_number: number;
+  crate_name: string;
+  crate_letter: string;
 };
 
 export default function BingoEditSessionPage() {
@@ -67,6 +76,9 @@ export default function BingoEditSessionPage() {
   const [sonosDelayMs, setSonosDelayMs] = useState(75);
   const [callRevealDelay, setCallRevealDelay] = useState(0);
   const [defaultIntermissionMinutes, setDefaultIntermissionMinutes] = useState(10);
+  const [crates, setCrates] = useState<BingoCrate[]>([]);
+  const [activeCrateByRound, setActiveCrateByRound] = useState<{ round: number; letter: string }[]>([]);
+  const [crateBusyRound, setCrateBusyRound] = useState<number | null>(null);
   const [showCountdown, setShowCountdown] = useState(true);
   const [recentCallsLimit, setRecentCallsLimit] = useState(5);
   const [nextGameRulesText, setNextGameRulesText] = useState("");
@@ -99,19 +111,21 @@ export default function BingoEditSessionPage() {
     setError(null);
 
     try {
-      const [eventsRes, playlistsRes, sessionRes] = await Promise.all([
+      const [eventsRes, playlistsRes, sessionRes, cratesRes] = await Promise.all([
         fetch("/api/games/bingo/events"),
         fetch("/api/games/playlists"),
         fetch(`/api/games/bingo/sessions/${sessionId}`),
+        fetch(`/api/games/bingo/sessions/${sessionId}/crates`, { cache: "no-store" }),
       ]);
 
-      if (!eventsRes.ok || !playlistsRes.ok || !sessionRes.ok) {
+      if (!eventsRes.ok || !playlistsRes.ok || !sessionRes.ok || !cratesRes.ok) {
         throw new Error("Failed to load session edit data.");
       }
 
       const eventsPayload = await eventsRes.json();
       const playlistsPayload = await playlistsRes.json();
       const sessionPayload = (await sessionRes.json()) as Session;
+      const cratesPayload = (await cratesRes.json()) as { data?: BingoCrate[] };
 
       setEvents(eventsPayload.data ?? []);
       setPlaylists(playlistsPayload.data ?? []);
@@ -154,6 +168,8 @@ export default function BingoEditSessionPage() {
       setShowCountdown(Boolean(sessionPayload.show_countdown));
       setRecentCallsLimit(sessionPayload.recent_calls_limit ?? 5);
       setNextGameRulesText(sessionPayload.next_game_rules_text ?? "");
+      setCrates(cratesPayload.data ?? []);
+      setActiveCrateByRound(sessionPayload.active_crate_letter_by_round ?? []);
       setIsFavorite(Boolean(sessionPayload.is_favorite));
       setFavoriteNote(sessionPayload.favorite_note ?? "");
     } catch (loadError) {
@@ -295,6 +311,71 @@ export default function BingoEditSessionPage() {
       setSaving(false);
     }
   };
+
+  const getActiveCrateForRound = useCallback(
+    (round: number) => activeCrateByRound.find((entry) => entry.round === round)?.letter ?? "",
+    [activeCrateByRound]
+  );
+
+  const getCratesForRound = useCallback(
+    (round: number) => crates.filter((crate) => crate.round_number === round),
+    [crates]
+  );
+
+  const selectCrateForRound = useCallback(
+    async (round: number, crateLetter: string) => {
+      if (!Number.isFinite(sessionId)) return;
+      setCrateBusyRound(round);
+      setError(null);
+      try {
+        const res = await fetch(`/api/games/bingo/sessions/${sessionId}/crates`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ round_number: round, crate_letter: crateLetter || null }),
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error((payload as { error?: string }).error ?? "Failed to set crate");
+        await load();
+      } catch (crateError) {
+        setError(crateError instanceof Error ? crateError.message : "Failed to set crate");
+      } finally {
+        setCrateBusyRound(null);
+      }
+    },
+    [load, sessionId]
+  );
+
+  const createCrateForRound = useCallback(
+    async (round: number) => {
+      if (!Number.isFinite(sessionId)) return;
+      setCrateBusyRound(round);
+      setError(null);
+      try {
+        const res = await fetch(`/api/games/bingo/sessions/${sessionId}/crates`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ round_number: round }),
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error((payload as { error?: string }).error ?? "Failed to create crate");
+
+        const created = (payload as { data?: BingoCrate }).data;
+        if (created?.crate_letter) {
+          await fetch(`/api/games/bingo/sessions/${sessionId}/crates`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ round_number: round, crate_letter: created.crate_letter }),
+          });
+        }
+        await load();
+      } catch (crateError) {
+        setError(crateError instanceof Error ? crateError.message : "Failed to create crate");
+      } finally {
+        setCrateBusyRound(null);
+      }
+    },
+    [load, sessionId]
+  );
 
   const resetGame = async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -497,6 +578,37 @@ export default function BingoEditSessionPage() {
                           ) : (
                             <p className="mt-2 text-[11px] text-stone-500">Using master playlist selection for this round.</p>
                           )}
+                        </div>
+
+                        <div className="mt-3 border-t border-stone-800 pt-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-stone-300">
+                            Round {round} Call Order (Crate)
+                          </p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <select
+                              className="rounded border border-stone-700 bg-stone-950 px-2 py-1 text-xs"
+                              value={getActiveCrateForRound(round)}
+                              disabled={crateBusyRound === round}
+                              onChange={(event) => {
+                                void selectCrateForRound(round, event.target.value);
+                              }}
+                            >
+                              <option value="">No crate selected</option>
+                              {getCratesForRound(round).map((crate) => (
+                                <option key={`${round}-${crate.crate_letter}`} value={crate.crate_letter}>
+                                  {crate.crate_name}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => { void createCrateForRound(round); }}
+                              disabled={crateBusyRound === round}
+                              className="rounded border border-amber-700/70 bg-amber-950/30 px-2 py-1 text-xs text-amber-200 disabled:opacity-50"
+                            >
+                              {crateBusyRound === round ? "Creating..." : "Create New Crate"}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );

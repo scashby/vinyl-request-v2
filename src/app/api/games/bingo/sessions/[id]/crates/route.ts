@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
-import { backfillMissingLegacyCrates, getCratesForSession, setActiveCrateForRound } from "src/lib/bingoCrateModel";
+import {
+  backfillMissingLegacyCrates,
+  createCrateFromRoundData,
+  getCratesForSession,
+  setActiveCrateForRound,
+} from "src/lib/bingoCrateModel";
 
 export const runtime = "nodejs";
 
@@ -66,6 +71,42 @@ export async function PATCH(
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to set active crate" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const sessionId = Number(id);
+  if (!Number.isFinite(sessionId)) {
+    return NextResponse.json({ error: "Invalid session id" }, { status: 400 });
+  }
+
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  const roundNumber = Number(body.round_number);
+
+  if (!Number.isFinite(roundNumber) || roundNumber < 1) {
+    return NextResponse.json({ error: "round_number must be a positive integer" }, { status: 400 });
+  }
+
+  const db = getBingoDb();
+  try {
+    const created = await createCrateFromRoundData(db, sessionId, roundNumber);
+    if (!created) {
+      return NextResponse.json(
+        { error: "No existing round call-order data available to create a crate for that round" },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({ data: created }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to create crate" },
       { status: 500 }
     );
   }
