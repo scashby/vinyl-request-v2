@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
-import { generateCardRows } from "src/lib/bingoEngine";
+import { generateAdditionalCards, generateCardRows } from "src/lib/bingoEngine";
 import { autoSyncSessionPlaylistMetadata } from "src/lib/playlistMetadataSync";
 
 export const runtime = "nodejs";
@@ -90,4 +90,42 @@ export async function GET(request: NextRequest) {
   });
 
   return NextResponse.json({ data: hydrated }, { status: 200 });
+}
+
+export async function POST(request: NextRequest) {
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  const sessionId = Number(body.sessionId);
+  const requestedCount = Number(body.count);
+
+  if (!Number.isFinite(sessionId)) {
+    return NextResponse.json({ error: "sessionId is required" }, { status: 400 });
+  }
+
+  if (!Number.isFinite(requestedCount) || requestedCount < 1) {
+    return NextResponse.json({ error: "count must be a positive integer" }, { status: 400 });
+  }
+
+  const db = getBingoDb();
+  const { data: session } = await db
+    .from("bingo_sessions")
+    .select("id, session_code, card_label_mode")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  const labelMode = (session?.card_label_mode ?? "track_artist") as "track_artist" | "track_only";
+  const sessionCode = session?.session_code ?? `BINGO-${sessionId}`;
+
+  try {
+    const created = await generateAdditionalCards(
+      db,
+      sessionId,
+      Math.floor(requestedCount),
+      labelMode,
+      sessionCode
+    );
+    return NextResponse.json({ createdCount: created.length }, { status: 201 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to generate additional cards";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

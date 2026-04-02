@@ -946,13 +946,90 @@ export async function generateCards(
   if (insertError) throw new Error(insertError.message);
 }
 
-export async function generateCardRows(
+type GeneratedCardRow = {
+  session_id: number;
+  card_number: number;
+  card_identifier: string;
+  has_free_space: boolean;
+  grid: BingoCardCell[];
+};
+
+function buildCardSignature(grid: BingoCardCell[]): string {
+  return grid
+    .filter((cell) => !cell.free)
+    .sort((a, b) => {
+      if (a.row !== b.row) return a.row - b.row;
+      return a.col - b.col;
+    })
+    .map((cell) => `${cell.column_letter}:${cell.call_id ?? 0}`)
+    .join("|");
+}
+
+function coerceStoredCardSignature(grid: unknown): string | null {
+  if (!Array.isArray(grid)) return null;
+
+  const cells = grid
+    .filter((cell): cell is Record<string, unknown> => Boolean(cell) && typeof cell === "object")
+    .map((cell) => ({
+      row: Number(cell.row ?? 0),
+      col: Number(cell.col ?? 0),
+      free: Boolean(cell.free),
+      column_letter: String(cell.column_letter ?? "") as BingoColumn,
+      call_id: typeof cell.call_id === "number" ? cell.call_id : null,
+      track_title: String(cell.track_title ?? ""),
+      artist_name: String(cell.artist_name ?? ""),
+      label: String(cell.label ?? ""),
+    } satisfies BingoCardCell));
+
+  return cells.length > 0 ? buildCardSignature(cells) : null;
+}
+
+export async function generateAdditionalCards(
   db: BingoDbClient,
   sessionId: number,
   cardCount: number,
   labelMode: "track_artist" | "track_only",
   sessionCode: string
-): Promise<Array<{ session_id: number; card_number: number; card_identifier: string; has_free_space: boolean; grid: BingoCardCell[] }>> {
+): Promise<GeneratedCardRow[]> {
+  const { data: existingCards, error: existingError } = await db
+    .from("bingo_cards")
+    .select("card_number, grid")
+    .eq("session_id", sessionId)
+    .order("card_number", { ascending: true });
+
+  if (existingError) throw new Error(existingError.message);
+
+  const existingSignatures = new Set<string>();
+  let maxCardNumber = 0;
+
+  for (const row of existingCards ?? []) {
+    maxCardNumber = Math.max(maxCardNumber, Number(row.card_number ?? 0));
+    const signature = coerceStoredCardSignature(row.grid);
+    if (signature) existingSignatures.add(signature);
+  }
+
+  const cards = await generateCardRows(db, sessionId, cardCount, labelMode, sessionCode, {
+    startCardNumber: maxCardNumber + 1,
+    existingSignatures,
+  });
+
+  const { error: insertError } = await db.from("bingo_cards").insert(cards);
+  if (insertError) throw new Error(insertError.message);
+
+  return cards;
+}
+
+export async function generateCardRows(
+  db: BingoDbClient,
+  sessionId: number,
+  cardCount: number,
+  labelMode: "track_artist" | "track_only",
+  sessionCode: string,
+  options?: {
+    startCardNumber?: number;
+    existingSignatures?: Set<string>;
+  }
+): Promise<GeneratedCardRow[]> {
   const { data, error } = await db
     .from("bingo_session_calls")
     .select("id, call_index, ball_number, column_letter, track_title, artist_name")
@@ -971,8 +1048,9 @@ export async function generateCardRows(
     O: baseCalls.filter((c) => c.column_letter === "O"),
   };
 
-  const cards: Array<{ session_id: number; card_number: number; card_identifier: string; has_free_space: boolean; grid: BingoCardCell[] }> = [];
-  const signatures = new Set<string>();
+  const cards: GeneratedCardRow[] = [];
+  const signatures = new Set(options?.existingSignatures ?? []);
+  const startCardNumber = Math.max(1, Math.floor(options?.startCardNumber ?? 1));
 
   function buildCardGrid(): BingoCardCell[] {
     const picked = {
@@ -1019,18 +1097,8 @@ export async function generateCardRows(
     return grid;
   }
 
-  function buildCardSignature(grid: BingoCardCell[]): string {
-    return grid
-      .filter((cell) => !cell.free)
-      .sort((a, b) => {
-        if (a.row !== b.row) return a.row - b.row;
-        return a.col - b.col;
-      })
-      .map((cell) => `${cell.column_letter}:${cell.call_id ?? 0}`)
-      .join("|");
-  }
-
-  for (let cardNum = 1; cardNum <= cardCount; cardNum += 1) {
+  for (let cardOffset = 0; cardOffset < cardCount; cardOffset += 1) {
+    const cardNum = startCardNumber + cardOffset;
     let grid: BingoCardCell[] = [];
     let signature = "";
     let generatedUnique = false;

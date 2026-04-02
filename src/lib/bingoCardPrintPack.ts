@@ -1,5 +1,6 @@
 export type PrintableCard = {
   card_number: number;
+  card_identifier?: string;
   grid: Array<{ row: number; col: number; label: string }>;
 };
 

@@ -3,6 +3,7 @@ import { BINGO_COLUMNS, BINGO_COLUMN_RGB, type BingoColumn } from "src/lib/bingo
 
 type Card = {
   card_number: number;
+  card_identifier?: string;
   grid: Array<{ row: number; col: number; label: string }>;
 };
 
@@ -25,9 +26,8 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
   const cardWidth = (pageW - marginX * 2 - gutterX * (columns - 1)) / columns;
   const cardHeight = (pageH - marginY * 2 - gutterY * (rows - 1)) / rows;
 
-  // Printed card title line is intentionally removed for cleaner physical handouts.
-  const headerH = 0;
-  const headerGap = 0;
+  const headerH = 16;
+  const headerGap = 4;
   const columnHeaderH = layout === "4-up" ? 12 : 14;
   const columnHeaderGap = layout === "4-up" ? 4 : 6;
 
@@ -235,6 +235,13 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
     const baseY = yOffsets[slot] ?? 20;
 
     doc.rect(baseX, baseY, cardWidth, cardHeight);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(layout === "4-up" ? 8 : 9);
+    doc.setTextColor(0, 0, 0);
+    doc.text(card.card_identifier ?? `CARD ${card.card_number}`, baseX + cardWidth - 6, baseY + headerH / 2, {
+      align: "right",
+      baseline: "middle",
+    });
 
     const gridX = baseX;
     const gridY = baseY + headerH + headerGap + columnHeaderH + columnHeaderGap;

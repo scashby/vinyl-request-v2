@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { generateBingoCardsPdf } from "src/lib/bingoCardsPdf";
-import { computeAutomaticCardOverage, type PrintableCard } from "src/lib/bingoCardPrintPack";
+import { type PrintableCard } from "src/lib/bingoCardPrintPack";
 import { generateBingoCallSheetPdf } from "src/lib/bingoCallSheetPdf";
 import type { GameMode } from "src/lib/bingoEngine";
 import { buildWelcomeRulesContent, GAME_MODE_OPTIONS, type RoundModesEntry } from "src/lib/bingoModes";
@@ -470,15 +470,13 @@ export default function BingoSetupPage() {
   ]);
 
   const downloadCards = async (sessionId: number, layout: "2-up" | "4-up") => {
-    const session = sessions.find((entry) => entry.id === sessionId);
-    const roundCopies = Math.max(1, session?.round_count ?? 1);
-    const desiredCount = Math.max(1, session?.card_count ?? 1) * roundCopies + computeAutomaticCardOverage(Math.max(1, session?.card_count ?? 1), roundCopies);
-    const cardsRes = await fetch(`/api/games/bingo/cards?sessionId=${sessionId}&fresh=true&count=${desiredCount}`);
+    const cardsRes = await fetch(`/api/games/bingo/cards?sessionId=${sessionId}`);
     if (!cardsRes.ok) return;
 
     const cardsPayload = await cardsRes.json();
     const baseCards = ((cardsPayload.data ?? []) as Array<Record<string, unknown>>).map((row) => ({
       card_number: Number(row.card_number ?? 0),
+      card_identifier: String(row.card_identifier ?? ""),
       grid: Array.isArray(row.grid)
         ? (row.grid as Array<Record<string, unknown>>)
             .filter((cell) => typeof cell === "object" && cell !== null)
@@ -492,6 +490,25 @@ export default function BingoSetupPage() {
 
     const doc = generateBingoCardsPdf(baseCards, layout, `Music Bingo ${sessionId}`);
     doc.save(`bingo-${sessionId}-cards-${layout}.pdf`);
+  };
+
+  const createAdditionalCards = async (session: Session) => {
+    const additionalCount = Math.max(1, session.round_count) * 100;
+    const response = await fetch(`/api/games/bingo/cards`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: session.id, count: additionalCount }),
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      alert((payload as { error?: string }).error ?? "Failed to generate additional cards");
+      return;
+    }
+
+    const payload = (await response.json().catch(() => ({}))) as { createdCount?: number };
+    alert(`Created ${payload.createdCount ?? additionalCount} additional cards.`);
+    await load();
   };
 
   const downloadCallSheet = async (
@@ -939,7 +956,7 @@ export default function BingoSetupPage() {
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/host?sessionId=${session.id}`, "bingo_host", "width=1280,height=960,left=0,top=0,noopener,noreferrer")}>Host</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/assistant?sessionId=${session.id}`, "bingo_assistant", "width=1024,height=800,left=1300,top=0,noopener,noreferrer")}>Assistant</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/jumbotron?sessionId=${session.id}`, "bingo_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "2-up")}>Cards Pack 2-up</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => createAdditionalCards(session)}>Add {Math.max(1, session.round_count) * 100} Cards</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "4-up")}>Cards Pack 4-up</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCallSheet(session.id)}>Call Sheet (Live)</button>
                     <button

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { computeAutomaticCardOverage, type PrintableCard } from "src/lib/bingoCardPrintPack";
+import { type PrintableCard } from "src/lib/bingoCardPrintPack";
 import { generateBingoCardsPdf } from "src/lib/bingoCardsPdf";
 import { generateBingoCallSheetPdf } from "src/lib/bingoCallSheetPdf";
 import { formatBallLabel, getBingoColumnTextClass } from "src/lib/bingoBall";
@@ -35,6 +35,7 @@ type Call = {
 type ApiCardRow = {
   id: number;
   card_number: number;
+  card_identifier?: string;
   has_free_space: boolean;
   grid: unknown;
 };
@@ -82,14 +83,13 @@ export default function BingoPrepPage() {
   };
 
   const downloadCards = async (layout: "2-up" | "4-up") => {
-    const roundCopies = Math.max(1, session?.round_count ?? 1);
-    const desiredCount = Math.max(1, session?.card_count ?? 1) * roundCopies + computeAutomaticCardOverage(Math.max(1, session?.card_count ?? 1), roundCopies);
-    const cardsRes = await fetch(`/api/games/bingo/cards?sessionId=${sessionId}&fresh=true&count=${desiredCount}`);
+    const cardsRes = await fetch(`/api/games/bingo/cards?sessionId=${sessionId}`);
     if (!cardsRes.ok) return;
     const payload = await cardsRes.json();
     const apiRows = (payload.data ?? []) as ApiCardRow[];
     const baseCards = apiRows.map((row) => ({
       card_number: row.card_number,
+      card_identifier: row.card_identifier ?? "",
       grid: Array.isArray(row.grid)
         ? (row.grid as Array<Record<string, unknown>>)
             .filter((cell) => typeof cell === "object" && cell !== null)
@@ -103,6 +103,17 @@ export default function BingoPrepPage() {
 
     const doc = generateBingoCardsPdf(baseCards, layout, `Music Bingo · ${session?.session_code ?? sessionId}`);
     doc.save(`bingo-${sessionId}-cards-${layout}.pdf`);
+  };
+
+  const createAdditionalCards = async () => {
+    const additionalCount = Math.max(1, session?.round_count ?? 1) * 100;
+    const response = await fetch(`/api/games/bingo/cards`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, count: additionalCount }),
+    });
+    if (!response.ok) return;
+    await load();
   };
 
   return (
@@ -176,7 +187,7 @@ export default function BingoPrepPage() {
               <h2 className="text-sm font-bold uppercase tracking-wide text-amber-200">Downloads</h2>
               <div className="mt-3 flex flex-wrap gap-2 text-xs">
                 <button onClick={downloadCratePullSheet} className="rounded bg-amber-700 px-3 py-2">Crate Pull PDF</button>
-                <button onClick={() => downloadCards("2-up")} className="rounded bg-stone-800 px-3 py-2">Cards Pack PDF (2-up)</button>
+                <button onClick={createAdditionalCards} className="rounded bg-stone-800 px-3 py-2">Add {Math.max(1, session?.round_count ?? 1) * 100} Cards</button>
                 <button onClick={() => downloadCards("4-up")} className="rounded bg-stone-800 px-3 py-2">Cards Pack PDF (4-up)</button>
               </div>
               <p className="mt-3 text-xs text-stone-400">
