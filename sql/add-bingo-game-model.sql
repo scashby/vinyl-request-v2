@@ -7,7 +7,7 @@ ALTER TABLE public.bingo_sessions
   ADD COLUMN IF NOT EXISTS favorite_note text;
 
 UPDATE public.bingo_sessions
-SET master_playlist_ids = COALESCE(playlist_ids, jsonb_build_array(playlist_id))
+SET master_playlist_ids = COALESCE(to_jsonb(playlist_ids), jsonb_build_array(playlist_id))
 WHERE master_playlist_ids IS NULL;
 
 CREATE TABLE IF NOT EXISTS public.bingo_session_round_tracks (
