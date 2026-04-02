@@ -70,7 +70,6 @@ export default function BingoHostPage() {
   const [resetCounter, setResetCounter] = useState(0);
   const [savingOverlay, setSavingOverlay] = useState(false);
   const [switchingCrate, setSwitchingCrate] = useState(false);
-  const [creatingCrate, setCreatingCrate] = useState(false);
   const [winnerCheckInput, setWinnerCheckInput] = useState("");
   const [winnerCheckResult, setWinnerCheckResult] = useState<CardValidationResponse | null>(null);
   const [winnerCheckError, setWinnerCheckError] = useState<string | null>(null);
@@ -331,21 +330,6 @@ export default function BingoHostPage() {
     }
   };
 
-  const createCrate = useCallback(async () => {
-    if (!session) return;
-    setCreatingCrate(true);
-    try {
-      await fetch(`/api/games/bingo/sessions/${sessionId}/crates`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ round_number: session.current_round }),
-      });
-      await load();
-    } finally {
-      setCreatingCrate(false);
-    }
-  }, [session, sessionId, load]);
-
   const switchCrate = useCallback(async (crateLetter: string) => {
     if (!session) return;
     setSwitchingCrate(true);
@@ -409,20 +393,6 @@ export default function BingoHostPage() {
     () => crates.filter((c) => c.round_number === (session?.current_round ?? 1)),
     [crates, session?.current_round]
   );
-
-  const allRoundCrateSummary = useMemo(() => {
-    if (!session) return "";
-    const maxRounds = Math.max(1, session.round_count || 1);
-    const parts: string[] = [];
-    for (let round = 1; round <= maxRounds; round += 1) {
-      const letters = crates
-        .filter((crate) => crate.round_number === round)
-        .map((crate) => crate.crate_letter)
-        .sort();
-      parts.push(`R${round}: ${letters.length > 0 ? letters.join(",") : "none"}`);
-    }
-    return parts.join(" · ");
-  }, [crates, session]);
 
   const activeCrateLetter = useMemo(() => {
     if (!session?.active_crate_letter_by_round) return null;
@@ -592,7 +562,9 @@ export default function BingoHostPage() {
               <div className="border-t border-stone-800 pt-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <label className="text-stone-400 whitespace-nowrap">Load Crate</label>
-                  {currentRoundCrates.length > 0 && (
+                  {currentRoundCrates.length === 0 ? (
+                    <span className="text-stone-500 italic">No crates generated yet</span>
+                  ) : (
                     <select
                       value={activeCrateLetter ?? ""}
                       disabled={roundIsStarted || switchingCrate}
@@ -609,16 +581,8 @@ export default function BingoHostPage() {
                       ))}
                     </select>
                   )}
-                  <button
-                    onClick={() => void createCrate()}
-                    disabled={creatingCrate}
-                    className="rounded border border-stone-600 px-2 py-1 text-stone-300 hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {creatingCrate ? "Creating…" : currentRoundCrates.length === 0 ? "Create Crate" : "+ New"}
-                  </button>
                   {roundIsStarted ? <span className="text-[10px] text-stone-500 italic">Locked (round started)</span> : null}
                 </div>
-                <p className="mt-2 text-[10px] text-stone-500">All rounds: {allRoundCrateSummary || "none"}</p>
               </div>
             </div>
 
