@@ -28,6 +28,7 @@ type Session = {
   event_id: number | null;
   playlist_id: number;
   playlist_ids: number[] | null;
+  master_playlist_ids?: number[] | null;
   round_playlist_ids?: RoundPlaylistEntry[] | null;
   playlist_names?: string[];
   session_code: string;
@@ -50,6 +51,8 @@ type Session = {
   show_countdown: boolean;
   recent_calls_limit: number;
   next_game_rules_text: string | null;
+  is_favorite?: boolean;
+  favorite_note?: string | null;
 };
 
 const GAME_BALL_COUNT = 75;
@@ -129,6 +132,8 @@ export default function BingoSetupPage() {
   const [thankYouHeadingText, setThankYouHeadingText] = useState("Thank You For Playing!");
   const [thankYouSubheadingText, setThankYouSubheadingText] = useState("Vinyl Music Bingo");
   const [thankYouEventsHeadingText, setThankYouEventsHeadingText] = useState("Find Us Next At");
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteNote, setFavoriteNote] = useState("");
   const [venueLogoUrl, setVenueLogoUrl] = useState<string | null>(null);
   const [uploadingVenueLogo, setUploadingVenueLogo] = useState(false);
 
@@ -365,6 +370,7 @@ export default function BingoSetupPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           event_id: eventId ? Number(eventId) : null,
+          master_playlist_ids: selectedPlaylistIds,
           playlist_id: selectedPlaylistIds[0],
           playlist_ids: selectedPlaylistIds,
           round_playlist_ids: roundPlaylistIds,
@@ -381,6 +387,8 @@ export default function BingoSetupPage() {
           call_reveal_delay_seconds: callRevealDelaySeconds,
           default_intermission_seconds: defaultIntermissionSeconds,
           next_game_rules_text: welcomePreviewContent.intro || null,
+          is_favorite: isFavorite,
+          favorite_note: favoriteNote.trim() || null,
         }),
       });
 
@@ -707,6 +715,22 @@ export default function BingoSetupPage() {
           >
             {creating ? "Creating..." : "Create Session"}
           </button>
+          <div className="mt-4 rounded-2xl border border-stone-700/70 bg-stone-950/40 p-4">
+            <label className="flex items-center gap-3 text-sm font-semibold text-stone-200">
+              <input type="checkbox" className="h-4 w-4" checked={isFavorite} onChange={(e) => setIsFavorite(e.target.checked)} />
+              Save this game as a favorite after creation
+            </label>
+            <label className="mt-3 block text-sm">
+              Favorite Note
+              <textarea
+                rows={3}
+                className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm"
+                value={favoriteNote}
+                onChange={(e) => setFavoriteNote(e.target.value)}
+                placeholder="Why this game playlist worked well, crowd energy notes, room fit, etc."
+              />
+            </label>
+          </div>
         </section>
 
         {/* ── SECTION 2: Gameplay Timing ────────────────────────── */}

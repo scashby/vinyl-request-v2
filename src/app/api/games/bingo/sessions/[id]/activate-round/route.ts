@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
 import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
+import { getRoundSnapshotTracks } from "src/lib/bingoGameModel";
 import { resolveRoundPlaylistIds, type RoundPlaylistEntry } from "src/lib/bingoRoundPlaylists";
 
 export const runtime = "nodejs";
@@ -51,7 +52,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: `round must be between 1 and ${typedSession.round_count}` }, { status: 400 });
     }
 
-    const tracks = await resolvePlaylistTracksForPlaylists(db, resolveRoundPlaylistIds(typedSession, requestedRound));
+    const snapshotTracks = await getRoundSnapshotTracks(db, sessionId, requestedRound);
+    const tracks = snapshotTracks.length > 0
+      ? snapshotTracks
+      : await resolvePlaylistTracksForPlaylists(db, resolveRoundPlaylistIds(typedSession, requestedRound));
     const plannedCalls = planRoundSessionCalls(tracks, sessionId, requestedRound);
 
     const { data: existingCalls, error: existingError } = await db

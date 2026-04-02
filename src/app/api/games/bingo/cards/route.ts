@@ -21,11 +21,12 @@ export async function GET(request: NextRequest) {
   }
   const { data: session } = await db
     .from("bingo_sessions")
-    .select("id, card_label_mode, card_count")
+    .select("id, session_code, card_label_mode, card_count")
     .eq("id", sessionId)
     .maybeSingle();
 
   const labelMode = (session?.card_label_mode ?? "track_artist") as "track_artist" | "track_only";
+  const sessionCode = session?.session_code ?? `BINGO-${sessionId}`;
 
   if (fresh) {
     const cardCount = Number.isFinite(requestedCount) && requestedCount > 0
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
       : Math.max(1, Math.floor(Number(session?.card_count ?? 1)));
 
     try {
-      const generated = await generateCardRows(db, sessionId, cardCount, labelMode);
+      const generated = await generateCardRows(db, sessionId, cardCount, labelMode, sessionCode);
       return NextResponse.json({ data: generated }, { status: 200 });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to generate fresh cards";
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await db
     .from("bingo_cards")
-    .select("id, session_id, card_number, has_free_space, grid, created_at")
+    .select("id, session_id, card_number, card_identifier, has_free_space, grid, created_at")
     .eq("session_id", sessionId)
     .order("card_number", { ascending: true });
 

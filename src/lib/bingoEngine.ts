@@ -161,6 +161,15 @@ export function parseTrackKey(trackKey: string): ParsedTrackKey {
 
 const GAME_BALL_COUNT = 75;
 
+export function buildCardIdentifier(sessionCode: string, cardNumber: number): string {
+  const normalizedCode = String(sessionCode ?? "")
+    .trim()
+    .replace(/[^A-Z0-9-]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .toUpperCase() || "BINGO";
+  return `${normalizedCode}-${String(Math.max(1, Math.floor(cardNumber))).padStart(3, "0")}`;
+}
+
 export function computeMinimumPlaylistTracks(roundCount: number, cardCount: number): number {
   void roundCount;
   void cardCount;
@@ -202,7 +211,11 @@ function stableRoundSort<T>(items: T[], seed: string, keyForItem: (item: T) => s
     .map((entry) => entry.item);
 }
 
-function getRoundTrackPool(tracks: ResolvedPlaylistTrack[], sessionId: number, roundNumber: number): ResolvedPlaylistTrack[] {
+export function buildRoundTrackPool(
+  tracks: ResolvedPlaylistTrack[],
+  sessionId: number,
+  roundNumber: number
+): ResolvedPlaylistTrack[] {
   void roundNumber;
   const seed = `session:${sessionId}:playlist-order:v1`;
   const ordered = stableRoundSort(tracks, seed, (track) => track.trackKey);
@@ -215,7 +228,7 @@ export function planRoundSessionCalls(
   roundNumber: number
 ): PlannedSessionCall[] {
   const normalizedRound = Math.max(1, Math.floor(roundNumber || 1));
-  const roundTracks = getRoundTrackPool(tracks, sessionId, normalizedRound);
+  const roundTracks = buildRoundTrackPool(tracks, sessionId, normalizedRound);
 
   if (roundTracks.length < GAME_BALL_COUNT) {
     throw new Error(`Playlist must contain at least ${GAME_BALL_COUNT} tracks to build a bingo crate.`);
@@ -924,9 +937,10 @@ export async function generateCards(
   db: BingoDbClient,
   sessionId: number,
   cardCount: number,
-  labelMode: "track_artist" | "track_only"
+  labelMode: "track_artist" | "track_only",
+  sessionCode: string
 ): Promise<void> {
-  const cards = await generateCardRows(db, sessionId, cardCount, labelMode);
+  const cards = await generateCardRows(db, sessionId, cardCount, labelMode, sessionCode);
 
   const { error: insertError } = await db.from("bingo_cards").insert(cards);
   if (insertError) throw new Error(insertError.message);
@@ -936,8 +950,9 @@ export async function generateCardRows(
   db: BingoDbClient,
   sessionId: number,
   cardCount: number,
-  labelMode: "track_artist" | "track_only"
-): Promise<Array<{ session_id: number; card_number: number; has_free_space: boolean; grid: BingoCardCell[] }>> {
+  labelMode: "track_artist" | "track_only",
+  sessionCode: string
+): Promise<Array<{ session_id: number; card_number: number; card_identifier: string; has_free_space: boolean; grid: BingoCardCell[] }>> {
   const { data, error } = await db
     .from("bingo_session_calls")
     .select("id, call_index, ball_number, column_letter, track_title, artist_name")
@@ -956,7 +971,7 @@ export async function generateCardRows(
     O: baseCalls.filter((c) => c.column_letter === "O"),
   };
 
-  const cards: Array<{ session_id: number; card_number: number; has_free_space: boolean; grid: BingoCardCell[] }> = [];
+  const cards: Array<{ session_id: number; card_number: number; card_identifier: string; has_free_space: boolean; grid: BingoCardCell[] }> = [];
   const signatures = new Set<string>();
 
   function buildCardGrid(): BingoCardCell[] {
@@ -1038,6 +1053,7 @@ export async function generateCardRows(
     cards.push({
       session_id: sessionId,
       card_number: cardNum,
+      card_identifier: buildCardIdentifier(sessionCode, cardNum),
       has_free_space: true,
       grid,
     });

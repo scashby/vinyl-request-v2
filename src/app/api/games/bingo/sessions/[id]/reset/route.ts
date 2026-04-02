@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
 import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
+import { getRoundSnapshotTracks } from "src/lib/bingoGameModel";
 
 export const runtime = "nodejs";
 
@@ -43,7 +44,10 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
   const typedSession = session as SessionRow;
-  const tracks = await resolvePlaylistTracksForPlaylists(db, resolveSessionPlaylistIds(typedSession));
+  const snapshotTracks = await getRoundSnapshotTracks(db, sessionId, 1);
+  const tracks = snapshotTracks.length > 0
+    ? snapshotTracks
+    : await resolvePlaylistTracksForPlaylists(db, resolveSessionPlaylistIds(typedSession));
   const plannedCalls = planRoundSessionCalls(tracks, sessionId, 1);
 
   const { data: existingCalls, error: existingError } = await db

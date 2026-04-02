@@ -33,6 +33,18 @@ type Call = BingoTransportCall & {
   position?: string | null;
 };
 
+type CardValidationResponse = {
+  card_identifier: string;
+  is_winner: boolean;
+  active_modes: GameMode[];
+  winning_patterns: Array<{ mode: GameMode; label: string }>;
+  mistakes: Array<{ mode: GameMode; message: string; missing_cells: Array<{ label: string }> }>;
+  expected_free_square_count: number;
+  actual_free_square_count: number;
+  marked_square_count: number;
+  playable_square_count: number;
+};
+
 export default function BingoHostPage() {
   const searchParams = useSearchParams();
   const sessionId = Number(searchParams.get("sessionId"));
@@ -46,6 +58,10 @@ export default function BingoHostPage() {
   const [autoCallEnabled, setAutoCallEnabled] = useState(false);
   const [resetCounter, setResetCounter] = useState(0);
   const [savingOverlay, setSavingOverlay] = useState(false);
+  const [winnerCheckInput, setWinnerCheckInput] = useState("");
+  const [winnerCheckResult, setWinnerCheckResult] = useState<CardValidationResponse | null>(null);
+  const [winnerCheckError, setWinnerCheckError] = useState<string | null>(null);
+  const [checkingWinner, setCheckingWinner] = useState(false);
   const currentCallRowRef = useRef<HTMLTableRowElement>(null);
   const autoCallLockRef = useRef(false);
   const revealDelayEditingRef = useRef(false);
@@ -325,6 +341,30 @@ export default function BingoHostPage() {
     [load]
   );
 
+  const checkWinner = useCallback(async () => {
+    const cardIdentifier = winnerCheckInput.trim().toUpperCase();
+    if (!cardIdentifier) return;
+
+    setCheckingWinner(true);
+    setWinnerCheckError(null);
+    try {
+      const response = await fetch(
+        `/api/games/bingo/cards/validate?sessionId=${sessionId}&cardIdentifier=${encodeURIComponent(cardIdentifier)}`,
+        { cache: "no-store" }
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error((payload as { error?: string }).error ?? "Failed to validate card");
+      }
+      setWinnerCheckResult(payload as CardValidationResponse);
+    } catch (error) {
+      setWinnerCheckResult(null);
+      setWinnerCheckError(error instanceof Error ? error.message : "Failed to validate card");
+    } finally {
+      setCheckingWinner(false);
+    }
+  }, [sessionId, winnerCheckInput]);
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#0c0c0c,#1b1b1b)] p-5 text-stone-100">
       <div className="mx-auto max-w-[1600px] space-y-3">
@@ -413,6 +453,31 @@ export default function BingoHostPage() {
               >
                 Bingo Winner!
               </button>
+              <div className="flex items-center gap-1 rounded border border-stone-700/80 bg-stone-950/50 px-2 py-1">
+                <label className="text-stone-400 whitespace-nowrap">Check Winner</label>
+                <input
+                  type="text"
+                  value={winnerCheckInput}
+                  onChange={(e) => setWinnerCheckInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      void checkWinner();
+                    }
+                  }}
+                  placeholder="CARD ID"
+                  className="w-28 rounded border border-stone-700 bg-black px-2 py-1 text-center uppercase tracking-[0.08em]"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    void checkWinner();
+                  }}
+                  disabled={checkingWinner}
+                  className="rounded border border-sky-700 px-2 py-1 text-sky-300 hover:bg-sky-900/20 disabled:opacity-50"
+                >
+                  {checkingWinner ? "Checking" : "Run"}
+                </button>
+              </div>
               <div className="flex items-center gap-1">
                 <label className="text-stone-400 whitespace-nowrap">Reveal Delay (sec)</label>
                 <input
@@ -468,6 +533,36 @@ export default function BingoHostPage() {
                       );
                     })}
                   </div>
+                </div>
+              ) : null}
+              {winnerCheckError ? (
+                <div className="w-full rounded border border-red-900/70 bg-red-950/40 p-2 text-[11px] text-red-200">
+                  {winnerCheckError}
+                </div>
+              ) : null}
+              {winnerCheckResult ? (
+                <div className={`w-full rounded border p-2 text-[11px] ${winnerCheckResult.is_winner ? "border-emerald-800/70 bg-emerald-950/30 text-emerald-100" : "border-amber-800/70 bg-amber-950/30 text-amber-100"}`}>
+                  <p className="font-bold uppercase tracking-[0.08em]">
+                    {winnerCheckResult.card_identifier} · {winnerCheckResult.is_winner ? "Winner" : "Not Yet Winning"}
+                  </p>
+                  <p className="mt-1 text-stone-300">
+                    Free squares {winnerCheckResult.actual_free_square_count}/{winnerCheckResult.expected_free_square_count} · Marked {winnerCheckResult.marked_square_count}/{winnerCheckResult.playable_square_count + winnerCheckResult.actual_free_square_count}
+                  </p>
+                  {winnerCheckResult.winning_patterns.length > 0 ? (
+                    <p className="mt-1 text-emerald-200">
+                      {winnerCheckResult.winning_patterns.map((pattern) => `${pattern.mode.replace("_", " ")}: ${pattern.label}`).join(" | ")}
+                    </p>
+                  ) : null}
+                  {winnerCheckResult.mistakes.length > 0 ? (
+                    <div className="mt-1 space-y-1 text-amber-100">
+                      {winnerCheckResult.mistakes.slice(0, 2).map((mistake) => (
+                        <p key={`${mistake.mode}-${mistake.message}`}>
+                          {mistake.message}
+                          {mistake.missing_cells.length > 0 ? ` Missing: ${mistake.missing_cells.slice(0, 4).map((cell) => cell.label).join(", ")}` : ""}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>

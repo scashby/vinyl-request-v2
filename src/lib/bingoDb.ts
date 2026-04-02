@@ -189,6 +189,7 @@ export type BingoDatabase = {
           event_id: number | null;
           playlist_id: number;
           playlist_ids: number[] | null;
+          master_playlist_ids: number[] | null;
           session_code: string;
           game_mode: string;
           card_count: number;
@@ -223,15 +224,19 @@ export type BingoDatabase = {
           next_game_rules_text: string | null;
           round_modes: { round: number; modes: string[] }[] | null;
           round_playlist_ids: { round: number; playlist_ids: number[] }[] | null;
+          round_crate_ids: { round: number; crate_id: number }[] | null;
           call_reveal_delay_seconds: number;
           call_reveal_at: string | null;
           bingo_overlay: string;
           default_intermission_seconds: number;
+          is_favorite: boolean;
+          favorite_note: string | null;
         };
         Insert: {
           id?: number;
           event_id?: number | null;
           playlist_ids?: number[] | null;
+          master_playlist_ids?: number[] | null;
           default_intermission_seconds?: number;
           playlist_id: number;
           session_code: string;
@@ -268,14 +273,18 @@ export type BingoDatabase = {
           next_game_rules_text?: string | null;
           round_modes?: { round: number; modes: string[] }[] | null;
           round_playlist_ids?: { round: number; playlist_ids: number[] }[] | null;
+          round_crate_ids?: { round: number; crate_id: number }[] | null;
           call_reveal_delay_seconds?: number;
           call_reveal_at?: string | null;
           bingo_overlay?: string;
+          is_favorite?: boolean;
+          favorite_note?: string | null;
         };
         Update: {
           id?: number;
           event_id?: number | null;
           playlist_ids?: number[] | null;
+          master_playlist_ids?: number[] | null;
           default_intermission_seconds?: number;
           playlist_id?: number;
           session_code?: string;
@@ -312,9 +321,12 @@ export type BingoDatabase = {
           next_game_rules_text?: string | null;
           round_modes?: { round: number; modes: string[] }[] | null;
           round_playlist_ids?: { round: number; playlist_ids: number[] }[] | null;
+          round_crate_ids?: { round: number; crate_id: number }[] | null;
           call_reveal_delay_seconds?: number;
           call_reveal_at?: string | null;
           bingo_overlay?: string;
+          is_favorite?: boolean;
+          favorite_note?: string | null;
         };
         Relationships: [];
       };
@@ -386,6 +398,7 @@ export type BingoDatabase = {
           id: number;
           session_id: number;
           card_number: number;
+          card_identifier: string;
           has_free_space: boolean;
           grid: Json;
           created_at: string;
@@ -394,6 +407,7 @@ export type BingoDatabase = {
           id?: number;
           session_id: number;
           card_number: number;
+          card_identifier: string;
           has_free_space?: boolean;
           grid: Json;
           created_at?: string;
@@ -402,8 +416,54 @@ export type BingoDatabase = {
           id?: number;
           session_id?: number;
           card_number?: number;
+          card_identifier?: string;
           has_free_space?: boolean;
           grid?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      bingo_session_round_tracks: {
+        Row: {
+          id: number;
+          session_id: number;
+          round_number: number;
+          slot_index: number;
+          playlist_track_key: string;
+          source_playlist_id: number | null;
+          track_title: string;
+          artist_name: string;
+          album_name: string | null;
+          side: string | null;
+          position: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          session_id: number;
+          round_number: number;
+          slot_index: number;
+          playlist_track_key: string;
+          source_playlist_id?: number | null;
+          track_title: string;
+          artist_name: string;
+          album_name?: string | null;
+          side?: string | null;
+          position?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          session_id?: number;
+          round_number?: number;
+          slot_index?: number;
+          playlist_track_key?: string;
+          source_playlist_id?: number | null;
+          track_title?: string;
+          artist_name?: string;
+          album_name?: string | null;
+          side?: string | null;
+          position?: string | null;
           created_at?: string;
         };
         Relationships: [];

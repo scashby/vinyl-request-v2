@@ -71,7 +71,11 @@ ALTER TABLE public.bingo_sessions
   ADD COLUMN IF NOT EXISTS host_buffer_seconds integer NOT NULL DEFAULT 2,
   ADD COLUMN IF NOT EXISTS seconds_to_next_call integer NOT NULL DEFAULT 45,
   ADD COLUMN IF NOT EXISTS sonos_output_delay_ms integer NOT NULL DEFAULT 75,
-  ADD COLUMN IF NOT EXISTS round_modes jsonb;
+  ADD COLUMN IF NOT EXISTS round_modes jsonb,
+  ADD COLUMN IF NOT EXISTS master_playlist_ids jsonb,
+  ADD COLUMN IF NOT EXISTS round_crate_ids jsonb,
+  ADD COLUMN IF NOT EXISTS is_favorite boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS favorite_note text;
 
 CREATE TABLE IF NOT EXISTS public.bingo_session_calls (
   id bigserial PRIMARY KEY,
@@ -108,10 +112,34 @@ CREATE TABLE IF NOT EXISTS public.bingo_cards (
   id bigserial PRIMARY KEY,
   session_id bigint NOT NULL REFERENCES public.bingo_sessions(id) ON DELETE CASCADE,
   card_number integer NOT NULL,
+  card_identifier text NOT NULL,
   has_free_space boolean NOT NULL DEFAULT true,
   grid jsonb NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT bingo_cards_unique_card_number UNIQUE (session_id, card_number)
+  CONSTRAINT bingo_cards_unique_card_number UNIQUE (session_id, card_number),
+  CONSTRAINT bingo_cards_unique_card_identifier UNIQUE (card_identifier)
+);
+
+ALTER TABLE public.bingo_cards
+  ADD COLUMN IF NOT EXISTS card_identifier text;
+
+CREATE TABLE IF NOT EXISTS public.bingo_session_round_tracks (
+  id bigserial PRIMARY KEY,
+  session_id bigint NOT NULL REFERENCES public.bingo_sessions(id) ON DELETE CASCADE,
+  round_number integer NOT NULL,
+  slot_index integer NOT NULL,
+  playlist_track_key text NOT NULL,
+  source_playlist_id bigint REFERENCES public.collection_playlists(id) ON DELETE SET NULL,
+  track_title text NOT NULL,
+  artist_name text NOT NULL,
+  album_name text,
+  side text,
+  position text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT bingo_session_round_tracks_round_chk CHECK (round_number >= 1),
+  CONSTRAINT bingo_session_round_tracks_slot_chk CHECK (slot_index >= 1),
+  CONSTRAINT bingo_session_round_tracks_unique_slot UNIQUE (session_id, round_number, slot_index),
+  CONSTRAINT bingo_session_round_tracks_unique_track UNIQUE (session_id, round_number, playlist_track_key)
 );
 
 CREATE TABLE IF NOT EXISTS public.bingo_session_events (
@@ -129,6 +157,7 @@ CREATE INDEX IF NOT EXISTS idx_bingo_calls_status ON public.bingo_session_calls(
 CREATE INDEX IF NOT EXISTS idx_bingo_calls_metadata_sync ON public.bingo_session_calls(session_id, metadata_locked, metadata_synced_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_bingo_calls_unique_ball_number ON public.bingo_session_calls(session_id, ball_number) WHERE ball_number IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_bingo_cards_session_id ON public.bingo_cards(session_id);
+CREATE INDEX IF NOT EXISTS idx_bingo_round_tracks_session_round ON public.bingo_session_round_tracks(session_id, round_number);
 CREATE INDEX IF NOT EXISTS idx_bingo_events_session_id ON public.bingo_session_events(session_id);
 
 COMMIT;

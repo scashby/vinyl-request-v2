@@ -21,6 +21,7 @@ type Session = {
   event_id: number | null;
   playlist_id: number;
   playlist_ids: number[] | null;
+  master_playlist_ids?: number[] | null;
   round_playlist_ids: RoundPlaylistEntry[] | null;
   session_code: string;
   game_mode: string;
@@ -38,6 +39,8 @@ type Session = {
   show_countdown: boolean;
   recent_calls_limit: number;
   next_game_rules_text: string | null;
+  is_favorite?: boolean;
+  favorite_note?: string | null;
 };
 
 export default function BingoEditSessionPage() {
@@ -65,6 +68,8 @@ export default function BingoEditSessionPage() {
   const [showCountdown, setShowCountdown] = useState(true);
   const [recentCallsLimit, setRecentCallsLimit] = useState(5);
   const [nextGameRulesText, setNextGameRulesText] = useState("");
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteNote, setFavoriteNote] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -112,8 +117,10 @@ export default function BingoEditSessionPage() {
 
       setEventId(sessionPayload.event_id ?? null);
       setPlaylistIds(
-        Array.isArray(sessionPayload.playlist_ids) && sessionPayload.playlist_ids.length > 0
-          ? sessionPayload.playlist_ids
+        Array.isArray(sessionPayload.master_playlist_ids) && sessionPayload.master_playlist_ids.length > 0
+          ? sessionPayload.master_playlist_ids
+          : Array.isArray(sessionPayload.playlist_ids) && sessionPayload.playlist_ids.length > 0
+            ? sessionPayload.playlist_ids
           : sessionPayload.playlist_id
             ? [sessionPayload.playlist_id]
             : []
@@ -144,6 +151,8 @@ export default function BingoEditSessionPage() {
       setShowCountdown(Boolean(sessionPayload.show_countdown));
       setRecentCallsLimit(sessionPayload.recent_calls_limit ?? 5);
       setNextGameRulesText(sessionPayload.next_game_rules_text ?? "");
+      setIsFavorite(Boolean(sessionPayload.is_favorite));
+      setFavoriteNote(sessionPayload.favorite_note ?? "");
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load session edit data.");
     } finally {
@@ -250,6 +259,7 @@ export default function BingoEditSessionPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           event_id: eventId,
+          master_playlist_ids: playlistIds,
           playlist_id: playlistIds[0],
           playlist_ids: playlistIds,
           round_playlist_ids: roundPlaylistIds,
@@ -268,6 +278,8 @@ export default function BingoEditSessionPage() {
           show_countdown: showCountdown,
           recent_calls_limit: recentCallsLimit,
           next_game_rules_text: nextGameRulesText.trim() || null,
+          is_favorite: isFavorite,
+          favorite_note: favoriteNote.trim() || null,
         }),
       });
 
@@ -496,6 +508,22 @@ export default function BingoEditSessionPage() {
               <label className="block text-sm">Welcome Screen Host Note (optional)
                 <textarea rows={3} className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm" value={nextGameRulesText} onChange={(e) => setNextGameRulesText(e.target.value)} placeholder="Optional extra note shown below the generated mode rules..." />
               </label>
+
+              <div className="rounded border border-stone-700 bg-stone-950/40 p-3">
+                <label className="flex items-center gap-3 text-sm font-semibold text-stone-200">
+                  <input type="checkbox" className="h-4 w-4" checked={isFavorite} onChange={(e) => setIsFavorite(e.target.checked)} />
+                  Mark this game as a favorite
+                </label>
+                <label className="mt-3 block text-sm">Favorite Note
+                  <textarea
+                    rows={3}
+                    className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm"
+                    value={favoriteNote}
+                    onChange={(e) => setFavoriteNote(e.target.value)}
+                    placeholder="What made this game strong: energy, pacing, demographic fit, etc."
+                  />
+                </label>
+              </div>
 
               {error ? <p className="text-sm text-red-400">{error}</p> : null}
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
 import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
+import { getRoundSnapshotTracks } from "src/lib/bingoGameModel";
 import { autoSyncSessionPlaylistMetadata } from "src/lib/playlistMetadataSync";
 import { resolveRoundPlaylistIds, type RoundPlaylistEntry } from "src/lib/bingoRoundPlaylists";
 
@@ -55,7 +56,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     try {
-      const tracks = await resolvePlaylistTracksForPlaylists(db, playlistIdsForRound);
+      const snapshotTracks = await getRoundSnapshotTracks(db, sessionId, requestedRound);
+      const tracks = snapshotTracks.length > 0
+        ? snapshotTracks
+        : await resolvePlaylistTracksForPlaylists(db, playlistIdsForRound);
       const rows = planRoundSessionCalls(tracks, sessionId, requestedRound).map((call, index) => ({
         id: -(index + 1),
         session_id: sessionId,
