@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { formatBallLabel, getBingoColumnTextClass } from "src/lib/bingoBall";
 import type { GameMode } from "src/lib/bingoEngine";
-import { GAME_MODE_OPTIONS, getModesForRound, normalizeRoundModes } from "src/lib/bingoModes";
 import InlineEditableCell from "../../_components/InlineEditableCell";
 import BingoTransportLane, { type BingoTransportCall } from "../_components/BingoTransportLane";
 
@@ -79,6 +78,7 @@ export default function BingoHostPage() {
   const autoCallLockRef = useRef(false);
   const revealDelayEditingRef = useRef(false);
   const intermissionEditingRef = useRef(false);
+  const START_GAME_COUNTDOWN_SECONDS = 300;
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -121,7 +121,7 @@ export default function BingoHostPage() {
 
   useEffect(() => {
     const tick = setInterval(() => {
-      if (!session || session.status === "paused" || session.status === "completed") return;
+      if (!session || session.status !== "running" || (session.current_call_index ?? 0) <= 0) return;
       setRemaining((v) => Math.max(0, v - 1));
     }, 1000);
     return () => clearInterval(tick);
@@ -134,11 +134,6 @@ export default function BingoHostPage() {
     if (byCurrentIndex) return byCurrentIndex;
     return [...calls].reverse().find((call) => call.status === "called") ?? null;
   }, [calls, session?.current_call_index]);
-
-  const activeRoundModes = useMemo(() => {
-    if (!session) return [] as GameMode[];
-    return getModesForRound(session.round_modes ?? [], session.current_round, session.game_mode);
-  }, [session]);
 
   useEffect(() => {
     currentCallRowRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -201,8 +196,8 @@ export default function BingoHostPage() {
   };
 
   const startGame = async () => {
-    // Show countdown screen on jumbotron; host starts the round when ready
-    await patchSession({ bingo_overlay: "countdown" });
+    const startsAt = new Date(Date.now() + START_GAME_COUNTDOWN_SECONDS * 1000).toISOString();
+    await patchSession({ bingo_overlay: "countdown", next_game_scheduled_at: startsAt });
   };
 
   const startRound = async () => {
@@ -217,23 +212,8 @@ export default function BingoHostPage() {
     setAutoCallEnabled(false);
     autoCallLockRef.current = false;
     await patchSession({ bingo_overlay: "none", next_game_scheduled_at: null });
+    await fetch(`/api/games/bingo/sessions/${sessionId}/advance`, { method: "POST" });
     await load();
-  };
-
-  const setModeForActiveRound = async (mode: GameMode) => {
-    if (!session) return;
-    const hasMode = activeRoundModes.includes(mode);
-    const nextModes = hasMode
-      ? activeRoundModes.filter((value) => value !== mode)
-      : [...activeRoundModes, mode];
-
-    const existing = normalizeRoundModes(session.round_modes, session.round_count);
-    const withoutCurrentRound = existing.filter((entry) => entry.round !== session.current_round);
-    const nextRoundModes = nextModes.length > 0
-      ? [...withoutCurrentRound, { round: session.current_round, modes: nextModes }].sort((a, b) => a.round - b.round)
-      : withoutCurrentRound;
-
-    await patchSession({ round_modes: nextRoundModes });
   };
 
   const resetRound = async () => {
@@ -305,31 +285,11 @@ export default function BingoHostPage() {
     await patchSession({ call_reveal_delay_seconds: updatedDelay });
   };
 
-  const nextRound = async () => {
-    if (!session) return;
-    const nextRoundValue = Math.min(session.round_count, session.current_round + 1);
-    if (nextRoundValue === session.current_round) {
-      alert("Already on the final round.");
-      return;
-    }
-    const intermissionSeconds = Math.max(0, intermissionLengthMinutes * 60);
-    const response = await fetch(`/api/games/bingo/sessions/${sessionId}/activate-round`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        round: nextRoundValue,
-        intermission_seconds: intermissionSeconds,
-      }),
-    });
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-      console.error("Failed to activate next round", { sessionId, nextRoundValue, status: response.status, payload });
-      alert(payload?.error ?? "Failed to activate next round");
-      return;
-    }
-    setAutoCallEnabled(false);
-    await patchSession({ bingo_overlay: "none" });
-    await load();
+  const saveIntermissionMinutes = async () => {
+    const updatedMinutes = Math.max(0, Math.floor(intermissionLengthMinutes));
+    setIntermissionLengthMinutes(updatedMinutes);
+    intermissionEditingRef.current = false;
+    await patchSession({ default_intermission_seconds: updatedMinutes * 60 });
   };
 
   const endGame = async () => {
@@ -347,6 +307,27 @@ export default function BingoHostPage() {
     }
     await patchSession({ bingo_overlay: overlay });
     setSavingOverlay(false);
+  };
+
+  const toggleTie = async () => {
+    if (!session) return;
+
+    setSavingOverlay(true);
+    try {
+      if (session.bingo_overlay === "tiebreaker") {
+        await fetch(`/api/games/bingo/sessions/${sessionId}/resume`, { method: "POST" });
+        await patchSession({ bingo_overlay: "none" });
+      } else {
+        if (session.status === "running") {
+          setAutoCallEnabled(false);
+          autoCallLockRef.current = false;
+          await fetch(`/api/games/bingo/sessions/${sessionId}/pause`, { method: "POST" });
+        }
+        await patchSession({ bingo_overlay: "tiebreaker" });
+      }
+    } finally {
+      setSavingOverlay(false);
+    }
   };
 
   const switchCrate = useCallback(async (crateLetter: string) => {
@@ -471,12 +452,10 @@ export default function BingoHostPage() {
 
         {/* ─── Control Panel ──────────────────────────────────────────────────── */}
         <section className="rounded-2xl border border-stone-700 bg-black/45 p-3">
-          <div className="flex flex-wrap gap-4">
+          <div className="grid gap-4 lg:grid-cols-[1.1fr,1.35fr,0.75fr]">
 
-            {/* ── Left block: Game flow + Bingo area + Load Crate ── */}
-            <div className="flex-1 min-w-[260px] space-y-2 text-xs">
-
-              {/* Row 1: Welcome toggle + Start Game */}
+            {/* Left column: CSV-required host controls */}
+            <div className="space-y-2 text-xs">
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => void toggleWelcome()}
@@ -496,14 +475,19 @@ export default function BingoHostPage() {
                 </button>
               </div>
 
-              {/* Row 2: Reset Game */}
               <div className="flex flex-wrap items-center gap-2">
-                <button onClick={() => void resetGame()} className="rounded border border-amber-700 bg-amber-900/40 px-3 py-1 text-amber-100 hover:bg-amber-900/60">Reset Game</button>
+                <button onClick={() => void resetGame()} className="rounded border border-amber-700 bg-amber-900/40 px-3 py-1 text-amber-100 hover:bg-amber-900/60">
+                  Reset Game
+                </button>
+                <button onClick={() => void endGame()} className="rounded border border-red-700 px-3 py-1 text-red-300 hover:bg-red-900/20">
+                  End Game
+                </button>
               </div>
 
-              {/* Row 3: Start Round + Reset Round (Start Round triggers Bingo Winner → next round flow) */}
               <div className="flex flex-wrap items-center gap-2">
-                <button onClick={() => void startRound()} className="rounded border border-emerald-700 bg-emerald-900/35 px-3 py-1 font-bold text-emerald-200 hover:bg-emerald-900/55">Start Round</button>
+                <button onClick={() => void startRound()} className="rounded border border-emerald-700 bg-emerald-900/35 px-3 py-1 font-bold text-emerald-200 hover:bg-emerald-900/55">
+                  Start Round
+                </button>
                 <button
                   onClick={() => void resetRound()}
                   disabled={resetRoundDisabled}
@@ -514,10 +498,35 @@ export default function BingoHostPage() {
                 </button>
               </div>
 
-              {/* Divider */}
-              <div className="border-t border-stone-800" />
+              <div className="border-t border-stone-800 pt-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="text-stone-400 whitespace-nowrap">Load Crate</label>
+                  {currentRoundCrates.length === 0 ? (
+                    <span className="text-stone-500 italic">No crates generated yet</span>
+                  ) : (
+                    <select
+                      value={activeCrateLetter ?? ""}
+                      disabled={roundIsStarted || switchingCrate}
+                      onChange={(e) => {
+                        if (e.target.value) void switchCrate(e.target.value);
+                      }}
+                      className="rounded border border-stone-600 bg-stone-950 px-2 py-1 text-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="">— select —</option>
+                      {currentRoundCrates.map((crate) => (
+                        <option key={crate.crate_letter} value={crate.crate_letter}>
+                          {crate.crate_name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {roundIsStarted ? <span className="text-[10px] text-stone-500 italic">Locked (round started)</span> : null}
+                </div>
+              </div>
+            </div>
 
-              {/* Row 4: Bingo area — Pending + Check + Tie + Winner */}
+            {/* Center column: Bingo Pending / Check / Tie / Winner */}
+            <div className="space-y-2 text-xs">
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => void setOverlay("pending")}
@@ -527,7 +536,7 @@ export default function BingoHostPage() {
                   Bingo Pending
                 </button>
                 <button
-                  onClick={() => void setOverlay("tiebreaker")}
+                  onClick={() => void toggleTie()}
                   disabled={savingOverlay}
                   className={`rounded border px-3 py-1 font-bold transition disabled:opacity-50 ${
                     session?.bingo_overlay === "tiebreaker"
@@ -546,7 +555,6 @@ export default function BingoHostPage() {
                 </button>
               </div>
 
-              {/* Check Winner input */}
               <div className="flex flex-wrap items-center gap-1 rounded border border-stone-700/80 bg-stone-950/50 px-2 py-1">
                 <label className="text-stone-400 whitespace-nowrap">Check Winner</label>
                 <input
@@ -569,7 +577,6 @@ export default function BingoHostPage() {
                 </button>
               </div>
 
-              {/* Winner check result */}
               {winnerCheckError ? (
                 <div className="rounded border border-red-900/70 bg-red-950/40 p-2 text-[11px] text-red-200">
                   {winnerCheckError}
@@ -600,50 +607,10 @@ export default function BingoHostPage() {
                   ) : null}
                 </div>
               ) : null}
-
-              {/* Divider */}
-              <div className="border-t border-stone-800" />
-
-              {/* Load Crate dropdown — locked once round is started */}
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="text-stone-400 whitespace-nowrap">Load Crate</label>
-                {currentRoundCrates.length === 0 ? (
-                  <span className="text-stone-500 italic">No crates generated yet</span>
-                ) : (
-                  <select
-                    value={activeCrateLetter ?? ""}
-                    disabled={roundIsStarted || switchingCrate}
-                    onChange={(e) => {
-                      if (e.target.value) void switchCrate(e.target.value);
-                    }}
-                    className="rounded border border-stone-600 bg-stone-950 px-2 py-1 text-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="">— select —</option>
-                    {currentRoundCrates.map((crate) => (
-                      <option key={crate.crate_letter} value={crate.crate_letter}>
-                        {crate.crate_name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {roundIsStarted ? (
-                  <span className="text-[10px] text-stone-500 italic">Locked (round started)</span>
-                ) : null}
-              </div>
-
-              {/* Bingo Winner → Next Round */}
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={() => void nextRound()}
-                  className="rounded border border-sky-700 px-3 py-1 text-sky-300 hover:bg-sky-900/20"
-                >
-                  Bingo Winner → Next Round
-                </button>
-              </div>
             </div>
 
-            {/* ── Right block: Timing Section ── */}
-            <div className="w-48 shrink-0 space-y-3 text-xs">
+            {/* Right column: Timing section */}
+            <div className="space-y-3 text-xs">
               <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-stone-400">Timing</p>
 
               {/* Next Call input */}
@@ -655,17 +622,12 @@ export default function BingoHostPage() {
                   max={300}
                   value={secondsToNextCallInput}
                   onChange={(e) => setSecondsToNextCallInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)))}
+                  onBlur={() => { void saveSecondsToNextCall(); }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") void saveSecondsToNextCall();
                   }}
                   className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
                 />
-                <button
-                  onClick={() => void saveSecondsToNextCall()}
-                  className="w-full rounded border border-stone-600 px-2 py-1 hover:border-stone-400"
-                >
-                  Set
-                </button>
               </div>
 
               {/* Reveal Delay */}
@@ -697,8 +659,11 @@ export default function BingoHostPage() {
                   min={0}
                   value={intermissionLengthMinutes}
                   onFocus={() => { intermissionEditingRef.current = true; }}
-                  onBlur={() => { intermissionEditingRef.current = false; }}
+                  onBlur={() => { void saveIntermissionMinutes(); }}
                   onChange={(e) => setIntermissionLengthMinutes(Math.max(0, Number(e.target.value) || 0))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void saveIntermissionMinutes();
+                  }}
                   className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
                 />
               </div>

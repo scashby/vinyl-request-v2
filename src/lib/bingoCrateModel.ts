@@ -7,6 +7,8 @@
  */
 
 import { getBingoDb } from "./bingoDb";
+import { planRoundSessionCalls } from "./bingoEngine";
+import { getRoundSnapshotTracks } from "./bingoGameModel";
 
 const CRATE_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
@@ -31,6 +33,12 @@ export type BingoSessionCrate = {
   crate_letter: string;
   call_order: CrateCallEntry[];
   created_at: string;
+};
+
+type SessionCrateBackfillRow = {
+  round_count: number;
+  current_round: number;
+  active_crate_letter_by_round: { round: number; letter: string }[] | null;
 };
 
 /** Return the next available crate letter for a session (across all rounds). */
@@ -120,6 +128,84 @@ export async function getCratesForRound(
     ...row,
     call_order: row.call_order as unknown as CrateCallEntry[],
   }));
+}
+
+/**
+ * Backfill missing crates for legacy sessions from existing immutable round data.
+ *
+ * Source priority per round:
+ * 1) Existing round snapshots (bingo_session_round_tracks)
+ * 2) Current round call rows (bingo_session_calls), current round only
+ *
+ * This intentionally avoids regenerating cards or overwriting existing call sheets.
+ */
+export async function backfillMissingLegacyCrates(
+  db: ReturnType<typeof getBingoDb>,
+  sessionId: number
+): Promise<void> {
+  const { data: session, error: sessionError } = await db
+    .from("bingo_sessions")
+    .select("round_count, current_round, active_crate_letter_by_round")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (sessionError) throw new Error(sessionError.message);
+  if (!session) return;
+
+  const typedSession = session as SessionCrateBackfillRow;
+  const existingCrates = await getCratesForSession(db, sessionId);
+
+  for (let round = 1; round <= Math.max(1, typedSession.round_count || 1); round += 1) {
+    const alreadyHasCrates = existingCrates.some((crate) => crate.round_number === round);
+    if (alreadyHasCrates) continue;
+
+    let callOrder: CrateCallEntry[] = [];
+
+    const snapshotTracks = await getRoundSnapshotTracks(db, sessionId, round);
+    if (snapshotTracks.length > 0) {
+      const planned = planRoundSessionCalls(snapshotTracks, sessionId, round);
+      callOrder = planned.map((row, index) => ({
+        id: -(index + 1),
+        call_index: row.call_index,
+        ball_number: row.ball_number,
+        column_letter: row.column_letter,
+        track_title: row.track_title,
+        artist_name: row.artist_name,
+        album_name: row.album_name,
+        side: row.side,
+        position: row.position,
+        status: "pending",
+      }));
+    } else if (round === typedSession.current_round) {
+      const { data: currentRoundCalls, error: callsError } = await db
+        .from("bingo_session_calls")
+        .select("id, call_index, ball_number, column_letter, track_title, artist_name, album_name, side, position, status")
+        .eq("session_id", sessionId)
+        .order("call_index", { ascending: true });
+
+      if (callsError) throw new Error(callsError.message);
+      callOrder = ((currentRoundCalls ?? []) as CrateCallEntry[]).map((row) => ({ ...row }));
+    }
+
+    if (callOrder.length === 0) continue;
+
+    const createdCrate = await saveCrateForRound(db, sessionId, round, callOrder);
+    existingCrates.push(createdCrate);
+  }
+
+  const activeByRound = typedSession.active_crate_letter_by_round ?? [];
+  for (let round = 1; round <= Math.max(1, typedSession.round_count || 1); round += 1) {
+    const hasActive = activeByRound.some((entry) => entry.round === round);
+    if (hasActive) continue;
+
+    const firstRoundCrate = existingCrates
+      .filter((crate) => crate.round_number === round)
+      .sort((left, right) => left.crate_letter.localeCompare(right.crate_letter))[0];
+
+    if (firstRoundCrate) {
+      await setActiveCrateForRound(db, sessionId, round, firstRoundCrate.crate_letter);
+    }
+  }
 }
 
 /**

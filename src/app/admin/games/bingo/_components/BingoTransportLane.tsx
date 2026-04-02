@@ -137,7 +137,7 @@ export default function BingoTransportLane({
         <div className="flex items-center gap-3">
           {secondsToNextCall !== undefined ? (
             <span
-              className={`rounded border px-2 py-0.5 text-xs font-bold tabular-nums ${
+              className={`rounded border px-3 py-1 text-sm font-black tabular-nums ${
                 secondsToNextCall <= 10
                   ? "border-red-700 text-red-300"
                   : secondsToNextCall <= 20
@@ -155,7 +155,7 @@ export default function BingoTransportLane({
       {errorMessage ? <p className="mt-2 rounded border border-red-700/60 bg-red-950/30 px-2 py-1 text-xs text-red-200">{errorMessage}</p> : null}
 
       <div className={`mt-3 space-y-2 ${callsContainerClassName}`}>
-        {laneCalls.map((call) => {
+        {laneCalls.map((call, laneIndex) => {
           const isCurrent = currentCall?.id === call.id;
           const queueRank = queueRankById.get(call.id);
           const isCue = queueRank === 0;
@@ -209,19 +209,21 @@ export default function BingoTransportLane({
             typeof queueRank !== "number" ||
             queueRank < 3;
 
+          const isTopTwo = laneIndex <= 1;
+
           return (
             <div key={call.id} className={`rounded border bg-stone-950/70 p-3 ${isCurrent ? "border-amber-500/70 ring-1 ring-inset ring-amber-500/40" : "border-stone-700"}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className={isCurrent ? "font-black text-stone-100" : "text-xs font-semibold text-stone-100"}>
+                <p className={isCurrent || isTopTwo ? "font-black text-stone-100" : "text-xs font-semibold text-stone-100"}>
                   {isCurrent ? (
                     <>
-                      <span className={`text-2xl font-black ${getBingoColumnTextClass(call.column_letter, call.ball_number)}`}>{formatBallLabel(call.ball_number, call.column_letter)}</span>
-                      <span className="ml-2 text-base font-bold">{call.track_title}</span>
+                      <span className={`text-3xl font-black ${getBingoColumnTextClass(call.column_letter, call.ball_number)}`}>{formatBallLabel(call.ball_number, call.column_letter)}</span>
+                      <span className="ml-2 text-xl font-bold">{call.track_title}</span>
                     </>
-                  ) : isCue ? (
+                  ) : isTopTwo ? (
                     <>
-                      <span className={`text-base font-bold ${getBingoColumnTextClass(call.column_letter, call.ball_number)}`}>{formatBallLabel(call.ball_number, call.column_letter)}</span>
-                      <span className="ml-2 text-sm font-semibold"> - {call.track_title}</span>
+                      <span className={`text-xl font-bold ${getBingoColumnTextClass(call.column_letter, call.ball_number)}`}>{formatBallLabel(call.ball_number, call.column_letter)}</span>
+                      <span className="ml-2 text-lg font-semibold"> - {call.track_title}</span>
                     </>
                   ) : (
                     <>#{call.call_index} · <span className={getBingoColumnTextClass(call.column_letter, call.ball_number)}>{formatBallLabel(call.ball_number, call.column_letter)}</span> - {call.track_title}</>

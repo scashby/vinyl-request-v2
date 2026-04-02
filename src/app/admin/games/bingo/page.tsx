@@ -121,7 +121,7 @@ export default function BingoSetupPage() {
   const [hostBufferSeconds, setHostBufferSeconds] = useState(2);
   const [sonosDelayMs, setSonosDelayMs] = useState(75);
   const [callRevealDelaySeconds, setCallRevealDelaySeconds] = useState(10);
-  const [defaultIntermissionSeconds, setDefaultIntermissionSeconds] = useState(600);
+  const [defaultIntermissionMinutes, setDefaultIntermissionMinutes] = useState(10);
   const [welcomeHeadingText, setWelcomeHeadingText] = useState("Welcome To Vinyl Music Bingo");
   const [welcomeMessageText, setWelcomeMessageText] = useState(INITIAL_WELCOME_CONTENT.intro);
   const [welcomeRulesText, setWelcomeRulesText] = useState(INITIAL_WELCOME_CONTENT.modeRules.join("\n"));
@@ -385,7 +385,7 @@ export default function BingoSetupPage() {
           host_buffer_seconds: hostBufferSeconds,
           sonos_output_delay_ms: sonosDelayMs,
           call_reveal_delay_seconds: callRevealDelaySeconds,
-          default_intermission_seconds: defaultIntermissionSeconds,
+          default_intermission_seconds: defaultIntermissionMinutes * 60,
           next_game_rules_text: welcomePreviewContent.intro || null,
           is_favorite: isFavorite,
           favorite_note: favoriteNote.trim() || null,
@@ -427,7 +427,7 @@ export default function BingoSetupPage() {
     const params = new URLSearchParams({
       sessionId: String(previewSessionId),
       preview: screen,
-      previewIntermissionSeconds: String(defaultIntermissionSeconds),
+      previewIntermissionSeconds: String(defaultIntermissionMinutes * 60),
       previewWelcomeHeading: welcomePreviewContent.heading,
       previewWelcomeText: welcomePreviewContent.intro,
       previewWelcomeRules: welcomePreviewContent.modeRules.join("\n"),
@@ -456,7 +456,7 @@ export default function BingoSetupPage() {
       "width=1920,height=1080,noopener,noreferrer"
     );
   }, [
-    defaultIntermissionSeconds,
+    defaultIntermissionMinutes,
     eventId,
     events,
     intermissionFooterText,
@@ -759,8 +759,8 @@ export default function BingoSetupPage() {
             <label className="text-sm">Reveal Delay (sec)
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={callRevealDelaySeconds} onChange={(e) => setCallRevealDelaySeconds(Number(e.target.value) || 0)} />
             </label>
-            <label className="text-sm">Intermission (sec)
-              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={defaultIntermissionSeconds} onChange={(e) => setDefaultIntermissionSeconds(Number(e.target.value) || 0)} />
+            <label className="text-sm">Intermission (min)
+              <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={defaultIntermissionMinutes} onChange={(e) => setDefaultIntermissionMinutes(Math.max(0, Number(e.target.value) || 0))} />
             </label>
           </div>
           <p className="mt-3 text-xs text-stone-400">
@@ -853,7 +853,7 @@ export default function BingoSetupPage() {
                 Preview Intermission
               </button>
               <p className="mt-2 text-xs text-stone-400">
-                Shown between rounds. Displays a countdown from the intermission duration set above (<span className="text-amber-300">{defaultIntermissionSeconds}s</span>).
+                Shown between rounds. Displays a countdown from the intermission duration set above (<span className="text-amber-300">{defaultIntermissionMinutes}m</span>).
               </p>
               <label className="mt-3 block text-sm text-stone-300">Intermission Heading
                 <input

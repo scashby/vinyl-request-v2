@@ -36,6 +36,7 @@ type Session = {
   sonos_output_delay_ms: number;
   seconds_to_next_call: number;
   call_reveal_delay_seconds: number;
+  default_intermission_seconds: number;
   show_countdown: boolean;
   recent_calls_limit: number;
   next_game_rules_text: string | null;
@@ -65,6 +66,7 @@ export default function BingoEditSessionPage() {
   const [hostBufferSeconds, setHostBufferSeconds] = useState(2);
   const [sonosDelayMs, setSonosDelayMs] = useState(75);
   const [callRevealDelay, setCallRevealDelay] = useState(0);
+  const [defaultIntermissionMinutes, setDefaultIntermissionMinutes] = useState(10);
   const [showCountdown, setShowCountdown] = useState(true);
   const [recentCallsLimit, setRecentCallsLimit] = useState(5);
   const [nextGameRulesText, setNextGameRulesText] = useState("");
@@ -148,6 +150,7 @@ export default function BingoEditSessionPage() {
       setHostBufferSeconds(sessionPayload.host_buffer_seconds ?? 2);
       setSonosDelayMs(sessionPayload.sonos_output_delay_ms ?? 75);
       setCallRevealDelay(sessionPayload.call_reveal_delay_seconds ?? 0);
+      setDefaultIntermissionMinutes(Math.round((sessionPayload.default_intermission_seconds ?? 600) / 60));
       setShowCountdown(Boolean(sessionPayload.show_countdown));
       setRecentCallsLimit(sessionPayload.recent_calls_limit ?? 5);
       setNextGameRulesText(sessionPayload.next_game_rules_text ?? "");
@@ -275,6 +278,7 @@ export default function BingoEditSessionPage() {
           sonos_output_delay_ms: sonosDelayMs,
           seconds_to_next_call: derivedSecondsToNextCall,
           call_reveal_delay_seconds: callRevealDelay,
+          default_intermission_seconds: defaultIntermissionMinutes * 60,
           show_countdown: showCountdown,
           recent_calls_limit: recentCallsLimit,
           next_game_rules_text: nextGameRulesText.trim() || null,
@@ -381,6 +385,10 @@ export default function BingoEditSessionPage() {
 
                 <label className="text-sm">Call Reveal Step (sec)
                   <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} max={300} value={callRevealDelay} onChange={(e) => setCallRevealDelay(Math.max(0, Math.min(300, Number(e.target.value) || 0)))} />
+                </label>
+
+                <label className="text-sm">Intermission (min)
+                  <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} value={defaultIntermissionMinutes} onChange={(e) => setDefaultIntermissionMinutes(Math.max(0, Number(e.target.value) || 0))} />
                 </label>
 
                 <label className="text-sm">Remove + Resleeve (sec)

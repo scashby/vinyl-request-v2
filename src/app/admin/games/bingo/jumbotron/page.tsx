@@ -523,21 +523,12 @@ export default function BingoJumbotronPage() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(56,189,248,0.18),transparent_35%),linear-gradient(180deg,#050a14,#0a1428)]" />
           <BrandingLogos venueLogoUrl={effectiveVenueLogo} venueName={effectiveVenueName} />
           <div className="relative z-10 space-y-[1.5vw]">
-            <p className="text-[2vw] font-semibold uppercase tracking-[0.5em] text-sky-300">
-              Round {session?.current_round ?? 1} of {session?.round_count ?? 1}
+            <p className="text-[2.4vw] font-semibold uppercase tracking-[0.25em] text-sky-300">
+              Round {session?.current_round ?? 1} begins in
             </p>
-            <p
-              className="font-black uppercase leading-none tracking-tight text-white"
-              style={{ fontSize: "9vw", textShadow: "0 8px 40px rgba(56,189,248,0.35)" }}
-            >
-              GET READY
+            <p className="text-[10vw] font-black tabular-nums text-white leading-none" style={{ textShadow: "0 8px 40px rgba(56,189,248,0.35)" }}>
+              {formatMinSec(Math.max(0, intermissionSecondsLeft ?? 0))}
             </p>
-            {intermissionSecondsLeft !== null && intermissionSecondsLeft > 0 ? (
-              <p className="text-[8vw] font-black tabular-nums text-sky-300 leading-none">
-                {formatMinSec(intermissionSecondsLeft)}
-              </p>
-            ) : null}
-            <p className="text-[1.8vw] text-sky-100/70">Round begins shortly — stand by</p>
           </div>
         </div>
       ) : showTiebreaker ? (
