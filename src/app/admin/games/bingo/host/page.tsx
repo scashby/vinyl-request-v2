@@ -452,11 +452,11 @@ export default function BingoHostPage() {
 
         {/* ─── Control Panel ──────────────────────────────────────────────────── */}
         <section className="rounded-2xl border border-stone-700 bg-black/45 p-3">
-          <div className="grid gap-4 lg:grid-cols-[1.1fr,1.35fr,0.75fr]">
+          <div className="grid gap-3 lg:grid-cols-[1fr,1fr,0.9fr]">
 
             {/* Left column: CSV-required host controls */}
             <div className="space-y-2 text-xs">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => void toggleWelcome()}
                   className={`rounded border px-3 py-1 font-bold transition ${
@@ -473,18 +473,12 @@ export default function BingoHostPage() {
                 >
                   Start Game
                 </button>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
                 <button onClick={() => void resetGame()} className="rounded border border-amber-700 bg-amber-900/40 px-3 py-1 text-amber-100 hover:bg-amber-900/60">
                   Reset Game
                 </button>
                 <button onClick={() => void endGame()} className="rounded border border-red-700 px-3 py-1 text-red-300 hover:bg-red-900/20">
                   End Game
                 </button>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
                 <button onClick={() => void startRound()} className="rounded border border-emerald-700 bg-emerald-900/35 px-3 py-1 font-bold text-emerald-200 hover:bg-emerald-900/55">
                   Start Round
                 </button>
@@ -610,77 +604,74 @@ export default function BingoHostPage() {
             </div>
 
             {/* Right column: Timing section */}
-            <div className="space-y-3 text-xs">
+            <div className="space-y-2 text-xs">
               <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-stone-400">Timing</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-stone-400 whitespace-nowrap">Next Call (sec)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={300}
+                    value={secondsToNextCallInput}
+                    onChange={(e) => setSecondsToNextCallInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)))}
+                    onBlur={() => { void saveSecondsToNextCall(); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void saveSecondsToNextCall();
+                    }}
+                    className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
+                  />
+                </div>
 
-              {/* Next Call input */}
-              <div className="space-y-1">
-                <label className="text-stone-400 whitespace-nowrap">Next Call (sec)</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={300}
-                  value={secondsToNextCallInput}
-                  onChange={(e) => setSecondsToNextCallInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)))}
-                  onBlur={() => { void saveSecondsToNextCall(); }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void saveSecondsToNextCall();
-                  }}
-                  className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
-                />
-              </div>
+                <div className="space-y-1">
+                  <label className="text-stone-400 whitespace-nowrap">Reveal Delay (sec)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={300}
+                    value={revealDelayInput}
+                    onFocus={() => { revealDelayEditingRef.current = true; }}
+                    onBlur={() => { void saveRevealDelay(); }}
+                    onChange={(e) => {
+                      revealDelayEditingRef.current = true;
+                      setRevealDelayInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)));
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void saveRevealDelay();
+                    }}
+                    className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
+                  />
+                </div>
 
-              {/* Reveal Delay */}
-              <div className="space-y-1">
-                <label className="text-stone-400 whitespace-nowrap">Reveal Delay (sec)</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={300}
-                  value={revealDelayInput}
-                  onFocus={() => { revealDelayEditingRef.current = true; }}
-                  onBlur={() => { void saveRevealDelay(); }}
-                  onChange={(e) => {
-                    revealDelayEditingRef.current = true;
-                    setRevealDelayInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)));
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void saveRevealDelay();
-                  }}
-                  className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
-                />
-              </div>
+                <div className="space-y-1">
+                  <label className="text-stone-400 whitespace-nowrap">Intermission (min)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={intermissionLengthMinutes}
+                    onFocus={() => { intermissionEditingRef.current = true; }}
+                    onBlur={() => { void saveIntermissionMinutes(); }}
+                    onChange={(e) => setIntermissionLengthMinutes(Math.max(0, Number(e.target.value) || 0))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void saveIntermissionMinutes();
+                    }}
+                    className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
+                  />
+                </div>
 
-              {/* Intermission in minutes */}
-              <div className="space-y-1">
-                <label className="text-stone-400 whitespace-nowrap">Intermission (min)</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={intermissionLengthMinutes}
-                  onFocus={() => { intermissionEditingRef.current = true; }}
-                  onBlur={() => { void saveIntermissionMinutes(); }}
-                  onChange={(e) => setIntermissionLengthMinutes(Math.max(0, Number(e.target.value) || 0))}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void saveIntermissionMinutes();
-                  }}
-                  className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-center"
-                />
-              </div>
-
-              {/* Pause / Resume toggle */}
-              <div className="space-y-1">
-                <label className="text-stone-400 whitespace-nowrap">Playback</label>
-                <button
-                  onClick={() => void (session?.status === "paused" ? resume() : pause())}
-                  className={`w-full rounded border px-2 py-1 font-bold transition ${
-                    session?.status === "paused"
-                      ? "border-emerald-600 bg-emerald-900/40 text-emerald-200 hover:bg-emerald-900/60"
-                      : "border-amber-600 bg-amber-900/30 text-amber-200 hover:bg-amber-900/50"
-                  }`}
-                >
-                  {session?.status === "paused" ? "▶ Resume" : "⏸ Pause"}
-                </button>
+                <div className="space-y-1">
+                  <label className="text-stone-400 whitespace-nowrap">Playback</label>
+                  <button
+                    onClick={() => void (session?.status === "paused" ? resume() : pause())}
+                    className={`w-full rounded border px-2 py-1 font-bold transition ${
+                      session?.status === "paused"
+                        ? "border-emerald-600 bg-emerald-900/40 text-emerald-200 hover:bg-emerald-900/60"
+                        : "border-amber-600 bg-amber-900/30 text-amber-200 hover:bg-amber-900/50"
+                    }`}
+                  >
+                    {session?.status === "paused" ? "▶ Resume" : "⏸ Pause"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
