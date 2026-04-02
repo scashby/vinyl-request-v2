@@ -12,6 +12,7 @@ type SessionRow = {
   playlist_ids: number[] | null;
   round_playlist_ids: RoundPlaylistEntry[] | null;
   round_count: number;
+  active_crate_letter_by_round: { round: number; letter: string }[] | null;
 };
 
 type ExistingCallRow = {
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const sessionQuery = (db
       .from("bingo_sessions")
-      .select("id, playlist_id, playlist_ids, round_playlist_ids, round_count") as unknown as {
+      .select("id, playlist_id, playlist_ids, round_playlist_ids, round_count, active_crate_letter_by_round") as unknown as {
         eq: (column: string, value: number) => {
           maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
         };
@@ -52,11 +53,50 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: `round must be between 1 and ${typedSession.round_count}` }, { status: 400 });
     }
 
-    const snapshotTracks = await getRoundSnapshotTracks(db, sessionId, requestedRound);
-    const tracks = snapshotTracks.length > 0
-      ? snapshotTracks
-      : await resolvePlaylistTracksForPlaylists(db, resolveRoundPlaylistIds(typedSession, requestedRound));
-    const plannedCalls = planRoundSessionCalls(tracks, sessionId, requestedRound);
+    let plannedCalls = [] as ReturnType<typeof planRoundSessionCalls>;
+
+    const activeCrateLetter = (typedSession.active_crate_letter_by_round ?? []).find((entry) => entry.round === requestedRound)?.letter ?? null;
+    if (activeCrateLetter) {
+      const { data: selectedCrate, error: selectedCrateError } = await db
+        .from("bingo_session_crates")
+        .select("crate_letter, call_order")
+        .eq("session_id", sessionId)
+        .eq("crate_letter", activeCrateLetter)
+        .maybeSingle();
+
+      if (selectedCrateError) {
+        return NextResponse.json({ error: selectedCrateError.message }, { status: 500 });
+      }
+
+      const callOrder = Array.isArray(selectedCrate?.call_order)
+        ? (selectedCrate.call_order as Array<Record<string, unknown>>)
+        : [];
+
+      if (callOrder.length > 0) {
+        plannedCalls = callOrder.map((row, index) => ({
+          playlist_track_key:
+            typeof row.playlist_track_key === "string" && row.playlist_track_key.length > 0
+              ? row.playlist_track_key
+              : `crate:${sessionId}:${activeCrateLetter}:${requestedRound}:${index + 1}`,
+          call_index: Number(row.call_index) || index + 1,
+          ball_number: Number(row.ball_number) || null,
+          column_letter: typeof row.column_letter === "string" ? row.column_letter : "B",
+          track_title: typeof row.track_title === "string" ? row.track_title : "",
+          artist_name: typeof row.artist_name === "string" ? row.artist_name : "",
+          album_name: typeof row.album_name === "string" ? row.album_name : null,
+          side: typeof row.side === "string" ? row.side : null,
+          position: typeof row.position === "string" ? row.position : null,
+        }));
+      }
+    }
+
+    if (plannedCalls.length === 0) {
+      const snapshotTracks = await getRoundSnapshotTracks(db, sessionId, requestedRound);
+      const tracks = snapshotTracks.length > 0
+        ? snapshotTracks
+        : await resolvePlaylistTracksForPlaylists(db, resolveRoundPlaylistIds(typedSession, requestedRound));
+      plannedCalls = planRoundSessionCalls(tracks, sessionId, requestedRound);
+    }
 
     const { data: existingCalls, error: existingError } = await db
       .from("bingo_session_calls")

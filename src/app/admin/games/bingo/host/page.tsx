@@ -394,6 +394,11 @@ export default function BingoHostPage() {
     [crates, session?.current_round]
   );
 
+  const cratesByRound = useMemo(
+    () => [...crates].sort((left, right) => left.round_number - right.round_number || left.crate_letter.localeCompare(right.crate_letter)),
+    [crates]
+  );
+
   const activeCrateLetter = useMemo(() => {
     if (!session?.active_crate_letter_by_round) return null;
     return session.active_crate_letter_by_round.find((e) => e.round === session.current_round)?.letter ?? null;
@@ -495,21 +500,23 @@ export default function BingoHostPage() {
               <div className="border-t border-stone-800 pt-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <label className="text-stone-400 whitespace-nowrap">Load Crate</label>
-                  {currentRoundCrates.length === 0 ? (
+                  {cratesByRound.length === 0 ? (
                     <span className="text-stone-500 italic">No crates generated yet</span>
                   ) : (
                     <select
                       value={activeCrateLetter ?? ""}
-                      disabled={roundIsStarted || switchingCrate}
+                      disabled={switchingCrate}
                       onChange={(e) => {
-                        if (e.target.value) void switchCrate(e.target.value);
+                        if (!e.target.value) return;
+                        if (roundIsStarted) return;
+                        void switchCrate(e.target.value);
                       }}
                       className="rounded border border-stone-600 bg-stone-950 px-2 py-1 text-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <option value="">— select —</option>
-                      {currentRoundCrates.map((crate) => (
-                        <option key={crate.crate_letter} value={crate.crate_letter}>
-                          {crate.crate_name}
+                      {cratesByRound.map((crate) => (
+                        <option key={`${crate.round_number}:${crate.crate_letter}`} value={crate.crate_letter}>
+                          {`Round ${crate.round_number} · ${crate.crate_name}`}
                         </option>
                       ))}
                     </select>
