@@ -78,6 +78,13 @@ type Session = {
   favorite_note?: string | null;
 };
 
+type SessionTemplateOption = {
+  id: number;
+  session_code: string;
+  event_title: string | null;
+  favorite_note?: string | null;
+};
+
 const GAME_BALL_COUNT = 75;
 
 function computeMinimumPlaylistTracks(roundCount: number, cardCount: number): number {
@@ -129,11 +136,13 @@ export default function BingoSetupPage() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [presets, setPresets] = useState<BingoPreset[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [templateSessions, setTemplateSessions] = useState<SessionTemplateOption[]>([]);
   const [eventId, setEventId] = useState<number | null>(Number.isFinite(eventIdFromUrl) ? eventIdFromUrl : null);
   const [showCreateEventModal, setShowCreateEventModal] = useState(false);
 
   const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<number[]>([]);
-  const [selectedPresetId, setSelectedPresetId] = useState<number | null>(null);
+  const [selectedTracklistPresetId, setSelectedTracklistPresetId] = useState<number | null>(null);
+  const [selectedTemplateSessionId, setSelectedTemplateSessionId] = useState<number | null>(null);
   const [roundModes, setRoundModes] = useState<RoundModesEntry[]>([]);
   const [roundPlaylistIds, setRoundPlaylistIds] = useState<RoundPlaylistEntry[]>([]);
   const [roundPlaylistOverrideRounds, setRoundPlaylistOverrideRounds] = useState<number[]>([]);
@@ -157,8 +166,6 @@ export default function BingoSetupPage() {
   const [thankYouHeadingText, setThankYouHeadingText] = useState("Thank You For Playing!");
   const [thankYouSubheadingText, setThankYouSubheadingText] = useState("Vinyl Music Bingo");
   const [thankYouEventsHeadingText, setThankYouEventsHeadingText] = useState("Find Us Next At");
-  const [isFavorite, setIsFavorite] = useState(false);
-  const [favoriteNote, setFavoriteNote] = useState("");
   const [venueLogoUrl, setVenueLogoUrl] = useState<string | null>(null);
   const [uploadingVenueLogo, setUploadingVenueLogo] = useState(false);
   const [applyingTemplate, setApplyingTemplate] = useState(false);
@@ -175,12 +182,12 @@ export default function BingoSetupPage() {
     [selectedPlaylistIds, trackCountByPlaylistId]
   );
   const hasSelectedPlaylists = selectedPlaylistIds.length > 0;
-  const selectedPreset = useMemo(
-    () => (selectedPresetId ? presets.find((preset) => preset.id === selectedPresetId) ?? null : null),
-    [presets, selectedPresetId]
+  const selectedTracklistPreset = useMemo(
+    () => (selectedTracklistPresetId ? presets.find((preset) => preset.id === selectedTracklistPresetId) ?? null : null),
+    [presets, selectedTracklistPresetId]
   );
-  const usingPreset = selectedPreset !== null;
-  const effectiveTrackCount = usingPreset ? selectedPreset.pool_size : selectedPlaylistTrackCount;
+  const usingTracklistPreset = selectedTracklistPreset !== null;
+  const effectiveTrackCount = usingTracklistPreset ? selectedTracklistPreset.pool_size : selectedPlaylistTrackCount;
   const getTrackCountForPlaylistIds = useCallback(
     (playlistIds: number[]) => playlistIds.reduce((sum, id) => sum + (trackCountByPlaylistId.get(id) ?? 0), 0),
     [trackCountByPlaylistId]
@@ -220,20 +227,19 @@ export default function BingoSetupPage() {
   }, [roundCount]);
 
   useEffect(() => {
-    if (!selectedPreset) return;
-    setSelectedPlaylistIds(selectedPreset.source_playlist_ids);
+    if (!selectedTracklistPreset) return;
+    setSelectedPlaylistIds(selectedTracklistPreset.source_playlist_ids);
     setRoundPlaylistIds([]);
     setRoundPlaylistOverrideRounds([]);
-  }, [selectedPreset]);
+  }, [selectedTracklistPreset]);
 
   useEffect(() => {
-    const sourceSessionId = selectedPreset?.created_from_session_id;
-    if (!sourceSessionId) return;
+    if (!selectedTemplateSessionId) return;
 
     let cancelled = false;
     setApplyingTemplate(true);
 
-    fetch(`/api/games/bingo/sessions/${sourceSessionId}`, { cache: "no-store" })
+    fetch(`/api/games/bingo/sessions/${selectedTemplateSessionId}`, { cache: "no-store" })
       .then(async (res) => {
         if (!res.ok) throw new Error("Failed to load favorite session template");
         return res.json() as Promise<Session>;
@@ -278,7 +284,7 @@ export default function BingoSetupPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedPreset?.created_from_session_id]);
+  }, [selectedTemplateSessionId]);
 
   const getModesForRound = useCallback(
      (round: number): GameMode[] => roundModes.find((entry) => entry.round === round)?.modes ?? [],
@@ -317,14 +323,14 @@ export default function BingoSetupPage() {
   }, [setPlaylistsForRound]);
 
   const missingPlaylistRounds = useMemo(
-    () => usingPreset || hasSelectedPlaylists
+    () => usingTracklistPreset || hasSelectedPlaylists
       ? []
       : Array.from({ length: Math.max(1, roundCount) }, (_, index) => index + 1).filter(
           (round) => getPlaylistIdsForRound(round).length === 0
         ),
-    [getPlaylistIdsForRound, hasSelectedPlaylists, roundCount, usingPreset]
+    [getPlaylistIdsForRound, hasSelectedPlaylists, roundCount, usingTracklistPreset]
   );
-  const hasUsablePlaylistConfiguration = usingPreset || hasSelectedPlaylists || missingPlaylistRounds.length === 0;
+  const hasUsablePlaylistConfiguration = usingTracklistPreset || hasSelectedPlaylists || missingPlaylistRounds.length === 0;
 
   const toggleRoundMode = useCallback(
     (round: number, mode: GameMode) => {
@@ -399,11 +405,12 @@ export default function BingoSetupPage() {
   }, [eventId]);
 
   const load = useCallback(async () => {
-    const [eRes, pRes, presetsRes, sRes] = await Promise.all([
+    const [eRes, pRes, presetsRes, sRes, allSessionsRes] = await Promise.all([
       fetch("/api/games/bingo/events"),
       fetch("/api/games/playlists"),
       fetch("/api/games/bingo/presets"),
       fetch(`/api/games/bingo/sessions${eventId ? `?eventId=${eventId}` : ""}`),
+      fetch("/api/games/bingo/sessions"),
     ]);
 
     if (eRes.ok) {
@@ -424,6 +431,21 @@ export default function BingoSetupPage() {
     if (sRes.ok) {
       const payload = await sRes.json();
       setSessions(payload.data ?? []);
+    }
+
+    if (allSessionsRes.ok) {
+      const payload = await allSessionsRes.json();
+      const all = (payload.data ?? []) as Session[];
+      setTemplateSessions(
+        all
+          .filter((session) => Boolean(session.is_favorite))
+          .map((session) => ({
+            id: session.id,
+            session_code: session.session_code,
+            event_title: session.event_title ?? null,
+            favorite_note: session.favorite_note ?? null,
+          }))
+      );
     }
   }, [eventId]);
 
@@ -464,14 +486,14 @@ export default function BingoSetupPage() {
     if (!hasUsablePlaylistConfiguration) return;
     setCreating(true);
     try {
-      const presetPlaylistIds = selectedPreset?.source_playlist_ids ?? [];
+      const presetPlaylistIds = selectedTracklistPreset?.source_playlist_ids ?? [];
       const payloadBody = {
         event_id: eventId ? Number(eventId) : null,
-        game_preset_id: selectedPresetId,
-        master_playlist_ids: usingPreset ? presetPlaylistIds : selectedPlaylistIds,
-        playlist_id: (usingPreset ? presetPlaylistIds : selectedPlaylistIds)[0],
-        playlist_ids: usingPreset ? presetPlaylistIds : selectedPlaylistIds,
-        round_playlist_ids: usingPreset ? [] : roundPlaylistIds,
+        game_preset_id: selectedTracklistPresetId,
+        master_playlist_ids: usingTracklistPreset ? presetPlaylistIds : selectedPlaylistIds,
+        playlist_id: (usingTracklistPreset ? presetPlaylistIds : selectedPlaylistIds)[0],
+        playlist_ids: usingTracklistPreset ? presetPlaylistIds : selectedPlaylistIds,
+        round_playlist_ids: usingTracklistPreset ? [] : roundPlaylistIds,
         game_mode: derivedGameMode,
         round_modes: roundModes,
         card_count: cardCount,
@@ -495,8 +517,6 @@ export default function BingoSetupPage() {
         thanks_heading_text: thankYouHeadingText.trim() || null,
         thanks_subheading_text: thankYouSubheadingText.trim() || null,
         thanks_events_heading_text: thankYouEventsHeadingText.trim() || null,
-        is_favorite: isFavorite,
-        favorite_note: favoriteNote.trim() || null,
       };
 
       const res = await fetch("/api/games/bingo/sessions", {
@@ -643,6 +663,30 @@ export default function BingoSetupPage() {
     await load();
   };
 
+  const setSessionFavorite = async (session: Session, nextValue: boolean) => {
+    const previous = session.is_favorite ?? false;
+    setSessions((current) =>
+      current.map((entry) => (entry.id === session.id ? { ...entry, is_favorite: nextValue } : entry))
+    );
+
+    const response = await fetch(`/api/games/bingo/sessions/${session.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_favorite: nextValue }),
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      setSessions((current) =>
+        current.map((entry) => (entry.id === session.id ? { ...entry, is_favorite: previous } : entry))
+      );
+      alert((payload as { error?: string }).error ?? "Failed to update session favorite");
+      return;
+    }
+
+    await load();
+  };
+
   const downloadCallSheet = async (
     sessionId: number,
     round?: number,
@@ -705,7 +749,7 @@ export default function BingoSetupPage() {
           </p>
           {hasSelectedPlaylists ? (
             <p className={`mt-1 text-xs ${effectiveTrackCount >= minimumTracksForSetup ? "text-emerald-300" : "text-rose-300"}`}>
-              {usingPreset ? `Selected preset pool: ${effectiveTrackCount}` : `Selected playlists: ${effectiveTrackCount}`} tracks {effectiveTrackCount >= minimumTracksForSetup ? "· enough to build the game crate and reshuffle it each round." : `· need at least ${minimumTracksForSetup} tracks to build the game crate.`}
+              {usingTracklistPreset ? `Selected preset pool: ${effectiveTrackCount}` : `Selected playlists: ${effectiveTrackCount}`} tracks {effectiveTrackCount >= minimumTracksForSetup ? "· enough to build the game crate and reshuffle it each round." : `· need at least ${minimumTracksForSetup} tracks to build the game crate.`}
             </p>
           ) : (
             <p className={`mt-1 text-xs ${hasUsablePlaylistConfiguration ? "text-amber-300" : "text-rose-300"}`}>
@@ -744,26 +788,48 @@ export default function BingoSetupPage() {
             <label className="block text-sm">Reuse Favorited Session Template (optional)
               <select
                 className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
-                value={selectedPresetId ?? ""}
-                onChange={(e) => setSelectedPresetId(Number(e.target.value) || null)}
+                value={selectedTemplateSessionId ?? ""}
+                onChange={(e) => setSelectedTemplateSessionId(Number(e.target.value) || null)}
               >
-                <option value="">Create from playlists below</option>
-                {presets.map((preset) => (
-                  <option key={preset.id} value={preset.id}>
-                    {(preset.template_session_code ?? preset.name)} ({preset.pool_size} tracks)
+                <option value="">Do not copy a session template</option>
+                {templateSessions.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.session_code}{template.event_title ? ` - ${template.event_title}` : ""}
                   </option>
                 ))}
               </select>
             </label>
-            {selectedPreset ? (
+            {selectedTemplateSessionId ? (
               <div className="mt-2 rounded border border-stone-700/70 bg-stone-950/40 p-3 text-xs text-stone-300">
-                <p className="font-semibold text-amber-200">Using favorited template {selectedPreset.template_session_code ?? selectedPreset.name}</p>
-                <p className="mt-1">Source playlists: {selectedPreset.source_playlist_names.join(", ") || "None"}</p>
-                {selectedPreset.created_from_session_id ? <p className="mt-1 text-stone-400">Template session: #{selectedPreset.created_from_session_id}</p> : null}
-                {selectedPreset.note ? <p className="mt-1 text-stone-400">{selectedPreset.note}</p> : null}
+                <p className="font-semibold text-amber-200">Template settings will be copied from this favorited session.</p>
+                <p className="mt-1 text-stone-400">A fresh game session and fresh crates will still be created.</p>
               </div>
             ) : null}
             {applyingTemplate ? <p className="mt-2 text-xs text-amber-300">Applying favorited session settings…</p> : null}
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-sm">Reuse Game Tracklist Favorite (optional)
+              <select
+                className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                value={selectedTracklistPresetId ?? ""}
+                onChange={(e) => setSelectedTracklistPresetId(Number(e.target.value) || null)}
+              >
+                <option value="">Create from playlists below</option>
+                {presets.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.name} ({preset.pool_size} tracks)
+                  </option>
+                ))}
+              </select>
+            </label>
+            {selectedTracklistPreset ? (
+              <div className="mt-2 rounded border border-stone-700/70 bg-stone-950/40 p-3 text-xs text-stone-300">
+                <p className="font-semibold text-amber-200">Using tracklist favorite {selectedTracklistPreset.name}</p>
+                <p className="mt-1">Source playlists: {selectedTracklistPreset.source_playlist_names.join(", ") || "None"}</p>
+                {selectedTracklistPreset.note ? <p className="mt-1 text-stone-400">{selectedTracklistPreset.note}</p> : null}
+              </div>
+            ) : null}
           </div>
 
           {/* Playlists */}
@@ -772,7 +838,7 @@ export default function BingoSetupPage() {
               <select
                 multiple
                 size={5}
-                disabled={usingPreset}
+                disabled={usingTracklistPreset}
                 className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
                 value={selectedPlaylistIds.map(String)}
                 onChange={(e) => {
@@ -784,7 +850,7 @@ export default function BingoSetupPage() {
               >
                 {playlists.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.track_count})</option>)}
               </select>
-              <p className="mt-2 text-xs text-stone-500">{usingPreset ? "Preset-backed sessions use the preset's fixed pool and source playlists." : "Leave this empty if each round below should use its own themed playlist set."}</p>
+              <p className="mt-2 text-xs text-stone-500">{usingTracklistPreset ? "Tracklist favorites use a fixed pool and source playlists." : "Leave this empty if each round below should use its own themed playlist set."}</p>
               <a
                 href="/edit-collection?playlistStudio=1&playlistView=manual&viewMode=playlist&trackSource=playlists&folderMode=playlists"
                 target="_blank"
@@ -834,7 +900,7 @@ export default function BingoSetupPage() {
                       <label className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-stone-300">
                         <input
                           type="checkbox"
-                          disabled={usingPreset}
+                          disabled={usingTracklistPreset}
                           checked={overrideEnabled}
                           onChange={(event) => setRoundPlaylistOverrideEnabled(round, event.target.checked)}
                         />
@@ -845,7 +911,7 @@ export default function BingoSetupPage() {
                           <select
                             multiple
                             size={4}
-                            disabled={usingPreset}
+                            disabled={usingTracklistPreset}
                             className="mt-2 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
                             value={roundPlaylistSelection.map(String)}
                             onChange={(e) => {
@@ -864,7 +930,7 @@ export default function BingoSetupPage() {
                           <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
                             <button
                               type="button"
-                              disabled={usingPreset}
+                              disabled={usingTracklistPreset}
                               onClick={() => setPlaylistsForRound(round, [])}
                               className="rounded border border-stone-700 px-2 py-1 text-stone-300 hover:border-amber-500 hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
                             >
@@ -894,22 +960,6 @@ export default function BingoSetupPage() {
           >
             {creating ? "Creating..." : "Create Session"}
           </button>
-          <div className="mt-4 rounded-2xl border border-stone-700/70 bg-stone-950/40 p-4">
-            <label className="flex items-center gap-3 text-sm font-semibold text-stone-200">
-              <input type="checkbox" className="h-4 w-4" checked={isFavorite} onChange={(e) => setIsFavorite(e.target.checked)} />
-              Save this game as a favorite after creation
-            </label>
-            <label className="mt-3 block text-sm">
-              Favorite Note
-              <textarea
-                rows={3}
-                className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm"
-                value={favoriteNote}
-                onChange={(e) => setFavoriteNote(e.target.value)}
-                placeholder="Why this game playlist worked well, crowd energy notes, room fit, etc."
-              />
-            </label>
-          </div>
         </section>
 
         {/* ── SECTION 2: Gameplay Timing ────────────────────────── */}
@@ -1113,6 +1163,19 @@ export default function BingoSetupPage() {
                   {session.event_title ? (
                     <div className="mt-1 text-xs text-stone-400">Event: {session.event_title}</div>
                   ) : null}
+                  <div className="mt-2">
+                    <label className="inline-flex items-center gap-2 text-xs font-semibold text-stone-200">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        checked={Boolean(session.is_favorite)}
+                        onChange={(event) => {
+                          void setSessionFavorite(session, event.target.checked);
+                        }}
+                      />
+                      Favorite Session Template
+                    </label>
+                  </div>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
                     <button className="rounded border border-amber-700/70 bg-amber-950/30 px-2 py-1 text-amber-200" onClick={() => openGameWindow(`/admin/games/bingo/edit?sessionId=${session.id}`, `bingo_edit_${session.id}`, "width=1320,height=960,left=80,top=40,noopener,noreferrer")}>Edit</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/host?sessionId=${session.id}`, "bingo_host", "width=1280,height=960,left=0,top=0,noopener,noreferrer")}>Host</button>

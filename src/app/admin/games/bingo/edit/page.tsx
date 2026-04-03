@@ -53,8 +53,6 @@ type Session = {
   show_countdown: boolean;
   recent_calls_limit: number;
   next_game_rules_text: string | null;
-  is_favorite?: boolean;
-  favorite_note?: string | null;
 };
 
 type BingoCrate = {
@@ -95,8 +93,6 @@ export default function BingoEditSessionPage() {
   const [showCountdown, setShowCountdown] = useState(true);
   const [recentCallsLimit, setRecentCallsLimit] = useState(5);
   const [nextGameRulesText, setNextGameRulesText] = useState("");
-  const [isFavorite, setIsFavorite] = useState(false);
-  const [favoriteNote, setFavoriteNote] = useState("");
   const [selectedPresetId, setSelectedPresetId] = useState<number | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -194,8 +190,6 @@ export default function BingoEditSessionPage() {
       setNextGameRulesText(sessionPayload.next_game_rules_text ?? "");
       setCrates(cratesPayload.data ?? []);
       setActiveCrateByRound(sessionPayload.active_crate_letter_by_round ?? []);
-      setIsFavorite(Boolean(sessionPayload.is_favorite));
-      setFavoriteNote(sessionPayload.favorite_note ?? "");
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load session edit data.");
     } finally {
@@ -323,8 +317,6 @@ export default function BingoEditSessionPage() {
           show_countdown: showCountdown,
           recent_calls_limit: recentCallsLimit,
           next_game_rules_text: nextGameRulesText.trim() || null,
-          is_favorite: usingPreset ? false : isFavorite,
-          favorite_note: usingPreset ? null : favoriteNote.trim() || null,
         }),
       });
 
@@ -666,24 +658,6 @@ export default function BingoEditSessionPage() {
               <label className="block text-sm">Welcome Screen Host Note (optional)
                 <textarea rows={3} className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm" value={nextGameRulesText} onChange={(e) => setNextGameRulesText(e.target.value)} placeholder="Optional extra note shown below the generated mode rules..." />
               </label>
-
-              <div className="rounded border border-stone-700 bg-stone-950/40 p-3">
-                <label className="flex items-center gap-3 text-sm font-semibold text-stone-200">
-                  <input type="checkbox" className="h-4 w-4" checked={isFavorite} disabled={usingPreset} onChange={(e) => setIsFavorite(e.target.checked)} />
-                  Mark this game as a favorite
-                </label>
-                {usingPreset ? <p className="mt-2 text-xs text-stone-500">This session already reuses a favorite preset. Editing it here does not create a new preset or change the shared fixed pool.</p> : null}
-                <label className="mt-3 block text-sm">Favorite Note
-                  <textarea
-                    rows={3}
-                    disabled={usingPreset}
-                    className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                    value={favoriteNote}
-                    onChange={(e) => setFavoriteNote(e.target.value)}
-                    placeholder="What made this game strong: energy, pacing, demographic fit, etc."
-                  />
-                </label>
-              </div>
 
               {error ? <p className="text-sm text-red-400">{error}</p> : null}
 
