@@ -149,14 +149,26 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
   const crates = await getCratesForSession(db, sessionId);
   const defaultActiveCratesByRound = Array.from(
     crates.reduce((map, crate) => {
-      const existingLetter = map.get(crate.round_number);
-      if (!existingLetter || crate.crate_letter.localeCompare(existingLetter) < 0) {
-        map.set(crate.round_number, crate.crate_letter);
+      const existing = map.get(crate.round_number);
+      const isCurrentSessionCrate = crate.source_session_id === sessionId;
+
+      if (!existing) {
+        map.set(crate.round_number, { letter: crate.crate_letter, isCurrentSessionCrate });
+        return map;
+      }
+
+      if (isCurrentSessionCrate && !existing.isCurrentSessionCrate) {
+        map.set(crate.round_number, { letter: crate.crate_letter, isCurrentSessionCrate: true });
+        return map;
+      }
+
+      if (isCurrentSessionCrate === existing.isCurrentSessionCrate && crate.crate_letter.localeCompare(existing.letter) < 0) {
+        map.set(crate.round_number, { letter: crate.crate_letter, isCurrentSessionCrate });
       }
       return map;
-    }, new Map<number, string>())
+    }, new Map<number, { letter: string; isCurrentSessionCrate: boolean }>())
   )
-    .map(([round, letter]) => ({ round, letter }))
+    .map(([round, value]) => ({ round, letter: value.letter }))
     .sort((left, right) => left.round - right.round);
 
   const { error: sessionError } = await db

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
 import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
+import { getCrateByLetter } from "src/lib/bingoCrateModel";
 import { getRoundSnapshotTracks } from "src/lib/bingoGameModel";
 import { resolveRoundPlaylistIds, type RoundPlaylistEntry } from "src/lib/bingoRoundPlaylists";
 
@@ -26,6 +27,7 @@ function coerceBallNumber(value: unknown, fallback: number): number {
 
 type SessionRow = {
   id: number;
+  game_preset_id?: number | null;
   playlist_id: number;
   playlist_ids: number[] | null;
   round_playlist_ids: RoundPlaylistEntry[] | null;
@@ -75,16 +77,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const activeCrateLetter = (typedSession.active_crate_letter_by_round ?? []).find((entry) => entry.round === requestedRound)?.letter ?? null;
     if (activeCrateLetter) {
-      const { data: selectedCrate, error: selectedCrateError } = await db
-        .from("bingo_session_crates")
-        .select("crate_letter, call_order")
-        .eq("session_id", sessionId)
-        .eq("crate_letter", activeCrateLetter)
-        .maybeSingle();
-
-      if (selectedCrateError) {
-        return NextResponse.json({ error: selectedCrateError.message }, { status: 500 });
-      }
+      const selectedCrate = await getCrateByLetter(db, sessionId, activeCrateLetter);
 
       const callOrder = Array.isArray(selectedCrate?.call_order)
         ? (selectedCrate.call_order as Array<Record<string, unknown>>)

@@ -17,6 +17,17 @@ type SessionCodeRow = {
   session_code: string;
 };
 
+type SessionCrateContext = {
+  session_code: string | null;
+  game_preset_id: number | null;
+  playlist_id: number | null;
+  playlist_ids: number[] | null;
+  round_playlist_ids: RoundPlaylistEntry[] | null;
+  round_count: number;
+  current_round: number;
+  active_crate_letter_by_round: { round: number; letter: string }[] | null;
+};
+
 export type CrateCallEntry = {
   id: number;
   call_index: number;
@@ -38,16 +49,36 @@ export type BingoSessionCrate = {
   crate_letter: string;
   call_order: CrateCallEntry[];
   created_at: string;
+  source_session_id?: number | null;
+  preset_id?: number | null;
 };
 
-type SessionCrateBackfillRow = {
-  playlist_id: number | null;
-  playlist_ids: number[] | null;
-  round_playlist_ids: RoundPlaylistEntry[] | null;
-  round_count: number;
-  current_round: number;
-  active_crate_letter_by_round: { round: number; letter: string }[] | null;
+type SessionCrateBackfillRow = SessionCrateContext;
+
+type PresetCrateRow = {
+  id: number;
+  preset_id: number;
+  crate_letter: string;
+  crate_name: string;
+  call_order: Record<string, unknown>[];
+  created_from_session_id: number | null;
+  created_for_round: number | null;
+  created_at: string;
 };
+
+async function getSessionCrateContext(
+  db: ReturnType<typeof getBingoDb>,
+  sessionId: number
+): Promise<SessionCrateContext | null> {
+  const { data, error } = await db
+    .from("bingo_sessions")
+    .select("session_code, game_preset_id, playlist_id, playlist_ids, round_playlist_ids, round_count, current_round, active_crate_letter_by_round")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return (data as SessionCrateContext | null) ?? null;
+}
 
 async function deriveRoundCallOrder(
   db: ReturnType<typeof getBingoDb>,
@@ -109,13 +140,20 @@ async function deriveRoundCallOrder(
 /** Return the next available crate letter for a session (across all rounds). */
 async function getNextCrateLetter(
   db: ReturnType<typeof getBingoDb>,
-  sessionId: number
+  sessionId: number,
+  presetId: number | null
 ): Promise<string> {
-  const { data } = await db
-    .from("bingo_session_crates")
-    .select("crate_letter")
-    .eq("session_id", sessionId)
-    .order("crate_letter", { ascending: true });
+  const { data } = presetId
+    ? await db
+        .from("bingo_preset_crates")
+        .select("crate_letter")
+        .eq("preset_id", presetId)
+        .order("crate_letter", { ascending: true })
+    : await db
+        .from("bingo_session_crates")
+        .select("crate_letter")
+        .eq("session_id", sessionId)
+        .order("crate_letter", { ascending: true });
 
   const usedLetters = new Set((data ?? []).map((row) => row.crate_letter as string));
   const next = CRATE_LETTERS.find((l) => !usedLetters.has(l));
@@ -127,14 +165,8 @@ async function getSessionCode(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number
 ): Promise<string | null> {
-  const { data, error } = await db
-    .from("bingo_sessions")
-    .select("session_code")
-    .eq("id", sessionId)
-    .maybeSingle();
-
-  if (error) throw new Error(error.message);
-  return (data as SessionCodeRow | null)?.session_code ?? null;
+  const context = await getSessionCrateContext(db, sessionId);
+  return context?.session_code ?? null;
 }
 
 function formatCrateName(sessionCode: string | null, sessionId: number, crateLetter: string): string {
@@ -152,9 +184,41 @@ export async function saveCrateForRound(
   roundNumber: number,
   calls: CrateCallEntry[]
 ): Promise<BingoSessionCrate> {
-  const letter = await getNextCrateLetter(db, sessionId);
-  const sessionCode = await getSessionCode(db, sessionId);
+  const context = await getSessionCrateContext(db, sessionId);
+  const presetId = context?.game_preset_id ?? null;
+  const letter = await getNextCrateLetter(db, sessionId, presetId);
+  const sessionCode = context?.session_code ?? null;
   const crateName = formatCrateName(sessionCode, sessionId, letter);
+
+  if (presetId) {
+    const { data, error } = await db
+      .from("bingo_preset_crates")
+      .insert({
+        preset_id: presetId,
+        crate_name: crateName,
+        crate_letter: letter,
+        call_order: calls as unknown as Record<string, unknown>[],
+        created_from_session_id: sessionId,
+        created_for_round: roundNumber,
+      })
+      .select()
+      .single();
+
+    if (error || !data) throw new Error(error?.message ?? "Failed to save crate.");
+
+    const row = data as PresetCrateRow;
+    return {
+      id: row.id,
+      session_id: sessionId,
+      round_number: row.created_for_round ?? roundNumber,
+      crate_name: row.crate_name,
+      crate_letter: row.crate_letter,
+      call_order: row.call_order as unknown as CrateCallEntry[],
+      created_at: row.created_at,
+      source_session_id: row.created_from_session_id,
+      preset_id: row.preset_id,
+    };
+  }
 
   const { data, error } = await db
     .from("bingo_session_crates")
@@ -181,7 +245,31 @@ export async function getCratesForSession(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number
 ): Promise<BingoSessionCrate[]> {
-  const sessionCode = await getSessionCode(db, sessionId);
+  const context = await getSessionCrateContext(db, sessionId);
+  const sessionCode = context?.session_code ?? null;
+
+  if (context?.game_preset_id) {
+    const { data, error } = await db
+      .from("bingo_preset_crates")
+      .select("*")
+      .eq("preset_id", context.game_preset_id)
+      .order("created_for_round", { ascending: true })
+      .order("crate_letter", { ascending: true });
+
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as PresetCrateRow[]).map((row) => ({
+      id: row.id,
+      session_id: sessionId,
+      round_number: row.created_for_round ?? 1,
+      crate_name: row.crate_name || formatCrateName(sessionCode, row.created_from_session_id ?? sessionId, row.crate_letter),
+      crate_letter: row.crate_letter,
+      call_order: row.call_order as unknown as CrateCallEntry[],
+      created_at: row.created_at,
+      source_session_id: row.created_from_session_id,
+      preset_id: row.preset_id,
+    }));
+  }
+
   const { data, error } = await db
     .from("bingo_session_crates")
     .select("*")
@@ -202,7 +290,31 @@ export async function getCratesForRound(
   sessionId: number,
   roundNumber: number
 ): Promise<BingoSessionCrate[]> {
-  const sessionCode = await getSessionCode(db, sessionId);
+  const context = await getSessionCrateContext(db, sessionId);
+  const sessionCode = context?.session_code ?? null;
+
+  if (context?.game_preset_id) {
+    const { data, error } = await db
+      .from("bingo_preset_crates")
+      .select("*")
+      .eq("preset_id", context.game_preset_id)
+      .eq("created_for_round", roundNumber)
+      .order("crate_letter", { ascending: true });
+
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as PresetCrateRow[]).map((row) => ({
+      id: row.id,
+      session_id: sessionId,
+      round_number: row.created_for_round ?? roundNumber,
+      crate_name: row.crate_name || formatCrateName(sessionCode, row.created_from_session_id ?? sessionId, row.crate_letter),
+      crate_letter: row.crate_letter,
+      call_order: row.call_order as unknown as CrateCallEntry[],
+      created_at: row.created_at,
+      source_session_id: row.created_from_session_id,
+      preset_id: row.preset_id,
+    }));
+  }
+
   const { data, error } = await db
     .from("bingo_session_crates")
     .select("*")
@@ -231,20 +343,17 @@ export async function backfillMissingLegacyCrates(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number
 ): Promise<void> {
-  const { data: session, error: sessionError } = await db
-    .from("bingo_sessions")
-    .select("playlist_id, playlist_ids, round_playlist_ids, round_count, current_round, active_crate_letter_by_round")
-    .eq("id", sessionId)
-    .maybeSingle();
-
-  if (sessionError) throw new Error(sessionError.message);
+  const session = await getSessionCrateContext(db, sessionId);
   if (!session) return;
 
   const typedSession = session as SessionCrateBackfillRow;
   const existingCrates = await getCratesForSession(db, sessionId);
+  const createdForCurrentSession = new Map<number, string>();
 
   for (let round = 1; round <= Math.max(1, typedSession.round_count || 1); round += 1) {
-    const alreadyHasCrates = existingCrates.some((crate) => crate.round_number === round);
+    const alreadyHasCrates = typedSession.game_preset_id
+      ? existingCrates.some((crate) => crate.round_number === round && crate.source_session_id === sessionId)
+      : existingCrates.some((crate) => crate.round_number === round);
     if (alreadyHasCrates) continue;
 
     const callOrder = await deriveRoundCallOrder(db, sessionId, round, typedSession);
@@ -253,12 +362,19 @@ export async function backfillMissingLegacyCrates(
 
     const createdCrate = await saveCrateForRound(db, sessionId, round, callOrder);
     existingCrates.push(createdCrate);
+    createdForCurrentSession.set(round, createdCrate.crate_letter);
   }
 
   const activeByRound = typedSession.active_crate_letter_by_round ?? [];
   for (let round = 1; round <= Math.max(1, typedSession.round_count || 1); round += 1) {
     const hasActive = activeByRound.some((entry) => entry.round === round);
     if (hasActive) continue;
+
+    const preferredLetter = createdForCurrentSession.get(round);
+    if (preferredLetter) {
+      await setActiveCrateForRound(db, sessionId, round, preferredLetter);
+      continue;
+    }
 
     const firstRoundCrate = existingCrates
       .filter((crate) => crate.round_number === round)
@@ -279,13 +395,7 @@ export async function createCrateFromRoundData(
   sessionId: number,
   roundNumber: number
 ): Promise<BingoSessionCrate | null> {
-  const { data: session, error } = await db
-    .from("bingo_sessions")
-    .select("playlist_id, playlist_ids, round_playlist_ids, current_round, round_count, active_crate_letter_by_round")
-    .eq("id", sessionId)
-    .maybeSingle();
-
-  if (error) throw new Error(error.message);
+  const session = await getSessionCrateContext(db, sessionId);
   if (!session) return null;
 
   const callOrder = await deriveRoundCallOrder(db, sessionId, roundNumber, session as SessionCrateBackfillRow);
@@ -332,4 +442,13 @@ export function getActiveCrateLetter(
 ): string | null {
   if (!activeCrateLetterByRound) return null;
   return activeCrateLetterByRound.find((e) => e.round === roundNumber)?.letter ?? null;
+}
+
+export async function getCrateByLetter(
+  db: ReturnType<typeof getBingoDb>,
+  sessionId: number,
+  crateLetter: string
+): Promise<BingoSessionCrate | null> {
+  const crates = await getCratesForSession(db, sessionId);
+  return crates.find((crate) => crate.crate_letter === crateLetter) ?? null;
 }
