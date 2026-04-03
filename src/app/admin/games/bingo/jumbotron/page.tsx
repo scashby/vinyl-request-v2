@@ -545,14 +545,12 @@ export default function BingoJumbotronPage() {
             >
               TIEBREAKER
             </p>
-            <div className="mx-auto w-full max-w-[74vw] rounded-2xl border border-rose-300/55 bg-white/68 px-[2.4vw] py-[1.3vw] text-left shadow-[0_12px_36px_rgba(120,53,15,0.16)] backdrop-blur-[1px]">
-              <p className="text-[1.55vw] font-black uppercase tracking-[0.16em] text-rose-700">Rules</p>
-              <p className="mt-[0.45vw] text-[1.7vw] font-semibold leading-tight text-stone-800">Most number of free squares wins.</p>
-              <p className="mt-[0.35vw] text-[1.7vw] font-semibold leading-tight text-stone-800">Still tied: sudden death. The next one to get a song loses.</p>
-            </div>
-            <p className="text-[1.5vw] text-stone-600 uppercase tracking-[0.3em]">
-              Round {session?.current_round ?? 1} · Stand by
-            </p>
+            {welcomeTieBreakLine ? (
+              <div className="mx-auto w-full max-w-[74vw] rounded-2xl border border-rose-300/55 bg-white/68 px-[2.4vw] py-[1.3vw] text-left shadow-[0_12px_36px_rgba(120,53,15,0.16)] backdrop-blur-[1px]">
+                <p className="text-[1.55vw] font-black uppercase tracking-[0.16em] text-rose-700">Rules</p>
+                <p className="mt-[0.45vw] text-[1.7vw] font-semibold leading-tight text-stone-800">{welcomeTieBreakLine}</p>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : (
