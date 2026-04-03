@@ -137,9 +137,15 @@ export default function BingoTransportLane({
         <div className="flex items-center gap-3">
           {secondsToNextCall !== undefined ? (
             <span
-              className="rounded border border-stone-600 px-4 py-2 text-2xl font-black leading-none tabular-nums text-stone-300"
+              className={`rounded border px-4 py-2 text-2xl font-black leading-none tabular-nums ${
+                secondsToNextCall <= 10
+                  ? "border-red-700 text-red-300"
+                  : secondsToNextCall <= 20
+                    ? "border-amber-600 text-amber-300"
+                    : "border-stone-600 text-stone-300"
+              }`}
             >
-              Next Call: {secondsToNextCall}s
+              Next: {secondsToNextCall}s
             </span>
           ) : null}
           {headerRight}
@@ -147,6 +153,20 @@ export default function BingoTransportLane({
       </div>
 
       {errorMessage ? <p className="mt-2 rounded border border-red-700/60 bg-red-950/30 px-2 py-1 text-xs text-red-200">{errorMessage}</p> : null}
+
+      {currentCall ? (
+        <div className="mt-3 rounded border border-amber-500/70 bg-amber-950/20 p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-200">Current Call</p>
+          <p className="mt-1 font-black text-stone-100">
+            <span className={`text-3xl font-black ${getBingoColumnTextClass(currentCall.column_letter, currentCall.ball_number)}`}>
+              {formatBallLabel(currentCall.ball_number, currentCall.column_letter)}
+            </span>
+            <span className="ml-2 text-xl font-bold">{currentCall.track_title}</span>
+          </p>
+          <p className="mt-1 text-stone-300">{currentCall.artist_name} · {currentCall.album_name ?? ""}</p>
+          <p className="mt-1 text-stone-500">Side {currentCall.side ?? "-"} · Position {currentCall.position ?? "-"}</p>
+        </div>
+      ) : null}
 
       <div className={`mt-3 space-y-2 ${callsContainerClassName}`}>
         {laneCalls.map((call, laneIndex) => {

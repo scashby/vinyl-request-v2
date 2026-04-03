@@ -195,6 +195,31 @@ export default function BingoHostPage() {
     await patchSession({ bingo_overlay: next });
   };
 
+  const toggleIntermission = async () => {
+    if (!session) return;
+
+    const nextScheduledAtMs = session.next_game_scheduled_at ? Date.parse(session.next_game_scheduled_at) : NaN;
+    const intermissionActive = session.status === "paused" && Number.isFinite(nextScheduledAtMs) && nextScheduledAtMs > Date.now();
+
+    if (intermissionActive) {
+      await patchSession({ next_game_scheduled_at: null, bingo_overlay: "none" });
+      await fetch(`/api/games/bingo/sessions/${sessionId}/resume`, { method: "POST" });
+      await load();
+      return;
+    }
+
+    const durationSeconds = Math.max(0, Math.floor(intermissionLengthMinutes)) * 60;
+    const nextScheduledAt = new Date(Date.now() + durationSeconds * 1000).toISOString();
+    setAutoCallEnabled(false);
+    autoCallLockRef.current = false;
+
+    if (session.status === "running") {
+      await fetch(`/api/games/bingo/sessions/${sessionId}/pause`, { method: "POST" });
+    }
+
+    await patchSession({ bingo_overlay: "none", next_game_scheduled_at: nextScheduledAt });
+  };
+
   const startGame = async () => {
     const startsAt = new Date(Date.now() + START_GAME_COUNTDOWN_SECONDS * 1000).toISOString();
     await patchSession({ bingo_overlay: "countdown", next_game_scheduled_at: startsAt });
@@ -439,6 +464,11 @@ export default function BingoHostPage() {
     return calledCount > 10;
   }, [calls]);
 
+  const intermissionIsActive = useMemo(() => {
+    const nextScheduledAtMs = session?.next_game_scheduled_at ? Date.parse(session.next_game_scheduled_at) : NaN;
+    return session?.status === "paused" && Number.isFinite(nextScheduledAtMs) && nextScheduledAtMs > Date.now();
+  }, [session?.next_game_scheduled_at, session?.status]);
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#0c0c0c,#1b1b1b)] p-5 text-stone-100">
       <div className="mx-auto max-w-[1600px] space-y-3">
@@ -497,6 +527,22 @@ export default function BingoHostPage() {
                   {session?.bingo_overlay === "welcome" ? "Welcome ✓" : "Welcome"}
                 </button>
                 <button
+                  onClick={() => void toggleIntermission()}
+                  className={`rounded border px-3 py-1 font-bold transition ${
+                    intermissionIsActive
+                      ? "border-amber-400 bg-amber-700/60 text-amber-50"
+                      : "border-amber-700 bg-amber-900/25 text-amber-300 hover:bg-amber-900/45"
+                  }`}
+                >
+                  {intermissionIsActive ? "Intermission ✓" : "Intermission"}
+                </button>
+                <button onClick={() => void endGame()} className="rounded border border-red-700 px-3 py-1 text-red-300 hover:bg-red-900/20">
+                  End Game
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
                   onClick={() => void startGame()}
                   className="rounded border border-sky-700 bg-sky-900/35 px-3 py-1 font-bold text-sky-200 hover:bg-sky-900/55"
                 >
@@ -505,9 +551,9 @@ export default function BingoHostPage() {
                 <button onClick={() => void resetGame()} className="rounded border border-amber-700 bg-amber-900/40 px-3 py-1 text-amber-100 hover:bg-amber-900/60">
                   Reset Game
                 </button>
-                <button onClick={() => void endGame()} className="rounded border border-red-700 px-3 py-1 text-red-300 hover:bg-red-900/20">
-                  End Game
-                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
                 <button onClick={() => void startRound()} className="rounded border border-emerald-700 bg-emerald-900/35 px-3 py-1 font-bold text-emerald-200 hover:bg-emerald-900/55">
                   Start Round
                 </button>
@@ -551,7 +597,8 @@ export default function BingoHostPage() {
 
             {/* Center column: Bingo Pending / Check / Tie / Winner */}
             <div className="min-w-0 space-y-2 text-xs">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="mx-auto flex w-fit flex-col items-center gap-2">
+                <div className="flex items-center gap-2">
                 <button
                   onClick={() => void setOverlay("pending")}
                   disabled={savingOverlay}
@@ -577,28 +624,29 @@ export default function BingoHostPage() {
                 >
                   Bingo Winner!
                 </button>
-              </div>
+                </div>
 
-              <div className="flex w-full max-w-full items-center gap-1 rounded border border-stone-700/80 bg-stone-950/50 px-2 py-1">
-                <label className="text-stone-400 whitespace-nowrap">Check Winner</label>
-                <input
-                  type="text"
-                  value={winnerCheckInput}
-                  onChange={(e) => setWinnerCheckInput(e.target.value.toUpperCase())}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void checkWinner();
-                  }}
-                  placeholder="CARD ID"
-                  className="w-28 min-w-0 rounded border border-stone-700 bg-black px-2 py-1 text-center uppercase tracking-[0.08em]"
-                />
-                <button
-                  type="button"
-                  onClick={() => void checkWinner()}
-                  disabled={checkingWinner}
-                  className="rounded border border-sky-700 px-2 py-1 text-sky-300 hover:bg-sky-900/20 disabled:opacity-50"
-                >
-                  {checkingWinner ? "Checking" : "Run"}
-                </button>
+                <div className="flex items-center gap-1 rounded border border-stone-700/80 bg-stone-950/50 px-2 py-1">
+                  <label className="text-stone-400 whitespace-nowrap">Check Winner</label>
+                  <input
+                    type="text"
+                    value={winnerCheckInput}
+                    onChange={(e) => setWinnerCheckInput(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void checkWinner();
+                    }}
+                    placeholder="CARD ID"
+                    className="w-28 rounded border border-stone-700 bg-black px-2 py-1 text-center uppercase tracking-[0.08em]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void checkWinner()}
+                    disabled={checkingWinner}
+                    className="rounded border border-sky-700 px-2 py-1 text-sky-300 hover:bg-sky-900/20 disabled:opacity-50"
+                  >
+                    {checkingWinner ? "Checking" : "Run"}
+                  </button>
+                </div>
               </div>
 
               {winnerCheckError ? (
@@ -789,7 +837,7 @@ export default function BingoHostPage() {
                   onClick={() => setAutoCallEnabled((value) => !value)}
                   className={`rounded px-2 py-0.5 font-black ${autoCallEnabled ? "bg-emerald-600 text-black" : "bg-stone-700 text-stone-200"}`}
                 >
-                  {autoCallEnabled ? "Auto-Call On" : "Auto-Call Off"}
+                  {autoCallEnabled ? "On" : "Off"}
                 </button>
               </div>
             }

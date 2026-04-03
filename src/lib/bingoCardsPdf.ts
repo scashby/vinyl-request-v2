@@ -30,6 +30,8 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
   const headerGap = 4;
   const columnHeaderH = layout === "4-up" ? 12 : 14;
   const columnHeaderGap = layout === "4-up" ? 4 : 6;
+  const footerGap = 3;
+  const footerH = 8;
 
   const cellPaddingX = layout === "4-up" ? 2.5 : 3.0;
   const cellPaddingY = layout === "4-up" ? 2.5 : 3.0;
@@ -196,10 +198,8 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
     const centerX = innerX + innerW / 2;
     const centerY = innerY + innerH / 2;
     const startY = centerY - totalH / 2;
-    const titleColor = BINGO_COLUMN_RGB[columnLetter];
-
     // Title (top block)
-    doc.setTextColor(...titleColor);
+    doc.setTextColor(0, 0, 0);
     titleLines.forEach((line, index) => {
       doc.text(line, centerX, startY + titleLineH * index, { align: "center", baseline: "top" });
     });
@@ -212,7 +212,7 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
       const lineY = cursorY + sepLineH / 2;
       const lineX1 = innerX + innerW * 0.15;
       const lineX2 = innerX + innerW * 0.85;
-      doc.setDrawColor(...titleColor);
+      doc.setDrawColor(0, 0, 0);
       doc.setLineWidth(Math.min(1.0, Math.max(0.5, sepLineH)));
       doc.line(lineX1, lineY, lineX2, lineY);
       cursorY += sepLineH + sepGap;
@@ -235,18 +235,11 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
     const baseY = yOffsets[slot] ?? 20;
 
     doc.rect(baseX, baseY, cardWidth, cardHeight);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(layout === "4-up" ? 8 : 9);
-    doc.setTextColor(0, 0, 0);
-    doc.text(card.card_identifier ?? `CARD ${card.card_number}`, baseX + cardWidth - 6, baseY + headerH / 2, {
-      align: "right",
-      baseline: "middle",
-    });
 
     const gridX = baseX;
     const gridY = baseY + headerH + headerGap + columnHeaderH + columnHeaderGap;
     const gridW = cardWidth;
-    const gridH = cardHeight - (headerH + headerGap + columnHeaderH + columnHeaderGap);
+    const gridH = cardHeight - (headerH + headerGap + columnHeaderH + columnHeaderGap + footerGap + footerH);
 
     const cellW = gridW / 5;
     const cellH = gridH / 5;
@@ -272,6 +265,16 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
         renderCellText(label, BINGO_COLUMNS[c], x, y, cellW, cellH);
       }
     }
+
+    // Keep the card identifier outside the table area so it stays unobtrusive.
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(layout === "4-up" ? 5.5 : 6.5);
+    doc.setTextColor(110, 110, 110);
+    doc.text(card.card_identifier ?? `CARD ${card.card_number}`, baseX + cardWidth - 4, baseY + cardHeight - 2, {
+      align: "right",
+      baseline: "bottom",
+    });
+    doc.setTextColor(0, 0, 0);
   });
 
   return doc;

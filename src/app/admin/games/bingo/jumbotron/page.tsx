@@ -333,6 +333,12 @@ export default function BingoJumbotronPage() {
     return Math.max(0, diff);
   }, [session?.next_game_scheduled_at, now, previewIntermissionSeconds, previewScreen]);
 
+  const countdownSecondsLeft = useMemo(() => {
+    if (!session?.next_game_scheduled_at) return null;
+    const diff = Math.ceil((new Date(session.next_game_scheduled_at).getTime() - now) / 1000);
+    return Math.max(0, diff);
+  }, [session?.next_game_scheduled_at, now]);
+
   const showIntermission = previewScreen === "intermission" || (session?.status === "paused" && intermissionSecondsLeft !== null && intermissionSecondsLeft > 0);
   const showWelcome = previewScreen === "welcome" || (!showIntermission && previewScreen === null && session?.bingo_overlay === "welcome");
   const showWinner = previewScreen === null && session?.bingo_overlay === "winner";
@@ -423,9 +429,6 @@ export default function BingoJumbotronPage() {
               {welcomeTieBreakLine ? <p className="mt-[0.9vw] border-t border-amber-300/80 pt-[0.6vw] text-[1.03vw] font-semibold text-stone-700">{welcomeTieBreakLine}</p> : null}
             </div>
           </div>
-          <p className="relative z-10 text-[1.5vw] font-semibold text-stone-700">
-            Round {session?.current_round ?? 1} of {session?.round_count ?? 1}
-          </p>
         </div>
       ) : showWinner ? (
         <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2.5vw] px-8 text-center">
@@ -524,16 +527,16 @@ export default function BingoJumbotronPage() {
           <BrandingLogos venueLogoUrl={effectiveVenueLogo} venueName={effectiveVenueName} />
           <div className="relative z-10 space-y-[1.5vw]">
             <p className="text-[2.4vw] font-semibold uppercase tracking-[0.25em] text-sky-300">
-              Round {session?.current_round ?? 1} begins in
+              Game Starts In
             </p>
             <p className="text-[10vw] font-black tabular-nums text-white leading-none" style={{ textShadow: "0 8px 40px rgba(56,189,248,0.35)" }}>
-              {formatMinSec(Math.max(0, intermissionSecondsLeft ?? 0))}
+              {formatMinSec(Math.max(0, countdownSecondsLeft ?? 0))}
             </p>
           </div>
         </div>
       ) : showTiebreaker ? (
         <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2vw] px-8 text-center">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(244,63,94,0.22),transparent_38%),linear-gradient(180deg,#0d050a,#1a070e)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_8%,rgba(244,63,94,0.18),transparent_40%),linear-gradient(180deg,#f6efe8,#eadbcf)]" />
           <BrandingLogos venueLogoUrl={effectiveVenueLogo} venueName={effectiveVenueName} />
           <div className="relative z-10 space-y-[1.5vw]">
             <p
@@ -542,12 +545,12 @@ export default function BingoJumbotronPage() {
             >
               TIEBREAKER
             </p>
-            <p className="text-[2vw] text-rose-100/80">
-              {session?.next_game_rules_text?.trim()
-                ? session.next_game_rules_text.trim()
-                : "The host will announce the tiebreaker rules."}
-            </p>
-            <p className="text-[1.5vw] text-stone-400 uppercase tracking-[0.3em]">
+            <div className="mx-auto w-full max-w-[74vw] rounded-2xl border border-rose-300/55 bg-white/68 px-[2.4vw] py-[1.3vw] text-left shadow-[0_12px_36px_rgba(120,53,15,0.16)] backdrop-blur-[1px]">
+              <p className="text-[1.55vw] font-black uppercase tracking-[0.16em] text-rose-700">Rules</p>
+              <p className="mt-[0.45vw] text-[1.7vw] font-semibold leading-tight text-stone-800">Most number of free squares wins.</p>
+              <p className="mt-[0.35vw] text-[1.7vw] font-semibold leading-tight text-stone-800">Still tied: sudden death. The next one to get a song loses.</p>
+            </div>
+            <p className="text-[1.5vw] text-stone-600 uppercase tracking-[0.3em]">
               Round {session?.current_round ?? 1} · Stand by
             </p>
           </div>
