@@ -8,6 +8,16 @@ import { GAME_MODE_OPTIONS, type RoundModesEntry, normalizeRoundModes } from "sr
 import { normalizeRoundPlaylistIds, type RoundPlaylistEntry } from "src/lib/bingoRoundPlaylists";
 
 type Playlist = { id: number; name: string; track_count: number };
+type BingoPreset = {
+  id: number;
+  name: string;
+  source_playlist_ids: number[];
+  source_playlist_names: string[];
+  pool_size: number;
+  note: string | null;
+  created_from_session_id: number | null;
+  created_at: string;
+};
 type EventRow = {
   id: number;
   title: string;
@@ -19,6 +29,7 @@ type EventRow = {
 type Session = {
   id: number;
   event_id: number | null;
+  game_preset_id?: number | null;
   playlist_id: number;
   playlist_ids: number[] | null;
   master_playlist_ids?: number[] | null;
@@ -58,6 +69,7 @@ export default function BingoEditSessionPage() {
 
   const [events, setEvents] = useState<EventRow[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [presets, setPresets] = useState<BingoPreset[]>([]);
   const [sessionCode, setSessionCode] = useState("");
 
   const [eventId, setEventId] = useState<number | null>(null);
@@ -84,10 +96,17 @@ export default function BingoEditSessionPage() {
   const [nextGameRulesText, setNextGameRulesText] = useState("");
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteNote, setFavoriteNote] = useState("");
+  const [selectedPresetId, setSelectedPresetId] = useState<number | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const selectedPreset = useMemo(
+    () => (selectedPresetId ? presets.find((preset) => preset.id === selectedPresetId) ?? null : null),
+    [presets, selectedPresetId]
+  );
+  const usingPreset = selectedPreset !== null;
 
   const derivedSecondsToNextCall = useMemo(
     () =>
@@ -111,25 +130,29 @@ export default function BingoEditSessionPage() {
     setError(null);
 
     try {
-      const [eventsRes, playlistsRes, sessionRes, cratesRes] = await Promise.all([
+      const [eventsRes, playlistsRes, presetsRes, sessionRes, cratesRes] = await Promise.all([
         fetch("/api/games/bingo/events"),
         fetch("/api/games/playlists"),
+        fetch("/api/games/bingo/presets", { cache: "no-store" }),
         fetch(`/api/games/bingo/sessions/${sessionId}`),
         fetch(`/api/games/bingo/sessions/${sessionId}/crates`, { cache: "no-store" }),
       ]);
 
-      if (!eventsRes.ok || !playlistsRes.ok || !sessionRes.ok || !cratesRes.ok) {
+      if (!eventsRes.ok || !playlistsRes.ok || !presetsRes.ok || !sessionRes.ok || !cratesRes.ok) {
         throw new Error("Failed to load session edit data.");
       }
 
       const eventsPayload = await eventsRes.json();
       const playlistsPayload = await playlistsRes.json();
+      const presetsPayload = await presetsRes.json();
       const sessionPayload = (await sessionRes.json()) as Session;
       const cratesPayload = (await cratesRes.json()) as { data?: BingoCrate[] };
 
       setEvents(eventsPayload.data ?? []);
       setPlaylists(playlistsPayload.data ?? []);
+      setPresets(presetsPayload.data ?? []);
       setSessionCode(sessionPayload.session_code ?? "");
+      setSelectedPresetId(sessionPayload.game_preset_id ?? null);
 
       setEventId(sessionPayload.event_id ?? null);
       setPlaylistIds(
@@ -228,14 +251,14 @@ export default function BingoEditSessionPage() {
   }, [setPlaylistIdsForRound]);
 
   const missingPlaylistRounds = useMemo(
-    () => playlistIds.length > 0
+    () => usingPreset || playlistIds.length > 0
       ? []
       : Array.from({ length: Math.max(1, roundCount) }, (_, index) => index + 1).filter(
           (round) => getPlaylistIdsForRound(round).length === 0
         ),
-    [getPlaylistIdsForRound, playlistIds.length, roundCount]
+    [getPlaylistIdsForRound, playlistIds.length, roundCount, usingPreset]
   );
-  const hasUsablePlaylistConfiguration = playlistIds.length > 0 || missingPlaylistRounds.length === 0;
+  const hasUsablePlaylistConfiguration = usingPreset || playlistIds.length > 0 || missingPlaylistRounds.length === 0;
 
   const toggleRoundMode = useCallback(
     (round: number, mode: GameMode) => {
@@ -278,10 +301,11 @@ export default function BingoEditSessionPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           event_id: eventId,
-          master_playlist_ids: playlistIds,
-          playlist_id: playlistIds[0],
-          playlist_ids: playlistIds,
-          round_playlist_ids: roundPlaylistIds,
+          game_preset_id: selectedPresetId,
+          master_playlist_ids: usingPreset ? (selectedPreset?.source_playlist_ids ?? playlistIds) : playlistIds,
+          playlist_id: usingPreset ? (selectedPreset?.source_playlist_ids?.[0] ?? playlistIds[0]) : playlistIds[0],
+          playlist_ids: usingPreset ? (selectedPreset?.source_playlist_ids ?? playlistIds) : playlistIds,
+          round_playlist_ids: usingPreset ? [] : roundPlaylistIds,
           game_mode: gameMode,
           round_modes: roundModes,
           card_count: cardCount,
@@ -298,8 +322,8 @@ export default function BingoEditSessionPage() {
           show_countdown: showCountdown,
           recent_calls_limit: recentCallsLimit,
           next_game_rules_text: nextGameRulesText.trim() || null,
-          is_favorite: isFavorite,
-          favorite_note: favoriteNote.trim() || null,
+          is_favorite: usingPreset ? false : isFavorite,
+          favorite_note: usingPreset ? null : favoriteNote.trim() || null,
         }),
       });
 
@@ -428,11 +452,21 @@ export default function BingoEditSessionPage() {
                   </select>
                 </label>
 
+                {selectedPreset ? (
+                  <div className="rounded border border-stone-700 bg-stone-950/40 p-3 text-sm md:col-span-2 lg:col-span-2">
+                    <p className="font-semibold text-amber-200">Preset-backed session</p>
+                    <p className="mt-1 text-xs text-stone-300">{selectedPreset.name} · {selectedPreset.pool_size} tracks in fixed pool</p>
+                    <p className="mt-1 text-xs text-stone-400">Source playlists: {selectedPreset.source_playlist_names.join(", ") || "None"}</p>
+                    {selectedPreset.note ? <p className="mt-1 text-xs text-stone-500">{selectedPreset.note}</p> : null}
+                  </div>
+                ) : null}
+
                 <label className="text-sm">Master Playlists
                   <select
                     multiple
                     size={6}
-                    className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                    disabled={usingPreset}
+                    className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
                     value={playlistIds.map(String)}
                     onChange={(e) => {
                       const values = Array.from(e.target.selectedOptions)
@@ -445,7 +479,7 @@ export default function BingoEditSessionPage() {
                       <option key={playlist.id} value={playlist.id}>{playlist.name} ({playlist.track_count})</option>
                     ))}
                   </select>
-                  <p className="mt-2 text-xs text-stone-500">Leave this empty only if every round below has its own playlist override.</p>
+                  <p className="mt-2 text-xs text-stone-500">{usingPreset ? "Preset-backed sessions keep the preset's fixed pool and source playlists." : "Leave this empty only if every round below has its own playlist override."}</p>
                 </label>
 
                 <label className="text-sm">Default Game Mode
@@ -541,6 +575,7 @@ export default function BingoEditSessionPage() {
                           <label className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-stone-300">
                             <input
                               type="checkbox"
+                              disabled={usingPreset}
                               checked={overrideEnabled}
                               onChange={(event) => setRoundPlaylistOverrideEnabled(round, event.target.checked)}
                             />
@@ -551,7 +586,8 @@ export default function BingoEditSessionPage() {
                               <select
                                 multiple
                                 size={5}
-                                className="mt-2 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs"
+                                disabled={usingPreset}
+                                className="mt-2 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
                                 value={roundPlaylistSelection.map(String)}
                                 onChange={(e) => {
                                   const values = Array.from(e.target.selectedOptions)
@@ -567,16 +603,17 @@ export default function BingoEditSessionPage() {
                               <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-stone-400">
                                 <button
                                   type="button"
+                                  disabled={usingPreset}
                                   onClick={() => setPlaylistIdsForRound(round, [])}
-                                  className="rounded border border-stone-700 px-2 py-1 text-stone-300 hover:border-amber-500 hover:text-amber-200"
+                                  className="rounded border border-stone-700 px-2 py-1 text-stone-300 hover:border-amber-500 hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   Clear Override
                                 </button>
-                                <span>{hasPlaylistOverride ? "This round uses only the selected playlists." : "Select one or more playlists for this round override."}</span>
+                                <span>{usingPreset ? "Preset-backed sessions do not use per-round playlist overrides." : hasPlaylistOverride ? "This round uses only the selected playlists." : "Select one or more playlists for this round override."}</span>
                               </div>
                             </>
                           ) : (
-                            <p className="mt-2 text-[11px] text-stone-500">Using master playlist selection for this round.</p>
+                            <p className="mt-2 text-[11px] text-stone-500">{usingPreset ? "Using the preset's fixed pool for this round." : "Using master playlist selection for this round."}</p>
                           )}
                         </div>
 
@@ -631,13 +668,15 @@ export default function BingoEditSessionPage() {
 
               <div className="rounded border border-stone-700 bg-stone-950/40 p-3">
                 <label className="flex items-center gap-3 text-sm font-semibold text-stone-200">
-                  <input type="checkbox" className="h-4 w-4" checked={isFavorite} onChange={(e) => setIsFavorite(e.target.checked)} />
+                  <input type="checkbox" className="h-4 w-4" checked={isFavorite} disabled={usingPreset} onChange={(e) => setIsFavorite(e.target.checked)} />
                   Mark this game as a favorite
                 </label>
+                {usingPreset ? <p className="mt-2 text-xs text-stone-500">This session already reuses a favorite preset. Editing it here does not create a new preset or change the shared fixed pool.</p> : null}
                 <label className="mt-3 block text-sm">Favorite Note
                   <textarea
                     rows={3}
-                    className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm"
+                    disabled={usingPreset}
+                    className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                     value={favoriteNote}
                     onChange={(e) => setFavoriteNote(e.target.value)}
                     placeholder="What made this game strong: energy, pacing, demographic fit, etc."
