@@ -330,6 +330,11 @@ export default function BingoHostPage() {
     }
   };
 
+  const roundIsStarted = useMemo(() => {
+    const calledCount = calls.filter((c) => ["called", "completed", "skipped"].includes(c.status)).length;
+    return calledCount > 0;
+  }, [calls]);
+
   const switchCrate = useCallback(async (crateLetter: string) => {
     if (!session) return;
     setSwitchingCrate(true);
@@ -427,11 +432,6 @@ export default function BingoHostPage() {
     if (!session?.active_crate_letter_by_round) return null;
     return session.active_crate_letter_by_round.find((e) => e.round === session.current_round)?.letter ?? null;
   }, [session]);
-
-  const roundIsStarted = useMemo(() => {
-    const calledCount = calls.filter((c) => ["called", "completed", "skipped"].includes(c.status)).length;
-    return calledCount > 0;
-  }, [calls]);
 
   const resetRoundDisabled = useMemo(() => {
     const calledCount = calls.filter((c) => ["called", "completed", "skipped"].includes(c.status)).length;
