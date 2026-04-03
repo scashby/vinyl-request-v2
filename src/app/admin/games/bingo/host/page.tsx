@@ -339,11 +339,22 @@ export default function BingoHostPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ round_number: session.current_round, crate_letter: crateLetter }),
       });
+
+      // If current round has not started yet, immediately rebuild live call rows
+      // from the newly-selected crate so the table reflects the chosen order.
+      if (!roundIsStarted) {
+        await fetch(`/api/games/bingo/sessions/${sessionId}/activate-round`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ round: Math.max(1, session.current_round || 1), intermission_seconds: 0 }),
+        });
+      }
+
       await load();
     } finally {
       setSwitchingCrate(false);
     }
-  }, [session, sessionId, load]);
+  }, [session, sessionId, roundIsStarted, load]);
 
   const patchCallMetadata = useCallback(
     async (callId: number, patch: Record<string, unknown>) => {
