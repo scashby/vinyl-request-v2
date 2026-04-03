@@ -6,6 +6,24 @@ import { resolveRoundPlaylistIds, type RoundPlaylistEntry } from "src/lib/bingoR
 
 export const runtime = "nodejs";
 
+const BINGO_COLUMNS = ["B", "G", "I", "N", "O"] as const;
+type BingoColumn = (typeof BINGO_COLUMNS)[number];
+
+function coerceBingoColumn(value: unknown): BingoColumn {
+  if (typeof value !== "string") return "B";
+  const normalized = value.toUpperCase().trim();
+  return (BINGO_COLUMNS as readonly string[]).includes(normalized)
+    ? (normalized as BingoColumn)
+    : "B";
+}
+
+function coerceBallNumber(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  const rounded = Math.floor(parsed);
+  return Math.max(1, Math.min(75, rounded));
+}
+
 type SessionRow = {
   id: number;
   playlist_id: number;
@@ -79,8 +97,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
               ? row.playlist_track_key
               : `crate:${sessionId}:${activeCrateLetter}:${requestedRound}:${index + 1}`,
           call_index: Number(row.call_index) || index + 1,
-          ball_number: Number(row.ball_number) || null,
-          column_letter: typeof row.column_letter === "string" ? row.column_letter : "B",
+          ball_number: coerceBallNumber(row.ball_number, index + 1),
+          column_letter: coerceBingoColumn(row.column_letter),
           track_title: typeof row.track_title === "string" ? row.track_title : "",
           artist_name: typeof row.artist_name === "string" ? row.artist_name : "",
           album_name: typeof row.album_name === "string" ? row.album_name : null,
