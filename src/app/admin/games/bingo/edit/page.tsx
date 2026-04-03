@@ -13,6 +13,7 @@ type BingoPreset = {
   name: string;
   source_playlist_ids: number[];
   source_playlist_names: string[];
+  template_session_code?: string | null;
   pool_size: number;
   note: string | null;
   created_from_session_id: number | null;

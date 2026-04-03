@@ -20,6 +20,7 @@ type BingoPreset = {
   name: string;
   source_playlist_ids: number[];
   source_playlist_names: string[];
+  template_session_code?: string | null;
   pool_size: number;
   note: string | null;
   created_from_session_id: number | null;
@@ -740,7 +741,7 @@ export default function BingoSetupPage() {
           </div>
 
           <div className="mt-4">
-            <label className="block text-sm">Reuse Favorite Preset (optional)
+            <label className="block text-sm">Reuse Favorited Session Template (optional)
               <select
                 className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
                 value={selectedPresetId ?? ""}
@@ -749,14 +750,14 @@ export default function BingoSetupPage() {
                 <option value="">Create from playlists below</option>
                 {presets.map((preset) => (
                   <option key={preset.id} value={preset.id}>
-                    {preset.name} ({preset.pool_size} tracks)
+                    {(preset.template_session_code ?? preset.name)} ({preset.pool_size} tracks)
                   </option>
                 ))}
               </select>
             </label>
             {selectedPreset ? (
               <div className="mt-2 rounded border border-stone-700/70 bg-stone-950/40 p-3 text-xs text-stone-300">
-                <p className="font-semibold text-amber-200">Using preset pool from {selectedPreset.name}</p>
+                <p className="font-semibold text-amber-200">Using favorited template {selectedPreset.template_session_code ?? selectedPreset.name}</p>
                 <p className="mt-1">Source playlists: {selectedPreset.source_playlist_names.join(", ") || "None"}</p>
                 {selectedPreset.created_from_session_id ? <p className="mt-1 text-stone-400">Template session: #{selectedPreset.created_from_session_id}</p> : null}
                 {selectedPreset.note ? <p className="mt-1 text-stone-400">{selectedPreset.note}</p> : null}

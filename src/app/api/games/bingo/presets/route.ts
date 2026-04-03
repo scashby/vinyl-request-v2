@@ -19,6 +19,11 @@ type PlaylistRow = {
   name: string;
 };
 
+type SessionRow = {
+  id: number;
+  session_code: string;
+};
+
 export async function GET() {
   const db = getBingoDb();
 
@@ -33,6 +38,13 @@ export async function GET() {
   }
 
   const presets = (data ?? []) as PresetRow[];
+  const sourceSessionIds = Array.from(
+    new Set(
+      presets
+        .map((preset) => preset.created_from_session_id)
+        .filter((value): value is number => Number.isFinite(value))
+    )
+  );
   const playlistIds = Array.from(
     new Set(
       presets.flatMap((preset) =>
@@ -51,6 +63,16 @@ export async function GET() {
 
   const playlistNameById = new Map<number, string>(((playlists ?? []) as PlaylistRow[]).map((row) => [row.id, row.name]));
 
+  const { data: sourceSessions, error: sourceSessionsError } = sourceSessionIds.length
+    ? await db.from("bingo_sessions").select("id, session_code").in("id", sourceSessionIds)
+    : { data: [] as SessionRow[], error: null };
+
+  if (sourceSessionsError) {
+    return NextResponse.json({ error: sourceSessionsError.message }, { status: 500 });
+  }
+
+  const sessionCodeById = new Map<number, string>(((sourceSessions ?? []) as SessionRow[]).map((row) => [row.id, row.session_code]));
+
   return NextResponse.json(
     {
       data: presets.map((preset) => {
@@ -59,6 +81,7 @@ export async function GET() {
           ...preset,
           source_playlist_ids: sourcePlaylistIds,
           source_playlist_names: sourcePlaylistIds.map((id) => playlistNameById.get(id) ?? `Playlist ${id}`),
+          template_session_code: preset.created_from_session_id ? sessionCodeById.get(preset.created_from_session_id) ?? null : null,
         };
       }),
     },
