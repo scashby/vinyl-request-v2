@@ -792,6 +792,9 @@ export default function BingoSetupPage() {
                 onChange={(e) => setSelectedTemplateSessionId(Number(e.target.value) || null)}
               >
                 <option value="">Do not copy a session template</option>
+                {templateSessions.length === 0 ? (
+                  <option value="" disabled>No favorited session templates yet</option>
+                ) : null}
                 {templateSessions.map((template) => (
                   <option key={template.id} value={template.id}>
                     {template.session_code}{template.event_title ? ` - ${template.event_title}` : ""}
@@ -799,6 +802,9 @@ export default function BingoSetupPage() {
                 ))}
               </select>
             </label>
+            {templateSessions.length === 0 ? (
+              <p className="mt-2 text-xs text-stone-400">Mark any session in Existing Sessions as Favorite Session Template to make it available here.</p>
+            ) : null}
             {selectedTemplateSessionId ? (
               <div className="mt-2 rounded border border-stone-700/70 bg-stone-950/40 p-3 text-xs text-stone-300">
                 <p className="font-semibold text-amber-200">Template settings will be copied from this favorited session.</p>

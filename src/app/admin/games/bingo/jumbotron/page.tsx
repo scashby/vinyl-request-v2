@@ -553,18 +553,18 @@ export default function BingoJumbotronPage() {
         </div>
       ) : showTiebreaker ? (
         <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2vw] px-8 text-center">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(251,191,36,0.2),transparent_26%),radial-gradient(circle_at_80%_26%,rgba(244,63,94,0.14),transparent_24%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(251,191,36,0.22),transparent_26%),radial-gradient(circle_at_78%_24%,rgba(180,83,9,0.12),transparent_24%)]" />
           <BrandingLogos venueLogoUrl={effectiveVenueLogo} venueName={effectiveVenueName} tone="light" />
           <div className="relative z-10 space-y-[1.5vw]">
             <p
-              className="font-black uppercase leading-none tracking-tight text-rose-400"
-              style={{ fontSize: "10vw", textShadow: "0 8px 40px rgba(244,63,94,0.35)" }}
+              className="font-black uppercase leading-none tracking-tight text-amber-700"
+              style={{ fontSize: "10vw", textShadow: "0 10px 35px rgba(245,158,11,0.24)" }}
             >
               TIEBREAKER
             </p>
             {welcomeTieBreakLine ? (
-              <div className="mx-auto w-full max-w-[74vw] rounded-2xl border border-rose-300/55 bg-white/76 px-[2.4vw] py-[1.3vw] text-left shadow-[0_18px_40px_rgba(120,53,15,0.14)] backdrop-blur-[1px]">
-                <p className="text-[1.55vw] font-black uppercase tracking-[0.16em] text-rose-700">Rules</p>
+              <div className="mx-auto w-full max-w-[74vw] rounded-2xl border border-amber-300/70 bg-white/76 px-[2.4vw] py-[1.3vw] text-left shadow-[0_18px_40px_rgba(120,53,15,0.14)] backdrop-blur-[1px]">
+                <p className="text-[1.55vw] font-black uppercase tracking-[0.16em] text-amber-800">Rules</p>
                 <p className="mt-[0.45vw] text-[1.7vw] font-semibold leading-tight text-stone-800">{welcomeTieBreakLine}</p>
               </div>
             ) : null}
