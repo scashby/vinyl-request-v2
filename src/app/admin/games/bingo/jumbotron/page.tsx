@@ -373,7 +373,7 @@ export default function BingoJumbotronPage() {
     ?? session?.next_game_rules_text?.trim()
     ?? welcomeContent?.intro
     ?? "Listen for each track. If the song is on your card, mark that square. Get five in a row to call BINGO.";
-  const welcomeHeadingText = previewWelcomeHeading ?? session?.welcome_heading_text?.trim() || "Welcome To Vinyl Music Bingo";
+  const welcomeHeadingText = (previewWelcomeHeading ?? session?.welcome_heading_text?.trim()) || "Welcome To Vinyl Music Bingo";
   const storedWelcomeRules = (session?.welcome_rules_text ?? "")
     .split(/\r?\n/)
     .map((line) => line.trim())
