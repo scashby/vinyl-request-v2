@@ -484,7 +484,7 @@ export default function BingoHostPage() {
           <div className="grid gap-3 lg:grid-cols-[1fr,1fr,0.9fr]">
 
             {/* Left column: CSV-required host controls */}
-            <div className="space-y-2 text-xs">
+            <div className="min-w-0 space-y-2 text-xs">
               <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => void toggleWelcome()}
@@ -550,7 +550,7 @@ export default function BingoHostPage() {
             </div>
 
             {/* Center column: Bingo Pending / Check / Tie / Winner */}
-            <div className="space-y-2 text-xs">
+            <div className="min-w-0 space-y-2 text-xs">
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => void setOverlay("pending")}
@@ -579,7 +579,7 @@ export default function BingoHostPage() {
                 </button>
               </div>
 
-              <div className="flex flex-wrap items-center gap-1 rounded border border-stone-700/80 bg-stone-950/50 px-2 py-1">
+              <div className="flex w-full max-w-full items-center gap-1 rounded border border-stone-700/80 bg-stone-950/50 px-2 py-1">
                 <label className="text-stone-400 whitespace-nowrap">Check Winner</label>
                 <input
                   type="text"
@@ -589,7 +589,7 @@ export default function BingoHostPage() {
                     if (e.key === "Enter") void checkWinner();
                   }}
                   placeholder="CARD ID"
-                  className="w-28 rounded border border-stone-700 bg-black px-2 py-1 text-center uppercase tracking-[0.08em]"
+                  className="w-28 min-w-0 rounded border border-stone-700 bg-black px-2 py-1 text-center uppercase tracking-[0.08em]"
                 />
                 <button
                   type="button"
@@ -634,7 +634,7 @@ export default function BingoHostPage() {
             </div>
 
             {/* Right column: Timing controls */}
-            <div className="space-y-2 text-xs">
+            <div className="min-w-0 space-y-2 text-xs">
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <label className="text-stone-400 whitespace-nowrap">Next Call (sec)</label>
@@ -789,7 +789,7 @@ export default function BingoHostPage() {
                   onClick={() => setAutoCallEnabled((value) => !value)}
                   className={`rounded px-2 py-0.5 font-black ${autoCallEnabled ? "bg-emerald-600 text-black" : "bg-stone-700 text-stone-200"}`}
                 >
-                  {autoCallEnabled ? "On" : "Off"}
+                  {autoCallEnabled ? "Auto-Call On" : "Auto-Call Off"}
                 </button>
               </div>
             }

@@ -137,15 +137,9 @@ export default function BingoTransportLane({
         <div className="flex items-center gap-3">
           {secondsToNextCall !== undefined ? (
             <span
-              className={`rounded border px-4 py-2 text-2xl font-black leading-none tabular-nums ${
-                secondsToNextCall <= 10
-                  ? "border-red-700 text-red-300"
-                  : secondsToNextCall <= 20
-                    ? "border-amber-600 text-amber-300"
-                    : "border-stone-600 text-stone-300"
-              }`}
+              className="rounded border border-stone-600 px-4 py-2 text-2xl font-black leading-none tabular-nums text-stone-300"
             >
-              Next: {secondsToNextCall}s
+              Next Call: {secondsToNextCall}s
             </span>
           ) : null}
           {headerRight}
