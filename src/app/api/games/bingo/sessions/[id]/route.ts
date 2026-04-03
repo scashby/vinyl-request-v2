@@ -86,6 +86,12 @@ type EventRow = {
   venue_logo_url: string | null;
 };
 
+type PresetValidationRow = {
+  id: number;
+  source_playlist_ids: number[] | null;
+  pool_size: number;
+};
+
 type TransportEventRow = {
   event_type: string;
   payload: { call_id?: unknown; after_call_id?: unknown } | null;
@@ -315,7 +321,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (requiresTrackValidation) {
     const validationQuery = (db
       .from("bingo_sessions")
-      .select("playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, round_count, card_count") as unknown as {
+      .select("game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, round_count, card_count") as unknown as {
         eq: (column: string, value: number) => {
           maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
         };
@@ -327,6 +333,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!existing) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
     const existingRow = existing as {
+      game_preset_id: number | null;
       playlist_id: number;
       playlist_ids: number[] | null;
       master_playlist_ids: number[] | null;
@@ -337,16 +344,49 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const roundCount = Math.max(1, Math.floor(Number(patch.round_count ?? existingRow.round_count)));
     const cardCount = Math.max(1, Math.floor(Number(patch.card_count ?? existingRow.card_count)));
-    const selectedPlaylistIds = patch.master_playlist_ids !== undefined
-      ? normalizePlaylistIds(patch.master_playlist_ids)
-      : patch.playlist_ids !== undefined
-        ? normalizePlaylistIds(patch.playlist_ids)
-        : normalizePlaylistIds(existingRow.master_playlist_ids ?? existingRow.playlist_ids, existingRow.playlist_id);
+    const effectivePresetId = patch.game_preset_id !== undefined
+      ? (patch.game_preset_id as number | null)
+      : existingRow.game_preset_id ?? null;
+
+    let selectedPlaylistIds: number[];
+    if (effectivePresetId) {
+      const { data: preset, error: presetError } = await db
+        .from("bingo_game_presets")
+        .select("id, source_playlist_ids, pool_size")
+        .eq("id", effectivePresetId)
+        .maybeSingle();
+
+      if (presetError) return NextResponse.json({ error: presetError.message }, { status: 500 });
+      if (!preset) return NextResponse.json({ error: "Favorite preset not found" }, { status: 404 });
+
+      const typedPreset = preset as PresetValidationRow;
+      selectedPlaylistIds = normalizePlaylistIds(typedPreset.source_playlist_ids);
+
+      if (selectedPlaylistIds.length === 0) {
+        return NextResponse.json({ error: "Favorite preset is missing its source playlists" }, { status: 400 });
+      }
+
+      const requiredTrackCount = computeMinimumPlaylistTracks(roundCount, cardCount);
+      if (typedPreset.pool_size < requiredTrackCount) {
+        return NextResponse.json(
+          {
+            error: `Favorite preset pool must contain at least ${requiredTrackCount} tracks to build one bingo crate.`,
+          },
+          { status: 400 }
+        );
+      }
+    } else {
+      selectedPlaylistIds = patch.master_playlist_ids !== undefined
+        ? normalizePlaylistIds(patch.master_playlist_ids)
+        : patch.playlist_ids !== undefined
+          ? normalizePlaylistIds(patch.playlist_ids)
+          : normalizePlaylistIds(existingRow.master_playlist_ids ?? existingRow.playlist_ids, existingRow.playlist_id);
+    }
 
     let normalizedRoundPlaylistIds: RoundPlaylistEntry[];
     try {
       normalizedRoundPlaylistIds = normalizeRoundPlaylistIds(
-        patch.round_playlist_ids ?? existingRow.round_playlist_ids,
+        effectivePresetId ? [] : (patch.round_playlist_ids ?? existingRow.round_playlist_ids),
         roundCount
       );
     } catch (error) {
@@ -356,42 +396,44 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       );
     }
 
-    const resolvedPlaylistsByRound = collectResolvedPlaylistIdsByRound(
-      {
-        playlist_id: selectedPlaylistIds[0] ?? existingRow.playlist_id,
-        playlist_ids: selectedPlaylistIds,
-        round_playlist_ids: normalizedRoundPlaylistIds,
-      },
-      roundCount
-    );
+    if (!effectivePresetId) {
+      const resolvedPlaylistsByRound = collectResolvedPlaylistIdsByRound(
+        {
+          playlist_id: selectedPlaylistIds[0] ?? existingRow.playlist_id,
+          playlist_ids: selectedPlaylistIds,
+          round_playlist_ids: normalizedRoundPlaylistIds,
+        },
+        roundCount
+      );
 
-    for (let round = 1; round <= roundCount; round += 1) {
-      if ((resolvedPlaylistsByRound.get(round) ?? []).length === 0) {
-        return NextResponse.json(
-          { error: `Round ${round} needs at least one playlist or a master playlist selection.` },
-          { status: 400 }
-        );
-      }
-    }
-
-    const requiredTrackCount = computeMinimumPlaylistTracks(roundCount, cardCount);
-    const trackCountCache = new Map<string, number>();
-    for (let round = 1; round <= roundCount; round += 1) {
-      const playlistIdsForRound = resolvedPlaylistsByRound.get(round) ?? [];
-      const cacheKey = playlistIdsForRound.join(",");
-      let availableTrackCount = trackCountCache.get(cacheKey);
-      if (availableTrackCount === undefined) {
-        availableTrackCount = await getPlaylistTrackCountForPlaylists(db, playlistIdsForRound);
-        trackCountCache.set(cacheKey, availableTrackCount);
+      for (let round = 1; round <= roundCount; round += 1) {
+        if ((resolvedPlaylistsByRound.get(round) ?? []).length === 0) {
+          return NextResponse.json(
+            { error: `Round ${round} needs at least one playlist or a master playlist selection.` },
+            { status: 400 }
+          );
+        }
       }
 
-      if (availableTrackCount < requiredTrackCount) {
-        return NextResponse.json(
-          {
-            error: `Round ${round} playlist selection must contain at least ${requiredTrackCount} tracks to build one bingo crate.`,
-          },
-          { status: 400 }
-        );
+      const requiredTrackCount = computeMinimumPlaylistTracks(roundCount, cardCount);
+      const trackCountCache = new Map<string, number>();
+      for (let round = 1; round <= roundCount; round += 1) {
+        const playlistIdsForRound = resolvedPlaylistsByRound.get(round) ?? [];
+        const cacheKey = playlistIdsForRound.join(",");
+        let availableTrackCount = trackCountCache.get(cacheKey);
+        if (availableTrackCount === undefined) {
+          availableTrackCount = await getPlaylistTrackCountForPlaylists(db, playlistIdsForRound);
+          trackCountCache.set(cacheKey, availableTrackCount);
+        }
+
+        if (availableTrackCount < requiredTrackCount) {
+          return NextResponse.json(
+            {
+              error: `Round ${round} playlist selection must contain at least ${requiredTrackCount} tracks to build one bingo crate.`,
+            },
+            { status: 400 }
+          );
+        }
       }
     }
 
