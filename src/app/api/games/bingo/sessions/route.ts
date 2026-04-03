@@ -49,6 +49,16 @@ type CreateSessionBody = {
   call_reveal_delay_seconds?: number;
   default_intermission_seconds?: number;
   next_game_rules_text?: string | null;
+  welcome_heading_text?: string | null;
+  welcome_message_text?: string | null;
+  welcome_rules_text?: string | null;
+  welcome_tiebreak_text?: string | null;
+  intermission_heading_text?: string | null;
+  intermission_message_text?: string | null;
+  intermission_footer_text?: string | null;
+  thanks_heading_text?: string | null;
+  thanks_subheading_text?: string | null;
+  thanks_events_heading_text?: string | null;
   recent_calls_limit?: number;
   show_title?: boolean;
   show_logo?: boolean;
@@ -377,6 +387,16 @@ export async function POST(request: NextRequest) {
         call_reveal_delay_seconds: callRevealDelaySeconds,
         default_intermission_seconds: defaultIntermissionSeconds,
         next_game_rules_text: body.next_game_rules_text ?? null,
+        welcome_heading_text: body.welcome_heading_text ?? null,
+        welcome_message_text: body.welcome_message_text ?? null,
+        welcome_rules_text: body.welcome_rules_text ?? null,
+        welcome_tiebreak_text: body.welcome_tiebreak_text ?? null,
+        intermission_heading_text: body.intermission_heading_text ?? null,
+        intermission_message_text: body.intermission_message_text ?? null,
+        intermission_footer_text: body.intermission_footer_text ?? null,
+        thanks_heading_text: body.thanks_heading_text ?? null,
+        thanks_subheading_text: body.thanks_subheading_text ?? null,
+        thanks_events_heading_text: body.thanks_events_heading_text ?? null,
         is_favorite: body.is_favorite ?? false,
         favorite_note: body.favorite_note?.trim() || null,
       })

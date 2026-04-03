@@ -20,6 +20,16 @@ type Session = {
   show_countdown: boolean;
   next_game_scheduled_at: string | null;
   next_game_rules_text: string | null;
+  welcome_heading_text?: string | null;
+  welcome_message_text?: string | null;
+  welcome_rules_text?: string | null;
+  welcome_tiebreak_text?: string | null;
+  intermission_heading_text?: string | null;
+  intermission_message_text?: string | null;
+  intermission_footer_text?: string | null;
+  thanks_heading_text?: string | null;
+  thanks_subheading_text?: string | null;
+  thanks_events_heading_text?: string | null;
   call_reveal_at: string | null;
   bingo_overlay: string;
   event?: {
@@ -359,12 +369,19 @@ export default function BingoJumbotronPage() {
   }, [session]);
 
   const welcomeIntroText = previewWelcomeText
+    ?? session?.welcome_message_text?.trim()
     ?? session?.next_game_rules_text?.trim()
     ?? welcomeContent?.intro
     ?? "Listen for each track. If the song is on your card, mark that square. Get five in a row to call BINGO.";
-  const welcomeHeadingText = previewWelcomeHeading ?? "Welcome To Vinyl Music Bingo";
-  const welcomeRulesLines = previewWelcomeRules.length > 0 ? previewWelcomeRules : (welcomeContent?.modeRules ?? []);
-  const welcomeTieBreakLine = previewWelcomeTieBreak ?? welcomeContent?.tieBreak ?? null;
+  const welcomeHeadingText = previewWelcomeHeading ?? session?.welcome_heading_text?.trim() || "Welcome To Vinyl Music Bingo";
+  const storedWelcomeRules = (session?.welcome_rules_text ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  const welcomeRulesLines = previewWelcomeRules.length > 0
+    ? previewWelcomeRules
+    : (storedWelcomeRules.length > 0 ? storedWelcomeRules : (welcomeContent?.modeRules ?? []));
+  const welcomeTieBreakLine = previewWelcomeTieBreak ?? session?.welcome_tiebreak_text?.trim() ?? welcomeContent?.tieBreak ?? null;
 
   const replaceRoundTokens = useCallback(
     (value: string) => value
@@ -373,14 +390,14 @@ export default function BingoJumbotronPage() {
     [session?.current_round, session?.round_count]
   );
 
-  const intermissionHeadingText = previewIntermissionHeading || "Intermission";
+  const intermissionHeadingText = previewIntermissionHeading || session?.intermission_heading_text?.trim() || "Intermission";
   const intermissionLeadText = replaceRoundTokens(
-    previewIntermissionText || "Round {round} of {roundCount} begins in"
+    previewIntermissionText || session?.intermission_message_text?.trim() || "Round {round} of {roundCount} begins in"
   );
-  const intermissionFooterText = previewIntermissionFooter || "Crate reset in progress. Next round starts shortly.";
-  const thanksHeadingText = previewThanksHeading || "Thank You For Playing!";
-  const thanksSubheadingText = previewThanksSubheading || "Vinyl Music Bingo";
-  const thanksEventsHeadingText = previewThanksEventsHeading || "Find Us Next At";
+  const intermissionFooterText = previewIntermissionFooter || session?.intermission_footer_text?.trim() || "Crate reset in progress. Next round starts shortly.";
+  const thanksHeadingText = previewThanksHeading || session?.thanks_heading_text?.trim() || "Thank You For Playing!";
+  const thanksSubheadingText = previewThanksSubheading || session?.thanks_subheading_text?.trim() || "Vinyl Music Bingo";
+  const thanksEventsHeadingText = previewThanksEventsHeading || session?.thanks_events_heading_text?.trim() || "Find Us Next At";
 
   const effectiveVenueLogo = previewVenueLogo ?? session?.event?.venue_logo_url ?? null;
   const effectiveVenueName = previewVenueName ?? session?.event?.title ?? null;

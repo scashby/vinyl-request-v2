@@ -59,9 +59,20 @@ type Session = {
   sonos_output_delay_ms: number;
   seconds_to_next_call: number;
   call_reveal_delay_seconds: number;
+  default_intermission_seconds?: number;
   show_countdown: boolean;
   recent_calls_limit: number;
   next_game_rules_text: string | null;
+  welcome_heading_text?: string | null;
+  welcome_message_text?: string | null;
+  welcome_rules_text?: string | null;
+  welcome_tiebreak_text?: string | null;
+  intermission_heading_text?: string | null;
+  intermission_message_text?: string | null;
+  intermission_footer_text?: string | null;
+  thanks_heading_text?: string | null;
+  thanks_subheading_text?: string | null;
+  thanks_events_heading_text?: string | null;
   is_favorite?: boolean;
   favorite_note?: string | null;
 };
@@ -149,6 +160,7 @@ export default function BingoSetupPage() {
   const [favoriteNote, setFavoriteNote] = useState("");
   const [venueLogoUrl, setVenueLogoUrl] = useState<string | null>(null);
   const [uploadingVenueLogo, setUploadingVenueLogo] = useState(false);
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
 
   const [creating, setCreating] = useState(false);
   const [downloadingRoundsSessionId, setDownloadingRoundsSessionId] = useState<number | null>(null);
@@ -211,8 +223,61 @@ export default function BingoSetupPage() {
     setSelectedPlaylistIds(selectedPreset.source_playlist_ids);
     setRoundPlaylistIds([]);
     setRoundPlaylistOverrideRounds([]);
-    setIsFavorite(false);
   }, [selectedPreset]);
+
+  useEffect(() => {
+    const sourceSessionId = selectedPreset?.created_from_session_id;
+    if (!sourceSessionId) return;
+
+    let cancelled = false;
+    setApplyingTemplate(true);
+
+    fetch(`/api/games/bingo/sessions/${sourceSessionId}`, { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Failed to load favorite session template");
+        return res.json() as Promise<Session>;
+      })
+      .then((templateSession) => {
+        if (cancelled) return;
+
+        setRoundCount(Math.max(1, Number(templateSession.round_count ?? 3)));
+        setRoundModes(templateSession.round_modes ?? []);
+        setCardCount(Math.max(1, Number(templateSession.card_count ?? 40)));
+
+        setRemoveResleeveSeconds(Math.max(0, Number(templateSession.remove_resleeve_seconds ?? 20)));
+        setPlaceVinylSeconds(Math.max(0, Number(templateSession.place_vinyl_seconds ?? 8)));
+        setCueSeconds(Math.max(0, Number(templateSession.cue_seconds ?? 12)));
+        setStartSlideSeconds(Math.max(0, Number(templateSession.start_slide_seconds ?? 5)));
+        setHostBufferSeconds(Math.max(0, Number(templateSession.host_buffer_seconds ?? 2)));
+        setSonosDelayMs(Math.max(0, Number(templateSession.sonos_output_delay_ms ?? 75)));
+        setCallRevealDelaySeconds(Math.max(0, Number(templateSession.call_reveal_delay_seconds ?? 10)));
+
+        const templateIntermissionSeconds = Number(templateSession.default_intermission_seconds ?? 600);
+        setDefaultIntermissionMinutes(Math.max(0, Math.round(templateIntermissionSeconds / 60)));
+
+        setWelcomeHeadingText(templateSession.welcome_heading_text ?? "Welcome To Vinyl Music Bingo");
+        setWelcomeMessageText(templateSession.welcome_message_text ?? templateSession.next_game_rules_text ?? INITIAL_WELCOME_CONTENT.intro);
+        setWelcomeRulesText(templateSession.welcome_rules_text ?? INITIAL_WELCOME_CONTENT.modeRules.join("\n"));
+        setWelcomeTieBreakText(templateSession.welcome_tiebreak_text ?? INITIAL_WELCOME_CONTENT.tieBreak);
+        setIntermissionHeadingText(templateSession.intermission_heading_text ?? "Intermission");
+        setIntermissionMessageText(templateSession.intermission_message_text ?? "Round {round} of {roundCount} begins in");
+        setIntermissionFooterText(templateSession.intermission_footer_text ?? "Crate reset in progress. Next round starts shortly.");
+        setThankYouHeadingText(templateSession.thanks_heading_text ?? "Thank You For Playing!");
+        setThankYouSubheadingText(templateSession.thanks_subheading_text ?? "Vinyl Music Bingo");
+        setThankYouEventsHeadingText(templateSession.thanks_events_heading_text ?? "Find Us Next At");
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        alert(error instanceof Error ? error.message : "Failed to load favorite session template");
+      })
+      .finally(() => {
+        if (!cancelled) setApplyingTemplate(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPreset?.created_from_session_id]);
 
   const getModesForRound = useCallback(
      (round: number): GameMode[] => roundModes.find((entry) => entry.round === round)?.modes ?? [],
@@ -419,8 +484,18 @@ export default function BingoSetupPage() {
         call_reveal_delay_seconds: callRevealDelaySeconds,
         default_intermission_seconds: defaultIntermissionMinutes * 60,
         next_game_rules_text: welcomePreviewContent.intro || null,
-        is_favorite: usingPreset ? false : isFavorite,
-        favorite_note: usingPreset ? null : favoriteNote.trim() || null,
+        welcome_heading_text: welcomeHeadingText.trim() || null,
+        welcome_message_text: welcomeMessageText.trim() || null,
+        welcome_rules_text: welcomeRulesText.trim() || null,
+        welcome_tiebreak_text: welcomeTieBreakText.trim() || null,
+        intermission_heading_text: intermissionHeadingText.trim() || null,
+        intermission_message_text: intermissionMessageText.trim() || null,
+        intermission_footer_text: intermissionFooterText.trim() || null,
+        thanks_heading_text: thankYouHeadingText.trim() || null,
+        thanks_subheading_text: thankYouSubheadingText.trim() || null,
+        thanks_events_heading_text: thankYouEventsHeadingText.trim() || null,
+        is_favorite: isFavorite,
+        favorite_note: favoriteNote.trim() || null,
       };
 
       const res = await fetch("/api/games/bingo/sessions", {
@@ -548,6 +623,25 @@ export default function BingoSetupPage() {
     await load();
   };
 
+  const createAdditionalCrates = async (session: Session) => {
+    for (let round = 1; round <= Math.max(1, session.round_count); round += 1) {
+      const response = await fetch(`/api/games/bingo/sessions/${session.id}/crates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ round_number: round }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        alert((payload as { error?: string }).error ?? `Failed to create crate for round ${round}`);
+        return;
+      }
+    }
+
+    alert(`Generated one additional crate for each round in ${session.session_code}.`);
+    await load();
+  };
+
   const downloadCallSheet = async (
     sessionId: number,
     round?: number,
@@ -664,9 +758,11 @@ export default function BingoSetupPage() {
               <div className="mt-2 rounded border border-stone-700/70 bg-stone-950/40 p-3 text-xs text-stone-300">
                 <p className="font-semibold text-amber-200">Using preset pool from {selectedPreset.name}</p>
                 <p className="mt-1">Source playlists: {selectedPreset.source_playlist_names.join(", ") || "None"}</p>
+                {selectedPreset.created_from_session_id ? <p className="mt-1 text-stone-400">Template session: #{selectedPreset.created_from_session_id}</p> : null}
                 {selectedPreset.note ? <p className="mt-1 text-stone-400">{selectedPreset.note}</p> : null}
               </div>
             ) : null}
+            {applyingTemplate ? <p className="mt-2 text-xs text-amber-300">Applying favorited session settings…</p> : null}
           </div>
 
           {/* Playlists */}
@@ -799,15 +895,14 @@ export default function BingoSetupPage() {
           </button>
           <div className="mt-4 rounded-2xl border border-stone-700/70 bg-stone-950/40 p-4">
             <label className="flex items-center gap-3 text-sm font-semibold text-stone-200">
-              <input type="checkbox" className="h-4 w-4" checked={isFavorite} disabled={usingPreset} onChange={(e) => setIsFavorite(e.target.checked)} />
+              <input type="checkbox" className="h-4 w-4" checked={isFavorite} onChange={(e) => setIsFavorite(e.target.checked)} />
               Save this game as a favorite after creation
             </label>
             <label className="mt-3 block text-sm">
               Favorite Note
               <textarea
                 rows={3}
-                disabled={usingPreset}
-                className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm"
                 value={favoriteNote}
                 onChange={(e) => setFavoriteNote(e.target.value)}
                 placeholder="Why this game playlist worked well, crowd energy notes, room fit, etc."
@@ -1023,6 +1118,7 @@ export default function BingoSetupPage() {
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/assistant?sessionId=${session.id}`, "bingo_assistant", "width=1024,height=800,left=1300,top=0,noopener,noreferrer")}>Assistant</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/jumbotron?sessionId=${session.id}`, "bingo_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => createAdditionalCards(session)}>Add {Math.max(1, session.round_count) * 100} Cards</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => void createAdditionalCrates(session)}>Generate Extra Crates</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "4-up")}>Cards Pack 4-up</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCallSheet(session.id)}>Call Sheet (Live)</button>
                     <button
