@@ -77,8 +77,11 @@ export default function BingoHostPage() {
   const currentCallRowRef = useRef<HTMLTableRowElement>(null);
   const autoCallLockRef = useRef(false);
   const revealDelayEditingRef = useRef(false);
+  const nextCallEditingRef = useRef(false);
   const intermissionEditingRef = useRef(false);
   const START_GAME_COUNTDOWN_SECONDS = 300;
+  const DEFAULT_NEXT_CALL_SECONDS = 45;
+  const nextCallConfiguredSecondsRef = useRef<number>(DEFAULT_NEXT_CALL_SECONDS);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -94,8 +97,21 @@ export default function BingoHostPage() {
       if (!revealDelayEditingRef.current) {
         setRevealDelayInput(payload.call_reveal_delay_seconds ?? 10);
       }
-      setSecondsToNextCallInput(payload.seconds_to_next_call ?? 0);
-      setRemaining(payload.seconds_to_next_call ?? 0);
+      const nextCallRemaining = payload.seconds_to_next_call ?? 0;
+      const countdownLikelyActive = payload.status === "running" && (payload.current_call_index ?? 0) > 0;
+
+      setRemaining(nextCallRemaining);
+
+      if (countdownLikelyActive) {
+        // Keep host input pinned to the configured interval while countdown is active.
+        nextCallConfiguredSecondsRef.current = Math.max(nextCallConfiguredSecondsRef.current, nextCallRemaining);
+      } else {
+        nextCallConfiguredSecondsRef.current = nextCallRemaining;
+      }
+
+      if (!nextCallEditingRef.current) {
+        setSecondsToNextCallInput(nextCallConfiguredSecondsRef.current);
+      }
       if (!intermissionEditingRef.current) {
         // Convert stored seconds to minutes for display
         setIntermissionLengthMinutes(Math.round((payload.default_intermission_seconds ?? 600) / 60));
@@ -266,8 +282,6 @@ export default function BingoHostPage() {
     setAutoCallEnabled(false);
     autoCallLockRef.current = false;
     setRevealDelayInput(10);
-    setSecondsToNextCallInput(0);
-    setRemaining(0);
     setResetCounter((v) => v + 1);
     await patchSession({ bingo_overlay: "none", next_game_scheduled_at: null });
     await load();
@@ -285,8 +299,9 @@ export default function BingoHostPage() {
       return;
     }
     setRevealDelayInput(10);
-    setSecondsToNextCallInput(0);
-    setRemaining(0);
+    nextCallConfiguredSecondsRef.current = DEFAULT_NEXT_CALL_SECONDS;
+    setSecondsToNextCallInput(DEFAULT_NEXT_CALL_SECONDS);
+    setRemaining(DEFAULT_NEXT_CALL_SECONDS);
     setResetCounter((v) => v + 1);
     await load();
   };
@@ -294,6 +309,8 @@ export default function BingoHostPage() {
   const saveSecondsToNextCall = async () => {
     const updatedSeconds = Math.max(0, Math.min(300, secondsToNextCallInput));
     setSecondsToNextCallInput(updatedSeconds);
+    nextCallConfiguredSecondsRef.current = updatedSeconds;
+    nextCallEditingRef.current = false;
     setRemaining(updatedSeconds);
 
     await patchSession({
@@ -691,6 +708,7 @@ export default function BingoHostPage() {
                     min={0}
                     max={300}
                     value={secondsToNextCallInput}
+                    onFocus={() => { nextCallEditingRef.current = true; }}
                     onChange={(e) => setSecondsToNextCallInput(Math.max(0, Math.min(300, Number(e.target.value) || 0)))}
                     onBlur={() => { void saveSecondsToNextCall(); }}
                     onKeyDown={(e) => {
