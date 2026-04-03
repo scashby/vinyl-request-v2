@@ -6,6 +6,7 @@ DECLARE
   chosen_preset_id bigint;
   pool_round integer;
   pool_track_count integer;
+  existing_pool_count integer;
 BEGIN
   SELECT *
   INTO target_session
@@ -16,25 +17,6 @@ BEGIN
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Legacy bingo session QFTD46 was not found';
-  END IF;
-
-  SELECT min(round_number)
-  INTO pool_round
-  FROM public.bingo_session_round_tracks
-  WHERE session_id = target_session.id;
-
-  IF pool_round IS NULL THEN
-    RAISE EXCEPTION 'Legacy bingo session QFTD46 has no saved round snapshots to migrate';
-  END IF;
-
-  SELECT count(*)
-  INTO pool_track_count
-  FROM public.bingo_session_round_tracks
-  WHERE session_id = target_session.id
-    AND round_number = pool_round;
-
-  IF pool_track_count < 75 THEN
-    RAISE EXCEPTION 'Legacy bingo session QFTD46 only has % saved pool tracks; expected at least 75', pool_track_count;
   END IF;
 
   chosen_preset_id := target_session.game_preset_id;
@@ -59,8 +41,8 @@ BEGIN
     )
     VALUES (
       target_session.session_code,
-      COALESCE(target_session.master_playlist_ids, target_session.playlist_ids, jsonb_build_array(target_session.playlist_id)),
-      pool_track_count,
+      COALESCE(to_jsonb(target_session.master_playlist_ids), to_jsonb(target_session.playlist_ids), jsonb_build_array(target_session.playlist_id)),
+      75,
       target_session.id,
       NULLIF(btrim(target_session.favorite_note), ''),
       false
@@ -69,21 +51,66 @@ BEGIN
     INTO chosen_preset_id;
   END IF;
 
-  INSERT INTO public.bingo_game_pool_tracks (preset_id, track_key, sort_order)
-  SELECT
-    chosen_preset_id,
-    round_tracks.playlist_track_key,
-    round_tracks.slot_index
-  FROM public.bingo_session_round_tracks AS round_tracks
-  WHERE round_tracks.session_id = target_session.id
-    AND round_tracks.round_number = pool_round
-    AND NOT EXISTS (
-      SELECT 1
-      FROM public.bingo_game_pool_tracks AS existing
-      WHERE existing.preset_id = chosen_preset_id
-        AND existing.track_key = round_tracks.playlist_track_key
-    )
-  ORDER BY round_tracks.slot_index;
+  SELECT count(*)
+  INTO existing_pool_count
+  FROM public.bingo_game_pool_tracks
+  WHERE preset_id = chosen_preset_id;
+
+  IF existing_pool_count < 75 THEN
+    SELECT min(round_number)
+    INTO pool_round
+    FROM public.bingo_session_round_tracks
+    WHERE session_id = target_session.id;
+
+    IF pool_round IS NOT NULL THEN
+      INSERT INTO public.bingo_game_pool_tracks (preset_id, track_key, sort_order)
+      SELECT
+        chosen_preset_id,
+        round_tracks.playlist_track_key,
+        round_tracks.slot_index
+      FROM public.bingo_session_round_tracks AS round_tracks
+      WHERE round_tracks.session_id = target_session.id
+        AND round_tracks.round_number = pool_round
+        AND NOT EXISTS (
+          SELECT 1
+          FROM public.bingo_game_pool_tracks AS existing
+          WHERE existing.preset_id = chosen_preset_id
+            AND existing.track_key = round_tracks.playlist_track_key
+        )
+      ORDER BY round_tracks.slot_index;
+    ELSE
+      INSERT INTO public.bingo_game_pool_tracks (preset_id, track_key, sort_order)
+      SELECT
+        chosen_preset_id,
+        fallback.track_key,
+        fallback.sort_order
+      FROM (
+        SELECT
+          calls.playlist_track_key AS track_key,
+          min(calls.call_index) AS sort_order
+        FROM public.bingo_session_calls AS calls
+        WHERE calls.session_id = target_session.id
+          AND calls.playlist_track_key IS NOT NULL
+        GROUP BY calls.playlist_track_key
+      ) AS fallback
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM public.bingo_game_pool_tracks AS existing
+        WHERE existing.preset_id = chosen_preset_id
+          AND existing.track_key = fallback.track_key
+      )
+      ORDER BY fallback.sort_order;
+    END IF;
+  END IF;
+
+  SELECT count(*)
+  INTO pool_track_count
+  FROM public.bingo_game_pool_tracks
+  WHERE preset_id = chosen_preset_id;
+
+  IF pool_track_count < 75 THEN
+    RAISE EXCEPTION 'Legacy bingo session QFTD46 has only % migratable pool tracks; expected at least 75', pool_track_count;
+  END IF;
 
   INSERT INTO public.bingo_preset_crates (
     preset_id,

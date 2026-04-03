@@ -15,8 +15,6 @@ import {
   createRoundTrackSnapshots,
   createRoundTrackSnapshotsFromTracks,
   getRoundSnapshotTracks,
-  normalizeRoundCrateIds,
-  type RoundCrateEntry,
 } from "src/lib/bingoGameModel";
 import { normalizeRoundModes } from "src/lib/bingoModes";
 import {
@@ -36,7 +34,6 @@ type CreateSessionBody = {
   master_playlist_ids?: number[];
   playlist_ids?: number[];
   round_playlist_ids?: { round: number; playlist_ids: number[] }[];
-  round_crate_ids?: RoundCrateEntry[];
   game_mode?: GameMode;
   round_modes?: { round: number; modes: GameMode[] }[];
   card_count?: number;
@@ -69,7 +66,6 @@ type SessionListRow = {
   playlist_ids: number[] | null;
   master_playlist_ids: number[] | null;
   round_playlist_ids: { round: number; playlist_ids: number[] }[] | null;
-  round_crate_ids: RoundCrateEntry[] | null;
   session_code: string;
   game_mode: string;
   round_modes: { round: number; modes: GameMode[] }[] | null;
@@ -164,7 +160,7 @@ export async function GET(request: NextRequest) {
 
   const queryBase = (db
     .from("bingo_sessions")
-    .select("id, event_id, game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, round_crate_ids, session_code, game_mode, round_modes, card_count, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, is_favorite, favorite_note, created_at") as unknown as {
+    .select("id, event_id, game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, session_code, game_mode, round_modes, card_count, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, is_favorite, favorite_note, created_at") as unknown as {
       order: (column: string, options: { ascending: boolean }) => {
         eq: (column: string, value: number) => Promise<{ data: unknown; error: { message: string } | null }>;
         then?: unknown;
@@ -261,7 +257,6 @@ export async function POST(request: NextRequest) {
     const roundCount = Math.max(1, Math.floor(body.round_count ?? 3));
     const roundModes = normalizeRoundModes(body.round_modes, roundCount);
     const roundPlaylistIds = normalizeRoundPlaylistIds(body.round_playlist_ids, roundCount);
-    const roundCrateIds = normalizeRoundCrateIds(body.round_crate_ids, roundCount);
     const resolvedPlaylistsByRound = collectResolvedPlaylistIdsByRound(
       {
         playlist_id: selectedPlaylistIds[0] ?? null,
@@ -351,7 +346,6 @@ export async function POST(request: NextRequest) {
         playlist_ids: selectedPlaylistIds.length > 0 ? selectedPlaylistIds : null,
         master_playlist_ids: selectedPlaylistIds.length > 0 ? selectedPlaylistIds : null,
         round_playlist_ids: roundPlaylistIds.length > 0 ? roundPlaylistIds : null,
-        round_crate_ids: roundCrateIds.length > 0 ? roundCrateIds : null,
         session_code: code,
         game_mode: gameMode,
         round_modes: roundModes.length > 0 ? roundModes : null,

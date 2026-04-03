@@ -8,11 +8,6 @@ import {
 } from "src/lib/bingoEngine";
 import { getModesForRound } from "src/lib/bingoModes";
 
-export type RoundCrateEntry = {
-  round: number;
-  crate_id: number;
-};
-
 type ValidationCell = BingoCardCell & {
   row: number;
   col: number;
@@ -61,37 +56,6 @@ function coerceInteger(value: unknown): number | null {
 
 function normalizeTrackText(value: unknown): string {
   return typeof value === "string" ? value : "";
-}
-
-export function normalizeRoundCrateIds(input: unknown, roundCount: number): RoundCrateEntry[] {
-  if (input == null) return [];
-  if (!Array.isArray(input)) {
-    throw new Error("round_crate_ids must be an array");
-  }
-
-  const maxRound = Math.max(1, Math.floor(roundCount || 1));
-  const byRound = new Map<number, RoundCrateEntry>();
-
-  for (const rawEntry of input) {
-    if (!rawEntry || typeof rawEntry !== "object") {
-      throw new Error("Each round crate override must be an object");
-    }
-
-    const round = coerceInteger((rawEntry as { round?: unknown }).round);
-    if (!round || round < 1 || round > maxRound) {
-      throw new Error(`round_crate_ids round must be between 1 and ${maxRound}`);
-    }
-
-    const crateId = coerceInteger((rawEntry as { crate_id?: unknown }).crate_id);
-    if (!crateId || crateId < 1) {
-      byRound.delete(round);
-      continue;
-    }
-
-    byRound.set(round, { round, crate_id: crateId });
-  }
-
-  return Array.from(byRound.values()).sort((left, right) => left.round - right.round);
 }
 
 export async function createRoundTrackSnapshots(
