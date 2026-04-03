@@ -334,23 +334,36 @@ export default function BingoHostPage() {
     if (!session) return;
     setSwitchingCrate(true);
     try {
-      await fetch(`/api/games/bingo/sessions/${sessionId}/crates`, {
+      const patchResponse = await fetch(`/api/games/bingo/sessions/${sessionId}/crates`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ round_number: session.current_round, crate_letter: crateLetter }),
       });
 
+      if (!patchResponse.ok) {
+        const payload = (await patchResponse.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error ?? "Failed to assign crate to this round");
+      }
+
       // If current round has not started yet, immediately rebuild live call rows
       // from the newly-selected crate so the table reflects the chosen order.
       if (!roundIsStarted) {
-        await fetch(`/api/games/bingo/sessions/${sessionId}/activate-round`, {
+        const activateResponse = await fetch(`/api/games/bingo/sessions/${sessionId}/activate-round`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ round: Math.max(1, session.current_round || 1), intermission_seconds: 0 }),
         });
+
+        if (!activateResponse.ok) {
+          const payload = (await activateResponse.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(payload?.error ?? "Failed to load selected crate into call order");
+        }
       }
 
       await load();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to switch crate";
+      alert(message);
     } finally {
       setSwitchingCrate(false);
     }
@@ -516,10 +529,9 @@ export default function BingoHostPage() {
                   ) : (
                     <select
                       value={activeCrateLetter ?? ""}
-                      disabled={switchingCrate}
+                      disabled={switchingCrate || roundIsStarted}
                       onChange={(e) => {
                         if (!e.target.value) return;
-                        if (roundIsStarted) return;
                         void switchCrate(e.target.value);
                       }}
                       className="rounded border border-stone-600 bg-stone-950 px-2 py-1 text-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
