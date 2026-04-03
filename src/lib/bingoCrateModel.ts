@@ -455,9 +455,17 @@ export async function syncCollectionCrateMirrorsForSession(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number
 ): Promise<void> {
+  const session = await getSessionCrateContext(db, sessionId);
   const crates = await getCratesForSession(db, sessionId);
   for (const crate of crates) {
-    await ensureCollectionCrateMirror(db, crate.crate_name, crate.call_order);
+    let calls = crate.call_order;
+    // Stored call_order may pre-date playlist_track_key being saved in the snapshot.
+    // Re-derive from live source data so inventory IDs can be resolved.
+    if (session && !calls.some((c) => c.playlist_track_key)) {
+      const fresh = await deriveRoundCallOrder(db, sessionId, crate.round_number, session as SessionCrateBackfillRow);
+      if (fresh.length > 0) calls = fresh;
+    }
+    await ensureCollectionCrateMirror(db, crate.crate_name, calls);
   }
 }
 
