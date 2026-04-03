@@ -4,10 +4,20 @@ import {
   computeMinimumPlaylistTracks,
   generateCards,
   generateSessionCalls,
+  generateSessionCallsFromTracks,
   getPlaylistTrackCountForPlaylists,
+  resolvePlaylistTracksForPlaylists,
+  resolveTrackKeys,
+  type ResolvedPlaylistTrack,
   type GameMode,
 } from "src/lib/bingoEngine";
-import { createRoundTrackSnapshots, getRoundSnapshotTracks, normalizeRoundCrateIds, type RoundCrateEntry } from "src/lib/bingoGameModel";
+import {
+  createRoundTrackSnapshots,
+  createRoundTrackSnapshotsFromTracks,
+  getRoundSnapshotTracks,
+  normalizeRoundCrateIds,
+  type RoundCrateEntry,
+} from "src/lib/bingoGameModel";
 import { normalizeRoundModes } from "src/lib/bingoModes";
 import {
   collectResolvedPlaylistIdsByRound,
@@ -85,6 +95,58 @@ type SessionListRow = {
 
 type PlaylistRow = { id: number; name: string };
 type EventRow = { id: number; title: string };
+type PresetRow = {
+  id: number;
+  source_playlist_ids: number[] | null;
+  pool_size: number;
+};
+
+const DEFAULT_POOL_SIZE = 75;
+
+function sampleTracks(tracks: ResolvedPlaylistTrack[], targetSize: number): ResolvedPlaylistTrack[] {
+  const copy = [...tracks];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, Math.max(1, targetSize));
+}
+
+async function loadPresetPoolTracks(db: ReturnType<typeof getBingoDb>, presetId: number): Promise<ResolvedPlaylistTrack[]> {
+  const { data: poolRows, error: poolError } = await db
+    .from("bingo_game_pool_tracks")
+    .select("track_key, sort_order")
+    .eq("preset_id", presetId)
+    .order("sort_order", { ascending: true });
+
+  if (poolError) throw new Error(poolError.message);
+  const trackKeys = (poolRows ?? []).map((row) => String(row.track_key ?? "")).filter(Boolean);
+  if (trackKeys.length === 0) {
+    throw new Error("Preset has no saved pool tracks.");
+  }
+
+  const resolved = await resolveTrackKeys(db, trackKeys);
+  const tracks: ResolvedPlaylistTrack[] = [];
+  trackKeys.forEach((trackKey, index) => {
+    const row = resolved.get(trackKey);
+    if (!row) return;
+    tracks.push({
+      trackKey,
+      sortOrder: index,
+      trackTitle: row.track_title,
+      artistName: row.artist_name,
+      albumName: row.album_name,
+      side: row.side,
+      position: row.position,
+    });
+  });
+
+  if (tracks.length === 0) {
+    throw new Error("Preset pool tracks no longer resolve to collection metadata.");
+  }
+
+  return tracks;
+}
 
 async function generateUniqueSessionCode() {
   const db = getBingoDb();
@@ -159,8 +221,37 @@ export async function POST(request: NextRequest) {
     const db = getBingoDb();
     const body = (await request.json()) as CreateSessionBody;
 
-    const playlistId = Number(body.playlist_id);
-    const selectedPlaylistIds = normalizePlaylistIds(body.master_playlist_ids ?? body.playlist_ids, playlistId);
+    const requestedPresetId = Number(body.game_preset_id);
+    const wantsPreset = Number.isFinite(requestedPresetId) && requestedPresetId > 0;
+
+    let presetIdForSession: number | null = null;
+    let selectedPlaylistIds = normalizePlaylistIds(body.master_playlist_ids ?? body.playlist_ids, Number(body.playlist_id));
+    let fixedPoolTracks: ResolvedPlaylistTrack[] | null = null;
+
+    if (wantsPreset) {
+      const { data: preset, error: presetError } = await db
+        .from("bingo_game_presets")
+        .select("id, source_playlist_ids, pool_size")
+        .eq("id", requestedPresetId)
+        .maybeSingle();
+
+      if (presetError) {
+        return NextResponse.json({ error: presetError.message }, { status: 500 });
+      }
+      if (!preset) {
+        return NextResponse.json({ error: "Favorite preset not found" }, { status: 404 });
+      }
+
+      const typedPreset = preset as PresetRow;
+      const presetPlaylistIds = normalizePlaylistIds(typedPreset.source_playlist_ids);
+      if (presetPlaylistIds.length > 0) {
+        selectedPlaylistIds = presetPlaylistIds;
+      }
+
+      presetIdForSession = typedPreset.id;
+      fixedPoolTracks = await loadPresetPoolTracks(db, typedPreset.id);
+    }
+
     if (selectedPlaylistIds.length === 0) {
       return NextResponse.json({ error: "At least one playlist is required" }, { status: 400 });
     }
@@ -190,23 +281,47 @@ export async function POST(request: NextRequest) {
     }
 
     const requiredTrackCount = computeMinimumPlaylistTracks(roundCount, cardCount);
-    const trackCountCache = new Map<string, number>();
-    for (let round = 1; round <= roundCount; round += 1) {
-      const playlistIdsForRound = resolvedPlaylistsByRound.get(round) ?? [];
-      const cacheKey = playlistIdsForRound.join(",");
-      let availableTrackCount = trackCountCache.get(cacheKey);
-      if (availableTrackCount === undefined) {
-        availableTrackCount = await getPlaylistTrackCountForPlaylists(db, playlistIdsForRound);
-        trackCountCache.set(cacheKey, availableTrackCount);
-      }
-
-      if (availableTrackCount < requiredTrackCount) {
+    if (fixedPoolTracks) {
+      if (fixedPoolTracks.length < requiredTrackCount) {
         return NextResponse.json(
           {
-            error: `Round ${round} playlist selection must contain at least ${requiredTrackCount} tracks to build one bingo crate.`,
+            error: `Favorite preset pool must contain at least ${requiredTrackCount} tracks to build one bingo crate.`,
           },
           { status: 400 }
         );
+      }
+    } else {
+      const trackCountCache = new Map<string, number>();
+      for (let round = 1; round <= roundCount; round += 1) {
+        const playlistIdsForRound = resolvedPlaylistsByRound.get(round) ?? [];
+        const cacheKey = playlistIdsForRound.join(",");
+        let availableTrackCount = trackCountCache.get(cacheKey);
+        if (availableTrackCount === undefined) {
+          availableTrackCount = await getPlaylistTrackCountForPlaylists(db, playlistIdsForRound);
+          trackCountCache.set(cacheKey, availableTrackCount);
+        }
+
+        if (availableTrackCount < requiredTrackCount) {
+          return NextResponse.json(
+            {
+              error: `Round ${round} playlist selection must contain at least ${requiredTrackCount} tracks to build one bingo crate.`,
+            },
+            { status: 400 }
+          );
+        }
+      }
+
+      if (body.is_favorite) {
+        const candidatePool = await resolvePlaylistTracksForPlaylists(db, selectedPlaylistIds);
+        if (candidatePool.length < requiredTrackCount) {
+          return NextResponse.json(
+            {
+              error: `Playlist selection must contain at least ${requiredTrackCount} tracks to build a reusable favorite pool.`,
+            },
+            { status: 400 }
+          );
+        }
+        fixedPoolTracks = sampleTracks(candidatePool, Math.min(DEFAULT_POOL_SIZE, candidatePool.length));
       }
     }
 
@@ -230,7 +345,7 @@ export async function POST(request: NextRequest) {
       .from("bingo_sessions")
       .insert({
         event_id: body.event_id ?? null,
-        game_preset_id: body.game_preset_id ?? null,
+        game_preset_id: presetIdForSession,
         // Keep primary playlist_id for backwards compatibility in existing views.
         playlist_id: primaryPlaylistId,
         playlist_ids: selectedPlaylistIds.length > 0 ? selectedPlaylistIds : null,
@@ -279,12 +394,63 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await createRoundTrackSnapshots(db, session.id, resolvedPlaylistsByRound);
+      if (!presetIdForSession && body.is_favorite && fixedPoolTracks && fixedPoolTracks.length > 0) {
+        const presetName = body.favorite_note?.trim() || `Favorite ${session.session_code}`;
+        const { data: createdPreset, error: presetInsertError } = await db
+          .from("bingo_game_presets")
+          .insert({
+            name: presetName,
+            source_playlist_ids: selectedPlaylistIds,
+            pool_size: fixedPoolTracks.length,
+            created_from_session_id: session.id,
+            note: body.favorite_note?.trim() || null,
+            archived: false,
+          })
+          .select("id")
+          .single();
+
+        if (presetInsertError || !createdPreset) {
+          throw new Error(presetInsertError?.message ?? "Failed to create favorite preset");
+        }
+
+        presetIdForSession = Number(createdPreset.id);
+        const poolRows = fixedPoolTracks.map((track, index) => ({
+          preset_id: presetIdForSession,
+          track_key: track.trackKey,
+          sort_order: index,
+        }));
+
+        const { error: poolInsertError } = await db.from("bingo_game_pool_tracks").insert(poolRows);
+        if (poolInsertError) {
+          throw new Error(poolInsertError.message);
+        }
+
+        const { error: sessionPresetUpdateError } = await db
+          .from("bingo_sessions")
+          .update({ game_preset_id: presetIdForSession })
+          .eq("id", session.id);
+        if (sessionPresetUpdateError) {
+          throw new Error(sessionPresetUpdateError.message);
+        }
+      }
+
+      if (fixedPoolTracks && fixedPoolTracks.length > 0) {
+        await createRoundTrackSnapshotsFromTracks(db, session.id, roundCount, fixedPoolTracks);
+      } else {
+        await createRoundTrackSnapshots(db, session.id, resolvedPlaylistsByRound);
+      }
+
       const roundOneTracks = await getRoundSnapshotTracks(db, session.id, 1);
       if (roundOneTracks.length === 0) {
         throw new Error("Failed to build immutable game playlist for round 1.");
       }
-      await generateSessionCalls(db, session.id, resolvedPlaylistsByRound.get(1) ?? [], { roundNumber: 1 });
+
+      if (fixedPoolTracks && fixedPoolTracks.length > 0) {
+        await generateSessionCallsFromTracks(db, session.id, fixedPoolTracks, { roundNumber: 1 });
+      } else {
+        await generateSessionCalls(db, session.id, resolvedPlaylistsByRound.get(1) ?? [], { roundNumber: 1 });
+      }
+
       await generateCards(
         db,
         session.id,

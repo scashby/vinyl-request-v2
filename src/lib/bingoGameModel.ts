@@ -136,6 +136,48 @@ export async function createRoundTrackSnapshots(
   if (error) throw new Error(error.message);
 }
 
+export async function createRoundTrackSnapshotsFromTracks(
+  db: BingoDbClient,
+  sessionId: number,
+  roundCount: number,
+  poolTracks: ResolvedPlaylistTrack[]
+): Promise<void> {
+  const rows: Array<{
+    session_id: number;
+    round_number: number;
+    slot_index: number;
+    playlist_track_key: string;
+    source_playlist_id: number | null;
+    track_title: string;
+    artist_name: string;
+    album_name: string | null;
+    side: string | null;
+    position: string | null;
+  }> = [];
+
+  const normalizedRoundCount = Math.max(1, Math.floor(roundCount || 1));
+  for (let roundNumber = 1; roundNumber <= normalizedRoundCount; roundNumber += 1) {
+    const gameTracks = buildRoundTrackPool(poolTracks, sessionId, roundNumber);
+    gameTracks.forEach((track, index) => {
+      rows.push({
+        session_id: sessionId,
+        round_number: roundNumber,
+        slot_index: index + 1,
+        playlist_track_key: track.trackKey,
+        source_playlist_id: null,
+        track_title: track.trackTitle,
+        artist_name: track.artistName,
+        album_name: track.albumName,
+        side: track.side,
+        position: track.position,
+      });
+    });
+  }
+
+  const { error } = await db.from("bingo_session_round_tracks").insert(rows);
+  if (error) throw new Error(error.message);
+}
+
 export async function getRoundSnapshotTracks(
   db: BingoDbClient,
   sessionId: number,

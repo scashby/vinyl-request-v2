@@ -914,6 +914,17 @@ export async function generateSessionCalls(
   const roundNumber = options?.roundNumber ?? 1;
   const tracks = await resolvePlaylistTracksForPlaylists(db, playlistIds);
 
+  return generateSessionCallsFromTracks(db, sessionId, tracks, options);
+}
+
+export async function generateSessionCallsFromTracks(
+  db: BingoDbClient,
+  sessionId: number,
+  tracks: ResolvedPlaylistTrack[],
+  options?: { roundNumber?: number }
+): Promise<number> {
+  const roundNumber = options?.roundNumber ?? 1;
+
   const rows = planRoundSessionCalls(tracks, sessionId, roundNumber).map((entry) => ({
     session_id: sessionId,
     playlist_track_key: entry.playlist_track_key,
