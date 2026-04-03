@@ -22,6 +22,7 @@ export const runtime = "nodejs";
 type SessionRow = {
   id: number;
   event_id: number | null;
+  game_preset_id: number | null;
   playlist_id: number;
   playlist_ids: number[] | null;
   master_playlist_ids: number[] | null;
@@ -112,7 +113,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const db = getBingoDb();
   const sessionQuery = (db
     .from("bingo_sessions")
-    .select("id, event_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, round_crate_ids, session_code, game_mode, round_modes, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, seconds_to_next_call, sonos_output_delay_ms, countdown_started_at, paused_remaining_seconds, paused_at, current_call_index, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at, next_game_scheduled_at, next_game_rules_text, call_reveal_delay_seconds, call_reveal_at, bingo_overlay, default_intermission_seconds, is_favorite, favorite_note, active_crate_letter_by_round") as unknown as {
+    .select("id, event_id, game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, round_crate_ids, session_code, game_mode, round_modes, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, seconds_to_next_call, sonos_output_delay_ms, countdown_started_at, paused_remaining_seconds, paused_at, current_call_index, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at, next_game_scheduled_at, next_game_rules_text, call_reveal_delay_seconds, call_reveal_at, bingo_overlay, default_intermission_seconds, is_favorite, favorite_note, active_crate_letter_by_round") as unknown as {
       eq: (column: string, value: number) => {
         maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
       };
@@ -222,6 +223,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const allowedFields = new Set([
     "event_id",
+    "game_preset_id",
     "playlist_id",
     "playlist_ids",
     "master_playlist_ids",
@@ -266,6 +268,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   if (patch.playlist_id !== undefined) {
     patch.playlist_id = Number(patch.playlist_id);
+  }
+  if (patch.game_preset_id !== undefined) {
+    const gamePresetId = Number(patch.game_preset_id);
+    patch.game_preset_id = Number.isFinite(gamePresetId) && gamePresetId > 0 ? gamePresetId : null;
   }
   if (patch.master_playlist_ids !== undefined) {
     patch.master_playlist_ids = normalizePlaylistIds(

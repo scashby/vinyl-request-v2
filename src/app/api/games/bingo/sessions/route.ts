@@ -21,6 +21,7 @@ export const runtime = "nodejs";
 
 type CreateSessionBody = {
   event_id?: number | null;
+  game_preset_id?: number | null;
   playlist_id?: number;
   master_playlist_ids?: number[];
   playlist_ids?: number[];
@@ -53,6 +54,7 @@ type CreateSessionBody = {
 type SessionListRow = {
   id: number;
   event_id: number | null;
+  game_preset_id: number | null;
   playlist_id: number;
   playlist_ids: number[] | null;
   master_playlist_ids: number[] | null;
@@ -100,7 +102,7 @@ export async function GET(request: NextRequest) {
 
   const queryBase = (db
     .from("bingo_sessions")
-    .select("id, event_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, round_crate_ids, session_code, game_mode, round_modes, card_count, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, is_favorite, favorite_note, created_at") as unknown as {
+    .select("id, event_id, game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, round_crate_ids, session_code, game_mode, round_modes, card_count, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, is_favorite, favorite_note, created_at") as unknown as {
       order: (column: string, options: { ascending: boolean }) => {
         eq: (column: string, value: number) => Promise<{ data: unknown; error: { message: string } | null }>;
         then?: unknown;
@@ -228,6 +230,7 @@ export async function POST(request: NextRequest) {
       .from("bingo_sessions")
       .insert({
         event_id: body.event_id ?? null,
+        game_preset_id: body.game_preset_id ?? null,
         // Keep primary playlist_id for backwards compatibility in existing views.
         playlist_id: primaryPlaylistId,
         playlist_ids: selectedPlaylistIds.length > 0 ? selectedPlaylistIds : null,

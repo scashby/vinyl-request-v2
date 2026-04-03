@@ -187,6 +187,7 @@ export type BingoDatabase = {
         Row: {
           id: number;
           event_id: number | null;
+          game_preset_id: number | null;
           playlist_id: number;
           playlist_ids: number[] | null;
           master_playlist_ids: number[] | null;
@@ -236,6 +237,7 @@ export type BingoDatabase = {
         Insert: {
           id?: number;
           event_id?: number | null;
+          game_preset_id?: number | null;
           playlist_ids?: number[] | null;
           master_playlist_ids?: number[] | null;
           default_intermission_seconds?: number;
@@ -285,6 +287,7 @@ export type BingoDatabase = {
         Update: {
           id?: number;
           event_id?: number | null;
+          game_preset_id?: number | null;
           playlist_ids?: number[] | null;
           master_playlist_ids?: number[] | null;
           default_intermission_seconds?: number;
@@ -330,6 +333,99 @@ export type BingoDatabase = {
           is_favorite?: boolean;
           favorite_note?: string | null;
           active_crate_letter_by_round?: { round: number; letter: string }[] | null;
+        };
+        Relationships: [];
+      };
+      bingo_game_presets: {
+        Row: {
+          id: number;
+          name: string;
+          source_playlist_ids: Json;
+          pool_size: number;
+          created_from_session_id: number | null;
+          note: string | null;
+          archived: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          name: string;
+          source_playlist_ids?: Json;
+          pool_size?: number;
+          created_from_session_id?: number | null;
+          note?: string | null;
+          archived?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          name?: string;
+          source_playlist_ids?: Json;
+          pool_size?: number;
+          created_from_session_id?: number | null;
+          note?: string | null;
+          archived?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      bingo_game_pool_tracks: {
+        Row: {
+          id: number;
+          preset_id: number;
+          track_key: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          preset_id: number;
+          track_key: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          preset_id?: number;
+          track_key?: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      bingo_preset_crates: {
+        Row: {
+          id: number;
+          preset_id: number;
+          crate_letter: string;
+          crate_name: string;
+          call_order: Record<string, unknown>[];
+          created_from_session_id: number | null;
+          created_for_round: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          preset_id: number;
+          crate_letter: string;
+          crate_name: string;
+          call_order: Record<string, unknown>[];
+          created_from_session_id?: number | null;
+          created_for_round?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          preset_id?: number;
+          crate_letter?: string;
+          crate_name?: string;
+          call_order?: Record<string, unknown>[];
+          created_from_session_id?: number | null;
+          created_for_round?: number | null;
+          created_at?: string;
         };
         Relationships: [];
       };

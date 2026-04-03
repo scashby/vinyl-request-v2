@@ -13,6 +13,10 @@ import { resolveRoundPlaylistIds, type RoundPlaylistEntry } from "./bingoRoundPl
 
 const CRATE_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
+type SessionCodeRow = {
+  session_code: string;
+};
+
 export type CrateCallEntry = {
   id: number;
   call_index: number;
@@ -119,6 +123,24 @@ async function getNextCrateLetter(
   return next;
 }
 
+async function getSessionCode(
+  db: ReturnType<typeof getBingoDb>,
+  sessionId: number
+): Promise<string | null> {
+  const { data, error } = await db
+    .from("bingo_sessions")
+    .select("session_code")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return (data as SessionCodeRow | null)?.session_code ?? null;
+}
+
+function formatCrateName(sessionCode: string | null, sessionId: number, crateLetter: string): string {
+  return `${sessionCode ?? sessionId} Crate ${crateLetter}`;
+}
+
 /**
  * Persist the current call order for a round as a new named crate.
  * The crate is automatically named "{sessionId} Crate {letter}".
@@ -131,7 +153,8 @@ export async function saveCrateForRound(
   calls: CrateCallEntry[]
 ): Promise<BingoSessionCrate> {
   const letter = await getNextCrateLetter(db, sessionId);
-  const crateName = `${sessionId} Crate ${letter}`;
+  const sessionCode = await getSessionCode(db, sessionId);
+  const crateName = formatCrateName(sessionCode, sessionId, letter);
 
   const { data, error } = await db
     .from("bingo_session_crates")
@@ -158,6 +181,7 @@ export async function getCratesForSession(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number
 ): Promise<BingoSessionCrate[]> {
+  const sessionCode = await getSessionCode(db, sessionId);
   const { data, error } = await db
     .from("bingo_session_crates")
     .select("*")
@@ -167,6 +191,7 @@ export async function getCratesForSession(
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => ({
     ...row,
+    crate_name: formatCrateName(sessionCode, sessionId, row.crate_letter),
     call_order: row.call_order as unknown as CrateCallEntry[],
   }));
 }
@@ -177,6 +202,7 @@ export async function getCratesForRound(
   sessionId: number,
   roundNumber: number
 ): Promise<BingoSessionCrate[]> {
+  const sessionCode = await getSessionCode(db, sessionId);
   const { data, error } = await db
     .from("bingo_session_crates")
     .select("*")
@@ -187,6 +213,7 @@ export async function getCratesForRound(
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => ({
     ...row,
+    crate_name: formatCrateName(sessionCode, sessionId, row.crate_letter),
     call_order: row.call_order as unknown as CrateCallEntry[],
   }));
 }

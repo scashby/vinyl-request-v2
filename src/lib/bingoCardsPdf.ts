@@ -26,12 +26,9 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
   const cardWidth = (pageW - marginX * 2 - gutterX * (columns - 1)) / columns;
   const cardHeight = (pageH - marginY * 2 - gutterY * (rows - 1)) / rows;
 
-  const headerH = 16;
-  const headerGap = 4;
-  const columnHeaderH = layout === "4-up" ? 12 : 14;
-  const columnHeaderGap = layout === "4-up" ? 4 : 6;
-  const footerGap = 3;
-  const footerH = 8;
+  const identifierOffsetY = layout === "4-up" ? 5 : 6;
+  const columnHeaderH = layout === "4-up" ? 20 : 26;
+  const columnHeaderGap = layout === "4-up" ? 3 : 4;
 
   const cellPaddingX = layout === "4-up" ? 2.5 : 3.0;
   const cellPaddingY = layout === "4-up" ? 2.5 : 3.0;
@@ -237,16 +234,16 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
     doc.rect(baseX, baseY, cardWidth, cardHeight);
 
     const gridX = baseX;
-    const gridY = baseY + headerH + headerGap + columnHeaderH + columnHeaderGap;
+    const gridY = baseY + columnHeaderH + columnHeaderGap;
     const gridW = cardWidth;
-    const gridH = cardHeight - (headerH + headerGap + columnHeaderH + columnHeaderGap + footerGap + footerH);
+    const gridH = cardHeight - (columnHeaderH + columnHeaderGap);
 
     const cellW = gridW / 5;
     const cellH = gridH / 5;
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(layout === "4-up" ? 12 : 14);
-    const columnHeaderY = baseY + headerH + headerGap + columnHeaderH / 2;
+    doc.setFontSize(layout === "4-up" ? 18 : 28);
+    const columnHeaderY = baseY + columnHeaderH / 2;
     for (let c = 0; c < 5; c += 1) {
       const letter = BINGO_COLUMNS[c];
       doc.setTextColor(...BINGO_COLUMN_RGB[letter]);
@@ -266,11 +263,11 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
       }
     }
 
-    // Keep the card identifier outside the table area so it stays unobtrusive.
+    // Print the card identifier outside the card border so it doesn't consume card space.
     doc.setFont("helvetica", "normal");
     doc.setFontSize(layout === "4-up" ? 5.5 : 6.5);
     doc.setTextColor(110, 110, 110);
-    doc.text(card.card_identifier ?? `CARD ${card.card_number}`, baseX + cardWidth - 4, baseY + cardHeight - 2, {
+    doc.text(card.card_identifier ?? `CARD ${card.card_number}`, baseX + cardWidth - 2, baseY - identifierOffsetY, {
       align: "right",
       baseline: "bottom",
     });
