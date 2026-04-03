@@ -26,6 +26,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
   const { id } = await params;
   const sessionId = Number(id);
   if (!Number.isFinite(sessionId)) return NextResponse.json({ error: "Invalid session id" }, { status: 400 });
+  const initialNextCallSeconds = 45;
 
   const db = getBingoDb();
   const now = new Date().toISOString();
@@ -149,11 +150,12 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
       status: "pending",
       current_call_index: 0,
       current_round: 1,
+      seconds_to_next_call: initialNextCallSeconds,
       started_at: null,
       ended_at: null,
       paused_at: null,
       paused_remaining_seconds: null,
-      countdown_started_at: now,
+      countdown_started_at: null,
       call_reveal_at: null,
       bingo_overlay: "welcome",
       next_game_scheduled_at: null,

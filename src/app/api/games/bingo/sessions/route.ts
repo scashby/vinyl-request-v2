@@ -222,13 +222,7 @@ export async function POST(request: NextRequest) {
     const sonosDelayMs = body.sonos_output_delay_ms ?? 75;
     const callRevealDelaySeconds = body.call_reveal_delay_seconds ?? 10;
     const defaultIntermissionSeconds = body.default_intermission_seconds ?? 600;
-    const secondsToNextCall =
-      removeResleeveSeconds +
-      placeVinylSeconds +
-      cueSeconds +
-      startSlideSeconds +
-      hostBufferSeconds +
-      Math.ceil(sonosDelayMs / 1000);
+    const secondsToNextCall = 45;
 
     const { data: session, error: insertError } = await db
       .from("bingo_sessions")
@@ -264,6 +258,10 @@ export async function POST(request: NextRequest) {
         show_rounds: body.show_rounds ?? true,
         show_countdown: body.show_countdown ?? true,
         status: "pending",
+        countdown_started_at: null,
+        paused_at: null,
+        paused_remaining_seconds: null,
+        bingo_overlay: "welcome",
         call_reveal_delay_seconds: callRevealDelaySeconds,
         default_intermission_seconds: defaultIntermissionSeconds,
         next_game_rules_text: body.next_game_rules_text ?? null,
