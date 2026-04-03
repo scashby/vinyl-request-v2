@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
+import { backfillMissingLegacyCrates, getCratesForSession } from "src/lib/bingoCrateModel";
 import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
 import { getRoundSnapshotTracks } from "src/lib/bingoGameModel";
 
@@ -144,6 +145,20 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
 
   if (clearEventsError) return NextResponse.json({ error: clearEventsError.message }, { status: 500 });
 
+  await backfillMissingLegacyCrates(db, sessionId);
+  const crates = await getCratesForSession(db, sessionId);
+  const defaultActiveCratesByRound = Array.from(
+    crates.reduce((map, crate) => {
+      const existingLetter = map.get(crate.round_number);
+      if (!existingLetter || crate.crate_letter.localeCompare(existingLetter) < 0) {
+        map.set(crate.round_number, crate.crate_letter);
+      }
+      return map;
+    }, new Map<number, string>())
+  )
+    .map(([round, letter]) => ({ round, letter }))
+    .sort((left, right) => left.round - right.round);
+
   const { error: sessionError } = await db
     .from("bingo_sessions")
     .update({
@@ -160,6 +175,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
       bingo_overlay: "welcome",
       next_game_scheduled_at: null,
       next_game_rules_text: null,
+      active_crate_letter_by_round: defaultActiveCratesByRound,
     })
     .eq("id", sessionId);
 
