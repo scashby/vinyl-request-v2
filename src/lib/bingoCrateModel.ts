@@ -7,7 +7,7 @@
  */
 
 import { getBingoDb } from "./bingoDb";
-import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "./bingoEngine";
+import { parseTrackKey, planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "./bingoEngine";
 import { getRoundSnapshotTracks } from "./bingoGameModel";
 import { resolveRoundPlaylistIds, type RoundPlaylistEntry } from "./bingoRoundPlaylists";
 
@@ -31,6 +31,7 @@ type SessionCrateContext = {
 export type CrateCallEntry = {
   id: number;
   call_index: number;
+  playlist_track_key?: string | null;
   ball_number: number | null;
   column_letter: string;
   track_title: string;
@@ -66,6 +67,96 @@ type PresetCrateRow = {
   created_at: string;
 };
 
+type CollectionCrateRow = {
+  id: number;
+  sort_order: number | null;
+};
+
+type CollectionCrateItemInsertRow = {
+  crate_id: number;
+  inventory_id: number;
+  position: number;
+};
+
+async function ensureCollectionCrateMirror(
+  db: ReturnType<typeof getBingoDb>,
+  crateName: string,
+  calls: CrateCallEntry[]
+): Promise<void> {
+  const rawDb = db as any;
+
+  const { data: existingCrateData, error: existingCrateError } = await rawDb
+    .from("crates")
+    .select("id")
+    .eq("name", crateName)
+    .eq("is_smart", false)
+    .maybeSingle();
+
+  if (existingCrateError) throw new Error(existingCrateError.message);
+
+  let collectionCrateId = Number((existingCrateData as { id?: unknown } | null)?.id ?? NaN);
+  if (!Number.isFinite(collectionCrateId)) {
+    const { data: maxSortData, error: maxSortError } = await rawDb
+      .from("crates")
+      .select("id, sort_order")
+      .order("sort_order", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (maxSortError) throw new Error(maxSortError.message);
+
+    const nextSortOrder = Number((maxSortData as CollectionCrateRow | null)?.sort_order ?? -1) + 1;
+    const { data: insertedCrateData, error: insertCrateError } = await rawDb
+      .from("crates")
+      .insert({
+        name: crateName,
+        icon: "🎯",
+        color: "#f59e0b",
+        is_smart: false,
+        smart_rules: null,
+        match_rules: "all",
+        live_update: false,
+        sort_order: nextSortOrder,
+      })
+      .select("id")
+      .single();
+
+    if (insertCrateError) throw new Error(insertCrateError.message);
+    collectionCrateId = Number((insertedCrateData as { id?: unknown } | null)?.id ?? NaN);
+    if (!Number.isFinite(collectionCrateId)) {
+      throw new Error("Failed to mirror game crate into collection crates.");
+    }
+  }
+
+  const inventoryIds = Array.from(
+    new Set(
+      calls
+        .map((call) => {
+          const trackKey = String(call.playlist_track_key ?? "").trim();
+          if (!trackKey) return null;
+          const parsed = parseTrackKey(trackKey);
+          return parsed.inventoryId;
+        })
+        .filter((value): value is number => Number.isFinite(value) && value > 0)
+    )
+  );
+
+  const { error: deleteItemsError } = await rawDb.from("crate_items").delete().eq("crate_id", collectionCrateId);
+  if (deleteItemsError) throw new Error(deleteItemsError.message);
+
+  if (inventoryIds.length === 0) return;
+
+  const insertRows: CollectionCrateItemInsertRow[] = inventoryIds.map((inventoryId, index) => ({
+    crate_id: collectionCrateId,
+    inventory_id: inventoryId,
+    position: index,
+  }));
+
+  const { error: insertItemsError } = await rawDb.from("crate_items").insert(insertRows as CollectionCrateItemInsertRow[]);
+
+  if (insertItemsError) throw new Error(insertItemsError.message);
+}
+
 async function getSessionCrateContext(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number
@@ -92,6 +183,7 @@ async function deriveRoundCallOrder(
     return planned.map((row, index) => ({
       id: -(index + 1),
       call_index: row.call_index,
+      playlist_track_key: row.playlist_track_key,
       ball_number: row.ball_number,
       column_letter: row.column_letter,
       track_title: row.track_title,
@@ -111,6 +203,7 @@ async function deriveRoundCallOrder(
       return planned.map((row, index) => ({
         id: -(index + 1),
         call_index: row.call_index,
+        playlist_track_key: row.playlist_track_key,
         ball_number: row.ball_number,
         column_letter: row.column_letter,
         track_title: row.track_title,
@@ -126,7 +219,7 @@ async function deriveRoundCallOrder(
   if (roundNumber === session.current_round) {
     const { data: currentRoundCalls, error: callsError } = await db
       .from("bingo_session_calls")
-      .select("id, call_index, ball_number, column_letter, track_title, artist_name, album_name, side, position, status")
+      .select("id, call_index, ball_number, column_letter, track_title, artist_name, album_name, side, position, status, playlist_track_key")
       .eq("session_id", sessionId)
       .order("call_index", { ascending: true });
 
@@ -207,6 +300,7 @@ export async function saveCrateForRound(
     if (error || !data) throw new Error(error?.message ?? "Failed to save crate.");
 
     const row = data as PresetCrateRow;
+    await ensureCollectionCrateMirror(db, row.crate_name, row.call_order as unknown as CrateCallEntry[]);
     return {
       id: row.id,
       session_id: sessionId,
@@ -233,6 +327,8 @@ export async function saveCrateForRound(
     .single();
 
   if (error || !data) throw new Error(error?.message ?? "Failed to save crate.");
+
+  await ensureCollectionCrateMirror(db, data.crate_name, data.call_order as unknown as CrateCallEntry[]);
 
   return {
     ...data,
@@ -328,6 +424,32 @@ export async function getCratesForRound(
     crate_name: formatCrateName(sessionCode, sessionId, row.crate_letter),
     call_order: row.call_order as unknown as CrateCallEntry[],
   }));
+}
+
+export async function syncCollectionCrateMirrorsForSession(
+  db: ReturnType<typeof getBingoDb>,
+  sessionId: number
+): Promise<void> {
+  const crates = await getCratesForSession(db, sessionId);
+  for (const crate of crates) {
+    await ensureCollectionCrateMirror(db, crate.crate_name, crate.call_order);
+  }
+}
+
+export async function syncCollectionCrateMirrorsForAllSessions(
+  db: ReturnType<typeof getBingoDb>
+): Promise<void> {
+  const { data, error } = await db.from("bingo_sessions").select("id");
+  if (error) throw new Error(error.message);
+
+  const sessionIds = (data ?? [])
+    .map((row) => Number((row as { id?: unknown }).id))
+    .filter((value) => Number.isFinite(value) && value > 0);
+
+  for (const sessionId of sessionIds) {
+    await backfillMissingLegacyCrates(db, sessionId);
+    await syncCollectionCrateMirrorsForSession(db, sessionId);
+  }
 }
 
 /**

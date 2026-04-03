@@ -15,6 +15,8 @@ const normalizeCrateName = (name: string): string =>
 
 const isAllAlbumsName = (name: string): boolean => normalizeCrateName(name) === 'all albums';
 
+const isLegacyAllAlbumsManualCrate = (crate: Crate): boolean => !crate.is_smart && isAllAlbumsName(crate.name);
+
 const getCrateDisplayName = (crate: Crate): string => {
   if (!crate.is_smart && isAllAlbumsName(crate.name)) {
     return `${crate.name} (Manual)`;
@@ -61,7 +63,7 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
           ...row,
           smart_rules: row.smart_rules as unknown as SmartRules | null
         })) as Crate[];
-        setCrates(normalized);
+        setCrates(normalized.filter((crate) => !isLegacyAllAlbumsManualCrate(crate)));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load crates');

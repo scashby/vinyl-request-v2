@@ -1060,6 +1060,11 @@ const normalizeCrateNameForUi = (name: string): string =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const isLegacyAllAlbumsManualCrate = (crate: Crate | null | undefined): boolean => {
+  if (!crate || crate.is_smart) return false;
+  return normalizeCrateNameForUi(crate.name) === 'all albums';
+};
+
 const getCrateDisplayName = (crate: Crate): string => {
   if (!crate.is_smart && normalizeCrateNameForUi(crate.name) === 'all albums') {
     return `${crate.name} (Manual)`;
@@ -1931,6 +1936,7 @@ function CollectionBrowserPage() {
 
   const loadCrates = useCallback(async () => {
     await ensureSaleCrateExists();
+    await fetch('/api/games/bingo/crates/sync-collection', { method: 'POST' }).catch(() => undefined);
 
     const { data, error } = await supabase
       .from('crates')
@@ -1943,7 +1949,8 @@ function CollectionBrowserPage() {
     }
 
     if (data) {
-      setCrates((data as Array<Partial<Crate>>).map((row) => normalizeCrateRecord(row)));
+      const normalized = (data as Array<Partial<Crate>>).map((row) => normalizeCrateRecord(row));
+      setCrates(normalized.filter((crate) => !isLegacyAllAlbumsManualCrate(crate)));
     }
 
     const { data: crateItems, error: crateItemsError } = await supabase

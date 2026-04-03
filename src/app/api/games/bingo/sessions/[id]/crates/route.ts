@@ -5,6 +5,7 @@ import {
   createCrateFromRoundData,
   getCratesForSession,
   setActiveCrateForRound,
+  syncCollectionCrateMirrorsForSession,
 } from "src/lib/bingoCrateModel";
 
 export const runtime = "nodejs";
@@ -22,6 +23,7 @@ export async function GET(
   const db = getBingoDb();
   try {
     await backfillMissingLegacyCrates(db, sessionId);
+    await syncCollectionCrateMirrorsForSession(db, sessionId);
     const crates = await getCratesForSession(db, sessionId);
     return NextResponse.json({ data: crates }, { status: 200 });
   } catch (error) {
