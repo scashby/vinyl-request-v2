@@ -69,6 +69,9 @@ type PresetCrateRow = {
 
 type CollectionCrateRow = {
   id: number;
+  name: string;
+  icon: string | null;
+  color: string | null;
   sort_order: number | null;
 };
 
@@ -84,11 +87,12 @@ async function ensureCollectionCrateMirror(
   calls: CrateCallEntry[]
 ): Promise<void> {
   const rawDb = db as any;
+  const collectionCrateName = `Bingo · ${crateName}`;
 
   const { data: existingCrateData, error: existingCrateError } = await rawDb
     .from("crates")
-    .select("id")
-    .eq("name", crateName)
+    .select("id, name, icon, color")
+    .eq("name", collectionCrateName)
     .eq("is_smart", false)
     .maybeSingle();
 
@@ -96,9 +100,30 @@ async function ensureCollectionCrateMirror(
 
   let collectionCrateId = Number((existingCrateData as { id?: unknown } | null)?.id ?? NaN);
   if (!Number.isFinite(collectionCrateId)) {
+    const { data: legacyCrateData, error: legacyCrateError } = await rawDb
+      .from("crates")
+      .select("id, name, icon, color")
+      .eq("name", crateName)
+      .eq("is_smart", false)
+      .maybeSingle();
+
+    if (legacyCrateError) throw new Error(legacyCrateError.message);
+
+    const legacyCrate = legacyCrateData as CollectionCrateRow | null;
+    if (legacyCrate && legacyCrate.icon === "🎯") {
+      const { error: renameError } = await rawDb
+        .from("crates")
+        .update({ name: collectionCrateName })
+        .eq("id", legacyCrate.id);
+      if (renameError) throw new Error(renameError.message);
+      collectionCrateId = legacyCrate.id;
+    }
+  }
+
+  if (!Number.isFinite(collectionCrateId)) {
     const { data: maxSortData, error: maxSortError } = await rawDb
       .from("crates")
-      .select("id, sort_order")
+      .select("id, name, icon, color, sort_order")
       .order("sort_order", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -109,7 +134,7 @@ async function ensureCollectionCrateMirror(
     const { data: insertedCrateData, error: insertCrateError } = await rawDb
       .from("crates")
       .insert({
-        name: crateName,
+        name: collectionCrateName,
         icon: "🎯",
         color: "#f59e0b",
         is_smart: false,

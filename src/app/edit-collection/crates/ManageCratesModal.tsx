@@ -51,6 +51,8 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
     setError(null);
 
     try {
+      await fetch('/api/games/bingo/crates/sync-collection', { method: 'POST' }).catch(() => undefined);
+
       const { data, error: fetchError } = await supabase
         .from('crates')
         .select('*')
