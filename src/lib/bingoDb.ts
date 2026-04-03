@@ -225,7 +225,6 @@ export type BingoDatabase = {
           next_game_rules_text: string | null;
           round_modes: { round: number; modes: string[] }[] | null;
           round_playlist_ids: { round: number; playlist_ids: number[] }[] | null;
-          round_crate_ids: { round: number; crate_id: number }[] | null;
           call_reveal_delay_seconds: number;
           call_reveal_at: string | null;
           bingo_overlay: string;
@@ -276,7 +275,6 @@ export type BingoDatabase = {
           next_game_rules_text?: string | null;
           round_modes?: { round: number; modes: string[] }[] | null;
           round_playlist_ids?: { round: number; playlist_ids: number[] }[] | null;
-          round_crate_ids?: { round: number; crate_id: number }[] | null;
           call_reveal_delay_seconds?: number;
           call_reveal_at?: string | null;
           bingo_overlay?: string;
@@ -326,7 +324,6 @@ export type BingoDatabase = {
           next_game_rules_text?: string | null;
           round_modes?: { round: number; modes: string[] }[] | null;
           round_playlist_ids?: { round: number; playlist_ids: number[] }[] | null;
-          round_crate_ids?: { round: number; crate_id: number }[] | null;
           call_reveal_delay_seconds?: number;
           call_reveal_at?: string | null;
           bingo_overlay?: string;
