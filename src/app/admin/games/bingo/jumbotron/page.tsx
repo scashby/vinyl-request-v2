@@ -356,7 +356,7 @@ export default function BingoJumbotronPage() {
   const showCountdown = previewScreen === null && session?.bingo_overlay === "countdown";
   const showTiebreaker = previewScreen === null && session?.bingo_overlay === "tiebreaker";
   const showGame = !showWelcome && !showWinner && !showThanks && !showIntermission && !showCountdown && !showTiebreaker;
-  const useLightScreenTheme = showWelcome || showWinner || showThanks || showIntermission;
+  const useLightScreenTheme = showWelcome || showWinner || showThanks || showIntermission || showCountdown || showTiebreaker;
 
   const welcomeContent = useMemo(() => {
     if (!session) return null;
@@ -540,21 +540,21 @@ export default function BingoJumbotronPage() {
         </div>
       ) : showCountdown ? (
         <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2vw] px-8 text-center">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(56,189,248,0.18),transparent_35%),linear-gradient(180deg,#050a14,#0a1428)]" />
-          <BrandingLogos venueLogoUrl={effectiveVenueLogo} venueName={effectiveVenueName} />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(251,191,36,0.2),transparent_26%),radial-gradient(circle_at_20%_78%,rgba(120,53,15,0.08),transparent_24%)]" />
+          <BrandingLogos venueLogoUrl={effectiveVenueLogo} venueName={effectiveVenueName} tone="light" />
           <div className="relative z-10 space-y-[1.5vw]">
-            <p className="text-[2.4vw] font-semibold uppercase tracking-[0.25em] text-sky-300">
+            <p className="text-[2.4vw] font-semibold uppercase tracking-[0.25em] text-amber-800">
               Game Starts In
             </p>
-            <p className="text-[10vw] font-black tabular-nums text-white leading-none" style={{ textShadow: "0 8px 40px rgba(56,189,248,0.35)" }}>
+            <p className="text-[10vw] font-black tabular-nums leading-none text-amber-600" style={{ textShadow: "0 10px 35px rgba(245,158,11,0.24)" }}>
               {formatMinSec(Math.max(0, countdownSecondsLeft ?? 0))}
             </p>
           </div>
         </div>
       ) : showTiebreaker ? (
         <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2vw] px-8 text-center">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_8%,rgba(244,63,94,0.18),transparent_40%),linear-gradient(180deg,#f6efe8,#eadbcf)]" />
-          <BrandingLogos venueLogoUrl={effectiveVenueLogo} venueName={effectiveVenueName} />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(251,191,36,0.2),transparent_26%),radial-gradient(circle_at_80%_26%,rgba(244,63,94,0.14),transparent_24%)]" />
+          <BrandingLogos venueLogoUrl={effectiveVenueLogo} venueName={effectiveVenueName} tone="light" />
           <div className="relative z-10 space-y-[1.5vw]">
             <p
               className="font-black uppercase leading-none tracking-tight text-rose-400"
@@ -563,7 +563,7 @@ export default function BingoJumbotronPage() {
               TIEBREAKER
             </p>
             {welcomeTieBreakLine ? (
-              <div className="mx-auto w-full max-w-[74vw] rounded-2xl border border-rose-300/55 bg-white/68 px-[2.4vw] py-[1.3vw] text-left shadow-[0_12px_36px_rgba(120,53,15,0.16)] backdrop-blur-[1px]">
+              <div className="mx-auto w-full max-w-[74vw] rounded-2xl border border-rose-300/55 bg-white/76 px-[2.4vw] py-[1.3vw] text-left shadow-[0_18px_40px_rgba(120,53,15,0.14)] backdrop-blur-[1px]">
                 <p className="text-[1.55vw] font-black uppercase tracking-[0.16em] text-rose-700">Rules</p>
                 <p className="mt-[0.45vw] text-[1.7vw] font-semibold leading-tight text-stone-800">{welcomeTieBreakLine}</p>
               </div>

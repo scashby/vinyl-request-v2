@@ -194,6 +194,7 @@ export const DEFAULT_VISIBLE_COLUMNS: ColumnId[] = [
   'menu',
   'artist',
   'title',
+  'crates',
   'format',
   'personal_notes',
   'genres',

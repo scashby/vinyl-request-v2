@@ -6,6 +6,22 @@ import { supabase } from 'lib/supabaseClient';
 import type { Crate, SmartRules } from 'types/crate';
 import { BoxIcon } from '../../../components/BoxIcon';
 
+const normalizeCrateName = (name: string): string =>
+  name
+    .toLowerCase()
+    .replace(/\[|\]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const isAllAlbumsName = (name: string): boolean => normalizeCrateName(name) === 'all albums';
+
+const getCrateDisplayName = (crate: Crate): string => {
+  if (!crate.is_smart && isAllAlbumsName(crate.name)) {
+    return `${crate.name} (Manual)`;
+  }
+  return crate.name;
+};
+
 interface ManageCratesModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -222,7 +238,7 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
                     </div>
                     <div className="flex-1">
                       <div className="text-sm font-semibold text-gray-900 mb-0.5">
-                        {crate.name}
+                        {getCrateDisplayName(crate)}
                       </div>
                       <div className="text-xs text-gray-500">
                         {crate.is_smart ? (
@@ -232,7 +248,9 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
                             {crate.live_update && ' • Live Update'}
                           </>
                         ) : (
-                          'Manual Crate'
+                          isAllAlbumsName(crate.name)
+                            ? 'Manual Crate • distinct from [All Albums] system filter'
+                            : 'Manual Crate'
                         )}
                       </div>
                     </div>

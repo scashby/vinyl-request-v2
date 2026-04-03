@@ -266,6 +266,18 @@ const TRACK_COLUMN_CONTROL_IDS = new Set<TrackViewColumnId>(['checkbox']);
 const TRACK_COLUMN_RIGHT_ALIGN_IDS = new Set<TrackViewColumnId>(['length', 'my_rating']);
 const COLLECTION_CONTROL_COLUMNS: ColumnId[] = ['checkbox', 'owned', 'for_sale_indicator', 'menu'];
 
+const ensureCratesColumnVisible = (columns: ColumnId[]): ColumnId[] => {
+  const deduped = Array.from(new Set(columns));
+  if (deduped.includes('crates')) return deduped;
+
+  const titleIndex = deduped.indexOf('title');
+  if (titleIndex >= 0) {
+    return [...deduped.slice(0, titleIndex + 1), 'crates', ...deduped.slice(titleIndex + 1)];
+  }
+
+  return [...deduped, 'crates'];
+};
+
 const normalizeCrateRecord = (row: Partial<Crate> & {
   smart_rules?: unknown;
   is_smart?: boolean | null;
@@ -1041,6 +1053,20 @@ const isSaleOnlyCrate = (crate: Crate | null | undefined): boolean => {
   return isSaleFolderName(crate.name);
 };
 
+const normalizeCrateNameForUi = (name: string): string =>
+  name
+    .toLowerCase()
+    .replace(/\[|\]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const getCrateDisplayName = (crate: Crate): string => {
+  if (!crate.is_smart && normalizeCrateNameForUi(crate.name) === 'all albums') {
+    return `${crate.name} (Manual)`;
+  }
+  return crate.name;
+};
+
 function CollectionBrowserPage() {
   const searchParams = useSearchParams();
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -1227,7 +1253,7 @@ function CollectionBrowserPage() {
     if (stored) {
       try {
         const parsed = JSON.parse(stored) as string[];
-        const filtered = parsed.filter(isCollectionColumnId).filter((id) => id !== 'location');
+        const filtered = ensureCratesColumnVisible(parsed.filter(isCollectionColumnId).filter((id) => id !== 'location'));
         if (filtered.length > 0) {
           setCollectionVisibleColumns(filtered);
         }
@@ -1488,7 +1514,7 @@ function CollectionBrowserPage() {
   }, []);
 
   const handleCollectionColumnsChange = useCallback((columns: ColumnId[]) => {
-    const sanitized = columns.filter((id) => id !== 'location');
+    const sanitized = ensureCratesColumnVisible(columns.filter((id) => id !== 'location'));
     setCollectionVisibleColumns(sanitized);
     localStorage.setItem('collection-visible-columns', JSON.stringify(sanitized));
   }, []);
@@ -4033,7 +4059,7 @@ function CollectionBrowserPage() {
                         ) : (
                           <span>{crate.icon}</span>
                         )}
-                        <span className="truncate">{crate.name}</span>
+                        <span className="truncate">{getCrateDisplayName(crate)}</span>
                       </span>
                       <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${selectedCrateId === crate.id ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{crate.album_count || 0}</span>
                     </button>
@@ -4261,7 +4287,7 @@ function CollectionBrowserPage() {
                     ) : (
                       <span>{selectedCrateWithCount.icon}</span>
                     )}
-                    <span className="font-semibold text-[#1f2937] truncate">{selectedCrateWithCount.name}</span>
+                    <span className="font-semibold text-[#1f2937] truncate">{getCrateDisplayName(selectedCrateWithCount)}</span>
                     <span className="text-[11px] uppercase tracking-wide text-[#64748b]">
                       {getCrateKindLabel(selectedCrateWithCount)}
                     </span>

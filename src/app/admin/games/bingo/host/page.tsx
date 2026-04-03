@@ -416,31 +416,6 @@ export default function BingoHostPage() {
     }
   }, [session, sessionId, roundIsStarted, load]);
 
-  const createCrateForCurrentRound = useCallback(async () => {
-    if (!session) return;
-
-    try {
-      const createResponse = await fetch(`/api/games/bingo/sessions/${sessionId}/crates`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ round_number: session.current_round }),
-      });
-
-      const createPayload = (await createResponse.json().catch(() => null)) as
-        | { data?: { crate_letter?: string }; error?: string }
-        | null;
-
-      if (!createResponse.ok || !createPayload?.data?.crate_letter) {
-        throw new Error(createPayload?.error ?? "Failed to create crate for current round");
-      }
-
-      await switchCrate(createPayload.data.crate_letter);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to create crate";
-      alert(message);
-    }
-  }, [session, sessionId, switchCrate]);
-
   const patchCallMetadata = useCallback(
     async (callId: number, patch: Record<string, unknown>) => {
       const response = await fetch(`/api/games/bingo/calls/${callId}`, {
@@ -633,16 +608,6 @@ export default function BingoHostPage() {
                     </select>
                   )}
                   {roundIsStarted ? <span className="text-[10px] text-stone-500 italic">Locked (round started)</span> : null}
-                </div>
-                <div className="mt-2">
-                  <button
-                    type="button"
-                    onClick={() => void createCrateForCurrentRound()}
-                    disabled={!session || switchingCrate || roundIsStarted}
-                    className="rounded border border-amber-700 bg-amber-900/35 px-3 py-1 font-bold text-amber-200 hover:bg-amber-900/55 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Create New Crate (Round {session?.current_round ?? 1})
-                  </button>
                 </div>
               </div>
             </div>
