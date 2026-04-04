@@ -67,75 +67,155 @@ type PresetCrateRow = {
   created_at: string;
 };
 
-type CollectionCrateRow = {
-  id: number;
-  name: string;
-  icon: string | null;
-  color: string | null;
-  sort_order: number | null;
-};
-
-type CollectionCrateItemInsertRow = {
-  crate_id: number;
-  inventory_id: number;
-  position: number;
-};
-
-async function ensureCollectionCrateMirror(
+/**
+ * Ensure a Game Crate mirror exists in the collection crates table for a given round.
+ *
+ * A Game Crate stores the specific 75 tracks (one per album) that are the source pool
+ * for this round. Each crate_item has both an inventory_id (the album) and a track_key
+ * (the specific chosen track), so the collection UI shows exactly those 75 tracks —
+ * not all tracks on those albums.
+ *
+ * Named: "Bingo {sessionCode} Round {n}"
+ */
+async function ensureGameCrateMirror(
   db: ReturnType<typeof getBingoDb>,
-  crateName: string,
-  calls: CrateCallEntry[]
+  sessionId: number,
+  roundNumber: number,
+  sessionCode: string | null
 ): Promise<void> {
   const rawDb = db as any;
-  const collectionCrateName = `Bingo · ${crateName}`;
+  const crateName = `Bingo ${sessionCode ?? sessionId} Round ${roundNumber}`;
 
-  const { data: existingCrateData, error: existingCrateError } = await rawDb
+  // Load the unordered round source tracks from bingo_session_round_tracks
+  const roundTracks = await getRoundSnapshotTracks(db, sessionId, roundNumber);
+  if (roundTracks.length === 0) return;
+
+  // Resolve track_key → inventory_id for each track
+  const trackItems = roundTracks
+    .map((track) => {
+      const parsed = parseTrackKey(track.trackKey);
+      if (!parsed.inventoryId || !Number.isFinite(parsed.inventoryId)) return null;
+      return { inventoryId: parsed.inventoryId, trackKey: track.trackKey };
+    })
+    .filter((item): item is { inventoryId: number; trackKey: string } => item !== null);
+
+  if (trackItems.length === 0) return;
+
+  // Find or create the collection crate record
+  const { data: existingData, error: existingError } = await rawDb
     .from("crates")
-    .select("id, name, icon, color")
-    .eq("name", collectionCrateName)
+    .select("id")
+    .eq("name", crateName)
     .eq("is_smart", false)
     .maybeSingle();
 
-  if (existingCrateError) throw new Error(existingCrateError.message);
+  if (existingError) throw new Error(existingError.message);
 
-  let collectionCrateId = Number((existingCrateData as { id?: unknown } | null)?.id ?? NaN);
-  if (!Number.isFinite(collectionCrateId)) {
-    const { data: legacyCrateData, error: legacyCrateError } = await rawDb
-      .from("crates")
-      .select("id, name, icon, color")
-      .eq("name", crateName)
-      .eq("is_smart", false)
-      .maybeSingle();
+  let crateId = Number((existingData as { id?: unknown } | null)?.id ?? NaN);
 
-    if (legacyCrateError) throw new Error(legacyCrateError.message);
-
-    const legacyCrate = legacyCrateData as CollectionCrateRow | null;
-    if (legacyCrate && legacyCrate.icon === "🎯") {
-      const { error: renameError } = await rawDb
-        .from("crates")
-        .update({ name: collectionCrateName })
-        .eq("id", legacyCrate.id);
-      if (renameError) throw new Error(renameError.message);
-      collectionCrateId = legacyCrate.id;
-    }
-  }
-
-  if (!Number.isFinite(collectionCrateId)) {
+  if (!Number.isFinite(crateId)) {
     const { data: maxSortData, error: maxSortError } = await rawDb
       .from("crates")
-      .select("id, name, icon, color, sort_order")
+      .select("sort_order")
       .order("sort_order", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (maxSortError) throw new Error(maxSortError.message);
 
-    const nextSortOrder = Number((maxSortData as CollectionCrateRow | null)?.sort_order ?? -1) + 1;
-    const { data: insertedCrateData, error: insertCrateError } = await rawDb
+    const nextSortOrder = Number((maxSortData as { sort_order?: unknown } | null)?.sort_order ?? -1) + 1;
+
+    const { data: insertedData, error: insertError } = await rawDb
       .from("crates")
       .insert({
-        name: collectionCrateName,
+        name: crateName,
         icon: "🎯",
+        color: "#f59e0b",
+        is_smart: false,
+        smart_rules: null,
+        match_rules: "all",
+        live_update: false,
+        sort_order: nextSortOrder,
+        game_source: "bingo",
+      })
+      .select("id")
+      .single();
+
+    if (insertError) throw new Error(insertError.message);
+    crateId = Number((insertedData as { id?: unknown } | null)?.id ?? NaN);
+    if (!Number.isFinite(crateId)) throw new Error("Failed to create game crate mirror.");
+  }
+
+  // Replace all crate_items with the current round tracks (track-level: inventory_id + track_key)
+  const { error: deleteError } = await rawDb.from("crate_items").delete().eq("crate_id", crateId);
+  if (deleteError) throw new Error(deleteError.message);
+
+  const insertRows = trackItems.map((item, index) => ({
+    crate_id: crateId,
+    inventory_id: item.inventoryId,
+    track_key: item.trackKey,
+    position: index,
+  }));
+
+  const { error: insertItemsError } = await rawDb.from("crate_items").insert(insertRows);
+  if (insertItemsError) throw new Error(insertItemsError.message);
+}
+
+/**
+ * Ensure a Game Playlist mirror exists in collection_playlists for a given call-order snapshot.
+ *
+ * A Game Playlist is the ordered call sequence for a round — the same 75 tracks as the
+ * Game Crate, arranged in the specific shuffled order balls are called.
+ * Multiple variants per round: A, B, C…
+ *
+ * Named: "Bingo {sessionCode} Playlist {letter}"
+ */
+async function ensureGamePlaylistMirror(
+  db: ReturnType<typeof getBingoDb>,
+  sessionCode: string | null,
+  sessionId: number,
+  playlistLetter: string,
+  calls: CrateCallEntry[]
+): Promise<void> {
+  const rawDb = db as any;
+  const playlistName = `Bingo ${sessionCode ?? sessionId} Playlist ${playlistLetter}`;
+
+  // Filter to entries with a valid track key
+  const validCalls = calls.filter((call) => {
+    const key = String(call.playlist_track_key ?? "").trim();
+    return key.length > 0;
+  });
+
+  if (validCalls.length === 0) return;
+
+  // Find or create the collection_playlists record
+  const { data: existingData, error: existingError } = await rawDb
+    .from("collection_playlists")
+    .select("id")
+    .eq("name", playlistName)
+    .maybeSingle();
+
+  if (existingError) throw new Error(existingError.message);
+
+  let playlistId = Number((existingData as { id?: unknown } | null)?.id ?? NaN);
+
+  if (!Number.isFinite(playlistId)) {
+    const { data: maxSortData, error: maxSortError } = await rawDb
+      .from("collection_playlists")
+      .select("sort_order")
+      .order("sort_order", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (maxSortError) throw new Error(maxSortError.message);
+
+    const nextSortOrder = Number((maxSortData as { sort_order?: unknown } | null)?.sort_order ?? -1) + 1;
+
+    const { data: insertedData, error: insertError } = await rawDb
+      .from("collection_playlists")
+      .insert({
+        name: playlistName,
+        icon: "▶️",
         color: "#f59e0b",
         is_smart: false,
         smart_rules: null,
@@ -146,39 +226,27 @@ async function ensureCollectionCrateMirror(
       .select("id")
       .single();
 
-    if (insertCrateError) throw new Error(insertCrateError.message);
-    collectionCrateId = Number((insertedCrateData as { id?: unknown } | null)?.id ?? NaN);
-    if (!Number.isFinite(collectionCrateId)) {
-      throw new Error("Failed to mirror game crate into collection crates.");
-    }
+    if (insertError) throw new Error(insertError.message);
+    playlistId = Number((insertedData as { id?: unknown } | null)?.id ?? NaN);
+    if (!Number.isFinite(playlistId)) throw new Error("Failed to create game playlist mirror.");
   }
 
-  const inventoryIds = Array.from(
-    new Set(
-      calls
-        .map((call) => {
-          const trackKey = String(call.playlist_track_key ?? "").trim();
-          if (!trackKey) return null;
-          const parsed = parseTrackKey(trackKey);
-          return parsed.inventoryId;
-        })
-        .filter((value): value is number => Number.isFinite(value) && value > 0)
-    )
-  );
+  // Replace all playlist items with the current call order
+  const { error: deleteError } = await rawDb
+    .from("collection_playlist_items")
+    .delete()
+    .eq("playlist_id", playlistId);
+  if (deleteError) throw new Error(deleteError.message);
 
-  const { error: deleteItemsError } = await rawDb.from("crate_items").delete().eq("crate_id", collectionCrateId);
-  if (deleteItemsError) throw new Error(deleteItemsError.message);
-
-  if (inventoryIds.length === 0) return;
-
-  const insertRows: CollectionCrateItemInsertRow[] = inventoryIds.map((inventoryId, index) => ({
-    crate_id: collectionCrateId,
-    inventory_id: inventoryId,
-    position: index,
+  const insertRows = validCalls.map((call) => ({
+    playlist_id: playlistId,
+    track_key: String(call.playlist_track_key).trim(),
+    sort_order: call.call_index,
   }));
 
-  const { error: insertItemsError } = await rawDb.from("crate_items").insert(insertRows as CollectionCrateItemInsertRow[]);
-
+  const { error: insertItemsError } = await rawDb
+    .from("collection_playlist_items")
+    .insert(insertRows);
   if (insertItemsError) throw new Error(insertItemsError.message);
 }
 
@@ -325,7 +393,9 @@ export async function saveCrateForRound(
     if (error || !data) throw new Error(error?.message ?? "Failed to save crate.");
 
     const row = data as PresetCrateRow;
-    await ensureCollectionCrateMirror(db, row.crate_name, row.call_order as unknown as CrateCallEntry[]);
+    // Mirror: game crate (source pool) + game playlist (call order)
+    await ensureGameCrateMirror(db, sessionId, roundNumber, sessionCode);
+    await ensureGamePlaylistMirror(db, sessionCode, sessionId, letter, calls);
     return {
       id: row.id,
       session_id: sessionId,
@@ -353,7 +423,9 @@ export async function saveCrateForRound(
 
   if (error || !data) throw new Error(error?.message ?? "Failed to save crate.");
 
-  await ensureCollectionCrateMirror(db, data.crate_name, data.call_order as unknown as CrateCallEntry[]);
+  // Mirror: game crate (source pool) + game playlist (call order)
+  await ensureGameCrateMirror(db, sessionId, roundNumber, sessionCode);
+  await ensureGamePlaylistMirror(db, sessionCode, sessionId, letter, calls);
 
   return {
     ...data,
@@ -456,16 +528,26 @@ export async function syncCollectionCrateMirrorsForSession(
   sessionId: number
 ): Promise<void> {
   const session = await getSessionCrateContext(db, sessionId);
-  const crates = await getCratesForSession(db, sessionId);
-  for (const crate of crates) {
-    let calls = crate.call_order;
-    // Stored call_order may pre-date playlist_track_key being saved in the snapshot.
-    // Re-derive from live source data so inventory IDs can be resolved.
-    if (session && !calls.some((c) => c.playlist_track_key)) {
-      const fresh = await deriveRoundCallOrder(db, sessionId, crate.round_number, session as SessionCrateBackfillRow);
+  if (!session) return;
+
+  const sessionCode = session.session_code;
+  const playlists = await getCratesForSession(db, sessionId);
+
+  // Sync one Game Crate per unique round (source pool, track-level)
+  const rounds = new Set(playlists.map((p) => p.round_number));
+  for (const roundNumber of rounds) {
+    await ensureGameCrateMirror(db, sessionId, roundNumber, sessionCode);
+  }
+
+  // Sync one Game Playlist per call-order snapshot (letter A, B, C…)
+  for (const playlist of playlists) {
+    let calls = playlist.call_order;
+    // Stored call_order may pre-date playlist_track_key — re-derive when missing
+    if (!calls.some((c) => c.playlist_track_key)) {
+      const fresh = await deriveRoundCallOrder(db, sessionId, playlist.round_number, session as SessionCrateBackfillRow);
       if (fresh.length > 0) calls = fresh;
     }
-    await ensureCollectionCrateMirror(db, crate.crate_name, calls);
+    await ensureGamePlaylistMirror(db, sessionCode, sessionId, playlist.crate_letter, calls);
   }
 }
 

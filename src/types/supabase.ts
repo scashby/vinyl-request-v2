@@ -383,6 +383,7 @@ export type Database = {
           position: number | null;
           notes: string | null;
           added_at: string | null;
+          track_key: string | null;
         };
         Insert: {
           id?: number;
@@ -391,6 +392,7 @@ export type Database = {
           position?: number | null;
           notes?: string | null;
           added_at?: string | null;
+          track_key?: string | null;
         };
         Update: {
           id?: number;
@@ -399,6 +401,7 @@ export type Database = {
           position?: number | null;
           notes?: string | null;
           added_at?: string | null;
+          track_key?: string | null;
         };
         Relationships: [
           {
@@ -428,6 +431,7 @@ export type Database = {
           sort_order: number | null;
           created_at: string | null;
           updated_at: string | null;
+          game_source: string | null;
         };
         Insert: {
           id?: number;
@@ -441,6 +445,7 @@ export type Database = {
           sort_order?: number | null;
           created_at?: string | null;
           updated_at?: string | null;
+          game_source?: string | null;
         };
         Update: {
           id?: number;
@@ -454,6 +459,7 @@ export type Database = {
           sort_order?: number | null;
           created_at?: string | null;
           updated_at?: string | null;
+          game_source?: string | null;
         };
         Relationships: [];
       };

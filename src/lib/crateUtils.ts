@@ -5,6 +5,9 @@ import { isForSaleInventory } from './saleUtils';
 
 export type CrateItemsByCrate = Record<number, Set<number>>;
 
+/** For game crates: crate ID → Set of track_key strings (specific tracks, not whole albums) */
+export type CrateTrackKeysByCrate = Record<number, Set<string>>;
+
 /**
  * Evaluate if an album matches a smart crate's rules
  */

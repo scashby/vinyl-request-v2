@@ -28,6 +28,7 @@ import {
   getCrateKindLabel,
   resolveCrateInventoryIds,
   type CrateItemsByCrate,
+  type CrateTrackKeysByCrate,
 } from '../../lib/crateUtils';
 import { trackMatchesSmartPlaylist } from '../../lib/playlistUtils';
 import { resolveTrackArtist } from '../../lib/artistName';
@@ -1053,25 +1054,6 @@ const isSaleOnlyCrate = (crate: Crate | null | undefined): boolean => {
   return isSaleFolderName(crate.name);
 };
 
-const normalizeCrateNameForUi = (name: string): string =>
-  name
-    .toLowerCase()
-    .replace(/\[|\]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-const isLegacyAllAlbumsManualCrate = (crate: Crate | null | undefined): boolean => {
-  if (!crate || crate.is_smart) return false;
-  return normalizeCrateNameForUi(crate.name) === 'all albums';
-};
-
-const getCrateDisplayName = (crate: Crate): string => {
-  if (!crate.is_smart && normalizeCrateNameForUi(crate.name) === 'all albums') {
-    return `${crate.name} (Manual)`;
-  }
-  return crate.name;
-};
-
 function CollectionBrowserPage() {
   const searchParams = useSearchParams();
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -1093,6 +1075,7 @@ function CollectionBrowserPage() {
   const [selectedCrateId, setSelectedCrateId] = useState<number | null>(null);
   const [crates, setCrates] = useState<Crate[]>([]);
   const [crateItemsByCrate, setCrateItemsByCrate] = useState<CrateItemsByCrate>({});
+  const [crateTrackKeysByCrate, setCrateTrackKeysByCrate] = useState<CrateTrackKeysByCrate>({});
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<number | null>(null);
   const [showPlaylistStudioModal, setShowPlaylistStudioModal] = useState(false);
@@ -1949,13 +1932,12 @@ function CollectionBrowserPage() {
     }
 
     if (data) {
-      const normalized = (data as Array<Partial<Crate>>).map((row) => normalizeCrateRecord(row));
-      setCrates(normalized.filter((crate) => !isLegacyAllAlbumsManualCrate(crate)));
+      setCrates((data as Array<Partial<Crate>>).map((row) => normalizeCrateRecord(row)));
     }
 
     const { data: crateItems, error: crateItemsError } = await supabase
       .from('crate_items')
-      .select('crate_id, inventory_id');
+      .select('crate_id, inventory_id, track_key');
 
     if (crateItemsError) {
       console.error('Error loading crate items:', crateItemsError);
@@ -1971,7 +1953,17 @@ function CollectionBrowserPage() {
       return acc;
     }, {} as CrateItemsByCrate);
 
+    const trackKeyMap = (crateItems ?? []).reduce((acc, item) => {
+      if (!item.crate_id || !item.track_key) return acc;
+      if (!acc[item.crate_id]) {
+        acc[item.crate_id] = new Set<string>();
+      }
+      acc[item.crate_id].add(item.track_key);
+      return acc;
+    }, {} as CrateTrackKeysByCrate);
+
     setCrateItemsByCrate(itemMap);
+    setCrateTrackKeysByCrate(trackKeyMap);
   }, [ensureSaleCrateExists]);
 
   const loadPlaylists = useCallback(async () => {
@@ -2479,8 +2471,14 @@ function CollectionBrowserPage() {
     let rows = allTrackRows;
 
     if (trackSource === 'crates' && selectedCrate) {
-      const allowedInventoryIds = resolvedCrateInventoryIdsByCrate[selectedCrate.id];
-      rows = rows.filter((row) => allowedInventoryIds?.has(row.inventoryId));
+      const crateTrackKeys = crateTrackKeysByCrate[selectedCrate.id];
+      if (crateTrackKeys && crateTrackKeys.size > 0) {
+        // Game crate: filter by specific track keys (not whole albums)
+        rows = rows.filter((row) => crateTrackKeys.has(row.key));
+      } else {
+        const allowedInventoryIds = resolvedCrateInventoryIdsByCrate[selectedCrate.id];
+        rows = rows.filter((row) => allowedInventoryIds?.has(row.inventoryId));
+      }
     }
 
     if (trackSource === 'playlists' && selectedPlaylistId) {
@@ -2580,6 +2578,7 @@ function CollectionBrowserPage() {
     trackSource,
     selectedCrate,
     resolvedCrateInventoryIdsByCrate,
+    crateTrackKeysByCrate,
     selectedPlaylistId,
     playlists,
     smartPlaylistSelectedKeys,
@@ -4066,7 +4065,7 @@ function CollectionBrowserPage() {
                         ) : (
                           <span>{crate.icon}</span>
                         )}
-                        <span className="truncate">{getCrateDisplayName(crate)}</span>
+                        <span className="truncate">{crate.name}</span>
                       </span>
                       <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${selectedCrateId === crate.id ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{crate.album_count || 0}</span>
                     </button>
@@ -4294,7 +4293,7 @@ function CollectionBrowserPage() {
                     ) : (
                       <span>{selectedCrateWithCount.icon}</span>
                     )}
-                    <span className="font-semibold text-[#1f2937] truncate">{getCrateDisplayName(selectedCrateWithCount)}</span>
+                    <span className="font-semibold text-[#1f2937] truncate">{selectedCrateWithCount.name}</span>
                     <span className="text-[11px] uppercase tracking-wide text-[#64748b]">
                       {getCrateKindLabel(selectedCrateWithCount)}
                     </span>

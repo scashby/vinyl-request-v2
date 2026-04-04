@@ -6,24 +6,6 @@ import { supabase } from 'lib/supabaseClient';
 import type { Crate, SmartRules } from 'types/crate';
 import { BoxIcon } from '../../../components/BoxIcon';
 
-const normalizeCrateName = (name: string): string =>
-  name
-    .toLowerCase()
-    .replace(/\[|\]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-const isAllAlbumsName = (name: string): boolean => normalizeCrateName(name) === 'all albums';
-
-const isLegacyAllAlbumsManualCrate = (crate: Crate): boolean => !crate.is_smart && isAllAlbumsName(crate.name);
-
-const getCrateDisplayName = (crate: Crate): string => {
-  if (!crate.is_smart && isAllAlbumsName(crate.name)) {
-    return `${crate.name} (Manual)`;
-  }
-  return crate.name;
-};
-
 interface ManageCratesModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -61,11 +43,10 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
       if (fetchError) {
         setError(fetchError.message);
       } else {
-        const normalized = (data || []).map((row) => ({
+        setCrates((data || []).map((row) => ({
           ...row,
           smart_rules: row.smart_rules as unknown as SmartRules | null
-        })) as Crate[];
-        setCrates(normalized.filter((crate) => !isLegacyAllAlbumsManualCrate(crate)));
+        })) as Crate[]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load crates');
@@ -242,7 +223,7 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
                     </div>
                     <div className="flex-1">
                       <div className="text-sm font-semibold text-gray-900 mb-0.5">
-                        {getCrateDisplayName(crate)}
+                        {crate.name}
                       </div>
                       <div className="text-xs text-gray-500">
                         {crate.is_smart ? (

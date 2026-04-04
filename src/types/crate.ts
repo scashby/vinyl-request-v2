@@ -11,6 +11,8 @@ export interface Crate {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  /** Populated for game-generated crates (e.g. 'bingo'). Null for user-created crates. */
+  game_source: string | null;
   album_count?: number; // Calculated on frontend
 }
 

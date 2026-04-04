@@ -612,7 +612,7 @@ export default function BingoEditSessionPage() {
 
                         <div className="mt-3 border-t border-stone-800 pt-3">
                           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-stone-300">
-                            Round {round} Call Order (Crate)
+                            Round {round} Game Playlist
                           </p>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             <select
@@ -623,7 +623,7 @@ export default function BingoEditSessionPage() {
                                 void selectCrateForRound(round, event.target.value);
                               }}
                             >
-                              <option value="">No crate selected</option>
+                              <option value="">No playlist selected</option>
                               {getCratesForRound(round).map((crate) => (
                                 <option key={`${round}-${crate.crate_letter}`} value={crate.crate_letter}>
                                   {crate.crate_name}
@@ -636,7 +636,7 @@ export default function BingoEditSessionPage() {
                               disabled={crateBusyRound === round}
                               className="rounded border border-amber-700/70 bg-amber-950/30 px-2 py-1 text-xs text-amber-200 disabled:opacity-50"
                             >
-                              {crateBusyRound === round ? "Creating..." : "Create New Crate"}
+                              {crateBusyRound === round ? "Generating..." : "Generate New Playlist"}
                             </button>
                           </div>
                         </div>
