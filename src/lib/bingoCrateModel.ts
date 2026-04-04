@@ -554,6 +554,19 @@ export async function syncCollectionCrateMirrorsForSession(
 export async function syncCollectionCrateMirrorsForAllSessions(
   db: ReturnType<typeof getBingoDb>
 ): Promise<void> {
+  // Clean up old album-level mirrors created by the pre-Rev3 ensureCollectionCrateMirror.
+  // Those were named "Bingo · <sessionCode> Crate <letter>" and had no game_source set.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rawDb = db as any;
+  const { error: cleanupError } = await rawDb
+    .from("crates")
+    .delete()
+    .like("name", "Bingo · %")
+    .is("game_source", null);
+  if (cleanupError) {
+    console.warn("Failed to clean up legacy album-level game crates:", cleanupError.message);
+  }
+
   const { data, error } = await db.from("bingo_sessions").select("id");
   if (error) throw new Error(error.message);
 
