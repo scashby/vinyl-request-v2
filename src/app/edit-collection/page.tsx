@@ -301,6 +301,7 @@ const normalizeCrateRecord = (row: Partial<Crate> & {
   sort_order: row.sort_order ?? 0,
   created_at: row.created_at ?? '',
   updated_at: row.updated_at ?? '',
+  game_source: row.game_source ?? null,
 });
 
 const dedupeInventoryIds = (albumIds: number[]): number[] => {
