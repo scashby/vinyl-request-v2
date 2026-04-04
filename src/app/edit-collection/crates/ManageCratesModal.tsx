@@ -233,7 +233,7 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
                             {crate.live_update && ' • Live Update'}
                           </>
                         ) : (
-                          isAllAlbumsName(crate.name)
+                          crate.name === 'All Albums'
                             ? 'Manual Crate • distinct from [All Albums] system filter'
                             : 'Manual Crate'
                         )}
