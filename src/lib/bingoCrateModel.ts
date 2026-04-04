@@ -68,34 +68,45 @@ type PresetCrateRow = {
 };
 
 /**
- * Ensure a Game Crate mirror exists in the collection crates table for a given round.
+ * Ensure ONE Game Crate mirror exists in the collection crates table for a session.
  *
- * A Game Crate stores the specific 75 tracks (one per album) that are the source pool
- * for this round. Each crate_item has both an inventory_id (the album) and a track_key
- * (the specific chosen track), so the collection UI shows exactly those 75 tracks —
- * not all tracks on those albums.
+ * A Game Crate is the pull list — the union of every unique track across ALL rounds
+ * for this session. One item per distinct track_key so the host knows exactly which
+ * records to have ready. Multiple rounds may share tracks; those are deduplicated.
  *
- * Named: "Bingo {sessionCode} Round {n}"
+ * Named: "Bingo {sessionCode}"
  */
 async function ensureGameCrateMirror(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number,
-  roundNumber: number,
   sessionCode: string | null
 ): Promise<void> {
   const rawDb = db as any;
-  const crateName = `Bingo ${sessionCode ?? sessionId} Round ${roundNumber}`;
+  const crateName = `Bingo ${sessionCode ?? sessionId}`;
 
-  // Load the unordered round source tracks from bingo_session_round_tracks
-  const roundTracks = await getRoundSnapshotTracks(db, sessionId, roundNumber);
-  if (roundTracks.length === 0) return;
+  // Load all tracks from ALL rounds for this session, then deduplicate by track_key
+  const { data: trackData, error: trackError } = await rawDb
+    .from("bingo_session_round_tracks")
+    .select("playlist_track_key")
+    .eq("session_id", sessionId);
+
+  if (trackError) throw new Error(trackError.message);
+
+  const uniqueTrackKeys = Array.from(
+    new Map(
+      ((trackData ?? []) as Array<{ playlist_track_key: string }>)
+        .map((row) => [row.playlist_track_key, row.playlist_track_key])
+    ).values()
+  );
+
+  if (uniqueTrackKeys.length === 0) return;
 
   // Resolve track_key → inventory_id for each track
-  const trackItems = roundTracks
-    .map((track) => {
-      const parsed = parseTrackKey(track.trackKey);
+  const trackItems = uniqueTrackKeys
+    .map((trackKey) => {
+      const parsed = parseTrackKey(trackKey);
       if (!parsed.inventoryId || !Number.isFinite(parsed.inventoryId)) return null;
-      return { inventoryId: parsed.inventoryId, trackKey: track.trackKey };
+      return { inventoryId: parsed.inventoryId, trackKey };
     })
     .filter((item): item is { inventoryId: number; trackKey: string } => item !== null);
 
@@ -394,7 +405,7 @@ export async function saveCrateForRound(
 
     const row = data as PresetCrateRow;
     // Mirror: game crate (source pool) + game playlist (call order)
-    await ensureGameCrateMirror(db, sessionId, roundNumber, sessionCode);
+    await ensureGameCrateMirror(db, sessionId, sessionCode);
     await ensureGamePlaylistMirror(db, sessionCode, sessionId, letter, calls);
     return {
       id: row.id,
@@ -424,7 +435,7 @@ export async function saveCrateForRound(
   if (error || !data) throw new Error(error?.message ?? "Failed to save crate.");
 
   // Mirror: game crate (source pool) + game playlist (call order)
-  await ensureGameCrateMirror(db, sessionId, roundNumber, sessionCode);
+  await ensureGameCrateMirror(db, sessionId, sessionCode);
   await ensureGamePlaylistMirror(db, sessionCode, sessionId, letter, calls);
 
   return {
@@ -533,11 +544,8 @@ export async function syncCollectionCrateMirrorsForSession(
   const sessionCode = session.session_code;
   const playlists = await getCratesForSession(db, sessionId);
 
-  // Sync one Game Crate per unique round (source pool, track-level)
-  const rounds = new Set(playlists.map((p) => p.round_number));
-  for (const roundNumber of rounds) {
-    await ensureGameCrateMirror(db, sessionId, roundNumber, sessionCode);
-  }
+  // Sync ONE Game Crate for the entire session (union of all round tracks)
+  await ensureGameCrateMirror(db, sessionId, sessionCode);
 
   // Sync one Game Playlist per call-order snapshot (letter A, B, C…)
   for (const playlist of playlists) {

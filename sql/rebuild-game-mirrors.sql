@@ -23,54 +23,54 @@ WHERE name LIKE 'Bingo · %'
   AND game_source IS NULL;
 
 -- ============================================================
--- Step 2: Game Crate mirrors
+-- Step 2: Game Crate mirrors (ONE per session)
 -- ============================================================
+-- The crate is the pull list: every unique track the host needs to have
+-- physically available across ALL rounds of the session, deduplicated.
 WITH
   next_crate_sort AS (
     SELECT COALESCE(MAX(sort_order), -1) AS max_sort FROM public.crates
   ),
-  rounds AS (
-    SELECT DISTINCT
-      t.session_id,
-      t.round_number,
+  sessions AS (
+    SELECT
+      s.id   AS session_id,
       s.session_code,
-      ROW_NUMBER() OVER (ORDER BY t.session_id, t.round_number) AS rn
-    FROM public.bingo_session_round_tracks t
-    JOIN public.bingo_sessions s ON s.id = t.session_id
+      ROW_NUMBER() OVER (ORDER BY s.id) AS rn
+    FROM public.bingo_sessions s
+    WHERE EXISTS (
+      SELECT 1 FROM public.bingo_session_round_tracks t WHERE t.session_id = s.id
+    )
   ),
   new_crates AS (
     INSERT INTO public.crates
       (name, icon, color, is_smart, smart_rules, match_rules, live_update, sort_order, game_source)
     SELECT
-      'Bingo ' || r.session_code || ' Round ' || r.round_number,
+      'Bingo ' || ses.session_code,
       '🎯',
       '#f59e0b',
       false,
       null,
       'all',
       false,
-      (SELECT max_sort FROM next_crate_sort) + r.rn,
+      (SELECT max_sort FROM next_crate_sort) + ses.rn,
       'bingo'
-    FROM rounds r
+    FROM sessions ses
     RETURNING id, name
   ),
   crate_map AS (
     SELECT
-      nc.id AS crate_id,
-      r.session_id,
-      r.round_number
+      nc.id      AS crate_id,
+      ses.session_id
     FROM new_crates nc
-    JOIN rounds r
-      ON nc.name = 'Bingo ' || r.session_code || ' Round ' || r.round_number
+    JOIN sessions ses ON nc.name = 'Bingo ' || ses.session_code
   )
 INSERT INTO public.crate_items (crate_id, inventory_id, track_key)
-SELECT
+SELECT DISTINCT ON (cm.crate_id, t.playlist_track_key)
   cm.crate_id,
   split_part(t.playlist_track_key, ':', 1)::bigint,
   t.playlist_track_key
 FROM public.bingo_session_round_tracks t
-JOIN crate_map cm
-  ON cm.session_id = t.session_id AND cm.round_number = t.round_number;
+JOIN crate_map cm ON cm.session_id = t.session_id;
 
 -- ============================================================
 -- Step 3: Game Playlist mirrors

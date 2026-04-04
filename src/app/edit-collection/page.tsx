@@ -2543,6 +2543,16 @@ function CollectionBrowserPage() {
           ? activePlaylistSortFields
           : [];
 
+    // Non-smart playlist: sort by explicit call order (sort_order from collection_playlist_items).
+    // trackKeys is already ordered by sort_order from the DB query, so its index IS the call position.
+    if (trackSource === 'playlists' && selectedPlaylistId) {
+      const playlist = playlists.find((item) => item.id === selectedPlaylistId);
+      if (playlist && !playlist.isSmart && playlist.trackKeys.length > 0) {
+        const keyOrder = new Map(playlist.trackKeys.map((key, idx) => [key, idx]));
+        return [...rows].sort((a, b) => (keyOrder.get(a.key) ?? Infinity) - (keyOrder.get(b.key) ?? Infinity));
+      }
+    }
+
     if (trackFavoriteFields.length > 0) {
       rows = sortTrackRowsByFavoriteFields(rows, trackFavoriteFields);
     } else {
