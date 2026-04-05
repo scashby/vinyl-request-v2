@@ -219,6 +219,7 @@ export default function BingoJumbotronPage() {
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
+    if (typeof document !== "undefined" && document.hidden) return;
     const [sRes, cRes] = await Promise.all([
       fetch(`/api/games/bingo/sessions/${sessionId}`, { cache: "no-store" }),
       fetch(`/api/games/bingo/sessions/${sessionId}/calls`, { cache: "no-store" }),
@@ -254,9 +255,10 @@ export default function BingoJumbotronPage() {
 
   useEffect(() => {
     load();
-    const poll = setInterval(load, 3000);
+    const isIdle = session?.status === "paused" || session?.status === "completed";
+    const poll = setInterval(load, isIdle ? 30_000 : 3_000);
     return () => clearInterval(poll);
-  }, [load]);
+  }, [load, session?.status]);
 
   useEffect(() => {
     const tick = setInterval(() => {

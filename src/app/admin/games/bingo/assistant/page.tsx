@@ -26,6 +26,7 @@ export default function BingoAssistantPage() {
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
+    if (typeof document !== "undefined" && document.hidden) return;
     const [sRes, cRes] = await Promise.all([
       fetch(`/api/games/bingo/sessions/${sessionId}`),
       fetch(`/api/games/bingo/sessions/${sessionId}/calls`),
@@ -55,9 +56,10 @@ export default function BingoAssistantPage() {
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, 3500);
+    const isIdle = session?.status === "paused" || session?.status === "completed";
+    const timer = setInterval(load, isIdle ? 30_000 : 3_500);
     return () => clearInterval(timer);
-  }, [load]);
+  }, [load, session?.status]);
 
   const called = useMemo(
     () =>
