@@ -2,6 +2,10 @@
 
 import React from 'react';
 
+export const metadata = {
+  title: 'Merch',
+};
+
 const stores = [
   {
     name: "Official Shop",

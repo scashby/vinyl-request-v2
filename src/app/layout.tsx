@@ -23,8 +23,14 @@ const libreBarcode = Libre_Barcode_EAN13_Text({
 });
 
 export const metadata = {
-  title: 'Dead Wax Dialogues',
+  title: {
+    default: 'Dead Wax Dialogues',
+    template: 'Dead Wax Dialogues | %s',
+  },
   description: 'Vinyl record collection manager and DJ booking page',
+  icons: {
+    icon: '/images/Skulllogo.png',
+  },
 };
 
 export default function RootLayout({

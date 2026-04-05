@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Games | Dead Wax Dialogues",
+  title: 'Games',
   description:
     "A vinyl-first catalog of Dead Wax Dialogues games: what they are and how to play.",
 };
