@@ -211,6 +211,29 @@ export async function getCratesForSession(
   }));
 }
 
+/** Return a single crate by session id and crate letter, or null if not found. */
+export async function getCrateByLetter(
+  db: ReturnType<typeof getBingoDb>,
+  sessionId: number,
+  crateLetter: string
+): Promise<BingoSessionCrate | null> {
+  const sessionCode = await getSessionCode(db, sessionId);
+  const { data, error } = await db
+    .from("bingo_session_crates")
+    .select("*")
+    .eq("session_id", sessionId)
+    .eq("crate_letter", crateLetter)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return {
+    ...data,
+    crate_name: formatCrateName(sessionCode, sessionId, data.crate_letter),
+    call_order: data.call_order as unknown as CrateCallEntry[],
+  };
+}
+
 /** Return all crates for a specific round of a session. */
 export async function getCratesForRound(
   db: ReturnType<typeof getBingoDb>,
