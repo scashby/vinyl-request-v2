@@ -150,25 +150,13 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
   const defaultActiveCratesByRound = Array.from(
     crates.reduce((map, crate) => {
       const existing = map.get(crate.round_number);
-      const isCurrentSessionCrate = crate.source_session_id === sessionId;
-
-      if (!existing) {
-        map.set(crate.round_number, { letter: crate.crate_letter, isCurrentSessionCrate });
-        return map;
-      }
-
-      if (isCurrentSessionCrate && !existing.isCurrentSessionCrate) {
-        map.set(crate.round_number, { letter: crate.crate_letter, isCurrentSessionCrate: true });
-        return map;
-      }
-
-      if (isCurrentSessionCrate === existing.isCurrentSessionCrate && crate.crate_letter.localeCompare(existing.letter) < 0) {
-        map.set(crate.round_number, { letter: crate.crate_letter, isCurrentSessionCrate });
+      if (!existing || crate.crate_letter.localeCompare(existing) < 0) {
+        map.set(crate.round_number, crate.crate_letter);
       }
       return map;
-    }, new Map<number, { letter: string; isCurrentSessionCrate: boolean }>())
+    }, new Map<number, string>())
   )
-    .map(([round, value]) => ({ round, letter: value.letter }))
+    .map(([round, letter]) => ({ round, letter }))
     .sort((left, right) => left.round - right.round);
 
   const { error: sessionError } = await db
