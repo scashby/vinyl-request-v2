@@ -13,10 +13,6 @@ import { resolveRoundPlaylistIds, type RoundPlaylistEntry } from "./bingoRoundPl
 
 const CRATE_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
-type SessionCodeRow = {
-  session_code: string;
-};
-
 type SessionCrateContext = {
   session_code: string | null;
   game_preset_id: number | null;
@@ -81,6 +77,7 @@ async function ensureGameCrateMirror(
   sessionId: number,
   sessionCode: string | null
 ): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rawDb = db as any;
   const crateName = `Bingo ${sessionCode ?? sessionId}`;
 
@@ -188,6 +185,7 @@ async function ensureGamePlaylistMirror(
   playlistLetter: string,
   calls: CrateCallEntry[]
 ): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rawDb = db as any;
   const playlistName = `Bingo ${sessionCode ?? sessionId} Playlist ${playlistLetter}`;
 
@@ -358,13 +356,6 @@ async function getNextCrateLetter(
   return next;
 }
 
-async function getSessionCode(
-  db: ReturnType<typeof getBingoDb>,
-  sessionId: number
-): Promise<string | null> {
-  const context = await getSessionCrateContext(db, sessionId);
-  return context?.session_code ?? null;
-}
 
 function formatCrateName(sessionCode: string | null, sessionId: number, crateLetter: string): string {
   return `${sessionCode ?? sessionId} Crate ${crateLetter}`;
