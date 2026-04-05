@@ -588,9 +588,9 @@ export default function BingoHostPage() {
 
               <div className="border-t border-stone-800 pt-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <label className="text-stone-400 whitespace-nowrap">Load Crate</label>
+                  <label className="text-stone-400 whitespace-nowrap">Load Game Playlist</label>
                   {cratesByRound.length === 0 ? (
-                    <span className="text-stone-500 italic">No crates generated yet</span>
+                    <span className="text-stone-500 italic">No game playlists generated yet</span>
                   ) : (
                     <select
                       value={activeCrateLetter ?? ""}
@@ -778,7 +778,7 @@ export default function BingoHostPage() {
         <div className="grid gap-3 lg:grid-cols-[1.55fr,1fr]">
           <section className="flex h-[68vh] flex-col rounded-2xl border border-stone-700 bg-black/50 p-4">
             <h2 className="text-sm font-bold uppercase tracking-wide text-amber-200">
-              Crate (Call Order){activeCrateLetter ? ` · Loaded: Crate ${activeCrateLetter}` : ""}
+              Call Order (Game Playlist){activeCrateLetter ? ` · Loaded: ${session?.session_code ? `${session.session_code} Playlist ${activeCrateLetter}` : `Playlist ${activeCrateLetter}`}` : ""}
             </h2>
             <div className="mt-3 flex-1 overflow-x-auto overflow-y-auto">
               <table className="w-full text-left text-xs">

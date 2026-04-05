@@ -138,7 +138,7 @@ export default function BingoPrepPage() {
         <section className="grid gap-4 lg:grid-cols-[1.2fr,0.8fr]">
           <div className="rounded-2xl border border-stone-700 bg-black/45 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-amber-200">Crate (Call Order)</h2>
+              <h2 className="text-sm font-bold uppercase tracking-wide text-amber-200">Call Order (Game Playlist)</h2>
               <p className="text-xs text-stone-400">{pulledCount} items</p>
             </div>
 

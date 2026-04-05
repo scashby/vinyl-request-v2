@@ -654,12 +654,12 @@ export default function BingoSetupPage() {
 
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
-        alert((payload as { error?: string }).error ?? `Failed to create crate for round ${round}`);
+        alert((payload as { error?: string }).error ?? `Failed to create game playlist for round ${round}`);
         return;
       }
     }
 
-    alert(`Generated one additional crate for each round in ${session.session_code}.`);
+    alert(`Generated one additional game playlist for each round in ${session.session_code}.`);
     await load();
   };
 
@@ -742,14 +742,14 @@ export default function BingoSetupPage() {
         <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
           <h2 className="text-xl font-black uppercase text-amber-100">1. Session Setup</h2>
           <p className="mt-1 text-xs text-stone-400">
-            Minimum playlist size: <span className="font-semibold text-amber-300">{minimumTracksForSetup}</span> tracks to build one bingo crate for this game.
+            Minimum playlist size: <span className="font-semibold text-amber-300">{minimumTracksForSetup}</span> tracks to build one game playlist for this game.
           </p>
           <p className="mt-1 text-xs text-stone-400">
-            Estimated exact card layouts from one 75-track crate: <span className="font-semibold text-emerald-300">{formatEnglishMagnitude(perRoundCardCapacityEstimate)}</span> before an exact duplicate.
+            Estimated exact card layouts from one 75-track game playlist: <span className="font-semibold text-emerald-300">{formatEnglishMagnitude(perRoundCardCapacityEstimate)}</span> before an exact duplicate.
           </p>
           {hasSelectedPlaylists ? (
             <p className={`mt-1 text-xs ${effectiveTrackCount >= minimumTracksForSetup ? "text-emerald-300" : "text-rose-300"}`}>
-              {usingTracklistPreset ? `Selected preset pool: ${effectiveTrackCount}` : `Selected playlists: ${effectiveTrackCount}`} tracks {effectiveTrackCount >= minimumTracksForSetup ? "· enough to build the game crate and reshuffle it each round." : `· need at least ${minimumTracksForSetup} tracks to build the game crate.`}
+              {usingTracklistPreset ? `Selected preset pool: ${effectiveTrackCount}` : `Selected playlists: ${effectiveTrackCount}`} tracks {effectiveTrackCount >= minimumTracksForSetup ? "· enough to build the game playlist and reshuffle it each round." : `· need at least ${minimumTracksForSetup} tracks to build the game playlist.`}
             </p>
           ) : (
             <p className={`mt-1 text-xs ${hasUsablePlaylistConfiguration ? "text-amber-300" : "text-rose-300"}`}>
@@ -808,7 +808,7 @@ export default function BingoSetupPage() {
             {selectedTemplateSessionId ? (
               <div className="mt-2 rounded border border-stone-700/70 bg-stone-950/40 p-3 text-xs text-stone-300">
                 <p className="font-semibold text-amber-200">Template settings will be copied from this favorited session.</p>
-                <p className="mt-1 text-stone-400">A fresh game session and fresh crates will still be created.</p>
+                <p className="mt-1 text-stone-400">A fresh game session and fresh game playlists will still be created.</p>
               </div>
             ) : null}
             {applyingTemplate ? <p className="mt-2 text-xs text-amber-300">Applying favorited session settings…</p> : null}
@@ -944,7 +944,7 @@ export default function BingoSetupPage() {
                             </button>
                             <span className={usesOverride ? (roundTrackCount >= minimumTracksForSetup ? "text-emerald-300" : "text-rose-300") : "text-stone-500"}>
                               {usesOverride
-                                ? `${roundTrackCount} tracks selected${roundTrackCount >= minimumTracksForSetup ? " · enough for this round crate." : ` · need at least ${minimumTracksForSetup} tracks.`}`
+                                ? `${roundTrackCount} tracks selected${roundTrackCount >= minimumTracksForSetup ? " · enough for this round's game playlist." : ` · need at least ${minimumTracksForSetup} tracks.`}`
                                 : "Select one or more playlists for this round override."}
                             </span>
                           </div>
@@ -1188,7 +1188,7 @@ export default function BingoSetupPage() {
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/assistant?sessionId=${session.id}`, "bingo_assistant", "width=1024,height=800,left=1300,top=0,noopener,noreferrer")}>Assistant</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/jumbotron?sessionId=${session.id}`, "bingo_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => createAdditionalCards(session)}>Add {Math.max(1, session.round_count) * 100} Cards</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => void createAdditionalCrates(session)}>Generate Extra Crates</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => void createAdditionalCrates(session)}>Generate Extra Game Playlists</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "4-up")}>Cards Pack 4-up</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCallSheet(session.id)}>Call Sheet (Live)</button>
                     <button

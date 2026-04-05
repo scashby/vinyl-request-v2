@@ -138,7 +138,22 @@ async function getSessionCode(
 }
 
 function formatCrateName(sessionCode: string | null, sessionId: number, crateLetter: string): string {
-  return `${sessionCode ?? sessionId} Crate ${crateLetter}`;
+  return `${sessionCode ?? sessionId} Playlist ${crateLetter}`;
+}
+
+/** No-op stub — collection sync is handled by the dedicated admin endpoint. */
+export async function syncCollectionCrateMirrorsForSession(
+  _db: ReturnType<typeof getBingoDb>,
+  _sessionId: number
+): Promise<void> {
+  // intentional no-op
+}
+
+/** No-op stub — collection sync is handled by the dedicated admin endpoint. */
+export async function syncCollectionCrateMirrorsForAllSessions(
+  _db: ReturnType<typeof getBingoDb>
+): Promise<void> {
+  // intentional no-op
 }
 
 /**
