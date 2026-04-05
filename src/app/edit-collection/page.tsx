@@ -2474,8 +2474,18 @@ function CollectionBrowserPage() {
     if (trackSource === 'crates' && selectedCrate) {
       const crateTrackKeys = crateTrackKeysByCrate[selectedCrate.id];
       if (crateTrackKeys && crateTrackKeys.size > 0) {
-        // Game crate: filter by specific track keys (not whole albums)
-        rows = rows.filter((row) => crateTrackKeys.has(row.key));
+        // Game crate: filter by specific track keys (not whole albums).
+        // Support legacy key formats (inventoryId:position, inventoryId:releaseTrackId)
+        // stored in crate_items alongside the current 3-part key format.
+        rows = rows.filter((row) => {
+          if (crateTrackKeys.has(row.key)) return true;
+          const legacyReleaseKey = row.releaseTrackId != null ? `${row.inventoryId}:${row.releaseTrackId}` : null;
+          const legacyPositionKey = `${row.inventoryId}:${row.position}`;
+          return (
+            (legacyReleaseKey !== null && crateTrackKeys.has(legacyReleaseKey)) ||
+            crateTrackKeys.has(legacyPositionKey)
+          );
+        });
       } else {
         const allowedInventoryIds = resolvedCrateInventoryIdsByCrate[selectedCrate.id];
         rows = rows.filter((row) => allowedInventoryIds?.has(row.inventoryId));
@@ -2549,7 +2559,20 @@ function CollectionBrowserPage() {
       const playlist = playlists.find((item) => item.id === selectedPlaylistId);
       if (playlist && !playlist.isSmart && playlist.trackKeys.length > 0) {
         const keyOrder = new Map(playlist.trackKeys.map((key, idx) => [key, idx]));
-        return [...rows].sort((a, b) => (keyOrder.get(a.key) ?? Infinity) - (keyOrder.get(b.key) ?? Infinity));
+        // playlist.trackKeys may be stored in legacy format (inventoryId:position or
+        // inventoryId:releaseTrackId) while row.key uses the current 3-part format.
+        // Try all legacy formats so call order is preserved regardless of storage format.
+        const resolveOrder = (row: (typeof rows)[0]): number => {
+          let idx = keyOrder.get(row.key);
+          if (idx !== undefined) return idx;
+          if (row.releaseTrackId != null) {
+            idx = keyOrder.get(`${row.inventoryId}:${row.releaseTrackId}`);
+            if (idx !== undefined) return idx;
+          }
+          idx = keyOrder.get(`${row.inventoryId}:${row.position}`);
+          return idx ?? Infinity;
+        };
+        return [...rows].sort((a, b) => resolveOrder(a) - resolveOrder(b));
       }
     }
 

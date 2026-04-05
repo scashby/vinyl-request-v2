@@ -396,11 +396,12 @@ export default function BingoHostPage() {
 
       // If current round has not started yet, immediately rebuild live call rows
       // from the newly-selected crate so the table reflects the chosen order.
+      // Pass keep_overlay so that switching playlists does not wipe the welcome screen.
       if (!roundIsStarted) {
         const activateResponse = await fetch(`/api/games/bingo/sessions/${sessionId}/activate-round`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ round: Math.max(1, session.current_round || 1), intermission_seconds: 0 }),
+          body: JSON.stringify({ round: Math.max(1, session.current_round || 1), intermission_seconds: 0, keep_overlay: true }),
         });
 
         if (!activateResponse.ok) {
@@ -471,6 +472,18 @@ export default function BingoHostPage() {
     () => [...crates].sort((left, right) => left.round_number - right.round_number || left.crate_letter.localeCompare(right.crate_letter)),
     [crates]
   );
+
+  // Unique playlists for the selector — one entry per letter (A, B, C) regardless of round.
+  const uniquePlaylistOptions = useMemo(() => {
+    const seen = new Set<string>();
+    return [...crates]
+      .sort((a, b) => a.crate_letter.localeCompare(b.crate_letter))
+      .filter((c) => {
+        if (seen.has(c.crate_letter)) return false;
+        seen.add(c.crate_letter);
+        return true;
+      });
+  }, [crates]);
 
   const activeCrateLetter = useMemo(() => {
     if (!session?.active_crate_letter_by_round) return null;
@@ -589,7 +602,7 @@ export default function BingoHostPage() {
               <div className="border-t border-stone-800 pt-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <label className="text-stone-400 whitespace-nowrap">Load Game Playlist</label>
-                  {cratesByRound.length === 0 ? (
+                  {uniquePlaylistOptions.length === 0 ? (
                     <span className="text-stone-500 italic">No game playlists generated yet</span>
                   ) : (
                     <select
@@ -602,9 +615,9 @@ export default function BingoHostPage() {
                       className="rounded border border-stone-600 bg-stone-950 px-2 py-1 text-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <option value="">— select —</option>
-                      {cratesByRound.map((crate) => (
-                        <option key={`${crate.round_number}:${crate.crate_letter}`} value={crate.crate_letter}>
-                          {`Round ${crate.round_number} · ${crate.crate_name}`}
+                      {uniquePlaylistOptions.map((crate) => (
+                        <option key={crate.crate_letter} value={crate.crate_letter}>
+                          {crate.crate_name}
                         </option>
                       ))}
                     </select>

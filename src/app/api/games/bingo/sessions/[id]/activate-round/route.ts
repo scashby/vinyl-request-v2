@@ -47,7 +47,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "Invalid session id" }, { status: 400 });
     }
 
-    const body = (await request.json().catch(() => ({}))) as { round?: unknown; intermission_seconds?: unknown };
+    const body = (await request.json().catch(() => ({}))) as { round?: unknown; intermission_seconds?: unknown; keep_overlay?: unknown };
     const requestedRound = Number(body.round);
     if (!Number.isFinite(requestedRound) || requestedRound < 1) {
       return NextResponse.json({ error: "round is required" }, { status: 400 });
@@ -148,6 +148,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const nextGameAt = intermissionSeconds > 0
       ? new Date(now.getTime() + intermissionSeconds * 1000).toISOString()
       : null;
+    const keepOverlay = body.keep_overlay === true;
 
     for (let index = 0; index < plannedCalls.length; index += 1) {
       const planned = plannedCalls[index];
@@ -187,19 +188,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (clearEventsError) return NextResponse.json({ error: clearEventsError.message }, { status: 500 });
 
+    const sessionUpdateFields: Record<string, unknown> = {
+      current_round: requestedRound,
+      current_call_index: 0,
+      status: "paused",
+      paused_at: now.toISOString(),
+      paused_remaining_seconds: null,
+      countdown_started_at: now.toISOString(),
+      call_reveal_at: null,
+      next_game_scheduled_at: nextGameAt,
+    };
+    if (!keepOverlay) {
+      sessionUpdateFields.bingo_overlay = "none";
+    }
+
     const { error: updateSessionError } = await db
       .from("bingo_sessions")
-      .update({
-        current_round: requestedRound,
-        current_call_index: 0,
-        status: "paused",
-        paused_at: now.toISOString(),
-        paused_remaining_seconds: null,
-        countdown_started_at: now.toISOString(),
-        call_reveal_at: null,
-        bingo_overlay: "none",
-        next_game_scheduled_at: nextGameAt,
-      })
+      .update(sessionUpdateFields)
       .eq("id", sessionId);
 
     if (updateSessionError) return NextResponse.json({ error: updateSessionError.message }, { status: 500 });

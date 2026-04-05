@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
-import { backfillMissingLegacyCrates, getCratesForSession } from "src/lib/bingoCrateModel";
+import { backfillMissingLegacyCrates, getCratesForSession, getCrateByLetter } from "src/lib/bingoCrateModel";
 import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
 import { getRoundSnapshotTracks } from "src/lib/bingoGameModel";
 
@@ -46,11 +46,52 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
   const typedSession = session as SessionRow;
-  const snapshotTracks = await getRoundSnapshotTracks(db, sessionId, 1);
-  const tracks = snapshotTracks.length > 0
-    ? snapshotTracks
-    : await resolvePlaylistTracksForPlaylists(db, resolveSessionPlaylistIds(typedSession));
-  const plannedCalls = planRoundSessionCalls(tracks, sessionId, 1);
+
+  // Determine active crate for round 1 and use its saved call_order if available.
+  // This ensures reset restores the exact call order the host configured, not a re-randomised plan.
+  await backfillMissingLegacyCrates(db, sessionId);
+  const crates = await getCratesForSession(db, sessionId);
+  const defaultActiveCratesByRound = Array.from(
+    crates.reduce((map, crate) => {
+      const existing = map.get(crate.round_number);
+      if (!existing || crate.crate_letter.localeCompare(existing) < 0) {
+        map.set(crate.round_number, crate.crate_letter);
+      }
+      return map;
+    }, new Map<number, string>())
+  )
+    .map(([round, letter]) => ({ round, letter }))
+    .sort((left, right) => left.round - right.round);
+
+  const round1Letter = defaultActiveCratesByRound.find((e) => e.round === 1)?.letter ?? null;
+  const activeCrateForRound1 = round1Letter ? await getCrateByLetter(db, sessionId, round1Letter) : null;
+  const crateCallOrder = Array.isArray(activeCrateForRound1?.call_order)
+    ? (activeCrateForRound1.call_order as Array<Record<string, unknown>>)
+    : [];
+
+  let plannedCalls;
+  if (crateCallOrder.length > 0) {
+    plannedCalls = crateCallOrder.map((row, index) => ({
+      playlist_track_key:
+        typeof row.playlist_track_key === "string" && row.playlist_track_key.length > 0
+          ? row.playlist_track_key
+          : `crate:${sessionId}:${round1Letter}:1:${index + 1}`,
+      call_index: Number(row.call_index) || index + 1,
+      ball_number: (() => { const n = Math.floor(Number(row.ball_number)); return Number.isFinite(n) ? Math.max(1, Math.min(75, n)) : index + 1; })(),
+      column_letter: (typeof row.column_letter === "string" && ["B","G","I","N","O"].includes(row.column_letter.toUpperCase()) ? row.column_letter.toUpperCase() : "B") as "B"|"G"|"I"|"N"|"O",
+      track_title: typeof row.track_title === "string" ? row.track_title : "",
+      artist_name: typeof row.artist_name === "string" ? row.artist_name : "",
+      album_name: typeof row.album_name === "string" ? row.album_name : null,
+      side: typeof row.side === "string" ? row.side : null,
+      position: typeof row.position === "string" ? row.position : null,
+    }));
+  } else {
+    const snapshotTracks = await getRoundSnapshotTracks(db, sessionId, 1);
+    const tracks = snapshotTracks.length > 0
+      ? snapshotTracks
+      : await resolvePlaylistTracksForPlaylists(db, resolveSessionPlaylistIds(typedSession));
+    plannedCalls = planRoundSessionCalls(tracks, sessionId, 1);
+  }
 
   const { data: existingCalls, error: existingError } = await db
     .from("bingo_session_calls")
@@ -145,19 +186,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
 
   if (clearEventsError) return NextResponse.json({ error: clearEventsError.message }, { status: 500 });
 
-  await backfillMissingLegacyCrates(db, sessionId);
-  const crates = await getCratesForSession(db, sessionId);
-  const defaultActiveCratesByRound = Array.from(
-    crates.reduce((map, crate) => {
-      const existing = map.get(crate.round_number);
-      if (!existing || crate.crate_letter.localeCompare(existing) < 0) {
-        map.set(crate.round_number, crate.crate_letter);
-      }
-      return map;
-    }, new Map<number, string>())
-  )
-    .map(([round, letter]) => ({ round, letter }))
-    .sort((left, right) => left.round - right.round);
+  // defaultActiveCratesByRound already computed above.
 
   const { error: sessionError } = await db
     .from("bingo_sessions")
