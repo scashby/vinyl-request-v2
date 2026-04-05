@@ -7,6 +7,12 @@ type GameSkeletonPageProps = {
   params: Promise<{ slug: string }>;
 };
 
+export async function generateMetadata({ params }: GameSkeletonPageProps) {
+  const { slug } = await params;
+  const game = gameBlueprints.find((entry) => entry.slug === slug);
+  return { title: game ? game.title : 'Game' };
+}
+
 export default async function GameSkeletonPage({ params }: GameSkeletonPageProps) {
   const { slug } = await params;
   const game = gameBlueprints.find((entry) => entry.slug === slug);
