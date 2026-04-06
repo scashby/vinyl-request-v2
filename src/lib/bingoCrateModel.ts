@@ -182,6 +182,12 @@ async function syncPlaylistToCollection(
 
     if (existing) {
       collectionPlaylistId = (existing as { id: number }).id;
+      // Patch icon/color if they were never set (e.g. entries created before this field was populated).
+      await db
+        .from("collection_playlists")
+        .update({ icon: "🎲", color: "#451a7d" })
+        .eq("id", collectionPlaylistId)
+        .is("icon", null);
     } else {
       const { data: maxRow } = await db
         .from("collection_playlists")

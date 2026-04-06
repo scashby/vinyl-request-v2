@@ -1245,23 +1245,8 @@ export default function BingoSetupPage() {
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => void createAdditionalPlaylists(session)}>Generate Extra Game Playlists</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "4-up")}>Cards Pack 4-up</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCallSheet(session.id)}>Call Sheet (Live)</button>
-                    <button
-                      className="rounded border border-sky-700/70 px-2 py-1 text-sky-200 disabled:cursor-not-allowed disabled:opacity-60"
-                      onClick={() => void downloadAllRoundSheets(session)}
-                      disabled={downloadingRoundsSessionId !== null}
-                    >
-                      {downloadingRoundsSessionId === session.id ? "Downloading Round Sheets..." : "All Round Sheets"}
-                    </button>
                     <button className="rounded border border-amber-700/70 bg-amber-950/30 px-2 py-1 text-amber-200" onClick={() => resetSession(session.id, session.session_code)}>Reset Game</button>
-                    {Array.from({ length: session.round_count }, (_, index) => index + 1).map((round) => (
-                      <button
-                        key={`${session.id}-round-sheet-${round}`}
-                        className="rounded border border-sky-700/70 px-2 py-1 text-sky-200"
-                        onClick={() => downloadCallSheet(session.id, round)}
-                      >
-                        Round {round} Sheet
-                      </button>
-                    ))}
+
                     {(() => {
                       const playlists = sessionPlaylistsMap[session.id] ?? [];
                       if (playlists.length === 0) return null;
@@ -1281,10 +1266,7 @@ export default function BingoSetupPage() {
                                   key={`${session.id}-pl-${playlist.playlist_letter}`}
                                   className="flex items-center justify-between gap-2 border-b border-stone-800 px-3 py-2 last:border-0"
                                 >
-                                  <span className="text-xs text-stone-200">
-                                    {playlist.playlist_name}
-                                    <span className="ml-1 text-stone-500">R{playlist.round_number}</span>
-                                  </span>
+                                  <span className="text-xs text-stone-200">{playlist.playlist_name}</span>
                                   <div className="flex shrink-0 gap-1">
                                     <button
                                       className="rounded border border-violet-700/70 px-2 py-0.5 text-[10px] text-violet-200 hover:border-violet-500"
