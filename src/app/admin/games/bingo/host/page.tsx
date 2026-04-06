@@ -27,7 +27,7 @@ type Session = {
   active_crate_letter_by_round: { round: number; letter: string }[] | null;
 };
 
-type BingoCrate = {
+type BingoGamePlaylist = {
   id: number;
   session_id: number;
   round_number: number;
@@ -60,7 +60,7 @@ export default function BingoHostPage() {
 
   const [session, setSession] = useState<Session | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
-  const [crates, setCrates] = useState<BingoCrate[]>([]);
+  const [gamePlaylists, setGamePlaylists] = useState<BingoGamePlaylist[]>([]);
   const [remaining, setRemaining] = useState(0);
   const [revealDelayInput, setRevealDelayInput] = useState<number>(10);
   // Stored as minutes for display; converted to seconds for persistence
@@ -69,7 +69,7 @@ export default function BingoHostPage() {
   const [autoCallEnabled, setAutoCallEnabled] = useState(false);
   const [resetCounter, setResetCounter] = useState(0);
   const [savingOverlay, setSavingOverlay] = useState(false);
-  const [switchingCrate, setSwitchingCrate] = useState(false);
+  const [switchingPlaylist, setSwitchingPlaylist] = useState(false);
   const [winnerCheckInput, setWinnerCheckInput] = useState("");
   const [winnerCheckResult, setWinnerCheckResult] = useState<CardValidationResponse | null>(null);
   const [winnerCheckError, setWinnerCheckError] = useState<string | null>(null);
@@ -86,7 +86,7 @@ export default function BingoHostPage() {
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
     if (typeof document !== "undefined" && document.hidden) return;
-    const [sRes, cRes, cratesRes] = await Promise.all([
+    const [sRes, cRes, playlistsRes] = await Promise.all([
       fetch(`/api/games/bingo/sessions/${sessionId}`, { cache: 'no-store' }),
       fetch(`/api/games/bingo/sessions/${sessionId}/calls`, { cache: 'no-store' }),
       fetch(`/api/games/bingo/sessions/${sessionId}/crates`, { cache: 'no-store' }),
@@ -124,9 +124,9 @@ export default function BingoHostPage() {
       setCalls(payload.data ?? []);
     }
 
-    if (cratesRes.ok) {
-      const payload = await cratesRes.json();
-      setCrates(payload.data ?? []);
+    if (playlistsRes.ok) {
+      const payload = await playlistsRes.json();
+      setGamePlaylists(payload.data ?? []);
     }
   }, [sessionId]);
 
@@ -379,23 +379,23 @@ export default function BingoHostPage() {
     return calledCount > 0;
   }, [calls]);
 
-  const switchCrate = useCallback(async (crateLetter: string) => {
+  const switchPlaylist = useCallback(async (playlistLetter: string) => {
     if (!session) return;
-    setSwitchingCrate(true);
+    setSwitchingPlaylist(true);
     try {
       const patchResponse = await fetch(`/api/games/bingo/sessions/${sessionId}/crates`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ round_number: session.current_round, crate_letter: crateLetter }),
+        body: JSON.stringify({ round_number: session.current_round, playlist_letter: playlistLetter }),
       });
 
       if (!patchResponse.ok) {
         const payload = (await patchResponse.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(payload?.error ?? "Failed to assign crate to this round");
+        throw new Error(payload?.error ?? "Failed to assign playlist to this round");
       }
 
       // If current round has not started yet, immediately rebuild live call rows
-      // from the newly-selected crate so the table reflects the chosen order.
+      // from the newly-selected playlist so the table reflects the chosen order.
       // Pass keep_overlay so that switching playlists does not wipe the welcome screen.
       if (!roundIsStarted) {
         const activateResponse = await fetch(`/api/games/bingo/sessions/${sessionId}/activate-round`, {
@@ -406,16 +406,16 @@ export default function BingoHostPage() {
 
         if (!activateResponse.ok) {
           const payload = (await activateResponse.json().catch(() => null)) as { error?: string } | null;
-          throw new Error(payload?.error ?? "Failed to load selected crate into call order");
+          throw new Error(payload?.error ?? "Failed to load selected playlist into call order");
         }
       }
 
       await load();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to switch crate";
+      const message = error instanceof Error ? error.message : "Failed to switch playlist";
       alert(message);
     } finally {
-      setSwitchingCrate(false);
+      setSwitchingPlaylist(false);
     }
   }, [session, sessionId, roundIsStarted, load]);
 
@@ -462,30 +462,19 @@ export default function BingoHostPage() {
     }
   }, [sessionId, winnerCheckInput]);
 
-  // Derive crate state for current round
-  const currentRoundCrates = useMemo(
-    () => crates.filter((c) => c.round_number === (session?.current_round ?? 1)),
-    [crates, session?.current_round]
-  );
-
-  const cratesByRound = useMemo(
-    () => [...crates].sort((left, right) => left.round_number - right.round_number || left.crate_letter.localeCompare(right.crate_letter)),
-    [crates]
-  );
-
-  // Unique playlists for the selector — one entry per letter (A, B, C) regardless of round.
+  // Unique playlists for the selector — sorted by letter.
   const uniquePlaylistOptions = useMemo(() => {
     const seen = new Set<string>();
-    return [...crates]
+    return [...gamePlaylists]
       .sort((a, b) => a.crate_letter.localeCompare(b.crate_letter))
       .filter((c) => {
         if (seen.has(c.crate_letter)) return false;
         seen.add(c.crate_letter);
         return true;
       });
-  }, [crates]);
+  }, [gamePlaylists]);
 
-  const activeCrateLetter = useMemo(() => {
+  const activePlaylistLetter = useMemo(() => {
     if (!session?.active_crate_letter_by_round) return null;
     return session.active_crate_letter_by_round.find((e) => e.round === session.current_round)?.letter ?? null;
   }, [session]);
@@ -606,18 +595,18 @@ export default function BingoHostPage() {
                     <span className="text-stone-500 italic">No game playlists generated yet</span>
                   ) : (
                     <select
-                      value={activeCrateLetter ?? ""}
-                      disabled={switchingCrate || roundIsStarted}
+                      value={activePlaylistLetter ?? ""}
+                      disabled={switchingPlaylist || roundIsStarted}
                       onChange={(e) => {
                         if (!e.target.value) return;
-                        void switchCrate(e.target.value);
+                        void switchPlaylist(e.target.value);
                       }}
                       className="rounded border border-stone-600 bg-stone-950 px-2 py-1 text-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <option value="">— select —</option>
-                      {uniquePlaylistOptions.map((crate) => (
-                        <option key={crate.crate_letter} value={crate.crate_letter}>
-                          {crate.crate_name}
+                      {uniquePlaylistOptions.map((playlist) => (
+                        <option key={playlist.crate_letter} value={playlist.crate_letter}>
+                          {playlist.crate_name}
                         </option>
                       ))}
                     </select>
@@ -791,7 +780,7 @@ export default function BingoHostPage() {
         <div className="grid gap-3 lg:grid-cols-[1.55fr,1fr]">
           <section className="flex h-[68vh] flex-col rounded-2xl border border-stone-700 bg-black/50 p-4">
             <h2 className="text-sm font-bold uppercase tracking-wide text-amber-200">
-              Call Order (Game Playlist){activeCrateLetter ? ` · Loaded: ${session?.session_code ? `${session.session_code} Playlist ${activeCrateLetter}` : `Playlist ${activeCrateLetter}`}` : ""}
+              Call Order (Game Playlist){activePlaylistLetter ? ` · Loaded: ${session?.session_code ? `${session.session_code} Playlist ${activePlaylistLetter}` : `Playlist ${activePlaylistLetter}`}` : ""}
             </h2>
             <div className="mt-3 flex-1 overflow-x-auto overflow-y-auto">
               <table className="w-full text-left text-xs">

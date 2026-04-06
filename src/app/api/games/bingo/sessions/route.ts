@@ -290,7 +290,7 @@ export async function POST(request: NextRequest) {
       if (fixedPoolTracks.length < requiredTrackCount) {
         return NextResponse.json(
           {
-            error: `Favorite preset pool must contain at least ${requiredTrackCount} tracks to build one bingo crate.`,
+            error: `Favorite preset pool must contain at least ${requiredTrackCount} tracks to build one game playlist.`,
           },
           { status: 400 }
         );
@@ -309,7 +309,7 @@ export async function POST(request: NextRequest) {
         if (availableTrackCount < requiredTrackCount) {
           return NextResponse.json(
             {
-              error: `Round ${round} playlist selection must contain at least ${requiredTrackCount} tracks to build one bingo crate.`,
+              error: `Round ${round} playlist selection must contain at least ${requiredTrackCount} tracks to build one game playlist.`,
             },
             { status: 400 }
           );

@@ -85,6 +85,23 @@ type SessionTemplateOption = {
   favorite_note?: string | null;
 };
 
+type BingoSessionPlaylistInfo = {
+  id: number;
+  round_number: number;
+  crate_name: string;
+  crate_letter: string;
+  call_order: Array<{
+    call_index: number;
+    ball_number: number | null;
+    column_letter: string;
+    track_title: string;
+    artist_name: string;
+    album_name: string | null;
+    side: string | null;
+    position: string | null;
+  }>;
+};
+
 const GAME_BALL_COUNT = 75;
 
 function computeMinimumPlaylistTracks(roundCount: number, cardCount: number): number {
@@ -172,6 +189,7 @@ export default function BingoSetupPage() {
 
   const [creating, setCreating] = useState(false);
   const [downloadingRoundsSessionId, setDownloadingRoundsSessionId] = useState<number | null>(null);
+  const [sessionPlaylistsMap, setSessionPlaylistsMap] = useState<Record<number, BingoSessionPlaylistInfo[]>>({});
   const minimumTracksForSetup = useMemo(() => computeMinimumPlaylistTracks(roundCount, cardCount), [roundCount, cardCount]);
   const trackCountByPlaylistId = useMemo(
     () => new Map(playlists.map((playlist) => [playlist.id, playlist.track_count])),
@@ -430,7 +448,17 @@ export default function BingoSetupPage() {
 
     if (sRes.ok) {
       const payload = await sRes.json();
-      setSessions(payload.data ?? []);
+      const fetchedSessions: Session[] = payload.data ?? [];
+      setSessions(fetchedSessions);
+
+      const playlistEntries = await Promise.all(
+        fetchedSessions.map(async (session) => {
+          const res = await fetch(`/api/games/bingo/sessions/${session.id}/crates`);
+          const cp = res.ok ? await res.json() : { data: [] };
+          return [session.id, (cp.data ?? []) as BingoSessionPlaylistInfo[]] as [number, BingoSessionPlaylistInfo[]];
+        })
+      );
+      setSessionPlaylistsMap(Object.fromEntries(playlistEntries));
     }
 
     if (allSessionsRes.ok) {
@@ -644,23 +672,27 @@ export default function BingoSetupPage() {
     await load();
   };
 
-  const createAdditionalCrates = async (session: Session) => {
-    for (let round = 1; round <= Math.max(1, session.round_count); round += 1) {
-      const response = await fetch(`/api/games/bingo/sessions/${session.id}/crates`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ round_number: round }),
-      });
+  const createAdditionalPlaylists = async (session: Session) => {
+    const response = await fetch(`/api/games/bingo/sessions/${session.id}/crates`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
 
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        alert((payload as { error?: string }).error ?? `Failed to create game playlist for round ${round}`);
-        return;
-      }
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      alert((payload as { error?: string }).error ?? "Failed to generate new game playlist");
+      return;
     }
 
-    alert(`Generated one additional game playlist for each round in ${session.session_code}.`);
+    alert(`Generated new game playlist for ${session.session_code}.`);
     await load();
+  };
+
+  const downloadPlaylistSheet = (session: Session, playlist: BingoSessionPlaylistInfo) => {
+    const title = `${session.session_code} · Playlist ${playlist.crate_letter}`;
+    const doc = generateBingoCallSheetPdf(playlist.call_order, title);
+    doc.save(`bingo-${session.id}-playlist-${playlist.crate_letter.toLowerCase()}.pdf`);
   };
 
   const setSessionFavorite = async (session: Session, nextValue: boolean) => {
@@ -1188,7 +1220,7 @@ export default function BingoSetupPage() {
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/assistant?sessionId=${session.id}`, "bingo_assistant", "width=1024,height=800,left=1300,top=0,noopener,noreferrer")}>Assistant</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/jumbotron?sessionId=${session.id}`, "bingo_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => createAdditionalCards(session)}>Add {Math.max(1, session.round_count) * 100} Cards</button>
-                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => void createAdditionalCrates(session)}>Generate Extra Game Playlists</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => void createAdditionalPlaylists(session)}>Generate Extra Game Playlists</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "4-up")}>Cards Pack 4-up</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCallSheet(session.id)}>Call Sheet (Live)</button>
                     <button
@@ -1206,6 +1238,15 @@ export default function BingoSetupPage() {
                         onClick={() => downloadCallSheet(session.id, round)}
                       >
                         Round {round} Sheet
+                      </button>
+                    ))}
+                    {(sessionPlaylistsMap[session.id] ?? []).map((playlist) => (
+                      <button
+                        key={`${session.id}-playlist-${playlist.crate_letter}`}
+                        className="rounded border border-violet-700/70 px-2 py-1 text-violet-200"
+                        onClick={() => downloadPlaylistSheet(session, playlist)}
+                      >
+                        Playlist {playlist.crate_letter}
                       </button>
                     ))}
                     <button className="rounded border border-red-800/60 bg-red-950/30 px-2 py-1 text-red-200" onClick={() => deleteSession(session.id, session.session_code)}>Delete</button>

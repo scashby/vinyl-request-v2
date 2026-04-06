@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
-import { backfillMissingLegacyCrates, getCratesForSession, getCrateByLetter } from "src/lib/bingoCrateModel";
+import { backfillMissingLegacyPlaylists, getPlaylistsForSession, getPlaylistByLetter } from "src/lib/bingoCrateModel";
 import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
 import { getRoundSnapshotTracks } from "src/lib/bingoGameModel";
 
@@ -47,15 +47,15 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
 
   const typedSession = session as SessionRow;
 
-  // Determine active crate for round 1 and use its saved call_order if available.
+  // Determine active playlist for round 1 and use its saved call_order if available.
   // This ensures reset restores the exact call order the host configured, not a re-randomised plan.
-  await backfillMissingLegacyCrates(db, sessionId);
-  const crates = await getCratesForSession(db, sessionId);
-  const defaultActiveCratesByRound = Array.from(
-    crates.reduce((map, crate) => {
-      const existing = map.get(crate.round_number);
-      if (!existing || crate.crate_letter.localeCompare(existing) < 0) {
-        map.set(crate.round_number, crate.crate_letter);
+  await backfillMissingLegacyPlaylists(db, sessionId);
+  const playlists = await getPlaylistsForSession(db, sessionId);
+  const defaultActivePlaylistsByRound = Array.from(
+    playlists.reduce((map, pl) => {
+      const existing = map.get(pl.round_number);
+      if (!existing || pl.crate_letter.localeCompare(existing) < 0) {
+        map.set(pl.round_number, pl.crate_letter);
       }
       return map;
     }, new Map<number, string>())
@@ -63,19 +63,19 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
     .map(([round, letter]) => ({ round, letter }))
     .sort((left, right) => left.round - right.round);
 
-  const round1Letter = defaultActiveCratesByRound.find((e) => e.round === 1)?.letter ?? null;
-  const activeCrateForRound1 = round1Letter ? await getCrateByLetter(db, sessionId, round1Letter) : null;
-  const crateCallOrder = Array.isArray(activeCrateForRound1?.call_order)
-    ? (activeCrateForRound1.call_order as Array<Record<string, unknown>>)
+  const round1Letter = defaultActivePlaylistsByRound.find((e) => e.round === 1)?.letter ?? null;
+  const activePlaylistForRound1 = round1Letter ? await getPlaylistByLetter(db, sessionId, round1Letter) : null;
+  const playlistCallOrder = Array.isArray(activePlaylistForRound1?.call_order)
+    ? (activePlaylistForRound1.call_order as Array<Record<string, unknown>>)
     : [];
 
   let plannedCalls;
-  if (crateCallOrder.length > 0) {
-    plannedCalls = crateCallOrder.map((row, index) => ({
+  if (playlistCallOrder.length > 0) {
+    plannedCalls = playlistCallOrder.map((row, index) => ({
       playlist_track_key:
         typeof row.playlist_track_key === "string" && row.playlist_track_key.length > 0
           ? row.playlist_track_key
-          : `crate:${sessionId}:${round1Letter}:1:${index + 1}`,
+          : `playlist:${sessionId}:${round1Letter}:1:${index + 1}`,
       call_index: Number(row.call_index) || index + 1,
       ball_number: (() => { const n = Math.floor(Number(row.ball_number)); return Number.isFinite(n) ? Math.max(1, Math.min(75, n)) : index + 1; })(),
       column_letter: (typeof row.column_letter === "string" && ["B","G","I","N","O"].includes(row.column_letter.toUpperCase()) ? row.column_letter.toUpperCase() : "B") as "B"|"G"|"I"|"N"|"O",
@@ -204,7 +204,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
       bingo_overlay: "welcome",
       next_game_scheduled_at: null,
       next_game_rules_text: null,
-      active_crate_letter_by_round: defaultActiveCratesByRound,
+      active_crate_letter_by_round: defaultActivePlaylistsByRound,
     })
     .eq("id", sessionId);
 

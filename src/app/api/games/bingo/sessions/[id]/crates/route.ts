@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
 import {
-  backfillMissingLegacyCrates,
-  createCrateFromRoundData,
-  getCratesForSession,
-  setActiveCrateForRound,
+  backfillMissingLegacyPlaylists,
+  createPlaylistFromSessionData,
+  getPlaylistsForSession,
+  setActivePlaylistForRound,
 } from "src/lib/bingoCrateModel";
 
 export const runtime = "nodejs";
@@ -21,12 +21,12 @@ export async function GET(
 
   const db = getBingoDb();
   try {
-    await backfillMissingLegacyCrates(db, sessionId);
-    const crates = await getCratesForSession(db, sessionId);
-    return NextResponse.json({ data: crates }, { status: 200 });
+    await backfillMissingLegacyPlaylists(db, sessionId);
+    const playlists = await getPlaylistsForSession(db, sessionId);
+    return NextResponse.json({ data: playlists }, { status: 200 });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to load crates" },
+      { error: error instanceof Error ? error.message : "Failed to load game playlists" },
       { status: 500 }
     );
   }
@@ -44,33 +44,33 @@ export async function PATCH(
 
   const body = (await request.json()) as Record<string, unknown>;
   const roundNumber = Number(body.round_number);
-  const crateLetterRaw = body.crate_letter;
+  const playlistLetterRaw = body.playlist_letter;
 
   if (!Number.isFinite(roundNumber) || roundNumber < 1) {
     return NextResponse.json({ error: "round_number must be a positive integer" }, { status: 400 });
   }
 
-  const crateLetter =
-    typeof crateLetterRaw === "string" && /^[A-Z]$/.test(crateLetterRaw)
-      ? crateLetterRaw
-      : crateLetterRaw === null
+  const playlistLetter =
+    typeof playlistLetterRaw === "string" && /^[A-Z]$/.test(playlistLetterRaw)
+      ? playlistLetterRaw
+      : playlistLetterRaw === null
       ? null
       : undefined;
 
-  if (crateLetter === undefined) {
+  if (playlistLetter === undefined) {
     return NextResponse.json(
-      { error: "crate_letter must be a single uppercase letter A-Z or null" },
+      { error: "playlist_letter must be a single uppercase letter A-Z or null" },
       { status: 400 }
     );
   }
 
   const db = getBingoDb();
   try {
-    await setActiveCrateForRound(db, sessionId, roundNumber, crateLetter);
+    await setActivePlaylistForRound(db, sessionId, roundNumber, playlistLetter);
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to set active crate" },
+      { error: error instanceof Error ? error.message : "Failed to set active playlist" },
       { status: 500 }
     );
   }
@@ -87,18 +87,15 @@ export async function POST(
   }
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-  const roundNumber = Number(body.round_number);
-
-  if (!Number.isFinite(roundNumber) || roundNumber < 1) {
-    return NextResponse.json({ error: "round_number must be a positive integer" }, { status: 400 });
-  }
+  const roundNumberRaw = Number(body.round_number);
+  const roundNumber = Number.isFinite(roundNumberRaw) && roundNumberRaw >= 1 ? Math.floor(roundNumberRaw) : undefined;
 
   const db = getBingoDb();
   try {
-    const created = await createCrateFromRoundData(db, sessionId, roundNumber);
+    const created = await createPlaylistFromSessionData(db, sessionId, roundNumber);
     if (!created) {
       return NextResponse.json(
-        { error: "No existing round call-order data available to create a crate for that round" },
+        { error: "No existing round call-order data available to create a playlist for that round" },
         { status: 400 }
       );
     }
@@ -106,7 +103,7 @@ export async function POST(
     return NextResponse.json({ data: created }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to create crate" },
+      { error: error instanceof Error ? error.message : "Failed to create game playlist" },
       { status: 500 }
     );
   }

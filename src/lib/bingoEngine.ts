@@ -214,10 +214,14 @@ function stableRoundSort<T>(items: T[], seed: string, keyForItem: (item: T) => s
 export function buildRoundTrackPool(
   tracks: ResolvedPlaylistTrack[],
   sessionId: number,
-  roundNumber: number
+  roundNumber: number,
+  generation = 0
 ): ResolvedPlaylistTrack[] {
   void roundNumber;
-  const seed = `session:${sessionId}:playlist-order:v1`;
+  const seed =
+    generation > 0
+      ? `session:${sessionId}:playlist-order:gen:${generation}:v1`
+      : `session:${sessionId}:playlist-order:v1`;
   const ordered = stableRoundSort(tracks, seed, (track) => track.trackKey);
   return ordered.slice(0, GAME_BALL_COUNT);
 }
@@ -225,10 +229,11 @@ export function buildRoundTrackPool(
 export function planRoundSessionCalls(
   tracks: ResolvedPlaylistTrack[],
   sessionId: number,
-  roundNumber: number
+  roundNumber: number,
+  generation = 0
 ): PlannedSessionCall[] {
   const normalizedRound = Math.max(1, Math.floor(roundNumber || 1));
-  const roundTracks = buildRoundTrackPool(tracks, sessionId, normalizedRound);
+  const roundTracks = buildRoundTrackPool(tracks, sessionId, normalizedRound, generation);
 
   if (roundTracks.length < GAME_BALL_COUNT) {
     throw new Error(`Playlist must contain at least ${GAME_BALL_COUNT} tracks to build a bingo crate.`);
@@ -243,7 +248,10 @@ export function planRoundSessionCalls(
     };
   });
 
-  const drawSeed = `session:${sessionId}:round:${normalizedRound}:draw-order:v1`;
+  const drawSeed =
+    generation > 0
+      ? `session:${sessionId}:round:${normalizedRound}:gen:${generation}:draw-order:v1`
+      : `session:${sessionId}:round:${normalizedRound}:draw-order:v1`;
   const drawOrder = stableRoundSort(
     boardSlots,
     drawSeed,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
 import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
-import { getCrateByLetter } from "src/lib/bingoCrateModel";
+import { getPlaylistByLetter } from "src/lib/bingoCrateModel";
 import { getRoundSnapshotTracks } from "src/lib/bingoGameModel";
 import { resolveRoundPlaylistIds, type RoundPlaylistEntry } from "src/lib/bingoRoundPlaylists";
 
@@ -75,12 +75,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     let plannedCalls = [] as ReturnType<typeof planRoundSessionCalls>;
 
-    const activeCrateLetter = (typedSession.active_crate_letter_by_round ?? []).find((entry) => entry.round === requestedRound)?.letter ?? null;
-    if (activeCrateLetter) {
-      const selectedCrate = await getCrateByLetter(db, sessionId, activeCrateLetter);
+    const activePlaylistLetter = (typedSession.active_crate_letter_by_round ?? []).find((entry) => entry.round === requestedRound)?.letter ?? null;
+    if (activePlaylistLetter) {
+      const selectedPlaylist = await getPlaylistByLetter(db, sessionId, activePlaylistLetter);
 
-      const callOrder = Array.isArray(selectedCrate?.call_order)
-        ? (selectedCrate.call_order as Array<Record<string, unknown>>)
+      const callOrder = Array.isArray(selectedPlaylist?.call_order)
+        ? (selectedPlaylist.call_order as Array<Record<string, unknown>>)
         : [];
 
       if (callOrder.length > 0) {
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           playlist_track_key:
             typeof row.playlist_track_key === "string" && row.playlist_track_key.length > 0
               ? row.playlist_track_key
-              : `crate:${sessionId}:${activeCrateLetter}:${requestedRound}:${index + 1}`,
+              : `playlist:${sessionId}:${activePlaylistLetter}:${requestedRound}:${index + 1}`,
           call_index: Number(row.call_index) || index + 1,
           ball_number: coerceBallNumber(row.ball_number, index + 1),
           column_letter: coerceBingoColumn(row.column_letter),

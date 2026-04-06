@@ -1,8 +1,8 @@
 /**
- * bingoCrateModel.ts
+ * bingoGamePlaylistModel.ts
  *
- * Helpers for managing immutable call-order crates attached to bingo session rounds.
- * Each crate captures the generated call order at a point in time and is named with a
+ * Helpers for managing immutable game playlists (call orders) attached to bingo sessions.
+ * Each game playlist captures the generated call order at a point in time and is named with a
  * sequential letter (A, B, C…) scoped to the session so hosts can identify them easily.
  */
 
@@ -11,13 +11,13 @@ import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "./bing
 import { getRoundSnapshotTracks } from "./bingoGameModel";
 import { resolveRoundPlaylistIds, type RoundPlaylistEntry } from "./bingoRoundPlaylists";
 
-const CRATE_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+const PLAYLIST_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 type SessionCodeRow = {
   session_code: string;
 };
 
-export type CrateCallEntry = {
+export type PlaylistCallEntry = {
   id: number;
   call_index: number;
   ball_number: number | null;
@@ -30,17 +30,17 @@ export type CrateCallEntry = {
   status: string;
 };
 
-export type BingoSessionCrate = {
+export type BingoSessionGamePlaylist = {
   id: number;
   session_id: number;
   round_number: number;
   crate_name: string;
   crate_letter: string;
-  call_order: CrateCallEntry[];
+  call_order: PlaylistCallEntry[];
   created_at: string;
 };
 
-type SessionCrateBackfillRow = {
+type SessionPlaylistBackfillRow = {
   playlist_id: number | null;
   playlist_ids: number[] | null;
   round_playlist_ids: RoundPlaylistEntry[] | null;
@@ -53,11 +53,12 @@ async function deriveRoundCallOrder(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number,
   roundNumber: number,
-  session: SessionCrateBackfillRow
-): Promise<CrateCallEntry[]> {
+  session: SessionPlaylistBackfillRow,
+  generation = 0
+): Promise<PlaylistCallEntry[]> {
   const snapshotTracks = await getRoundSnapshotTracks(db, sessionId, roundNumber);
   if (snapshotTracks.length > 0) {
-    const planned = planRoundSessionCalls(snapshotTracks, sessionId, roundNumber);
+    const planned = planRoundSessionCalls(snapshotTracks, sessionId, roundNumber, generation);
     return planned.map((row, index) => ({
       id: -(index + 1),
       call_index: row.call_index,
@@ -76,7 +77,7 @@ async function deriveRoundCallOrder(
   if (playlistIds.length > 0) {
     const resolvedTracks = await resolvePlaylistTracksForPlaylists(db, playlistIds);
     if (resolvedTracks.length > 0) {
-      const planned = planRoundSessionCalls(resolvedTracks, sessionId, roundNumber);
+      const planned = planRoundSessionCalls(resolvedTracks, sessionId, roundNumber, generation);
       return planned.map((row, index) => ({
         id: -(index + 1),
         call_index: row.call_index,
@@ -100,14 +101,14 @@ async function deriveRoundCallOrder(
       .order("call_index", { ascending: true });
 
     if (callsError) throw new Error(callsError.message);
-    return ((currentRoundCalls ?? []) as CrateCallEntry[]).map((row) => ({ ...row }));
+    return ((currentRoundCalls ?? []) as PlaylistCallEntry[]).map((row) => ({ ...row }));
   }
 
   return [];
 }
 
-/** Return the next available crate letter for a session (across all rounds). */
-async function getNextCrateLetter(
+/** Return the next available playlist letter for a session (across all rounds). */
+async function getNextPlaylistLetter(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number
 ): Promise<string> {
@@ -118,8 +119,8 @@ async function getNextCrateLetter(
     .order("crate_letter", { ascending: true });
 
   const usedLetters = new Set((data ?? []).map((row) => row.crate_letter as string));
-  const next = CRATE_LETTERS.find((l) => !usedLetters.has(l));
-  if (!next) throw new Error("All 26 crate letters exhausted for this session.");
+  const next = PLAYLIST_LETTERS.find((l) => !usedLetters.has(l));
+  if (!next) throw new Error("All 26 playlist letters exhausted for this session.");
   return next;
 }
 
@@ -137,12 +138,12 @@ async function getSessionCode(
   return (data as SessionCodeRow | null)?.session_code ?? null;
 }
 
-function formatCrateName(sessionCode: string | null, sessionId: number, crateLetter: string): string {
-  return `${sessionCode ?? sessionId} Playlist ${crateLetter}`;
+function formatPlaylistName(sessionCode: string | null, sessionId: number, playlistLetter: string): string {
+  return `${sessionCode ?? sessionId} Playlist ${playlistLetter}`;
 }
 
 /** No-op stub — collection sync is handled by the dedicated admin endpoint. */
-export async function syncCollectionCrateMirrorsForSession(
+export async function syncCollectionPlaylistMirrorsForSession(
   _db: ReturnType<typeof getBingoDb>,
   _sessionId: number
 ): Promise<void> {
@@ -150,52 +151,52 @@ export async function syncCollectionCrateMirrorsForSession(
 }
 
 /** No-op stub — collection sync is handled by the dedicated admin endpoint. */
-export async function syncCollectionCrateMirrorsForAllSessions(
+export async function syncCollectionPlaylistMirrorsForAllSessions(
   _db: ReturnType<typeof getBingoDb>
 ): Promise<void> {
   // intentional no-op
 }
 
 /**
- * Persist the current call order for a round as a new named crate.
- * The crate is automatically named "{sessionId} Crate {letter}".
- * Returns the newly-created crate row.
+ * Persist the current call order for a session as a new named game playlist.
+ * The playlist is automatically named "{sessionCode} Playlist {letter}".
+ * Returns the newly-created row.
  */
-export async function saveCrateForRound(
+export async function savePlaylistForRound(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number,
   roundNumber: number,
-  calls: CrateCallEntry[]
-): Promise<BingoSessionCrate> {
-  const letter = await getNextCrateLetter(db, sessionId);
+  calls: PlaylistCallEntry[]
+): Promise<BingoSessionGamePlaylist> {
+  const letter = await getNextPlaylistLetter(db, sessionId);
   const sessionCode = await getSessionCode(db, sessionId);
-  const crateName = formatCrateName(sessionCode, sessionId, letter);
+  const playlistName = formatPlaylistName(sessionCode, sessionId, letter);
 
   const { data, error } = await db
     .from("bingo_session_crates")
     .insert({
       session_id: sessionId,
       round_number: roundNumber,
-      crate_name: crateName,
+      crate_name: playlistName,
       crate_letter: letter,
       call_order: calls as unknown as Record<string, unknown>[],
     })
     .select()
     .single();
 
-  if (error || !data) throw new Error(error?.message ?? "Failed to save crate.");
+  if (error || !data) throw new Error(error?.message ?? "Failed to save game playlist.");
 
   return {
     ...data,
-    call_order: data.call_order as unknown as CrateCallEntry[],
+    call_order: data.call_order as unknown as PlaylistCallEntry[],
   };
 }
 
-/** Return all crates for a session, ordered by crate_letter. */
-export async function getCratesForSession(
+/** Return all game playlists for a session, ordered by letter. */
+export async function getPlaylistsForSession(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number
-): Promise<BingoSessionCrate[]> {
+): Promise<BingoSessionGamePlaylist[]> {
   const sessionCode = await getSessionCode(db, sessionId);
   const { data, error } = await db
     .from("bingo_session_crates")
@@ -206,40 +207,40 @@ export async function getCratesForSession(
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => ({
     ...row,
-    crate_name: formatCrateName(sessionCode, sessionId, row.crate_letter),
-    call_order: row.call_order as unknown as CrateCallEntry[],
+    crate_name: formatPlaylistName(sessionCode, sessionId, row.crate_letter),
+    call_order: row.call_order as unknown as PlaylistCallEntry[],
   }));
 }
 
-/** Return a single crate by session id and crate letter, or null if not found. */
-export async function getCrateByLetter(
+/** Return a single game playlist by session id and letter, or null if not found. */
+export async function getPlaylistByLetter(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number,
-  crateLetter: string
-): Promise<BingoSessionCrate | null> {
+  playlistLetter: string
+): Promise<BingoSessionGamePlaylist | null> {
   const sessionCode = await getSessionCode(db, sessionId);
   const { data, error } = await db
     .from("bingo_session_crates")
     .select("*")
     .eq("session_id", sessionId)
-    .eq("crate_letter", crateLetter)
+    .eq("crate_letter", playlistLetter)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
   if (!data) return null;
   return {
     ...data,
-    crate_name: formatCrateName(sessionCode, sessionId, data.crate_letter),
-    call_order: data.call_order as unknown as CrateCallEntry[],
+    crate_name: formatPlaylistName(sessionCode, sessionId, data.crate_letter),
+    call_order: data.call_order as unknown as PlaylistCallEntry[],
   };
 }
 
-/** Return all crates for a specific round of a session. */
-export async function getCratesForRound(
+/** Return all game playlists for a specific round of a session. */
+export async function getPlaylistsForRound(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number,
   roundNumber: number
-): Promise<BingoSessionCrate[]> {
+): Promise<BingoSessionGamePlaylist[]> {
   const sessionCode = await getSessionCode(db, sessionId);
   const { data, error } = await db
     .from("bingo_session_crates")
@@ -251,13 +252,13 @@ export async function getCratesForRound(
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => ({
     ...row,
-    crate_name: formatCrateName(sessionCode, sessionId, row.crate_letter),
-    call_order: row.call_order as unknown as CrateCallEntry[],
+    crate_name: formatPlaylistName(sessionCode, sessionId, row.crate_letter),
+    call_order: row.call_order as unknown as PlaylistCallEntry[],
   }));
 }
 
 /**
- * Backfill missing crates for legacy sessions from existing immutable round data.
+ * Backfill missing game playlists for legacy sessions from existing immutable round data.
  *
  * Source priority per round:
  * 1) Existing round snapshots (bingo_session_round_tracks)
@@ -265,7 +266,7 @@ export async function getCratesForRound(
  *
  * This intentionally avoids regenerating cards or overwriting existing call sheets.
  */
-export async function backfillMissingLegacyCrates(
+export async function backfillMissingLegacyPlaylists(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number
 ): Promise<void> {
@@ -278,19 +279,19 @@ export async function backfillMissingLegacyCrates(
   if (sessionError) throw new Error(sessionError.message);
   if (!session) return;
 
-  const typedSession = session as SessionCrateBackfillRow;
-  const existingCrates = await getCratesForSession(db, sessionId);
+  const typedSession = session as SessionPlaylistBackfillRow;
+  const existingPlaylists = await getPlaylistsForSession(db, sessionId);
 
   for (let round = 1; round <= Math.max(1, typedSession.round_count || 1); round += 1) {
-    const alreadyHasCrates = existingCrates.some((crate) => crate.round_number === round);
-    if (alreadyHasCrates) continue;
+    const alreadyHasPlaylists = existingPlaylists.some((pl) => pl.round_number === round);
+    if (alreadyHasPlaylists) continue;
 
     const callOrder = await deriveRoundCallOrder(db, sessionId, round, typedSession);
 
     if (callOrder.length === 0) continue;
 
-    const createdCrate = await saveCrateForRound(db, sessionId, round, callOrder);
-    existingCrates.push(createdCrate);
+    const createdPlaylist = await savePlaylistForRound(db, sessionId, round, callOrder);
+    existingPlaylists.push(createdPlaylist);
   }
 
   const activeByRound = typedSession.active_crate_letter_by_round ?? [];
@@ -298,25 +299,25 @@ export async function backfillMissingLegacyCrates(
     const hasActive = activeByRound.some((entry) => entry.round === round);
     if (hasActive) continue;
 
-    const firstRoundCrate = existingCrates
-      .filter((crate) => crate.round_number === round)
+    const firstRoundPlaylist = existingPlaylists
+      .filter((pl) => pl.round_number === round)
       .sort((left, right) => left.crate_letter.localeCompare(right.crate_letter))[0];
 
-    if (firstRoundCrate) {
-      await setActiveCrateForRound(db, sessionId, round, firstRoundCrate.crate_letter);
+    if (firstRoundPlaylist) {
+      await setActivePlaylistForRound(db, sessionId, round, firstRoundPlaylist.crate_letter);
     }
   }
 }
 
 /**
- * Create a new crate for a round from existing immutable session data.
- * Returns null when no source call-order data is available for the requested round.
+ * Create a new game playlist from existing immutable session data.
+ * Returns null when no source call-order data is available.
  */
-export async function createCrateFromRoundData(
+export async function createPlaylistFromSessionData(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number,
-  roundNumber: number
-): Promise<BingoSessionCrate | null> {
+  roundNumber?: number
+): Promise<BingoSessionGamePlaylist | null> {
   const { data: session, error } = await db
     .from("bingo_sessions")
     .select("playlist_id, playlist_ids, round_playlist_ids, current_round, round_count, active_crate_letter_by_round")
@@ -326,21 +327,31 @@ export async function createCrateFromRoundData(
   if (error) throw new Error(error.message);
   if (!session) return null;
 
-  const callOrder = await deriveRoundCallOrder(db, sessionId, roundNumber, session as SessionCrateBackfillRow);
+  const typedSession = session as SessionPlaylistBackfillRow;
+  const effectiveRound = (roundNumber != null && roundNumber >= 1) ? roundNumber : (typedSession.current_round ?? 1);
+
+  // Count ALL existing crates for this session so the new one gets a unique shuffle seed.
+  const { data: existingAll } = await db
+    .from("bingo_session_crates")
+    .select("id")
+    .eq("session_id", sessionId);
+  const generation = existingAll?.length ?? 0;
+
+  const callOrder = await deriveRoundCallOrder(db, sessionId, effectiveRound, typedSession, generation);
   if (callOrder.length === 0) return null;
 
-  return saveCrateForRound(db, sessionId, roundNumber, callOrder);
+  return savePlaylistForRound(db, sessionId, effectiveRound, callOrder);
 }
 
 /**
- * Mark a crate letter as the active crate for a round in the session.
+ * Mark a playlist letter as the active game playlist for a round in the session.
  * Reads existing `active_crate_letter_by_round` jsonb array and updates it.
  */
-export async function setActiveCrateForRound(
+export async function setActivePlaylistForRound(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number,
   roundNumber: number,
-  crateLetterOrNull: string | null
+  playlistLetterOrNull: string | null
 ): Promise<void> {
   const { data: session } = await db
     .from("bingo_sessions")
@@ -353,8 +364,8 @@ export async function setActiveCrateForRound(
 
   const without = existing.filter((entry) => entry.round !== roundNumber);
   const next =
-    crateLetterOrNull !== null
-      ? [...without, { round: roundNumber, letter: crateLetterOrNull }].sort((a, b) => a.round - b.round)
+    playlistLetterOrNull !== null
+      ? [...without, { round: roundNumber, letter: playlistLetterOrNull }].sort((a, b) => a.round - b.round)
       : without;
 
   await db
@@ -363,8 +374,8 @@ export async function setActiveCrateForRound(
     .eq("id", sessionId);
 }
 
-/** Return the active crate letter for a round (null = none selected yet). */
-export function getActiveCrateLetter(
+/** Return the active playlist letter for a round (null = none selected yet). */
+export function getActivePlaylistLetter(
   activeCrateLetterByRound: { round: number; letter: string }[] | null,
   roundNumber: number
 ): string | null {

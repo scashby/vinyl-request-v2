@@ -55,7 +55,7 @@ type Session = {
   next_game_rules_text: string | null;
 };
 
-type BingoCrate = {
+type BingoGamePlaylist = {
   id: number;
   session_id: number;
   round_number: number;
@@ -87,9 +87,9 @@ export default function BingoEditSessionPage() {
   const [sonosDelayMs, setSonosDelayMs] = useState(75);
   const [callRevealDelay, setCallRevealDelay] = useState(0);
   const [defaultIntermissionMinutes, setDefaultIntermissionMinutes] = useState(10);
-  const [crates, setCrates] = useState<BingoCrate[]>([]);
-  const [activeCrateByRound, setActiveCrateByRound] = useState<{ round: number; letter: string }[]>([]);
-  const [crateBusyRound, setCrateBusyRound] = useState<number | null>(null);
+  const [gamePlaylists, setGamePlaylists] = useState<BingoGamePlaylist[]>([]);
+  const [activePlaylistByRound, setActivePlaylistByRound] = useState<{ round: number; letter: string }[]>([]);
+  const [playlistBusyRound, setPlaylistBusyRound] = useState<number | null>(null);
   const [showCountdown, setShowCountdown] = useState(true);
   const [recentCallsLimit, setRecentCallsLimit] = useState(5);
   const [nextGameRulesText, setNextGameRulesText] = useState("");
@@ -127,7 +127,7 @@ export default function BingoEditSessionPage() {
     setError(null);
 
     try {
-      const [eventsRes, playlistsRes, presetsRes, sessionRes, cratesRes] = await Promise.all([
+      const [eventsRes, playlistsRes, presetsRes, sessionRes, gamePlaylistsRes] = await Promise.all([
         fetch("/api/games/bingo/events"),
         fetch("/api/games/playlists"),
         fetch("/api/games/bingo/presets", { cache: "no-store" }),
@@ -135,7 +135,7 @@ export default function BingoEditSessionPage() {
         fetch(`/api/games/bingo/sessions/${sessionId}/crates`, { cache: "no-store" }),
       ]);
 
-      if (!eventsRes.ok || !playlistsRes.ok || !presetsRes.ok || !sessionRes.ok || !cratesRes.ok) {
+      if (!eventsRes.ok || !playlistsRes.ok || !presetsRes.ok || !sessionRes.ok || !gamePlaylistsRes.ok) {
         throw new Error("Failed to load session edit data.");
       }
 
@@ -143,7 +143,7 @@ export default function BingoEditSessionPage() {
       const playlistsPayload = await playlistsRes.json();
       const presetsPayload = await presetsRes.json();
       const sessionPayload = (await sessionRes.json()) as Session;
-      const cratesPayload = (await cratesRes.json()) as { data?: BingoCrate[] };
+      const gamePlaylistsPayload = (await gamePlaylistsRes.json()) as { data?: BingoGamePlaylist[] };
 
       setEvents(eventsPayload.data ?? []);
       setPlaylists(playlistsPayload.data ?? []);
@@ -188,8 +188,8 @@ export default function BingoEditSessionPage() {
       setShowCountdown(Boolean(sessionPayload.show_countdown));
       setRecentCallsLimit(sessionPayload.recent_calls_limit ?? 5);
       setNextGameRulesText(sessionPayload.next_game_rules_text ?? "");
-      setCrates(cratesPayload.data ?? []);
-      setActiveCrateByRound(sessionPayload.active_crate_letter_by_round ?? []);
+      setGamePlaylists(gamePlaylistsPayload.data ?? []);
+      setActivePlaylistByRound(sessionPayload.active_crate_letter_by_round ?? []);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load session edit data.");
     } finally {
@@ -329,43 +329,43 @@ export default function BingoEditSessionPage() {
     }
   };
 
-  const getActiveCrateForRound = useCallback(
-    (round: number) => activeCrateByRound.find((entry) => entry.round === round)?.letter ?? "",
-    [activeCrateByRound]
+  const getActivePlaylistForRound = useCallback(
+    (round: number) => activePlaylistByRound.find((entry) => entry.round === round)?.letter ?? "",
+    [activePlaylistByRound]
   );
 
-  const getCratesForRound = useCallback(
-    (round: number) => crates.filter((crate) => crate.round_number === round),
-    [crates]
+  const getPlaylistsForRound = useCallback(
+    (round: number) => gamePlaylists.filter((pl) => pl.round_number === round),
+    [gamePlaylists]
   );
 
-  const selectCrateForRound = useCallback(
-    async (round: number, crateLetter: string) => {
+  const selectPlaylistForRound = useCallback(
+    async (round: number, playlistLetter: string) => {
       if (!Number.isFinite(sessionId)) return;
-      setCrateBusyRound(round);
+      setPlaylistBusyRound(round);
       setError(null);
       try {
         const res = await fetch(`/api/games/bingo/sessions/${sessionId}/crates`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ round_number: round, crate_letter: crateLetter || null }),
+          body: JSON.stringify({ round_number: round, playlist_letter: playlistLetter || null }),
         });
         const payload = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error((payload as { error?: string }).error ?? "Failed to set crate");
+        if (!res.ok) throw new Error((payload as { error?: string }).error ?? "Failed to set playlist");
         await load();
-      } catch (crateError) {
-        setError(crateError instanceof Error ? crateError.message : "Failed to set crate");
+      } catch (playlistError) {
+        setError(playlistError instanceof Error ? playlistError.message : "Failed to set playlist");
       } finally {
-        setCrateBusyRound(null);
+        setPlaylistBusyRound(null);
       }
     },
     [load, sessionId]
   );
 
-  const createCrateForRound = useCallback(
+  const createPlaylistForRound = useCallback(
     async (round: number) => {
       if (!Number.isFinite(sessionId)) return;
-      setCrateBusyRound(round);
+      setPlaylistBusyRound(round);
       setError(null);
       try {
         const res = await fetch(`/api/games/bingo/sessions/${sessionId}/crates`, {
@@ -374,21 +374,21 @@ export default function BingoEditSessionPage() {
           body: JSON.stringify({ round_number: round }),
         });
         const payload = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error((payload as { error?: string }).error ?? "Failed to create crate");
+        if (!res.ok) throw new Error((payload as { error?: string }).error ?? "Failed to create game playlist");
 
-        const created = (payload as { data?: BingoCrate }).data;
+        const created = (payload as { data?: BingoGamePlaylist }).data;
         if (created?.crate_letter) {
           await fetch(`/api/games/bingo/sessions/${sessionId}/crates`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ round_number: round, crate_letter: created.crate_letter }),
+            body: JSON.stringify({ round_number: round, playlist_letter: created.crate_letter }),
           });
         }
         await load();
-      } catch (crateError) {
-        setError(crateError instanceof Error ? crateError.message : "Failed to create crate");
+      } catch (playlistError) {
+        setError(playlistError instanceof Error ? playlistError.message : "Failed to create game playlist");
       } finally {
-        setCrateBusyRound(null);
+        setPlaylistBusyRound(null);
       }
     },
     [load, sessionId]
@@ -617,26 +617,26 @@ export default function BingoEditSessionPage() {
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             <select
                               className="rounded border border-stone-700 bg-stone-950 px-2 py-1 text-xs"
-                              value={getActiveCrateForRound(round)}
-                              disabled={crateBusyRound === round}
+                              value={getActivePlaylistForRound(round)}
+                              disabled={playlistBusyRound === round}
                               onChange={(event) => {
-                                void selectCrateForRound(round, event.target.value);
+                                void selectPlaylistForRound(round, event.target.value);
                               }}
                             >
                               <option value="">No playlist selected</option>
-                              {getCratesForRound(round).map((crate) => (
-                                <option key={`${round}-${crate.crate_letter}`} value={crate.crate_letter}>
-                                  {crate.crate_name}
+                              {getPlaylistsForRound(round).map((pl) => (
+                                <option key={`${round}-${pl.crate_letter}`} value={pl.crate_letter}>
+                                  {pl.crate_name}
                                 </option>
                               ))}
                             </select>
                             <button
                               type="button"
-                              onClick={() => { void createCrateForRound(round); }}
-                              disabled={crateBusyRound === round}
+                              onClick={() => { void createPlaylistForRound(round); }}
+                              disabled={playlistBusyRound === round}
                               className="rounded border border-amber-700/70 bg-amber-950/30 px-2 py-1 text-xs text-amber-200 disabled:opacity-50"
                             >
-                              {crateBusyRound === round ? "Generating..." : "Generate New Playlist"}
+                              {playlistBusyRound === round ? "Generating..." : "Generate New Playlist"}
                             </button>
                           </div>
                         </div>
