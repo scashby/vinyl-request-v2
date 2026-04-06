@@ -3,6 +3,7 @@ import { getBingoDb } from "src/lib/bingoDb";
 import {
   backfillMissingLegacyPlaylists,
   createPlaylistFromSessionData,
+  deletePlaylistByLetter,
   getPlaylistsForSession,
   setActivePlaylistForRound,
 } from "src/lib/bingoCrateModel";
@@ -51,7 +52,7 @@ export async function PATCH(
   }
 
   const playlistLetter =
-    typeof playlistLetterRaw === "string" && /^[A-Z]$/.test(playlistLetterRaw)
+    typeof playlistLetterRaw === "string" && /^[A-Za-z]+$/.test(playlistLetterRaw)
       ? playlistLetterRaw
       : playlistLetterRaw === null
       ? null
@@ -104,6 +105,34 @@ export async function POST(
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create game playlist" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const sessionId = Number(id);
+  if (!Number.isFinite(sessionId)) {
+    return NextResponse.json({ error: "Invalid session id" }, { status: 400 });
+  }
+
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  const playlistLetterRaw = body.playlist_letter;
+  if (typeof playlistLetterRaw !== "string" || !/^[A-Za-z]+$/.test(playlistLetterRaw)) {
+    return NextResponse.json({ error: "playlist_letter must be a non-empty alphabetic string" }, { status: 400 });
+  }
+
+  const db = getBingoDb();
+  try {
+    await deletePlaylistByLetter(db, sessionId, playlistLetterRaw);
+    return NextResponse.json({ ok: true }, { status: 200 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to delete game playlist" },
       { status: 500 }
     );
   }

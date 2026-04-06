@@ -190,6 +190,7 @@ export default function BingoSetupPage() {
   const [creating, setCreating] = useState(false);
   const [downloadingRoundsSessionId, setDownloadingRoundsSessionId] = useState<number | null>(null);
   const [sessionPlaylistsMap, setSessionPlaylistsMap] = useState<Record<number, BingoSessionPlaylistInfo[]>>({});
+  const [openPlaylistPanelId, setOpenPlaylistPanelId] = useState<number | null>(null);
   const minimumTracksForSetup = useMemo(() => computeMinimumPlaylistTracks(roundCount, cardCount), [roundCount, cardCount]);
   const trackCountByPlaylistId = useMemo(
     () => new Map(playlists.map((playlist) => [playlist.id, playlist.track_count])),
@@ -694,6 +695,27 @@ export default function BingoSetupPage() {
     const doc = generateBingoCallSheetPdf(playlist.call_order, title);
     doc.save(`bingo-${session.id}-playlist-${playlist.playlist_letter.toLowerCase()}.pdf`);
   };
+
+  const deleteGamePlaylist = useCallback(async (sessionId: number, playlistLetter: string) => {
+    if (!confirm(`Delete game playlist "${playlistLetter}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/games/bingo/sessions/${sessionId}/crates`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playlist_letter: playlistLetter }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        alert((payload as { error?: string }).error ?? "Failed to delete game playlist");
+        return;
+      }
+      const updatedRes = await fetch(`/api/games/bingo/sessions/${sessionId}/crates`);
+      const updated = updatedRes.ok ? await updatedRes.json() : { data: [] };
+      setSessionPlaylistsMap((prev) => ({ ...prev, [sessionId]: (updated.data ?? []) as BingoSessionPlaylistInfo[] }));
+    } catch {
+      alert("Failed to delete game playlist");
+    }
+  }, []);
 
   const setSessionFavorite = async (session: Session, nextValue: boolean) => {
     const previous = session.is_favorite ?? false;
@@ -1240,15 +1262,50 @@ export default function BingoSetupPage() {
                         Round {round} Sheet
                       </button>
                     ))}
-                    {(sessionPlaylistsMap[session.id] ?? []).map((playlist) => (
-                      <button
-                        key={`${session.id}-playlist-${playlist.playlist_letter}`}
-                        className="rounded border border-violet-700/70 px-2 py-1 text-violet-200"
-                        onClick={() => downloadPlaylistSheet(session, playlist)}
-                      >
-                        Playlist {playlist.playlist_letter}
-                      </button>
-                    ))}
+                    {(() => {
+                      const playlists = sessionPlaylistsMap[session.id] ?? [];
+                      if (playlists.length === 0) return null;
+                      const isOpen = openPlaylistPanelId === session.id;
+                      return (
+                        <div className="relative">
+                          <button
+                            className="rounded border border-violet-700/70 px-2 py-1 text-violet-200"
+                            onClick={() => setOpenPlaylistPanelId(isOpen ? null : session.id)}
+                          >
+                            Playlists ({playlists.length}) {isOpen ? "▴" : "▾"}
+                          </button>
+                          {isOpen && (
+                            <div className="absolute left-0 top-full z-20 mt-1 min-w-56 rounded border border-violet-700/70 bg-stone-950 shadow-xl">
+                              {playlists.map((playlist) => (
+                                <div
+                                  key={`${session.id}-pl-${playlist.playlist_letter}`}
+                                  className="flex items-center justify-between gap-2 border-b border-stone-800 px-3 py-2 last:border-0"
+                                >
+                                  <span className="text-xs text-stone-200">
+                                    {playlist.playlist_name}
+                                    <span className="ml-1 text-stone-500">R{playlist.round_number}</span>
+                                  </span>
+                                  <div className="flex shrink-0 gap-1">
+                                    <button
+                                      className="rounded border border-violet-700/70 px-2 py-0.5 text-[10px] text-violet-200 hover:border-violet-500"
+                                      onClick={() => downloadPlaylistSheet(session, playlist)}
+                                    >
+                                      Download
+                                    </button>
+                                    <button
+                                      className="rounded border border-red-900/60 px-2 py-0.5 text-[10px] text-red-400 hover:border-red-600 hover:text-red-200"
+                                      onClick={() => void deleteGamePlaylist(session.id, playlist.playlist_letter)}
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                     <button className="rounded border border-red-800/60 bg-red-950/30 px-2 py-1 text-red-200" onClick={() => deleteSession(session.id, session.session_code)}>Delete</button>
                   </div>
                 </div>
