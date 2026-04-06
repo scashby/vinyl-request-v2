@@ -475,6 +475,50 @@ export async function createPlaylistFromSessionData(
 }
 
 /**
+ * Regenerate the call_order for every game playlist in a session so each has a
+ * unique shuffle. Useful when multiple playlists were created with the same seed
+ * and therefore ended up with identical call orders.
+ *
+ * Each playlist is assigned generation = (its alphabetical index + 1), which
+ * produces a deterministic but distinct seed per playlist. The existing playlist
+ * rows are updated in-place (names and letters are preserved). Collection items
+ * are re-synced immediately.
+ */
+export async function reshuffleAllPlaylists(
+  db: ReturnType<typeof getBingoDb>,
+  sessionId: number
+): Promise<void> {
+  const { data: session, error: sessionError } = await db
+    .from("bingo_sessions")
+    .select("playlist_id, playlist_ids, round_playlist_ids, current_round, round_count, active_playlist_letter_by_round")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (sessionError) throw new Error(sessionError.message);
+  if (!session) throw new Error("Session not found");
+
+  const typedSession = session as SessionPlaylistBackfillRow;
+  const playlists = await getPlaylistsForSession(db, sessionId);
+  if (playlists.length === 0) return;
+
+  const sorted = [...playlists].sort((a, b) => a.playlist_letter.localeCompare(b.playlist_letter));
+
+  for (let i = 0; i < sorted.length; i++) {
+    const playlist = sorted[i];
+    const generation = i + 1; // unique per-playlist; generation 0 was the broken shared seed
+    const newCallOrder = await deriveRoundCallOrder(db, sessionId, playlist.round_number, typedSession, generation);
+    if (newCallOrder.length === 0) continue;
+
+    await db
+      .from("bingo_session_game_playlists")
+      .update({ call_order: newCallOrder as unknown as Record<string, unknown>[] })
+      .eq("id", playlist.id);
+
+    await syncPlaylistToCollection(db, { ...playlist, call_order: newCallOrder });
+  }
+}
+
+/**
  * Mark a playlist letter as the active game playlist for a round in the session.
  * Reads existing `active_playlist_letter_by_round` jsonb array and updates it.
  */

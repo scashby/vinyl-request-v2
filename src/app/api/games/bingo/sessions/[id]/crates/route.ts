@@ -5,6 +5,7 @@ import {
   createPlaylistFromSessionData,
   deletePlaylistByLetter,
   getPlaylistsForSession,
+  reshuffleAllPlaylists,
   setActivePlaylistForRound,
 } from "src/lib/bingoCrateModel";
 
@@ -133,6 +134,29 @@ export async function DELETE(
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to delete game playlist" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(
+  _: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const sessionId = Number(id);
+  if (!Number.isFinite(sessionId)) {
+    return NextResponse.json({ error: "Invalid session id" }, { status: 400 });
+  }
+
+  const db = getBingoDb();
+  try {
+    await reshuffleAllPlaylists(db, sessionId);
+    const playlists = await getPlaylistsForSession(db, sessionId);
+    return NextResponse.json({ data: playlists }, { status: 200 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to reshuffle game playlists" },
       { status: 500 }
     );
   }

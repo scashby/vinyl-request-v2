@@ -189,6 +189,7 @@ export default function BingoSetupPage() {
 
   const [creating, setCreating] = useState(false);
   const [downloadingRoundsSessionId, setDownloadingRoundsSessionId] = useState<number | null>(null);
+  const [reshufflingSessionId, setReshufflingSessionId] = useState<number | null>(null);
   const [sessionPlaylistsMap, setSessionPlaylistsMap] = useState<Record<number, BingoSessionPlaylistInfo[]>>({});
   const [openPlaylistPanelId, setOpenPlaylistPanelId] = useState<number | null>(null);
   const minimumTracksForSetup = useMemo(() => computeMinimumPlaylistTracks(roundCount, cardCount), [roundCount, cardCount]);
@@ -688,6 +689,25 @@ export default function BingoSetupPage() {
 
     alert(`Generated new game playlist for ${session.session_code}.`);
     await load();
+  };
+
+  const reshuffleGamePlaylists = async (session: Session) => {
+    if (!confirm(`Regenerate unique call orders for all ${session.session_code} playlists? This replaces their current call orders.`)) return;
+    setReshufflingSessionId(session.id);
+    try {
+      const response = await fetch(`/api/games/bingo/sessions/${session.id}/crates`, { method: "PUT" });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        alert((payload as { error?: string }).error ?? "Failed to reshuffle game playlists");
+        return;
+      }
+      const updated = await response.json();
+      setSessionPlaylistsMap((prev) => ({ ...prev, [session.id]: (updated.data ?? []) as BingoSessionPlaylistInfo[] }));
+    } catch {
+      alert("Failed to reshuffle game playlists");
+    } finally {
+      setReshufflingSessionId(null);
+    }
   };
 
   const downloadPlaylistSheet = (session: Session, playlist: BingoSessionPlaylistInfo) => {
@@ -1243,6 +1263,13 @@ export default function BingoSetupPage() {
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/jumbotron?sessionId=${session.id}`, "bingo_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => createAdditionalCards(session)}>Add {Math.max(1, session.round_count) * 100} Cards</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => void createAdditionalPlaylists(session)}>Generate Extra Game Playlists</button>
+                    <button
+                      className="rounded border border-violet-700/70 px-2 py-1 text-violet-200 disabled:cursor-not-allowed disabled:opacity-60"
+                      onClick={() => void reshuffleGamePlaylists(session)}
+                      disabled={reshufflingSessionId !== null}
+                    >
+                      {reshufflingSessionId === session.id ? "Reshuffling..." : "Reshuffle All Playlists"}
+                    </button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "4-up")}>Cards Pack 4-up</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCallSheet(session.id)}>Call Sheet (Live)</button>
                     <button className="rounded border border-amber-700/70 bg-amber-950/30 px-2 py-1 text-amber-200" onClick={() => resetSession(session.id, session.session_code)}>Reset Game</button>
