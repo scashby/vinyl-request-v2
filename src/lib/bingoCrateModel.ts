@@ -34,8 +34,8 @@ export type BingoSessionGamePlaylist = {
   id: number;
   session_id: number;
   round_number: number;
-  crate_name: string;
-  crate_letter: string;
+  playlist_name: string;
+  playlist_letter: string;
   call_order: PlaylistCallEntry[];
   created_at: string;
 };
@@ -46,7 +46,7 @@ type SessionPlaylistBackfillRow = {
   round_playlist_ids: RoundPlaylistEntry[] | null;
   round_count: number;
   current_round: number;
-  active_crate_letter_by_round: { round: number; letter: string }[] | null;
+  active_playlist_letter_by_round: { round: number; letter: string }[] | null;
 };
 
 async function deriveRoundCallOrder(
@@ -113,12 +113,12 @@ async function getNextPlaylistLetter(
   sessionId: number
 ): Promise<string> {
   const { data } = await db
-    .from("bingo_session_crates")
-    .select("crate_letter")
+    .from("bingo_session_game_playlists")
+    .select("playlist_letter")
     .eq("session_id", sessionId)
-    .order("crate_letter", { ascending: true });
+    .order("playlist_letter", { ascending: true });
 
-  const usedLetters = new Set((data ?? []).map((row) => row.crate_letter as string));
+  const usedLetters = new Set((data ?? []).map((row) => row.playlist_letter as string));
   const next = PLAYLIST_LETTERS.find((l) => !usedLetters.has(l));
   if (!next) throw new Error("All 26 playlist letters exhausted for this session.");
   return next;
@@ -173,12 +173,12 @@ export async function savePlaylistForRound(
   const playlistName = formatPlaylistName(sessionCode, sessionId, letter);
 
   const { data, error } = await db
-    .from("bingo_session_crates")
+    .from("bingo_session_game_playlists")
     .insert({
       session_id: sessionId,
       round_number: roundNumber,
-      crate_name: playlistName,
-      crate_letter: letter,
+      playlist_name: playlistName,
+      playlist_letter: letter,
       call_order: calls as unknown as Record<string, unknown>[],
     })
     .select()
@@ -199,15 +199,15 @@ export async function getPlaylistsForSession(
 ): Promise<BingoSessionGamePlaylist[]> {
   const sessionCode = await getSessionCode(db, sessionId);
   const { data, error } = await db
-    .from("bingo_session_crates")
+    .from("bingo_session_game_playlists")
     .select("*")
     .eq("session_id", sessionId)
-    .order("crate_letter", { ascending: true });
+    .order("playlist_letter", { ascending: true });
 
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => ({
     ...row,
-    crate_name: formatPlaylistName(sessionCode, sessionId, row.crate_letter),
+    playlist_name: formatPlaylistName(sessionCode, sessionId, row.playlist_letter),
     call_order: row.call_order as unknown as PlaylistCallEntry[],
   }));
 }
@@ -220,17 +220,17 @@ export async function getPlaylistByLetter(
 ): Promise<BingoSessionGamePlaylist | null> {
   const sessionCode = await getSessionCode(db, sessionId);
   const { data, error } = await db
-    .from("bingo_session_crates")
+    .from("bingo_session_game_playlists")
     .select("*")
     .eq("session_id", sessionId)
-    .eq("crate_letter", playlistLetter)
+    .eq("playlist_letter", playlistLetter)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
   if (!data) return null;
   return {
     ...data,
-    crate_name: formatPlaylistName(sessionCode, sessionId, data.crate_letter),
+    playlist_name: formatPlaylistName(sessionCode, sessionId, data.playlist_letter),
     call_order: data.call_order as unknown as PlaylistCallEntry[],
   };
 }
@@ -243,16 +243,16 @@ export async function getPlaylistsForRound(
 ): Promise<BingoSessionGamePlaylist[]> {
   const sessionCode = await getSessionCode(db, sessionId);
   const { data, error } = await db
-    .from("bingo_session_crates")
+    .from("bingo_session_game_playlists")
     .select("*")
     .eq("session_id", sessionId)
     .eq("round_number", roundNumber)
-    .order("crate_letter", { ascending: true });
+    .order("playlist_letter", { ascending: true });
 
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => ({
     ...row,
-    crate_name: formatPlaylistName(sessionCode, sessionId, row.crate_letter),
+    playlist_name: formatPlaylistName(sessionCode, sessionId, row.playlist_letter),
     call_order: row.call_order as unknown as PlaylistCallEntry[],
   }));
 }
@@ -272,7 +272,7 @@ export async function backfillMissingLegacyPlaylists(
 ): Promise<void> {
   const { data: session, error: sessionError } = await db
     .from("bingo_sessions")
-    .select("playlist_id, playlist_ids, round_playlist_ids, round_count, current_round, active_crate_letter_by_round")
+    .select("playlist_id, playlist_ids, round_playlist_ids, round_count, current_round, active_playlist_letter_by_round")
     .eq("id", sessionId)
     .maybeSingle();
 
@@ -294,17 +294,17 @@ export async function backfillMissingLegacyPlaylists(
     existingPlaylists.push(createdPlaylist);
   }
 
-  const activeByRound = typedSession.active_crate_letter_by_round ?? [];
+  const activeByRound = typedSession.active_playlist_letter_by_round ?? [];
   for (let round = 1; round <= Math.max(1, typedSession.round_count || 1); round += 1) {
     const hasActive = activeByRound.some((entry) => entry.round === round);
     if (hasActive) continue;
 
     const firstRoundPlaylist = existingPlaylists
       .filter((pl) => pl.round_number === round)
-      .sort((left, right) => left.crate_letter.localeCompare(right.crate_letter))[0];
+      .sort((left, right) => left.playlist_letter.localeCompare(right.playlist_letter))[0];
 
     if (firstRoundPlaylist) {
-      await setActivePlaylistForRound(db, sessionId, round, firstRoundPlaylist.crate_letter);
+      await setActivePlaylistForRound(db, sessionId, round, firstRoundPlaylist.playlist_letter);
     }
   }
 }
@@ -320,7 +320,7 @@ export async function createPlaylistFromSessionData(
 ): Promise<BingoSessionGamePlaylist | null> {
   const { data: session, error } = await db
     .from("bingo_sessions")
-    .select("playlist_id, playlist_ids, round_playlist_ids, current_round, round_count, active_crate_letter_by_round")
+    .select("playlist_id, playlist_ids, round_playlist_ids, current_round, round_count, active_playlist_letter_by_round")
     .eq("id", sessionId)
     .maybeSingle();
 
@@ -330,9 +330,9 @@ export async function createPlaylistFromSessionData(
   const typedSession = session as SessionPlaylistBackfillRow;
   const effectiveRound = (roundNumber != null && roundNumber >= 1) ? roundNumber : (typedSession.current_round ?? 1);
 
-  // Count ALL existing crates for this session so the new one gets a unique shuffle seed.
+  // Count ALL existing game playlists for this session so the new one gets a unique shuffle seed.
   const { data: existingAll } = await db
-    .from("bingo_session_crates")
+    .from("bingo_session_game_playlists")
     .select("id")
     .eq("session_id", sessionId);
   const generation = existingAll?.length ?? 0;
@@ -345,7 +345,7 @@ export async function createPlaylistFromSessionData(
 
 /**
  * Mark a playlist letter as the active game playlist for a round in the session.
- * Reads existing `active_crate_letter_by_round` jsonb array and updates it.
+ * Reads existing `active_playlist_letter_by_round` jsonb array and updates it.
  */
 export async function setActivePlaylistForRound(
   db: ReturnType<typeof getBingoDb>,
@@ -355,12 +355,12 @@ export async function setActivePlaylistForRound(
 ): Promise<void> {
   const { data: session } = await db
     .from("bingo_sessions")
-    .select("active_crate_letter_by_round")
+    .select("active_playlist_letter_by_round")
     .eq("id", sessionId)
     .single();
 
   const existing: { round: number; letter: string }[] =
-    (session?.active_crate_letter_by_round as { round: number; letter: string }[] | null) ?? [];
+    (session?.active_playlist_letter_by_round as { round: number; letter: string }[] | null) ?? [];
 
   const without = existing.filter((entry) => entry.round !== roundNumber);
   const next =
@@ -370,7 +370,7 @@ export async function setActivePlaylistForRound(
 
   await db
     .from("bingo_sessions")
-    .update({ active_crate_letter_by_round: next })
+    .update({ active_playlist_letter_by_round: next })
     .eq("id", sessionId);
 }
 

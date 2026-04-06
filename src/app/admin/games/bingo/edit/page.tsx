@@ -49,7 +49,7 @@ type Session = {
   seconds_to_next_call: number;
   call_reveal_delay_seconds: number;
   default_intermission_seconds: number;
-  active_crate_letter_by_round: { round: number; letter: string }[] | null;
+  active_playlist_letter_by_round: { round: number; letter: string }[] | null;
   show_countdown: boolean;
   recent_calls_limit: number;
   next_game_rules_text: string | null;
@@ -59,8 +59,8 @@ type BingoGamePlaylist = {
   id: number;
   session_id: number;
   round_number: number;
-  crate_name: string;
-  crate_letter: string;
+  playlist_name: string;
+  playlist_letter: string;
 };
 
 export default function BingoEditSessionPage() {
@@ -189,7 +189,7 @@ export default function BingoEditSessionPage() {
       setRecentCallsLimit(sessionPayload.recent_calls_limit ?? 5);
       setNextGameRulesText(sessionPayload.next_game_rules_text ?? "");
       setGamePlaylists(gamePlaylistsPayload.data ?? []);
-      setActivePlaylistByRound(sessionPayload.active_crate_letter_by_round ?? []);
+      setActivePlaylistByRound(sessionPayload.active_playlist_letter_by_round ?? []);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load session edit data.");
     } finally {
@@ -377,11 +377,11 @@ export default function BingoEditSessionPage() {
         if (!res.ok) throw new Error((payload as { error?: string }).error ?? "Failed to create game playlist");
 
         const created = (payload as { data?: BingoGamePlaylist }).data;
-        if (created?.crate_letter) {
+        if (created?.playlist_letter) {
           await fetch(`/api/games/bingo/sessions/${sessionId}/crates`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ round_number: round, playlist_letter: created.crate_letter }),
+            body: JSON.stringify({ round_number: round, playlist_letter: created.playlist_letter }),
           });
         }
         await load();
@@ -625,8 +625,8 @@ export default function BingoEditSessionPage() {
                             >
                               <option value="">No playlist selected</option>
                               {getPlaylistsForRound(round).map((pl) => (
-                                <option key={`${round}-${pl.crate_letter}`} value={pl.crate_letter}>
-                                  {pl.crate_name}
+                                <option key={`${round}-${pl.playlist_letter}`} value={pl.playlist_letter}>
+                                  {pl.playlist_name}
                                 </option>
                               ))}
                             </select>

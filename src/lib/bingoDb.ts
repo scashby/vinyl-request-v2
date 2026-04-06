@@ -241,7 +241,7 @@ export type BingoDatabase = {
           default_intermission_seconds: number;
           is_favorite: boolean;
           favorite_note: string | null;
-          active_crate_letter_by_round: { round: number; letter: string }[] | null;
+          active_playlist_letter_by_round: { round: number; letter: string }[] | null;
         };
         Insert: {
           id?: number;
@@ -300,7 +300,7 @@ export type BingoDatabase = {
           bingo_overlay?: string;
           is_favorite?: boolean;
           favorite_note?: string | null;
-          active_crate_letter_by_round?: { round: number; letter: string }[] | null;
+          active_playlist_letter_by_round?: { round: number; letter: string }[] | null;
         };
         Update: {
           id?: number;
@@ -359,7 +359,7 @@ export type BingoDatabase = {
           bingo_overlay?: string;
           is_favorite?: boolean;
           favorite_note?: string | null;
-          active_crate_letter_by_round?: { round: number; letter: string }[] | null;
+          active_playlist_letter_by_round?: { round: number; letter: string }[] | null;
         };
         Relationships: [];
       };
@@ -456,13 +456,13 @@ export type BingoDatabase = {
         };
         Relationships: [];
       };
-      bingo_session_crates: {
+      bingo_session_game_playlists: {
         Row: {
           id: number;
           session_id: number;
           round_number: number;
-          crate_name: string;
-          crate_letter: string;
+          playlist_name: string;
+          playlist_letter: string;
           call_order: Record<string, unknown>[];
           created_at: string;
         };
@@ -470,8 +470,8 @@ export type BingoDatabase = {
           id?: number;
           session_id: number;
           round_number: number;
-          crate_name: string;
-          crate_letter: string;
+          playlist_name: string;
+          playlist_letter: string;
           call_order: Record<string, unknown>[];
           created_at?: string;
         };
@@ -479,8 +479,8 @@ export type BingoDatabase = {
           id?: number;
           session_id?: number;
           round_number?: number;
-          crate_name?: string;
-          crate_letter?: string;
+          playlist_name?: string;
+          playlist_letter?: string;
           call_order?: Record<string, unknown>[];
           created_at?: string;
         };

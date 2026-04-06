@@ -32,7 +32,7 @@ type SessionRow = {
   playlist_ids: number[] | null;
   round_playlist_ids: RoundPlaylistEntry[] | null;
   round_count: number;
-  active_crate_letter_by_round: { round: number; letter: string }[] | null;
+  active_playlist_letter_by_round: { round: number; letter: string }[] | null;
 };
 
 type ExistingCallRow = {
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const sessionQuery = (db
       .from("bingo_sessions")
-      .select("id, playlist_id, playlist_ids, round_playlist_ids, round_count, active_crate_letter_by_round") as unknown as {
+      .select("id, playlist_id, playlist_ids, round_playlist_ids, round_count, active_playlist_letter_by_round") as unknown as {
         eq: (column: string, value: number) => {
           maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
         };
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     let plannedCalls = [] as ReturnType<typeof planRoundSessionCalls>;
 
-    const activePlaylistLetter = (typedSession.active_crate_letter_by_round ?? []).find((entry) => entry.round === requestedRound)?.letter ?? null;
+    const activePlaylistLetter = (typedSession.active_playlist_letter_by_round ?? []).find((entry) => entry.round === requestedRound)?.letter ?? null;
     if (activePlaylistLetter) {
       const selectedPlaylist = await getPlaylistByLetter(db, sessionId, activePlaylistLetter);
 

@@ -88,8 +88,8 @@ type SessionTemplateOption = {
 type BingoSessionPlaylistInfo = {
   id: number;
   round_number: number;
-  crate_name: string;
-  crate_letter: string;
+  playlist_name: string;
+  playlist_letter: string;
   call_order: Array<{
     call_index: number;
     ball_number: number | null;
@@ -690,9 +690,9 @@ export default function BingoSetupPage() {
   };
 
   const downloadPlaylistSheet = (session: Session, playlist: BingoSessionPlaylistInfo) => {
-    const title = `${session.session_code} · Playlist ${playlist.crate_letter}`;
+    const title = `${session.session_code} · Playlist ${playlist.playlist_letter}`;
     const doc = generateBingoCallSheetPdf(playlist.call_order, title);
-    doc.save(`bingo-${session.id}-playlist-${playlist.crate_letter.toLowerCase()}.pdf`);
+    doc.save(`bingo-${session.id}-playlist-${playlist.playlist_letter.toLowerCase()}.pdf`);
   };
 
   const setSessionFavorite = async (session: Session, nextValue: boolean) => {
@@ -1242,11 +1242,11 @@ export default function BingoSetupPage() {
                     ))}
                     {(sessionPlaylistsMap[session.id] ?? []).map((playlist) => (
                       <button
-                        key={`${session.id}-playlist-${playlist.crate_letter}`}
+                        key={`${session.id}-playlist-${playlist.playlist_letter}`}
                         className="rounded border border-violet-700/70 px-2 py-1 text-violet-200"
                         onClick={() => downloadPlaylistSheet(session, playlist)}
                       >
-                        Playlist {playlist.crate_letter}
+                        Playlist {playlist.playlist_letter}
                       </button>
                     ))}
                     <button className="rounded border border-red-800/60 bg-red-950/30 px-2 py-1 text-red-200" onClick={() => deleteSession(session.id, session.session_code)}>Delete</button>

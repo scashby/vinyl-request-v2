@@ -54,8 +54,8 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
   const defaultActivePlaylistsByRound = Array.from(
     playlists.reduce((map, pl) => {
       const existing = map.get(pl.round_number);
-      if (!existing || pl.crate_letter.localeCompare(existing) < 0) {
-        map.set(pl.round_number, pl.crate_letter);
+      if (!existing || pl.playlist_letter.localeCompare(existing) < 0) {
+        map.set(pl.round_number, pl.playlist_letter);
       }
       return map;
     }, new Map<number, string>())
@@ -204,7 +204,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
       bingo_overlay: "welcome",
       next_game_scheduled_at: null,
       next_game_rules_text: null,
-      active_crate_letter_by_round: defaultActivePlaylistsByRound,
+      active_playlist_letter_by_round: defaultActivePlaylistsByRound,
     })
     .eq("id", sessionId);
 

@@ -24,15 +24,15 @@ type Session = {
   next_game_scheduled_at: string | null;
   bingo_overlay: string;
   default_intermission_seconds: number;
-  active_crate_letter_by_round: { round: number; letter: string }[] | null;
+  active_playlist_letter_by_round: { round: number; letter: string }[] | null;
 };
 
 type BingoGamePlaylist = {
   id: number;
   session_id: number;
   round_number: number;
-  crate_name: string;
-  crate_letter: string;
+  playlist_name: string;
+  playlist_letter: string;
   created_at: string;
 };
 
@@ -466,17 +466,17 @@ export default function BingoHostPage() {
   const uniquePlaylistOptions = useMemo(() => {
     const seen = new Set<string>();
     return [...gamePlaylists]
-      .sort((a, b) => a.crate_letter.localeCompare(b.crate_letter))
+      .sort((a, b) => a.playlist_letter.localeCompare(b.playlist_letter))
       .filter((c) => {
-        if (seen.has(c.crate_letter)) return false;
-        seen.add(c.crate_letter);
+        if (seen.has(c.playlist_letter)) return false;
+        seen.add(c.playlist_letter);
         return true;
       });
   }, [gamePlaylists]);
 
   const activePlaylistLetter = useMemo(() => {
-    if (!session?.active_crate_letter_by_round) return null;
-    return session.active_crate_letter_by_round.find((e) => e.round === session.current_round)?.letter ?? null;
+    if (!session?.active_playlist_letter_by_round) return null;
+    return session.active_playlist_letter_by_round.find((e) => e.round === session.current_round)?.letter ?? null;
   }, [session]);
 
   const resetRoundDisabled = useMemo(() => {
@@ -605,8 +605,8 @@ export default function BingoHostPage() {
                     >
                       <option value="">— select —</option>
                       {uniquePlaylistOptions.map((playlist) => (
-                        <option key={playlist.crate_letter} value={playlist.crate_letter}>
-                          {playlist.crate_name}
+                        <option key={playlist.playlist_letter} value={playlist.playlist_letter}>
+                          {playlist.playlist_name}
                         </option>
                       ))}
                     </select>
