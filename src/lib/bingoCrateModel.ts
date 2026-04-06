@@ -159,7 +159,11 @@ async function getSessionCode(
 }
 
 function formatPlaylistName(sessionCode: string | null, sessionId: number, playlistLetter: string): string {
-  return `${sessionCode ?? sessionId} Playlist ${playlistLetter}`;
+  // Legacy rows stored single uppercase letters (A, B, C…) — map them to the animal name at the same index.
+  const displayName = /^[A-Z]$/.test(playlistLetter)
+    ? (PLAYLIST_NAMES[playlistLetter.charCodeAt(0) - 65] ?? playlistLetter)
+    : playlistLetter;
+  return `${sessionCode ?? sessionId} Playlist ${displayName}`;
 }
 
 /** Sync a single game playlist to collection_playlists and collection_playlist_items. */
@@ -211,16 +215,17 @@ async function syncPlaylistToCollection(
       .map((entry) => entry.track_key)
       .filter((key): key is string => typeof key === "string" && key.length > 0);
 
-    if (trackKeys.length === 0) return;
-
+    // Always replace items; if no track_keys the playlist entry still exists in the library.
     await db.from("collection_playlist_items").delete().eq("playlist_id", collectionPlaylistId);
-    await db.from("collection_playlist_items").insert(
-      trackKeys.map((trackKey, idx) => ({
-        playlist_id: collectionPlaylistId,
-        track_key: trackKey,
-        sort_order: idx + 1,
-      }))
-    );
+    if (trackKeys.length > 0) {
+      await db.from("collection_playlist_items").insert(
+        trackKeys.map((trackKey, idx) => ({
+          playlist_id: collectionPlaylistId,
+          track_key: trackKey,
+          sort_order: idx + 1,
+        }))
+      );
+    }
   } catch {
     // Non-fatal: collection sync failure should not break game playlist creation
   }
@@ -231,9 +236,31 @@ export async function syncCollectionPlaylistMirrorsForSession(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number
 ): Promise<void> {
+  // Fetch session source data so we can re-derive call orders for playlists that pre-date
+  // the track_key field and therefore have no keys in their stored call_order JSON.
+  const { data: sessionRow } = await db
+    .from("bingo_sessions")
+    .select("playlist_id, playlist_ids, round_playlist_ids, round_count, current_round, active_playlist_letter_by_round")
+    .eq("id", sessionId)
+    .maybeSingle();
+
   const playlists = await getPlaylistsForSession(db, sessionId);
   for (const playlist of playlists) {
-    await syncPlaylistToCollection(db, playlist);
+    const hasTrackKeys = playlist.call_order.some(
+      (e) => typeof e.track_key === "string" && e.track_key.length > 0
+    );
+    if (!hasTrackKeys && sessionRow) {
+      // Re-derive so we pick up playlist_track_key values that weren't stored originally.
+      const freshCalls = await deriveRoundCallOrder(
+        db,
+        sessionId,
+        playlist.round_number,
+        sessionRow as SessionPlaylistBackfillRow
+      );
+      await syncPlaylistToCollection(db, { ...playlist, call_order: freshCalls });
+    } else {
+      await syncPlaylistToCollection(db, playlist);
+    }
   }
 }
 
