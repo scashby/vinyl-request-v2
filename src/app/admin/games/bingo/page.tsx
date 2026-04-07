@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { generateBingoCardsPdf } from "src/lib/bingoCardsPdf";
 import { type PrintableCard } from "src/lib/bingoCardPrintPack";
 import { generateBingoCallSheetPdf } from "src/lib/bingoCallSheetPdf";
+import { generateBingoCrateLabelsPdf } from "src/lib/bingoCrateLabelsPdf";
 import type { GameMode } from "src/lib/bingoEngine";
 import { buildWelcomeRulesContent, GAME_MODE_OPTIONS, type RoundModesEntry } from "src/lib/bingoModes";
 import type { RoundPlaylistEntry } from "src/lib/bingoRoundPlaylists";
@@ -691,6 +692,13 @@ export default function BingoSetupPage() {
     await load();
   };
 
+  const downloadCrateLabels = (session: Session) => {
+    const playlists = sessionPlaylistsMap[session.id] ?? [];
+    if (playlists.length === 0) return;
+    const doc = generateBingoCrateLabelsPdf(playlists, session.session_code ?? String(session.id));
+    doc.save(`bingo-${session.id}-crate-labels.pdf`);
+  };
+
   const reshuffleGamePlaylists = async (session: Session) => {
     if (!confirm(`Regenerate unique call orders for all ${session.session_code} playlists? This replaces their current call orders.`)) return;
     setReshufflingSessionId(session.id);
@@ -1272,6 +1280,9 @@ export default function BingoSetupPage() {
                     </button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCards(session.id, "4-up")}>Cards Pack 4-up</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadCallSheet(session.id)}>Call Sheet (Live)</button>
+                    {(sessionPlaylistsMap[session.id] ?? []).length > 0 && (
+                      <button className="rounded border border-violet-700/70 px-2 py-1 text-violet-200" onClick={() => downloadCrateLabels(session)}>Crate Labels</button>
+                    )}
                     <button className="rounded border border-amber-700/70 bg-amber-950/30 px-2 py-1 text-amber-200" onClick={() => resetSession(session.id, session.session_code)}>Reset Game</button>
 
                     {(() => {
