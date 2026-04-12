@@ -1,14 +1,34 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 
 export default function BracketBattleJumbotronPage() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("sessionId");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen().catch(() => undefined);
+    } else {
+      document.exitFullscreen().catch(() => undefined);
+    }
+  }, []);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "f" || event.key === "F") {
+        toggleFullscreen();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleFullscreen]);
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#090909,#050505)] p-6 text-stone-100">
+    <div ref={containerRef} className="min-h-screen bg-[linear-gradient(180deg,#090909,#050505)] p-6 text-stone-100">
       <div className="mx-auto max-w-5xl rounded-3xl border border-fuchsia-900/40 bg-black/55 p-6">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-3xl font-black uppercase text-fuchsia-100">Bracket Battle Jumbotron</h1>
@@ -32,6 +52,15 @@ export default function BracketBattleJumbotronPage() {
           Keep typography large and high-contrast for mixed lighting and long viewing distance in brewery rooms.
         </section>
       </div>
+
+      <button
+        type="button"
+        onClick={toggleFullscreen}
+        className="fixed bottom-3 right-3 z-50 rounded border border-stone-600/70 bg-black/55 px-3 py-1 text-xs text-stone-200"
+        aria-label="Toggle fullscreen"
+      >
+        Fullscreen (F)
+      </button>
     </div>
   );
 }

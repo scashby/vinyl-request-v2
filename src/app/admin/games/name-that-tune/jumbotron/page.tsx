@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 type Session = {
@@ -36,6 +36,7 @@ type LeaderboardRow = {
 
 export default function NameThatTuneJumbotronPage() {
   const sessionId = Number(useSearchParams().get("sessionId"));
+  const containerRef = useRef<HTMLDivElement>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
@@ -108,13 +109,35 @@ export default function NameThatTuneJumbotronPage() {
   }, [currentCall]);
 
   const overlayMode = session?.host_overlay ?? "none";
+  const showThanks = session?.status === "completed";
   const showOverlay =
     overlayMode === "welcome" ||
     (overlayMode === "countdown" && overlayRemaining > 0) ||
     (overlayMode === "intermission" && overlayRemaining > 0);
 
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen().catch(() => undefined);
+    } else {
+      document.exitFullscreen().catch(() => undefined);
+    }
+  }, []);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "f" || event.key === "F") {
+        toggleFullscreen();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleFullscreen]);
+
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_50%_0%,#5f112e,transparent_38%),linear-gradient(180deg,#020202,#0d0d0d)] p-8 text-white">
+    <div
+      ref={containerRef}
+      className="min-h-screen bg-[radial-gradient(circle_at_50%_0%,#5f112e,transparent_38%),linear-gradient(180deg,#020202,#0d0d0d)] p-8 text-white"
+    >
       <div className="mx-auto max-w-7xl space-y-6">
         <header className="rounded-3xl border border-rose-700/40 bg-black/35 p-6">
           {session?.show_title ? <h1 className="text-5xl font-black uppercase tracking-tight text-rose-200">{session?.title ?? "Name That Tune"}</h1> : null}
@@ -184,6 +207,26 @@ export default function NameThatTuneJumbotronPage() {
             </div>
           </section>
         ) : null}
+
+        {showThanks ? (
+          <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1f2937,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
+            <div className="max-w-4xl rounded-3xl border border-emerald-700/40 bg-black/70 p-10">
+              <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Thanks For Playing</p>
+              <p className="mt-3 text-6xl font-black text-emerald-200">Name That Tune</p>
+              <p className="mt-4 text-2xl text-stone-200">Session {session?.session_code ?? "-"} is complete</p>
+              <p className="mt-6 text-xl text-stone-300">See you at the next round</p>
+            </div>
+          </section>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          className="fixed bottom-3 right-3 z-50 rounded border border-stone-600/70 bg-black/55 px-3 py-1 text-xs text-stone-200"
+          aria-label="Toggle fullscreen"
+        >
+          Fullscreen (F)
+        </button>
       </div>
     </div>
   );

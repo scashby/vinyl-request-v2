@@ -252,7 +252,7 @@ export default function OriginalOrCoverHostPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
-              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/original-or-cover/jumbotron?sessionId=${sessionId}`}>Jumbotron</Link>
+              <button className="rounded border border-stone-700 px-2 py-1" type="button" onClick={() => window.open(`/admin/games/original-or-cover/jumbotron?sessionId=${sessionId}`, "original_or_cover_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/original-or-cover/history">History</Link>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/original-or-cover">Setup</Link>
             </div>

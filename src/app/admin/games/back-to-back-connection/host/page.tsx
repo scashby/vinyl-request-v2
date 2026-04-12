@@ -248,8 +248,8 @@ export default function BackToBackConnectionHostPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
-              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/back-to-back-connection/jumbotron?sessionId=${sessionId}`}>Jumbotron</Link>
-              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/back-to-back-connection/assistant?sessionId=${sessionId}`}>Assistant</Link>
+              <button className="rounded border border-stone-700 px-2 py-1" type="button" onClick={() => window.open(`/admin/games/back-to-back-connection/jumbotron?sessionId=${sessionId}`, "back_to_back_connection_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
+              <button className="rounded border border-stone-700 px-2 py-1" type="button" onClick={() => window.open(`/admin/games/back-to-back-connection/assistant?sessionId=${sessionId}`, "back_to_back_connection_assistant", "width=1024,height=800,left=1300,top=0")}>Assistant</button>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/back-to-back-connection/help">Help</Link>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/back-to-back-connection/history">History</Link>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/back-to-back-connection">Setup</Link>

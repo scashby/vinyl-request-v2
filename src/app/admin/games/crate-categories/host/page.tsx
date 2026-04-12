@@ -261,7 +261,7 @@ export default function CrateCategoriesHostPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
-              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/crate-categories/jumbotron?sessionId=${sessionId}`}>Jumbotron</Link>
+              <button className="rounded border border-stone-700 px-2 py-1" type="button" onClick={() => window.open(`/admin/games/crate-categories/jumbotron?sessionId=${sessionId}`, "crate_categories_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/crate-categories/history">History</Link>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/crate-categories">Setup</Link>
             </div>

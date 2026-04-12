@@ -249,8 +249,8 @@ export default function CoverArtClueChaseHostPage() {
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/cover-art-clue-chase/help">Help</Link>
-              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/cover-art-clue-chase/jumbotron?sessionId=${sessionId}`}>Jumbotron</Link>
-              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/cover-art-clue-chase/assistant?sessionId=${sessionId}`}>Assistant</Link>
+              <button className="rounded border border-stone-700 px-2 py-1" type="button" onClick={() => window.open(`/admin/games/cover-art-clue-chase/jumbotron?sessionId=${sessionId}`, "cover_art_clue_chase_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
+              <button className="rounded border border-stone-700 px-2 py-1" type="button" onClick={() => window.open(`/admin/games/cover-art-clue-chase/assistant?sessionId=${sessionId}`, "cover_art_clue_chase_assistant", "width=1024,height=800,left=1300,top=0")}>Assistant</button>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/cover-art-clue-chase/history">History</Link>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/cover-art-clue-chase">Setup</Link>
             </div>

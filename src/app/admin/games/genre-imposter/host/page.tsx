@@ -348,8 +348,8 @@ export default function GenreImposterHostPage() {
               <p className="text-xs text-stone-500">Playlist: {session?.playlist?.name ?? "(none)"}</p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
-              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/genre-imposter/assistant?sessionId=${sessionId}`}>Assistant</Link>
-              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/genre-imposter/jumbotron?sessionId=${sessionId}`}>Jumbotron</Link>
+              <button className="rounded border border-stone-700 px-2 py-1" type="button" onClick={() => window.open(`/admin/games/genre-imposter/assistant?sessionId=${sessionId}`, "genre_imposter_assistant", "width=1024,height=800,left=1300,top=0")}>Assistant</button>
+              <button className="rounded border border-stone-700 px-2 py-1" type="button" onClick={() => window.open(`/admin/games/genre-imposter/jumbotron?sessionId=${sessionId}`, "genre_imposter_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/genre-imposter/history">History</Link>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/genre-imposter">Setup</Link>
             </div>

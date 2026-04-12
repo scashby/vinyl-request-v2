@@ -358,6 +358,15 @@ export default function NameThatTuneHostPage() {
     }
   };
 
+  const openWindow = useCallback((url: string, name: string, features: string) => {
+    const opened = window.open(url, name, features);
+    if (opened) {
+      opened.focus();
+    } else {
+      window.open(url, "_blank");
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#0c0c0c,#1b1b1b)] p-5 text-stone-100">
       <div className="mx-auto max-w-[1600px] space-y-3">
@@ -375,8 +384,32 @@ export default function NameThatTuneHostPage() {
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
-            <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/name-that-tune/assistant?sessionId=${sessionId}`}>Assistant</Link>
-            <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/name-that-tune/jumbotron?sessionId=${sessionId}`}>Jumbotron</Link>
+            <button
+              type="button"
+              className="rounded border border-stone-700 px-2 py-1"
+              onClick={() =>
+                openWindow(
+                  `/admin/games/name-that-tune/assistant?sessionId=${sessionId}`,
+                  "name_that_tune_assistant",
+                  "width=1024,height=800,left=1300,top=0"
+                )
+              }
+            >
+              Assistant
+            </button>
+            <button
+              type="button"
+              className="rounded border border-stone-700 px-2 py-1"
+              onClick={() =>
+                openWindow(
+                  `/admin/games/name-that-tune/jumbotron?sessionId=${sessionId}`,
+                  "name_that_tune_jumbotron",
+                  "width=1920,height=1080,noopener,noreferrer"
+                )
+              }
+            >
+              Jumbotron
+            </button>
             <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/name-that-tune">Setup</Link>
             <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games">Main</Link>
           </div>

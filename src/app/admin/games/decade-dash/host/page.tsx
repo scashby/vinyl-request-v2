@@ -257,8 +257,8 @@ export default function DecadeDashHostPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
-              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/decade-dash/assistant?sessionId=${sessionId}`}>Assistant</Link>
-              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/decade-dash/jumbotron?sessionId=${sessionId}`}>Jumbotron</Link>
+              <button className="rounded border border-stone-700 px-2 py-1" type="button" onClick={() => window.open(`/admin/games/decade-dash/assistant?sessionId=${sessionId}`, "decade_dash_assistant", "width=1024,height=800,left=1300,top=0")}>Assistant</button>
+              <button className="rounded border border-stone-700 px-2 py-1" type="button" onClick={() => window.open(`/admin/games/decade-dash/jumbotron?sessionId=${sessionId}`, "decade_dash_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/decade-dash/history">History</Link>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/decade-dash">Setup</Link>
             </div>

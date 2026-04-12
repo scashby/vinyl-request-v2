@@ -361,8 +361,8 @@ export default function MusicTriviaHostPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
-              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/music-trivia/prep?sessionId=${sessionId}`}>Prep</Link>
-              <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/music-trivia/jumbotron?sessionId=${sessionId}`}>Jumbotron</Link>
+              <button className="rounded border border-stone-700 px-2 py-1" type="button" onClick={() => window.open(`/admin/games/music-trivia/prep?sessionId=${sessionId}`, "music_trivia_prep", "width=1024,height=800,left=1300,top=0")}>Prep</button>
+              <button className="rounded border border-stone-700 px-2 py-1" type="button" onClick={() => window.open(`/admin/games/music-trivia/jumbotron?sessionId=${sessionId}`, "music_trivia_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/music-trivia/history">History</Link>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/music-trivia">Setup</Link>
             </div>
