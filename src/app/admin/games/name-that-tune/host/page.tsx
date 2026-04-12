@@ -374,11 +374,56 @@ export default function NameThatTuneHostPage() {
                           onSave={(nextValue) => patchCallMetadata(call.id, { title_answer: nextValue })}
                           value={call.title_answer}
                         />
+
+                        const patchSession = useCallback(
+                          async (patch: Record<string, unknown>) => {
+                            const res = await fetch(`/api/games/name-that-tune/sessions/${sessionId}`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify(patch),
+                            });
+                            if (!res.ok) {
+                              const payload = await res.json().catch(() => null);
+                              throw new Error(payload?.error ?? "Failed to update session");
+                            }
+                            await load();
+                          },
+                          [sessionId, load]
+                        );
+
+                        const toggleIntermission = async () => {
+                          if (!session) return;
+                          if (session.host_overlay === "intermission") {
+                            await setOverlay("none");
+                            if (session.status === "paused") await resume();
+                            return;
+                          }
+                          if (session.status === "running") await pause();
+                          await setOverlay("intermission", overlaySecondsInput);
+                        };
+
+                        const startGame = async () => {
+                          if (session?.status === "running") await pause();
+                          await setOverlay("countdown", 300);
+                        };
+
+                        const startRound = async () => {
+                          if (!session) return;
+                          if (session.host_overlay !== "none") await setOverlay("none");
+                          if (session.status === "paused") await resume();
+                          if ((session.current_call_index ?? 0) === 0) await advance();
+                        };
+
+                        const endGame = async () => {
+                          setAutoAdvanceEnabled(false);
+                          await patchSession({ status: "completed", ended_at: new Date().toISOString() });
+                          await setOverlay("none");
+                        };
                       </td>
                       <td className="py-1">
-                        <InlineEditableCell
-                          onSave={(nextValue) => patchCallMetadata(call.id, { source_label: nextValue || null })}
-                          value={call.source_label ?? ""}
+                          <div className="min-h-screen bg-[linear-gradient(180deg,#0c0c0c,#1b1b1b)] p-5 text-stone-100">
+                            <div className="mx-auto max-w-[1600px] space-y-3">
+                              <header className="rounded-2xl border border-red-900/40 bg-black/60 p-4">
                         />
                       </td>
                       <td className="py-2">{call.snippet_duration_seconds}s</td>
@@ -387,64 +432,126 @@ export default function NameThatTuneHostPage() {
                   ))}
                 </tbody>
               </table>
+                                  <span className="rounded border border-stone-700 px-2 py-1 text-xs text-stone-400 capitalize">
+                                    {session?.status ?? "-"}
+                                  </span>
+                                </div>
+
+                                <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                                  <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/name-that-tune/assistant?sessionId=${sessionId}`}>Assistant</Link>
+                                  <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/name-that-tune/jumbotron?sessionId=${sessionId}`}>Jumbotron</Link>
+                                  <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/name-that-tune">Setup</Link>
+                                  <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games">Main</Link>
+                                </div>
+                              </header>
+
+                              <section className="rounded-2xl border border-stone-700 bg-black/45 p-3">
+                                <div className="grid gap-3 lg:grid-cols-[1fr,1fr,0.9fr] text-xs">
+                                  <div className="space-y-2">
+                                    <div className="grid grid-cols-3 gap-2">
+                                      <button disabled={overlayBusy || working} onClick={() => setOverlay("welcome")} className="rounded border border-violet-700 bg-violet-900/25 px-3 py-1 font-bold text-violet-300 disabled:opacity-50">Welcome</button>
+                                      <button disabled={overlayBusy || working} onClick={toggleIntermission} className="rounded border border-amber-700 bg-amber-900/25 px-3 py-1 font-bold text-amber-300 disabled:opacity-50">Intermission</button>
+                                      <button disabled={working} onClick={endGame} className="rounded border border-red-700 px-3 py-1 text-red-300 disabled:opacity-50">End Game</button>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <button disabled={overlayBusy || working} onClick={startGame} className="rounded border border-sky-700 bg-sky-900/35 px-3 py-1 font-bold text-sky-200 disabled:opacity-50">Start Game</button>
+                                      <button disabled={working} onClick={startRound} className="rounded border border-emerald-700 bg-emerald-900/35 px-3 py-1 font-bold text-emerald-200 disabled:opacity-50">Start Round</button>
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <p className="text-stone-400">Overlay: {session?.host_overlay ?? "none"}</p>
+                                    <p className="text-stone-400">Remaining: {remaining}s</p>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <label className="inline-flex items-center gap-1 text-stone-300">
+                                        Intermission
+                                        <input
+                                          type="number"
+                                          min={30}
+                                          max={3600}
+                                          className="w-20 rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                                          value={overlaySecondsInput}
+                                          onChange={(e) => setOverlaySecondsInput(Math.max(30, Number(e.target.value) || 30))}
+                                        />
+                                        sec
+                                      </label>
+                                      <button disabled={overlayBusy || working} onClick={() => setOverlay("none")} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Clear Overlay</button>
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <label className="inline-flex items-center gap-1 text-stone-300">
+                                        Next Gap
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          max={300}
+                                          className="w-20 rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                                          value={targetGapInput}
+                                          onChange={(e) => setTargetGapInput(Number(e.target.value) || 0)}
+                                        />
+                                        sec
+                                      </label>
+                                      <button disabled={savingGap || working} onClick={saveTargetGap} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">{savingGap ? "Saving..." : "Save Gap"}</button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                      <button disabled={working} onClick={session?.status === "paused" ? resume : pause} className="rounded border border-amber-700 px-2 py-1 text-amber-300 disabled:opacity-50">{session?.status === "paused" ? "Resume" : "Pause"}</button>
+                                      <button disabled={working} onClick={() => setAutoAdvanceEnabled((value) => !value)} className={`rounded border px-2 py-1 disabled:opacity-50 ${autoAdvanceEnabled ? "border-emerald-600 text-emerald-300" : "border-stone-600"}`}>Auto-Call {autoAdvanceEnabled ? "On" : "Off"}</button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </section>
+
+                              <div className="grid gap-4 lg:grid-cols-[1.2fr,1fr]">
+                                <section className="rounded-2xl border border-stone-700 bg-black/45 p-4">
+                                  <h2 className="text-sm font-bold uppercase tracking-wide text-rose-200">Call Order (Game Playlist)</h2>
+                                  <div className="mt-3 overflow-x-auto">
+                                    <table className="w-full text-left text-xs">
+                                      <thead>
+                                        <tr className="text-stone-300">
+                                          <th className="pb-2">#</th>
+                                          <th className="pb-2">Round</th>
+                                          <th className="pb-2">Artist</th>
+                                          <th className="pb-2">Title</th>
+                                          <th className="pb-2">Source</th>
+                                          <th className="pb-2">Snippet</th>
+                                          <th className="pb-2">Status</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {calls.map((call) => (
+                                          <tr key={call.id} className="border-t border-stone-800 align-top">
+                                            <td className="py-2 font-bold text-rose-300">{call.call_index}</td>
+                                            <td className="py-2">{call.round_number}</td>
+                                            <td className="py-1">
+                                              <InlineEditableCell
+                                                onSave={(nextValue) => patchCallMetadata(call.id, { artist_answer: nextValue })}
+                                                value={call.artist_answer}
+                                              />
+                                            </td>
+                                            <td className="py-1">
+                                              <InlineEditableCell
+                                                onSave={(nextValue) => patchCallMetadata(call.id, { title_answer: nextValue })}
+                                                value={call.title_answer}
+                                              />
+                                            </td>
+                                            <td className="py-1">
+                                              <InlineEditableCell
+                                                onSave={(nextValue) => patchCallMetadata(call.id, { source_label: nextValue || null })}
+                                                value={call.source_label ?? ""}
+                                              />
+                                            </td>
+                                            <td className="py-2">{call.snippet_duration_seconds}s</td>
+                                            <td className="py-2 text-stone-400">{call.status}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </section>
             </div>
-          </section>
-
-          <section className="space-y-4">
-            <div className="rounded-2xl border border-stone-700 bg-black/45 p-4">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-rose-200">Current Snippet</h2>
-              <div className="mt-3 rounded border border-rose-700/40 bg-rose-950/20 p-3">
-                <p className="text-xs uppercase text-rose-300">
-                  {callForControls
-                    ? `Snippet ${callForControls.call_index} · Round ${callForControls.round_number}`
-                    : "Waiting"}
-                </p>
-                <p className="mt-1 text-lg font-black">
-                  {(callForControls?.status === "answer_revealed" || callForControls?.status === "scored")
-                    ? `${callForControls.artist_answer} - ${callForControls.title_answer}`
-                    : "Answer hidden until reveal"}
-                </p>
-                <p className="mt-2 text-sm text-stone-300">
-                  Source: {callForControls?.source_label ?? "Unlabeled"} · Snippet: {callForControls?.snippet_duration_seconds ?? 0}s · Lock rule: {session?.lock_in_rule ?? "-"} ({session?.lock_in_window_seconds ?? 0}s)
-                </p>
-                {callForControls?.host_notes ? (
-                  <p className="mt-2 text-xs text-stone-400">Host note: {callForControls.host_notes}</p>
-                ) : null}
-                <p className="mt-1 text-[11px] text-stone-500">
-                  Click Artist/Title/Source fields in Snippet Stack to edit inline. Press Enter to save.
-                </p>
-              </div>
-
-              <div className="mt-3 text-xs">
-                <p className="font-semibold text-stone-300">Recently Played</p>
-                <div className="mt-1 max-h-24 overflow-auto text-stone-400">
-                  {previousCalls.map((call) => (
-                    <div key={call.id}>#{call.call_index} {call.artist_answer} - {call.title_answer} ({call.status})</div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-stone-700 bg-black/45 p-4">
-              <p className="text-xs uppercase text-rose-300">Controls</p>
-              <p className="mt-1 text-xs text-stone-400">Gap timer target: {session?.target_gap_seconds ?? 0}s · Remaining: {remaining}s · Status: {session?.status ?? "-"}</p>
-              <p className="mt-1 text-xs text-stone-400">
-                Overlay: {session?.host_overlay ?? "none"}
-                {(session?.host_overlay === "countdown" || session?.host_overlay === "intermission")
-                  ? ` · ${session?.host_overlay_remaining_seconds ?? 0}s left`
-                  : ""}
-              </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                <label className="inline-flex items-center gap-1">
-                  <span className="text-stone-300">Target gap</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={300}
-                    className="w-20 rounded border border-stone-700 bg-stone-950 px-2 py-1"
-                    value={targetGapInput}
-                    onChange={(e) => setTargetGapInput(Number(e.target.value) || 0)}
-                  />
+                                <section className="space-y-4">
                   <span className="text-stone-400">sec</span>
                 </label>
                 <button
