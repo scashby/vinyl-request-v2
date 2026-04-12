@@ -144,7 +144,6 @@ export default function NameThatTuneSetupPage() {
     [teamNamesText]
   );
   const snippets = useMemo(() => playlistSnippets, [playlistSnippets]);
-  const preflightComplete = useMemo(() => Object.values(preflight).every(Boolean), [preflight]);
   const targetGapSeconds = useMemo(
     () => removeResleeveSeconds + findRecordSeconds + cueSeconds + hostBufferSeconds,
     [cueSeconds, findRecordSeconds, hostBufferSeconds, removeResleeveSeconds]
@@ -434,6 +433,9 @@ export default function NameThatTuneSetupPage() {
 
           <div className="mt-4 rounded-xl border border-stone-700 bg-stone-950/80 p-3 text-sm">
             <p className="font-semibold uppercase tracking-wide text-rose-200">Preflight Checklist</p>
+            <p className="mt-1 text-xs text-stone-400">
+              Advisory only for planning mode. You can create sessions now and complete these checks on event day.
+            </p>
             <div className="mt-2 grid gap-2 md:grid-cols-2">
               <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.snippetsPreCue} onChange={(e) => setPreflight((p) => ({ ...p, snippetsPreCue: e.target.checked }))} /> <span>Snippets pre-cued by round <InlineFieldHelp label="Snippets pre-cued by round" /></span></label>
               <label className="inline-flex items-center gap-2"><input type="checkbox" checked={preflight.cratePullStaged} onChange={(e) => setPreflight((p) => ({ ...p, cratePullStaged: e.target.checked }))} /> <span>Crate/playlist pull staged ({recommendedPullSize} snippets) <InlineFieldHelp label="Crate/playlist pull staged" /></span></label>
@@ -442,7 +444,7 @@ export default function NameThatTuneSetupPage() {
             </div>
           </div>
 
-          <button disabled={!playlistId || playlistTooSmall || playlistSnippetsLoading || !!playlistSnippetsError || !preflightComplete || teamNames.length < 2 || roundCountWarning || creating} onClick={createSession} className="mt-5 rounded bg-rose-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+          <button disabled={!playlistId || playlistTooSmall || playlistSnippetsLoading || !!playlistSnippetsError || teamNames.length < 2 || roundCountWarning || creating} onClick={createSession} className="mt-5 rounded bg-rose-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
             {creating ? "Creating..." : "Create Session"}
           </button>
         </section>
