@@ -15,6 +15,8 @@ type Session = {
   show_title: boolean;
   show_rounds: boolean;
   show_scoreboard: boolean;
+  host_overlay?: "none" | "welcome" | "countdown" | "intermission";
+  host_overlay_remaining_seconds?: number;
 };
 
 type Call = {
@@ -38,6 +40,7 @@ export default function NameThatTuneJumbotronPage() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [remaining, setRemaining] = useState(0);
+  const [overlayRemaining, setOverlayRemaining] = useState(0);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -52,6 +55,7 @@ export default function NameThatTuneJumbotronPage() {
       const payload = await sessionRes.json();
       setSession(payload);
       setRemaining(payload.remaining_seconds ?? 0);
+      setOverlayRemaining(payload.host_overlay_remaining_seconds ?? 0);
     }
 
     if (callsRes.ok) {
@@ -77,6 +81,11 @@ export default function NameThatTuneJumbotronPage() {
         if (!session || session.status === "paused") return value;
         return Math.max(0, value - 1);
       });
+      setOverlayRemaining((value) => {
+        if (!session) return value;
+        if (session.host_overlay !== "countdown" && session.host_overlay !== "intermission") return value;
+        return Math.max(0, value - 1);
+      });
     }, 1000);
 
     return () => clearInterval(tick);
@@ -97,6 +106,12 @@ export default function NameThatTuneJumbotronPage() {
     if (currentCall.status === "skipped") return "Snippet skipped by host";
     return "Get ready for next snippet";
   }, [currentCall]);
+
+  const overlayMode = session?.host_overlay ?? "none";
+  const showOverlay =
+    overlayMode === "welcome" ||
+    (overlayMode === "countdown" && overlayRemaining > 0) ||
+    (overlayMode === "intermission" && overlayRemaining > 0);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_50%_0%,#5f112e,transparent_38%),linear-gradient(180deg,#020202,#0d0d0d)] p-8 text-white">
@@ -136,6 +151,36 @@ export default function NameThatTuneJumbotronPage() {
                 </div>
               ))}
               {leaderboard.length === 0 ? <p className="text-stone-400">No scores yet</p> : null}
+            </div>
+          </section>
+        ) : null}
+
+        {showOverlay ? (
+          <section className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-8 text-center">
+            <div className="max-w-4xl rounded-3xl border border-rose-700/40 bg-black/70 p-8">
+              {overlayMode === "welcome" ? (
+                <>
+                  <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Welcome</p>
+                  <p className="mt-2 text-6xl font-black text-rose-200">Name That Tune</p>
+                  <p className="mt-4 text-2xl text-stone-200">Get ready for the next round</p>
+                </>
+              ) : null}
+
+              {overlayMode === "countdown" ? (
+                <>
+                  <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Starting Soon</p>
+                  <p className="mt-2 text-7xl font-black text-rose-200">{overlayRemaining}s</p>
+                  <p className="mt-4 text-2xl text-stone-200">Game starts in</p>
+                </>
+              ) : null}
+
+              {overlayMode === "intermission" ? (
+                <>
+                  <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Intermission</p>
+                  <p className="mt-2 text-7xl font-black text-amber-300">{overlayRemaining}s</p>
+                  <p className="mt-4 text-2xl text-stone-200">Next snippet after the break</p>
+                </>
+              ) : null}
             </div>
           </section>
         ) : null}

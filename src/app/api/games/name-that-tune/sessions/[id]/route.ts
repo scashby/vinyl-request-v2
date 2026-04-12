@@ -38,12 +38,17 @@ type SessionEventRow = {
   payload: { call_id?: unknown } | null;
 };
 
+type OverlayEventRow = {
+  payload: { mode?: unknown; ends_at?: unknown } | null;
+};
+
 type TransportEventRow = {
   event_type: string;
   payload: { call_id?: unknown; after_call_id?: unknown } | null;
 };
 
 const DONE_STATUSES = new Set(["asked", "locked", "answer_revealed", "scored", "skipped"]);
+const OVERLAY_MODES = new Set(["none", "welcome", "countdown", "intermission"]);
 
 function parseSessionId(id: string) {
   const sessionId = Number(id);
@@ -54,6 +59,19 @@ function parseSessionId(id: string) {
 function parseEventCallId(raw: unknown): number | null {
   const value = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : Number.NaN;
   return Number.isFinite(value) ? value : null;
+}
+
+function parseOverlayMode(raw: unknown): "none" | "welcome" | "countdown" | "intermission" {
+  const value = typeof raw === "string" ? raw : "none";
+  if (!OVERLAY_MODES.has(value)) return "none";
+  return value as "none" | "welcome" | "countdown" | "intermission";
+}
+
+function computeOverlayRemainingSeconds(rawEndsAt: unknown): number {
+  if (typeof rawEndsAt !== "string" || !rawEndsAt) return 0;
+  const endsAtMs = Date.parse(rawEndsAt);
+  if (!Number.isFinite(endsAtMs)) return 0;
+  return Math.max(0, Math.ceil((endsAtMs - Date.now()) / 1000));
 }
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -74,7 +92,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     ? await db.from("events").select("id, title, date, time, location").eq("id", session.event_id).maybeSingle()
     : { data: null };
 
-  const [{ data: calls }, { data: cueEvent }, { data: pullEvent }, { data: promoteEvents }, { data: transportEvents }] = await Promise.all([
+  const [{ data: calls }, { data: cueEvent }, { data: pullEvent }, { data: promoteEvents }, { data: transportEvents }, { data: overlayEvent }] = await Promise.all([
     db.from("ntt_session_calls").select("id, call_index, status").eq("session_id", sessionId),
     dbAny
       .from("ntt_session_events")
@@ -106,6 +124,14 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       .in("event_type", ["cue_set", "pull_set", "pull_promote", "call_set"])
       .order("id", { ascending: true })
       .limit(5000),
+    dbAny
+      .from("ntt_session_events")
+      .select("payload")
+      .eq("session_id", sessionId)
+      .eq("event_type", "overlay_set")
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const typedCueEvent = (cueEvent ?? null) as SessionEventRow | null;
@@ -141,6 +167,14 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     }
   );
 
+  const typedOverlayEvent = (overlayEvent ?? null) as OverlayEventRow | null;
+  const baseOverlayMode = parseOverlayMode(typedOverlayEvent?.payload?.mode);
+  const overlayRemainingSeconds = computeOverlayRemainingSeconds(typedOverlayEvent?.payload?.ends_at);
+  const hostOverlay =
+    (baseOverlayMode === "countdown" || baseOverlayMode === "intermission") && overlayRemainingSeconds <= 0
+      ? "none"
+      : baseOverlayMode;
+
   return NextResponse.json(
     {
       ...session,
@@ -151,6 +185,8 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       pull_call_id: pullCallId,
       promoted_call_ids: promotedCallIds,
       transport_queue_call_ids: queueIds,
+      host_overlay: hostOverlay,
+      host_overlay_remaining_seconds: overlayRemainingSeconds,
     },
     { status: 200 }
   );
@@ -168,6 +204,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "playlist_id",
     "current_round",
     "current_call_index",
+    "target_gap_seconds",
     "show_title",
     "show_rounds",
     "show_scoreboard",

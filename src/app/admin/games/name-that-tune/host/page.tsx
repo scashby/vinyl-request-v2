@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import InlineEditableCell from "../../_components/InlineEditableCell";
 import GameTransportLane, { type TransportCallRow } from "../../_components/GameTransportLane";
@@ -19,6 +19,8 @@ type Session = {
   remaining_seconds: number;
   target_gap_seconds: number;
   transport_queue_call_ids?: number[];
+  host_overlay?: "none" | "welcome" | "countdown" | "intermission";
+  host_overlay_remaining_seconds?: number;
 };
 
 type Call = {
@@ -61,6 +63,13 @@ export default function NameThatTuneHostPage() {
   const [scoreDraft, setScoreDraft] = useState<ScoreDraft>({});
   const [saving, setSaving] = useState(false);
   const [working, setWorking] = useState(false);
+  const [remaining, setRemaining] = useState(0);
+  const [autoAdvanceEnabled, setAutoAdvanceEnabled] = useState(false);
+  const [targetGapInput, setTargetGapInput] = useState(45);
+  const [savingGap, setSavingGap] = useState(false);
+  const [overlaySecondsInput, setOverlaySecondsInput] = useState(600);
+  const [overlayBusy, setOverlayBusy] = useState(false);
+  const autoAdvanceLockRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -71,7 +80,12 @@ export default function NameThatTuneHostPage() {
       fetch(`/api/games/name-that-tune/sessions/${sessionId}/leaderboard`),
     ]);
 
-    if (sessionRes.ok) setSession(await sessionRes.json());
+    if (sessionRes.ok) {
+      const payload = await sessionRes.json();
+      setSession(payload);
+      setRemaining(payload.remaining_seconds ?? 0);
+      setTargetGapInput(payload.target_gap_seconds ?? 45);
+    }
     if (callsRes.ok) {
       const payload = await callsRes.json();
       setCalls(payload.data ?? []);
@@ -87,6 +101,14 @@ export default function NameThatTuneHostPage() {
     const poll = setInterval(load, 3000);
     return () => clearInterval(poll);
   }, [load]);
+
+  useEffect(() => {
+    const tick = setInterval(() => {
+      if (!session || session.status !== "running" || (session.current_call_index ?? 0) <= 0) return;
+      setRemaining((value) => Math.max(0, value - 1));
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [session]);
 
   const activeCall = useMemo(() => {
     if (!session) return null;
@@ -244,6 +266,62 @@ export default function NameThatTuneHostPage() {
     }
   };
 
+  useEffect(() => {
+    if (!autoAdvanceEnabled || !session || session.status !== "running" || remaining > 0 || autoAdvanceLockRef.current) {
+      return;
+    }
+
+    autoAdvanceLockRef.current = true;
+    (async () => {
+      try {
+        await advance();
+      } finally {
+        autoAdvanceLockRef.current = false;
+      }
+    })();
+  }, [autoAdvanceEnabled, session, remaining]);
+
+  const saveTargetGap = async () => {
+    const nextTarget = Math.max(0, Math.min(300, Number(targetGapInput) || 0));
+    setSavingGap(true);
+    try {
+      const res = await fetch(`/api/games/name-that-tune/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_gap_seconds: nextTarget }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        throw new Error(payload?.error ?? "Failed to update target gap");
+      }
+      await load();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to update target gap");
+    } finally {
+      setSavingGap(false);
+    }
+  };
+
+  const setOverlay = async (mode: "none" | "welcome" | "countdown" | "intermission", durationSeconds?: number) => {
+    setOverlayBusy(true);
+    try {
+      const res = await fetch(`/api/games/name-that-tune/sessions/${sessionId}/overlay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode, duration_seconds: durationSeconds ?? 0 }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        throw new Error(payload?.error ?? "Failed to update overlay");
+      }
+      await load();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to update overlay");
+    } finally {
+      setOverlayBusy(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#090909,#171717)] p-6 text-stone-100">
       <div className="mx-auto max-w-7xl space-y-4">
@@ -349,7 +427,59 @@ export default function NameThatTuneHostPage() {
 
             <div className="rounded-2xl border border-stone-700 bg-black/45 p-4">
               <p className="text-xs uppercase text-rose-300">Controls</p>
-              <p className="mt-1 text-xs text-stone-400">Gap timer target: {session?.target_gap_seconds ?? 0}s · Remaining: {session?.remaining_seconds ?? 0}s · Status: {session?.status ?? "-"}</p>
+              <p className="mt-1 text-xs text-stone-400">Gap timer target: {session?.target_gap_seconds ?? 0}s · Remaining: {remaining}s · Status: {session?.status ?? "-"}</p>
+              <p className="mt-1 text-xs text-stone-400">
+                Overlay: {session?.host_overlay ?? "none"}
+                {(session?.host_overlay === "countdown" || session?.host_overlay === "intermission")
+                  ? ` · ${session?.host_overlay_remaining_seconds ?? 0}s left`
+                  : ""}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <label className="inline-flex items-center gap-1">
+                  <span className="text-stone-300">Target gap</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={300}
+                    className="w-20 rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                    value={targetGapInput}
+                    onChange={(e) => setTargetGapInput(Number(e.target.value) || 0)}
+                  />
+                  <span className="text-stone-400">sec</span>
+                </label>
+                <button
+                  disabled={savingGap || working}
+                  onClick={saveTargetGap}
+                  className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50"
+                >
+                  {savingGap ? "Saving..." : "Save Gap"}
+                </button>
+                <button
+                  disabled={working}
+                  onClick={() => setAutoAdvanceEnabled((value) => !value)}
+                  className={`rounded border px-2 py-1 disabled:opacity-50 ${autoAdvanceEnabled ? "border-emerald-600 text-emerald-300" : "border-stone-600"}`}
+                >
+                  Auto Advance: {autoAdvanceEnabled ? "On" : "Off"}
+                </button>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <button disabled={overlayBusy || working} onClick={() => setOverlay("welcome")} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Show Welcome</button>
+                <button disabled={overlayBusy || working} onClick={() => setOverlay("countdown", 300)} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Start 5m Countdown</button>
+                <label className="inline-flex items-center gap-1 text-stone-300">
+                  Intermission
+                  <input
+                    type="number"
+                    min={30}
+                    max={3600}
+                    className="w-20 rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                    value={overlaySecondsInput}
+                    onChange={(e) => setOverlaySecondsInput(Math.max(30, Number(e.target.value) || 30))}
+                  />
+                  sec
+                </label>
+                <button disabled={overlayBusy || working} onClick={() => setOverlay("intermission", overlaySecondsInput)} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Start Intermission</button>
+                <button disabled={overlayBusy || working} onClick={() => setOverlay("none")} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Clear Overlay</button>
+              </div>
               <div className="mt-2 flex flex-wrap gap-2 text-xs">
                 <button disabled={working} onClick={advance} className="rounded bg-rose-700 px-2 py-1 disabled:opacity-50">Advance Snippet</button>
                 <button disabled={working || !callForControls} onClick={() => patchCallStatus("asked")} className="rounded bg-blue-700 px-2 py-1 disabled:opacity-50">Mark Asked</button>
