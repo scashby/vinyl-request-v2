@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { formatBallLabel, getBingoColumnTextClass } from "src/lib/bingoBall";
 import type { GameMode } from "src/lib/bingoEngine";
+import { emitBingoSessionSync } from "src/lib/bingoSessionSync";
 import InlineEditableCell from "../../_components/InlineEditableCell";
 import BingoTransportLane, { type BingoTransportCall } from "../_components/BingoTransportLane";
 
@@ -187,11 +188,14 @@ export default function BingoHostPage() {
 
   const patchSession = useCallback(
     async (patch: Record<string, unknown>) => {
-      await fetch(`/api/games/bingo/sessions/${sessionId}`, {
+      const response = await fetch(`/api/games/bingo/sessions/${sessionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       });
+      if (response.ok) {
+        emitBingoSessionSync(sessionId);
+      }
       await load();
     },
     [sessionId, load]

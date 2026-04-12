@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { GameMode } from "src/lib/bingoEngine";
 import { getBingoColumnTextClass } from "src/lib/bingoBall";
+import { subscribeToBingoSessionSync } from "src/lib/bingoSessionSync";
 import { buildWelcomeRulesContent, type RoundModesEntry } from "src/lib/bingoModes";
 
 type Session = {
@@ -256,9 +257,17 @@ export default function BingoJumbotronPage() {
   useEffect(() => {
     load();
     const isIdle = session?.status === "paused" || session?.status === "completed";
-    const poll = setInterval(load, isIdle ? 30_000 : 3_000);
+    const poll = setInterval(load, isIdle ? 30_000 : 1_000);
     return () => clearInterval(poll);
   }, [load, session?.status]);
+
+  useEffect(() => {
+    if (!Number.isFinite(sessionId)) return;
+    return subscribeToBingoSessionSync((changedSessionId) => {
+      if (changedSessionId !== sessionId) return;
+      load();
+    });
+  }, [sessionId, load]);
 
   useEffect(() => {
     const tick = setInterval(() => {
