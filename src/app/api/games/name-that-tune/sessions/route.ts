@@ -46,6 +46,13 @@ type SessionListRow = {
 
 type EventRow = { id: number; title: string };
 
+function normalizeOptionalEventId(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
 function normalizeTeamNames(teamNames: string[] | undefined): string[] {
   const names = (teamNames ?? []).map((name) => name.trim()).filter(Boolean);
   return Array.from(new Set(names));
@@ -165,6 +172,7 @@ export async function POST(request: NextRequest) {
   try {
     const db = getNameThatTuneDb();
     const body = (await request.json()) as CreateSessionBody;
+    const normalizedEventId = normalizeOptionalEventId(body.event_id);
 
     const roundCount = normalizeRoundCount(body.round_count);
     const playlistId = Number(body.playlist_id);
@@ -183,6 +191,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "At least 2 team names are required" }, { status: 400 });
     }
 
+    if (normalizedEventId !== null) {
+      const { data: existingEvent, error: eventLookupError } = await db
+        .from("events")
+        .select("id")
+        .eq("id", normalizedEventId)
+        .maybeSingle();
+
+      if (eventLookupError) {
+        return NextResponse.json({ error: eventLookupError.message }, { status: 500 });
+      }
+
+      if (!existingEvent) {
+        return NextResponse.json({ error: "Selected event does not exist" }, { status: 400 });
+      }
+    }
+
     const snippets = shuffle(await buildSnippetsFromPlaylist(playlistId)).slice(0, roundCount);
     if (snippets.length < roundCount) {
       return NextResponse.json(
@@ -196,7 +220,7 @@ export async function POST(request: NextRequest) {
     const { data: session, error: sessionError } = await db
       .from("ntt_sessions")
       .insert({
-        event_id: body.event_id ?? null,
+        event_id: normalizedEventId,
         playlist_id: playlistId,
         session_code: code,
         title: (body.title ?? "Name That Tune Session").trim() || "Name That Tune Session",
