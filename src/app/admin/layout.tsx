@@ -14,8 +14,8 @@ function RequireAuth({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Game display windows (host/assistant/jumbotron) should render without the
-  // admin shell — no sidebar, no hamburger, no content offset margin.
-  const isGameDisplay = /\/admin\/games\/bingo\/(host|assistant|jumbotron)(\?|$)/.test(pathname);
+  // admin shell - no sidebar, no hamburger, no content offset margin.
+  const isGameDisplay = /\/admin\/games\/[^/]+\/(host|assistant|jumbotron)(\?|$)/.test(pathname);
 
   useEffect(() => {
     const timer = setTimeout(() => {
