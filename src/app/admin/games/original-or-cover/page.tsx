@@ -350,6 +350,7 @@ export default function OriginalOrCoverSetupPage() {
                   <p>{session.session_code} · {session.title} · Event: {session.event_title ?? "(none)"}</p>
                   <p className="text-stone-400">Round {session.current_round} / {session.round_count} · Calls {session.calls_scored}/{session.calls_total} scored · Scoring {session.points_correct_call}+{session.bonus_original_artist_points} · Status: {session.status}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
+                    <Link className="rounded border border-emerald-700 px-2 py-1 text-xs" href={`/admin/games/original-or-cover/edit?sessionId=${session.id}`}>Edit</Link>
                     <Link className="rounded border border-stone-700 px-2 py-1 text-xs" href={`/admin/games/original-or-cover/host?sessionId=${session.id}`}>Host</Link>
                     <Link className="rounded border border-stone-700 px-2 py-1 text-xs" href={`/admin/games/original-or-cover/assistant?sessionId=${session.id}`}>Assistant</Link>
                     <Link className="rounded border border-stone-700 px-2 py-1 text-xs" href={`/admin/games/original-or-cover/jumbotron?sessionId=${session.id}`}>Jumbotron</Link>

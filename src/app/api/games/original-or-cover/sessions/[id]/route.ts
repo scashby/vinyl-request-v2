@@ -24,16 +24,24 @@ type SessionRow = {
   paused_at: string | null;
   current_call_index: number;
   show_title: boolean;
+  show_logo: boolean;
   show_round: boolean;
   show_scoreboard: boolean;
   show_prompt: boolean;
+  welcome_heading_text: string | null;
+  welcome_message_text: string | null;
+  intermission_heading_text: string | null;
+  intermission_message_text: string | null;
+  thanks_heading_text: string | null;
+  thanks_subheading_text: string | null;
+  default_intermission_seconds: number;
   status: "pending" | "running" | "paused" | "completed";
   created_at: string;
   started_at: string | null;
   ended_at: string | null;
 };
 
-type EventRow = { id: number; title: string; date: string; time: string | null; location: string | null };
+type EventRow = { id: number; title: string; date: string; time: string | null; location: string | null; venue_logo_url: string | null };
 type PlaylistRow = { id: number; name: string; track_count: number };
 
 function parseSessionId(id: string) {
@@ -54,18 +62,37 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   if (!data) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
   const session = data as SessionRow;
-  const { data: event } = session.event_id
-    ? await db.from("events").select("id, title, date, time, location").eq("id", session.event_id).maybeSingle()
-    : { data: null };
-  const { data: playlist } = session.playlist_id
-    ? await db
-        .from("collection_playlists")
-        .select("id, name, track_count")
-        .eq("id", session.playlist_id)
-        .maybeSingle()
-    : { data: null };
+  const [{ data: event }, { data: playlist }, { data: calls }, { data: overlayEvent }] = await Promise.all([
+    session.event_id
+      ? db.from("events").select("id, title, date, time, location, venue_logo_url").eq("id", session.event_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    session.playlist_id
+      ? db
+          .from("collection_playlists")
+          .select("id, name, track_count")
+          .eq("id", session.playlist_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    db.from("ooc_session_calls").select("id").eq("session_id", sessionId),
+    db
+      .from("ooc_session_events")
+      .select("payload, created_at")
+      .eq("session_id", sessionId)
+      .eq("event_type", "overlay_set")
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
-  const { data: calls } = await db.from("ooc_session_calls").select("id").eq("session_id", sessionId);
+  const overlayPayload = (overlayEvent?.payload ?? null) as
+    | { mode?: unknown; duration_seconds?: unknown; started_at?: unknown; ends_at?: unknown }
+    | null;
+  const overlayMode =
+    typeof overlayPayload?.mode === "string" && ["none", "welcome", "countdown", "intermission", "thanks"].includes(overlayPayload.mode)
+      ? (overlayPayload.mode as "none" | "welcome" | "countdown" | "intermission" | "thanks")
+      : "none";
+  const overlayEndsAt = typeof overlayPayload?.ends_at === "string" ? new Date(overlayPayload.ends_at).getTime() : Number.NaN;
+  const overlayRemainingSeconds = Number.isFinite(overlayEndsAt) ? Math.max(0, Math.ceil((overlayEndsAt - Date.now()) / 1000)) : 0;
 
   return NextResponse.json(
     {
@@ -74,6 +101,8 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       playlist: (playlist ?? null) as PlaylistRow | null,
       remaining_seconds: computeOriginalOrCoverRemainingSeconds(session),
       calls_total: (calls ?? []).length,
+      host_overlay: overlayMode,
+      host_overlay_remaining_seconds: overlayRemainingSeconds,
     },
     { status: 200 }
   );
@@ -96,15 +125,51 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "paused_remaining_seconds",
     "paused_at",
     "show_title",
+    "show_logo",
     "show_round",
     "show_scoreboard",
     "show_prompt",
+    "welcome_heading_text",
+    "welcome_message_text",
+    "intermission_heading_text",
+    "intermission_message_text",
+    "thanks_heading_text",
+    "thanks_subheading_text",
+    "default_intermission_seconds",
+    "round_count",
+    "points_correct_call",
+    "bonus_original_artist_points",
+    "remove_resleeve_seconds",
+    "find_record_seconds",
+    "cue_seconds",
+    "host_buffer_seconds",
+    "target_gap_seconds",
     "status",
     "started_at",
     "ended_at",
   ]);
 
   const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key)));
+
+  const timerFields = ["remove_resleeve_seconds", "find_record_seconds", "cue_seconds", "host_buffer_seconds"] as const;
+  const hasAnyTimerChange = timerFields.some((field) => field in patch);
+  const hasExplicitTargetGap = "target_gap_seconds" in patch;
+
+  if (hasAnyTimerChange && !hasExplicitTargetGap) {
+    const { data: current } = await getOriginalOrCoverDb()
+      .from("ooc_sessions")
+      .select("remove_resleeve_seconds, find_record_seconds, cue_seconds, host_buffer_seconds")
+      .eq("id", sessionId)
+      .maybeSingle();
+
+    if (current) {
+      const removeResleeveSeconds = Number(patch.remove_resleeve_seconds ?? current.remove_resleeve_seconds ?? 0);
+      const findRecordSeconds = Number(patch.find_record_seconds ?? current.find_record_seconds ?? 0);
+      const cueSeconds = Number(patch.cue_seconds ?? current.cue_seconds ?? 0);
+      const hostBufferSeconds = Number(patch.host_buffer_seconds ?? current.host_buffer_seconds ?? 0);
+      patch.target_gap_seconds = Math.max(0, removeResleeveSeconds + findRecordSeconds + cueSeconds + hostBufferSeconds);
+    }
+  }
 
   const db = getOriginalOrCoverDb();
   const { error } = await db.from("ooc_sessions").update(patch).eq("id", sessionId);

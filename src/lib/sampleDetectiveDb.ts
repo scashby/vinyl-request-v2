@@ -15,6 +15,7 @@ type SampleDetectiveDatabase = {
           title: string;
           time: string | null;
           location: string | null;
+          venue_logo_url: string | null;
         };
         Insert: {
           id?: number;
@@ -22,6 +23,7 @@ type SampleDetectiveDatabase = {
           title: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Update: {
           id?: number;
@@ -29,6 +31,7 @@ type SampleDetectiveDatabase = {
           title?: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Relationships: [];
       };
@@ -68,9 +71,17 @@ type SampleDetectiveDatabase = {
           current_round: number;
           current_call_index: number;
           show_title: boolean;
+          show_logo: boolean;
           show_round: boolean;
           show_scoreboard: boolean;
           show_scoring_hint: boolean;
+          welcome_heading_text: string | null;
+          welcome_message_text: string | null;
+          intermission_heading_text: string | null;
+          intermission_message_text: string | null;
+          thanks_heading_text: string | null;
+          thanks_subheading_text: string | null;
+          default_intermission_seconds: number;
           status: SampleDetectiveSessionStatus;
           created_at: string;
           started_at: string | null;
@@ -93,9 +104,17 @@ type SampleDetectiveDatabase = {
           current_round?: number;
           current_call_index?: number;
           show_title?: boolean;
+          show_logo?: boolean;
           show_round?: boolean;
           show_scoreboard?: boolean;
           show_scoring_hint?: boolean;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
+          default_intermission_seconds?: number;
           status?: SampleDetectiveSessionStatus;
           created_at?: string;
           started_at?: string | null;
@@ -118,9 +137,17 @@ type SampleDetectiveDatabase = {
           current_round?: number;
           current_call_index?: number;
           show_title?: boolean;
+          show_logo?: boolean;
           show_round?: boolean;
           show_scoreboard?: boolean;
           show_scoring_hint?: boolean;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
+          default_intermission_seconds?: number;
           status?: SampleDetectiveSessionStatus;
           created_at?: string;
           started_at?: string | null;

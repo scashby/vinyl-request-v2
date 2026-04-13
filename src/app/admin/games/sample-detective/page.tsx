@@ -345,6 +345,7 @@ export default function SampleDetectiveSetupPage() {
                   <p className="text-stone-100">{session.session_code} · {session.title} · {session.status}</p>
                   <p className="text-stone-400">Event: {session.event_title ?? "(none)"} · Playlist: {session.playlist_name ?? "(unknown)"} · Round {session.current_round}/{session.round_count} · Calls {session.calls_scored}/{session.calls_total} scored · Scoring {session.points_correct_pair}+{session.bonus_both_artists_points}</p>
                   <div className="mt-2 flex gap-2 text-xs">
+                    <Link className="rounded border border-emerald-700 px-2 py-1" href={`/admin/games/sample-detective/edit?sessionId=${session.id}`}>Edit</Link>
                     <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/sample-detective/host?sessionId=${session.id}`}>Host</Link>
                     <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/sample-detective/assistant?sessionId=${session.id}`}>Assistant</Link>
                     <Link className="rounded border border-stone-700 px-2 py-1" href={`/admin/games/sample-detective/jumbotron?sessionId=${session.id}`}>Jumbotron</Link>

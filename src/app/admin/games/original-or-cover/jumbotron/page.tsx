@@ -14,9 +14,21 @@ type Session = {
   remaining_seconds: number;
   status: "pending" | "running" | "paused" | "completed";
   show_title: boolean;
+  show_logo: boolean;
   show_round: boolean;
   show_scoreboard: boolean;
   show_prompt: boolean;
+  welcome_heading_text: string | null;
+  welcome_message_text: string | null;
+  intermission_heading_text: string | null;
+  intermission_message_text: string | null;
+  thanks_heading_text: string | null;
+  thanks_subheading_text: string | null;
+  host_overlay?: "none" | "welcome" | "countdown" | "intermission" | "thanks";
+  host_overlay_remaining_seconds?: number;
+  event?: {
+    venue_logo_url: string | null;
+  } | null;
 };
 
 type Call = {
@@ -56,7 +68,7 @@ export default function OriginalOrCoverJumbotronPage() {
     if (sessionRes.ok) {
       const payload = await sessionRes.json();
       setSession(payload);
-      setRemaining(payload.remaining_seconds ?? 0);
+      setRemaining(payload.host_overlay_remaining_seconds ?? payload.remaining_seconds ?? 0);
     }
 
     if (callsRes.ok) {
@@ -103,6 +115,12 @@ export default function OriginalOrCoverJumbotronPage() {
   }, [currentCall]);
 
   const showThanks = session?.status === "completed";
+  const overlayMode = session?.host_overlay ?? "none";
+  const showOverlay =
+    overlayMode === "welcome" ||
+    (overlayMode === "countdown" && remaining > 0) ||
+    (overlayMode === "intermission" && remaining > 0);
+  const showThanksOverlay = showThanks || overlayMode === "thanks";
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -126,6 +144,13 @@ export default function OriginalOrCoverJumbotronPage() {
     <div ref={containerRef} className="min-h-screen bg-[radial-gradient(circle_at_50%_0%,#664d03,transparent_38%),linear-gradient(180deg,#020202,#0d0d0d)] p-8 text-white">
       <div className="mx-auto max-w-7xl space-y-6">
         <header className="rounded-3xl border border-yellow-700/40 bg-black/35 p-6">
+          {session?.show_logo && session?.event?.venue_logo_url ? (
+            <img
+              alt="Venue logo"
+              className="mb-3 h-16 w-auto rounded border border-yellow-700/40 bg-black/50 p-2"
+              src={session.event.venue_logo_url}
+            />
+          ) : null}
           {session?.show_title ? <h1 className="text-5xl font-black uppercase tracking-tight text-yellow-200">{session?.title ?? "Original or Cover"}</h1> : null}
 
           <div className="mt-4 flex flex-wrap gap-6 text-xl font-semibold">
@@ -136,6 +161,7 @@ export default function OriginalOrCoverJumbotronPage() {
           </div>
         </header>
 
+        {!showOverlay && !showThanksOverlay ? (
         <section className="rounded-3xl border border-stone-700 bg-black/45 p-8">
           <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Current Prompt</p>
           <p className="mt-2 text-6xl font-black text-yellow-200">{promptText}</p>
@@ -158,6 +184,37 @@ export default function OriginalOrCoverJumbotronPage() {
 
           <p className="mt-6 text-xl text-stone-200">Scoring: +{session?.points_correct_call ?? 2} correct call, +{session?.bonus_original_artist_points ?? 1} original artist</p>
         </section>
+        ) : null}
+
+        {showOverlay ? (
+          <section className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-8 text-center">
+            <div className="max-w-4xl rounded-3xl border border-yellow-700/40 bg-black/70 p-8">
+              {overlayMode === "welcome" ? (
+                <>
+                  <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Welcome</p>
+                  <p className="mt-2 text-6xl font-black text-yellow-200">{session?.welcome_heading_text || "Welcome to Original or Cover"}</p>
+                  <p className="mt-4 text-2xl text-stone-200">{session?.welcome_message_text || "Call it: original or cover."}</p>
+                </>
+              ) : null}
+
+              {overlayMode === "countdown" ? (
+                <>
+                  <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Starting Soon</p>
+                  <p className="mt-2 text-7xl font-black text-yellow-200">{remaining}s</p>
+                  <p className="mt-4 text-2xl text-stone-200">Game starts in</p>
+                </>
+              ) : null}
+
+              {overlayMode === "intermission" ? (
+                <>
+                  <p className="text-sm uppercase tracking-[0.2em] text-stone-300">{session?.intermission_heading_text || "Intermission"}</p>
+                  <p className="mt-2 text-7xl font-black text-amber-300">{remaining}s</p>
+                  <p className="mt-4 text-2xl text-stone-200">{session?.intermission_message_text || "Short break before the next round."}</p>
+                </>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
 
         {session?.show_scoreboard ? (
           <section className="rounded-3xl border border-stone-700 bg-black/45 p-6">
@@ -174,13 +231,13 @@ export default function OriginalOrCoverJumbotronPage() {
           </section>
         ) : null}
 
-        {showThanks ? (
+        {showThanksOverlay ? (
           <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1f2937,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
             <div className="max-w-4xl rounded-3xl border border-yellow-700/40 bg-black/70 p-10">
               <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Thanks For Playing</p>
-              <p className="mt-3 text-6xl font-black text-yellow-200">Original or Cover</p>
+              <p className="mt-3 text-6xl font-black text-yellow-200">{session?.thanks_heading_text || "Original or Cover"}</p>
               <p className="mt-4 text-2xl text-stone-200">Session {session?.session_code ?? "-"} is complete</p>
-              <p className="mt-6 text-xl text-stone-300">See you at the next round</p>
+              <p className="mt-6 text-xl text-stone-300">{session?.thanks_subheading_text || "See you at the next round"}</p>
             </div>
           </section>
         ) : null}
