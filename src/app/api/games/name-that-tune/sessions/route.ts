@@ -18,8 +18,16 @@ type CreateSessionBody = {
   cue_seconds?: number;
   host_buffer_seconds?: number;
   show_title?: boolean;
+  show_logo?: boolean;
   show_rounds?: boolean;
   show_scoreboard?: boolean;
+  welcome_heading_text?: string | null;
+  welcome_message_text?: string | null;
+  intermission_heading_text?: string | null;
+  intermission_message_text?: string | null;
+  thanks_heading_text?: string | null;
+  thanks_subheading_text?: string | null;
+  default_intermission_seconds?: number;
   team_names?: string[];
   snippets?: Array<{
     artist: string;
@@ -184,6 +192,7 @@ export async function POST(request: NextRequest) {
     const findRecordSeconds = Math.max(0, Number(body.find_record_seconds ?? 12));
     const cueSeconds = Math.max(0, Number(body.cue_seconds ?? 12));
     const hostBufferSeconds = Math.max(0, Number(body.host_buffer_seconds ?? 8));
+    const defaultIntermissionSeconds = Math.max(0, Number(body.default_intermission_seconds ?? 600));
     const targetGapSeconds = removeResleeveSeconds + findRecordSeconds + cueSeconds + hostBufferSeconds;
 
     const teamNames = normalizeTeamNames(body.team_names);
@@ -235,8 +244,16 @@ export async function POST(request: NextRequest) {
         current_round: 1,
         current_call_index: 0,
         show_title: body.show_title ?? true,
+        show_logo: body.show_logo ?? true,
         show_rounds: body.show_rounds ?? true,
         show_scoreboard: body.show_scoreboard ?? true,
+        welcome_heading_text: body.welcome_heading_text ?? "Welcome to Name That Tune",
+        welcome_message_text: body.welcome_message_text ?? "Get your team ready for the next snippet.",
+        intermission_heading_text: body.intermission_heading_text ?? "Intermission",
+        intermission_message_text: body.intermission_message_text ?? "Quick reset. Next snippet starts soon.",
+        thanks_heading_text: body.thanks_heading_text ?? "Thanks for Playing",
+        thanks_subheading_text: body.thanks_subheading_text ?? "See you at the next round.",
+        default_intermission_seconds: defaultIntermissionSeconds,
         status: "pending",
       })
       .select("id, session_code")

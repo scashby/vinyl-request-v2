@@ -13,6 +13,7 @@ export type NameThatTuneDatabase = {
           title: string;
           time: string | null;
           location: string | null;
+          venue_logo_url: string | null;
         };
         Insert: {
           id?: number;
@@ -20,6 +21,7 @@ export type NameThatTuneDatabase = {
           title: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Update: {
           id?: number;
@@ -27,6 +29,7 @@ export type NameThatTuneDatabase = {
           title?: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Relationships: [];
       };
@@ -51,8 +54,16 @@ export type NameThatTuneDatabase = {
           paused_remaining_seconds: number | null;
           paused_at: string | null;
           show_title: boolean;
+          show_logo: boolean;
           show_rounds: boolean;
           show_scoreboard: boolean;
+          welcome_heading_text: string | null;
+          welcome_message_text: string | null;
+          intermission_heading_text: string | null;
+          intermission_message_text: string | null;
+          thanks_heading_text: string | null;
+          thanks_subheading_text: string | null;
+          default_intermission_seconds: number;
           status: "pending" | "running" | "paused" | "completed";
           created_at: string;
           started_at: string | null;
@@ -78,8 +89,16 @@ export type NameThatTuneDatabase = {
           paused_remaining_seconds?: number | null;
           paused_at?: string | null;
           show_title?: boolean;
+          show_logo?: boolean;
           show_rounds?: boolean;
           show_scoreboard?: boolean;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
+          default_intermission_seconds?: number;
           status?: "pending" | "running" | "paused" | "completed";
           created_at?: string;
           started_at?: string | null;
@@ -105,8 +124,16 @@ export type NameThatTuneDatabase = {
           paused_remaining_seconds?: number | null;
           paused_at?: string | null;
           show_title?: boolean;
+          show_logo?: boolean;
           show_rounds?: boolean;
           show_scoreboard?: boolean;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
+          default_intermission_seconds?: number;
           status?: "pending" | "running" | "paused" | "completed";
           created_at?: string;
           started_at?: string | null;

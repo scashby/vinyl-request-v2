@@ -3,14 +3,14 @@ import { getNameThatTuneDb } from "src/lib/nameThatTuneDb";
 
 export const runtime = "nodejs";
 
-type OverlayMode = "none" | "welcome" | "countdown" | "intermission";
+type OverlayMode = "none" | "welcome" | "countdown" | "intermission" | "thanks";
 
 type OverlayBody = {
   mode?: OverlayMode;
   duration_seconds?: number;
 };
 
-const ALLOWED_MODES = new Set<OverlayMode>(["none", "welcome", "countdown", "intermission"]);
+const ALLOWED_MODES = new Set<OverlayMode>(["none", "welcome", "countdown", "intermission", "thanks"]);
 
 function normalizeDurationSeconds(value: unknown): number {
   const parsed = Number(value);
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const body = (await request.json()) as OverlayBody;
   const mode = body.mode;
   if (!mode || !ALLOWED_MODES.has(mode)) {
-    return NextResponse.json({ error: "mode must be one of: none, welcome, countdown, intermission" }, { status: 400 });
+    return NextResponse.json({ error: "mode must be one of: none, welcome, countdown, intermission, thanks" }, { status: 400 });
   }
 
   const durationSeconds = normalizeDurationSeconds(body.duration_seconds);

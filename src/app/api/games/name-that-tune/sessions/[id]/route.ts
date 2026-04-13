@@ -25,15 +25,30 @@ type SessionRow = {
   paused_remaining_seconds: number | null;
   paused_at: string | null;
   show_title: boolean;
+  show_logo: boolean;
   show_rounds: boolean;
   show_scoreboard: boolean;
+  welcome_heading_text: string | null;
+  welcome_message_text: string | null;
+  intermission_heading_text: string | null;
+  intermission_message_text: string | null;
+  thanks_heading_text: string | null;
+  thanks_subheading_text: string | null;
+  default_intermission_seconds: number;
   status: "pending" | "running" | "paused" | "completed";
   created_at: string;
   started_at: string | null;
   ended_at: string | null;
 };
 
-type EventRow = { id: number; title: string; date: string; time: string | null; location: string | null };
+type EventRow = {
+  id: number;
+  title: string;
+  date: string;
+  time: string | null;
+  location: string | null;
+  venue_logo_url: string | null;
+};
 type SessionEventRow = {
   payload: { call_id?: unknown } | null;
 };
@@ -48,7 +63,7 @@ type TransportEventRow = {
 };
 
 const DONE_STATUSES = new Set(["asked", "locked", "answer_revealed", "scored", "skipped"]);
-const OVERLAY_MODES = new Set(["none", "welcome", "countdown", "intermission"]);
+const OVERLAY_MODES = new Set(["none", "welcome", "countdown", "intermission", "thanks"]);
 
 function parseSessionId(id: string) {
   const sessionId = Number(id);
@@ -61,10 +76,10 @@ function parseEventCallId(raw: unknown): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
-function parseOverlayMode(raw: unknown): "none" | "welcome" | "countdown" | "intermission" {
+function parseOverlayMode(raw: unknown): "none" | "welcome" | "countdown" | "intermission" | "thanks" {
   const value = typeof raw === "string" ? raw : "none";
   if (!OVERLAY_MODES.has(value)) return "none";
-  return value as "none" | "welcome" | "countdown" | "intermission";
+  return value as "none" | "welcome" | "countdown" | "intermission" | "thanks";
 }
 
 function computeOverlayRemainingSeconds(rawEndsAt: unknown): number {
@@ -89,7 +104,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 
   const session = data as SessionRow;
   const { data: event } = session.event_id
-    ? await db.from("events").select("id, title, date, time, location").eq("id", session.event_id).maybeSingle()
+    ? await db.from("events").select("id, title, date, time, location, venue_logo_url").eq("id", session.event_id).maybeSingle()
     : { data: null };
 
   const [{ data: calls }, { data: cueEvent }, { data: pullEvent }, { data: promoteEvents }, { data: transportEvents }, { data: overlayEvent }] = await Promise.all([
@@ -200,14 +215,30 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const body = (await request.json()) as Record<string, unknown>;
 
   const allowedFields = new Set([
+    "event_id",
     "title",
     "playlist_id",
+    "round_count",
+    "lock_in_rule",
+    "lock_in_window_seconds",
+    "remove_resleeve_seconds",
+    "find_record_seconds",
+    "cue_seconds",
+    "host_buffer_seconds",
     "current_round",
     "current_call_index",
     "target_gap_seconds",
     "show_title",
+    "show_logo",
     "show_rounds",
     "show_scoreboard",
+    "welcome_heading_text",
+    "welcome_message_text",
+    "intermission_heading_text",
+    "intermission_message_text",
+    "thanks_heading_text",
+    "thanks_subheading_text",
+    "default_intermission_seconds",
     "status",
     "countdown_started_at",
     "paused_remaining_seconds",
@@ -217,6 +248,33 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   ]);
 
   const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key)));
+
+  const removeResleeveSeconds = Number(
+    patch.remove_resleeve_seconds ?? body.remove_resleeve_seconds ?? Number.NaN
+  );
+  const findRecordSeconds = Number(
+    patch.find_record_seconds ?? body.find_record_seconds ?? Number.NaN
+  );
+  const cueSeconds = Number(
+    patch.cue_seconds ?? body.cue_seconds ?? Number.NaN
+  );
+  const hostBufferSeconds = Number(
+    patch.host_buffer_seconds ?? body.host_buffer_seconds ?? Number.NaN
+  );
+
+  if (
+    Number.isFinite(removeResleeveSeconds) &&
+    Number.isFinite(findRecordSeconds) &&
+    Number.isFinite(cueSeconds) &&
+    Number.isFinite(hostBufferSeconds) &&
+    !Object.prototype.hasOwnProperty.call(patch, "target_gap_seconds")
+  ) {
+    patch.target_gap_seconds =
+      Math.max(0, removeResleeveSeconds) +
+      Math.max(0, findRecordSeconds) +
+      Math.max(0, cueSeconds) +
+      Math.max(0, hostBufferSeconds);
+  }
 
   const db = getNameThatTuneDb();
   const { error } = await db.from("ntt_sessions").update(patch).eq("id", sessionId);

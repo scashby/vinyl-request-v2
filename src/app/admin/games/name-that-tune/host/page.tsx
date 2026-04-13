@@ -16,6 +16,7 @@ type Session = {
   status: "pending" | "running" | "paused" | "completed";
   lock_in_rule: "time_window" | "first_sheet_wins" | "hand_raise";
   lock_in_window_seconds: number;
+  default_intermission_seconds: number;
   remaining_seconds: number;
   target_gap_seconds: number;
   transport_queue_call_ids?: number[];
@@ -86,6 +87,7 @@ export default function NameThatTuneHostPage() {
       setSession(payload);
       setRemaining(payload.remaining_seconds ?? 0);
       setTargetGapInput(payload.target_gap_seconds ?? 45);
+      setOverlaySecondsInput(payload.default_intermission_seconds ?? 600);
     }
 
     if (callsRes.ok) {
