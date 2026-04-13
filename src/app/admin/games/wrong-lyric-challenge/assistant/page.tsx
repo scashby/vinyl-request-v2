@@ -13,9 +13,12 @@ type Session = {
   current_call_index: number;
   current_round: number;
   round_count: number;
+  target_gap_seconds: number;
+  remaining_seconds: number;
   lyric_points: number;
   song_bonus_enabled: boolean;
   song_bonus_points: number;
+  show_options: boolean;
   status: "pending" | "running" | "paused" | "completed";
 };
 
@@ -23,6 +26,7 @@ type Call = {
   id: number;
   call_index: number;
   round_number: number;
+  source_label: string | null;
   artist: string;
   title: string;
   correct_lyric: string;
@@ -30,6 +34,8 @@ type Call = {
   decoy_lyric_2: string;
   decoy_lyric_3: string | null;
   answer_slot: number;
+  dj_cue_hint: string | null;
+  host_notes: string | null;
   status: "pending" | "asked" | "locked" | "revealed" | "scored" | "skipped";
 };
 
@@ -67,6 +73,8 @@ export default function WrongLyricChallengeAssistantPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [scoreDraft, setScoreDraft] = useState<ScoreDraft>({});
   const [saving, setSaving] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [errorText, setErrorText] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -99,10 +107,18 @@ export default function WrongLyricChallengeAssistantPage() {
     return calls.find((call) => call.call_index === session.current_call_index) ?? null;
   }, [calls, session]);
 
+  const nextPendingCall = useMemo(() => calls.find((call) => call.status === "pending") ?? null, [calls]);
+  const callForControls = currentCall ?? nextPendingCall;
+
   const options = useMemo(() => {
-    if (!currentCall || !session) return [];
-    return buildWrongLyricOptions(currentCall, session.option_count);
-  }, [currentCall, session]);
+    if (!callForControls || !session) return [];
+    return buildWrongLyricOptions(callForControls, session.option_count);
+  }, [callForControls, session]);
+
+  const previousCalls = useMemo(
+    () => calls.filter((call) => ["asked", "locked", "revealed", "scored", "skipped"].includes(call.status)).slice(-6),
+    [calls]
+  );
 
   useEffect(() => {
     const draft: ScoreDraft = {};
@@ -110,11 +126,70 @@ export default function WrongLyricChallengeAssistantPage() {
       draft[row.team_id] = createDefaultScoreDraftEntry();
     }
     setScoreDraft(draft);
-  }, [currentCall?.id, leaderboard]);
+  }, [callForControls?.id, leaderboard]);
+
+  const runAction = async (fn: () => Promise<void>) => {
+    setWorking(true);
+    setErrorText(null);
+    try {
+      await fn();
+      await load();
+    } catch (error) {
+      setErrorText(error instanceof Error ? error.message : "Action failed");
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const advance = async () => {
+    await runAction(async () => {
+      const res = await fetch(`/api/games/wrong-lyric-challenge/sessions/${sessionId}/advance`, { method: "POST" });
+      if (!res.ok) {
+        const payload = await res.json();
+        throw new Error(payload.error ?? "Failed to advance");
+      }
+    });
+  };
+
+  const pause = async () => {
+    await runAction(async () => {
+      const res = await fetch(`/api/games/wrong-lyric-challenge/sessions/${sessionId}/pause`, { method: "POST" });
+      if (!res.ok) {
+        const payload = await res.json();
+        throw new Error(payload.error ?? "Failed to pause");
+      }
+    });
+  };
+
+  const resume = async () => {
+    await runAction(async () => {
+      const res = await fetch(`/api/games/wrong-lyric-challenge/sessions/${sessionId}/resume`, { method: "POST" });
+      if (!res.ok) {
+        const payload = await res.json();
+        throw new Error(payload.error ?? "Failed to resume");
+      }
+    });
+  };
+
+  const patchCallStatus = async (status: "asked" | "locked" | "revealed" | "scored" | "skipped") => {
+    if (!callForControls) return;
+    await runAction(async () => {
+      const res = await fetch(`/api/games/wrong-lyric-challenge/calls/${callForControls.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) {
+        const payload = await res.json();
+        throw new Error(payload.error ?? `Failed to mark ${status}`);
+      }
+    });
+  };
 
   const submitScores = async () => {
-    if (!currentCall) return;
+    if (!callForControls) return;
     setSaving(true);
+    setErrorText(null);
 
     try {
       const awards = leaderboard.map((team) => {
@@ -137,7 +212,7 @@ export default function WrongLyricChallengeAssistantPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          call_id: currentCall.id,
+          call_id: callForControls.id,
           awards,
           scored_by: "assistant",
         }),
@@ -150,7 +225,7 @@ export default function WrongLyricChallengeAssistantPage() {
 
       await load();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to save scores");
+      setErrorText(error instanceof Error ? error.message : "Failed to save scores");
     } finally {
       setSaving(false);
     }
@@ -169,19 +244,40 @@ export default function WrongLyricChallengeAssistantPage() {
           <div className="flex gap-2 text-xs">
             <button className="rounded border border-stone-700 px-2 py-1" onClick={() => load()}>Refresh</button>
             <Link href="/admin/games/wrong-lyric-challenge/help" className="rounded border border-stone-600 px-3 py-1 uppercase">Help</Link>
-            <Link href={`/admin/games/wrong-lyric-challenge/host?sessionId=${sessionId}`} className="rounded border border-stone-600 px-3 py-1 uppercase">Host</Link>
+            <button type="button" onClick={() => window.open(`/admin/games/wrong-lyric-challenge/host?sessionId=${sessionId}`, "wrong_lyric_challenge_host", "width=1280,height=900")} className="rounded border border-stone-600 px-3 py-1 uppercase">Host</button>
+            <button type="button" onClick={() => window.open(`/admin/games/wrong-lyric-challenge/jumbotron?sessionId=${sessionId}`, "wrong_lyric_challenge_jumbotron", "width=1920,height=1080")} className="rounded border border-stone-600 px-3 py-1 uppercase">Jumbotron</button>
             <Link href="/admin/games/wrong-lyric-challenge" className="rounded border border-stone-600 px-3 py-1 uppercase">Setup</Link>
           </div>
         </div>
 
+        {errorText ? <div className="mt-3 rounded border border-red-800 bg-red-950/40 px-3 py-2 text-xs text-red-200">{errorText}</div> : null}
+
+        <section className="mt-6 rounded-xl border border-stone-700 bg-stone-950/60 p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-red-200">Session Controls</h2>
+          <p className="mt-2 text-xs text-stone-400">Gap timer target: {session?.target_gap_seconds ?? 0}s · Remaining: {session?.remaining_seconds ?? 0}s · Status: {session?.status ?? "-"}</p>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+            <button disabled={working} onClick={advance} className="rounded bg-red-700 px-2 py-1 disabled:opacity-50">Advance Call</button>
+            <button disabled={working || !callForControls} onClick={() => patchCallStatus("asked")} className="rounded bg-blue-700 px-2 py-1 disabled:opacity-50">Mark Asked</button>
+            <button disabled={working || !callForControls} onClick={() => patchCallStatus("locked")} className="rounded bg-violet-700 px-2 py-1 disabled:opacity-50">Lock Picks</button>
+            <button disabled={working || !callForControls} onClick={() => patchCallStatus("revealed")} className="rounded bg-amber-700 px-2 py-1 disabled:opacity-50">Reveal</button>
+            <button disabled={working || !callForControls} onClick={() => patchCallStatus("skipped")} className="rounded bg-red-900 px-2 py-1 disabled:opacity-50">Skip</button>
+            <button disabled={working || !callForControls} onClick={() => patchCallStatus("scored")} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Mark Scored</button>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs">
+            <button disabled={working} onClick={pause} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Pause</button>
+            <button disabled={working} onClick={resume} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Resume</button>
+          </div>
+        </section>
+
         <section className="mt-6 rounded-xl border border-stone-700 bg-stone-950/60 p-4">
           <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-red-200">Current Call Intake</h2>
           <p className="mt-2 text-sm text-stone-300">
-            {currentCall ? `Call ${currentCall.call_index} · ${currentCall.artist} - ${currentCall.title}` : "Waiting for host to open a call."}
+            {callForControls ? `Call ${callForControls.call_index} · ${callForControls.artist} - ${callForControls.title}` : "Waiting for host to open a call."}
           </p>
-          <p className="mt-1 text-xs text-stone-400">Use this screen for score capture only. Host controls transport/reveal timing.</p>
+          <p className="mt-1 text-xs text-stone-400">Source: {callForControls?.source_label ?? "Unlabeled"} · Cue: {callForControls?.dj_cue_hint ?? "none"} · Status: {callForControls?.status ?? "-"}</p>
+          {callForControls?.host_notes ? <p className="mt-2 text-xs text-stone-400">Host note: {callForControls.host_notes}</p> : null}
 
-          {options.length ? (
+          {session?.show_options && options.length ? (
             <div className="mt-3 grid gap-2 md:grid-cols-2">
               {options.map((option) => (
                 <div key={option.slot} className="rounded border border-stone-700 bg-stone-950/70 px-2 py-1 text-sm">
@@ -191,6 +287,15 @@ export default function WrongLyricChallengeAssistantPage() {
               ))}
             </div>
           ) : null}
+
+          <div className="mt-3 text-xs">
+            <p className="font-semibold text-stone-300">Recently Called</p>
+            <div className="mt-1 max-h-24 overflow-auto text-stone-400">
+              {previousCalls.map((call) => (
+                <div key={call.id}>#{call.call_index} {call.artist} - {call.title} ({call.status})</div>
+              ))}
+            </div>
+          </div>
         </section>
 
         <section className="mt-4 rounded-xl border border-stone-700 bg-stone-950/60 p-4">
@@ -316,7 +421,7 @@ export default function WrongLyricChallengeAssistantPage() {
               );
             })}
           </div>
-          <button disabled={!currentCall || saving} onClick={submitScores} className="mt-3 rounded bg-emerald-700 px-3 py-1.5 text-xs font-bold disabled:opacity-50">
+          <button disabled={!callForControls || saving} onClick={submitScores} className="mt-3 rounded bg-emerald-700 px-3 py-1.5 text-xs font-bold disabled:opacity-50">
             {saving ? "Saving..." : "Save Scores as Assistant"}
           </button>
         </section>
