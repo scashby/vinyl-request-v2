@@ -325,6 +325,7 @@ export default function NeedleDropRouletteSetupPage() {
                   <div className="text-sm">{session.session_code} · {session.title} · Round {session.current_round} of {session.round_count} · Calls {session.calls_total}</div>
                   <div className="text-xs text-stone-400">Event: {session.event_title ?? "(none)"} · Mode: {session.answer_mode} · Snippet: {session.snippet_seconds}s · Status: {session.status}</div>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    <button className="rounded border border-emerald-700 px-2 py-1" onClick={() => window.open(`/admin/games/needle-drop-roulette/edit?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Edit</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/needle-drop-roulette/host?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Host</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/needle-drop-roulette/assistant?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Assistant</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/needle-drop-roulette/jumbotron?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Jumbotron</button>

@@ -13,9 +13,21 @@ type Session = {
   current_call_index: number;
   remaining_seconds: number;
   show_title: boolean;
+  show_logo: boolean;
   show_round: boolean;
   show_category: boolean;
   show_scoreboard: boolean;
+  welcome_heading_text: string | null;
+  welcome_message_text: string | null;
+  intermission_heading_text: string | null;
+  intermission_message_text: string | null;
+  thanks_heading_text: string | null;
+  thanks_subheading_text: string | null;
+  host_overlay?: "none" | "welcome" | "countdown" | "intermission" | "thanks";
+  host_overlay_remaining_seconds?: number;
+  event?: {
+    venue_logo_url: string | null;
+  } | null;
   rounds: Array<{ round_number: number; category_label: string }>;
   calls: Array<{
     id: number;
@@ -53,7 +65,7 @@ export default function GenreImposterJumbotronPage() {
     if (sessionRes.ok) {
       const payload = (await sessionRes.json()) as Session;
       setSession(payload);
-      setRemaining(payload.remaining_seconds ?? 0);
+      setRemaining(payload.host_overlay_remaining_seconds ?? payload.remaining_seconds ?? 0);
 
       const picksRes = await fetch(`/api/games/genre-imposter/sessions/${sessionId}/picks?roundNumber=${payload.current_round}`);
       if (picksRes.ok) {
@@ -118,6 +130,12 @@ export default function GenreImposterJumbotronPage() {
   }, [imposterCall, revealReady, session]);
 
   const showThanks = session?.status === "completed";
+  const overlayMode = session?.host_overlay ?? "none";
+  const showOverlay =
+    overlayMode === "welcome" ||
+    (overlayMode === "countdown" && remaining > 0) ||
+    (overlayMode === "intermission" && remaining > 0);
+  const showThanksOverlay = showThanks || overlayMode === "thanks";
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -143,6 +161,13 @@ export default function GenreImposterJumbotronPage() {
         <header className="rounded-3xl border border-emerald-700/40 bg-black/35 p-6">
           <div className="flex items-center justify-between gap-4">
             <div>
+              {session?.show_logo && session?.event?.venue_logo_url ? (
+                <img
+                  alt="Venue logo"
+                  className="mb-3 h-16 w-auto rounded border border-emerald-700/40 bg-black/50 p-2"
+                  src={session.event.venue_logo_url}
+                />
+              ) : null}
               {session?.show_title ? <h1 className="text-5xl font-black uppercase tracking-tight text-emerald-200">{session?.title ?? "Genre Imposter"}</h1> : null}
               <div className="mt-4 flex flex-wrap gap-6 text-xl font-semibold">
                 {session?.show_round ? <p>Round {session?.current_round} of {session?.round_count}</p> : null}
@@ -162,6 +187,7 @@ export default function GenreImposterJumbotronPage() {
           </div>
         </header>
 
+        {!showOverlay && !showThanksOverlay ? (
         <section className="rounded-3xl border border-stone-700 bg-black/45 p-8">
           <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Current Prompt</p>
           {session?.show_category ? <p className="mt-2 text-4xl font-black text-emerald-200">{currentRound?.category_label ?? "Waiting"}</p> : null}
@@ -186,6 +212,37 @@ export default function GenreImposterJumbotronPage() {
             ))}
           </div>
         </section>
+        ) : null}
+
+        {showOverlay ? (
+          <section className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-8 text-center">
+            <div className="max-w-4xl rounded-3xl border border-emerald-700/40 bg-black/70 p-8">
+              {overlayMode === "welcome" ? (
+                <>
+                  <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Welcome</p>
+                  <p className="mt-2 text-6xl font-black text-emerald-200">{session?.welcome_heading_text || "Welcome to Genre Imposter"}</p>
+                  <p className="mt-4 text-2xl text-stone-200">{session?.welcome_message_text || "Pick the track that does not belong in the set."}</p>
+                </>
+              ) : null}
+
+              {overlayMode === "countdown" ? (
+                <>
+                  <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Starting Soon</p>
+                  <p className="mt-2 text-7xl font-black text-emerald-200">{remaining}s</p>
+                  <p className="mt-4 text-2xl text-stone-200">Game starts in</p>
+                </>
+              ) : null}
+
+              {overlayMode === "intermission" ? (
+                <>
+                  <p className="text-sm uppercase tracking-[0.2em] text-stone-300">{session?.intermission_heading_text || "Intermission"}</p>
+                  <p className="mt-2 text-7xl font-black text-lime-300">{remaining}s</p>
+                  <p className="mt-4 text-2xl text-stone-200">{session?.intermission_message_text || "Grab a drink and reset for the next round."}</p>
+                </>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
 
         {session?.show_scoreboard ? (
           <section className="rounded-3xl border border-stone-700 bg-black/45 p-6">
@@ -202,13 +259,13 @@ export default function GenreImposterJumbotronPage() {
           </section>
         ) : null}
 
-        {showThanks ? (
+        {showThanksOverlay ? (
           <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1f2937,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
             <div className="max-w-4xl rounded-3xl border border-emerald-700/40 bg-black/70 p-10">
               <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Thanks For Playing</p>
-              <p className="mt-3 text-6xl font-black text-emerald-200">Genre Imposter</p>
+              <p className="mt-3 text-6xl font-black text-emerald-200">{session?.thanks_heading_text || "Genre Imposter"}</p>
               <p className="mt-4 text-2xl text-stone-200">Session {session?.session_code ?? "-"} is complete</p>
-              <p className="mt-6 text-xl text-stone-300">See you at the next round</p>
+              <p className="mt-6 text-xl text-stone-300">{session?.thanks_subheading_text || "See you at the next round"}</p>
             </div>
           </section>
         ) : null}

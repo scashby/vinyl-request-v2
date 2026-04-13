@@ -37,9 +37,17 @@ type CreateSessionBody = {
   cue_seconds?: number;
   host_buffer_seconds?: number;
   show_title?: boolean;
+  show_logo?: boolean;
   show_round?: boolean;
   show_category?: boolean;
   show_scoreboard?: boolean;
+  welcome_heading_text?: string;
+  welcome_message_text?: string;
+  intermission_heading_text?: string;
+  intermission_message_text?: string;
+  thanks_heading_text?: string;
+  thanks_subheading_text?: string;
+  default_intermission_seconds?: number;
   team_names?: string[];
   rounds?: RoundDraft[];
 };
@@ -314,9 +322,17 @@ export async function POST(request: NextRequest) {
         paused_at: null,
         paused_remaining_seconds: null,
         show_title: body.show_title ?? true,
+        show_logo: body.show_logo ?? true,
         show_round: body.show_round ?? true,
         show_category: body.show_category ?? true,
         show_scoreboard: body.show_scoreboard ?? true,
+        welcome_heading_text: body.welcome_heading_text?.trim() || "Welcome to Genre Imposter",
+        welcome_message_text: body.welcome_message_text?.trim() || "Pick the track that does not belong in the set.",
+        intermission_heading_text: body.intermission_heading_text?.trim() || "Intermission",
+        intermission_message_text: body.intermission_message_text?.trim() || "Grab a drink and reset for the next round.",
+        thanks_heading_text: body.thanks_heading_text?.trim() || "Thanks for Playing",
+        thanks_subheading_text: body.thanks_subheading_text?.trim() || "See you at the next round.",
+        default_intermission_seconds: Math.max(0, Number(body.default_intermission_seconds ?? 600)),
         status: "pending",
       })
       .select("id, session_code")

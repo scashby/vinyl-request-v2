@@ -13,6 +13,7 @@ export type NeedleDropRouletteDatabase = {
           title: string;
           time: string | null;
           location: string | null;
+          venue_logo_url: string | null;
         };
         Insert: {
           id?: number;
@@ -20,6 +21,7 @@ export type NeedleDropRouletteDatabase = {
           title: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Update: {
           id?: number;
@@ -27,6 +29,7 @@ export type NeedleDropRouletteDatabase = {
           title?: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Relationships: [];
       };
@@ -48,8 +51,16 @@ export type NeedleDropRouletteDatabase = {
           current_round: number;
           current_call_index: number;
           show_title: boolean;
+          show_logo: boolean;
           show_round: boolean;
           show_scoreboard: boolean;
+          welcome_heading_text: string | null;
+          welcome_message_text: string | null;
+          intermission_heading_text: string | null;
+          intermission_message_text: string | null;
+          thanks_heading_text: string | null;
+          thanks_subheading_text: string | null;
+          default_intermission_seconds: number;
           status: "pending" | "running" | "paused" | "completed";
           created_at: string;
           started_at: string | null;
@@ -72,8 +83,16 @@ export type NeedleDropRouletteDatabase = {
           current_round?: number;
           current_call_index?: number;
           show_title?: boolean;
+          show_logo?: boolean;
           show_round?: boolean;
           show_scoreboard?: boolean;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
+          default_intermission_seconds?: number;
           status?: "pending" | "running" | "paused" | "completed";
           created_at?: string;
           started_at?: string | null;
@@ -96,8 +115,16 @@ export type NeedleDropRouletteDatabase = {
           current_round?: number;
           current_call_index?: number;
           show_title?: boolean;
+          show_logo?: boolean;
           show_round?: boolean;
           show_scoreboard?: boolean;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
+          default_intermission_seconds?: number;
           status?: "pending" | "running" | "paused" | "completed";
           created_at?: string;
           started_at?: string | null;
@@ -224,6 +251,30 @@ export type NeedleDropRouletteDatabase = {
           asked_at?: string | null;
           answer_revealed_at?: string | null;
           scored_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      ndr_session_events: {
+        Row: {
+          id: number;
+          session_id: number;
+          event_type: string;
+          payload: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          session_id: number;
+          event_type: string;
+          payload?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          session_id?: number;
+          event_type?: string;
+          payload?: Json;
           created_at?: string;
         };
         Relationships: [];

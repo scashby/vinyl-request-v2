@@ -396,6 +396,7 @@ export default function GenreImposterSetupPage() {
                   <div className="text-sm">{session.session_code} · {session.title} · Round {session.current_round} of {session.round_count} · Rounds Loaded {session.rounds_total}</div>
                   <div className="text-xs text-stone-400">Event: {session.event_title ?? "(none)"} · Playlist: {session.playlist_name ?? "(unlabeled)"} · Reveal: {session.reveal_mode} · Reason mode: {session.reason_mode} · Picks: {session.picks_logged} · Status: {session.status}</div>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    <button className="rounded border border-emerald-700 px-2 py-1" onClick={() => window.open(`/admin/games/genre-imposter/edit?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Edit</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/genre-imposter/host?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Host</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/genre-imposter/assistant?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Assistant</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/genre-imposter/jumbotron?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Jumbotron</button>

@@ -15,6 +15,7 @@ export type GenreImposterDatabase = {
           title: string;
           time: string | null;
           location: string | null;
+          venue_logo_url: string | null;
         };
         Insert: {
           id?: number;
@@ -22,6 +23,7 @@ export type GenreImposterDatabase = {
           title: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Update: {
           id?: number;
@@ -29,6 +31,7 @@ export type GenreImposterDatabase = {
           title?: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Relationships: [];
       };
@@ -55,9 +58,17 @@ export type GenreImposterDatabase = {
           paused_remaining_seconds: number | null;
           paused_at: string | null;
           show_title: boolean;
+          show_logo: boolean;
           show_round: boolean;
           show_category: boolean;
           show_scoreboard: boolean;
+          welcome_heading_text: string | null;
+          welcome_message_text: string | null;
+          intermission_heading_text: string | null;
+          intermission_message_text: string | null;
+          thanks_heading_text: string | null;
+          thanks_subheading_text: string | null;
+          default_intermission_seconds: number;
           status: GiSessionStatus;
           created_at: string;
           started_at: string | null;
@@ -85,9 +96,17 @@ export type GenreImposterDatabase = {
           paused_remaining_seconds?: number | null;
           paused_at?: string | null;
           show_title?: boolean;
+          show_logo?: boolean;
           show_round?: boolean;
           show_category?: boolean;
           show_scoreboard?: boolean;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
+          default_intermission_seconds?: number;
           status?: GiSessionStatus;
           created_at?: string;
           started_at?: string | null;
@@ -115,9 +134,17 @@ export type GenreImposterDatabase = {
           paused_remaining_seconds?: number | null;
           paused_at?: string | null;
           show_title?: boolean;
+          show_logo?: boolean;
           show_round?: boolean;
           show_category?: boolean;
           show_scoreboard?: boolean;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
+          default_intermission_seconds?: number;
           status?: GiSessionStatus;
           created_at?: string;
           started_at?: string | null;
@@ -343,6 +370,30 @@ export type GenreImposterDatabase = {
           imposter_hits?: number;
           reason_bonus_hits?: number;
           updated_at?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      gi_session_events: {
+        Row: {
+          id: number;
+          session_id: number;
+          event_type: string;
+          payload: Record<string, unknown> | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          session_id: number;
+          event_type: string;
+          payload?: Record<string, unknown> | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          session_id?: number;
+          event_type?: string;
+          payload?: Record<string, unknown> | null;
           created_at?: string;
         };
         Relationships: [];
