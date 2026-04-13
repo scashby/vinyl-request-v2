@@ -71,6 +71,13 @@ type QuestionDetail = {
   assets: TriviaQuestionAsset[];
 };
 
+const STATUS_TABS: Array<{ value: "" | QuestionStatus; label: string }> = [
+  { value: "", label: "All" },
+  { value: "draft", label: "Drafts" },
+  { value: "published", label: "Published" },
+  { value: "archived", label: "Archived" },
+];
+
 type TaxonomyPayload = {
   categories?: string[];
   tags?: string[];
@@ -478,6 +485,46 @@ export default function MusicTriviaBankPage() {
     await loadDetail(selectedId);
   };
 
+  const restoreQuestion = async () => {
+    if (!selectedId) return;
+
+    const res = await fetch(`/api/games/trivia/questions/${selectedId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "draft" }),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(payload.error ?? "Failed to restore question");
+      return;
+    }
+
+    await loadList();
+    await loadDetail(selectedId);
+  };
+
+  const deleteQuestion = async () => {
+    if (!selectedId) return;
+    const yes = confirm("Permanently delete this archived question? This cannot be undone.");
+    if (!yes) return;
+
+    const res = await fetch(`/api/games/trivia/questions/${selectedId}`, { method: "DELETE" });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const usage = payload.usage && typeof payload.usage === "object"
+        ? payload.usage as { deck_usage_count?: number; session_usage_count?: number }
+        : null;
+      const usageDetail = usage
+        ? `\nDecks: ${usage.deck_usage_count ?? 0} · Sessions: ${usage.session_usage_count ?? 0}`
+        : "";
+      alert(`${payload.error ?? "Failed to delete question"}${usageDetail}`);
+      return;
+    }
+
+    resetForNew();
+    await loadList();
+  };
+
   const uploadAssets = async (files: FileList | null) => {
     if (!selectedId) {
       alert("Save the question first, then upload media.");
@@ -575,6 +622,17 @@ export default function MusicTriviaBankPage() {
         <section className="grid gap-4 lg:grid-cols-[360px,1fr]">
           <aside className="rounded-2xl border border-stone-700 bg-black/45 p-4">
             <div className="space-y-2 text-xs">
+              <div className="flex flex-wrap gap-1">
+                {STATUS_TABS.map((tab) => (
+                  <button
+                    key={tab.label}
+                    className={`rounded border px-2 py-1 ${statusFilter === tab.value ? "border-emerald-600 bg-emerald-950/40 text-emerald-100" : "border-stone-700 text-stone-300"}`}
+                    onClick={() => setStatusFilter(tab.value)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
               <label className="block">
                 Search
                 <input
@@ -624,8 +682,16 @@ export default function MusicTriviaBankPage() {
                 <button className="rounded border border-emerald-700 px-3 py-1" disabled={saving} onClick={() => saveQuestion(false)}>{saving ? "Saving..." : "Save Draft"}</button>
                 <button className="rounded border border-cyan-700 px-3 py-1" disabled={saving} onClick={() => saveQuestion(true)}>Publish</button>
                 <button className="rounded border border-stone-700 px-3 py-1" disabled={!selectedId || saving} onClick={archiveQuestion}>Archive</button>
+                <button className="rounded border border-amber-700 px-3 py-1" disabled={!selectedId || selectedDetail?.status !== "archived" || saving} onClick={restoreQuestion}>Restore to Draft</button>
+                <button className="rounded border border-rose-700 px-3 py-1" disabled={!selectedId || selectedDetail?.status !== "archived" || saving} onClick={deleteQuestion}>Delete</button>
               </div>
             </div>
+
+            {selectedDetail?.status === "archived" ? (
+              <p className="mb-3 rounded border border-amber-800/70 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
+                Archived questions stay editable for review, but must be restored before they can return to active use. Permanent delete is only allowed after archive and only when the question is not used by any deck or session.
+              </p>
+            ) : null}
 
             <div className="grid gap-3 text-xs lg:grid-cols-2">
               <label className="block lg:col-span-2">Question (required)

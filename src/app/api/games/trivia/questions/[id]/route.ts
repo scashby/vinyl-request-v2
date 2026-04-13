@@ -11,6 +11,22 @@ function parseQuestionId(raw: string): number | null {
   return value;
 }
 
+async function getQuestionUsageCounts(questionId: number) {
+  const db = getTriviaDb();
+  const [{ count: deckUsageCount, error: deckUsageError }, { count: sessionUsageCount, error: sessionUsageError }] = await Promise.all([
+    db.from("trivia_deck_items").select("id", { count: "exact", head: true }).eq("question_id", questionId),
+    db.from("trivia_session_calls").select("id", { count: "exact", head: true }).eq("question_id", questionId),
+  ]);
+
+  if (deckUsageError) throw new Error(deckUsageError.message);
+  if (sessionUsageError) throw new Error(sessionUsageError.message);
+
+  return {
+    deck_usage_count: deckUsageCount ?? 0,
+    session_usage_count: sessionUsageCount ?? 0,
+  };
+}
+
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!TRIVIA_BANK_ENABLED) return NextResponse.json({ error: "Trivia bank disabled" }, { status: 404 });
 
@@ -189,4 +205,56 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     .maybeSingle();
 
   return NextResponse.json({ ok: true, data: updated ?? null }, { status: 200 });
+}
+
+export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!TRIVIA_BANK_ENABLED) return NextResponse.json({ error: "Trivia bank disabled" }, { status: 404 });
+
+  const { id } = await params;
+  const questionId = parseQuestionId(id);
+  if (!questionId) return NextResponse.json({ error: "Invalid question id" }, { status: 400 });
+
+  try {
+    const db = getTriviaDb();
+    const { data: existingQuestion, error: existingQuestionError } = await db
+      .from("trivia_questions")
+      .select("id, status")
+      .eq("id", questionId)
+      .maybeSingle();
+
+    if (existingQuestionError) return NextResponse.json({ error: existingQuestionError.message }, { status: 500 });
+    if (!existingQuestion) return NextResponse.json({ error: "Question not found" }, { status: 404 });
+
+    const usage = await getQuestionUsageCounts(questionId);
+    if (usage.deck_usage_count > 0 || usage.session_usage_count > 0) {
+      return NextResponse.json(
+        {
+          error: "This question is already used by a deck or session and cannot be deleted.",
+          usage,
+        },
+        { status: 409 }
+      );
+    }
+
+    if (existingQuestion.status !== "archived") {
+      return NextResponse.json({ error: "Archive this question before deleting it." }, { status: 400 });
+    }
+
+    const { error: assetsError } = await db.from("trivia_question_assets").delete().eq("question_id", questionId);
+    if (assetsError) return NextResponse.json({ error: assetsError.message }, { status: 500 });
+
+    const { error: tagsError } = await db.from("trivia_question_tags").delete().eq("question_id", questionId);
+    if (tagsError) return NextResponse.json({ error: tagsError.message }, { status: 500 });
+
+    const { error: facetsError } = await db.from("trivia_question_facets").delete().eq("question_id", questionId);
+    if (facetsError) return NextResponse.json({ error: facetsError.message }, { status: 500 });
+
+    const { error: questionError } = await db.from("trivia_questions").delete().eq("id", questionId);
+    if (questionError) return NextResponse.json({ error: questionError.message }, { status: 500 });
+
+    return NextResponse.json({ ok: true }, { status: 200 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unexpected server error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

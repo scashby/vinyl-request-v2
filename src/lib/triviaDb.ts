@@ -245,6 +245,153 @@ export type TriviaDatabase = {
         };
         Relationships: [];
       };
+      trivia_import_runs: {
+        Row: {
+          id: number;
+          run_code: string;
+          source_mode: string;
+          status: string;
+          triggered_by: string | null;
+          scope_payload: Json;
+          source_payload: Json;
+          notes_text: string | null;
+          created_at: string;
+          started_at: string | null;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          run_code: string;
+          source_mode?: string;
+          status?: string;
+          triggered_by?: string | null;
+          scope_payload?: Json;
+          source_payload?: Json;
+          notes_text?: string | null;
+          created_at?: string;
+          started_at?: string | null;
+          completed_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          run_code?: string;
+          source_mode?: string;
+          status?: string;
+          triggered_by?: string | null;
+          scope_payload?: Json;
+          source_payload?: Json;
+          notes_text?: string | null;
+          created_at?: string;
+          started_at?: string | null;
+          completed_at?: string | null;
+        };
+        Relationships: [];
+      };
+      trivia_source_records: {
+        Row: {
+          id: number;
+          import_run_id: number | null;
+          source_kind: string;
+          source_url: string | null;
+          source_domain: string | null;
+          source_title: string | null;
+          excerpt_text: string | null;
+          claim_text: string | null;
+          verification_status: string;
+          verification_notes: string | null;
+          fetched_at: string | null;
+          published_at: string | null;
+          content_hash: string | null;
+          metadata_payload: Json;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          import_run_id?: number | null;
+          source_kind?: string;
+          source_url?: string | null;
+          source_domain?: string | null;
+          source_title?: string | null;
+          excerpt_text?: string | null;
+          claim_text?: string | null;
+          verification_status?: string;
+          verification_notes?: string | null;
+          fetched_at?: string | null;
+          published_at?: string | null;
+          content_hash?: string | null;
+          metadata_payload?: Json;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          import_run_id?: number | null;
+          source_kind?: string;
+          source_url?: string | null;
+          source_domain?: string | null;
+          source_title?: string | null;
+          excerpt_text?: string | null;
+          claim_text?: string | null;
+          verification_status?: string;
+          verification_notes?: string | null;
+          fetched_at?: string | null;
+          published_at?: string | null;
+          content_hash?: string | null;
+          metadata_payload?: Json;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      trivia_question_sources: {
+        Row: {
+          id: number;
+          question_id: number;
+          source_record_id: number;
+          relationship_type: string;
+          is_primary: boolean;
+          sort_order: number;
+          citation_excerpt: string | null;
+          claim_text: string | null;
+          verification_notes: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          question_id: number;
+          source_record_id: number;
+          relationship_type?: string;
+          is_primary?: boolean;
+          sort_order?: number;
+          citation_excerpt?: string | null;
+          claim_text?: string | null;
+          verification_notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          question_id?: number;
+          source_record_id?: number;
+          relationship_type?: string;
+          is_primary?: boolean;
+          sort_order?: number;
+          citation_excerpt?: string | null;
+          claim_text?: string | null;
+          verification_notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       trivia_decks: {
         Row: {
           id: number;
