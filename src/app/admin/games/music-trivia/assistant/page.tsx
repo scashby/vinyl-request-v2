@@ -18,6 +18,10 @@ type Session = {
   status: "pending" | "running" | "paused" | "completed";
   remaining_seconds: number;
   target_gap_seconds: number;
+  prep_ready_main: number;
+  prep_ready_tiebreakers: number;
+  prep_total_main: number;
+  prep_total_tiebreakers: number;
   transport_queue_call_ids?: number[];
 };
 
@@ -55,6 +59,7 @@ type Call = {
       instruction?: string | null;
     }>;
   };
+  display_element_type: "song" | "artist" | "album" | "cover_art" | "vinyl_label";
   effective_display_image_url: string | null;
   source_artist: string | null;
   source_title: string | null;
@@ -119,6 +124,15 @@ function readCueSegments(call: Call | null): CueSegment[] {
     .sort((a, b) => a.start_seconds - b.start_seconds);
 }
 
+function readCueSourceSummary(call: Call | null): string {
+  if (!call) return "No cue source selected";
+  const payload = asObject(call.cue_payload);
+  const segments = Array.isArray(payload.segments) ? payload.segments.length : 0;
+  if (segments > 0) return `${segments} cue segment${segments === 1 ? "" : "s"} configured`;
+  if (call.cue_notes_text) return "Cue notes provided";
+  return "No cue source selected";
+}
+
 export default function MusicTriviaAssistantPage() {
   const sessionId = Number(useSearchParams().get("sessionId"));
 
@@ -171,6 +185,7 @@ export default function MusicTriviaAssistantPage() {
   const tieBreakerForControls = activeCall?.is_tiebreaker ? activeCall : nextPendingTieBreaker;
   const currentChoices = useMemo(() => readChoiceOptions(callForControls), [callForControls]);
   const currentCueSegments = useMemo(() => readCueSegments(callForControls), [callForControls]);
+  const cueSourceSummary = useMemo(() => readCueSourceSummary(callForControls), [callForControls]);
   const revealMediaAssets = useMemo(
     () =>
       (callForControls?.reveal_media_assets ??
@@ -289,9 +304,20 @@ export default function MusicTriviaAssistantPage() {
             <p className="mt-2 text-sm text-stone-300">
               {session?.title ?? "Session"} · {session?.session_code ?? "-"} · Round {session?.current_round ?? 0} of {session?.round_count ?? 0}
             </p>
+            {session ? (
+              <p className={`mt-2 text-xs ${((session.prep_total_main - session.prep_ready_main) + (session.prep_total_tiebreakers - session.prep_ready_tiebreakers) > 0) ? "text-amber-300" : "text-emerald-300"}`}>
+                Prep readiness · Main {session.prep_ready_main}/{session.prep_total_main} · Tie-breaker {session.prep_ready_tiebreakers}/{session.prep_total_tiebreakers}
+              </p>
+            ) : null}
           </div>
-          <div className="rounded-xl border border-stone-700 bg-stone-950/60 px-4 py-3 text-xs text-stone-300">
-            Gap target: {session?.target_gap_seconds ?? 0}s · Remaining: {session?.remaining_seconds ?? 0}s
+          <div className="flex flex-wrap gap-2 text-xs">
+            <button className="rounded border border-stone-700 px-3 py-2" type="button" onClick={() => window.open(`/admin/games/music-trivia/host?sessionId=${sessionId}`, "music_trivia_host", "width=1280,height=900")}>Host</button>
+            <button className="rounded border border-stone-700 px-3 py-2" type="button" onClick={() => window.open(`/admin/games/music-trivia/prep?sessionId=${sessionId}`, "music_trivia_prep", "width=1024,height=800,left=1300,top=0")}>Prep</button>
+            <button className="rounded border border-stone-700 px-3 py-2" type="button" onClick={() => window.open(`/admin/games/music-trivia/jumbotron?sessionId=${sessionId}`, "music_trivia_jumbotron", "width=1920,height=1080")}>Jumbotron</button>
+            <Link href="/admin/games/music-trivia" className="rounded border border-stone-700 px-3 py-2">Setup</Link>
+            <div className="rounded-xl border border-stone-700 bg-stone-950/60 px-4 py-3 text-xs text-stone-300">
+              Gap target: {session?.target_gap_seconds ?? 0}s · Remaining: {session?.remaining_seconds ?? 0}s
+            </div>
           </div>
         </header>
 
@@ -334,6 +360,7 @@ export default function MusicTriviaAssistantPage() {
                       </div>
                     </div>
                   ) : null}
+                  <p className="mt-3 text-xs text-stone-400">Cue setup: {cueSourceSummary} · Display: {callForControls.display_element_type}</p>
                   {callForControls.cue_notes_text ? <p className="mt-3 text-sm text-stone-400">Cue notes: {callForControls.cue_notes_text}</p> : null}
                   {callForControls.effective_display_image_url ? (
                     <img
