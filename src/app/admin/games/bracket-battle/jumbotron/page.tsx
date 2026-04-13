@@ -65,6 +65,16 @@ type SessionPayload = {
   entries: Entry[];
   matchups: Matchup[];
   leaderboard: LeaderboardRow[];
+  show_logo: boolean;
+  welcome_heading_text: string | null;
+  welcome_message_text: string | null;
+  intermission_heading_text: string | null;
+  intermission_message_text: string | null;
+  thanks_heading_text: string | null;
+  thanks_subheading_text: string | null;
+  host_overlay: string;
+  host_overlay_remaining_seconds: number;
+  event: { venue_logo_url: string | null } | null;
 };
 
 function formatEntry(entry: Entry | null): string {
@@ -86,6 +96,7 @@ export default function BracketBattleJumbotronPage() {
   const sessionId = Number(searchParams.get("sessionId"));
   const containerRef = useRef<HTMLDivElement>(null);
   const [session, setSession] = useState<SessionPayload | null>(null);
+  const [overlayRemaining, setOverlayRemaining] = useState(0);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -96,6 +107,14 @@ export default function BracketBattleJumbotronPage() {
     const payload = (await sessionRes.json()) as SessionPayload;
     setSession(payload);
   }, [sessionId]);
+
+  useEffect(() => {
+    const remaining = session?.host_overlay_remaining_seconds ?? 0;
+    setOverlayRemaining(remaining);
+    if (remaining <= 0) return;
+    const tick = setInterval(() => setOverlayRemaining((prev) => Math.max(0, prev - 1)), 1000);
+    return () => clearInterval(tick);
+  }, [session?.host_overlay, session?.host_overlay_remaining_seconds]);
 
   useEffect(() => {
     load();
@@ -141,14 +160,19 @@ export default function BracketBattleJumbotronPage() {
   }, [currentRoundIndex, session]);
 
   const currentWinner = currentMatchup?.winner_entry ?? null;
-  const showThanks = session?.status === "completed";
+  const showThanksOverlay = session?.status === "completed" || session?.host_overlay === "thanks";
+  const showOverlay = showThanksOverlay || (!!session?.host_overlay && session.host_overlay !== "none");
+  const logoUrl = session?.show_logo ? (session?.event?.venue_logo_url ?? null) : null;
   const topTeams = session?.leaderboard.slice(0, 6) ?? [];
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[linear-gradient(180deg,#090909,#050505)] p-6 text-stone-100">
       <div className="mx-auto max-w-7xl space-y-6 rounded-3xl border border-fuchsia-900/40 bg-black/55 p-6">
+        {!showOverlay ? (
+        <>
         <div className="flex items-center justify-between gap-3">
           <div>
+            {logoUrl ? <img src={logoUrl} alt="Venue logo" className="mb-3 h-14 w-auto object-contain" /> : null}
             {session?.show_title ? <h1 className="text-3xl font-black uppercase text-fuchsia-100">{session?.title ?? "Bracket Battle"}</h1> : null}
             <p className="mt-2 text-sm text-stone-300">
               Session: {session?.session_code ?? (Number.isFinite(sessionId) ? sessionId : "(none selected)")} · Status: {session?.status ?? "-"}
@@ -241,13 +265,49 @@ export default function BracketBattleJumbotronPage() {
           </section>
         ) : null}
 
-        {showThanks ? (
+        </>
+        ) : null}
+
+        {/* Welcome overlay */}
+        {!showThanksOverlay && session?.host_overlay === "welcome" ? (
+          <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1a0a2e,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
+            <div className="max-w-4xl rounded-3xl border border-fuchsia-700/40 bg-black/70 p-10">
+              {logoUrl ? <img src={logoUrl} alt="Venue logo" className="mx-auto mb-6 h-20 w-auto object-contain" /> : null}
+              <p className="text-6xl font-black text-fuchsia-200">{session.welcome_heading_text ?? "Welcome to Bracket Battle"}</p>
+              <p className="mt-4 text-2xl text-stone-200">{session.welcome_message_text ?? "Vote for your favourite track in each matchup to advance seeds through the bracket."}</p>
+            </div>
+          </section>
+        ) : null}
+
+        {/* Countdown overlay */}
+        {!showThanksOverlay && session?.host_overlay === "countdown" ? (
+          <section className="fixed inset-0 z-40 flex items-center justify-center bg-[linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
+            <div className="max-w-xl rounded-3xl border border-fuchsia-700/40 bg-black/70 p-10">
+              <p className="text-3xl font-bold uppercase text-stone-300">Starting in…</p>
+              <p className="mt-4 text-9xl font-black text-fuchsia-300">{overlayRemaining > 0 ? overlayRemaining : ""}</p>
+            </div>
+          </section>
+        ) : null}
+
+        {/* Intermission overlay */}
+        {!showThanksOverlay && session?.host_overlay === "intermission" ? (
+          <section className="fixed inset-0 z-40 flex items-center justify-center bg-[linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
+            <div className="max-w-4xl rounded-3xl border border-fuchsia-700/40 bg-black/70 p-10">
+              {logoUrl ? <img src={logoUrl} alt="Venue logo" className="mx-auto mb-6 h-20 w-auto object-contain" /> : null}
+              <p className="text-6xl font-black text-fuchsia-200">{session.intermission_heading_text ?? "Intermission"}</p>
+              <p className="mt-4 text-2xl text-stone-200">{session.intermission_message_text ?? "Short break before the next round."}</p>
+              {overlayRemaining > 0 ? <p className="mt-6 text-4xl font-bold text-fuchsia-300">{overlayRemaining}s</p> : null}
+            </div>
+          </section>
+        ) : null}
+
+        {/* Thanks overlay */}
+        {showThanksOverlay ? (
           <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1f2937,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
             <div className="max-w-4xl rounded-3xl border border-fuchsia-700/40 bg-black/70 p-10">
-              <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Thanks For Playing</p>
-              <p className="mt-3 text-6xl font-black text-fuchsia-100">Bracket Battle</p>
-              <p className="mt-4 text-2xl text-stone-200">Session {session?.session_code ?? "-"} is complete</p>
-              <p className="mt-6 text-xl text-stone-300">See you at the next round</p>
+              {logoUrl ? <img src={logoUrl} alt="Venue logo" className="mx-auto mb-6 h-20 w-auto object-contain" /> : null}
+              <p className="text-6xl font-black text-fuchsia-200">{session?.thanks_heading_text ?? "Thanks for Playing"}</p>
+              <p className="mt-4 text-2xl text-stone-200">{session?.thanks_subheading_text ?? "See you at the next round."}</p>
             </div>
           </section>
         ) : null}

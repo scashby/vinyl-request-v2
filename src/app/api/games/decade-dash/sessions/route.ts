@@ -20,6 +20,14 @@ type CreateSessionBody = {
   show_round?: boolean;
   show_scoreboard?: boolean;
   show_scoring_hint?: boolean;
+    show_logo?: boolean;
+    welcome_heading_text?: string;
+    welcome_message_text?: string;
+    intermission_heading_text?: string;
+    intermission_message_text?: string;
+    thanks_heading_text?: string;
+    thanks_subheading_text?: string;
+    default_intermission_seconds?: number;
   team_names?: string[];
   calls?: Array<{
     artist?: string;
@@ -240,6 +248,16 @@ export async function POST(request: NextRequest) {
         show_round: body.show_round ?? true,
         show_scoreboard: body.show_scoreboard ?? true,
         show_scoring_hint: body.show_scoring_hint ?? true,
+          show_logo: body.show_logo ?? true,
+          welcome_heading_text: body.welcome_heading_text ?? 'Welcome to Decade Dash',
+          welcome_message_text: body.welcome_message_text ?? 'Identify songs from a specific era.',
+          intermission_heading_text: body.intermission_heading_text ?? 'Intermission',
+          intermission_message_text: body.intermission_message_text ?? 'Grab a drink and stretch your legs.',
+          thanks_heading_text: body.thanks_heading_text ?? 'Thanks for Playing',
+          thanks_subheading_text: body.thanks_subheading_text ?? 'See you at the next round.',
+          default_intermission_seconds: Number(body.default_intermission_seconds ?? 600),
+          host_overlay: "none",
+          host_overlay_remaining_seconds: 0,
         status: "pending",
       })
       .select("id, session_code")

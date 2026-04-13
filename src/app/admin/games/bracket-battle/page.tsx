@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import GameEventSelect from "src/components/GameEventSelect";
 import GamePlaylistSelect from "src/components/GamePlaylistSelect";
 import GameSetupInfoButton from "src/components/GameSetupInfoButton";
@@ -353,6 +354,7 @@ export default function BracketBattleSetupPage() {
                   <div className="text-sm">{session.session_code} · {session.title} · Round {session.current_round} · Matchups {session.matchups_total}</div>
                   <div className="text-xs text-stone-400">Event: {session.event_title ?? "(none)"} · Bracket: {session.bracket_size} · Vote: {session.vote_method} · Status: {session.status}</div>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    <Link href={`/admin/games/bracket-battle/edit?sessionId=${session.id}`} className="rounded border border-stone-600 px-2 py-1">Edit</Link>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/bracket-battle/host?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Host</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/bracket-battle/assistant?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Assistant</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/bracket-battle/jumbotron?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Jumbotron</button>

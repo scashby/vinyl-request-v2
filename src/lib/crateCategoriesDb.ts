@@ -1,3 +1,5 @@
+          venue_logo_url: string | null;
+          location: string | null;
 import { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
 
@@ -15,6 +17,7 @@ type CrateCategoriesDatabase = {
   public: {
     Tables: {
       events: {
+        };
         Row: {
           id: number;
           date: string;
@@ -79,6 +82,16 @@ type CrateCategoriesDatabase = {
           show_round: boolean;
           show_prompt: boolean;
           show_scoreboard: boolean;
+          show_logo: boolean;
+                    welcome_heading_text: string | null;
+                    welcome_message_text: string | null;
+                    intermission_heading_text: string | null;
+                    intermission_message_text: string | null;
+                    thanks_heading_text: string | null;
+                    thanks_subheading_text: string | null;
+                    default_intermission_seconds: number;
+                    host_overlay: string;
+                    host_overlay_remaining_seconds: number;
           status: CrateCategoriesSessionStatus;
           created_at: string;
           started_at: string | null;
@@ -106,6 +119,16 @@ type CrateCategoriesDatabase = {
           show_round?: boolean;
           show_prompt?: boolean;
           show_scoreboard?: boolean;
+          show_logo?: boolean;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
+          default_intermission_seconds?: number;
+          host_overlay?: string;
+          host_overlay_remaining_seconds?: number;
           status?: CrateCategoriesSessionStatus;
           created_at?: string;
           started_at?: string | null;
@@ -124,6 +147,16 @@ type CrateCategoriesDatabase = {
           show_round?: boolean;
           show_prompt?: boolean;
           show_scoreboard?: boolean;
+          show_logo?: boolean;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
+          default_intermission_seconds?: number;
+          host_overlay?: string;
+          host_overlay_remaining_seconds?: number;
           status?: CrateCategoriesSessionStatus;
           started_at?: string | null;
           ended_at?: string | null;

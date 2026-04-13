@@ -20,9 +20,17 @@ type SessionRow = {
   current_round: number;
   current_matchup_index: number;
   show_title: boolean;
+  show_logo: boolean;
   show_round: boolean;
   show_bracket: boolean;
   show_scoreboard: boolean;
+  welcome_heading_text: string | null;
+  welcome_message_text: string | null;
+  intermission_heading_text: string | null;
+  intermission_message_text: string | null;
+  thanks_heading_text: string | null;
+  thanks_subheading_text: string | null;
+  default_intermission_seconds: number;
   status: "pending" | "running" | "paused" | "completed";
   created_at: string;
   started_at: string | null;
@@ -35,6 +43,7 @@ type EventRow = {
   date: string;
   time: string | null;
   location: string | null;
+  venue_logo_url: string | null;
 };
 type PlaylistRow = { id: number; name: string };
 type TeamRow = { id: number; team_name: string; active: boolean };
@@ -76,6 +85,10 @@ type VoteTallyRow = {
   matchup_id: number;
   winner_entry_id: number;
   vote_count: number;
+
+type OverlayEventRow = {
+  payload: { mode: string; duration_seconds: number | null; started_at: string; ends_at: string | null } | null;
+};
 };
 
 function parseSessionId(id: string) {
@@ -108,7 +121,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     { data: voteTallies },
   ] = await Promise.all([
     session.event_id
-      ? db.from("events").select("id, title, date, time, location").eq("id", session.event_id).maybeSingle()
+      ? db.from("events").select("id, title, date, time, location, venue_logo_url").eq("id", session.event_id).maybeSingle()
       : Promise.resolve({ data: null }),
     session.playlist_id
       ? db.from("collection_playlists").select("id, name").eq("id", session.playlist_id).maybeSingle()
@@ -128,6 +141,23 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const typedScores = (scores ?? []) as ScoreRow[];
   const typedVoteTallies = (voteTallies ?? []) as VoteTallyRow[];
 
+  const overlayResult = await db
+    .from("bb_session_events")
+    .select("payload")
+    .eq("session_id", sessionId)
+    .eq("event_type", "overlay_set")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const overlayEvent = overlayResult.data as OverlayEventRow | null;
+  const overlayPayload = overlayEvent?.payload ?? null;
+  const overlayMode = overlayPayload?.mode ?? "none";
+  const overlayEndsAt = overlayPayload?.ends_at ? new Date(overlayPayload.ends_at) : null;
+  const now = new Date();
+  const hostOverlay = overlayMode !== "none" && (!overlayEndsAt || overlayEndsAt > now) ? overlayMode : "none";
+  const hostOverlayRemainingSeconds =
+    hostOverlay !== "none" && overlayEndsAt ? Math.max(0, Math.round((overlayEndsAt.getTime() - now.getTime()) / 1000)) : 0;
+
   const entryById = new Map<number, EntryRow>(typedEntries.map((entry) => [entry.id, entry]));
   const scoreByTeamId = new Map<number, ScoreRow>(typedScores.map((score) => [score.team_id, score]));
   const talliesByMatchupId = new Map<number, VoteTallyRow[]>();
@@ -143,6 +173,8 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       ...session,
       event: (event ?? null) as EventRow | null,
       playlist: (playlist ?? null) as PlaylistRow | null,
+      host_overlay: hostOverlay,
+      host_overlay_remaining_seconds: hostOverlayRemainingSeconds,
       teams_total: typedTeams.length,
       rounds_total: typedRounds.length,
       matchups_total: typedMatchups.length,
@@ -191,9 +223,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "current_round",
     "current_matchup_index",
     "show_title",
+    "show_logo",
     "show_round",
     "show_bracket",
     "show_scoreboard",
+    "welcome_heading_text",
+    "welcome_message_text",
+    "intermission_heading_text",
+    "intermission_message_text",
+    "thanks_heading_text",
+    "thanks_subheading_text",
+    "default_intermission_seconds",
     "status",
     "started_at",
     "ended_at",

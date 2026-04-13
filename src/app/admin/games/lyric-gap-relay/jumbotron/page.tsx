@@ -15,6 +15,19 @@ type Session = {
   show_round: boolean;
   show_scoreboard: boolean;
   show_answer_mode: boolean;
+  show_logo: boolean;
+  welcome_heading_text: string | null;
+  welcome_message_text: string | null;
+  intermission_heading_text: string | null;
+  intermission_message_text: string | null;
+  thanks_heading_text: string | null;
+  thanks_subheading_text: string | null;
+  default_intermission_seconds: number;
+  host_overlay: string;
+  host_overlay_remaining_seconds: number;
+  event: {
+    venue_logo_url: string | null;
+  } | null;
 };
 
 type Call = {
@@ -26,6 +39,7 @@ type Call = {
   status: "pending" | "asked" | "locked" | "answer_revealed" | "scored" | "skipped";
 };
 
+  const [overlayRemaining, setOverlayRemaining] = useState(0);
 type LeaderboardRow = {
   team_id: number;
   team_name: string;
@@ -39,6 +53,7 @@ export default function LyricGapRelayJumbotronPage() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [remaining, setRemaining] = useState(0);
+  const [overlayRemaining, setOverlayRemaining] = useState(0);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -80,7 +95,19 @@ export default function LyricGapRelayJumbotronPage() {
       });
     }, 1000);
 
-    return () => clearInterval(tick);
+    return () =>
+
+  useEffect(() => {
+    if (!session?.host_overlay_remaining_seconds) {
+      setOverlayRemaining(0);
+      return;
+    }
+    setOverlayRemaining(session.host_overlay_remaining_seconds);
+    const interval = setInterval(() => {
+      setOverlayRemaining((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [session?.host_overlay_remaining_seconds]); clearInterval(tick);
   }, [session]);
 
   const currentCall = useMemo(() => {
@@ -89,6 +116,10 @@ export default function LyricGapRelayJumbotronPage() {
   }, [calls, session]);
 
   const promptState = useMemo(() => {
+
+  const showThanksOverlay = session?.host_overlay === "thanks" && session.host_overlay_remaining_seconds > 0;
+  const showOverlay = showThanksOverlay || (!!session?.host_overlay && session.host_overlay !== "none");
+  const logoUrl = session?.event?.venue_logo_url ?? "";
     if (!currentCall) return "Waiting for host to start the next lyric gap";
     if (currentCall.status === "asked") return "Write the next line now";
     if (currentCall.status === "locked") return "Answers locked";
@@ -108,74 +139,109 @@ export default function LyricGapRelayJumbotronPage() {
       containerRef.current?.requestFullscreen().catch(() => undefined);
     } else {
       document.exitFullscreen().catch(() => undefined);
-    }
-  }, []);
+    }{!showOverlay ? (
+          <>
+            <header className="rounded-3xl border border-fuchsia-700/40 bg-black/35 p-6">
+              {session?.show_title ? <h1 className="text-5xl font-black uppercase tracking-tight text-fuchsia-200">{session?.title ?? "Lyric Gap Relay"}</h1> : null}
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "f" || event.key === "F") {
-        toggleFullscreen();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [toggleFullscreen]);
+              <div className="mt-4 flex flex-wrap gap-6 text-xl font-semibold">
+                {session?.show_round ? <p>Round {session?.current_round} of {session?.round_count}</p> : null}
+                <p>Gap {session?.current_call_index ?? 0} / {session?.round_count ?? 0}</p>
+                <p>Next Reset: <span className="font-black text-fuchsia-300">{remaining}s</span></p>
+                {session?.status === "paused" ? <p className="text-red-400">Paused</p> : null}
+              </div>
+            </header>
 
-  return (
-    <div ref={containerRef} className="min-h-screen bg-[radial-gradient(circle_at_50%_0%,#5f114e,transparent_38%),linear-gradient(180deg,#020202,#0d0d0d)] p-8 text-white">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <header className="rounded-3xl border border-fuchsia-700/40 bg-black/35 p-6">
-          {session?.show_title ? <h1 className="text-5xl font-black uppercase tracking-tight text-fuchsia-200">{session?.title ?? "Lyric Gap Relay"}</h1> : null}
+            <section className="rounded-3xl border border-stone-700 bg-black/45 p-8">
+              <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Prompt State</p>
+              <p className="mt-2 text-5xl font-black text-fuchsia-200">{promptState}</p>
+              <p className="mt-4 text-xl text-stone-200">Cue lyric:</p>
+              <p className="mt-2 text-4xl font-semibold text-stone-100">{currentCall?.cue_lyric ?? "Waiting for next lyric gap"}</p>
+              {showAnswer ? (
+                <>
+                  <p className="mt-6 text-xl text-amber-300">Official line:</p>
+                  <p className="mt-2 text-4xl font-semibold text-amber-200">{currentCall?.answer_lyric}</p>
+                </>
+              ) : (
+                <p className="mt-6 text-2xl font-semibold text-stone-300">Answer hidden until reveal</p>
+              )}
 
-          <div className="mt-4 flex flex-wrap gap-6 text-xl font-semibold">
-            {session?.show_round ? <p>Round {session?.current_round} of {session?.round_count}</p> : null}
-            <p>Gap {session?.current_call_index ?? 0} / {session?.round_count ?? 0}</p>
-            <p>Next Reset: <span className="font-black text-fuchsia-300">{remaining}s</span></p>
-            {session?.status === "paused" ? <p className="text-red-400">Paused</p> : null}
-          </div>
-        </header>
+              {session?.show_answer_mode ? (
+                <p className="mt-6 text-lg text-stone-200">Scoring rubric: <span className="font-bold text-fuchsia-300">2 exact</span> · <span className="font-bold text-fuchsia-300">1 close</span> · <span className="font-bold text-fuchsia-300">0 miss</span></p>
+              ) : null}
+            </section>
 
-        <section className="rounded-3xl border border-stone-700 bg-black/45 p-8">
-          <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Prompt State</p>
-          <p className="mt-2 text-5xl font-black text-fuchsia-200">{promptState}</p>
-          <p className="mt-4 text-xl text-stone-200">Cue lyric:</p>
-          <p className="mt-2 text-4xl font-semibold text-stone-100">{currentCall?.cue_lyric ?? "Waiting for next lyric gap"}</p>
-          {showAnswer ? (
-            <>
-              <p className="mt-6 text-xl text-amber-300">Official line:</p>
-              <p className="mt-2 text-4xl font-semibold text-amber-200">{currentCall?.answer_lyric}</p>
-            </>
-          ) : (
-            <p className="mt-6 text-2xl font-semibold text-stone-300">Answer hidden until reveal</p>
-          )}
-
-          {session?.show_answer_mode ? (
-            <p className="mt-6 text-lg text-stone-200">Scoring rubric: <span className="font-bold text-fuchsia-300">2 exact</span> · <span className="font-bold text-fuchsia-300">1 close</span> · <span className="font-bold text-fuchsia-300">0 miss</span></p>
-          ) : null}
-        </section>
-
-        {session?.show_scoreboard ? (
-          <section className="rounded-3xl border border-stone-700 bg-black/45 p-6">
-            <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Leaderboard</p>
-            <div className="mt-3 grid gap-2 text-2xl font-semibold">
-              {leaderboard.slice(0, 6).map((row, index) => (
-                <div key={row.team_id} className="flex items-center justify-between rounded border border-stone-700 bg-stone-950/70 px-3 py-2">
-                  <span>{index + 1}. {row.team_name}</span>
-                  <span className="text-fuchsia-300">{row.total_points} pts</span>
+            {session?.show_scoreboard ? (
+              <section className="rounded-3xl border border-stone-700 bg-black/45 p-6">
+                <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Leaderboard</p>
+                <div className="mt-3 grid gap-2 text-2xl font-semibold">
+                  {leaderboard.slice(0, 6).map((row, index) => (
+                    <div key={row.team_id} className="flex items-center justify-between rounded border border-stone-700 bg-stone-950/70 px-3 py-2">
+                      <span>{index + 1}. {row.team_name}</span>
+                      <span className="text-fuchsia-300">{row.total_points} pts</span>
+                    </div>
+                  ))}
+                  {leaderboard.length === 0 ? <p className="text-stone-400">No scores yet</p> : null}
                 </div>
-              ))}
-              {leaderboard.length === 0 ? <p className="text-stone-400">No scores yet</p> : null}
-            </div>
-          </section>
+              </section>
+            ) : null}
+
+            {showThanks ? (
+              <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1f2937,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
+                <div className="max-w-4xl rounded-3xl border border-indigo-700/40 bg-black/70 p-10">
+                  <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Thanks For Playing</p>
+                  <p className="mt-3 text-6xl font-black text-indigo-200">Lyric Gap Relay</p>
+                  <p className="mt-4 text-2xl text-stone-200">Session {session?.session_code ?? "-"} is complete</p>
+                  <p className="mt-6 text-xl text-stone-300">See you at the next round</p>
+                </div>
+              </section>
+            ) : null}
+          </>
         ) : null}
 
-        {showThanks ? (
-          <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1f2937,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
-            <div className="max-w-4xl rounded-3xl border border-fuchsia-700/40 bg-black/70 p-10">
-              <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Thanks For Playing</p>
-              <p className="mt-3 text-6xl font-black text-fuchsia-200">Lyric Gap Relay</p>
-              <p className="mt-4 text-2xl text-stone-200">Session {session?.session_code ?? "-"} is complete</p>
-              <p className="mt-6 text-xl text-stone-300">See you at the next round</p>
+        {/* Welcome Overlay */}
+        {session?.host_overlay === "welcome" && !showThanksOverlay && (
+          <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-gradient-to-b from-indigo-900/90 via-stone-900/80 to-stone-950/90 backdrop-blur-sm">
+            {logoUrl && session.show_logo && <img src={logoUrl} alt="Venue" className="h-16 mb-4 object-contain" />}
+            <div className="text-center">
+              <h2 className="text-4xl font-black text-indigo-300 mb-4">{session?.welcome_heading_text}</h2>
+              <p className="text-lg text-stone-300">{session?.welcome_message_text}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Countdown Overlay */}
+        {session?.host_overlay === "countdown" && !showThanksOverlay && (
+          <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-gradient-to-b from-indigo-900/90 via-stone-900/80 to-stone-950/90 backdrop-blur-sm">
+            <div className="text-center">
+              <p className="text-xl text-stone-300 mb-2">Starting in…</p>
+              <p className="text-6xl font-black text-indigo-300">{overlayRemaining}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Intermission Overlay */}
+        {session?.host_overlay === "intermission" && !showThanksOverlay && (
+          <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-gradient-to-b from-indigo-900/90 via-stone-900/80 to-stone-950/90 backdrop-blur-sm">
+            <div className="text-center">
+              <h2 className="text-4xl font-black text-indigo-300 mb-4">{session?.intermission_heading_text}</h2>
+              <p className="text-lg text-stone-300 mb-4">{session?.intermission_message_text}</p>
+              <p className="text-2xl font-bold text-indigo-400">{overlayRemaining}s</p>
+            </div>
+          </div>
+        )}
+
+        {/* Thanks Overlay */}
+        {showThanksOverlay && (
+          <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-gradient-to-b from-indigo-900/90 via-stone-900/80 to-stone-950/90 backdrop-blur-sm">
+            {logoUrl && session.show_logo && <img src={logoUrl} alt="Venue" className="h-20 mb-6 object-contain" />}
+            <div className="text-center">
+              <h2 className="text-5xl font-black text-indigo-300 mb-4">{session?.thanks_heading_text}</h2>
+              <p className="text-2xl text-stone-300">{session?.thanks_subheading_text}</p>
+            </div>
+          </div>
+        )}
+      </div>             <p className="mt-6 text-xl text-stone-300">See you at the next round</p>
             </div>
           </section>
         ) : null}

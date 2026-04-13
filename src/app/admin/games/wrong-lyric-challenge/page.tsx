@@ -371,6 +371,7 @@ export default function WrongLyricChallengeSetupPage() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="text-sm">{session.session_code} · {session.title} · Round {session.current_round} of {session.round_count} · Calls {session.calls_total}</div>
                     <div className="flex gap-2 text-xs">
+                      <Link href={`/admin/games/wrong-lyric-challenge/edit?sessionId=${session.id}`} className="rounded border border-stone-600 px-2 py-1 text-xs">Edit</Link>
                       <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/wrong-lyric-challenge/host?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Host</button>
                       <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/wrong-lyric-challenge/assistant?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Assistant</button>
                       <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/wrong-lyric-challenge/jumbotron?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Jumbotron</button>

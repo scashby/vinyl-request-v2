@@ -359,6 +359,7 @@ export default function ArtistAliasSetupPage() {
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/artist-alias/host?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Host</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/artist-alias/assistant?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Assistant</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/artist-alias/jumbotron?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Jumbotron</button>
+                    <Link href={`/admin/games/artist-alias/edit?sessionId=${session.id}`} className="rounded border border-stone-600 px-2 py-1">Edit</Link>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => downloadGamePullListPdf({ gameSlug: "artist-alias", gameTitle: "Artist Alias", sessionId: session.id, sessionCode: session.session_code, accentRgb: [139, 92, 246] })}>Pull List PDF</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open("/admin/games/artist-alias/history", "_blank", "noopener,noreferrer")}>History</button>
                   </div>

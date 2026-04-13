@@ -16,9 +16,17 @@ type CreateSessionBody = {
   cue_seconds?: number;
   host_buffer_seconds?: number;
   show_title?: boolean;
+  show_logo?: boolean;
   show_round?: boolean;
   show_scoreboard?: boolean;
   show_connection_prompt?: boolean;
+  welcome_heading_text?: string;
+  welcome_message_text?: string;
+  intermission_heading_text?: string;
+  intermission_message_text?: string;
+  thanks_heading_text?: string;
+  thanks_subheading_text?: string;
+  default_intermission_seconds?: number;
   team_names?: string[];
   calls?: Array<{
     track_a_artist: string;
@@ -209,9 +217,17 @@ export async function POST(request: NextRequest) {
         current_round: 1,
         current_call_index: 0,
         show_title: body.show_title ?? true,
+        show_logo: body.show_logo ?? true,
         show_round: body.show_round ?? true,
         show_scoreboard: body.show_scoreboard ?? true,
         show_connection_prompt: body.show_connection_prompt ?? true,
+        welcome_heading_text: body.welcome_heading_text ?? 'Welcome to Back-to-Back Connection',
+        welcome_message_text: body.welcome_message_text ?? 'Identify the hidden musical connection between two back-to-back tracks.',
+        intermission_heading_text: body.intermission_heading_text ?? 'Intermission',
+        intermission_message_text: body.intermission_message_text ?? 'Short break before the next round.',
+        thanks_heading_text: body.thanks_heading_text ?? 'Thanks for Playing',
+        thanks_subheading_text: body.thanks_subheading_text ?? 'See you at the next round.',
+        default_intermission_seconds: body.default_intermission_seconds ?? 600,
         status: "pending",
       })
       .select("id, session_code")

@@ -358,6 +358,7 @@ export default function BackToBackConnectionSetupPage() {
                   <p>{session.session_code} · {session.title}</p>
                   <p className="text-stone-400">Event: {session.event_title ?? "(none)"} · Round: {session.current_round}/{session.round_count} · Calls: {session.calls_scored}/{session.calls_total} scored · Status: {session.status}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
+                    <Link href={`/admin/games/back-to-back-connection/edit?sessionId=${session.id}`} className="rounded border border-stone-600 px-2 py-1 text-xs">Edit</Link>
                     <button className="rounded border border-stone-600 px-2 py-1 text-xs" onClick={() => window.open(`/admin/games/back-to-back-connection/host?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Host</button>
                     <button className="rounded border border-stone-600 px-2 py-1 text-xs" onClick={() => window.open(`/admin/games/back-to-back-connection/assistant?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Assistant</button>
                     <button className="rounded border border-stone-600 px-2 py-1 text-xs" onClick={() => window.open(`/admin/games/back-to-back-connection/jumbotron?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Jumbotron</button>

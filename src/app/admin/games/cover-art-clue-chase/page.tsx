@@ -355,6 +355,7 @@ export default function CoverArtClueChaseSetupPage() {
                   <p>{session.session_code} · {session.title} · Round {session.current_round}/{session.round_count}</p>
                   <p className="text-stone-400">Event: {session.event_title ?? "(none)"} · Playlist: {session.playlist_name ?? "(none)"} · Score model: {session.stage_one_points}/{session.stage_two_points}/{session.final_reveal_points} · Calls: {session.calls_scored}/{session.calls_total} · Status: {session.status}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
+                    <Link href={`/admin/games/cover-art-clue-chase/edit?sessionId=${session.id}`} className="rounded border border-stone-600 px-2 py-1 text-xs">Edit</Link>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/cover-art-clue-chase/host?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Host</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/cover-art-clue-chase/assistant?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Assistant</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/cover-art-clue-chase/jumbotron?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Jumbotron</button>

@@ -16,6 +16,16 @@ type Session = {
   exact_points: number;
   adjacent_points: number;
   target_gap_seconds: number;
+  show_logo: boolean;
+  welcome_heading_text: string | null;
+  welcome_message_text: string | null;
+  intermission_heading_text: string | null;
+  intermission_message_text: string | null;
+  thanks_heading_text: string | null;
+  thanks_subheading_text: string | null;
+  default_intermission_seconds: number;
+  host_overlay: string | null;
+  host_overlay_remaining_seconds: number;
 };
 
 type Call = {
@@ -81,6 +91,8 @@ export default function DecadeDashHostPage() {
   const [scoreDraft, setScoreDraft] = useState<ScoreDraft>({});
   const [saving, setSaving] = useState(false);
   const [working, setWorking] = useState(false);
+  const [overlaySecondsInput, setOverlaySecondsInput] = useState(600);
+  const [overlayBusy, setOverlayBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -167,7 +179,26 @@ export default function DecadeDashHostPage() {
       if (!res.ok) {
         const payload = await res.json();
         throw new Error(payload.error ?? "Failed to resume");
+    
+
+  const setOverlay = async (mode: string) => {
+    setOverlayBusy(true);
+    try {
+      const res = await fetch(`/api/games/decade-dash/sessions/${sessionId}/overlay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode,
+          duration_seconds: mode === "none" ? null : overlaySecondsInput,
+        }),
+      });
+      if (res.ok) {
+        setSession((s) => s ? { ...s, host_overlay: mode, host_overlay_remaining_seconds: overlaySecondsInput } : null);
       }
+    } finally {
+      setOverlayBusy(false);
+    }
+  };  }
     });
   };
 
@@ -324,6 +355,24 @@ export default function DecadeDashHostPage() {
                 <p className="font-semibold text-stone-300">Recently Played</p>
                 <div className="mt-1 max-h-24 overflow-auto text-stone-400">
                   {previousCalls.map((call) => (
+
+              <div className="border-t border-stone-700 pt-4 mt-4">
+                <div className="text-sm font-semibold mb-2">Overlay Control</div>
+                <div className="inline-flex gap-1 mb-2">
+                  {["Welcome", "Countdown", "Intermission", "Thanks", "Clear"].map((label, i) => {
+                    const modes = ["welcome", "countdown", "intermission", "thanks", "none"];
+                    return (
+                      <button key={label} onClick={() => setOverlay(modes[i])} disabled={overlayBusy} className="rounded border border-stone-600 px-2 py-1 text-xs hover:bg-stone-800">
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-2 items-center">
+                  <label className="text-xs">Duration (seconds):</label>
+                  <input type="number" value={overlaySecondsInput} onChange={(e) => setOverlaySecondsInput(parseInt(e.target.value))} className="w-16 rounded border border-stone-600 bg-stone-900 px-1 py-0.5" />
+                </div>
+              </div>
                     <div key={call.id}>#{call.call_index} {call.artist ?? "Unknown"} - {call.title ?? "Untitled"} ({call.status})</div>
                   ))}
                 </div>

@@ -25,6 +25,16 @@ type SessionRow = {
   show_round: boolean;
   show_scoreboard: boolean;
   show_stage_hint: boolean;
+  show_logo: boolean;
+  welcome_heading_text: string | null;
+  welcome_message_text: string | null;
+  intermission_heading_text: string | null;
+  intermission_message_text: string | null;
+  thanks_heading_text: string | null;
+  thanks_subheading_text: string | null;
+  default_intermission_seconds: number;
+    host_overlay: string;
+    host_overlay_remaining_seconds: number;
   status: "pending" | "running" | "paused" | "completed";
   created_at: string;
   started_at: string | null;
@@ -53,7 +63,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 
   const session = data as SessionRow;
   const { data: event } = session.event_id
-    ? await db.from("events").select("id, title, date, time, location").eq("id", session.event_id).maybeSingle()
+    ? await db.from("events").select("id, title, date, time, location, venue_logo_url").eq("id", session.event_id).maybeSingle()
     : { data: null };
   const { data: playlist } = session.playlist_id
     ? await db.from("collection_playlists").select("id, name").eq("id", session.playlist_id).maybeSingle()
@@ -93,6 +103,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "show_round",
     "show_scoreboard",
     "show_stage_hint",
+    "show_logo",
+    "welcome_heading_text",
+    "welcome_message_text",
+    "intermission_heading_text",
+    "intermission_message_text",
+    "thanks_heading_text",
+    "thanks_subheading_text",
+    "default_intermission_seconds",
     "status",
     "started_at",
     "ended_at",

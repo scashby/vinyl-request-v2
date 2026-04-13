@@ -352,6 +352,7 @@ export default function LyricGapRelaySetupPage() {
                   <div className="text-sm">{session.session_code} · {session.title} · Round {session.current_round} of {session.round_count} · Calls {session.calls_total}</div>
                   <div className="text-xs text-stone-400">Event: {session.event_title ?? "(none)"} · Judge: {session.judge_mode} · Status: {session.status}</div>
                   <div className="mt-2 flex flex-wrap gap-2">
+                    <Link href={`/admin/games/lyric-gap-relay/edit?sessionId=${session.id}`} className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Edit</Link>
                     <Link href={`/admin/games/lyric-gap-relay/host?sessionId=${session.id}`} className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Host</Link>
                     <Link href={`/admin/games/lyric-gap-relay/assistant?sessionId=${session.id}`} className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Assistant</Link>
                     <Link href={`/admin/games/lyric-gap-relay/jumbotron?sessionId=${session.id}`} className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Jumbotron</Link>

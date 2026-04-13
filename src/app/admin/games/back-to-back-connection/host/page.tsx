@@ -15,6 +15,9 @@ type Session = {
   connection_points: number;
   detail_bonus_points: number;
   target_gap_seconds: number;
+  default_intermission_seconds: number;
+  host_overlay: string;
+  host_overlay_remaining_seconds: number;
 };
 
 type Call = {
@@ -71,6 +74,8 @@ export default function BackToBackConnectionHostPage() {
   const [scoreDraft, setScoreDraft] = useState<ScoreDraft>({});
   const [saving, setSaving] = useState(false);
   const [working, setWorking] = useState(false);
+  const [overlaySecondsInput, setOverlaySecondsInput] = useState(600);
+  const [overlayBusy, setOverlayBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -81,7 +86,11 @@ export default function BackToBackConnectionHostPage() {
       fetch(`/api/games/back-to-back-connection/sessions/${sessionId}/leaderboard`),
     ]);
 
-    if (sessionRes.ok) setSession(await sessionRes.json());
+    if (sessionRes.ok) {
+      const s = await sessionRes.json();
+      setSession(s);
+      setOverlaySecondsInput((prev) => (prev === 600 ? (s.default_intermission_seconds ?? 600) : prev));
+    }
     if (callsRes.ok) {
       const payload = await callsRes.json();
       setCalls(payload.data ?? []);
@@ -235,6 +244,28 @@ export default function BackToBackConnectionHostPage() {
     }
   };
 
+  const setOverlay = async (mode: string, durationSeconds?: number) => {
+    setOverlayBusy(true);
+    try {
+      await fetch(`/api/games/back-to-back-connection/sessions/${sessionId}/overlay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode, duration_seconds: durationSeconds ?? null }),
+      });
+      await load();
+    } finally {
+      setOverlayBusy(false);
+    }
+  };
+
+  const toggleIntermission = () => {
+    if (session?.host_overlay === "intermission") {
+      setOverlay("none");
+    } else {
+      setOverlay("intermission", overlaySecondsInput);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#090909,#171717)] p-6 text-stone-100">
       <div className="mx-auto max-w-7xl space-y-4">
@@ -343,6 +374,34 @@ export default function BackToBackConnectionHostPage() {
                 <button disabled={working} onClick={pause} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Pause</button>
                 <button disabled={working} onClick={resume} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Resume</button>
                 <button disabled={working || !callForControls} onClick={() => patchCallStatus("scored")} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Mark Scored</button>
+              </div>
+              <div className="mt-3 rounded border border-stone-700 bg-black/30 p-3">
+                <p className="mb-2 text-xs font-semibold uppercase text-amber-300">Overlay</p>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <button disabled={overlayBusy} onClick={() => setOverlay("welcome")} className="rounded bg-blue-800 px-2 py-1 disabled:opacity-50">Welcome</button>
+                  <button disabled={overlayBusy} onClick={() => setOverlay("countdown")} className="rounded bg-violet-800 px-2 py-1 disabled:opacity-50">Countdown</button>
+                  <button disabled={overlayBusy} onClick={toggleIntermission} className={`rounded px-2 py-1 disabled:opacity-50 ${session?.host_overlay === "intermission" ? "bg-amber-600" : "bg-amber-800"}`}>
+                    {session?.host_overlay === "intermission" ? "End Intermission" : "Intermission"}
+                  </button>
+                  <button disabled={overlayBusy} onClick={() => setOverlay("thanks")} className="rounded bg-emerald-800 px-2 py-1 disabled:opacity-50">Thanks</button>
+                  <button disabled={overlayBusy} onClick={() => setOverlay("none")} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Clear</button>
+                </div>
+                <div className="mt-2 flex items-center gap-2 text-xs">
+                  <label className="text-stone-400">Intermission sec</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={overlaySecondsInput}
+                    onChange={(e) => setOverlaySecondsInput(Math.max(0, Number(e.target.value) || 0))}
+                    className="w-20 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-white"
+                  />
+                  {session?.host_overlay && session.host_overlay !== "none" && (
+                    <span className="text-amber-300">
+                      Active: {session.host_overlay}
+                      {session.host_overlay_remaining_seconds > 0 ? ` (${session.host_overlay_remaining_seconds}s)` : ""}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 

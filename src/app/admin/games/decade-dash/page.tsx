@@ -347,6 +347,7 @@ export default function DecadeDashSetupPage() {
                   <p>{session.session_code} · {session.title} · {session.status}</p>
                   <p className="text-stone-400">Event: {session.event_title ?? "(none)"} · Round: {session.current_round}/{session.round_count} · Calls: {session.calls_scored}/{session.calls_total} scored · Adjacent: {session.adjacent_scoring_enabled ? "On" : "Off"}</p>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    <Link href={`/admin/games/decade-dash/edit?sessionId=${session.id}`} className="rounded border border-stone-600 px-2 py-1 text-xs">Edit</Link>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/decade-dash/host?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Host</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/decade-dash/assistant?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Assistant</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => window.open(`/admin/games/decade-dash/jumbotron?sessionId=${session.id}`, "_blank", "noopener,noreferrer")}>Jumbotron</button>

@@ -16,6 +16,19 @@ type Session = {
   show_round: boolean;
   show_scoreboard: boolean;
   show_scoring_hint: boolean;
+  show_logo: boolean;
+  welcome_heading_text: string | null;
+  welcome_message_text: string | null;
+  intermission_heading_text: string | null;
+  intermission_message_text: string | null;
+  thanks_heading_text: string | null;
+  thanks_subheading_text: string | null;
+  default_intermission_seconds: number;
+  host_overlay: string;
+  host_overlay_remaining_seconds: number;
+  event: {
+    venue_logo_url: string | null;
+  } | null;
 };
 
 type Call = {
@@ -47,6 +60,7 @@ export default function DecadeDashJumbotronPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
+  const [overlayRemaining, setOverlayRemaining] = useState(0);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -71,7 +85,23 @@ export default function DecadeDashJumbotronPage() {
   useEffect(() => {
     load();
     const poll = setInterval(load, 3000);
-    return () => clearInterval(poll);
+    return ()
+
+  useEffect(() => {
+    if (!session?.host_overlay_remaining_seconds) {
+      setOverlayRemaining(0);
+      return;
+    }
+    setOverlayRemaining(session.host_overlay_remaining_seconds);
+    const interval = setInterval(() => {
+
+  const showThanksOverlay = session?.host_overlay === "thanks" && session.host_overlay_remaining_seconds > 0;
+  const showOverlay = showThanksOverlay || (!!session?.host_overlay && session.host_overlay !== "none");
+  const logoUrl = session?.event?.venue_logo_url ?? "";
+      setOverlayRemaining((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [session?.host_overlay_remaining_seconds]); => clearInterval(poll);
   }, [load]);
 
   const activeCall = useMemo(() => {
@@ -86,92 +116,127 @@ export default function DecadeDashJumbotronPage() {
       containerRef.current?.requestFullscreen().catch(() => undefined);
     } else {
       document.exitFullscreen().catch(() => undefined);
-    }
-  }, []);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "f" || event.key === "F") {
-        toggleFullscreen();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [toggleFullscreen]);
-
-  return (
-    <div ref={containerRef} className="min-h-screen bg-[linear-gradient(180deg,#090909,#040404)] p-6 text-stone-100">
-      <div className="mx-auto max-w-6xl rounded-3xl border border-sky-900/40 bg-black/55 p-8">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-3xl font-black uppercase text-sky-100">Decade Dash Jumbotron</h1>
-          <Link href="/admin/games/decade-dash" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Back to Setup</Link>
-        </div>
-
-        <p className="mt-3 text-sm text-stone-300">
-          Session: {session?.session_code ?? "(none selected)"} · Status: {session?.status ?? "-"}
-        </p>
-
-        <section className="mt-6 rounded-xl border border-stone-700 bg-stone-950/60 p-4">
-          {session?.show_title ? (
-            <p className="text-xs uppercase tracking-[0.18em] text-sky-300">{session.title}</p>
-          ) : null}
-          {session?.show_round ? (
-            <p className="mt-2 text-4xl font-black text-sky-100">Round {session.current_round} / {session.round_count}</p>
-          ) : null}
-          <p className="mt-4 text-xl text-stone-100">{getStateCopy(activeCall?.status ?? null)}</p>
-
-          <div className="mt-6 rounded-2xl border border-sky-800/50 bg-sky-950/25 p-6 text-center">
-            {(activeCall?.status === "revealed" || activeCall?.status === "scored") ? (
-              <>
-                <p className="text-sm uppercase tracking-[0.2em] text-sky-300">Answer</p>
-                <p className="mt-2 text-7xl font-black text-sky-100">{activeCall.decade_start}s</p>
-              </>
-            ) : (
-              <>
-                <p className="text-sm uppercase tracking-[0.2em] text-sky-300">Pick a Decade</p>
-                <p className="mt-2 text-4xl font-black text-stone-200">1950s · 1960s · 1970s · 1980s · 1990s · 2000s · 2010s</p>
-              </>
-            )}
-          </div>
-
-          {session?.show_scoring_hint ? (
-            <p className="mt-4 text-sm text-stone-300">
-              Scoring: Exact = 2, Adjacent = 1 (if enabled), Miss = 0
-            </p>
-          ) : null}
-        </section>
-
-        {session?.show_scoreboard ? (
-          <section className="mt-4 rounded-xl border border-stone-700 bg-stone-950/60 p-4">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-sky-200">Scoreboard</h2>
-            <div className="mt-3 grid gap-2 md:grid-cols-2">
-              {leaderboard.slice(0, 8).map((team, index) => (
-                <div key={team.team_id} className="rounded border border-stone-700 bg-black/40 p-3">
-                  <p className="text-sm text-stone-400">#{index + 1}</p>
-                  <p className="text-2xl font-black text-sky-100">{team.team_name}</p>
-                  <p className="text-lg text-stone-200">{team.total_points} pts</p>
-                </div>
-              ))}
+    }{!showOverlay ? (
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <h1 className="text-3xl font-black uppercase text-sky-100">Decade Dash Jumbotron</h1>
+              <Link href="/admin/games/decade-dash" className="rounded border border-stone-600 px-3 py-1 text-xs uppercase">Back to Setup</Link>
             </div>
-          </section>
+
+            <p className="mt-3 text-sm text-stone-300">
+              Session: {session?.session_code ?? "(none selected)"} · Status: {session?.status ?? "-"}
+            </p>
+
+            <section className="mt-6 rounded-xl border border-stone-700 bg-stone-950/60 p-4">
+              {session?.show_title ? (
+                <p className="text-xs uppercase tracking-[0.18em] text-sky-300">{session.title}</p>
+              ) : null}
+              {session?.show_round ? (
+                <p className="mt-2 text-4xl font-black text-sky-100">Round {session.current_round} / {session.round_count}</p>
+              ) : null}
+              <p className="mt-4 text-xl text-stone-100">{getStateCopy(activeCall?.status ?? null)}</p>
+
+              <div className="mt-6 rounded-2xl border border-sky-800/50 bg-sky-950/25 p-6 text-center">
+                {(activeCall?.status === "revealed" || activeCall?.status === "scored") ? (
+                  <>
+                    <p className="text-sm uppercase tracking-[0.2em] text-sky-300">Answer</p>
+                    <p className="mt-2 text-7xl font-black text-sky-100">{activeCall.decade_start}s</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm uppercase tracking-[0.2em] text-sky-300">Pick a Decade</p>
+                    <p className="mt-2 text-4xl font-black text-stone-200">1950s · 1960s · 1970s · 1980s · 1990s · 2000s · 2010s</p>
+                  </>
+                )}
+              </div>
+
+              {session?.show_scoring_hint ? (
+                <p className="mt-4 text-sm text-stone-300">
+                  Scoring: Exact = 2, Adjacent = 1 (if enabled), Miss = 0
+                </p>
+              ) : null}
+            </section>
+
+            {session?.show_scoreboard ? (
+              <section className="mt-4 rounded-xl border border-stone-700 bg-stone-950/60 p-4">
+                <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-sky-200">Scoreboard</h2>
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
+                  {leaderboard.slice(0, 8).map((team, index) => (
+                    <div key={team.team_id} className="rounded border border-stone-700 bg-black/40 p-3">
+                      <p className="text-sm text-stone-400">#{index + 1}</p>
+                      <p className="text-2xl font-black text-sky-100">{team.team_name}</p>
+                      <p className="text-lg text-stone-200">{team.total_points} pts</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            <section className="mt-4 rounded-xl border border-stone-700 bg-stone-950/60 p-4">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-sky-200">Operator Notes</h2>
+              <ul className="mt-3 list-disc space-y-2 pl-6 text-sm text-stone-200">
+                <li>Use this screen for public state only, not answer key prep notes.</li>
+                <li>Keep decade card options visible until host reveals the answer.</li>
+                <li>In solo-host mode, hold this on a separate display and drive transitions from Host.</li>
+              </ul>
+            </section>
+
+            {showThanks ? (
+              <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1f2937,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
+                <div className="max-w-4xl rounded-3xl border border-pink-700/40 bg-black/70 p-10">
+                  <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Thanks For Playing</p>
+                  <p className="mt-3 text-6xl font-black text-pink-200">Decade Dash</p>
+                  <p className="mt-4 text-2xl text-stone-200">Session {session?.session_code ?? "-"} is complete</p>
+                  <p className="mt-6 text-xl text-stone-300">See you at the next round</p>
+                </div>
+              </section>
+            ) : null}
+          </>
         ) : null}
 
-        <section className="mt-4 rounded-xl border border-stone-700 bg-stone-950/60 p-4">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-sky-200">Operator Notes</h2>
-          <ul className="mt-3 list-disc space-y-2 pl-6 text-sm text-stone-200">
-            <li>Use this screen for public state only, not answer key prep notes.</li>
-            <li>Keep decade card options visible until host reveals the answer.</li>
-            <li>In solo-host mode, hold this on a separate display and drive transitions from Host.</li>
-          </ul>
-        </section>
+        {/* Welcome Overlay */}
+        {session?.host_overlay === "welcome" && !showThanksOverlay && (
+          <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-gradient-to-b from-pink-900/90 via-stone-900/80 to-stone-950/90 backdrop-blur-sm">
+            {logoUrl && session.show_logo && <img src={logoUrl} alt="Venue" className="h-16 mb-4 object-contain" />}
+            <div className="text-center">
+              <h2 className="text-4xl font-black text-pink-300 mb-4">{session?.welcome_heading_text}</h2>
+              <p className="text-lg text-stone-300">{session?.welcome_message_text}</p>
+            </div>
+          </div>
+        )}
 
-        {showThanks ? (
-          <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1f2937,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
-            <div className="max-w-4xl rounded-3xl border border-sky-700/40 bg-black/70 p-10">
-              <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Thanks For Playing</p>
-              <p className="mt-3 text-6xl font-black text-sky-200">Decade Dash</p>
-              <p className="mt-4 text-2xl text-stone-200">Session {session?.session_code ?? "-"} is complete</p>
-              <p className="mt-6 text-xl text-stone-300">See you at the next round</p>
+        {/* Countdown Overlay */}
+        {session?.host_overlay === "countdown" && !showThanksOverlay && (
+          <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-gradient-to-b from-pink-900/90 via-stone-900/80 to-stone-950/90 backdrop-blur-sm">
+            <div className="text-center">
+              <p className="text-xl text-stone-300 mb-2">Starting in…</p>
+              <p className="text-6xl font-black text-pink-300">{overlayRemaining}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Intermission Overlay */}
+        {session?.host_overlay === "intermission" && !showThanksOverlay && (
+          <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-gradient-to-b from-pink-900/90 via-stone-900/80 to-stone-950/90 backdrop-blur-sm">
+            <div className="text-center">
+              <h2 className="text-4xl font-black text-pink-300 mb-4">{session?.intermission_heading_text}</h2>
+              <p className="text-lg text-stone-300 mb-4">{session?.intermission_message_text}</p>
+              <p className="text-2xl font-bold text-pink-400">{overlayRemaining}s</p>
+            </div>
+          </div>
+        )}
+
+        {/* Thanks Overlay */}
+        {showThanksOverlay && (
+          <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-gradient-to-b from-pink-900/90 via-stone-900/80 to-stone-950/90 backdrop-blur-sm">
+            {logoUrl && session.show_logo && <img src={logoUrl} alt="Venue" className="h-20 mb-6 object-contain" />}
+            <div className="text-center">
+              <h2 className="text-5xl font-black text-pink-300 mb-4">{session?.thanks_heading_text}</h2>
+              <p className="text-2xl text-stone-300">{session?.thanks_subheading_text}</p>
+            </div>
+          </div>
+        )}
+      </div>             <p className="mt-6 text-xl text-stone-300">See you at the next round</p>
             </div>
           </section>
         ) : null}

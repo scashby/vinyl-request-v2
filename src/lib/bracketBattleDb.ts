@@ -13,6 +13,7 @@ export type BracketBattleDatabase = {
           title: string;
           time: string | null;
           location: string | null;
+          venue_logo_url: string | null;
         };
         Insert: {
           id?: number;
@@ -20,6 +21,7 @@ export type BracketBattleDatabase = {
           title: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Update: {
           id?: number;
@@ -27,6 +29,7 @@ export type BracketBattleDatabase = {
           title?: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Relationships: [];
       };
@@ -48,9 +51,17 @@ export type BracketBattleDatabase = {
           current_round: number;
           current_matchup_index: number;
           show_title: boolean;
+          show_logo: boolean;
           show_round: boolean;
           show_bracket: boolean;
           show_scoreboard: boolean;
+          welcome_heading_text: string | null;
+          welcome_message_text: string | null;
+          intermission_heading_text: string | null;
+          intermission_message_text: string | null;
+          thanks_heading_text: string | null;
+          thanks_subheading_text: string | null;
+          default_intermission_seconds: number;
           status: "pending" | "running" | "paused" | "completed";
           created_at: string;
           started_at: string | null;
@@ -73,9 +84,17 @@ export type BracketBattleDatabase = {
           current_round?: number;
           current_matchup_index?: number;
           show_title?: boolean;
+          show_logo?: boolean;
           show_round?: boolean;
           show_bracket?: boolean;
           show_scoreboard?: boolean;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
+          default_intermission_seconds?: number;
           status?: "pending" | "running" | "paused" | "completed";
           created_at?: string;
           started_at?: string | null;
@@ -98,9 +117,17 @@ export type BracketBattleDatabase = {
           current_round?: number;
           current_matchup_index?: number;
           show_title?: boolean;
+          show_logo?: boolean;
           show_round?: boolean;
           show_bracket?: boolean;
           show_scoreboard?: boolean;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
+          default_intermission_seconds?: number;
           status?: "pending" | "running" | "paused" | "completed";
           created_at?: string;
           started_at?: string | null;

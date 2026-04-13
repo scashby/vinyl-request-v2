@@ -15,6 +15,7 @@ type ArtistAliasDatabase = {
           title: string;
           time: string | null;
           location: string | null;
+          venue_logo_url: string | null;
         };
         Insert: {
           id?: number;
@@ -22,6 +23,7 @@ type ArtistAliasDatabase = {
           title: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Update: {
           id?: number;
@@ -29,6 +31,7 @@ type ArtistAliasDatabase = {
           title?: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Relationships: [];
       };
@@ -52,9 +55,17 @@ type ArtistAliasDatabase = {
           current_round: number;
           current_call_index: number;
           show_title: boolean;
+          show_logo: boolean;
           show_round: boolean;
           show_scoreboard: boolean;
           show_stage_hint: boolean;
+          welcome_heading_text: string | null;
+          welcome_message_text: string | null;
+          intermission_heading_text: string | null;
+          intermission_message_text: string | null;
+          thanks_heading_text: string | null;
+          thanks_subheading_text: string | null;
+          default_intermission_seconds: number;
           status: ArtistAliasSessionStatus;
           created_at: string;
           started_at: string | null;
@@ -79,9 +90,17 @@ type ArtistAliasDatabase = {
           current_round?: number;
           current_call_index?: number;
           show_title?: boolean;
+          show_logo?: boolean;
           show_round?: boolean;
           show_scoreboard?: boolean;
           show_stage_hint?: boolean;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
+          default_intermission_seconds?: number;
           status?: ArtistAliasSessionStatus;
           created_at?: string;
           started_at?: string | null;
@@ -106,9 +125,17 @@ type ArtistAliasDatabase = {
           current_round?: number;
           current_call_index?: number;
           show_title?: boolean;
+          show_logo?: boolean;
           show_round?: boolean;
           show_scoreboard?: boolean;
           show_stage_hint?: boolean;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
+          default_intermission_seconds?: number;
           status?: ArtistAliasSessionStatus;
           created_at?: string;
           started_at?: string | null;

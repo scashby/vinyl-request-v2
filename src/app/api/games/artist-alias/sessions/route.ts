@@ -18,9 +18,17 @@ type CreateSessionBody = {
   cue_seconds?: number;
   host_buffer_seconds?: number;
   show_title?: boolean;
+  show_logo?: boolean;
   show_round?: boolean;
   show_scoreboard?: boolean;
   show_stage_hint?: boolean;
+  welcome_heading_text?: string | null;
+  welcome_message_text?: string | null;
+  intermission_heading_text?: string | null;
+  intermission_message_text?: string | null;
+  thanks_heading_text?: string | null;
+  thanks_subheading_text?: string | null;
+  default_intermission_seconds?: number;
   team_names?: string[];
   calls?: Array<{
     artist_name: string;
@@ -218,8 +226,16 @@ export async function POST(request: NextRequest) {
         current_call_index: 0,
         show_title: body.show_title ?? true,
         show_round: body.show_round ?? true,
+        show_logo: body.show_logo ?? true,
         show_scoreboard: body.show_scoreboard ?? true,
         show_stage_hint: body.show_stage_hint ?? true,
+        welcome_heading_text: body.welcome_heading_text?.trim() || 'Welcome to Artist Alias',
+        welcome_message_text: body.welcome_message_text?.trim() || 'Name the artist from the clues revealed one stage at a time.',
+        intermission_heading_text: body.intermission_heading_text?.trim() || 'Intermission',
+        intermission_message_text: body.intermission_message_text?.trim() || 'Short break before the next round.',
+        thanks_heading_text: body.thanks_heading_text?.trim() || 'Thanks for Playing',
+        thanks_subheading_text: body.thanks_subheading_text?.trim() || 'See you at the next round.',
+        default_intermission_seconds: Math.max(0, Number(body.default_intermission_seconds ?? 600)),
         status: "pending",
       })
       .select("id, session_code")

@@ -14,7 +14,8 @@ type CoverArtClueChaseDatabase = {
           date: string;
           title: string;
           time: string | null;
-          location: string | null;
+            location: string | null;
+            venue_logo_url: string | null;
         };
         Insert: {
           id?: number;
@@ -22,13 +23,15 @@ type CoverArtClueChaseDatabase = {
           title: string;
           time?: string | null;
           location?: string | null;
+            venue_logo_url?: string | null;
         };
         Update: {
           id?: number;
           date?: string;
           title?: string;
           time?: string | null;
-          location?: string | null;
+            location?: string | null;
+            venue_logo_url?: string | null;
         };
         Relationships: [];
       };
@@ -73,6 +76,16 @@ type CoverArtClueChaseDatabase = {
           show_round: boolean;
           show_scoreboard: boolean;
           show_stage_hint: boolean;
+          show_logo: boolean;
+          welcome_heading_text: string | null;
+          welcome_message_text: string | null;
+          intermission_heading_text: string | null;
+          intermission_message_text: string | null;
+          thanks_heading_text: string | null;
+          thanks_subheading_text: string | null;
+          default_intermission_seconds: number;
+          host_overlay: string;
+          host_overlay_remaining_seconds: number;
           status: CoverArtSessionStatus;
           created_at: string;
           started_at: string | null;
@@ -100,6 +113,16 @@ type CoverArtClueChaseDatabase = {
           show_round?: boolean;
           show_scoreboard?: boolean;
           show_stage_hint?: boolean;
+          show_logo?: boolean;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
+          default_intermission_seconds?: number;
+          host_overlay?: string;
+          host_overlay_remaining_seconds?: number;
           status?: CoverArtSessionStatus;
           created_at?: string;
           started_at?: string | null;
@@ -127,6 +150,16 @@ type CoverArtClueChaseDatabase = {
           show_round?: boolean;
           show_scoreboard?: boolean;
           show_stage_hint?: boolean;
+          show_logo?: boolean;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
+          default_intermission_seconds?: number;
+          host_overlay?: string;
+          host_overlay_remaining_seconds?: number;
           status?: CoverArtSessionStatus;
           created_at?: string;
           started_at?: string | null;
@@ -342,6 +375,7 @@ type CoverArtClueChaseDatabase = {
     CompositeTypes: Record<string, never>;
   };
 };
+  venue_logo_url: string | null;
 
 export function getCoverArtClueChaseDb(): SupabaseClient<CoverArtClueChaseDatabase> {
   return supabaseAdmin as unknown as SupabaseClient<CoverArtClueChaseDatabase>;

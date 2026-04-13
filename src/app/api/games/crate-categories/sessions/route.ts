@@ -19,6 +19,14 @@ type CreateSessionBody = {
   show_title?: boolean;
   show_round?: boolean;
   show_prompt?: boolean;
+    show_logo?: boolean;
+    welcome_heading_text?: string;
+    welcome_message_text?: string;
+    intermission_heading_text?: string;
+    intermission_message_text?: string;
+    thanks_heading_text?: string;
+    thanks_subheading_text?: string;
+    default_intermission_seconds?: number;
   show_scoreboard?: boolean;
   team_names?: string[];
   rounds?: Array<{
@@ -306,6 +314,16 @@ export async function POST(request: NextRequest) {
         show_title: body.show_title ?? true,
         show_round: body.show_round ?? true,
         show_prompt: body.show_prompt ?? true,
+          show_logo: body.show_logo ?? true,
+          welcome_heading_text: body.welcome_heading_text ?? 'Welcome to Crate Categories',
+          welcome_message_text: body.welcome_message_text ?? 'Guess what connects these tracks in the category.',
+          intermission_heading_text: body.intermission_heading_text ?? 'Intermission',
+          intermission_message_text: body.intermission_message_text ?? 'Grab a drink and stretch your legs.',
+          thanks_heading_text: body.thanks_heading_text ?? 'Thanks for Playing',
+          thanks_subheading_text: body.thanks_subheading_text ?? 'See you at the next round.',
+          default_intermission_seconds: Number(body.default_intermission_seconds ?? 600),
+          host_overlay: "none",
+          host_overlay_remaining_seconds: 0,
         show_scoreboard: body.show_scoreboard ?? true,
         status: "pending",
       })

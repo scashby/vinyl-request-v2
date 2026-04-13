@@ -25,6 +25,16 @@ type Session = {
   final_reveal_points: number;
   audio_clue_enabled: boolean;
   teams: SessionTeam[];
+  show_logo: boolean;
+  welcome_heading_text: string | null;
+  welcome_message_text: string | null;
+  intermission_heading_text: string | null;
+  intermission_message_text: string | null;
+  thanks_heading_text: string | null;
+  thanks_subheading_text: string | null;
+  default_intermission_seconds: number;
+  host_overlay: string | null;
+  host_overlay_remaining_seconds: number;
 };
 
 type Call = {
@@ -75,6 +85,8 @@ export default function CoverArtClueChaseHostPage() {
   const [scoreDraft, setScoreDraft] = useState<ScoreDraft>({});
   const [saving, setSaving] = useState(false);
   const [working, setWorking] = useState(false);
+  const [overlaySecondsInput, setOverlaySecondsInput] = useState(600);
+  const [overlayBusy, setOverlayBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -180,7 +192,26 @@ export default function CoverArtClueChaseHostPage() {
       await postAction(`/api/games/cover-art-clue-chase/sessions/${sessionId}/reveal`, {
         call_id: callForControls.id,
         stage,
+    
+
+  const setOverlay = async (mode: string) => {
+    setOverlayBusy(true);
+    try {
+      const res = await fetch(`/api/games/cover-art-clue-chase/sessions/${sessionId}/overlay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode,
+          duration_seconds: mode === "none" ? null : overlaySecondsInput,
+        }),
       });
+      if (res.ok) {
+        setSession((s) => s ? { ...s, host_overlay: mode, host_overlay_remaining_seconds: overlaySecondsInput } : null);
+      }
+    } finally {
+      setOverlayBusy(false);
+    }
+  };  });
     });
   };
 
@@ -294,6 +325,24 @@ export default function CoverArtClueChaseHostPage() {
           <section className="space-y-4">
             <div className="rounded-2xl border border-stone-700 bg-black/45 p-4">
               <h2 className="text-sm font-bold uppercase tracking-wide text-teal-200">Round Controls</h2>
+
+              <div className="border-t border-stone-700 pt-4 mt-4">
+                <div className="text-sm font-semibold mb-2">Overlay Control</div>
+                <div className="inline-flex gap-1 mb-2">
+                  {["Welcome", "Countdown", "Intermission", "Thanks", "Clear"].map((label, i) => {
+                    const modes = ["welcome", "countdown", "intermission", "thanks", "none"];
+                    return (
+                      <button key={label} onClick={() => setOverlay(modes[i])} disabled={overlayBusy} className="rounded border border-stone-600 px-2 py-1 text-xs hover:bg-stone-800">
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-2 items-center">
+                  <label className="text-xs">Duration (seconds):</label>
+                  <input type="number" value={overlaySecondsInput} onChange={(e) => setOverlaySecondsInput(parseInt(e.target.value))} className="w-16 rounded border border-stone-600 bg-stone-900 px-1 py-0.5" />
+                </div>
+              </div>
               <p className="mt-2 text-xs text-stone-400">
                 Status: {session?.status ?? "(unknown)"} · Current call: {session?.current_call_index ?? 0} · Gap target: {session?.target_gap_seconds ?? 0}s
               </p>

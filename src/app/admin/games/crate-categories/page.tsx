@@ -379,6 +379,7 @@ export default function CrateCategoriesSetupPage() {
                   <p>{session.session_code} · {session.title}</p>
                   <p className="text-stone-400">Event: {session.event_title ?? "(none)"} · Playlist: {session.playlist_name ?? "(none)"} · Round: {session.current_round}/{session.round_count} · Scored rounds: {session.rounds_scored}/{session.rounds_total} · Status: {session.status}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
+                    <Link href={`/admin/games/crate-categories/edit?sessionId=${session.id}`} className="rounded border border-stone-600 px-2 py-1 text-xs">Edit</Link>
                     <Link href={`/admin/games/crate-categories/host?sessionId=${session.id}`} className="rounded border border-stone-600 px-2 py-1 text-xs">Host</Link>
                     <Link href={`/admin/games/crate-categories/assistant?sessionId=${session.id}`} className="rounded border border-stone-600 px-2 py-1 text-xs">Assistant</Link>
                     <Link href={`/admin/games/crate-categories/jumbotron?sessionId=${session.id}`} className="rounded border border-stone-600 px-2 py-1 text-xs">Jumbotron</Link>

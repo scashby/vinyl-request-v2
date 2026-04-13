@@ -1,3 +1,5 @@
+          venue_logo_url: string | null;
+          location: string | null;
 import { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
 
@@ -7,6 +9,7 @@ export type LyricGapRelayDatabase = {
   public: {
     Tables: {
       events: {
+        };
         Row: {
           id: number;
           date: string;
@@ -54,6 +57,16 @@ export type LyricGapRelayDatabase = {
           show_round: boolean;
           show_scoreboard: boolean;
           show_answer_mode: boolean;
+          show_logo: boolean;
+                    welcome_heading_text: string | null;
+                    welcome_message_text: string | null;
+                    intermission_heading_text: string | null;
+                    intermission_message_text: string | null;
+                    thanks_heading_text: string | null;
+                    thanks_subheading_text: string | null;
+                    default_intermission_seconds: number;
+                    host_overlay: string;
+                    host_overlay_remaining_seconds: number;
           status: "pending" | "running" | "paused" | "completed";
           created_at: string;
           started_at: string | null;
@@ -82,6 +95,16 @@ export type LyricGapRelayDatabase = {
           show_round?: boolean;
           show_scoreboard?: boolean;
           show_answer_mode?: boolean;
+          show_logo?: boolean;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
+          default_intermission_seconds?: number;
+          host_overlay?: string;
+          host_overlay_remaining_seconds?: number;
           status?: "pending" | "running" | "paused" | "completed";
           created_at?: string;
           started_at?: string | null;
@@ -110,6 +133,16 @@ export type LyricGapRelayDatabase = {
           show_round?: boolean;
           show_scoreboard?: boolean;
           show_answer_mode?: boolean;
+          show_logo?: boolean;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
+          default_intermission_seconds?: number;
+          host_overlay?: string;
+          host_overlay_remaining_seconds?: number;
           status?: "pending" | "running" | "paused" | "completed";
           created_at?: string;
           started_at?: string | null;

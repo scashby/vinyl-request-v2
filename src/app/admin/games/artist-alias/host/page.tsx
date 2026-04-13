@@ -15,6 +15,9 @@ type Session = {
   stage_two_points: number;
   final_reveal_points: number;
   target_gap_seconds: number;
+  default_intermission_seconds: number;
+  host_overlay?: "none" | "welcome" | "countdown" | "intermission" | "thanks";
+  host_overlay_remaining_seconds?: number;
   status: "pending" | "running" | "paused" | "completed";
   show_title: boolean;
   show_round: boolean;
@@ -78,6 +81,8 @@ export default function ArtistAliasHostPage() {
   const [scoreDraft, setScoreDraft] = useState<ScoreDraft>({});
   const [working, setWorking] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [overlaySecondsInput, setOverlaySecondsInput] = useState(600);
+  const [overlayBusy, setOverlayBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -137,6 +142,11 @@ export default function ArtistAliasHostPage() {
     setScoreDraft(draft);
   }, [callForControls?.id, callForControls?.stage_revealed, leaderboard]);
 
+  useEffect(() => {
+    if (!session) return;
+    setOverlaySecondsInput(session.default_intermission_seconds ?? 600);
+  }, [session]);
+
   const runAction = async (fn: () => Promise<void>) => {
     setWorking(true);
     try {
@@ -192,8 +202,36 @@ export default function ArtistAliasHostPage() {
     });
   };
 
+  const setOverlay = async (mode: "none" | "welcome" | "countdown" | "intermission" | "thanks", durationSeconds?: number) => {
+    setOverlayBusy(true);
+    try {
+      const res = await fetch(`/api/games/artist-alias/sessions/${sessionId}/overlay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode, duration_seconds: durationSeconds ?? 0 }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        throw new Error(payload?.error ?? "Failed to update overlay");
+      }
+      await load();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to update overlay");
+    } finally {
+      setOverlayBusy(false);
+    }
+  };
+
+  const toggleIntermission = async () => {
+    if (!session) return;
+    if (session.host_overlay === "intermission") {
+      await setOverlay("none");
+      return;
+    }
+    await setOverlay("intermission", overlaySecondsInput);
+  };
+
   const submitScores = async () => {
-    if (!callForControls) return;
     setSaving(true);
     try {
       const awards = leaderboard.map((team) => {
@@ -349,6 +387,28 @@ export default function ArtistAliasHostPage() {
                 <button disabled={working} onClick={pause} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Pause</button>
                 <button disabled={working} onClick={resume} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Resume</button>
                 <button disabled={working || !callForControls} onClick={() => patchCallStatus("scored")} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Mark Scored</button>
+              </div>
+
+              <div className="mt-3 rounded border border-stone-700 bg-stone-950/60 p-2">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-stone-400">Jumbotron Overlay</p>
+                <p className="mt-1 text-[11px] text-stone-500">Current: {session?.host_overlay ?? "none"}</p>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                  <button disabled={overlayBusy} onClick={() => setOverlay("welcome")} className="rounded border border-violet-700 px-2 py-1 disabled:opacity-50">Welcome</button>
+                  <button disabled={overlayBusy} onClick={() => setOverlay("countdown", 300)} className="rounded border border-violet-700 px-2 py-1 disabled:opacity-50">Countdown 5m</button>
+                  <button disabled={overlayBusy} onClick={toggleIntermission} className="rounded border border-violet-700 px-2 py-1 disabled:opacity-50">Intermission</button>
+                  <button disabled={overlayBusy} onClick={() => setOverlay("thanks")} className="rounded border border-indigo-700 px-2 py-1 disabled:opacity-50">Thanks</button>
+                  <button disabled={overlayBusy} onClick={() => setOverlay("none")} className="rounded border border-stone-600 px-2 py-1 disabled:opacity-50">Clear</button>
+                </div>
+                <label className="mt-2 block text-[11px] text-stone-400">
+                  Intermission Seconds
+                  <input
+                    className="mt-1 w-28 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-xs"
+                    type="number"
+                    min={0}
+                    value={overlaySecondsInput}
+                    onChange={(e) => setOverlaySecondsInput(Math.max(0, Number(e.target.value) || 0))}
+                  />
+                </label>
               </div>
             </div>
 
