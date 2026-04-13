@@ -21,6 +21,7 @@ export type TriviaDatabase = {
           title: string;
           time: string | null;
           location: string | null;
+          venue_logo_url: string | null;
         };
         Insert: {
           id?: number;
@@ -28,6 +29,7 @@ export type TriviaDatabase = {
           title: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Update: {
           id?: number;
@@ -35,6 +37,7 @@ export type TriviaDatabase = {
           title?: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Relationships: [];
       };
@@ -356,10 +359,18 @@ export type TriviaDatabase = {
           paused_remaining_seconds: number | null;
           paused_at: string | null;
           show_title: boolean;
+          show_logo: boolean;
           show_rounds: boolean;
           show_question_counter: boolean;
           show_leaderboard: boolean;
           show_cue_hints: boolean;
+          trivia_overlay: string;
+          welcome_heading_text: string | null;
+          welcome_message_text: string | null;
+          intermission_heading_text: string | null;
+          intermission_message_text: string | null;
+          thanks_heading_text: string | null;
+          thanks_subheading_text: string | null;
           max_teams: number | null;
           slips_batch_size: number | null;
           status: string;
@@ -393,10 +404,18 @@ export type TriviaDatabase = {
           paused_remaining_seconds?: number | null;
           paused_at?: string | null;
           show_title?: boolean;
+          show_logo?: boolean;
           show_rounds?: boolean;
           show_question_counter?: boolean;
           show_leaderboard?: boolean;
           show_cue_hints?: boolean;
+          trivia_overlay?: string;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
           max_teams?: number | null;
           slips_batch_size?: number | null;
           status?: string;
@@ -430,10 +449,18 @@ export type TriviaDatabase = {
           paused_remaining_seconds?: number | null;
           paused_at?: string | null;
           show_title?: boolean;
+          show_logo?: boolean;
           show_rounds?: boolean;
           show_question_counter?: boolean;
           show_leaderboard?: boolean;
           show_cue_hints?: boolean;
+          trivia_overlay?: string;
+          welcome_heading_text?: string | null;
+          welcome_message_text?: string | null;
+          intermission_heading_text?: string | null;
+          intermission_message_text?: string | null;
+          thanks_heading_text?: string | null;
+          thanks_subheading_text?: string | null;
           max_teams?: number | null;
           slips_batch_size?: number | null;
           status?: string;

@@ -43,10 +43,18 @@ type CreateSessionBody = {
   cue_seconds?: number;
   host_buffer_seconds?: number;
   show_title?: boolean;
+  show_logo?: boolean;
   show_rounds?: boolean;
   show_question_counter?: boolean;
   show_leaderboard?: boolean;
   show_cue_hints?: boolean;
+  trivia_overlay?: "none" | "welcome" | "intermission" | "thanks";
+  welcome_heading_text?: string | null;
+  welcome_message_text?: string | null;
+  intermission_heading_text?: string | null;
+  intermission_message_text?: string | null;
+  thanks_heading_text?: string | null;
+  thanks_subheading_text?: string | null;
   categories?: string[];
   difficulty_targets?: Partial<Record<TriviaDifficulty, number>>;
   max_teams?: number | null;
@@ -508,10 +516,18 @@ export async function POST(request: NextRequest) {
         host_buffer_seconds: hostBufferSeconds,
         target_gap_seconds: targetGapSeconds,
         show_title: body.show_title ?? true,
+        show_logo: body.show_logo ?? true,
         show_rounds: body.show_rounds ?? true,
         show_question_counter: body.show_question_counter ?? true,
         show_leaderboard: body.show_leaderboard ?? true,
         show_cue_hints: body.show_cue_hints ?? false,
+        trivia_overlay: body.trivia_overlay ?? "welcome",
+        welcome_heading_text: body.welcome_heading_text ?? "Welcome to Music Trivia",
+        welcome_message_text: body.welcome_message_text ?? "Get your team ready and watch the jumbotron for the first question.",
+        intermission_heading_text: body.intermission_heading_text ?? "Intermission",
+        intermission_message_text: body.intermission_message_text ?? "Quick reset. Next round starts shortly.",
+        thanks_heading_text: body.thanks_heading_text ?? "Thanks for Playing",
+        thanks_subheading_text: body.thanks_subheading_text ?? "See you at the next trivia night.",
         max_teams: body.max_teams ?? null,
         slips_batch_size: body.slips_batch_size ?? null,
         status: "pending",

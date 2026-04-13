@@ -31,10 +31,18 @@ type SessionRow = {
   paused_remaining_seconds: number | null;
   paused_at: string | null;
   show_title: boolean;
+  show_logo: boolean;
   show_rounds: boolean;
   show_question_counter: boolean;
   show_leaderboard: boolean;
   show_cue_hints: boolean;
+  trivia_overlay: "none" | "welcome" | "intermission" | "thanks";
+  welcome_heading_text: string | null;
+  welcome_message_text: string | null;
+  intermission_heading_text: string | null;
+  intermission_message_text: string | null;
+  thanks_heading_text: string | null;
+  thanks_subheading_text: string | null;
   max_teams: number | null;
   slips_batch_size: number | null;
   status: "pending" | "running" | "paused" | "completed";
@@ -43,7 +51,14 @@ type SessionRow = {
   ended_at: string | null;
 };
 
-type EventRow = { id: number; title: string; date: string; time: string | null; location: string | null };
+type EventRow = {
+  id: number;
+  title: string;
+  date: string;
+  time: string | null;
+  location: string | null;
+  venue_logo_url: string | null;
+};
 type PlaylistRow = { id: number; name: string };
 type SessionEventRow = {
   payload: { call_id?: unknown } | null;
@@ -83,7 +98,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const dbAny = db as any;
   const [{ data: event }, { data: playlist }, { data: calls }, { data: cueEvent }, { data: pullEvent }, { data: promoteEvents }, { data: transportEvents }] = await Promise.all([
     session.event_id
-      ? db.from("events").select("id, title, date, time, location").eq("id", session.event_id).maybeSingle()
+      ? db.from("events").select("id, title, date, time, location, venue_logo_url").eq("id", session.event_id).maybeSingle()
       : Promise.resolve({ data: null }),
     session.playlist_id
       ? dbAny.from("collection_playlists").select("id, name").eq("id", session.playlist_id).maybeSingle()
@@ -202,16 +217,41 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const body = (await request.json()) as Record<string, unknown>;
 
   const allowedFields = new Set([
+    "event_id",
+    "playlist_id",
+    "title",
+    "round_count",
+    "questions_per_round",
+    "score_mode",
+    "remove_resleeve_seconds",
+    "find_record_seconds",
+    "cue_seconds",
+    "host_buffer_seconds",
+    "target_gap_seconds",
+    "max_teams",
+    "slips_batch_size",
+    "question_categories",
+    "difficulty_easy_target",
+    "difficulty_medium_target",
+    "difficulty_hard_target",
     "title",
     "deck_id",
     "current_round",
     "current_call_index",
     "tie_breaker_count",
     "show_title",
+    "show_logo",
     "show_rounds",
     "show_question_counter",
     "show_leaderboard",
     "show_cue_hints",
+    "trivia_overlay",
+    "welcome_heading_text",
+    "welcome_message_text",
+    "intermission_heading_text",
+    "intermission_message_text",
+    "thanks_heading_text",
+    "thanks_subheading_text",
     "status",
     "countdown_started_at",
     "paused_remaining_seconds",
@@ -221,6 +261,33 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   ]);
 
   const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key)));
+
+  const removeResleeveSeconds = Number(
+    patch.remove_resleeve_seconds ?? body.remove_resleeve_seconds ?? Number.NaN
+  );
+  const findRecordSeconds = Number(
+    patch.find_record_seconds ?? body.find_record_seconds ?? Number.NaN
+  );
+  const cueSeconds = Number(
+    patch.cue_seconds ?? body.cue_seconds ?? Number.NaN
+  );
+  const hostBufferSeconds = Number(
+    patch.host_buffer_seconds ?? body.host_buffer_seconds ?? Number.NaN
+  );
+
+  if (
+    Number.isFinite(removeResleeveSeconds) &&
+    Number.isFinite(findRecordSeconds) &&
+    Number.isFinite(cueSeconds) &&
+    Number.isFinite(hostBufferSeconds) &&
+    !Object.prototype.hasOwnProperty.call(patch, "target_gap_seconds")
+  ) {
+    patch.target_gap_seconds =
+      Math.max(0, removeResleeveSeconds) +
+      Math.max(0, findRecordSeconds) +
+      Math.max(0, cueSeconds) +
+      Math.max(0, hostBufferSeconds);
+  }
 
   const db = getTriviaDb();
   const { error } = await db.from("trivia_sessions").update(patch).eq("id", sessionId);

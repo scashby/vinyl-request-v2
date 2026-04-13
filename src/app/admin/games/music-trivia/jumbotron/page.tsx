@@ -15,10 +15,21 @@ type Session = {
   remaining_seconds: number;
   status: "pending" | "running" | "paused" | "completed";
   show_title: boolean;
+  show_logo: boolean;
   show_rounds: boolean;
   show_question_counter: boolean;
   show_leaderboard: boolean;
   show_cue_hints: boolean;
+  trivia_overlay: "none" | "welcome" | "intermission" | "thanks";
+  welcome_heading_text: string | null;
+  welcome_message_text: string | null;
+  intermission_heading_text: string | null;
+  intermission_message_text: string | null;
+  thanks_heading_text: string | null;
+  thanks_subheading_text: string | null;
+  event?: {
+    venue_logo_url: string | null;
+  } | null;
 };
 
 type Call = {
@@ -169,7 +180,9 @@ export default function MusicTriviaJumbotronPage() {
     [currentCall]
   );
 
-  const showThanks = session?.status === "completed";
+  const showThanks = session?.status === "completed" || session?.trivia_overlay === "thanks";
+  const showWelcome = session?.trivia_overlay === "welcome";
+  const showIntermission = session?.trivia_overlay === "intermission";
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -193,6 +206,13 @@ export default function MusicTriviaJumbotronPage() {
     <div ref={containerRef} className="min-h-screen bg-[radial-gradient(circle_at_50%_0%,#0a4453,transparent_38%),linear-gradient(180deg,#020202,#0d0d0d)] p-8 text-white">
       <div className="mx-auto max-w-7xl space-y-6">
         <header className="rounded-3xl border border-cyan-700/40 bg-black/35 p-6">
+          {session?.show_logo && session?.event?.venue_logo_url ? (
+            <img
+              alt="Venue logo"
+              className="mb-4 h-20 w-auto rounded border border-cyan-700/40 bg-black/50 p-2"
+              src={session.event.venue_logo_url}
+            />
+          ) : null}
           {session?.show_title ? <h1 className="text-5xl font-black uppercase tracking-tight text-cyan-200">{session?.title ?? "Music Trivia"}</h1> : null}
 
           <div className="mt-4 flex flex-wrap gap-6 text-xl font-semibold">
@@ -213,7 +233,8 @@ export default function MusicTriviaJumbotronPage() {
           </div>
         </header>
 
-        <section className="rounded-3xl border border-stone-700 bg-black/45 p-8">
+        {!showWelcome && !showIntermission && !showThanks ? (
+          <section className="rounded-3xl border border-stone-700 bg-black/45 p-8">
           <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Current Question</p>
           {currentCall?.effective_display_image_url ? (
             <img
@@ -267,7 +288,24 @@ export default function MusicTriviaJumbotronPage() {
           ) : (
             <p className="mt-4 text-2xl font-semibold text-stone-300">Submit your answers now</p>
           )}
-        </section>
+          </section>
+        ) : null}
+
+        {showWelcome ? (
+          <section className="rounded-3xl border border-cyan-700/40 bg-black/60 p-10 text-center">
+            <p className="text-sm uppercase tracking-[0.2em] text-cyan-300">Welcome</p>
+            <p className="mt-3 text-6xl font-black text-cyan-200">{session?.welcome_heading_text || "Welcome to Music Trivia"}</p>
+            <p className="mt-5 text-2xl text-stone-200">{session?.welcome_message_text || "Get your team ready. First question is coming up."}</p>
+          </section>
+        ) : null}
+
+        {showIntermission ? (
+          <section className="rounded-3xl border border-amber-700/40 bg-amber-950/20 p-10 text-center">
+            <p className="text-sm uppercase tracking-[0.2em] text-amber-300">Intermission</p>
+            <p className="mt-3 text-6xl font-black text-amber-200">{session?.intermission_heading_text || "Intermission"}</p>
+            <p className="mt-5 text-2xl text-stone-100">{session?.intermission_message_text || "Resetting for the next round."}</p>
+          </section>
+        ) : null}
 
         {session?.show_leaderboard ? (
           <section className="rounded-3xl border border-stone-700 bg-black/45 p-6">
@@ -288,9 +326,9 @@ export default function MusicTriviaJumbotronPage() {
           <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1f2937,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
             <div className="max-w-4xl rounded-3xl border border-cyan-700/40 bg-black/70 p-10">
               <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Thanks For Playing</p>
-              <p className="mt-3 text-6xl font-black text-cyan-200">Music Trivia</p>
+              <p className="mt-3 text-6xl font-black text-cyan-200">{session?.thanks_heading_text || "Music Trivia"}</p>
               <p className="mt-4 text-2xl text-stone-200">Session {session?.session_code ?? "-"} is complete</p>
-              <p className="mt-6 text-xl text-stone-300">See you at the next round</p>
+              <p className="mt-6 text-xl text-stone-300">{session?.thanks_subheading_text || "See you at the next round"}</p>
             </div>
           </section>
         ) : null}
