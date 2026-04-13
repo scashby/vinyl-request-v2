@@ -187,7 +187,9 @@ export default function CrateCategoriesHostPage() {
       if (!res.ok) {
         const payload = await res.json();
         throw new Error(payload.error ?? "Failed to resume");
-    
+      }
+    });
+  };
 
   const setOverlay = async (mode: string) => {
     setOverlayBusy(true);
@@ -201,13 +203,13 @@ export default function CrateCategoriesHostPage() {
         }),
       });
       if (res.ok) {
-        setSession((s) => s ? { ...s, host_overlay: mode, host_overlay_remaining_seconds: overlaySecondsInput } : null);
+        setSession((s) =>
+          s ? { ...s, host_overlay: mode, host_overlay_remaining_seconds: overlaySecondsInput } : null
+        );
       }
     } finally {
       setOverlayBusy(false);
     }
-  };  }
-    });
   };
 
   const patchCallStatus = async (status: "playing" | "revealed" | "scored" | "skipped") => {
@@ -363,6 +365,9 @@ export default function CrateCategoriesHostPage() {
                 <div className="mt-1 max-h-24 overflow-auto text-stone-400">
                   {recentCalls.map((call) => (
                     <div key={call.id}>#{call.call_index} {call.artist} - {call.title} ({call.status})</div>
+                  ))}
+                </div>
+              </div>
 
               <div className="border-t border-stone-700 pt-4 mt-4">
                 <div className="text-sm font-semibold mb-2">Overlay Control</div>
@@ -381,12 +386,8 @@ export default function CrateCategoriesHostPage() {
                   <input type="number" value={overlaySecondsInput} onChange={(e) => setOverlaySecondsInput(parseInt(e.target.value))} className="w-16 rounded border border-stone-600 bg-stone-900 px-1 py-0.5" />
                 </div>
               </div>
-                  ))}
-                </div>
-              </div>
-            </div>
 
-            <div className="rounded-2xl border border-stone-700 bg-black/45 p-4">
+              <div className="rounded-2xl border border-stone-700 bg-black/45 p-4">
               <p className="text-xs uppercase text-lime-300">Controls</p>
               <p className="mt-1 text-xs text-stone-400">Gap timer target: {session?.target_gap_seconds ?? 0}s · Remaining: {session?.remaining_seconds ?? 0}s · Status: {session?.status ?? "-"}</p>
               <div className="mt-2 flex flex-wrap gap-2 text-xs">
@@ -473,6 +474,7 @@ export default function CrateCategoriesHostPage() {
                 {saving ? "Saving..." : "Save Scores For Round"}
               </button>
             </div>
+          </div>
           </section>
         </div>
       </div>

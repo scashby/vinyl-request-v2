@@ -131,11 +131,11 @@ export default function CoverArtClueChaseEditPage() {
 
         <section className="rounded-2xl border border-stone-700 bg-black/40 p-4 space-y-4">
           <h2 className="text-sm font-bold uppercase text-teal-400">Scoring</h2>
-          {[
+          {([
             ["Stage 1 Points (0-5)", stageOnePoints, setStageOnePoints, 5],
             ["Stage 2 Points (0-5)", stageTwoPoints, setStageTwoPoints, 5],
             ["Final Reveal Points (0-5)", finalRevealPoints, setFinalRevealPoints, 5],
-          ].map(([label, val, setter, max]) => (
+          ] as Array<[string, number, (value: number) => void, number]>).map(([label, val, setter, max]) => (
             <label key={label} className="block text-sm">
               {label}
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-white"
@@ -155,14 +155,14 @@ export default function CoverArtClueChaseEditPage() {
 
         <section className="rounded-2xl border border-stone-700 bg-black/40 p-4 space-y-4">
           <h2 className="text-sm font-bold uppercase text-teal-400">Overlay Text</h2>
-          {[
+          {([
             ["Welcome Heading", welcomeHeading, setWelcomeHeading],
             ["Welcome Message", welcomeMessage, setWelcomeMessage],
             ["Intermission Heading", intermissionHeading, setIntermissionHeading],
             ["Intermission Message", intermissionMessage, setIntermissionMessage],
             ["Thanks Heading", thanksHeading, setThanksHeading],
             ["Thanks Subheading", thanksSubheading, setThanksSubheading],
-          ].map(([label, val, setter]) => (
+          ] as Array<[string, string, (value: string) => void]>).map(([label, val, setter]) => (
             <label key={label} className="block text-sm">
               {label}
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-white"

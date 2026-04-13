@@ -1,5 +1,3 @@
-          venue_logo_url: string | null;
-          location: string | null;
 import { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
 
@@ -17,13 +15,13 @@ type CrateCategoriesDatabase = {
   public: {
     Tables: {
       events: {
-        };
         Row: {
           id: number;
           date: string;
           title: string;
           time: string | null;
           location: string | null;
+          venue_logo_url: string | null;
         };
         Insert: {
           id?: number;
@@ -31,6 +29,7 @@ type CrateCategoriesDatabase = {
           title: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Update: {
           id?: number;
@@ -38,6 +37,7 @@ type CrateCategoriesDatabase = {
           title?: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Relationships: [];
       };

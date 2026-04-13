@@ -375,7 +375,6 @@ type CoverArtClueChaseDatabase = {
     CompositeTypes: Record<string, never>;
   };
 };
-  venue_logo_url: string | null;
 
 export function getCoverArtClueChaseDb(): SupabaseClient<CoverArtClueChaseDatabase> {
   return supabaseAdmin as unknown as SupabaseClient<CoverArtClueChaseDatabase>;

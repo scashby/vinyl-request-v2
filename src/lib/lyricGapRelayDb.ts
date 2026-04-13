@@ -1,5 +1,3 @@
-          venue_logo_url: string | null;
-          location: string | null;
 import { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
 
@@ -9,13 +7,13 @@ export type LyricGapRelayDatabase = {
   public: {
     Tables: {
       events: {
-        };
         Row: {
           id: number;
           date: string;
           title: string;
           time: string | null;
           location: string | null;
+          venue_logo_url: string | null;
         };
         Insert: {
           id?: number;
@@ -23,6 +21,7 @@ export type LyricGapRelayDatabase = {
           title: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Update: {
           id?: number;
@@ -30,6 +29,7 @@ export type LyricGapRelayDatabase = {
           title?: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Relationships: [];
       };
@@ -305,6 +305,30 @@ export type LyricGapRelayDatabase = {
           scored_by?: string | null;
           notes?: string | null;
           scored_at?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      lgr_session_events: {
+        Row: {
+          id: number;
+          session_id: number;
+          event_type: string;
+          payload: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          session_id: number;
+          event_type: string;
+          payload?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          session_id?: number;
+          event_type?: string;
+          payload?: Json | null;
           created_at?: string;
         };
         Relationships: [];

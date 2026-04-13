@@ -1,4 +1,4 @@
-import { getLyricGapRelayDb, type OverlayEventRow } from "@/lib/lyricGapRelayDb";
+import { getLyricGapRelayDb } from "@/lib/lyricGapRelayDb";
 import { NextRequest, NextResponse } from "next/server";
 
 const VALID_MODES = ["none", "welcome", "countdown", "intermission", "thanks"] as const;

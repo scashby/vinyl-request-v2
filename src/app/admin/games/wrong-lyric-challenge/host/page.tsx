@@ -206,7 +206,9 @@ export default function WrongLyricChallengeHostPage() {
       if (!res.ok) {
         const payload = await res.json();
         throw new Error(payload.error ?? `Failed to mark ${status}`);
-    
+      }
+    });
+  };
 
   const setOverlay = async (mode: string) => {
     setOverlayBusy(true);
@@ -220,13 +222,13 @@ export default function WrongLyricChallengeHostPage() {
         }),
       });
       if (res.ok) {
-        setSession((s) => s ? { ...s, host_overlay: mode, host_overlay_remaining_seconds: overlaySecondsInput } : null);
+        setSession((s) =>
+          s ? { ...s, host_overlay: mode, host_overlay_remaining_seconds: overlaySecondsInput } : null
+        );
       }
     } finally {
       setOverlayBusy(false);
     }
-  };  }
-    });
   };
 
   const submitScores = async () => {

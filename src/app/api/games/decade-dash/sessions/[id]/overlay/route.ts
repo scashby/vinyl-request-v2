@@ -1,4 +1,4 @@
-import { getDecadeDashDb, type OverlayEventRow } from "@/lib/decadeDashDb";
+import { getDecadeDashDb } from "@/lib/decadeDashDb";
 import { NextRequest, NextResponse } from "next/server";
 
 const VALID_MODES = ["none", "welcome", "countdown", "intermission", "thanks"] as const;

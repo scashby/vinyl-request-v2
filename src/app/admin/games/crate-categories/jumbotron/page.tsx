@@ -114,7 +114,8 @@ export default function CrateCategoriesJumbotronPage() {
       });
     }, 1000);
 
-    return () =>
+    return () => clearInterval(tick);
+  }, [session?.status]);
 
   useEffect(() => {
     if (!session?.host_overlay_remaining_seconds) {
@@ -126,8 +127,7 @@ export default function CrateCategoriesJumbotronPage() {
       setOverlayRemaining((prev) => Math.max(0, prev - 1));
     }, 1000);
     return () => clearInterval(interval);
-  }, [session?.host_overlay_remaining_seconds]); clearInterval(tick);
-  }, [session]);
+  }, [session?.host_overlay_remaining_seconds]);
 
   const currentCall = useMemo(() => {
     if (!session) return null;
@@ -145,11 +145,7 @@ export default function CrateCategoriesJumbotronPage() {
 
   const promptText = useMemo(() => {
     if (!currentCall) return "Waiting for host to start the next track";
-    if (currentCall.status === "playing") return "Lis
-
-  const showThanksOverlay = session?.host_overlay === "thanks" && session.host_overlay_remaining_seconds > 0;
-  const showOverlay = showThanksOverlay || (!!session?.host_overlay && session.host_overlay !== "none");
-  const logoUrl = session?.event?.venue_logo_url ?? "";ten now and write your answer";
+    if (currentCall.status === "playing") return "Listen now and write your answer";
     if (currentCall.status === "revealed") return `${currentCall.artist} - ${currentCall.title}`;
     if (currentCall.status === "scored") return "Round scoring in progress";
     if (currentCall.status === "skipped") return "Track skipped, standby";
@@ -162,13 +158,22 @@ export default function CrateCategoriesJumbotronPage() {
   }, [currentCall, currentRound]);
 
   const showThanks = session?.status === "completed";
+  const showThanksOverlay = session?.host_overlay === "thanks" && overlayRemaining > 0;
+  const showOverlay = showThanksOverlay || (!!session?.host_overlay && session.host_overlay !== "none");
+  const logoUrl = session?.event?.venue_logo_url ?? "";
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       containerRef.current?.requestFullscreen().catch(() => undefined);
     } else {
       document.exitFullscreen().catch(() => undefined);
-    }{!showOverlay ? (
+    }
+  }, []);
+
+  return (
+    <div ref={containerRef} className="min-h-screen bg-[radial-gradient(circle_at_50%_0%,#72c02f,transparent_38%),linear-gradient(180deg,#020202,#0d0d0d)] p-8 text-white">
+      <div className="mx-auto max-w-7xl space-y-6">
+        {!showOverlay ? (
           <>
             <header className="rounded-3xl border border-lime-700/40 bg-black/35 p-6">
               {session?.show_title ? <h1 className="text-5xl font-black uppercase tracking-tight text-lime-200">{session?.title ?? "Crate Categories"}</h1> : null}
@@ -271,33 +276,6 @@ export default function CrateCategoriesJumbotronPage() {
           </div>
         )}
       </div>
-        </section>
-
-        {session?.show_scoreboard ? (
-          <section className="rounded-3xl border border-stone-700 bg-black/45 p-6">
-            <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Leaderboard</p>
-            <div className="mt-3 grid gap-2 text-2xl font-semibold">
-              {leaderboard.slice(0, 6).map((row, index) => (
-                <div key={row.team_id} className="flex items-center justify-between rounded border border-stone-700 bg-stone-950/70 px-3 py-2">
-                  <span>{index + 1}. {row.team_name}</span>
-                  <span className="text-lime-300">{row.total_points} pts</span>
-                </div>
-              ))}
-              {leaderboard.length === 0 ? <p className="text-stone-400">No scores yet</p> : null}
-            </div>
-          </section>
-        ) : null}
-
-        {showThanks ? (
-          <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1f2937,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
-            <div className="max-w-4xl rounded-3xl border border-lime-700/40 bg-black/70 p-10">
-              <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Thanks For Playing</p>
-              <p className="mt-3 text-6xl font-black text-lime-200">Crate Categories</p>
-              <p className="mt-4 text-2xl text-stone-200">Session {session?.session_code ?? "-"} is complete</p>
-              <p className="mt-6 text-xl text-stone-300">See you at the next round</p>
-            </div>
-          </section>
-        ) : null}
 
         <button
           type="button"
@@ -308,6 +286,5 @@ export default function CrateCategoriesJumbotronPage() {
           Fullscreen (F)
         </button>
       </div>
-    </div>
   );
 }

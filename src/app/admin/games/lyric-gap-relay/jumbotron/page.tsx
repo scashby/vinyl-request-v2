@@ -39,7 +39,6 @@ type Call = {
   status: "pending" | "asked" | "locked" | "answer_revealed" | "scored" | "skipped";
 };
 
-  const [overlayRemaining, setOverlayRemaining] = useState(0);
 type LeaderboardRow = {
   team_id: number;
   team_name: string;
@@ -95,7 +94,8 @@ export default function LyricGapRelayJumbotronPage() {
       });
     }, 1000);
 
-    return () =>
+    return () => clearInterval(tick);
+  }, [session?.status]);
 
   useEffect(() => {
     if (!session?.host_overlay_remaining_seconds) {
@@ -107,8 +107,7 @@ export default function LyricGapRelayJumbotronPage() {
       setOverlayRemaining((prev) => Math.max(0, prev - 1));
     }, 1000);
     return () => clearInterval(interval);
-  }, [session?.host_overlay_remaining_seconds]); clearInterval(tick);
-  }, [session]);
+  }, [session?.host_overlay_remaining_seconds]);
 
   const currentCall = useMemo(() => {
     if (!session) return null;
@@ -116,10 +115,6 @@ export default function LyricGapRelayJumbotronPage() {
   }, [calls, session]);
 
   const promptState = useMemo(() => {
-
-  const showThanksOverlay = session?.host_overlay === "thanks" && session.host_overlay_remaining_seconds > 0;
-  const showOverlay = showThanksOverlay || (!!session?.host_overlay && session.host_overlay !== "none");
-  const logoUrl = session?.event?.venue_logo_url ?? "";
     if (!currentCall) return "Waiting for host to start the next lyric gap";
     if (currentCall.status === "asked") return "Write the next line now";
     if (currentCall.status === "locked") return "Answers locked";
@@ -133,13 +128,22 @@ export default function LyricGapRelayJumbotronPage() {
   const showAnswer = currentCall?.status === "answer_revealed" || currentCall?.status === "scored";
 
   const showThanks = session?.status === "completed";
+  const showThanksOverlay = session?.host_overlay === "thanks" && overlayRemaining > 0;
+  const showOverlay = showThanksOverlay || (!!session?.host_overlay && session.host_overlay !== "none");
+  const logoUrl = session?.event?.venue_logo_url ?? "";
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       containerRef.current?.requestFullscreen().catch(() => undefined);
     } else {
       document.exitFullscreen().catch(() => undefined);
-    }{!showOverlay ? (
+    }
+  }, []);
+
+  return (
+    <div ref={containerRef} className="min-h-screen bg-[radial-gradient(circle_at_50%_0%,#4f46e5,transparent_38%),linear-gradient(180deg,#020202,#0d0d0d)] p-8 text-white">
+      <div className="mx-auto max-w-7xl space-y-6">
+        {!showOverlay ? (
           <>
             <header className="rounded-3xl border border-fuchsia-700/40 bg-black/35 p-6">
               {session?.show_title ? <h1 className="text-5xl font-black uppercase tracking-tight text-fuchsia-200">{session?.title ?? "Lyric Gap Relay"}</h1> : null}
@@ -241,19 +245,6 @@ export default function LyricGapRelayJumbotronPage() {
             </div>
           </div>
         )}
-      </div>             <p className="mt-6 text-xl text-stone-300">See you at the next round</p>
-            </div>
-          </section>
-        ) : null}
-
-        <button
-          type="button"
-          onClick={toggleFullscreen}
-          className="fixed bottom-3 right-3 z-50 rounded border border-stone-600/70 bg-black/55 px-3 py-1 text-xs text-stone-200"
-          aria-label="Toggle fullscreen"
-        >
-          Fullscreen (F)
-        </button>
       </div>
     </div>
   );

@@ -85,7 +85,8 @@ export default function DecadeDashJumbotronPage() {
   useEffect(() => {
     load();
     const poll = setInterval(load, 3000);
-    return ()
+    return () => clearInterval(poll);
+  }, [load]);
 
   useEffect(() => {
     if (!session?.host_overlay_remaining_seconds) {
@@ -94,15 +95,10 @@ export default function DecadeDashJumbotronPage() {
     }
     setOverlayRemaining(session.host_overlay_remaining_seconds);
     const interval = setInterval(() => {
-
-  const showThanksOverlay = session?.host_overlay === "thanks" && session.host_overlay_remaining_seconds > 0;
-  const showOverlay = showThanksOverlay || (!!session?.host_overlay && session.host_overlay !== "none");
-  const logoUrl = session?.event?.venue_logo_url ?? "";
       setOverlayRemaining((prev) => Math.max(0, prev - 1));
     }, 1000);
     return () => clearInterval(interval);
-  }, [session?.host_overlay_remaining_seconds]); => clearInterval(poll);
-  }, [load]);
+  }, [session?.host_overlay_remaining_seconds]);
 
   const activeCall = useMemo(() => {
     if (!session) return null;
@@ -110,13 +106,22 @@ export default function DecadeDashJumbotronPage() {
   }, [calls, session]);
 
   const showThanks = session?.status === "completed";
+  const showThanksOverlay = session?.host_overlay === "thanks" && overlayRemaining > 0;
+  const showOverlay = showThanksOverlay || (!!session?.host_overlay && session.host_overlay !== "none");
+  const logoUrl = session?.event?.venue_logo_url ?? "";
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       containerRef.current?.requestFullscreen().catch(() => undefined);
     } else {
       document.exitFullscreen().catch(() => undefined);
-    }{!showOverlay ? (
+    }
+  }, []);
+
+  return (
+    <div ref={containerRef} className="min-h-screen bg-[radial-gradient(circle_at_50%_0%,#0369a1,transparent_38%),linear-gradient(180deg,#020202,#0d0d0d)] p-8 text-white">
+      <div className="mx-auto max-w-7xl space-y-6">
+        {!showOverlay ? (
           <>
             <div className="flex items-center justify-between gap-3">
               <h1 className="text-3xl font-black uppercase text-sky-100">Decade Dash Jumbotron</h1>
@@ -236,19 +241,6 @@ export default function DecadeDashJumbotronPage() {
             </div>
           </div>
         )}
-      </div>             <p className="mt-6 text-xl text-stone-300">See you at the next round</p>
-            </div>
-          </section>
-        ) : null}
-
-        <button
-          type="button"
-          onClick={toggleFullscreen}
-          className="fixed bottom-3 right-3 z-50 rounded border border-stone-600/70 bg-black/55 px-3 py-1 text-xs text-stone-200"
-          aria-label="Toggle fullscreen"
-        >
-          Fullscreen (F)
-        </button>
       </div>
     </div>
   );

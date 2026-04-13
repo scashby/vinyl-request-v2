@@ -1,4 +1,4 @@
-import { getWrongLyricChallengeDb, type OverlayEventRow } from "@/lib/wrongLyricChallengeDb";
+import { getWrongLyricChallengeDb } from "@/lib/wrongLyricChallengeDb";
 import { NextRequest, NextResponse } from "next/server";
 
 const VALID_MODES = ["none", "welcome", "countdown", "intermission", "thanks"] as const;

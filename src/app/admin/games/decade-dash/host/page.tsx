@@ -179,7 +179,9 @@ export default function DecadeDashHostPage() {
       if (!res.ok) {
         const payload = await res.json();
         throw new Error(payload.error ?? "Failed to resume");
-    
+      }
+    });
+  };
 
   const setOverlay = async (mode: string) => {
     setOverlayBusy(true);
@@ -193,13 +195,13 @@ export default function DecadeDashHostPage() {
         }),
       });
       if (res.ok) {
-        setSession((s) => s ? { ...s, host_overlay: mode, host_overlay_remaining_seconds: overlaySecondsInput } : null);
+        setSession((s) =>
+          s ? { ...s, host_overlay: mode, host_overlay_remaining_seconds: overlaySecondsInput } : null
+        );
       }
     } finally {
       setOverlayBusy(false);
     }
-  };  }
-    });
   };
 
   const patchCallStatus = async (status: "asked" | "locked" | "revealed" | "scored" | "skipped") => {
@@ -355,6 +357,10 @@ export default function DecadeDashHostPage() {
                 <p className="font-semibold text-stone-300">Recently Played</p>
                 <div className="mt-1 max-h-24 overflow-auto text-stone-400">
                   {previousCalls.map((call) => (
+                    <div key={call.id}>#{call.call_index} {call.artist ?? "Unknown"} - {call.title ?? "Untitled"} ({call.status})</div>
+                  ))}
+                </div>
+              </div>
 
               <div className="border-t border-stone-700 pt-4 mt-4">
                 <div className="text-sm font-semibold mb-2">Overlay Control</div>
@@ -371,10 +377,6 @@ export default function DecadeDashHostPage() {
                 <div className="flex gap-2 items-center">
                   <label className="text-xs">Duration (seconds):</label>
                   <input type="number" value={overlaySecondsInput} onChange={(e) => setOverlaySecondsInput(parseInt(e.target.value))} className="w-16 rounded border border-stone-600 bg-stone-900 px-1 py-0.5" />
-                </div>
-              </div>
-                    <div key={call.id}>#{call.call_index} {call.artist ?? "Unknown"} - {call.title ?? "Untitled"} ({call.status})</div>
-                  ))}
                 </div>
               </div>
             </div>

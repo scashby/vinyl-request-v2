@@ -1,4 +1,4 @@
-import { getCrateCategoriesDb, type OverlayEventRow } from "@/lib/crateCategoriesDb";
+import { getCrateCategoriesDb } from "@/lib/crateCategoriesDb";
 import { NextRequest, NextResponse } from "next/server";
 
 const VALID_MODES = ["none", "welcome", "countdown", "intermission", "thanks"] as const;

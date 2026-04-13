@@ -1,4 +1,4 @@
-import { getCoverArtClueChaseDb, type OverlayEventRow } from "@/lib/coverArtClueChaseDb";
+import { getCoverArtClueChaseDb } from "@/lib/coverArtClueChaseDb";
 import { NextRequest, NextResponse } from "next/server";
 
 const VALID_MODES = ["none", "welcome", "countdown", "intermission", "thanks"] as const;

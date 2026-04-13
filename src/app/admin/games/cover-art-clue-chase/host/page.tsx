@@ -192,7 +192,9 @@ export default function CoverArtClueChaseHostPage() {
       await postAction(`/api/games/cover-art-clue-chase/sessions/${sessionId}/reveal`, {
         call_id: callForControls.id,
         stage,
-    
+      });
+    });
+  };
 
   const setOverlay = async (mode: string) => {
     setOverlayBusy(true);
@@ -211,8 +213,6 @@ export default function CoverArtClueChaseHostPage() {
     } finally {
       setOverlayBusy(false);
     }
-  };  });
-    });
   };
 
   const submitScores = async () => {

@@ -85,10 +85,10 @@ type VoteTallyRow = {
   matchup_id: number;
   winner_entry_id: number;
   vote_count: number;
+};
 
 type OverlayEventRow = {
   payload: { mode: string; duration_seconds: number | null; started_at: string; ends_at: string | null } | null;
-};
 };
 
 function parseSessionId(id: string) {

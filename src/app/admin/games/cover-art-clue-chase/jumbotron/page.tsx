@@ -90,7 +90,8 @@ export default function CoverArtClueChaseJumbotronPage() {
   useEffect(() => {
     load();
     const poll = setInterval(load, 3000);
-    return ()
+    return () => clearInterval(poll);
+  }, [load]);
 
   useEffect(() => {
     if (!session?.host_overlay_remaining_seconds) {
@@ -102,12 +103,11 @@ export default function CoverArtClueChaseJumbotronPage() {
       setOverlayRemaining((prev) => Math.max(0, prev - 1));
     }, 1000);
     return () => clearInterval(interval);
+  }, [session?.host_overlay_remaining_seconds]);
 
   const showThanksOverlay = session?.host_overlay === "thanks" && session.host_overlay_remaining_seconds > 0;
   const showOverlay = showThanksOverlay || (!!session?.host_overlay && session.host_overlay !== "none");
   const logoUrl = session?.event?.venue_logo_url ?? "";
-  }, [session?.host_overlay_remaining_seconds]); => clearInterval(poll);
-  }, [load]);
 
   const currentCall = useMemo(() => {
     if (!session) return null;
@@ -137,7 +137,10 @@ export default function CoverArtClueChaseJumbotronPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [toggleFullscreen]);
 
-  return{!showOverlay ? (
+  return (
+    <div ref={containerRef} className="min-h-screen bg-[radial-gradient(circle_at_50%_0%,#155e75,transparent_38%),linear-gradient(180deg,#020202,#0d0d0d)] p-8 text-white">
+      <div className="mx-auto max-w-7xl space-y-6">
+        {!showOverlay ? (
           <>
             <section className="rounded-3xl border border-stone-700 bg-black/45 p-6">
               <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Current Cover</p>
@@ -246,10 +249,12 @@ export default function CoverArtClueChaseJumbotronPage() {
               <p className="text-2xl text-stone-300">{session?.thanks_subheading_text}</p>
             </div>
           </div>
-        ) className="max-w-4xl rounded-3xl border border-cyan-700/40 bg-black/70 p-8">
-              <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Welcome</p>
-              <p className="mt-2 text-6xl font-black text-cyan-200">Cover Art Clue Chase</p>
-              <p className="mt-4 text-2xl text-stone-200">Guess the album from each reveal stage</p>
+        )}
+
+        {showThanks ? (
+          <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1f2937,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
+            <div className="max-w-4xl rounded-3xl border border-cyan-700/40 bg-black/70 p-8">
+              <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Thanks For Playing</p>
             </div>
           </section>
         ) : null}

@@ -1,5 +1,3 @@
-          venue_logo_url: string | null;
-          location: string | null;
 import { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
 
@@ -12,13 +10,13 @@ export type DecadeDashDatabase = {
   public: {
     Tables: {
       events: {
-        };
         Row: {
           id: number;
           date: string;
           title: string;
           time: string | null;
           location: string | null;
+          venue_logo_url: string | null;
         };
         Insert: {
           id?: number;
@@ -26,6 +24,7 @@ export type DecadeDashDatabase = {
           title: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Update: {
           id?: number;
@@ -33,6 +32,7 @@ export type DecadeDashDatabase = {
           title?: string;
           time?: string | null;
           location?: string | null;
+          venue_logo_url?: string | null;
         };
         Relationships: [];
       };

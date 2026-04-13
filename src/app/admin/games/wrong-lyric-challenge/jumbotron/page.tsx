@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { buildWrongLyricOptions } from "src/lib/wrongLyricChallengeEngine";
@@ -48,7 +47,6 @@ type Call = {
   status: "pending" | "asked" | "locked" | "revealed" | "scored" | "skipped";
 };
 
-  const [overlayRemaining, setOverlayRemaining] = useState(0);
 type LeaderboardRow = {
   team_id: number;
   team_name: string;
@@ -62,6 +60,7 @@ export default function WrongLyricChallengeJumbotronPage() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [remaining, setRemaining] = useState(0);
+  const [overlayRemaining, setOverlayRemaining] = useState(0);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -103,7 +102,8 @@ export default function WrongLyricChallengeJumbotronPage() {
       });
     }, 1000);
 
-    return () =>
+    return () => clearInterval(tick);
+  }, [session?.status]);
 
   useEffect(() => {
     if (!session?.host_overlay_remaining_seconds) {
@@ -115,8 +115,7 @@ export default function WrongLyricChallengeJumbotronPage() {
       setOverlayRemaining((prev) => Math.max(0, prev - 1));
     }, 1000);
     return () => clearInterval(interval);
-  }, [session?.host_overlay_remaining_seconds]); clearInterval(tick);
-  }, [session]);
+  }, [session?.host_overlay_remaining_seconds]);
 
   const currentCall = useMemo(() => {
     if (!session) return null;
@@ -157,7 +156,13 @@ export default function WrongLyricChallengeJumbotronPage() {
       containerRef.current?.requestFullscreen().catch(() => undefined);
     } else {
       document.exitFullscreen().catch(() => undefined);
-    }{!showOverlay ? (
+    }
+  }, []);
+
+  return (
+    <div ref={containerRef} className="min-h-screen bg-[radial-gradient(circle_at_50%_0%,#7c2d12,transparent_38%),linear-gradient(180deg,#020202,#0d0d0d)] p-8 text-white">
+      <div className="mx-auto max-w-7xl space-y-6">
+        {!showOverlay ? (
           <>
             <header className="rounded-3xl border border-red-700/40 bg-black/35 p-6">
               {session?.show_title ? <h1 className="text-5xl font-black uppercase tracking-tight text-red-100">{session?.title ?? "Wrong Lyric Challenge"}</h1> : null}
@@ -274,48 +279,6 @@ export default function WrongLyricChallengeJumbotronPage() {
             </div>
           </div>
         )}
-      </div>
-        </section>
-
-        {session?.show_scoreboard ? (
-          <section className="rounded-3xl border border-stone-700 bg-black/45 p-6">
-            <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Leaderboard</p>
-            <div className="mt-3 grid gap-2 text-2xl font-semibold">
-              {leaderboard.slice(0, 8).map((row, index) => (
-                <div key={row.team_id} className="flex items-center justify-between rounded border border-stone-700 bg-stone-950/70 px-3 py-2">
-                  <span>{index + 1}. {row.team_name}</span>
-                  <span className="text-red-300">{row.total_points} pts</span>
-                </div>
-              ))}
-              {leaderboard.length === 0 ? <p className="text-stone-400">No scores yet</p> : null}
-            </div>
-          </section>
-        ) : null}
-
-        <footer className="flex justify-end gap-2 text-xs text-stone-400">
-          <Link href="/admin/games/wrong-lyric-challenge" className="rounded border border-stone-700 px-2 py-1">Setup</Link>
-          <Link href={`/admin/games/wrong-lyric-challenge/host?sessionId=${sessionId}`} className="rounded border border-stone-700 px-2 py-1">Host</Link>
-        </footer>
-
-        {showThanks ? (
-          <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1f2937,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
-            <div className="max-w-4xl rounded-3xl border border-red-700/40 bg-black/70 p-10">
-              <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Thanks For Playing</p>
-              <p className="mt-3 text-6xl font-black text-red-100">Wrong Lyric Challenge</p>
-              <p className="mt-4 text-2xl text-stone-200">Session {session?.session_code ?? "-"} is complete</p>
-              <p className="mt-6 text-xl text-stone-300">See you at the next round</p>
-            </div>
-          </section>
-        ) : null}
-
-        <button
-          type="button"
-          onClick={toggleFullscreen}
-          className="fixed bottom-3 right-3 z-50 rounded border border-stone-600/70 bg-black/55 px-3 py-1 text-xs text-stone-200"
-          aria-label="Toggle fullscreen"
-        >
-          Fullscreen (F)
-        </button>
       </div>
     </div>
   );
