@@ -229,6 +229,7 @@ export default function LyricGapRelayHostPage() {
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
               <button className="rounded border border-stone-700 px-2 py-1" type="button" onClick={() => window.open(`/admin/games/lyric-gap-relay/jumbotron?sessionId=${sessionId}`, "lyric_gap_relay_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
+              <button className="rounded border border-stone-700 px-2 py-1" type="button" onClick={() => window.open(`/admin/games/lyric-gap-relay/assistant?sessionId=${sessionId}`, "lyric_gap_relay_assistant", "width=1024,height=800,left=1300,top=0")}>Assistant</button>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/lyric-gap-relay/help">Help</Link>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/lyric-gap-relay/history">History</Link>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/lyric-gap-relay">Setup</Link>

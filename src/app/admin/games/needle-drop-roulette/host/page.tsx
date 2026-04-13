@@ -217,6 +217,7 @@ export default function NeedleDropRouletteHostPage() {
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
               <button className="rounded border border-stone-700 px-2 py-1" type="button" onClick={() => window.open(`/admin/games/needle-drop-roulette/jumbotron?sessionId=${sessionId}`, "needle_drop_roulette_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
+              <button className="rounded border border-stone-700 px-2 py-1" type="button" onClick={() => window.open(`/admin/games/needle-drop-roulette/assistant?sessionId=${sessionId}`, "needle_drop_roulette_assistant", "width=1024,height=800,left=1300,top=0")}>Assistant</button>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/needle-drop-roulette/history">History</Link>
               <Link className="rounded border border-stone-700 px-2 py-1" href="/admin/games/needle-drop-roulette">Setup</Link>
             </div>
