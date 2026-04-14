@@ -180,7 +180,7 @@ export default function SaleItemsPage() {
       updatePayload.personal_notes = editValues.sale_notes;
     }
 
-    // @ts-expect-error - updatePayload is runtime safe
+    
     const { error } = await supabase
       .from('inventory')
       .update(updatePayload)
