@@ -439,6 +439,7 @@ export type TriviaDatabase = {
           status: TriviaDeckStatus;
           event_id: number | null;
           playlist_id: number | null;
+          crate_id: number | null;
           build_mode: TriviaDeckBuildMode;
           rules_payload: Json;
           cooldown_days: number;
@@ -454,6 +455,7 @@ export type TriviaDatabase = {
           status?: TriviaDeckStatus;
           event_id?: number | null;
           playlist_id?: number | null;
+          crate_id?: number | null;
           build_mode?: TriviaDeckBuildMode;
           rules_payload?: Json;
           cooldown_days?: number;
@@ -469,6 +471,7 @@ export type TriviaDatabase = {
           status?: TriviaDeckStatus;
           event_id?: number | null;
           playlist_id?: number | null;
+          crate_id?: number | null;
           build_mode?: TriviaDeckBuildMode;
           rules_payload?: Json;
           cooldown_days?: number;
