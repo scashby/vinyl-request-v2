@@ -54,7 +54,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   let nextStage = clampStage(typedCall.stage_revealed ?? 0);
   if (hasStage) nextStage = clampStage(Number(body.stage_revealed));
 
-  const patch: Record<string, unknown> = {};
+  const patch: Partial<import('src/types/supabase').Database['public']['Tables']['artist_alias_session_calls']['Update']> = {};
   if (hasStatus) {
     patch.status = body.status;
   }

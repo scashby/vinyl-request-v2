@@ -225,12 +225,12 @@ export async function POST(req: Request) {
     console.log(`✓ Found ${musiciansSet.size} musicians, ${producersSet.size} producers, ${engineersSet.size} engineers, ${songwritersSet.size} songwriters`);
 
     // Build update object
-    const updateData: Record<string, unknown> = {
+    const updateData: import('src/types/supabase').Database['public']['Tables']['masters']['Update'] = {
       musicbrainz_release_group_id: mbid,
     };
 
     const labelInfo = release['label-info']?.[0];
-    const releaseUpdate: Record<string, unknown> = {};
+    const releaseUpdate: Partial<import('src/types/supabase').Database['public']['Tables']['releases']['Update']> = {};
     if (labelInfo?.label?.name) {
       releaseUpdate.label = labelInfo.label.name;
       console.log(`✓ Found label: ${labelInfo.label.name}`);

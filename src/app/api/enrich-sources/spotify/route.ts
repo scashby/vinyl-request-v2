@@ -216,7 +216,7 @@ export async function POST(req: Request) {
       }
 
       if (master?.id) {
-        const masterUpdate: Record<string, unknown> = {};
+        const masterUpdate: Partial<import('src/types/supabase').Database['public']['Tables']['masters']['Update']> = {};
         if (spotifyData.spotify_genres?.length) {
           masterUpdate.genres = spotifyData.spotify_genres;
         }

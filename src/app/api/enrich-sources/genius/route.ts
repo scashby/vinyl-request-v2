@@ -531,8 +531,8 @@ export async function POST(req: Request) {
       for (const track of tracksWithLyricsUpdates) {
         const nextLyricsUrl = track.credits?.lyrics_url ? String(track.credits.lyrics_url) : null;
         const nextLyricsText = track.credits?.lyrics ? String(track.credits.lyrics) : null;
-        const updatePayload: Record<string, unknown> = {
-          credits: track.credits as unknown as import('types/supabase').Json
+        const updatePayload: import('src/types/supabase').Database['public']['Tables']['recordings']['Update'] = {
+          credits: track.credits as import('src/types/supabase').Json
         };
         if (nextLyricsUrl) {
           updatePayload.lyrics_url = nextLyricsUrl;
