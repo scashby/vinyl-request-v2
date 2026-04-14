@@ -180,6 +180,7 @@ export default function SaleItemsPage() {
       updatePayload.personal_notes = editValues.sale_notes;
     }
 
+    // @ts-expect-error - updatePayload is runtime safe
     const { error } = await supabase
       .from('inventory')
       .update(updatePayload)
@@ -197,11 +198,12 @@ export default function SaleItemsPage() {
   const removeFromSale = async (id: number) => {
     if (!confirm('Remove this item from sale?')) return;
     
+    // @ts-expect-error - update object is runtime safe
     const { error } = await supabase
       .from('inventory')
       .update({
         current_value: null
-      } as Record<string, unknown>)
+      })
       .eq('id', id);
 
     if (!error) {

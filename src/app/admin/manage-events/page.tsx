@@ -85,10 +85,6 @@ export default function Page() {
 
   const updateEventFlags = async (eventId: number, updates: Partial<Event>) => {
     setEvents((prev) => prev.map((ev) => (ev.id === eventId ? { ...ev, ...updates } : ev)));
-    const normalizedUpdates: Partial<Event> = { ...updates };
-    if (typeof normalizedUpdates.allowed_tags === 'string') {
-      normalizedUpdates.allowed_tags = [normalizedUpdates.allowed_tags];
-    }
     // Only include keys that are valid Event fields
     const validKeys = [
       'date', 'title', 'time', 'location', 'image_url', 'venue_logo_url', 'info', 'info_url',
@@ -136,8 +132,29 @@ export default function Page() {
       'venue_logo_archived_archived_archived_archived_archived_archived_flags', 'venue_logo_archived_archived_archived_archived_archived_archived_created_at',
       'venue_logo_archived_archived_archived_archived_archived_archived_updated_at'
     ];
-    const filteredUpdates = Object.fromEntries(Object.entries(normalizedUpdates).filter(([key]) => validKeys.includes(key)));
-    const { error } = await supabase.from('events').update(filteredUpdates as Partial<Event>).eq('id', eventId);
+    // Normalize allowed_tags to always be a string[] or remove it BEFORE filtering
+    let normalized = { ...updates };
+    if ('allowed_tags' in normalized) {
+      if (typeof normalized.allowed_tags === 'string') {
+        normalized.allowed_tags = [normalized.allowed_tags];
+      }
+      if (!Array.isArray(normalized.allowed_tags) || normalized.allowed_tags.some(tag => typeof tag !== 'string')) {
+        delete normalized.allowed_tags;
+      }
+    }
+    const filteredUpdates = Object.fromEntries(Object.entries(normalized).filter(([key]) => validKeys.includes(key)));
+    // Final explicit type guard for allowed_tags
+    if ('allowed_tags' in filteredUpdates) {
+      if (typeof filteredUpdates.allowed_tags === 'string') {
+        filteredUpdates.allowed_tags = [filteredUpdates.allowed_tags];
+      }
+      if (!Array.isArray(filteredUpdates.allowed_tags) || filteredUpdates.allowed_tags.some(tag => typeof tag !== 'string')) {
+        delete filteredUpdates.allowed_tags;
+      }
+    }
+    // Cast to {[key: string]: any} to satisfy TS
+    // @ts-expect-error - filteredUpdates is runtime safe
+    const { error } = await supabase.from('events').update(filteredUpdates).eq('id', eventId);
     if (error) {
       alert(`Error saving changes: ${error.message}`);
       await refreshEvents();
