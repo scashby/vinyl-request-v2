@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTriviaDb } from "src/lib/triviaDb";
 import { TRIVIA_BANK_ENABLED, asString, normalizeQuestionWriteInput } from "src/lib/triviaBankApi";
+import { replaceQuestionSources } from "src/lib/triviaSources";
 
 type QuickPatchBody = {
   question_text?: string;
@@ -34,6 +35,7 @@ type QuickPatchBody = {
   status?: "draft" | "published" | "archived";
   publish?: boolean;
   updated_by?: string;
+  sources?: unknown[];
 };
 
 export const runtime = "nodejs";
@@ -231,6 +233,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           .insert(normalized.tags.map((tag) => ({ question_id: questionId, tag })));
         if (insertTagsError) return NextResponse.json({ error: insertTagsError.message }, { status: 500 });
       }
+    }
+
+    if (hasOwn(bodyRecord, "sources")) {
+      await replaceQuestionSources(questionId, body.sources, userLabel);
     }
 
     return NextResponse.json({

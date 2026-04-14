@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTriviaDb } from "src/lib/triviaDb";
 import { generateTriviaQuestionCode } from "src/lib/triviaBank";
 import { TRIVIA_BANK_ENABLED, asString, normalizeQuestionWriteInput } from "src/lib/triviaBankApi";
+import { replaceQuestionSources } from "src/lib/triviaSources";
 
 export const runtime = "nodejs";
 
@@ -256,6 +257,10 @@ export async function POST(request: NextRequest) {
         normalized.tags.map((tag) => ({ question_id: questionId, tag }))
       );
       if (tagsError) throw new Error(tagsError.message);
+    }
+
+    if (Array.isArray(body.sources)) {
+      await replaceQuestionSources(questionId, body.sources, userLabel);
     }
 
     return NextResponse.json({ id: questionId, question_code: question.question_code }, { status: 201 });

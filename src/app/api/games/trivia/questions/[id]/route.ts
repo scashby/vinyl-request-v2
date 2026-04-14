@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTriviaDb } from "src/lib/triviaDb";
 import { TRIVIA_BANK_ENABLED, asString, normalizeQuestionWriteInput } from "src/lib/triviaBankApi";
 import { hasRequiredCueSource } from "src/lib/triviaBank";
+import { loadQuestionSources, replaceQuestionSources } from "src/lib/triviaSources";
 
 export const runtime = "nodejs";
 
@@ -35,7 +36,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   if (!questionId) return NextResponse.json({ error: "Invalid question id" }, { status: 400 });
 
   const db = getTriviaDb();
-  const [{ data: question, error: questionError }, { data: facets }, { data: tags }, { data: assets }] = await Promise.all([
+  const [{ data: question, error: questionError }, { data: facets }, { data: tags }, { data: assets }, sources] = await Promise.all([
     db
       .from("trivia_questions")
       .select("id, question_code, status, question_type, prompt_text, answer_key, accepted_answers, answer_payload, options_payload, reveal_payload, display_element_type, explanation_text, default_category, default_difficulty, source_note, is_tiebreaker_eligible, cue_source_type, cue_source_payload, primary_cue_start_seconds, primary_cue_end_seconds, primary_cue_instruction, cue_notes_text, cue_payload, created_by, updated_by, created_at, updated_at, published_at, archived_at")
@@ -56,6 +57,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       .select("id, asset_role, asset_type, bucket, object_path, mime_type, width, height, duration_seconds, sort_order, created_at")
       .eq("question_id", questionId)
       .order("sort_order", { ascending: true }),
+    loadQuestionSources(questionId),
   ]);
 
   if (questionError) return NextResponse.json({ error: questionError.message }, { status: 500 });
@@ -67,6 +69,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       facets: facets ?? null,
       tags: (tags ?? []).map((row) => row.tag),
       assets: assets ?? [],
+      sources,
     },
     { status: 200 }
   );
@@ -194,7 +197,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
   }
 
-  if (Object.keys(patch).length === 0 && !touchesFacets && !touchesCueRuleFields && !Object.prototype.hasOwnProperty.call(body, "tags")) {
+  if (Object.prototype.hasOwnProperty.call(body, "sources")) {
+    try {
+      await replaceQuestionSources(questionId, body.sources, userLabel);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update question sources";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+  }
+
+  if (Object.keys(patch).length === 0 && !touchesFacets && !touchesCueRuleFields && !Object.prototype.hasOwnProperty.call(body, "tags") && !Object.prototype.hasOwnProperty.call(body, "sources")) {
     return NextResponse.json({ error: "No valid fields provided" }, { status: 400 });
   }
 

@@ -37,6 +37,23 @@ type TriviaQuestionAsset = {
   created_at?: string;
 };
 
+type TriviaQuestionSource = {
+  id?: number;
+  source_record_id?: number;
+  relationship_type?: string;
+  is_primary?: boolean;
+  citation_excerpt?: string | null;
+  claim_text?: string | null;
+  verification_notes?: string | null;
+  source_kind?: string;
+  source_url?: string | null;
+  source_domain?: string | null;
+  source_title?: string | null;
+  excerpt_text?: string | null;
+  source_claim_text?: string | null;
+  verification_status?: string;
+};
+
 type QuestionListRow = {
   id: number;
   question_code: string;
@@ -69,6 +86,7 @@ type QuestionDetail = {
   primary_cue_instruction: string | null;
   cue_notes_text: string | null;
   assets: TriviaQuestionAsset[];
+  sources?: TriviaQuestionSource[];
 };
 
 const STATUS_TABS: Array<{ value: "" | QuestionStatus; label: string }> = [
@@ -97,6 +115,20 @@ type FormState = {
   cue_notes_text: string;
   selected_track: InventoryTrackResult | null;
   selected_clip_asset_id: number | null;
+  sources: TriviaQuestionSource[];
+};
+const DEFAULT_SOURCE: TriviaQuestionSource = {
+  source_kind: "editorial",
+  source_url: "",
+  source_domain: "",
+  source_title: "",
+  excerpt_text: "",
+  source_claim_text: "",
+  citation_excerpt: "",
+  verification_notes: "",
+  verification_status: "unreviewed",
+  relationship_type: "research",
+  is_primary: true,
 };
 
 const DEFAULT_FORM: FormState = {
@@ -113,6 +145,7 @@ const DEFAULT_FORM: FormState = {
   cue_notes_text: "",
   selected_track: null,
   selected_clip_asset_id: null,
+  sources: [],
 };
 
 const DIFFICULTY_OPTIONS: Difficulty[] = ["easy", "medium", "hard"];
@@ -193,6 +226,23 @@ function mapDetailToForm(detail: QuestionDetail): FormState {
     cue_notes_text: detail.cue_notes_text ?? "",
     selected_track: selectedTrack,
     selected_clip_asset_id: selectedClipAsset?.id ?? null,
+    sources: Array.isArray(detail.sources)
+      ? detail.sources.map((source, index) => ({
+          ...DEFAULT_SOURCE,
+          ...source,
+          is_primary: source.is_primary ?? index === 0,
+          source_url: source.source_url ?? "",
+          source_domain: source.source_domain ?? "",
+          source_title: source.source_title ?? "",
+          excerpt_text: source.excerpt_text ?? "",
+          source_claim_text: source.source_claim_text ?? source.claim_text ?? "",
+          citation_excerpt: source.citation_excerpt ?? "",
+          verification_notes: source.verification_notes ?? "",
+          verification_status: source.verification_status ?? "unreviewed",
+          relationship_type: source.relationship_type ?? "research",
+          source_kind: source.source_kind ?? "editorial",
+        }))
+      : [],
   };
 }
 
@@ -224,6 +274,17 @@ export default function MusicTriviaBankPage() {
 
   const setFormField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
+  };
+  const setSourceField = (index: number, key: keyof TriviaQuestionSource, value: string | boolean) => {
+    setForm((current) => ({
+      ...current,
+      sources: current.sources.map((source, sourceIndex) => {
+        if (sourceIndex !== index) {
+          return key === "is_primary" && value === true ? { ...source, is_primary: false } : source;
+        }
+        return { ...source, [key]: value };
+      }),
+    }));
   };
 
   const categoryOptions = useMemo(() => {
@@ -454,6 +515,7 @@ export default function MusicTriviaBankPage() {
           source_note: cueSourceMode === "inventory_track"
             ? `Bank cue source: ${formatTrackLabel(selectedTrack)}`
             : `Bank cue source: uploaded clip ${selectedClip?.object_path ?? ""}`,
+          sources: form.sources,
           publish,
         }),
       });
@@ -884,6 +946,99 @@ export default function MusicTriviaBankPage() {
 
               {validationMessage ? <p className="mt-2 text-amber-300">{validationMessage}</p> : null}
             </section>
+            <section className="mt-4 rounded border border-amber-900/60 bg-amber-950/20 p-3 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="font-semibold text-amber-200">Sources & Provenance</p>
+                  <p className="text-[11px] text-amber-100/70">Add citations for manually researched or imported trivia so review and future imports stay auditable.</p>
+                </div>
+                <button
+                  className="rounded border border-amber-700 px-3 py-1"
+                  onClick={() => setFormField("sources", [...form.sources, { ...DEFAULT_SOURCE, is_primary: form.sources.length === 0 }])}
+                >
+                  Add Source
+                </button>
+              </div>
+
+              {form.sources.length === 0 ? <p className="mt-2 text-stone-400">No sources attached yet. Manual trivia can still be saved, but sourced questions should carry provenance.</p> : null}
+
+              <div className="mt-3 space-y-3">
+                {form.sources.map((source, index) => (
+                  <div key={`${source.id ?? "new"}-${index}`} className="rounded border border-stone-800 bg-stone-950/50 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-semibold text-stone-100">Source {index + 1}</p>
+                      <div className="flex flex-wrap gap-2">
+                        <label className="flex items-center gap-2 text-[11px] text-stone-300">
+                          <input
+                            type="radio"
+                            name="primary-source"
+                            checked={source.is_primary === true}
+                            onChange={() => setSourceField(index, "is_primary", true)}
+                          />
+                          Primary
+                        </label>
+                        <button
+                          className="rounded border border-stone-700 px-2 py-0.5"
+                          onClick={() => setFormField("sources", form.sources.filter((_, sourceIndex) => sourceIndex !== index).map((entry, entryIndex) => ({ ...entry, is_primary: entry.is_primary ?? entryIndex === 0 })))}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-2 grid gap-2 lg:grid-cols-2">
+                      <label>Source URL
+                        <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={source.source_url ?? ""} onChange={(e) => setSourceField(index, "source_url", e.target.value)} placeholder="https://..." />
+                      </label>
+                      <label>Source Title
+                        <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={source.source_title ?? ""} onChange={(e) => setSourceField(index, "source_title", e.target.value)} placeholder="Article, interview, database entry" />
+                      </label>
+                      <label>Source Kind
+                        <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={source.source_kind ?? "editorial"} onChange={(e) => setSourceField(index, "source_kind", e.target.value)}>
+                          <option value="editorial">editorial</option>
+                          <option value="manual">manual</option>
+                          <option value="api">api</option>
+                          <option value="reference">reference</option>
+                        </select>
+                      </label>
+                      <label>Verification Status
+                        <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={source.verification_status ?? "unreviewed"} onChange={(e) => setSourceField(index, "verification_status", e.target.value)}>
+                          <option value="unreviewed">unreviewed</option>
+                          <option value="approved">approved</option>
+                          <option value="rejected">rejected</option>
+                          <option value="superseded">superseded</option>
+                        </select>
+                      </label>
+                      <label>Relationship
+                        <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={source.relationship_type ?? "research"} onChange={(e) => setSourceField(index, "relationship_type", e.target.value)}>
+                          <option value="research">research</option>
+                          <option value="verification">verification</option>
+                          <option value="inspiration">inspiration</option>
+                          <option value="manual_note">manual_note</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <label className="mt-2 block">Excerpt
+                      <textarea className="mt-1 h-20 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={source.excerpt_text ?? ""} onChange={(e) => setSourceField(index, "excerpt_text", e.target.value)} placeholder="Relevant quoted or paraphrased source excerpt" />
+                    </label>
+
+                    <label className="mt-2 block">Claim / Fact
+                      <textarea className="mt-1 h-16 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={source.source_claim_text ?? ""} onChange={(e) => setSourceField(index, "source_claim_text", e.target.value)} placeholder="Normalized factual claim extracted from the source" />
+                    </label>
+
+                    <label className="mt-2 block">Citation Excerpt Used For This Question
+                      <textarea className="mt-1 h-16 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={source.citation_excerpt ?? ""} onChange={(e) => setSourceField(index, "citation_excerpt", e.target.value)} placeholder="Short excerpt or summary used in the final question" />
+                    </label>
+
+                    <label className="mt-2 block">Verification Notes
+                      <textarea className="mt-1 h-16 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={source.verification_notes ?? ""} onChange={(e) => setSourceField(index, "verification_notes", e.target.value)} placeholder="Why this source is trustworthy, any caveats, editorial notes" />
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </section>
+
 
             <section className="mt-4 rounded border border-violet-900/60 bg-violet-950/20 p-3 text-xs">
               <div className="flex flex-wrap items-end gap-2">
