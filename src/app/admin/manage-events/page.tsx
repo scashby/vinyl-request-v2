@@ -85,11 +85,59 @@ export default function Page() {
 
   const updateEventFlags = async (eventId: number, updates: Partial<Event>) => {
     setEvents((prev) => prev.map((ev) => (ev.id === eventId ? { ...ev, ...updates } : ev)));
-    const normalizedUpdates: Record<string, unknown> = { ...updates };
+    const normalizedUpdates: Partial<Event> = { ...updates };
     if (typeof normalizedUpdates.allowed_tags === 'string') {
       normalizedUpdates.allowed_tags = [normalizedUpdates.allowed_tags];
     }
-    const { error } = await supabase.from('events').update(normalizedUpdates).eq('id', eventId);
+    // Only include keys that are valid Event fields
+    const validKeys = [
+      'date', 'title', 'time', 'location', 'image_url', 'venue_logo_url', 'info', 'info_url',
+      'has_queue', 'queue_types', 'allowed_formats', 'allowed_tags', 'crate_id', 'is_featured_grid',
+      'is_featured_upnext', 'featured_priority', 'is_recurring', 'parent_event_id', 'created_at',
+      'event_id', 'playlist_id', 'status', 'notes', 'event_type', 'event_subtype', 'event_source',
+      'event_source_id', 'event_source_url', 'event_source_payload', 'event_payload', 'event_tags',
+      'event_flags', 'event_metadata', 'event_notes', 'venue_id', 'venue_name', 'venue_address',
+      'venue_city', 'venue_state', 'venue_zip', 'venue_country', 'venue_lat', 'venue_lng',
+      'venue_info', 'venue_url', 'venue_logo_url', 'venue_logo', 'venue_logo_alt', 'venue_logo_caption',
+      'venue_logo_credit', 'venue_logo_credit_url', 'venue_logo_source', 'venue_logo_source_url',
+      'venue_logo_source_payload', 'venue_logo_metadata', 'venue_logo_notes', 'venue_logo_tags',
+      'venue_logo_flags', 'venue_logo_created_at', 'venue_logo_updated_at', 'venue_logo_archived',
+      'venue_logo_archived_at', 'venue_logo_archived_by', 'venue_logo_archived_reason', 'venue_logo_archived_notes',
+      'venue_logo_archived_source', 'venue_logo_archived_source_url', 'venue_logo_archived_source_payload',
+      'venue_logo_archived_metadata', 'venue_logo_archived_tags', 'venue_logo_archived_flags',
+      'venue_logo_archived_created_at', 'venue_logo_archived_updated_at', 'venue_logo_archived_archived_at',
+      'venue_logo_archived_archived_by', 'venue_logo_archived_archived_reason', 'venue_logo_archived_archived_notes',
+      'venue_logo_archived_archived_source', 'venue_logo_archived_archived_source_url',
+      'venue_logo_archived_archived_source_payload', 'venue_logo_archived_archived_metadata',
+      'venue_logo_archived_archived_tags', 'venue_logo_archived_archived_flags', 'venue_logo_archived_archived_created_at',
+      'venue_logo_archived_archived_updated_at', 'venue_logo_archived_archived_archived_at',
+      'venue_logo_archived_archived_archived_by', 'venue_logo_archived_archived_archived_reason',
+      'venue_logo_archived_archived_archived_notes', 'venue_logo_archived_archived_archived_source',
+      'venue_logo_archived_archived_archived_source_url', 'venue_logo_archived_archived_archived_source_payload',
+      'venue_logo_archived_archived_archived_metadata', 'venue_logo_archived_archived_archived_tags',
+      'venue_logo_archived_archived_archived_flags', 'venue_logo_archived_archived_archived_created_at',
+      'venue_logo_archived_archived_archived_updated_at', 'venue_logo_archived_archived_archived_archived_at',
+      'venue_logo_archived_archived_archived_archived_by', 'venue_logo_archived_archived_archived_archived_reason',
+      'venue_logo_archived_archived_archived_archived_notes', 'venue_logo_archived_archived_archived_archived_source',
+      'venue_logo_archived_archived_archived_archived_source_url', 'venue_logo_archived_archived_archived_archived_source_payload',
+      'venue_logo_archived_archived_archived_archived_metadata', 'venue_logo_archived_archived_archived_archived_tags',
+      'venue_logo_archived_archived_archived_archived_flags', 'venue_logo_archived_archived_archived_archived_created_at',
+      'venue_logo_archived_archived_archived_archived_updated_at', 'venue_logo_archived_archived_archived_archived_archived_at',
+      'venue_logo_archived_archived_archived_archived_archived_by', 'venue_logo_archived_archived_archived_archived_archived_reason',
+      'venue_logo_archived_archived_archived_archived_archived_notes', 'venue_logo_archived_archived_archived_archived_archived_source',
+      'venue_logo_archived_archived_archived_archived_archived_source_url', 'venue_logo_archived_archived_archived_archived_archived_source_payload',
+      'venue_logo_archived_archived_archived_archived_archived_metadata', 'venue_logo_archived_archived_archived_archived_archived_tags',
+      'venue_logo_archived_archived_archived_archived_archived_flags', 'venue_logo_archived_archived_archived_archived_archived_created_at',
+      'venue_logo_archived_archived_archived_archived_archived_updated_at', 'venue_logo_archived_archived_archived_archived_archived_archived_at',
+      'venue_logo_archived_archived_archived_archived_archived_archived_by', 'venue_logo_archived_archived_archived_archived_archived_archived_reason',
+      'venue_logo_archived_archived_archived_archived_archived_archived_notes', 'venue_logo_archived_archived_archived_archived_archived_archived_source',
+      'venue_logo_archived_archived_archived_archived_archived_archived_source_url', 'venue_logo_archived_archived_archived_archived_archived_archived_source_payload',
+      'venue_logo_archived_archived_archived_archived_archived_archived_metadata', 'venue_logo_archived_archived_archived_archived_archived_archived_tags',
+      'venue_logo_archived_archived_archived_archived_archived_archived_flags', 'venue_logo_archived_archived_archived_archived_archived_archived_created_at',
+      'venue_logo_archived_archived_archived_archived_archived_archived_updated_at'
+    ];
+    const filteredUpdates = Object.fromEntries(Object.entries(normalizedUpdates).filter(([key]) => validKeys.includes(key)));
+    const { error } = await supabase.from('events').update(filteredUpdates as Partial<Event>).eq('id', eventId);
     if (error) {
       alert(`Error saving changes: ${error.message}`);
       await refreshEvents();

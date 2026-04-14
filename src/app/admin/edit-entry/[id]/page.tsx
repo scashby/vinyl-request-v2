@@ -939,7 +939,7 @@ export default function EditEntryPage() {
       cover_image_url: entry.image_url || null,
       genres: entry.discogs_genres || null,
       styles: entry.discogs_styles || null,
-      discogs_master_id: entry.discogs_master_id || null,
+      discogs_master_id: entry.discogs_master_id && typeof entry.discogs_master_id === 'string' ? entry.discogs_master_id : null,
       original_release_year: entry.year ? parseInt(entry.year, 10) : null,
     };
 
