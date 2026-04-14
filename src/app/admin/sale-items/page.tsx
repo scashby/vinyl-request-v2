@@ -183,7 +183,7 @@ export default function SaleItemsPage() {
     
     const { error } = await supabase
       .from('inventory')
-      .update(updatePayload)
+      .update(updatePayload as any)
       .eq('id', id);
 
     if (!error) {
