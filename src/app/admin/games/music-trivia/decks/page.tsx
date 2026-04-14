@@ -260,7 +260,7 @@ export default function MusicTriviaDecksPage() {
 
       await loadDecks();
       if (Number.isFinite(Number(payload.id))) {
-        await load(Number(payload.id));
+        await loadDeck(Number(payload.id));
       }
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to create deck");
