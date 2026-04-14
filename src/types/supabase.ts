@@ -461,6 +461,60 @@ export type Database = {
         }
         Relationships: []
       }
+      album_suggestions: {
+        Row: {
+          admin_notes: string | null
+          album: string
+          artist: string
+          context: string
+          contribution_amount: string | null
+          contributor_email: string | null
+          contributor_name: string | null
+          created_at: string
+          estimated_cost: number | null
+          id: number
+          priority_score: number | null
+          reason: string | null
+          status: string
+          updated_at: string | null
+          venmo_transaction_id: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          album: string
+          artist: string
+          context?: string
+          contribution_amount?: string | null
+          contributor_email?: string | null
+          contributor_name?: string | null
+          created_at?: string
+          estimated_cost?: number | null
+          id?: never
+          priority_score?: number | null
+          reason?: string | null
+          status?: string
+          updated_at?: string | null
+          venmo_transaction_id?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          album?: string
+          artist?: string
+          context?: string
+          contribution_amount?: string | null
+          contributor_email?: string | null
+          contributor_name?: string | null
+          created_at?: string
+          estimated_cost?: number | null
+          id?: never
+          priority_score?: number | null
+          reason?: string | null
+          status?: string
+          updated_at?: string | null
+          venmo_transaction_id?: string | null
+        }
+        Relationships: []
+      }
       artist_rules: {
         Row: {
           created_at: string | null
