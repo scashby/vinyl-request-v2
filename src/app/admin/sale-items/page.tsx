@@ -198,7 +198,7 @@ export default function SaleItemsPage() {
   const removeFromSale = async (id: number) => {
     if (!confirm('Remove this item from sale?')) return;
     
-    // @ts-expect-error - update object is runtime safe
+    
     const { error } = await supabase
       .from('inventory')
       .update({

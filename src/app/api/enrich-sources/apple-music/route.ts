@@ -29,14 +29,14 @@ const getHeaders = () => ({
 });
 
 const buildArtworkUrl = (artwork?: { url?: string; width?: number; height?: number }) => {
-  if (!artwork?.url) return null;
+      await supabase.from('releases').update(releaseUpdate as any).eq('id', release.id);
   return artwork.url
     .replace('{w}', String(artwork.width ?? 600))
     .replace('{h}', String(artwork.height ?? 600));
 };
 
 export async function POST(req: Request) {
-  if (!APPLE_MUSIC_TOKEN) {
+      await supabase.from('masters').update(masterUpdate as any).eq('id', master.id);
     return NextResponse.json({ success: false, error: 'Apple Music token not configured' }, { status: 500 });
   }
 
@@ -177,7 +177,7 @@ export async function POST(req: Request) {
         releaseUpdate.track_count = albumMeta.trackCount;
       }
       if (Object.keys(releaseUpdate).length > 0) {
-        await supabase.from('releases').update(releaseUpdate).eq('id', release.id);
+        await supabase.from('releases').update(releaseUpdate as any).eq('id', release.id);
       }
     }
 
@@ -187,7 +187,7 @@ export async function POST(req: Request) {
         masterUpdate.cover_image_url = albumMeta.artworkUrl;
       }
       if (Object.keys(masterUpdate).length > 0) {
-        await supabase.from('masters').update(masterUpdate).eq('id', master.id);
+        await supabase.from('masters').update(masterUpdate as any).eq('id', master.id);
       }
     }
 

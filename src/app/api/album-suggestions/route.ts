@@ -269,7 +269,7 @@ export async function PUT(request: NextRequest) {
     // Update with request-scoped client (RLS will apply)
     const { data, error } = await supabase
       .from('album_suggestions')
-      .update(updateData)
+      .update(updateData as any)
       .eq('id', id)
       .select();
 

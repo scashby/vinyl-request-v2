@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
         tags: tags || [],
         track_listing: track_listing || [],
         is_live: is_live || false
-      })
+      } as any)
       .select()
       .single();
 
