@@ -129,4 +129,4 @@ export default function NavigationMenu() {
     </>
   );
 }
-// AUDIT: inspected, no changes.
+// AUDIT: inspected for staff-picks, no changes needed.

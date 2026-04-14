@@ -33,7 +33,7 @@ write('manage-dj-sets',     'Manage DJ Sets');
 write('manage-events',      'Manage Events');
 write('media-grading',      'Media Grading');
 write('playlists',          'Playlists');
-write('staff-picks',        'Staff Picks (Admin)');
+// write('staff-picks',        'Staff Picks (Admin)');
 
 // Admin games hub
 write('games',              'Games Admin');

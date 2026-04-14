@@ -108,5 +108,22 @@ drwxr-xr-x  5 stephenashby  staff    160 Feb 23 00:39 library
 - Environments: .env.local
 
   Creating an optimized production build ...
-✓ Compiled successfully in 8.0s
+✓ Compiled successfully in 7.7s
   Running TypeScript ...
+Failed to type check.
+
+./src/app/api/album-suggestions/route.ts:64:13
+Type error: No overload matches this call.
+  Overload 1 of 2, '(relation: "aa_sessions" | "events" | "collection_playlists" | "aa_session_calls" | "aa_session_teams" | "b2bc_sessions" | "b2bc_session_calls" | "b2bc_session_teams" | "bb_session_matchups" | ... 125 more ... | "wlc_team_scores"): PostgrestQueryBuilder<...>', gave the following error.
+    Argument of type '"album_suggestions"' is not assignable to parameter of type '"aa_sessions" | "events" | "collection_playlists" | "aa_session_calls" | "aa_session_teams" | "b2bc_sessions" | "b2bc_session_calls" | "b2bc_session_teams" | "bb_session_matchups" | ... 125 more ... | "wlc_team_scores"'.
+  Overload 2 of 2, '(relation: "enrichment_pattern_stats"): PostgrestQueryBuilder<{ PostgrestVersion: "14.1"; }, { Tables: { aa_session_calls: { Row: { accepted_aliases: string[]; artist_name: string; asked_at: string; audio_clue_source: string; ... 13 more ...; status: string; }; Insert: { ...; }; Update: { ...; }; Relationships: [...]; }; ... 133 more ...; works: { ...; }; }; Views: { ...; }; Functions: { ...; }; Enums: {}; CompositeTypes: {}; }, { ...; }, "enrichment_pattern_stats", []>', gave the following error.
+    Argument of type '"album_suggestions"' is not assignable to parameter of type '"enrichment_pattern_stats"'.
+
+  [90m62 |[0m     [90m// Check if suggestion already exists (to avoid duplicates)[0m
+  [90m63 |[0m     [36mconst[0m { data: existing, error: existingError } = [36mawait[0m supabase
+[31m[1m>[0m [90m64 |[0m       .[36mfrom[0m([32m'album_suggestions'[0m)
+  [90m   |[0m             [31m[1m^[0m
+  [90m65 |[0m       .select([32m'id, contribution_amount'[0m)
+  [90m66 |[0m       .eq([32m'artist'[0m, artist.trim())
+  [90m67 |[0m       .eq([32m'album'[0m, album.trim())
+Next.js build worker exited with code: 1 and signal: null
