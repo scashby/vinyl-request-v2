@@ -438,7 +438,7 @@ export async function POST(req: Request) {
     if (Object.keys(releaseUpdate).length > 0) {
       const { error: releaseError } = await supabase
         .from('releases')
-        .update(releaseUpdate)
+        .update(releaseUpdate as any)
         .eq('id', release.id);
 
       if (releaseError) {
@@ -452,7 +452,7 @@ export async function POST(req: Request) {
     if (Object.keys(masterUpdate).length > 0) {
       const { error: masterError } = await supabase
         .from('masters')
-        .update(masterUpdate)
+        .update(masterUpdate as any)
         .eq('id', master.id);
 
       if (masterError) {

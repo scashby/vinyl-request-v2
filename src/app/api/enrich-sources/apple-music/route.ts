@@ -29,14 +29,15 @@ const getHeaders = () => ({
 });
 
 const buildArtworkUrl = (artwork?: { url?: string; width?: number; height?: number }) => {
-      await supabase.from('releases').update(releaseUpdate as any).eq('id', release.id);
+  if (!artwork?.url) return undefined;
   return artwork.url
     .replace('{w}', String(artwork.width ?? 600))
     .replace('{h}', String(artwork.height ?? 600));
 };
 
+
 export async function POST(req: Request) {
-      await supabase.from('masters').update(masterUpdate as any).eq('id', master.id);
+  if (!APPLE_MUSIC_TOKEN) {
     return NextResponse.json({ success: false, error: 'Apple Music token not configured' }, { status: 500 });
   }
 

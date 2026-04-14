@@ -1,0 +1,128 @@
+
+> deadwaxdialogues@0.1.0 prebuild
+> ls -l src/lib && cat jsconfig.json
+
+total 1880
+-rw-r--r--  1 stephenashby  staff   5430 Feb  5 08:38 addOrVoteRequest.ts
+-rw-r--r--@ 1 stephenashby  staff   3378 Mar 26 11:47 adminImageLibrary.ts
+-rw-r--r--@ 1 stephenashby  staff  15184 Mar 26 11:47 adminImageLibraryServer.ts
+-rw-r--r--@ 1 stephenashby  staff    651 Mar 26 11:47 adminImageLibraryTypes.ts
+-rw-r--r--@ 1 stephenashby  staff  11093 Apr 13 16:45 artistAliasDb.ts
+-rw-r--r--  1 stephenashby  staff    259 Feb 20 16:32 artistAliasSessionCode.ts
+-rw-r--r--  1 stephenashby  staff   1853 Mar  2 20:43 artistName.ts
+-rw-r--r--@ 1 stephenashby  staff  11457 Apr 13 16:45 backToBackConnectionDb.ts
+-rw-r--r--  1 stephenashby  staff    268 Feb 20 16:31 backToBackConnectionSessionCode.ts
+-rw-r--r--@ 1 stephenashby  staff   1971 Mar 29 15:47 bingoBall.ts
+-rw-r--r--  1 stephenashby  staff   1067 Feb 20 23:10 bingoCallSheetPdf.ts
+-rw-r--r--@ 1 stephenashby  staff   1274 Apr  2 18:16 bingoCardPrintPack.ts
+-rw-r--r--@ 1 stephenashby  staff  10044 Apr  3 09:59 bingoCardsPdf.ts
+-rw-r--r--@ 1 stephenashby  staff   9859 Apr  6 20:30 bingoCrateLabelsPdf.ts
+-rw-r--r--@ 1 stephenashby  staff  21993 Apr  6 17:30 bingoCrateModel.ts
+-rw-r--r--@ 1 stephenashby  staff  20399 Apr  6 00:43 bingoDb.ts
+-rw-r--r--@ 1 stephenashby  staff  43027 Apr  6 00:25 bingoEngine.ts
+-rw-r--r--@ 1 stephenashby  staff  16865 Apr  3 12:23 bingoGameModel.ts
+-rw-r--r--@ 1 stephenashby  staff   5241 Mar 24 11:46 bingoModes.ts
+-rw-r--r--@ 1 stephenashby  staff   3099 Mar 24 21:49 bingoRoundPlaylists.ts
+-rw-r--r--  1 stephenashby  staff    262 Feb 18 22:59 bingoSessionCode.ts
+-rw-r--r--@ 1 stephenashby  staff   2548 Apr 12 14:33 bingoSessionSync.ts
+-rw-r--r--@ 1 stephenashby  staff  13227 Apr 13 16:45 bracketBattleDb.ts
+-rw-r--r--  1 stephenashby  staff    267 Feb 20 11:10 bracketBattleSessionCode.ts
+-rw-r--r--  1 stephenashby  staff  17425 Feb  5 08:38 clzImportWorkflow.ts
+-rw-r--r--  1 stephenashby  staff   9573 Feb  5 08:38 clzParser.ts
+-rw-r--r--  1 stephenashby  staff   8699 Feb  6 13:45 collection-columns.ts
+-rw-r--r--  1 stephenashby  staff  18207 Feb 14 09:38 conflictDetection.ts
+-rw-r--r--@ 1 stephenashby  wheel  12009 Apr 13 18:29 coverArtClueChaseDb.ts
+-rw-r--r--  1 stephenashby  staff    265 Feb 20 16:03 coverArtClueChaseSessionCode.ts
+-rw-r--r--@ 1 stephenashby  staff  10938 Apr 13 18:29 crateCategoriesDb.ts
+-rw-r--r--  1 stephenashby  staff    818 Mar  1 09:10 crateCategoriesEngine.ts
+-rw-r--r--  1 stephenashby  staff    263 Feb 20 16:30 crateCategoriesSessionCode.ts
+-rw-r--r--@ 1 stephenashby  staff   8084 Apr  4 10:40 crateUtils.ts
+-rw-r--r--  1 stephenashby  staff   2241 Feb  5 08:38 csvUtils.ts
+-rw-r--r--@ 1 stephenashby  staff  10885 Apr 13 18:29 decadeDashDb.ts
+-rw-r--r--  1 stephenashby  staff    258 Feb 20 15:05 decadeDashSessionCode.ts
+-rw-r--r--  1 stephenashby  staff   1578 Feb  5 08:38 discogs-validation.ts
+-rw-r--r--@ 1 stephenashby  staff   6408 Mar 21 14:37 discogsAuth.ts
+-rw-r--r--  1 stephenashby  staff   3531 Mar  2 09:50 downloadGamePullListPdf.ts
+-rw-r--r--  1 stephenashby  staff  14941 Mar  2 19:32 enrichment-data-mapping.ts
+-rw-r--r--@ 1 stephenashby  staff  80904 Mar 21 14:37 enrichment-utils.ts
+-rw-r--r--  1 stephenashby  staff   9080 Feb 19 08:56 enrichmentDiagnostics.ts
+-rw-r--r--@ 1 stephenashby  staff   2718 Mar 21 09:38 eventTypeConfig.ts
+-rw-r--r--  1 stephenashby  staff    300 Feb  5 08:38 formatParser.ts
+-rw-r--r--@ 1 stephenashby  staff   9850 Mar 21 01:16 gameBlueprints.ts
+-rw-r--r--  1 stephenashby  staff   1607 Feb 28 23:29 gamePullListPdf.ts
+-rw-r--r--@ 1 stephenashby  staff  13118 Apr 13 12:39 genreImposterDb.ts
+-rw-r--r--  1 stephenashby  staff   1549 Mar  1 09:08 genreImposterEngine.ts
+-rw-r--r--  1 stephenashby  staff    261 Feb 20 14:22 genreImposterSessionCode.ts
+-rw-r--r--  1 stephenashby  staff   5249 Feb 28 17:46 importUtils.ts
+-rw-r--r--  1 stephenashby  staff   1026 Feb  5 08:38 lastfm.ts
+drwxr-xr-x  5 stephenashby  staff    160 Feb 23 00:39 library
+-rw-r--r--@ 1 stephenashby  staff  11287 Apr 13 18:29 lyricGapRelayDb.ts
+-rw-r--r--  1 stephenashby  staff    816 Mar  1 09:07 lyricGapRelayEngine.ts
+-rw-r--r--  1 stephenashby  staff    261 Feb 20 14:45 lyricGapRelaySessionCode.ts
+-rw-r--r--@ 1 stephenashby  staff   9782 Apr 13 12:27 nameThatTuneDb.ts
+-rw-r--r--  1 stephenashby  staff    815 Feb 20 10:11 nameThatTuneEngine.ts
+-rw-r--r--  1 stephenashby  staff   2032 Feb 28 23:15 nameThatTunePullListPdf.ts
+-rw-r--r--  1 stephenashby  staff    260 Feb 20 10:11 nameThatTuneSessionCode.ts
+-rw-r--r--@ 1 stephenashby  staff  10710 Apr 13 12:39 needleDropRouletteDb.ts
+-rw-r--r--  1 stephenashby  staff    266 Feb 20 11:30 needleDropRouletteSessionCode.ts
+-rw-r--r--@ 1 stephenashby  staff  11678 Apr 13 13:58 originalOrCoverDb.ts
+-rw-r--r--  1 stephenashby  staff    818 Mar  1 09:10 originalOrCoverEngine.ts
+-rw-r--r--  1 stephenashby  staff    263 Feb 20 16:31 originalOrCoverSessionCode.ts
+-rw-r--r--  1 stephenashby  staff   9020 Feb  5 08:38 pdfGenerator.ts
+-rw-r--r--@ 1 stephenashby  staff  34830 Mar 18 19:40 playlistImportEngine.ts
+-rw-r--r--@ 1 stephenashby  staff   9539 Mar 23 17:17 playlistMetadataSync.ts
+-rw-r--r--  1 stephenashby  staff   8278 Feb 19 11:18 playlistUtils.ts
+-rw-r--r--  1 stephenashby  staff   2487 Mar  2 19:17 saleUtils.ts
+-rw-r--r--@ 1 stephenashby  staff  11690 Apr 13 13:58 sampleDetectiveDb.ts
+-rw-r--r--  1 stephenashby  staff    263 Feb 20 16:33 sampleDetectiveSessionCode.ts
+-rw-r--r--  1 stephenashby  staff   1805 Feb  5 08:38 spotify.ts
+-rw-r--r--  1 stephenashby  staff   6409 Feb 19 20:42 spotifyUser.ts
+-rw-r--r--  1 stephenashby  staff   2541 Feb 26 15:54 supabaseAdmin.ts
+-rw-r--r--  1 stephenashby  staff    832 Feb 19 13:56 supabaseClient.ts
+-rw-r--r--  1 stephenashby  staff    979 Feb  5 08:38 supabaseServer.ts
+-rw-r--r--  1 stephenashby  staff   2310 Mar  3 15:49 transportQueue.ts
+-rw-r--r--  1 stephenashby  staff  13331 Mar  5 16:53 triviaBank.ts
+-rw-r--r--  1 stephenashby  staff   5641 Mar  5 16:53 triviaBankApi.ts
+-rw-r--r--@ 1 stephenashby  staff  29476 Apr 13 23:21 triviaDb.ts
+-rw-r--r--  1 stephenashby  staff   5799 Mar  5 16:57 triviaDeckSnapshots.ts
+-rw-r--r--  1 stephenashby  staff  21559 Mar  5 09:36 triviaEngine.ts
+-rw-r--r--@ 1 stephenashby  staff   3763 Apr 13 22:24 triviaScopes.ts
+-rw-r--r--  1 stephenashby  staff    263 Feb 20 09:19 triviaSessionCode.ts
+-rw-r--r--@ 1 stephenashby  staff   8213 Apr 13 21:39 triviaSources.ts
+-rw-r--r--@ 1 stephenashby  staff    360 Mar 26 11:47 uploadEventImage.ts
+-rw-r--r--@ 1 stephenashby  staff    356 Mar 26 11:47 uploadVenueLogo.ts
+-rw-r--r--  1 stephenashby  staff  25607 Mar  6 15:37 vinylPlaylistImport.ts
+-rw-r--r--  1 stephenashby  staff   4807 Feb 17 12:06 wikimediaAuth.ts
+-rw-r--r--@ 1 stephenashby  staff  12778 Apr 13 18:29 wrongLyricChallengeDb.ts
+-rw-r--r--  1 stephenashby  staff   2080 Mar  1 09:10 wrongLyricChallengeEngine.ts
+-rw-r--r--  1 stephenashby  staff    267 Feb 20 16:29 wrongLyricChallengeSessionCode.ts
+{
+  "compilerOptions": {
+  }
+}
+
+> deadwaxdialogues@0.1.0 build
+> next build --webpack
+
+▲ Next.js 16.2.3 (webpack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 9.0s
+  Running TypeScript ...
+Failed to type check.
+
+./src/app/api/enrich-sources/genius/route.ts:545:19
+Type error: Argument of type 'Record<string, unknown>' is not assignable to parameter of type 'RejectExcessProperties<{ id?: number; work_id?: number; title?: string; duration_seconds?: number; isrc?: string; bpm?: number; musical_key?: string; energy?: number; danceability?: number; valence?: number; lyrics?: string; lyrics_url?: string; ... 5 more ...; created_at?: string; }, Record<...>>'.
+  Type 'Record<string, unknown>' is not assignable to type '{ [x: string]: never; }'.
+    'string' index signatures are incompatible.
+      Type 'unknown' is not assignable to type 'never'.
+
+  [90m543 |[0m         [36mconst[0m { error: updateError } = [36mawait[0m supabase
+  [90m544 |[0m           .[36mfrom[0m([32m'recordings'[0m)
+[31m[1m>[0m [90m545 |[0m           .update(updatePayload)
+  [90m    |[0m                   [31m[1m^[0m
+  [90m546 |[0m           .eq([32m'id'[0m, track.recording_id [36mas[0m number);
+  [90m547 |[0m
+  [90m548 |[0m         [36mif[0m (updateError) {
+Next.js build worker exited with code: 1 and signal: null
