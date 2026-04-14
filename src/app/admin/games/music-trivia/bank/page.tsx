@@ -675,6 +675,7 @@ export default function MusicTriviaBankPage() {
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
               <Link href="/admin/games/music-trivia" className="rounded border border-stone-700 px-3 py-1">Setup</Link>
+              <Link href="/admin/games/music-trivia/imports" className="rounded border border-stone-700 px-3 py-1">Imports Queue</Link>
               <Link href="/admin/games/music-trivia/decks" className="rounded border border-stone-700 px-3 py-1">Deck Builder</Link>
               <button className="rounded border border-emerald-700 px-3 py-1" onClick={resetForNew}>New Question</button>
             </div>

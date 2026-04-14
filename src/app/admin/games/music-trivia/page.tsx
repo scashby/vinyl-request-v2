@@ -226,6 +226,7 @@ export default function MusicTriviaSetupPage() {
           <p className="mt-2 text-sm text-stone-300">Create questions in Question Bank, build decks in Deck Builder, then start a game from a chosen deck.</p>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
             <Link href="/admin/games/music-trivia/bank" className="rounded border border-stone-700 px-3 py-1">Question Bank</Link>
+            <Link href="/admin/games/music-trivia/imports" className="rounded border border-stone-700 px-3 py-1">Imports Queue</Link>
             <Link href="/admin/games/music-trivia/generate" className="rounded border border-stone-700 px-3 py-1">Generate from Collection</Link>
             <Link href="/admin/games/music-trivia/decks" className="rounded border border-stone-700 px-3 py-1">Deck Builder</Link>
             <Link href="/admin/games/music-trivia/history" className="rounded border border-stone-700 px-3 py-1">History</Link>
