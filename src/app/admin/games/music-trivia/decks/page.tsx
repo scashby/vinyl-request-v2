@@ -11,12 +11,17 @@ type DeckListRow = {
   title: string;
   status: DeckStatus;
   playlist_id?: number | null;
+  crate_id?: number | null;
   item_total: number;
   item_locked_total: number;
   updated_at: string;
 };
 
 type PlaylistOption = {
+  id: number;
+  name: string;
+};
+type CrateOption = {
   id: number;
   name: string;
 };
@@ -42,6 +47,7 @@ type DeckDetail = {
   title: string;
   status: DeckStatus;
   playlist_id: number | null;
+  crate_id?: number | null;
   cooldown_days: number;
   rules_payload: Record<string, unknown>;
   locked_at: string | null;
@@ -108,9 +114,11 @@ export default function MusicTriviaDecksPage() {
 
   const [newDeckTitle, setNewDeckTitle] = useState("Trivia Deck");
   const [newDeckPlaylistId, setNewDeckPlaylistId] = useState("");
+  const [newDeckCrateId, setNewDeckCrateId] = useState("");
   const [questionSearch, setQuestionSearch] = useState("");
   const [questionResults, setQuestionResults] = useState<QuestionPick[]>([]);
   const [playlistOptions, setPlaylistOptions] = useState<PlaylistOption[]>([]);
+  const [crateOptions, setCrateOptions] = useState<CrateOption[]>([]);
 
   const [busy, setBusy] = useState(false);
 
@@ -140,13 +148,23 @@ export default function MusicTriviaDecksPage() {
       : []);
   }, []);
 
+  const loadCrates = useCallback(async () => {
+    const res = await fetch("/api/games/trivia/crates");
+    if (!res.ok) return;
+    const payload = await res.json().catch(() => ({}));
+    setCrateOptions(Array.isArray(payload.data)
+      ? payload.data.map((row: { id: number; name: string }) => ({ id: Number(row.id), name: row.name }))
+      : []);
+  }, []);
+
   useEffect(() => {
     loadDecks();
   }, [loadDecks]);
 
   useEffect(() => {
     loadPlaylists();
-  }, [loadPlaylists]);
+    loadCrates();
+  }, [loadPlaylists, loadCrates]);
 
   const requiredMain = config.round_count * config.questions_per_round;
   const requiredTotal = requiredMain + config.tie_breaker_count;
@@ -221,6 +239,7 @@ export default function MusicTriviaDecksPage() {
         body: JSON.stringify({
           title: newDeckTitle.trim() || "Trivia Deck",
           playlist_id: newDeckPlaylistId ? Number(newDeckPlaylistId) : null,
+          crate_id: newDeckCrateId ? Number(newDeckCrateId) : null,
           build_mode: "hybrid",
           cooldown_days: config.cooldown_days,
           rules_payload: {
@@ -241,7 +260,7 @@ export default function MusicTriviaDecksPage() {
 
       await loadDecks();
       if (Number.isFinite(Number(payload.id))) {
-        await loadDeck(Number(payload.id));
+        await load(Number(payload.id));
       }
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to create deck");
@@ -261,6 +280,7 @@ export default function MusicTriviaDecksPage() {
         body: JSON.stringify({
           title: selectedDeck.title,
           playlist_id: selectedDeck.playlist_id,
+          crate_id: selectedDeck.crate_id ?? null,
           cooldown_days: config.cooldown_days,
           rules_payload: {
             round_count: config.round_count,
@@ -449,6 +469,14 @@ export default function MusicTriviaDecksPage() {
                   ))}
                 </select>
               </label>
+              <label className="block">Crate Target
+                <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={newDeckCrateId} onChange={(e) => setNewDeckCrateId(e.target.value)}>
+                  <option value="">Any crate</option>
+                  {crateOptions.map((crate) => (
+                    <option key={crate.id} value={crate.id}>{crate.name}</option>
+                  ))}
+                </select>
+              </label>
               <button className="rounded border border-amber-700 px-3 py-1" disabled={busy} onClick={createDeck}>{busy ? "Working..." : "Create Deck"}</button>
             </div>
 
@@ -499,6 +527,14 @@ export default function MusicTriviaDecksPage() {
                       <option value="">Any playlist</option>
                       {playlistOptions.map((playlist) => (
                         <option key={playlist.id} value={playlist.id}>{playlist.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>Crate Target
+                    <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={selectedDeck.crate_id ?? ""} onChange={(e) => setSelectedDeck((current) => current ? { ...current, crate_id: e.target.value ? Number(e.target.value) : null } : current)}>
+                      <option value="">Any crate</option>
+                      {crateOptions.map((crate) => (
+                        <option key={crate.id} value={crate.id}>{crate.name}</option>
                       ))}
                     </select>
                   </label>

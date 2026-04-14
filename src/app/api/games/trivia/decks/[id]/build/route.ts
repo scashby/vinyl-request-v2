@@ -32,6 +32,7 @@ type DeckRow = {
   deck_code: string;
   status: "draft" | "ready" | "archived";
   playlist_id: number | null;
+  crate_id?: number | null;
   build_mode: "manual" | "hybrid" | "rule";
   cooldown_days: number;
   rules_payload: JsonValue;
@@ -195,7 +196,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const db = getTriviaDb();
   const { data: rawDeck, error: deckError } = await db
     .from("trivia_decks")
-    .select("id, deck_code, status, playlist_id, build_mode, cooldown_days, rules_payload")
+    .select("id, deck_code, status, playlist_id, crate_id, build_mode, cooldown_days, rules_payload")
     .eq("id", deckId)
     .maybeSingle();
   if (deckError) return NextResponse.json({ error: deckError.message }, { status: 500 });
@@ -268,6 +269,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     ? explicitPlaylistIds
     : (Number.isFinite(Number(deck.playlist_id)) && Number(deck.playlist_id) > 0 ? [Number(deck.playlist_id)] : []);
 
+  // Crate targeting
+  const explicitCrateIds = asNumberList(filters.crate_ids);
+  const effectiveCrateIds = explicitCrateIds.length > 0
+    ? explicitCrateIds
+    : (Number.isFinite(Number(deck.crate_id)) && Number(deck.crate_id) > 0 ? [Number(deck.crate_id)] : []);
+
   const manualQuestionIds = asNumberList(body.manual_question_ids ?? mergedRules.manual_question_ids);
 
   let constrainedIds: Set<number> | null = null;
@@ -328,6 +335,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   let pool = (questionRows ?? []) as QuestionCandidate[];
 
+  // Playlist scope filtering
   if (effectivePlaylistIds.length > 0 && pool.length > 0) {
     const { data: playlistScopeRows, error: playlistScopeError } = await db
       .from("trivia_question_scopes")
@@ -351,6 +359,33 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const scopedIds = playlistScopeMap.get(candidate.id);
       if (!scopedIds || scopedIds.size === 0) return true;
       return effectivePlaylistIds.some((playlistId) => scopedIds.has(playlistId));
+    });
+  }
+
+  // Crate scope filtering
+  if (effectiveCrateIds.length > 0 && pool.length > 0) {
+    const { data: crateScopeRows, error: crateScopeError } = await db
+      .from("trivia_question_scopes")
+      .select("question_id, scope_ref_id")
+      .eq("scope_type", "crate")
+      .in("question_id", pool.map((candidate) => candidate.id));
+
+    if (crateScopeError) return NextResponse.json({ error: crateScopeError.message }, { status: 500 });
+
+    const crateScopeMap = new Map<number, Set<number>>();
+    for (const row of crateScopeRows ?? []) {
+      const questionId = Number(row.question_id);
+      const crateId = Number(row.scope_ref_id);
+      if (!Number.isFinite(questionId) || questionId <= 0 || !Number.isFinite(crateId) || crateId <= 0) continue;
+      const scopedIds = crateScopeMap.get(questionId) ?? new Set<number>();
+      scopedIds.add(crateId);
+      crateScopeMap.set(questionId, scopedIds);
+    }
+
+    pool = pool.filter((candidate) => {
+      const scopedIds = crateScopeMap.get(candidate.id);
+      if (!scopedIds || scopedIds.size === 0) return true;
+      return effectiveCrateIds.some((crateId) => scopedIds.has(crateId));
     });
   }
 
