@@ -3,7 +3,7 @@
 'use client'
 
 import React, { useEffect, useState } from "react"
-import SocialEmbeds from "components/SocialEmbeds"
+import SocialEmbeds from "../../components/SocialEmbeds"
 
 interface MostWantedItem {
   id: number;

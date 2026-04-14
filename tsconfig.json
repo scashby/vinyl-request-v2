@@ -1,5 +1,8 @@
 {
   "compilerOptions": {
+          "types": ["react", "react-dom"],
+        "typeRoots": ["./node_modules/@types"],
+      "allowImportingTsExtensions": true,
     "target": "ES2017",
     "lib": [
       "dom",
@@ -14,12 +17,12 @@
     "incremental": true,
     "module": "esnext",
     "esModuleInterop": true,
-    "moduleResolution": "nodeNext",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
-    "ignoreDeprecations": "6.0",
+    
     "paths": {
       "@/*": [
         "./src/*"

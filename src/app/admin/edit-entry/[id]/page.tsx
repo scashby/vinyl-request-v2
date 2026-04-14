@@ -918,23 +918,23 @@ export default function EditEntryPage() {
     setSaving(true);
     setStatus('Saving...');
     
-    const inventoryUpdate: Record<string, unknown> = {
+    const inventoryUpdate = {
       location: entry.location || null,
       media_condition: entry.media_condition || null,
       status: 'active',
       current_value: forSale && salePrice ? parseFloat(salePrice) : null,
-      personal_notes: forSale && saleNotes ? saleNotes : entry.personal_notes || null,
-      purchase_price: entry.wholesale_cost || null,
+      personal_notes: forSale && saleNotes ? String(saleNotes) : (typeof entry.personal_notes === 'string' ? entry.personal_notes : null),
+      purchase_price: entry.wholesale_cost !== undefined && entry.wholesale_cost !== null && entry.wholesale_cost !== '' ? Number(entry.wholesale_cost) : null,
     };
 
-    const releaseUpdate: Record<string, unknown> = {
+    const releaseUpdate = {
       discogs_release_id: entry.discogs_release_id || null,
       spotify_album_id: entry.spotify_id || null,
       release_year: entry.year ? parseInt(entry.year, 10) : null,
       release_date: entry.master_release_date || null,
     };
 
-    const masterUpdate: Record<string, unknown> = {
+    const masterUpdate = {
       title: entry.title || 'Untitled',
       cover_image_url: entry.image_url || null,
       genres: entry.discogs_genres || null,
@@ -947,7 +947,7 @@ export default function EditEntryPage() {
       if (entry.artist_id && entry.artist) {
         await supabase
           .from('artists')
-          .update({ name: entry.artist } as Record<string, unknown>)
+          .update({ name: entry.artist })
           .eq('id', entry.artist_id);
       }
 
