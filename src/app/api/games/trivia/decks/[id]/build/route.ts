@@ -31,6 +31,7 @@ type DeckRow = {
   id: number;
   deck_code: string;
   status: "draft" | "ready" | "archived";
+  playlist_id: number | null;
   build_mode: "manual" | "hybrid" | "rule";
   cooldown_days: number;
   rules_payload: JsonValue;
@@ -194,7 +195,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const db = getTriviaDb();
   const { data: rawDeck, error: deckError } = await db
     .from("trivia_decks")
-    .select("id, deck_code, status, build_mode, cooldown_days, rules_payload")
+    .select("id, deck_code, status, playlist_id, build_mode, cooldown_days, rules_payload")
     .eq("id", deckId)
     .maybeSingle();
   if (deckError) return NextResponse.json({ error: deckError.message }, { status: 500 });
@@ -260,8 +261,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const facetDecade = asStringList(filters.decades);
   const facetRegion = asStringList(filters.regions);
   const facetLanguage = asStringList(filters.languages);
+  const explicitPlaylistIds = asNumberList(filters.playlist_ids);
   const hasMedia = typeof filters.has_media === "boolean" ? filters.has_media : null;
   const hasRequiredCue = typeof filters.has_required_cue === "boolean" ? filters.has_required_cue : true;
+  const effectivePlaylistIds = explicitPlaylistIds.length > 0
+    ? explicitPlaylistIds
+    : (Number.isFinite(Number(deck.playlist_id)) && Number(deck.playlist_id) > 0 ? [Number(deck.playlist_id)] : []);
 
   const manualQuestionIds = asNumberList(body.manual_question_ids ?? mergedRules.manual_question_ids);
 
@@ -321,7 +326,33 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { data: questionRows, error: questionError } = await questionQuery;
   if (questionError) return NextResponse.json({ error: questionError.message }, { status: 500 });
 
-  const pool = (questionRows ?? []) as QuestionCandidate[];
+  let pool = (questionRows ?? []) as QuestionCandidate[];
+
+  if (effectivePlaylistIds.length > 0 && pool.length > 0) {
+    const { data: playlistScopeRows, error: playlistScopeError } = await db
+      .from("trivia_question_scopes")
+      .select("question_id, scope_ref_id")
+      .eq("scope_type", "playlist")
+      .in("question_id", pool.map((candidate) => candidate.id));
+
+    if (playlistScopeError) return NextResponse.json({ error: playlistScopeError.message }, { status: 500 });
+
+    const playlistScopeMap = new Map<number, Set<number>>();
+    for (const row of playlistScopeRows ?? []) {
+      const questionId = Number(row.question_id);
+      const playlistId = Number(row.scope_ref_id);
+      if (!Number.isFinite(questionId) || questionId <= 0 || !Number.isFinite(playlistId) || playlistId <= 0) continue;
+      const scopedIds = playlistScopeMap.get(questionId) ?? new Set<number>();
+      scopedIds.add(playlistId);
+      playlistScopeMap.set(questionId, scopedIds);
+    }
+
+    pool = pool.filter((candidate) => {
+      const scopedIds = playlistScopeMap.get(candidate.id);
+      if (!scopedIds || scopedIds.size === 0) return true;
+      return effectivePlaylistIds.some((playlistId) => scopedIds.has(playlistId));
+    });
+  }
 
   const { data: existingRows, error: existingError } = await db
     .from("trivia_deck_items")
@@ -548,6 +579,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         shortfall_total: Math.max(0, totalTarget - rows.length),
         include_cooled_down: includeCooledDown,
         cooldown_days: cooldownDays,
+        playlist_scope_ids: effectivePlaylistIds,
       },
     },
     { status: 200 }
