@@ -27,6 +27,7 @@ type SourceRecordRow = {
   verification_status: string;
   verification_notes: string | null;
   created_at: string;
+  draft_question_code?: string | null;
 };
 
 type RunFormState = {
@@ -73,6 +74,8 @@ export default function MusicTriviaImportsPage() {
   const [loadingSources, setLoadingSources] = useState(false);
   const [creatingRun, setCreatingRun] = useState(false);
   const [creatingSource, setCreatingSource] = useState(false);
+  const [savingRecordId, setSavingRecordId] = useState<number | null>(null);
+  const [convertingRecordId, setConvertingRecordId] = useState<number | null>(null);
 
   const selectedRun = useMemo(
     () => runs.find((run) => run.id === selectedRunId) ?? null,
@@ -165,6 +168,45 @@ export default function MusicTriviaImportsPage() {
       alert(error instanceof Error ? error.message : "Failed to create source record");
     } finally {
       setCreatingSource(false);
+    }
+  };
+
+  const updateSourceRecord = async (record: SourceRecordRow, patch: Record<string, unknown>) => {
+    setSavingRecordId(record.id);
+    try {
+      const res = await fetch(`/api/games/trivia/source-records/${record.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error ?? "Failed to update source record");
+      await loadSources(selectedRunId);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to update source record");
+    } finally {
+      setSavingRecordId(null);
+    }
+  };
+
+  const convertToDraftQuestion = async (record: SourceRecordRow) => {
+    setConvertingRecordId(record.id);
+    try {
+      const res = await fetch(`/api/games/trivia/source-records/${record.id}/convert`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ created_by: "admin" }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error ?? "Failed to convert source record");
+
+      const questionCode = payload.data?.question_code ? String(payload.data.question_code) : "new draft";
+      alert(`Created draft question ${questionCode}. Open Question Bank to refine it.`);
+      window.open("/admin/games/music-trivia/bank", "_blank", "noopener,noreferrer");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to convert source record");
+    } finally {
+      setConvertingRecordId(null);
     }
   };
 
@@ -301,6 +343,40 @@ export default function MusicTriviaImportsPage() {
                     {record.claim_text ? <p className="mt-2 text-stone-200">Claim: {record.claim_text}</p> : null}
                     {record.excerpt_text ? <p className="mt-1 whitespace-pre-wrap text-stone-300">{record.excerpt_text}</p> : null}
                     {record.verification_notes ? <p className="mt-1 text-amber-200">Notes: {record.verification_notes}</p> : null}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        className="rounded border border-emerald-700 px-2 py-1"
+                        disabled={savingRecordId === record.id}
+                        onClick={() => void updateSourceRecord(record, { verification_status: "approved" })}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        className="rounded border border-rose-700 px-2 py-1"
+                        disabled={savingRecordId === record.id}
+                        onClick={() => void updateSourceRecord(record, { verification_status: "rejected" })}
+                      >
+                        Reject
+                      </button>
+                      <button
+                        className="rounded border border-stone-700 px-2 py-1"
+                        disabled={savingRecordId === record.id}
+                        onClick={() => {
+                          const nextNotes = window.prompt("Update verification notes", record.verification_notes ?? "");
+                          if (nextNotes === null) return;
+                          void updateSourceRecord(record, { verification_notes: nextNotes });
+                        }}
+                      >
+                        Edit Notes
+                      </button>
+                      <button
+                        className="rounded border border-cyan-700 px-2 py-1"
+                        disabled={convertingRecordId === record.id}
+                        onClick={() => void convertToDraftQuestion(record)}
+                      >
+                        {convertingRecordId === record.id ? "Converting..." : "Convert To Draft"}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
