@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTriviaDb } from "src/lib/triviaDb";
 import { TRIVIA_BANK_ENABLED, asString, normalizeQuestionWriteInput } from "src/lib/triviaBankApi";
 import { hasRequiredCueSource } from "src/lib/triviaBank";
+import { loadQuestionScopes, replaceQuestionScopes } from "src/lib/triviaScopes";
 import { loadQuestionSources, replaceQuestionSources } from "src/lib/triviaSources";
 
 export const runtime = "nodejs";
@@ -36,7 +37,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   if (!questionId) return NextResponse.json({ error: "Invalid question id" }, { status: 400 });
 
   const db = getTriviaDb();
-  const [{ data: question, error: questionError }, { data: facets }, { data: tags }, { data: assets }, sources] = await Promise.all([
+  const [{ data: question, error: questionError }, { data: facets }, { data: tags }, { data: assets }, sources, scopes] = await Promise.all([
     db
       .from("trivia_questions")
       .select("id, question_code, status, question_type, prompt_text, answer_key, accepted_answers, answer_payload, options_payload, reveal_payload, display_element_type, explanation_text, default_category, default_difficulty, source_note, is_tiebreaker_eligible, cue_source_type, cue_source_payload, primary_cue_start_seconds, primary_cue_end_seconds, primary_cue_instruction, cue_notes_text, cue_payload, created_by, updated_by, created_at, updated_at, published_at, archived_at")
@@ -58,6 +59,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       .eq("question_id", questionId)
       .order("sort_order", { ascending: true }),
     loadQuestionSources(questionId),
+    loadQuestionScopes(questionId),
   ]);
 
   if (questionError) return NextResponse.json({ error: questionError.message }, { status: 500 });
@@ -70,6 +72,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       tags: (tags ?? []).map((row) => row.tag),
       assets: assets ?? [],
       sources,
+      scopes,
     },
     { status: 200 }
   );
@@ -206,7 +209,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
   }
 
-  if (Object.keys(patch).length === 0 && !touchesFacets && !touchesCueRuleFields && !Object.prototype.hasOwnProperty.call(body, "tags") && !Object.prototype.hasOwnProperty.call(body, "sources")) {
+  if (Object.prototype.hasOwnProperty.call(body, "scopes")) {
+    try {
+      await replaceQuestionScopes(questionId, body.scopes, userLabel);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update question scopes";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+  }
+
+  if (Object.keys(patch).length === 0 && !touchesFacets && !touchesCueRuleFields && !Object.prototype.hasOwnProperty.call(body, "tags") && !Object.prototype.hasOwnProperty.call(body, "sources") && !Object.prototype.hasOwnProperty.call(body, "scopes")) {
     return NextResponse.json({ error: "No valid fields provided" }, { status: 400 });
   }
 

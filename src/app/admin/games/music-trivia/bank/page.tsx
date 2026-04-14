@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatSecondsClock, parseCueTimeToSeconds } from "src/lib/triviaBank";
 
@@ -53,6 +54,18 @@ type TriviaQuestionSource = {
   source_claim_text?: string | null;
   verification_status?: string;
 };
+type TriviaQuestionScope = {
+  id?: number;
+  scope_type?: "playlist" | "crate" | "format" | "artist" | "album" | "track";
+  scope_ref_id?: number | null;
+  scope_value?: string | null;
+  display_label?: string | null;
+};
+
+type ScopeOption = {
+  id: number;
+  name: string;
+};
 
 type QuestionListRow = {
   id: number;
@@ -87,6 +100,7 @@ type QuestionDetail = {
   cue_notes_text: string | null;
   assets: TriviaQuestionAsset[];
   sources?: TriviaQuestionSource[];
+  scopes?: TriviaQuestionScope[];
 };
 
 const STATUS_TABS: Array<{ value: "" | QuestionStatus; label: string }> = [
@@ -116,6 +130,7 @@ type FormState = {
   selected_track: InventoryTrackResult | null;
   selected_clip_asset_id: number | null;
   sources: TriviaQuestionSource[];
+  scopes: TriviaQuestionScope[];
 };
 const DEFAULT_SOURCE: TriviaQuestionSource = {
   source_kind: "editorial",
@@ -146,6 +161,7 @@ const DEFAULT_FORM: FormState = {
   selected_track: null,
   selected_clip_asset_id: null,
   sources: [],
+  scopes: [],
 };
 
 const DIFFICULTY_OPTIONS: Difficulty[] = ["easy", "medium", "hard"];
@@ -243,10 +259,20 @@ function mapDetailToForm(detail: QuestionDetail): FormState {
           source_kind: source.source_kind ?? "editorial",
         }))
       : [],
+    scopes: Array.isArray(detail.scopes)
+      ? detail.scopes.map((scope) => ({
+          id: scope.id,
+          scope_type: scope.scope_type,
+          scope_ref_id: scope.scope_ref_id ?? null,
+          scope_value: scope.scope_value ?? "",
+          display_label: scope.display_label ?? scope.scope_value ?? "",
+        }))
+      : [],
   };
 }
 
 export default function MusicTriviaBankPage() {
+  const searchParams = useSearchParams();
   const [rows, setRows] = useState<QuestionListRow[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedDetail, setSelectedDetail] = useState<QuestionDetail | null>(null);
@@ -259,6 +285,8 @@ export default function MusicTriviaBankPage() {
 
   const [taxonomyCategories, setTaxonomyCategories] = useState<string[]>(["General Music"]);
   const [taxonomyTags, setTaxonomyTags] = useState<string[]>([]);
+  const [playlistOptions, setPlaylistOptions] = useState<ScopeOption[]>([]);
+  const [crateOptions, setCrateOptions] = useState<ScopeOption[]>([]);
 
   const [inventoryQuery, setInventoryQuery] = useState("");
   const [inventoryLimitText, setInventoryLimitText] = useState("");
@@ -274,6 +302,27 @@ export default function MusicTriviaBankPage() {
 
   const setFormField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const updateScope = (index: number, patch: Partial<TriviaQuestionScope>) => {
+    setForm((current) => ({
+      ...current,
+      scopes: current.scopes.map((scope, scopeIndex) => scopeIndex === index ? { ...scope, ...patch } : scope),
+    }));
+  };
+
+  const removeScope = (index: number) => {
+    setForm((current) => ({
+      ...current,
+      scopes: current.scopes.filter((_, scopeIndex) => scopeIndex !== index),
+    }));
+  };
+
+  const addScope = (scope: TriviaQuestionScope) => {
+    setForm((current) => ({
+      ...current,
+      scopes: [...current.scopes, scope],
+    }));
   };
   const setSourceField = (index: number, key: keyof TriviaQuestionSource, value: string | boolean) => {
     setForm((current) => ({
@@ -342,13 +391,32 @@ export default function MusicTriviaBankPage() {
 
   const loadTaxonomy = useCallback(async () => {
     try {
-      const res = await fetch("/api/games/trivia/questions/options");
-      if (!res.ok) return;
-      const payload = (await res.json()) as TaxonomyPayload;
+      const [optionsRes, playlistsRes, cratesRes] = await Promise.all([
+        fetch("/api/games/trivia/questions/options"),
+        fetch("/api/games/playlists"),
+        fetch("/api/games/trivia/crates"),
+      ]);
+
+      if (!optionsRes.ok) return;
+      const payload = (await optionsRes.json()) as TaxonomyPayload;
       const categories = Array.isArray(payload.categories) ? payload.categories.filter(Boolean) : [];
       const tags = Array.isArray(payload.tags) ? payload.tags.filter(Boolean) : [];
       if (categories.length > 0) setTaxonomyCategories(Array.from(new Set(["General Music", ...categories])));
       if (tags.length > 0) setTaxonomyTags(Array.from(new Set(tags)));
+
+      if (playlistsRes.ok) {
+        const playlistsPayload = await playlistsRes.json().catch(() => ({}));
+        setPlaylistOptions(Array.isArray(playlistsPayload.data)
+          ? playlistsPayload.data.map((row: { id: number; name: string }) => ({ id: Number(row.id), name: row.name }))
+          : []);
+      }
+
+      if (cratesRes.ok) {
+        const cratesPayload = await cratesRes.json().catch(() => ({}));
+        setCrateOptions(Array.isArray(cratesPayload.data)
+          ? cratesPayload.data.map((row: { id: number; name: string }) => ({ id: Number(row.id), name: row.name }))
+          : []);
+      }
     } catch {
       // No-op; bank still works with defaults.
     }
@@ -399,6 +467,14 @@ export default function MusicTriviaBankPage() {
   useEffect(() => {
     void loadTaxonomy();
   }, [loadTaxonomy]);
+
+  useEffect(() => {
+    const raw = searchParams.get("questionId");
+    if (!raw) return;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0) return;
+    void loadDetail(parsed);
+  }, [loadDetail, searchParams]);
 
   const resetForNew = () => {
     setSelectedId(null);
@@ -516,6 +592,7 @@ export default function MusicTriviaBankPage() {
             ? `Bank cue source: ${formatTrackLabel(selectedTrack)}`
             : `Bank cue source: uploaded clip ${selectedClip?.object_path ?? ""}`,
           sources: form.sources,
+          scopes: form.scopes,
           publish,
         }),
       });
@@ -830,6 +907,109 @@ export default function MusicTriviaBankPage() {
                 </div>
               </div>
             </div>
+
+            <section className="mt-4 rounded border border-emerald-900/60 bg-emerald-950/20 p-3 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="font-semibold text-emerald-200">Question Scopes</p>
+                  <p className="text-[11px] text-emerald-100/70">Attach reusable matching scopes so questions can later be targeted by playlist, crate, artist, album, format, or specific cue track.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button className="rounded border border-emerald-700 px-2 py-1" onClick={() => addScope({ scope_type: "playlist", scope_ref_id: null, scope_value: "", display_label: "" })}>+ Playlist</button>
+                  <button className="rounded border border-emerald-700 px-2 py-1" onClick={() => addScope({ scope_type: "crate", scope_ref_id: null, scope_value: "", display_label: "" })}>+ Crate</button>
+                  <button className="rounded border border-emerald-700 px-2 py-1" onClick={() => addScope({ scope_type: "artist", scope_ref_id: null, scope_value: form.selected_track?.artist ?? "", display_label: form.selected_track?.artist ?? "" })}>+ Artist</button>
+                  <button className="rounded border border-emerald-700 px-2 py-1" onClick={() => addScope({ scope_type: "album", scope_ref_id: null, scope_value: form.selected_track?.album ?? "", display_label: form.selected_track?.album ?? "" })}>+ Album</button>
+                  <button className="rounded border border-emerald-700 px-2 py-1" onClick={() => addScope({ scope_type: "format", scope_ref_id: null, scope_value: "", display_label: "" })}>+ Format</button>
+                  <button className="rounded border border-emerald-700 px-2 py-1" onClick={() => {
+                    if (!form.selected_track) {
+                      alert("Pick a cue track first, then add a track scope.");
+                      return;
+                    }
+                    addScope({
+                      scope_type: "track",
+                      scope_ref_id: form.selected_track.inventory_id,
+                      scope_value: form.selected_track.track_key ?? String(form.selected_track.inventory_id),
+                      display_label: formatTrackLabel(form.selected_track),
+                    });
+                  }}>+ Cue Track</button>
+                </div>
+              </div>
+
+              {form.scopes.length === 0 ? <p className="mt-2 text-stone-400">No scopes attached yet.</p> : null}
+
+              <div className="mt-3 space-y-2">
+                {form.scopes.map((scope, index) => (
+                  <div key={`${scope.scope_type ?? "scope"}-${scope.id ?? index}-${index}`} className="rounded border border-stone-800 bg-stone-950/50 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-semibold text-stone-100">{scope.scope_type?.toUpperCase() ?? "SCOPE"}</p>
+                      <button className="rounded border border-stone-700 px-2 py-0.5" onClick={() => removeScope(index)}>Remove</button>
+                    </div>
+
+                    {scope.scope_type === "playlist" ? (
+                      <label className="mt-2 block">Playlist
+                        <select
+                          className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                          value={scope.scope_ref_id ?? ""}
+                          onChange={(e) => {
+                            const selected = playlistOptions.find((option) => option.id === Number(e.target.value));
+                            updateScope(index, {
+                              scope_ref_id: e.target.value ? Number(e.target.value) : null,
+                              scope_value: selected?.name ?? "",
+                              display_label: selected?.name ?? "",
+                            });
+                          }}
+                        >
+                          <option value="">Choose playlist</option>
+                          {playlistOptions.map((option) => (
+                            <option key={option.id} value={option.id}>{option.name}</option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+
+                    {scope.scope_type === "crate" ? (
+                      <label className="mt-2 block">Crate
+                        <select
+                          className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                          value={scope.scope_ref_id ?? ""}
+                          onChange={(e) => {
+                            const selected = crateOptions.find((option) => option.id === Number(e.target.value));
+                            updateScope(index, {
+                              scope_ref_id: e.target.value ? Number(e.target.value) : null,
+                              scope_value: selected?.name ?? "",
+                              display_label: selected?.name ?? "",
+                            });
+                          }}
+                        >
+                          <option value="">Choose crate</option>
+                          {crateOptions.map((option) => (
+                            <option key={option.id} value={option.id}>{option.name}</option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+
+                    {(scope.scope_type === "artist" || scope.scope_type === "album" || scope.scope_type === "format") ? (
+                      <label className="mt-2 block">Value
+                        <input
+                          className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                          value={scope.scope_value ?? ""}
+                          onChange={(e) => updateScope(index, { scope_value: e.target.value, display_label: e.target.value })}
+                          placeholder={`Enter ${scope.scope_type}`}
+                        />
+                      </label>
+                    ) : null}
+
+                    {scope.scope_type === "track" ? (
+                      <div className="mt-2 rounded border border-stone-800 bg-stone-950/70 p-2 text-stone-200">
+                        <p>{scope.display_label || scope.scope_value || "Track scope"}</p>
+                        <p className="mt-1 text-[11px] text-stone-400">Inventory ref: {scope.scope_ref_id ?? "-"}</p>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </section>
 
             <section className="mt-4 rounded border border-cyan-900/60 bg-cyan-950/20 p-3 text-xs">
               <p className="font-semibold text-cyan-200">Cue Source (required)</p>

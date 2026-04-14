@@ -392,6 +392,45 @@ export type TriviaDatabase = {
         };
         Relationships: [];
       };
+      trivia_question_scopes: {
+        Row: {
+          id: number;
+          question_id: number;
+          scope_type: string;
+          scope_ref_id: number | null;
+          scope_value: string | null;
+          display_label: string | null;
+          sort_order: number;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          question_id: number;
+          scope_type: string;
+          scope_ref_id?: number | null;
+          scope_value?: string | null;
+          display_label?: string | null;
+          sort_order?: number;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          question_id?: number;
+          scope_type?: string;
+          scope_ref_id?: number | null;
+          scope_value?: string | null;
+          display_label?: string | null;
+          sort_order?: number;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       trivia_decks: {
         Row: {
           id: number;

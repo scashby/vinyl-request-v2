@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTriviaDb } from "src/lib/triviaDb";
 import { generateTriviaQuestionCode } from "src/lib/triviaBank";
 import { TRIVIA_BANK_ENABLED, asString, normalizeQuestionWriteInput } from "src/lib/triviaBankApi";
+import { replaceQuestionScopes } from "src/lib/triviaScopes";
 import { replaceQuestionSources } from "src/lib/triviaSources";
 
 export const runtime = "nodejs";
@@ -39,6 +40,7 @@ type QuickCreateBody = {
   publish?: boolean;
   created_by?: string;
   sources?: unknown[];
+  scopes?: unknown[];
 };
 
 async function generateUniqueQuestionCode() {
@@ -196,6 +198,10 @@ export async function POST(request: NextRequest) {
 
     if (Array.isArray(body.sources)) {
       await replaceQuestionSources(questionId, body.sources, userLabel);
+    }
+
+    if (Array.isArray(body.scopes)) {
+      await replaceQuestionScopes(questionId, body.scopes, userLabel);
     }
 
     return NextResponse.json({

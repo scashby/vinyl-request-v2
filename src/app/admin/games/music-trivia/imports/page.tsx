@@ -200,9 +200,13 @@ export default function MusicTriviaImportsPage() {
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload.error ?? "Failed to convert source record");
 
+      const questionId = Number(payload.data?.question_id);
       const questionCode = payload.data?.question_code ? String(payload.data.question_code) : "new draft";
       alert(`Created draft question ${questionCode}. Open Question Bank to refine it.`);
-      window.open("/admin/games/music-trivia/bank", "_blank", "noopener,noreferrer");
+      const target = Number.isFinite(questionId) && questionId > 0
+        ? `/admin/games/music-trivia/bank?questionId=${questionId}`
+        : "/admin/games/music-trivia/bank";
+      window.open(target, "_blank", "noopener,noreferrer");
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to convert source record");
     } finally {

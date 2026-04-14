@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTriviaDb } from "src/lib/triviaDb";
 import { TRIVIA_BANK_ENABLED, asString, normalizeQuestionWriteInput } from "src/lib/triviaBankApi";
+import { replaceQuestionScopes } from "src/lib/triviaScopes";
 import { replaceQuestionSources } from "src/lib/triviaSources";
 
 type QuickPatchBody = {
@@ -36,6 +37,7 @@ type QuickPatchBody = {
   publish?: boolean;
   updated_by?: string;
   sources?: unknown[];
+  scopes?: unknown[];
 };
 
 export const runtime = "nodejs";
@@ -237,6 +239,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (hasOwn(bodyRecord, "sources")) {
       await replaceQuestionSources(questionId, body.sources, userLabel);
+    }
+
+    if (hasOwn(bodyRecord, "scopes")) {
+      await replaceQuestionScopes(questionId, body.scopes, userLabel);
     }
 
     return NextResponse.json({
