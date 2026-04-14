@@ -64,44 +64,16 @@ export default function AdminStaffPicksPage() {
 
   const loadStaffSubmissions = async () => {
     try {
+      // Select only flat fields from staff_picks to isolate type error
       const { data, error } = await supabase
         .from('staff_picks')
-        .select(`
-          *,
-          inventory:inventory_id (
-            id,
-            location,
-            release:releases (
-              release_year,
-              master:masters (
-                title,
-                original_release_year,
-                cover_image_url,
-                artist:artists ( name )
-              )
-            )
-          )
-        `)
+        .select('id, staff_name, staff_title, staff_photo_url, staff_bio, inventory_id, pick_order, reason, favorite_track, listening_context, is_active, created_at')
         .order('staff_name')
         .order('pick_order');
 
       if (error) throw error;
 
-      // Flatten the data structure
-      const picks = data?.map(pick => ({
-        ...pick,
-        artist: pick.inventory?.release?.master?.artist?.name,
-        title: pick.inventory?.release?.master?.title,
-        year: pick.inventory?.release?.release_year
-          ? String(pick.inventory.release.release_year)
-          : pick.inventory?.release?.master?.original_release_year
-            ? String(pick.inventory.release.master.original_release_year)
-            : null,
-        image_url: pick.inventory?.release?.master?.cover_image_url,
-        location: pick.inventory?.location ?? null
-      })) || [];
-
-      setSubmissions(picks);
+      setSubmissions(data || []);
     } catch (error) {
       console.error('Error loading staff submissions:', error);
       setStatus(`Error loading submissions: ${error instanceof Error ? error.message : 'Unknown error'}`);

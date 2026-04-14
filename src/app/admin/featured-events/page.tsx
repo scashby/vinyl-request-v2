@@ -75,9 +75,12 @@ export default function Page() {
       prev.map((ev) => (ev.id === id ? { ...ev, ...updates } : ev))
     );
 
+    // Remove id from updates to satisfy Supabase Update type
+    const { id: _id, ...updateFields } = updates;
+
     const { error } = await supabase
       .from("events")
-      .update(updates)
+      .update(updateFields)
       .eq("id", id);
 
     if (error) {

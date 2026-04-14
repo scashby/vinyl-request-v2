@@ -108,21 +108,5 @@ drwxr-xr-x  5 stephenashby  staff    160 Feb 23 00:39 library
 - Environments: .env.local
 
   Creating an optimized production build ...
-✓ Compiled successfully in 9.0s
+✓ Compiled successfully in 8.0s
   Running TypeScript ...
-Failed to type check.
-
-./src/app/api/enrich-sources/genius/route.ts:545:19
-Type error: Argument of type 'Record<string, unknown>' is not assignable to parameter of type 'RejectExcessProperties<{ id?: number; work_id?: number; title?: string; duration_seconds?: number; isrc?: string; bpm?: number; musical_key?: string; energy?: number; danceability?: number; valence?: number; lyrics?: string; lyrics_url?: string; ... 5 more ...; created_at?: string; }, Record<...>>'.
-  Type 'Record<string, unknown>' is not assignable to type '{ [x: string]: never; }'.
-    'string' index signatures are incompatible.
-      Type 'unknown' is not assignable to type 'never'.
-
-  [90m543 |[0m         [36mconst[0m { error: updateError } = [36mawait[0m supabase
-  [90m544 |[0m           .[36mfrom[0m([32m'recordings'[0m)
-[31m[1m>[0m [90m545 |[0m           .update(updatePayload)
-  [90m    |[0m                   [31m[1m^[0m
-  [90m546 |[0m           .eq([32m'id'[0m, track.recording_id [36mas[0m number);
-  [90m547 |[0m
-  [90m548 |[0m         [36mif[0m (updateError) {
-Next.js build worker exited with code: 1 and signal: null
