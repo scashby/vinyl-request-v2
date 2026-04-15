@@ -147,7 +147,9 @@ function BrowseAlbumsContent() {
           .single();
         if (!error && data && isMounted) {
           const formats = (data.allowed_formats || []).filter(Boolean);
-          const tags = (data.allowed_tags || []).filter(Boolean);
+          const tags = (data.allowed_tags || [])
+            .filter(Boolean)
+            .filter((tag: string) => !tag.startsWith('event_type:') && !tag.startsWith('event_subtype:'));
           setAllowedFormats(formats.length > 0 ? formats : null);
           setAllowedTags(tags.length > 0 ? tags : null);
           setEventTitle(data.title || '');

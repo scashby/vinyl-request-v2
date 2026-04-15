@@ -353,6 +353,19 @@ export default function BingoHostPage() {
       autoCallLockRef.current = false;
       await fetch(`/api/games/bingo/sessions/${sessionId}/pause`, { method: "POST" });
     }
+    // When a winner is declared, pre-load the next round so that clicking
+    // "Start Round" afterwards advances to it rather than re-running this one.
+    if (overlay === "winner" && session && session.current_round < session.round_count) {
+      await fetch(`/api/games/bingo/sessions/${sessionId}/activate-round`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          round: session.current_round + 1,
+          intermission_seconds: 0,
+          keep_overlay: true,
+        }),
+      });
+    }
     await patchSession({ bingo_overlay: overlay });
     setSavingOverlay(false);
   };

@@ -59,9 +59,9 @@ export default function DialoguesPage() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
 
   useEffect(() => {
-    fetch("/api/playlists")
+    fetch("/api/social-embeds")
       .then(res => res.json())
-      .then((data: Playlist[]) => setPlaylists(data));
+      .then((data: Playlist[]) => setPlaylists((data ?? []).filter(p => p.visible)));
   }, []);
   
   useEffect(() => {
