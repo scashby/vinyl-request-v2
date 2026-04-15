@@ -32,7 +32,7 @@ type TriviaFact = {
   trivia_source_records?: { source_url?: string | null; source_title?: string | null; source_domain?: string | null } | null;
 };
 
-type FetchResult = { run_id: number; facts_fetched: number; entities_processed: number; skipped_duplicates: number };
+type FetchResult = { run_id: number; facts_fetched: number; entities_processed: number; skipped_duplicates: number; api_errors?: string[] };
 type GenerateResult = { generated_count: number; facts_processed: number; question_ids: number[] };
 
 // Classic template generator types (legacy mode)
@@ -496,9 +496,14 @@ function WizardMode() {
               <div className="mt-1 text-xs text-stone-400">Duplicates skipped</div>
             </div>
           </div>
-          {fetchResult.facts_fetched === 0 && (
-            <p className="text-xs text-amber-400">No new facts found. This scope may already be fully processed, or the entities in your collection may not have rich metadata (notes, reviews, credits) yet.</p>
-          )}
+          {fetchResult.api_errors?.length ? (
+            <div className="rounded border border-red-700 bg-red-950/40 p-3 text-xs text-red-300 space-y-1">
+              <p className="font-semibold">API errors — Claude could not be reached:</p>
+              {fetchResult.api_errors.map((e, i) => <p key={i} className="font-mono">{e}</p>)}
+            </div>
+          ) : fetchResult.facts_fetched === 0 ? (
+            <p className="text-xs text-amber-400">No new facts found. Facts for these entities may already exist in the library.</p>
+          ) : null}
           <div className="flex gap-3">
             <button onClick={handleReview} disabled={fetchResult.facts_fetched === 0} className="rounded border border-cyan-700 bg-cyan-900/30 px-5 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-900/60 disabled:opacity-50">
               Review Facts →

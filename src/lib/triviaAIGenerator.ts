@@ -91,8 +91,10 @@ async function callAnthropic(body: AnthropicRequest): Promise<string> {
   });
 
   if (!res.ok) {
-    console.error("[triviaAIGenerator] API error", res.status, await res.text());
-    return "";
+    const errBody = await res.text();
+    console.error("[triviaAIGenerator] API error", res.status, errBody);
+    // Propagate a descriptive error so callers can surface it
+    throw new Error(`Anthropic API ${res.status}: ${errBody.slice(0, 200)}`);
   }
 
   const json = (await res.json()) as AnthropicResponse;
@@ -193,6 +195,8 @@ export async function generateRawTrivia(
   } = {}
 ): Promise<RawTriviaFact[]> {
   if (!process.env.ANTHROPIC_API_KEY) return [];
+
+  console.log(`[triviaAIGenerator] generateRawTrivia: ${entityType} "${entityRef}"`);
 
   const raw = await callAnthropic({
     model: TRIVIA_MODEL,

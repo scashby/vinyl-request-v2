@@ -12,6 +12,7 @@ import {
 import { generateRawTrivia, type RawTriviaFact } from "src/lib/triviaAIGenerator";
 
 export const runtime = "nodejs";
+export const maxDuration = 300; // 5 minutes — sequential Sonnet calls can be slow
 
 // ---------------------------------------------------------------------------
 // Types
@@ -436,29 +437,44 @@ export async function POST(request: NextRequest) {
   let factsInserted = 0;
   let skippedDuplicates = 0;
   const processedArtists = new Set<number>();
+  const apiErrors: string[] = [];
 
   for (const master of masters) {
     const genres: string[] = master.genres ?? [];
 
     // Ask Claude Sonnet for counterintuitive, pub-quiz-worthy trivia about the album
-    const aiAlbumFacts = await generateRawTrivia(master.title, "album", { genres });
-    const { inserted: aiAlbumInserted, skipped: aiAlbumSkipped } = await insertAIFacts(
-      triviaDb, aiAlbumFacts, "master", master.id, master.title, runId, created_by
-    );
-    factsInserted += aiAlbumInserted;
-    skippedDuplicates += aiAlbumSkipped;
+    try {
+      const aiAlbumFacts = await generateRawTrivia(master.title, "album", { genres });
+      const { inserted: aiAlbumInserted, skipped: aiAlbumSkipped } = await insertAIFacts(
+        triviaDb, aiAlbumFacts, "master", master.id, master.title, runId, created_by
+      );
+      factsInserted += aiAlbumInserted;
+      skippedDuplicates += aiAlbumSkipped;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[facts/fetch] AI album error for "${master.title}":`, msg);
+      apiErrors.push(`album "${master.title}": ${msg}`);
+      // Stop on first API error — likely auth/model issue affecting all calls
+      break;
+    }
 
     // Ask Claude Sonnet for surprising artist trivia (once per artist)
     if (master.main_artist_id && !processedArtists.has(master.main_artist_id)) {
       processedArtists.add(master.main_artist_id);
       const artist = artistMap.get(master.main_artist_id);
       if (artist) {
-        const aiArtistFacts = await generateRawTrivia(artist.name, "artist", { genres });
-        const { inserted: aiArtistInserted, skipped: aiArtistSkipped } = await insertAIFacts(
-          triviaDb, aiArtistFacts, "artist", artist.id, artist.name, runId, created_by
-        );
-        factsInserted += aiArtistInserted;
-        skippedDuplicates += aiArtistSkipped;
+        try {
+          const aiArtistFacts = await generateRawTrivia(artist.name, "artist", { genres });
+          const { inserted: aiArtistInserted, skipped: aiArtistSkipped } = await insertAIFacts(
+            triviaDb, aiArtistFacts, "artist", artist.id, artist.name, runId, created_by
+          );
+          factsInserted += aiArtistInserted;
+          skippedDuplicates += aiArtistSkipped;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`[facts/fetch] AI artist error for "${artist.name}":`, msg);
+          apiErrors.push(`artist "${artist.name}": ${msg}`);
+        }
       }
     }
   }
@@ -475,5 +491,6 @@ export async function POST(request: NextRequest) {
     entities_processed: masters.length,
     artists_processed: processedArtists.size,
     skipped_duplicates: skippedDuplicates,
+    ...(apiErrors.length ? { api_errors: apiErrors } : {}),
   });
 }
