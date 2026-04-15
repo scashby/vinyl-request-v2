@@ -39,6 +39,39 @@ type SessionRow = {
   ended_at: string | null;
 };
 
+type SessionPatch = {
+  title?: string;
+  event_id?: number | null;
+  playlist_id?: number | null;
+  current_round?: number;
+  current_call_index?: number;
+  show_title?: boolean;
+  show_logo?: boolean;
+  show_round?: boolean;
+  show_scoreboard?: boolean;
+  show_stage_hint?: boolean;
+  welcome_heading_text?: string | null;
+  welcome_message_text?: string | null;
+  intermission_heading_text?: string | null;
+  intermission_message_text?: string | null;
+  thanks_heading_text?: string | null;
+  thanks_subheading_text?: string | null;
+  default_intermission_seconds?: number;
+  round_count?: number;
+  stage_one_points?: number;
+  stage_two_points?: number;
+  final_reveal_points?: number;
+  audio_clue_enabled?: boolean;
+  remove_resleeve_seconds?: number;
+  find_record_seconds?: number;
+  cue_seconds?: number;
+  host_buffer_seconds?: number;
+  target_gap_seconds?: number;
+  status?: "pending" | "running" | "paused" | "completed";
+  started_at?: string | null;
+  ended_at?: string | null;
+};
+
 type EventRow = { id: number; title: string; date: string; time: string | null; location: string | null; venue_logo_url: string | null };
 type PlaylistRow = { id: number; name: string };
 
@@ -164,7 +197,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const db = getArtistAliasDb();
-  const { error } = await db.from("aa_sessions").update(patch).eq("id", sessionId);
+  const { error } = await db.from("aa_sessions").update(patch as SessionPatch).eq("id", sessionId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true }, { status: 200 });
