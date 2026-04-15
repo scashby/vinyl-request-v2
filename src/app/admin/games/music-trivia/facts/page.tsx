@@ -64,7 +64,7 @@ export default function MusicTriviaFactsPage() {
   const [factKindFilter, setFactKindFilter] = useState("");
   const [entityRefSearch, setEntityRefSearch] = useState("");
   const [offset, setOffset] = useState(0);
-  const [pendingChanges, setPendingChanges] = useState<Record<number, "approved" | "archived">>({});
+  const [pendingChanges, setPendingChanges] = useState<Record<number, "approved" | "archived" | "draft">>({});
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -97,7 +97,7 @@ export default function MusicTriviaFactsPage() {
   // Reset offset when filters change
   useEffect(() => { setOffset(0); }, [statusTab, entityTypeFilter, factKindFilter, entityRefSearch]);
 
-  async function patchFact(id: number, status: "approved" | "archived") {
+  async function patchFact(id: number, status: "approved" | "archived" | "draft") {
     setPendingChanges((prev) => ({ ...prev, [id]: status }));
     try {
       await fetch(`/api/games/trivia/facts/${id}`, {
@@ -113,7 +113,7 @@ export default function MusicTriviaFactsPage() {
     }
   }
 
-  async function bulkPatch(status: "approved" | "archived") {
+  async function bulkPatch(status: "approved" | "archived" | "draft") {
     const visible = facts.filter((f) => f.status !== status);
     for (const fact of visible) {
       await patchFact(fact.id, status);
