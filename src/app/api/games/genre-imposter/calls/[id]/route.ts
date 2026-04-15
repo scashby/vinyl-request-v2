@@ -58,7 +58,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const typedCall = call as CallRow;
   const now = new Date().toISOString();
 
-  const patch: Record<string, unknown> = {};
+  type GiCallPatch = {
+    status?: "pending" | "cued" | "played" | "revealed" | "scored" | "skipped";
+    cued_at?: string | null;
+    played_at?: string | null;
+    revealed_at?: string | null;
+    artist?: string | null;
+    title?: string | null;
+    source_label?: string | null;
+    record_label?: string | null;
+    host_notes?: string | null;
+    metadata_locked?: boolean;
+    metadata_synced_at?: string | null;
+  };
+  const patch: GiCallPatch = {};
   if (body.status) {
     patch.status = body.status;
     if (body.status === "cued") patch.cued_at = now;

@@ -174,9 +174,10 @@ export default function ConflictResolutionModal({
       }
 
       const tableName = target.table as 'inventory' | 'releases' | 'masters';
+      type ConflictUpdatePayload = import('types/supabase').Database['public']['Tables']['inventory']['Update'] | import('types/supabase').Database['public']['Tables']['releases']['Update'] | import('types/supabase').Database['public']['Tables']['masters']['Update'];
       const { error: updateError } = await supabase
         .from(tableName)
-        .update({ [target.column]: target.value } as Record<string, unknown>)
+        .update({ [target.column]: target.value } as unknown as ConflictUpdatePayload)
         .eq('id', targetId);
 
       if (updateError) throw updateError;

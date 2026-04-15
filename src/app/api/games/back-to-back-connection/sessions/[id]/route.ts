@@ -3,6 +3,39 @@ import { getBackToBackConnectionDb } from "src/lib/backToBackConnectionDb";
 
 export const runtime = "nodejs";
 
+type SessionPatch = {
+  id?: number;
+  event_id?: number | null;
+  playlist_id?: number | null;
+  session_code?: string;
+  title?: string;
+  round_count?: number;
+  connection_points?: number;
+  detail_bonus_points?: number;
+  remove_resleeve_seconds?: number;
+  find_record_seconds?: number;
+  cue_seconds?: number;
+  host_buffer_seconds?: number;
+  target_gap_seconds?: number;
+  current_round?: number;
+  current_call_index?: number;
+  show_title?: boolean;
+  show_logo?: boolean;
+  show_round?: boolean;
+  show_scoreboard?: boolean;
+  show_connection_prompt?: boolean;
+  welcome_heading_text?: string | null;
+  welcome_message_text?: string | null;
+  intermission_heading_text?: string | null;
+  intermission_message_text?: string | null;
+  thanks_heading_text?: string | null;
+  thanks_subheading_text?: string | null;
+  default_intermission_seconds?: number;
+  status?: "pending" | "running" | "paused" | "completed";
+  started_at?: string | null;
+  ended_at?: string | null;
+};
+
 type SessionRow = {
   id: number;
   event_id: number | null;
@@ -136,7 +169,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "ended_at",
   ]);
 
-  const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key)));
+  const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key))) as SessionPatch;
 
   const timerFields = ["remove_resleeve_seconds", "find_record_seconds", "cue_seconds", "host_buffer_seconds"] as const;
   const touchesTimer = timerFields.some((f) => f in patch);

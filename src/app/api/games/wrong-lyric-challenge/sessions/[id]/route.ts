@@ -114,7 +114,48 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "ended_at",
   ]);
 
-  const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key)));
+  type WlcSessionPatch = {
+    id?: number;
+    event_id?: number | null;
+    playlist_id?: number | null;
+    session_code?: string;
+    title?: string;
+    round_count?: number;
+    lyric_points?: number;
+    song_bonus_enabled?: boolean;
+    song_bonus_points?: number;
+    option_count?: number;
+    reveal_mode?: "host_reads" | "jumbotron_choices";
+    remove_resleeve_seconds?: number;
+    find_record_seconds?: number;
+    cue_seconds?: number;
+    host_buffer_seconds?: number;
+    target_gap_seconds?: number;
+    current_round?: number;
+    current_call_index?: number;
+    countdown_started_at?: string | null;
+    paused_remaining_seconds?: number | null;
+    paused_at?: string | null;
+    show_title?: boolean;
+    show_round?: boolean;
+    show_scoreboard?: boolean;
+    show_options?: boolean;
+    show_logo?: boolean;
+    welcome_heading_text?: string | null;
+    welcome_message_text?: string | null;
+    intermission_heading_text?: string | null;
+    intermission_message_text?: string | null;
+    thanks_heading_text?: string | null;
+    thanks_subheading_text?: string | null;
+    default_intermission_seconds?: number;
+    host_overlay?: string;
+    host_overlay_remaining_seconds?: number;
+    status?: "pending" | "running" | "paused" | "completed";
+    created_at?: string;
+    started_at?: string | null;
+    ended_at?: string | null;
+  };
+  const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key))) as WlcSessionPatch;
 
   const db = getWrongLyricChallengeDb();
   const { error } = await db.from("wlc_sessions").update(patch).eq("id", sessionId);

@@ -136,7 +136,35 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const typedCall = call as CallRow;
   const now = new Date().toISOString();
 
-  const patch: Record<string, unknown> = {};
+  type TriviaCallPatch = {
+    status?: "pending" | "asked" | "answer_revealed" | "scored" | "skipped";
+    asked_at?: string | null;
+    answer_revealed_at?: string | null;
+    scored_at?: string | null;
+    question_id?: number | null;
+    question_type?: "free_response" | "multiple_choice" | "true_false" | "ordering";
+    question_text?: string;
+    answer_key?: string;
+    accepted_answers?: string[];
+    options_payload?: unknown;
+    answer_payload?: unknown;
+    explanation_text?: string | null;
+    reveal_payload?: unknown;
+    source_note?: string | null;
+    cue_notes_text?: string | null;
+    cue_payload?: unknown;
+    prep_status?: "draft" | "ready";
+    display_element_type?: string;
+    display_image_override_url?: string | null;
+    source_artist?: string | null;
+    source_title?: string | null;
+    source_album?: string | null;
+    source_side?: string | null;
+    source_position?: string | null;
+    metadata_locked?: boolean;
+    metadata_synced_at?: string | null;
+  };
+  const patch: TriviaCallPatch = {};
 
   if (body.status) {
     patch.status = body.status;

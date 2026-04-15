@@ -118,7 +118,45 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "ended_at",
   ]);
 
-  const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key)));
+  type LgrSessionPatch = {
+    id?: number;
+    event_id?: number | null;
+    playlist_id?: number | null;
+    session_code?: string;
+    title?: string;
+    round_count?: number;
+    judge_mode?: "official_key" | "crowd_check";
+    close_match_policy?: "host_discretion" | "strict_key";
+    remove_resleeve_seconds?: number;
+    find_record_seconds?: number;
+    cue_seconds?: number;
+    host_buffer_seconds?: number;
+    target_gap_seconds?: number;
+    current_round?: number;
+    current_call_index?: number;
+    countdown_started_at?: string | null;
+    paused_remaining_seconds?: number | null;
+    paused_at?: string | null;
+    show_title?: boolean;
+    show_round?: boolean;
+    show_scoreboard?: boolean;
+    show_answer_mode?: boolean;
+    show_logo?: boolean;
+    welcome_heading_text?: string | null;
+    welcome_message_text?: string | null;
+    intermission_heading_text?: string | null;
+    intermission_message_text?: string | null;
+    thanks_heading_text?: string | null;
+    thanks_subheading_text?: string | null;
+    default_intermission_seconds?: number;
+    host_overlay?: string;
+    host_overlay_remaining_seconds?: number;
+    status?: "pending" | "running" | "paused" | "completed";
+    created_at?: string;
+    started_at?: string | null;
+    ended_at?: string | null;
+  };
+  const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key))) as LgrSessionPatch;
 
   const db = getLyricGapRelayDb();
   const { error } = await db.from("lgr_sessions").update(patch).eq("id", sessionId);

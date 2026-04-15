@@ -129,7 +129,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { error: callUpdateError } = await db
     .from("dd_session_calls")
     .update({
-      status: "scored",
+      status: "scored" as const,
       scored_at: now,
       revealed_at: now,
     })

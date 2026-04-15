@@ -102,7 +102,36 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const now = new Date().toISOString();
   const userLabel = asString(body.updated_by) || "admin";
 
-  const patch: Record<string, unknown> = {};
+  type TriviaQuestionPatch = {
+    status?: "draft" | "published" | "archived";
+    question_type?: "free_response" | "multiple_choice" | "true_false" | "ordering";
+    prompt_text?: string;
+    answer_key?: string;
+    accepted_answers?: unknown;
+    answer_payload?: unknown;
+    options_payload?: unknown;
+    reveal_payload?: unknown;
+    display_element_type?: string;
+    explanation_text?: string | null;
+    default_category?: string;
+    default_difficulty?: "easy" | "medium" | "hard";
+    source_note?: string | null;
+    is_tiebreaker_eligible?: boolean;
+    cue_source_type?: "inventory_track" | "uploaded_clip" | null;
+    cue_source_payload?: unknown;
+    primary_cue_start_seconds?: number | null;
+    primary_cue_end_seconds?: number | null;
+    primary_cue_instruction?: string | null;
+    cue_notes_text?: string | null;
+    cue_payload?: unknown;
+    created_by?: string | null;
+    updated_by?: string | null;
+    created_at?: string;
+    updated_at?: string;
+    published_at?: string | null;
+    archived_at?: string | null;
+  };
+  const patch: TriviaQuestionPatch = {};
 
   if (Object.prototype.hasOwnProperty.call(body, "status")) patch.status = normalized.status;
   if (Object.prototype.hasOwnProperty.call(body, "question_type")) patch.question_type = normalized.question_type;

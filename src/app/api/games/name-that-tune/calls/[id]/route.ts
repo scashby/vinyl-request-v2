@@ -53,7 +53,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const typedCall = call as CallRow;
   const now = new Date().toISOString();
 
-  const patch: Record<string, unknown> = {};
+  type NttCallPatch = {
+    status?: "pending" | "asked" | "locked" | "answer_revealed" | "scored" | "skipped";
+    asked_at?: string | null;
+    answer_revealed_at?: string | null;
+    scored_at?: string | null;
+    artist_answer?: string;
+    title_answer?: string;
+    source_label?: string | null;
+    host_notes?: string | null;
+    metadata_locked?: boolean;
+    metadata_synced_at?: string | null;
+  };
+  const patch: NttCallPatch = {};
   if (body.status) {
     patch.status = body.status;
     if (body.status === "asked") patch.asked_at = now;

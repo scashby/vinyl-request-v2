@@ -1,7 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
 
-type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+type Json = unknown;
 type TriviaQuestionStatus = "draft" | "published" | "archived";
 type TriviaQuestionType = "free_response" | "multiple_choice" | "true_false" | "ordering";
 type TriviaDifficulty = "easy" | "medium" | "hard";

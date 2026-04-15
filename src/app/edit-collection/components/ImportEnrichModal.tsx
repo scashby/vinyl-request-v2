@@ -959,7 +959,7 @@ const applyAlbumCreditsToRecordings = async (
           for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
             const { error: updateError } = await supabase
               .from('recordings')
-              .update(recordingUpdates)
+              .update(recordingUpdates as unknown as import('types/supabase').Database['public']['Tables']['recordings']['Update'])
               .eq('id', recording.id);
 
             if (!updateError) return;
@@ -1949,7 +1949,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         (async () => {
           const { error } = await supabase
             .from('inventory')
-            .update(inventoryUpdates as Record<string, unknown>)
+            .update(inventoryUpdates as unknown as import('types/supabase').Database['public']['Tables']['inventory']['Update'])
             .eq('id', album.id);
           if (error) {
             throw new Error(
@@ -1965,7 +1965,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         (async () => {
           const { error } = await supabase
             .from('releases')
-            .update(releaseUpdates as Record<string, unknown>)
+            .update(releaseUpdates as unknown as import('types/supabase').Database['public']['Tables']['releases']['Update'])
             .eq('id', album.release_id);
           if (error) {
             throw new Error(
@@ -1983,7 +1983,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         (async () => {
           const { error } = await supabase
             .from('masters')
-            .update(masterUpdates as Record<string, unknown>)
+            .update(masterUpdates as unknown as import('types/supabase').Database['public']['Tables']['masters']['Update'])
             .eq('id', album.master_id);
           if (error) {
             throw new Error(
@@ -2989,7 +2989,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         Promise.resolve(
           supabase
             .from('recordings')
-            .update(updatePayload)
+            .update(updatePayload as unknown as import('types/supabase').Database['public']['Tables']['recordings']['Update'])
             .eq('id', recording.id)
         )
       );

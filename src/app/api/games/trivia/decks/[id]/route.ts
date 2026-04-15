@@ -71,7 +71,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const body = (await request.json()) as PatchDeckBody;
   const db = getTriviaDb();
   const now = new Date().toISOString();
-  const patch: Record<string, unknown> = {};
+  type TriviaDeckPatch = {
+    title?: string;
+    status?: "draft" | "ready" | "archived";
+    event_id?: number | null;
+    playlist_id?: number | null;
+    build_mode?: "manual" | "hybrid" | "rule";
+    rules_payload?: unknown;
+    cooldown_days?: number;
+    created_by?: string | null;
+    created_at?: string;
+    updated_at?: string;
+    locked_at?: string | null;
+  };
+  const patch: TriviaDeckPatch = {};
 
   if (Object.prototype.hasOwnProperty.call(body, "title")) patch.title = asString(body.title) || "Trivia Deck";
   if (body.status === "draft" || body.status === "ready" || body.status === "archived") patch.status = body.status;

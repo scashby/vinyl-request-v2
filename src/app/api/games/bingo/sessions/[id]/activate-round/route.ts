@@ -188,7 +188,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (clearEventsError) return NextResponse.json({ error: clearEventsError.message }, { status: 500 });
 
-    const sessionUpdateFields: Record<string, unknown> = {
+    type BingoSessionActivationPatch = {
+      current_round?: number;
+      current_call_index?: number;
+      status?: string;
+      paused_at?: string | null;
+      paused_remaining_seconds?: number | null;
+      countdown_started_at?: string | null;
+      call_reveal_at?: string | null;
+      next_game_scheduled_at?: string | null;
+      bingo_overlay?: string;
+    };
+    const sessionUpdateFields: BingoSessionActivationPatch = {
       current_round: requestedRound,
       current_call_index: 0,
       status: "paused",

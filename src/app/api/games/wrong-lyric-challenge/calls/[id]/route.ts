@@ -40,7 +40,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const typedCall = call as CallRow;
   const now = new Date().toISOString();
 
-  const patch: Record<string, unknown> = { status: body.status };
+  type WlcCallPatch = {
+    status?: "pending" | "asked" | "locked" | "revealed" | "scored" | "skipped";
+    asked_at?: string | null;
+    revealed_at?: string | null;
+    scored_at?: string | null;
+  };
+  const patch: WlcCallPatch = { status: body.status };
   if (body.status === "asked") patch.asked_at = now;
   if (body.status === "revealed") patch.revealed_at = now;
   if (body.status === "scored") patch.scored_at = now;

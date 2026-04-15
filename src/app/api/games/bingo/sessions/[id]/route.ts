@@ -18,6 +18,65 @@ import { computeTransportQueueIds, type TransportQueueEvent } from "src/lib/tran
 
 export const runtime = "nodejs";
 
+type BingoSessionPatch = {
+  id?: number;
+  event_id?: number | null;
+  game_preset_id?: number | null;
+  playlist_ids?: number[] | null;
+  master_playlist_ids?: number[] | null;
+  default_intermission_seconds?: number;
+  playlist_id?: number;
+  session_code?: string;
+  game_mode?: string;
+  card_count?: number;
+  card_layout?: string;
+  card_label_mode?: string;
+  round_count?: number;
+  current_round?: number;
+  round_end_policy?: string;
+  tie_break_policy?: string;
+  pool_exhaustion_policy?: string;
+  remove_resleeve_seconds?: number;
+  place_vinyl_seconds?: number;
+  cue_seconds?: number;
+  start_slide_seconds?: number;
+  host_buffer_seconds?: number;
+  seconds_to_next_call?: number;
+  sonos_output_delay_ms?: number;
+  countdown_started_at?: string | null;
+  paused_remaining_seconds?: number | null;
+  paused_at?: string | null;
+  current_call_index?: number;
+  recent_calls_limit?: number;
+  show_title?: boolean;
+  show_logo?: boolean;
+  show_rounds?: boolean;
+  show_countdown?: boolean;
+  status?: string;
+  started_at?: string | null;
+  ended_at?: string | null;
+  next_game_scheduled_at?: string | null;
+  next_game_rules_text?: string | null;
+  welcome_heading_text?: string | null;
+  welcome_message_text?: string | null;
+  welcome_rules_text?: string | null;
+  welcome_tiebreak_text?: string | null;
+  intermission_heading_text?: string | null;
+  intermission_message_text?: string | null;
+  intermission_footer_text?: string | null;
+  thanks_heading_text?: string | null;
+  thanks_subheading_text?: string | null;
+  thanks_events_heading_text?: string | null;
+  round_modes?: { round: number; modes: string[] }[] | null;
+  round_playlist_ids?: { round: number; playlist_ids: number[] }[] | null;
+  call_reveal_delay_seconds?: number;
+  call_reveal_at?: string | null;
+  bingo_overlay?: string;
+  is_favorite?: boolean;
+  favorite_note?: string | null;
+  active_playlist_letter_by_round?: { round: number; letter: string }[] | null;
+};
+
 type SessionRow = {
   id: number;
   event_id: number | null;
@@ -287,7 +346,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "active_playlist_letter_by_round",
   ]);
 
-  const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key))) as Record<string, unknown>;
+  const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key))) as BingoSessionPatch;
 
   if (patch.playlist_id !== undefined) {
     patch.playlist_id = Number(patch.playlist_id);
@@ -317,7 +376,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   // Allow crate letter selection to be patched directly
   if ("active_playlist_letter_by_round" in body) {
-    patch.active_playlist_letter_by_round = body.active_playlist_letter_by_round;
+    patch.active_playlist_letter_by_round = body.active_playlist_letter_by_round as { round: number; letter: string }[] | null;
   }
 
   const db = getBingoDb();

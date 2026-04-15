@@ -12,7 +12,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
   const { error } = await db
     .from("dd_sessions")
     .update({
-      status: "paused",
+      status: "paused" as const,
     })
     .eq("id", sessionId);
 

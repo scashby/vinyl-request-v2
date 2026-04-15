@@ -48,7 +48,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
     await db
       .from("ccat_session_rounds")
       .update({
-        status: "closed",
+        status: "closed" as const,
         closed_at: now,
       })
       .eq("session_id", sessionId)
@@ -57,7 +57,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
     await db
       .from("ccat_sessions")
       .update({
-        status: "completed",
+        status: "completed" as const,
         ended_at: now,
         paused_at: null,
         paused_remaining_seconds: null,
@@ -73,7 +73,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
   const { error: updateCallError } = await db
     .from("ccat_session_calls")
     .update({
-      status: "playing",
+      status: "playing" as const,
       asked_at: now,
     })
     .eq("id", typedCall.id)
@@ -84,7 +84,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
   const { error: updateRoundError } = await db
     .from("ccat_session_rounds")
     .update({
-      status: "active",
+      status: "active" as const,
       opened_at: now,
     })
     .eq("session_id", sessionId)
@@ -97,7 +97,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
     .update({
       current_call_index: typedCall.call_index,
       current_round: nextRound,
-      status: "running",
+      status: "running" as const,
       countdown_started_at: now,
       paused_at: null,
       paused_remaining_seconds: null,

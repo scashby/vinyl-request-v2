@@ -2111,7 +2111,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               if (Object.keys(inventoryUpdates).length > 0) {
                 const { error: inventoryUpdateError } = await supabase
                   .from('inventory')
-                  .update(inventoryUpdates as Record<string, unknown>)
+                  .update(inventoryUpdates as unknown as import('types/supabase').Database['public']['Tables']['inventory']['Update'])
                   .eq('id', inventoryRow.id);
 
                 if (inventoryUpdateError) {
@@ -2127,7 +2127,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     };
                     const { error: fallbackError } = await supabase
                       .from('inventory')
-                      .update(fallbackUpdates as Record<string, unknown>)
+                      .update(fallbackUpdates as unknown as import('types/supabase').Database['public']['Tables']['inventory']['Update'])
                       .eq('id', inventoryRow.id);
                     if (fallbackError) throw fallbackError;
                   } else {
@@ -2136,10 +2136,10 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 }
               }
               if (Object.keys(releaseUpdates).length > 0) {
-                await supabase.from('releases').update(releaseUpdates as Record<string, unknown>).eq('id', releaseRow.id);
+                await supabase.from('releases').update(releaseUpdates as unknown as import('types/supabase').Database['public']['Tables']['releases']['Update']).eq('id', releaseRow.id);
               }
               if (Object.keys(masterUpdates).length > 0) {
-                await supabase.from('masters').update(masterUpdates as Record<string, unknown>).eq('id', masterRow.id);
+                await supabase.from('masters').update(masterUpdates as unknown as import('types/supabase').Database['public']['Tables']['masters']['Update']).eq('id', masterRow.id);
               }
 
               if (enrichedData) {

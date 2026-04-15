@@ -149,7 +149,43 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "ended_at",
   ]);
 
-  const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key)));
+  type OocSessionPatch = {
+    id?: number;
+    event_id?: number | null;
+    playlist_id?: number | null;
+    session_code?: string;
+    title?: string;
+    round_count?: number;
+    points_correct_call?: number;
+    bonus_original_artist_points?: number;
+    remove_resleeve_seconds?: number;
+    find_record_seconds?: number;
+    cue_seconds?: number;
+    host_buffer_seconds?: number;
+    target_gap_seconds?: number;
+    current_round?: number;
+    countdown_started_at?: string | null;
+    paused_remaining_seconds?: number | null;
+    paused_at?: string | null;
+    current_call_index?: number;
+    show_title?: boolean;
+    show_logo?: boolean;
+    show_round?: boolean;
+    show_scoreboard?: boolean;
+    show_prompt?: boolean;
+    welcome_heading_text?: string | null;
+    welcome_message_text?: string | null;
+    intermission_heading_text?: string | null;
+    intermission_message_text?: string | null;
+    thanks_heading_text?: string | null;
+    thanks_subheading_text?: string | null;
+    default_intermission_seconds?: number;
+    status?: "pending" | "running" | "paused" | "completed";
+    created_at?: string;
+    started_at?: string | null;
+    ended_at?: string | null;
+  };
+  const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key))) as OocSessionPatch;
 
   const timerFields = ["remove_resleeve_seconds", "find_record_seconds", "cue_seconds", "host_buffer_seconds"] as const;
   const hasAnyTimerChange = timerFields.some((field) => field in patch);

@@ -239,7 +239,40 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "ended_at",
   ]);
 
-  const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key)));
+  type BbSessionPatch = {
+    id?: number;
+    event_id?: number | null;
+    playlist_id?: number | null;
+    session_code?: string;
+    title?: string;
+    bracket_size?: number;
+    vote_method?: "hands" | "slips";
+    scoring_model?: "round_weighted" | "flat_per_hit";
+    remove_resleeve_seconds?: number;
+    find_record_seconds?: number;
+    cue_seconds?: number;
+    host_buffer_seconds?: number;
+    target_gap_seconds?: number;
+    current_round?: number;
+    current_matchup_index?: number;
+    show_title?: boolean;
+    show_logo?: boolean;
+    show_round?: boolean;
+    show_bracket?: boolean;
+    show_scoreboard?: boolean;
+    welcome_heading_text?: string | null;
+    welcome_message_text?: string | null;
+    intermission_heading_text?: string | null;
+    intermission_message_text?: string | null;
+    thanks_heading_text?: string | null;
+    thanks_subheading_text?: string | null;
+    default_intermission_seconds?: number;
+    status?: "pending" | "running" | "paused" | "completed";
+    started_at?: string | null;
+    ended_at?: string | null;
+  };
+
+  const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key))) as BbSessionPatch;
 
   const db = getBracketBattleDb();
   const { error } = await db.from("bb_sessions").update(patch).eq("id", sessionId);

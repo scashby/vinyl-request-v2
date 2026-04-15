@@ -83,7 +83,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { error: roundUpdateError } = await db
     .from("ccat_session_rounds")
     .update({
-      status: "closed",
+      status: "closed" as const,
       closed_at: now,
     })
     .eq("id", typedRound.id)
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { error: callUpdateError } = await db
     .from("ccat_session_calls")
     .update({
-      status: "scored",
+      status: "scored" as const,
       scored_at: now,
     })
     .eq("session_id", sessionId)
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { error: sessionUpdateError } = await db
       .from("ccat_sessions")
       .update({
-        status: "completed",
+        status: "completed" as const,
         ended_at: now,
       })
       .eq("id", sessionId);

@@ -23,6 +23,30 @@ type RoundCompletionRow = {
   status: "pending" | "playing" | "revealed" | "scored" | "skipped";
 };
 
+type CcatCallPatch = {
+  status?: "pending" | "playing" | "revealed" | "scored" | "skipped";
+  asked_at?: string | null;
+  revealed_at?: string | null;
+  scored_at?: string | null;
+};
+
+type CcatSessionPatch = {
+  current_call_index?: number;
+  current_round?: number;
+  status?: "pending" | "running" | "paused" | "completed";
+  countdown_started_at?: string | null;
+  paused_at?: string | null;
+  paused_remaining_seconds?: number | null;
+  ended_at?: string | null;
+  started_at?: string | null;
+};
+
+type CcatRoundPatch = {
+  status?: "pending" | "active" | "closed";
+  opened_at?: string | null;
+  closed_at?: string | null;
+};
+
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const callId = Number(id);
@@ -44,7 +68,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const typedCall = call as CallRow;
   const now = new Date().toISOString();
 
-  const patch: Record<string, unknown> = { status: body.status };
+  const patch: CcatCallPatch = { status: body.status };
   if (body.status === "playing") patch.asked_at = now;
   if (body.status === "revealed") patch.revealed_at = now;
   if (body.status === "scored") patch.scored_at = now;
@@ -60,30 +84,32 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       .maybeSingle();
     const typedSession = session as SessionRow | null;
 
+    const sessionUpdate: CcatSessionPatch = {
+      current_call_index: typedCall.call_index,
+      current_round: typedCall.round_number,
+      status: "running" as const,
+      countdown_started_at: now,
+      paused_at: null,
+      paused_remaining_seconds: null,
+      ended_at: null,
+      started_at: typedSession?.started_at ?? now,
+    };
     const { error: sessionUpdateError } = await db
       .from("ccat_sessions")
-      .update({
-        current_call_index: typedCall.call_index,
-        current_round: typedCall.round_number,
-        status: "running",
-        countdown_started_at: now,
-        paused_at: null,
-        paused_remaining_seconds: null,
-        ended_at: null,
-        started_at: typedSession?.started_at ?? now,
-      })
+      .update(sessionUpdate)
       .eq("id", typedCall.session_id);
 
     if (sessionUpdateError) {
       return NextResponse.json({ error: sessionUpdateError.message }, { status: 500 });
     }
 
+    const roundUpdate: CcatRoundPatch = {
+      status: "active" as const,
+      opened_at: now,
+    };
     const { error: roundUpdateError } = await db
       .from("ccat_session_rounds")
-      .update({
-        status: "active",
-        opened_at: now,
-      })
+      .update(roundUpdate)
       .eq("session_id", typedCall.session_id)
       .eq("round_number", typedCall.round_number);
 
@@ -106,12 +132,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     );
 
     if (allClosed) {
+      const closedRoundUpdate: CcatRoundPatch = {
+        status: "closed" as const,
+        closed_at: now,
+      };
       const { error: roundUpdateError } = await db
         .from("ccat_session_rounds")
-        .update({
-          status: "closed",
-          closed_at: now,
-        })
+        .update(closedRoundUpdate)
         .eq("session_id", typedCall.session_id)
         .eq("round_number", typedCall.round_number);
 

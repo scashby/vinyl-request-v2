@@ -260,7 +260,52 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "ended_at",
   ]);
 
-  const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key)));
+  type TriviaSessPatch = {
+    id?: number;
+    event_id?: number | null;
+    playlist_id?: number | null;
+    deck_id?: number | null;
+    session_code?: string;
+    title?: string;
+    round_count?: number;
+    questions_per_round?: number;
+    tie_breaker_count?: number;
+    score_mode?: string;
+    question_categories?: string[];
+    difficulty_easy_target?: number;
+    difficulty_medium_target?: number;
+    difficulty_hard_target?: number;
+    remove_resleeve_seconds?: number;
+    find_record_seconds?: number;
+    cue_seconds?: number;
+    host_buffer_seconds?: number;
+    target_gap_seconds?: number;
+    current_round?: number;
+    current_call_index?: number;
+    countdown_started_at?: string | null;
+    paused_remaining_seconds?: number | null;
+    paused_at?: string | null;
+    show_title?: boolean;
+    show_logo?: boolean;
+    show_rounds?: boolean;
+    show_question_counter?: boolean;
+    show_leaderboard?: boolean;
+    show_cue_hints?: boolean;
+    trivia_overlay?: string;
+    welcome_heading_text?: string | null;
+    welcome_message_text?: string | null;
+    intermission_heading_text?: string | null;
+    intermission_message_text?: string | null;
+    thanks_heading_text?: string | null;
+    thanks_subheading_text?: string | null;
+    max_teams?: number | null;
+    slips_batch_size?: number | null;
+    status?: string;
+    created_at?: string;
+    started_at?: string | null;
+    ended_at?: string | null;
+  };
+  const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key))) as TriviaSessPatch;
 
   const removeResleeveSeconds = Number(
     patch.remove_resleeve_seconds ?? body.remove_resleeve_seconds ?? Number.NaN

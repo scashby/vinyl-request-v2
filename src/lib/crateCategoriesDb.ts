@@ -1,6 +1,13 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
 
+type CcatEventPayload = {
+  mode?: string;
+  duration_seconds?: number | null;
+  started_at?: string;
+  ends_at?: string | null;
+};
+
 type CrateCategoriesSessionStatus = "pending" | "running" | "paused" | "completed";
 type CrateCategoriesRoundStatus = "pending" | "active" | "closed";
 type CrateCategoriesCallStatus = "pending" | "playing" | "revealed" | "scored" | "skipped";
@@ -322,23 +329,27 @@ type CrateCategoriesDatabase = {
           id: number;
           session_id: number;
           event_type: string;
-          payload: Record<string, unknown> | null;
+          payload: CcatEventPayload | null;
           created_at: string;
         };
         Insert: {
           id?: number;
           session_id: number;
           event_type: string;
-          payload?: Record<string, unknown> | null;
+          payload?: CcatEventPayload | null;
           created_at?: string;
         };
         Update: {
           event_type?: string;
-          payload?: Record<string, unknown> | null;
+          payload?: CcatEventPayload | null;
         };
         Relationships: [];
       };
     };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
   };
 };
 

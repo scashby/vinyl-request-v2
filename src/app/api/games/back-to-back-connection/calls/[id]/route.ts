@@ -10,6 +10,13 @@ type PatchBody = {
   host_notes?: string | null;
 };
 
+type CallPatch = {
+  status?: CallStatus;
+  host_notes?: string | null;
+  revealed_at?: string | null;
+  scored_at?: string | null;
+};
+
 const ALLOWED_STATUSES = new Set<CallStatus>([
   "pending",
   "played_track_a",
@@ -28,7 +35,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const body = (await request.json()) as PatchBody;
-  const patch: Record<string, unknown> = {};
+  const patch: CallPatch = {};
 
   if (typeof body.status === "string") {
     if (!ALLOWED_STATUSES.has(body.status)) {

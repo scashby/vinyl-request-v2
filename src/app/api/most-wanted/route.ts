@@ -24,12 +24,12 @@ export async function GET(request: Request) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, inventory_id, title, url, rank } = body;
+    const { id, title, url, rank } = body;
     const supabase = supabaseServer(getAuthHeader(request));
 
     const { error } = await supabase
       .from("most_wanted")
-      .update({ title, url, rank, inventory_id })
+      .update({ title, url, rank })
       .eq("id", id);
 
     if (error) {

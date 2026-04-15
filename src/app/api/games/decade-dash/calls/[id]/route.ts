@@ -21,6 +21,21 @@ type SessionRow = {
   started_at: string | null;
 };
 
+type DdCallPatch = {
+  status?: "pending" | "asked" | "locked" | "revealed" | "scored" | "skipped";
+  asked_at?: string | null;
+  revealed_at?: string | null;
+  scored_at?: string | null;
+};
+
+type DdSessionRunningPatch = {
+  current_call_index?: number;
+  current_round?: number;
+  status?: "pending" | "running" | "paused" | "completed";
+  ended_at?: string | null;
+  started_at?: string | null;
+};
+
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const callId = Number(id);
@@ -42,7 +57,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const typedCall = call as CallRow;
   const now = new Date().toISOString();
 
-  const patch: Record<string, unknown> = { status: body.status };
+  const patch: DdCallPatch = { status: body.status };
   if (body.status === "asked") patch.asked_at = now;
   if (body.status === "revealed") patch.revealed_at = now;
   if (body.status === "scored") patch.scored_at = now;
@@ -58,15 +73,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       .maybeSingle();
     const typedSession = session as SessionRow | null;
 
+    const sessionPatch: DdSessionRunningPatch = {
+      current_call_index: typedCall.call_index,
+      current_round: typedCall.round_number,
+      status: "running" as const,
+      ended_at: null,
+      started_at: typedSession?.started_at ?? now,
+    };
     const { error: sessionUpdateError } = await db
       .from("dd_sessions")
-      .update({
-        current_call_index: typedCall.call_index,
-        current_round: typedCall.round_number,
-        status: "running",
-        ended_at: null,
-        started_at: typedSession?.started_at ?? now,
-      })
+      .update(sessionPatch)
       .eq("id", typedCall.session_id);
 
     if (sessionUpdateError) return NextResponse.json({ error: sessionUpdateError.message }, { status: 500 });

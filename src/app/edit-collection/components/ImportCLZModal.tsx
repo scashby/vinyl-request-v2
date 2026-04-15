@@ -628,7 +628,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
         (async () => {
           await supabase
             .from('inventory')
-            .update(inventoryUpdates as Record<string, unknown>)
+            .update(inventoryUpdates as unknown as import('types/supabase').Database['public']['Tables']['inventory']['Update'])
             .eq('id', album.id);
         })()
       );
@@ -639,7 +639,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
         (async () => {
           await supabase
             .from('releases')
-            .update(releaseUpdates as Record<string, unknown>)
+            .update(releaseUpdates as unknown as import('types/supabase').Database['public']['Tables']['releases']['Update'])
             .eq('id', album.release_id);
         })()
       );

@@ -48,7 +48,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
     const { error: completeError } = await db
       .from("dd_sessions")
       .update({
-        status: "completed",
+        status: "completed" as const,
         ended_at: now,
       })
       .eq("id", sessionId);
@@ -64,7 +64,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
   const { error: updateCallError } = await db
     .from("dd_session_calls")
     .update({
-      status: "asked",
+      status: "asked" as const,
       asked_at: now,
     })
     .eq("id", typedCall.id)
@@ -77,7 +77,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
     .update({
       current_call_index: typedCall.call_index,
       current_round: nextRound,
-      status: "running",
+      status: "running" as const,
       ended_at: null,
       started_at: typedSession.started_at ?? now,
     })

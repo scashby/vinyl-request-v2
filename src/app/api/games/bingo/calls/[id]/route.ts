@@ -4,6 +4,20 @@ import { rehydrateBingoCardLabels } from "src/lib/playlistMetadataSync";
 
 export const runtime = "nodejs";
 
+type BingoCallPatch = {
+  status?: string;
+  prep_started_at?: string | null;
+  called_at?: string | null;
+  completed_at?: string | null;
+  track_title?: string;
+  artist_name?: string;
+  album_name?: string | null;
+  side?: string | null;
+  position?: string | null;
+  metadata_locked?: boolean;
+  metadata_synced_at?: string | null;
+};
+
 type CallPatchBody = {
   status?: "pending" | "prep_started" | "called" | "completed" | "skipped";
   track_title?: string;
@@ -55,7 +69,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const typedCall = call as CallRow;
   const now = new Date().toISOString();
 
-  const patch: Record<string, unknown> = {};
+  const patch: BingoCallPatch = {};
   if (body.status) {
     patch.status = body.status;
     if (body.status === "prep_started") patch.prep_started_at = now;

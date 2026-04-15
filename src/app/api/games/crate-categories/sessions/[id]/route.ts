@@ -121,7 +121,33 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "ended_at",
   ]);
 
-  const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key)));
+  type CcatSessionUpdatePatch = {
+    title?: string;
+    event_id?: number | null;
+    playlist_id?: number | null;
+    current_round?: number;
+    current_call_index?: number;
+    countdown_started_at?: string | null;
+    paused_remaining_seconds?: number | null;
+    paused_at?: string | null;
+    show_title?: boolean;
+    show_round?: boolean;
+    show_prompt?: boolean;
+    show_scoreboard?: boolean;
+    show_logo?: boolean;
+    welcome_heading_text?: string | null;
+    welcome_message_text?: string | null;
+    intermission_heading_text?: string | null;
+    intermission_message_text?: string | null;
+    thanks_heading_text?: string | null;
+    thanks_subheading_text?: string | null;
+    default_intermission_seconds?: number;
+    status?: "pending" | "running" | "paused" | "completed";
+    started_at?: string | null;
+    ended_at?: string | null;
+  };
+
+  const patch = Object.fromEntries(Object.entries(body).filter(([key]) => allowedFields.has(key))) as CcatSessionUpdatePatch;
 
   const db = getCrateCategoriesDb();
   const { error } = await db.from("ccat_sessions").update(patch).eq("id", sessionId);

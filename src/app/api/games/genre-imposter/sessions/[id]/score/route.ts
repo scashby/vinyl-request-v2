@@ -211,7 +211,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (scoresInsertError) return NextResponse.json({ error: scoresInsertError.message }, { status: 500 });
   }
 
-  const sessionPatch: Record<string, unknown> = {
+  type GiSessionScorePatch = {
+    current_round?: number;
+    current_call_index?: number;
+    countdown_started_at?: string | null;
+    paused_at?: string | null;
+    paused_remaining_seconds?: number | null;
+    status?: "pending" | "running" | "paused" | "completed";
+    ended_at?: string | null;
+  };
+  const sessionPatch: GiSessionScorePatch = {
     current_round: roundNumber,
     current_call_index: 3,
     countdown_started_at: now,

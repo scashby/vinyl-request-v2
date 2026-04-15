@@ -38,7 +38,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
   const { error: updateError } = await db
     .from("ccat_sessions")
     .update({
-      status: "paused",
+      status: "paused" as const,
       paused_at: now,
       paused_remaining_seconds: remaining,
     })

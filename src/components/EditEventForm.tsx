@@ -765,7 +765,7 @@ export default function EditEventForm({
           return acc;
         }, {} as Record<string, unknown>);
       }
-      const { error } = await supabase.from('events').update(eventPayload).eq('id', event.id);
+      const { error } = await supabase.from('events').update(eventPayload as unknown as Database['public']['Tables']['events']['Update']).eq('id', event.id);
       if (error) throw error;
     }
 

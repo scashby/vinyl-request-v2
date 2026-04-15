@@ -1,7 +1,15 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
 
-type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+type DdEventPayload = {
+  mode?: string;
+  duration_seconds?: number | null;
+  started_at?: string;
+  ends_at?: string | null;
+};
+
+type DdAdjacentDecades = number[];
+
 type DdSessionStatus = "pending" | "running" | "paused" | "completed";
 type DdRoundStatus = "pending" | "active" | "closed";
 type DdCallStatus = "pending" | "asked" | "locked" | "revealed" | "scored" | "skipped";
@@ -218,7 +226,7 @@ export type DecadeDashDatabase = {
           title: string | null;
           release_year: number | null;
           decade_start: number;
-          accepted_adjacent_decades: Json;
+          accepted_adjacent_decades: DdAdjacentDecades;
           host_notes: string | null;
           status: DdCallStatus;
           asked_at: string | null;
@@ -236,7 +244,7 @@ export type DecadeDashDatabase = {
           title?: string | null;
           release_year?: number | null;
           decade_start: number;
-          accepted_adjacent_decades?: Json;
+          accepted_adjacent_decades?: DdAdjacentDecades;
           host_notes?: string | null;
           status?: DdCallStatus;
           asked_at?: string | null;
@@ -254,7 +262,7 @@ export type DecadeDashDatabase = {
           title?: string | null;
           release_year?: number | null;
           decade_start?: number;
-          accepted_adjacent_decades?: Json;
+          accepted_adjacent_decades?: DdAdjacentDecades;
           host_notes?: string | null;
           status?: DdCallStatus;
           asked_at?: string | null;
@@ -314,26 +322,30 @@ export type DecadeDashDatabase = {
           id: number;
           session_id: number;
           event_type: string;
-          payload: Json | null;
+          payload: DdEventPayload | null;
           created_at: string;
         };
         Insert: {
           id?: number;
           session_id: number;
           event_type: string;
-          payload?: Json | null;
+          payload?: DdEventPayload | null;
           created_at?: string;
         };
         Update: {
           id?: number;
           session_id?: number;
           event_type?: string;
-          payload?: Json | null;
+          payload?: DdEventPayload | null;
           created_at?: string;
         };
         Relationships: [];
       };
     };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
   };
 };
 
