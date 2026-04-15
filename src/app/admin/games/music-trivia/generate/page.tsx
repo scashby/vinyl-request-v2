@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,12 +48,102 @@ type PreviewResult = {
 const FACT_KIND_LABELS: Record<string, string> = {
   bio: "Bio", recording_context: "Recording", chart_fact: "Chart",
   production_note: "Production", cultural_context: "Cultural", critical_reception: "Review",
+  name_origin: "Name Origin", connection: "Connection", pre_fame: "Pre-Fame",
+  collaboration: "Collab", personal: "Personal", song_history: "Song History",
+  band_history: "Band History", unusual_skill: "Unusual Skill", other: "Other",
 };
 const ENTITY_TYPE_LABELS: Record<string, string> = {
   artist: "Artist", master: "Album", recording: "Track", label: "Label",
 };
 const FORMAT_OPTIONS = ["Vinyl", '12"', '10"', '7"', "CD", "Cassette"];
 const DECADE_OPTIONS = ["1950s","1960s","1970s","1980s","1990s","2000s","2010s","2020s"];
+
+// ---------------------------------------------------------------------------
+// Typeahead search component for artists and albums
+// ---------------------------------------------------------------------------
+
+type SearchResult = { id: number; label: string };
+
+function EntitySearch({
+  apiPath,
+  placeholder,
+  onSelect,
+  selectedLabel,
+}: {
+  apiPath: string;
+  placeholder: string;
+  onSelect: (id: number, label: string) => void;
+  selectedLabel: string;
+}) {
+  const [query, setQuery] = useState(selectedLabel);
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [open, setOpen] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Sync display when parent resets selection
+  useEffect(() => { setQuery(selectedLabel); }, [selectedLabel]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  function handleChange(val: string) {
+    setQuery(val);
+    if (timer.current) clearTimeout(timer.current);
+    if (val.length < 2) { setResults([]); setOpen(false); return; }
+    timer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`${apiPath}?q=${encodeURIComponent(val)}`);
+        const json = await res.json();
+        setResults(json.data ?? []);
+        setOpen(true);
+      } catch { setResults([]); }
+    }, 250);
+  }
+
+  function handleSelect(r: SearchResult) {
+    setQuery(r.label);
+    setOpen(false);
+    setResults([]);
+    onSelect(r.id, r.label);
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => handleChange(e.target.value)}
+        onFocus={() => { if (results.length > 0) setOpen(true); }}
+        placeholder={placeholder}
+        className="w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm text-stone-100 placeholder-stone-500"
+      />
+      {open && results.length > 0 && (
+        <ul className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded border border-stone-700 bg-stone-900 shadow-xl">
+          {results.map((r) => (
+            <li key={r.id}>
+              <button
+                type="button"
+                onMouseDown={() => handleSelect(r)}
+                className="w-full px-3 py-2 text-left text-sm text-stone-200 hover:bg-stone-700"
+              >
+                {r.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 function Spinner() {
   return (
@@ -118,6 +208,7 @@ function WizardMode() {
   const [scopeRefId, setScopeRefId] = useState<number | null>(null);
   const [scopeValue, setScopeValue] = useState("");
   const [entityLimit, setEntityLimit] = useState(20);
+  const [selectedEntityLabel, setSelectedEntityLabel] = useState("");
   const [playlists, setPlaylists] = useState<PlaylistOption[]>([]);
   const [crates, setCrates] = useState<CrateOption[]>([]);
   const [optionsLoaded, setOptionsLoaded] = useState(false);
@@ -250,6 +341,7 @@ function WizardMode() {
     setScopeRefId(null);
     setScopeValue("");
     setEntityLimit(20);
+    setSelectedEntityLabel("");
   }
 
   const approvedCount = facts.filter((f) => f.status === "approved").length;
@@ -280,7 +372,7 @@ function WizardMode() {
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {(["collection","playlist","crate","artist","album","format","decade","genre"] as ScopeType[]).map((s) => (
                 <label key={s} className="flex cursor-pointer items-center gap-2 rounded border border-stone-700 px-2 py-1.5 text-xs capitalize hover:border-cyan-700">
-                  <input type="radio" name="scope" value={s} checked={scopeType === s} onChange={() => { setScopeType(s); setScopeRefId(null); setScopeValue(""); }} className="accent-cyan-400" />
+                  <input type="radio" name="scope" value={s} checked={scopeType === s} onChange={() => { setScopeType(s); setScopeRefId(null); setScopeValue(""); setSelectedEntityLabel(""); }} className="accent-cyan-400" />
                   {s}
                 </label>
               ))}
@@ -341,15 +433,27 @@ function WizardMode() {
 
           {scopeType === "artist" && (
             <div>
-              <label className="text-xs font-semibold text-stone-400">Artist ID (from artists table)</label>
-              <input type="number" value={scopeRefId ?? ""} onChange={(e) => setScopeRefId(Number(e.target.value) || null)} placeholder="Artist ID" className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm" />
+              <label className="mb-1 block text-xs font-semibold text-stone-400">Artist</label>
+              <EntitySearch
+                apiPath="/api/games/trivia/search-artists"
+                placeholder="Type to search artists…"
+                selectedLabel={selectedEntityLabel}
+                onSelect={(id, label) => { setScopeRefId(id); setSelectedEntityLabel(label); }}
+              />
+              {scopeRefId && <p className="mt-1 text-[10px] text-stone-500">Selected: {selectedEntityLabel} (id {scopeRefId})</p>}
             </div>
           )}
 
           {scopeType === "album" && (
             <div>
-              <label className="text-xs font-semibold text-stone-400">Master ID (from masters table)</label>
-              <input type="number" value={scopeRefId ?? ""} onChange={(e) => setScopeRefId(Number(e.target.value) || null)} placeholder="Master ID" className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm" />
+              <label className="mb-1 block text-xs font-semibold text-stone-400">Album</label>
+              <EntitySearch
+                apiPath="/api/games/trivia/search-albums"
+                placeholder="Type to search albums…"
+                selectedLabel={selectedEntityLabel}
+                onSelect={(id, label) => { setScopeRefId(id); setSelectedEntityLabel(label); }}
+              />
+              {scopeRefId && <p className="mt-1 text-[10px] text-stone-500">Selected: {selectedEntityLabel} (id {scopeRefId})</p>}
             </div>
           )}
 
@@ -366,7 +470,7 @@ function WizardMode() {
 
           <button
             onClick={handleFetch}
-            disabled={fetching || (scopeType === "playlist" && !scopeRefId) || (scopeType === "crate" && !scopeRefId) || (scopeType === "format" && !scopeValue) || (scopeType === "decade" && !scopeValue)}
+            disabled={fetching || (scopeType === "playlist" && !scopeRefId) || (scopeType === "crate" && !scopeRefId) || (scopeType === "artist" && !scopeRefId) || (scopeType === "album" && !scopeRefId) || (scopeType === "format" && !scopeValue) || (scopeType === "decade" && !scopeValue)}
             className="rounded border border-cyan-700 bg-cyan-900/30 px-5 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-900/60 disabled:opacity-50"
           >
             {fetching ? <><Spinner /> Fetching facts…</> : "Fetch Facts →"}

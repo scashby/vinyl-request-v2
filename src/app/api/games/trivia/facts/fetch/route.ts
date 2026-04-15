@@ -4,13 +4,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
 import { getTriviaDb } from "src/lib/triviaDb";
 import {
-  fetchAlbumFacts,
-  fetchArtistFacts,
   contentHash,
   type MasterForFacts,
   type ArtistForFacts,
   type TriviaRawFact,
 } from "src/lib/triviaFactFetcher";
+import { generateRawTrivia, type RawTriviaFact } from "src/lib/triviaAIGenerator";
 
 export const runtime = "nodejs";
 
@@ -43,10 +42,6 @@ type ArtistRow = ArtistForFacts;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 function parseDecade(value: string): number | null {
   const m = value.match(/(\d{4})/);
@@ -317,6 +312,52 @@ async function insertFact(
 }
 
 // ---------------------------------------------------------------------------
+// AI trivia fact insertion (Phase 1 — Claude Sonnet surprising trivia)
+// ---------------------------------------------------------------------------
+
+async function insertAIFacts(
+  triviaDb: unknown,
+  aiFacts: RawTriviaFact[],
+  entityType: "artist" | "master",
+  entityId: number,
+  entityRef: string,
+  runId: number,
+  createdBy: string
+): Promise<{ inserted: number; skipped: number }> {
+  let inserted = 0;
+  let skipped = 0;
+
+  for (const ai of aiFacts) {
+    const factText = ai.fact.trim();
+    if (factText.length < 20) continue;
+
+    const hash = contentHash(factText);
+
+    // Build a minimal TriviaRawFact-shaped object so we can reuse upsertSourceRecord
+    const rawFact: TriviaRawFact = {
+      entity_type: entityType,
+      entity_id: entityId,
+      entity_ref: entityRef,
+      fact_text: factText,
+      fact_kind: ai.kind,
+      confidence: "high", // Claude Sonnet from its own training
+      source_url: null,
+      source_domain: null,
+      source_title: "Claude AI (training knowledge)",
+      excerpt_text: factText,
+      content_hash: hash,
+    };
+
+    const srcId = await upsertSourceRecord(triviaDb, rawFact, runId, createdBy);
+    const ok = await insertFact(triviaDb, rawFact, srcId, runId, createdBy);
+    if (ok) inserted++;
+    else skipped++;
+  }
+
+  return { inserted, skipped };
+}
+
+// ---------------------------------------------------------------------------
 // Route
 // ---------------------------------------------------------------------------
 
@@ -397,28 +438,27 @@ export async function POST(request: NextRequest) {
   const processedArtists = new Set<number>();
 
   for (const master of masters) {
-    // Fetch album facts
-    const albumFacts = await fetchAlbumFacts(master);
-    for (const fact of albumFacts) {
-      const srcId = await upsertSourceRecord(triviaDb, fact, runId, created_by);
-      const inserted = await insertFact(triviaDb, fact, srcId, runId, created_by);
-      if (inserted) factsInserted++;
-      else skippedDuplicates++;
-    }
+    const genres: string[] = master.genres ?? [];
 
-    // Fetch artist facts (once per artist across all masters)
+    // Ask Claude Sonnet for counterintuitive, pub-quiz-worthy trivia about the album
+    const aiAlbumFacts = await generateRawTrivia(master.title, "album", { genres });
+    const { inserted: aiAlbumInserted, skipped: aiAlbumSkipped } = await insertAIFacts(
+      triviaDb, aiAlbumFacts, "master", master.id, master.title, runId, created_by
+    );
+    factsInserted += aiAlbumInserted;
+    skippedDuplicates += aiAlbumSkipped;
+
+    // Ask Claude Sonnet for surprising artist trivia (once per artist)
     if (master.main_artist_id && !processedArtists.has(master.main_artist_id)) {
       processedArtists.add(master.main_artist_id);
       const artist = artistMap.get(master.main_artist_id);
       if (artist) {
-        await sleep(300);
-        const artistFacts = await fetchArtistFacts(artist);
-        for (const fact of artistFacts) {
-          const srcId = await upsertSourceRecord(triviaDb, fact, runId, created_by);
-          const inserted = await insertFact(triviaDb, fact, srcId, runId, created_by);
-          if (inserted) factsInserted++;
-          else skippedDuplicates++;
-        }
+        const aiArtistFacts = await generateRawTrivia(artist.name, "artist", { genres });
+        const { inserted: aiArtistInserted, skipped: aiArtistSkipped } = await insertAIFacts(
+          triviaDb, aiArtistFacts, "artist", artist.id, artist.name, runId, created_by
+        );
+        factsInserted += aiArtistInserted;
+        skippedDuplicates += aiArtistSkipped;
       }
     }
   }

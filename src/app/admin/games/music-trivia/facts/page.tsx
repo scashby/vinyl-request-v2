@@ -30,12 +30,23 @@ type TriviaFact = {
 };
 
 const FACT_KIND_LABELS: Record<string, string> = {
+  // DB-extracted kinds
   bio: "Bio",
   recording_context: "Recording",
   chart_fact: "Chart",
   production_note: "Production",
   cultural_context: "Cultural",
   critical_reception: "Review",
+  // AI-generated trivia kinds
+  name_origin: "Name Origin",
+  connection: "Connection",
+  pre_fame: "Pre-Fame",
+  collaboration: "Collab",
+  personal: "Personal",
+  song_history: "Song History",
+  band_history: "Band History",
+  unusual_skill: "Unusual Skill",
+  other: "Other",
 };
 
 const ENTITY_TYPE_LABELS: Record<string, string> = {
