@@ -54,7 +54,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   let nextStage = clampStage(typedCall.stage_revealed ?? 0);
   if (hasStage) nextStage = clampStage(Number(body.stage_revealed));
 
-  const patch: Partial<import('src/types/supabase').Database['public']['Tables']['artist_alias_session_calls']['Update']> = {};
+  const patch: {
+    status?: "pending" | "stage_1" | "stage_2" | "final_reveal" | "scored" | "skipped";
+    stage_revealed?: number;
+    asked_at?: string | null;
+    revealed_at?: string | null;
+    scored_at?: string | null;
+  } = {};
   if (hasStatus) {
     patch.status = body.status;
   }
