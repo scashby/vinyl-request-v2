@@ -437,7 +437,3 @@ export async function POST(request: NextRequest) {
     skipped_duplicates: skippedDuplicates,
   });
 }
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
