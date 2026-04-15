@@ -5,6 +5,7 @@ import { supabaseAdmin } from "src/lib/supabaseAdmin";
 import { getTriviaDb } from "src/lib/triviaDb";
 import { generateTriviaQuestionCode } from "src/lib/triviaBank";
 import { TRIVIA_BANK_ENABLED } from "src/lib/triviaBankApi";
+import { replaceQuestionScopes } from "src/lib/triviaScopes";
 
 export const runtime = "nodejs";
 
@@ -630,6 +631,22 @@ async function insertQuestions(payloads: DraftQuestion[], createdBy: string): Pr
         payload.tags.map((tag) => ({ question_id: question.id, tag }))
       );
       if (tErr) throw new Error(tErr.message);
+    }
+
+    // Populate trivia_question_scopes so questions can be filtered by artist/album/track
+    const cue = payload.cue_source_payload;
+    const scopes: Array<{ scope_type: string; scope_ref_id?: number | null; scope_value?: string | null; display_label?: string | null }> = [];
+    if (cue.artist && typeof cue.artist === "string") {
+      scopes.push({ scope_type: "artist", scope_ref_id: null, scope_value: cue.artist, display_label: cue.artist });
+    }
+    if (cue.album && typeof cue.album === "string") {
+      scopes.push({ scope_type: "album", scope_ref_id: typeof cue.release_id === "number" ? cue.release_id : null, scope_value: cue.album, display_label: cue.album });
+    }
+    if (cue.title && typeof cue.title === "string") {
+      scopes.push({ scope_type: "track", scope_ref_id: typeof cue.release_track_id === "number" ? cue.release_track_id : null, scope_value: cue.title, display_label: cue.title });
+    }
+    if (scopes.length > 0) {
+      await replaceQuestionScopes(question.id, scopes, createdBy);
     }
 
     count += 1;
