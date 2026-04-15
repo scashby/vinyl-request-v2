@@ -1,7 +1,7 @@
 // src/app/dialogues/page.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 
 interface BlogPost {
@@ -59,9 +59,9 @@ export default function DialoguesPage() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
 
   useEffect(() => {
-    fetch("/api/social-embeds")
+    fetch("/api/playlists")
       .then(res => res.json())
-      .then((data: Playlist[]) => setPlaylists((data ?? []).filter(p => p.visible)));
+      .then((data: Playlist[]) => setPlaylists(data ?? []));
   }, []);
   
   useEffect(() => {
