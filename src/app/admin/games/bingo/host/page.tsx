@@ -353,10 +353,10 @@ export default function BingoHostPage() {
       autoCallLockRef.current = false;
       await fetch(`/api/games/bingo/sessions/${sessionId}/pause`, { method: "POST" });
     }
-    // When a winner is declared, pre-load the next round so that clicking
-    // "Start Round" afterwards advances to it rather than re-running this one.
+    // Pre-load the next round in the background so it's ready by the time
+    // the host clicks "Start Round". Fire-and-forget — don't block the overlay.
     if (overlay === "winner" && session && session.current_round < session.round_count) {
-      await fetch(`/api/games/bingo/sessions/${sessionId}/activate-round`, {
+      void fetch(`/api/games/bingo/sessions/${sessionId}/activate-round`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
