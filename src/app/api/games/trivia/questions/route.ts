@@ -77,6 +77,8 @@ export async function GET(request: NextRequest) {
       : "";
   const hasMedia = parseBoolean(searchParams.get("has_media"));
   const hasRequiredCue = parseBoolean(searchParams.get("has_required_cue"));
+  const scopeType = asString(searchParams.get("scope_type"));
+  const scopeValue = asString(searchParams.get("scope_value"));
   const limit = Math.min(200, parsePositiveInt(searchParams.get("limit"), 50));
   const offset = Math.max(0, parsePositiveInt(searchParams.get("offset"), 0));
 
@@ -102,6 +104,19 @@ export async function GET(request: NextRequest) {
     constrainedIds = intersectIds(
       constrainedIds,
       ((data ?? []) as Array<{ question_id: number }>).map((row) => row.question_id)
+    );
+  }
+
+  if (scopeType) {
+    let scopeQuery = db.from("trivia_question_scopes").select("question_id").eq("scope_type", scopeType);
+    if (scopeValue) {
+      scopeQuery = scopeQuery.ilike("scope_value", `%${scopeValue}%`);
+    }
+    const { data: scopeData, error: scopeError } = await scopeQuery as unknown as { data: Array<{ question_id: number }> | null; error: { message: string } | null };
+    if (scopeError) return NextResponse.json({ error: scopeError.message }, { status: 500 });
+    constrainedIds = intersectIds(
+      constrainedIds,
+      (scopeData ?? []).map((row) => row.question_id)
     );
   }
 

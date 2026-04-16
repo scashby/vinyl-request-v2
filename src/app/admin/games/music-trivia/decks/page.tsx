@@ -216,6 +216,7 @@ export default function MusicTriviaDecksPage() {
   const [questionSearch, setQuestionSearch] = useState("");
   const [questionTagFilter, setQuestionTagFilter] = useState("");
   const [questionDiffFilter, setQuestionDiffFilter] = useState("");
+  const [questionFormatFilter, setQuestionFormatFilter] = useState("");
   const [questionResults, setQuestionResults] = useState<QuestionPick[]>([]);
 
   const [playlistOptions, setPlaylistOptions] = useState<PlaylistOption[]>([]);
@@ -452,6 +453,10 @@ export default function MusicTriviaDecksPage() {
     if (questionSearch.trim()) params.set("q", questionSearch.trim());
     if (questionTagFilter.trim()) params.set("tag", questionTagFilter.trim());
     if (questionDiffFilter) params.set("difficulty", questionDiffFilter);
+    if (questionFormatFilter) {
+      params.set("scope_type", "format");
+      params.set("scope_value", questionFormatFilter);
+    }
     params.set("status", "published");
     params.set("limit", "60");
 
@@ -723,12 +728,27 @@ export default function MusicTriviaDecksPage() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
+                      {/* Format filter */}
+                      <div className="flex flex-wrap gap-1">
+                        {["", "vinyl", '12"', '7"', "CD"].map((fmt) => (
+                          <button key={fmt || "any-fmt"} onClick={() => setQuestionFormatFilter(fmt)}
+                            className={`rounded border px-2 py-0.5 text-[10px] ${
+                              questionFormatFilter === fmt
+                                ? fmt && fmt !== "CD" ? "border-emerald-600 bg-emerald-950/40 text-emerald-200"
+                                  : fmt === "CD" ? "border-rose-600 bg-rose-950/40 text-rose-200"
+                                  : "border-stone-600 bg-stone-800 text-stone-200"
+                                : "border-stone-700 text-stone-400"
+                            }`}>
+                            {fmt || "Any format"}
+                          </button>
+                        ))}
+                      </div>
                       {/* Difficulty filter */}
                       <div className="flex gap-1">
                         {["", "easy", "medium", "hard"].map((d) => (
                           <button key={d} onClick={() => setQuestionDiffFilter(d)}
                             className={`rounded border px-2 py-0.5 text-[10px] uppercase tracking-wide ${diffBtnClass(d)}`}>
-                            {d || "Any"}
+                            {d || "Any diff"}
                           </button>
                         ))}
                       </div>

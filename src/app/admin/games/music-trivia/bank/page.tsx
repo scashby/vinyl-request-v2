@@ -335,6 +335,8 @@ export default function MusicTriviaBankPage() {
   const [artistLinkResults, setArtistLinkResults] = useState<Array<{ id: number; label: string }>>([]);
   const [albumLinkQ, setAlbumLinkQ] = useState("");
   const [albumLinkResults, setAlbumLinkResults] = useState<Array<{ id: number; label: string }>>([]);
+  const [trackLinkQ, setTrackLinkQ] = useState("");
+  const [trackLinkResults, setTrackLinkResults] = useState<InventoryTrackResult[]>([]);
 
   const setFormField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -386,6 +388,19 @@ export default function MusicTriviaBankPage() {
     const t = window.setTimeout(() => { void searchAlbumLinks(albumLinkQ); }, 250);
     return () => window.clearTimeout(t);
   }, [albumLinkQ, searchAlbumLinks]);
+
+  const searchTrackLinks = useCallback(async (q: string) => {
+    if (!q.trim()) { setTrackLinkResults([]); return; }
+    const res = await fetch(`/api/games/trivia/inventory-search?q=${encodeURIComponent(q.trim())}&limit=20`);
+    if (!res.ok) return;
+    const payload = await res.json().catch(() => ({}));
+    setTrackLinkResults(Array.isArray(payload.data) ? payload.data : []);
+  }, []);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => { void searchTrackLinks(trackLinkQ); }, 250);
+    return () => window.clearTimeout(t);
+  }, [trackLinkQ, searchTrackLinks]);
 
   const setSourceField = (index: number, key: keyof TriviaQuestionSource, value: string | boolean) => {
     setForm((current) => ({
@@ -1208,6 +1223,69 @@ export default function MusicTriviaBankPage() {
                 {albumLinkQ.trim() && albumLinkResults.length === 0 && (
                   <p className="text-[11px] text-amber-400">Not found in collection — use &quot;Add unlinked&quot; to save anyway</p>
                 )}
+              </div>
+
+              {/* Add track */}
+              <div className="mt-2 space-y-2 rounded border border-stone-800 bg-stone-950/40 p-2">
+                <p className="font-semibold text-stone-300">+ Track</p>
+                <input
+                  className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                  value={trackLinkQ}
+                  onChange={(e) => setTrackLinkQ(e.target.value)}
+                  placeholder="Type song title to search collection…"
+                />
+                {trackLinkResults.length > 0 && (
+                  <div className="max-h-40 overflow-auto rounded border border-stone-800">
+                    {trackLinkResults.map((track) => {
+                      const label = `${track.title} — ${track.artist} (${track.album})`;
+                      return (
+                        <button
+                          key={`${track.inventory_id}-${track.track_key ?? ""}-${track.position ?? ""}`}
+                          className="block w-full border-b border-stone-900 px-3 py-1.5 text-left hover:bg-violet-950/30 last:border-b-0"
+                          onClick={() => {
+                            addScope({
+                              scope_type: "track",
+                              scope_ref_id: track.inventory_id,
+                              scope_value: track.track_key ?? String(track.inventory_id),
+                              display_label: label,
+                            });
+                            setTrackLinkQ("");
+                            setTrackLinkResults([]);
+                          }}
+                        >
+                          <span className="text-stone-200">{track.title}</span>
+                          <span className="ml-2 text-[10px] text-stone-400">{track.artist}</span>
+                          <span className="ml-1 text-[10px] text-stone-500">{track.album}</span>
+                          {track.position && <span className="ml-1 text-[10px] text-stone-600">#{track.position}</span>}
+                          <span className="ml-2 text-[10px] text-violet-400">✓ in collection</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {trackLinkQ.trim() && trackLinkResults.length === 0 && (
+                  <p className="text-[11px] text-stone-500">No tracks found — try a different search term.</p>
+                )}
+              </div>
+
+              {/* Add format */}
+              <div className="mt-2 rounded border border-stone-800 bg-stone-950/40 p-2">
+                <p className="mb-1 font-semibold text-stone-300">+ Format</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {["vinyl", '12"', '7"', '10"', "CD", "cassette", "digital"].map((fmt) => {
+                    const already = form.scopes.some((s) => s.scope_type === "format" && s.scope_value === fmt);
+                    return (
+                      <button
+                        key={fmt}
+                        disabled={already}
+                        onClick={() => addScope({ scope_type: "format", scope_ref_id: null, scope_value: fmt, display_label: fmt })}
+                        className={`rounded border px-2 py-0.5 text-[11px] ${already ? "border-stone-800 text-stone-600 cursor-not-allowed" : "border-stone-600 text-stone-300 hover:border-stone-400"}`}
+                      >
+                        {already ? `${fmt} ✓` : `+ ${fmt}`}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Add playlist/crate */}
