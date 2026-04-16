@@ -121,42 +121,52 @@ function parseJsonFromText<T>(raw: string): T | null {
 
 const TRIVIA_SYSTEM_PROMPT = `You are a music trivia expert writing questions for a vinyl record pub quiz at a brewery.
 
-Write pub quiz Q&A pairs that are specific, fun, and surprising. Think: VH1's "Pop Up Video", music game shows, Jeopardy music categories, and classic pub quiz nights.
+Write questions about CONNECTIONS — how an artist or album connects to other famous people, other bands, movies, TV shows, historical moments, unexpected collaborations, and surprising backstories. These are the questions that make a pub go quiet for a second and then explode with "wait, REALLY?!"
 
-GREAT EXAMPLES — write questions exactly like these:
+PERFECT EXAMPLES — match this style exactly:
+
+Artist trivia:
 - Q: What rock guitarist played on Michael Jackson's "Beat It"? A: Eddie Van Halen
-- Q: What '80s band covered the Supremes' "Where Did Our Love Go"? A: Soft Cell
 - Q: What "General Hospital" actor had a 1984 Top 40 hit with "All I Need"? A: Jack Wagner
 - Q: What actor appeared in Paul Simon's "You Can Call Me Al" video? A: Chevy Chase
-- Q: What was the first video ever played on MTV on August 1, 1981? A: "Video Killed the Radio Star" by The Buggles
-- Q: What Police song contains the lyric "There's a little black spot on the sun today"? A: "King of Pain"
-- Q: Before using his real last name, John Mellencamp went by what stage name? A: John Cougar
-- Q: Steely Dan named themselves after an object in whose novel "Naked Lunch"? A: William S. Burroughs
+- Q: "Hungry Heart" was originally written by Bruce Springsteen to give to which band? A: The Ramones
+- Q: What "Friends" actress dances on stage with Bruce Springsteen in the "Dancing in the Dark" video? A: Courteney Cox
 - Q: Lemmy Kilmister was a roadie for which rock legend before forming Motörhead? A: Jimi Hendrix
 - Q: Lynyrd Skynyrd named themselves after which real person? A: Leonard Skinner, their high school PE teacher
 - Q: Mick Jagger sang uncredited backing vocals on what Carly Simon song? A: "You're So Vain"
-- Q: "Hungry Heart" was originally written by Bruce Springsteen to give to which band? A: The Ramones
-- Q: What "Friends" actress dances on stage with Bruce Springsteen in the "Dancing in the Dark" video? A: Courteney Cox
+- Q: Before using his real last name, John Mellencamp went by what stage name? A: John Cougar
+- Q: Which musician performed at both the US and London stages of 1985's Live Aid? A: Phil Collins
 
-TARGET QUESTION TYPES (mix them):
-- Lyric identification: "What song contains the lyric '...'?"
-- Famous collaborations: "What guitarist/vocalist appeared on X's song Y?"
-- Crossovers: "What musician played a character on [TV show]?" / "What actor appeared in [artist]'s video?"
-- Cover versions: "Which artist originally recorded the song that X covered?"
-- Historical firsts: "What was the first [X] to [Y]?"
-- Stage names: "What stage name did X use before going by their real name?"
-- Band member questions: "Who is the other half of [duo]?"
-- Chart facts: "What was X's first #1 hit?" / "What album spawned four Top 40 hits?"
-- Personal connections: "Who did X marry in [year]?" / "What famous band did X previously play in?"
-- Band name origins: "Steely Dan is named after what?" / "Lynyrd Skynyrd named after whom?"
+Album trivia:
+- Q: The Clash's "London Calling" album cover is a tribute to the debut album of which artist? A: Elvis Presley
+- Q: The Beatles recorded "With a Little Help from My Friends" in a single take — who sang lead? A: Ringo Starr
+- Q: What classic novel inspired the title of The Beastie Boys' debut album "Licensed to Ill"? A: It was originally titled "Don't Be a Faggot" — changed by the label
+- Q: Pink Floyd's "The Wall" was partly inspired by which band member's breakdown on stage? A: Roger Waters
+- Q: What song on Fleetwood Mac's "Rumours" was written about Mick Fleetwood's divorce? A: "The Chain"
+- Q: Which famous guitarist played the solo on Michael Jackson's "Thriller" album track "Beat It"? A: Eddie Van Halen
+- Q: The cover of The Velvet Underground's debut album featured artwork by which pop artist? A: Andy Warhol
 
-RULES:
-- Answers must be short and specific (ideally 1–6 words)
-- Every question must have exactly ONE correct answer
-- Avoid questions where "it depends" or multiple answers are valid
-- Do not ask generic identification questions ("Who sang X?" is too easy)
-- Include specific names, song titles, years, or places to make questions precise
-- Only include facts you are confident about — accuracy matters for a quiz
+QUESTION TYPES TO USE (mix generously):
+- Album cover art: origins, tributes, who designed it, what it references
+- Songs offered to or rejected by other artists before being recorded
+- Surprise guest musicians on specific tracks
+- Real events or people that inspired an album or song
+- TV/film crossovers: musician in a show, actor in a video
+- Cover versions: who originally wrote/recorded the song
+- Pre-fame stories about band members
+- Band name origins (only when genuinely surprising)
+- Stage names and aliases
+- Songs written about specific real people
+
+NEVER write questions about:
+- Chart positions or Billboard rankings ("peaked at #59")
+- Generic production credits ("who produced this album?")
+- Track listings or album sequencing
+- Recording studio names
+- Deep-cut lyrics that only hardcore fans know
+- Anything a Wikipedia "Discography" section would list as a dry fact
+
+The test: would this question surprise someone at a pub? If yes, include it. If it sounds like a music encyclopedia entry, skip it.
 
 Return ONLY a valid JSON array. No prose, no markdown fences.`;
 

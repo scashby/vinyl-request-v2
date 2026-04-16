@@ -159,7 +159,7 @@ function Spinner() {
 // ---------------------------------------------------------------------------
 
 export default function GenerateTriviaPage() {
-  const [mode, setMode] = useState<"wizard" | "classic">("wizard");
+  const [mode, setMode] = useState<"api" | "wizard" | "classic">("api");
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,#0f2d3a,transparent_45%),linear-gradient(180deg,#111,#070707)] p-6 text-stone-100">
@@ -173,26 +173,151 @@ export default function GenerateTriviaPage() {
             <Link href="/admin/games/music-trivia/bank" className="rounded border border-stone-700 px-3 py-1">Question Bank</Link>
             <Link href="/admin/games/music-trivia/decks" className="rounded border border-stone-700 px-3 py-1">Deck Builder</Link>
           </div>
-          {/* Mode toggle */}
           <div className="mt-4 flex gap-2 text-xs">
-            <button
-              onClick={() => setMode("wizard")}
-              className={`rounded px-3 py-1 ${mode === "wizard" ? "bg-cyan-800 text-cyan-100" : "border border-stone-700 text-stone-400 hover:text-stone-200"}`}
-            >
+            <button onClick={() => setMode("api")} className={`rounded px-3 py-1 ${mode === "api" ? "bg-cyan-800 text-cyan-100" : "border border-stone-700 text-stone-400 hover:text-stone-200"}`}>
+              Trivia API Import
+            </button>
+            <button onClick={() => setMode("wizard")} className={`rounded px-3 py-1 ${mode === "wizard" ? "bg-fuchsia-800 text-fuchsia-100" : "border border-stone-700 text-stone-400 hover:text-stone-200"}`}>
               AI Fact Generator
             </button>
-            <button
-              onClick={() => setMode("classic")}
-              className={`rounded px-3 py-1 ${mode === "classic" ? "bg-stone-700 text-stone-100" : "border border-stone-700 text-stone-400 hover:text-stone-200"}`}
-            >
-              Classic Template Mode
+            <button onClick={() => setMode("classic")} className={`rounded px-3 py-1 ${mode === "classic" ? "bg-stone-700 text-stone-100" : "border border-stone-700 text-stone-400 hover:text-stone-200"}`}>
+              Classic Templates
             </button>
           </div>
         </header>
 
-        {mode === "wizard" ? <WizardMode /> : <ClassicMode />}
+        {mode === "api" ? <TriviaApiMode /> : mode === "wizard" ? <WizardMode /> : <ClassicMode />}
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Trivia API Import Mode — pulls real curated trivia from the-trivia-api.com
+// ---------------------------------------------------------------------------
+
+type ApiImportResult = { imported: number; skipped: number; total_fetched: number; message: string };
+
+function TriviaApiMode() {
+  const [scopeType, setScopeType] = useState<"collection" | "decade" | "genre">("collection");
+  const [scopeValue, setScopeValue] = useState("");
+  const [difficulties, setDifficulties] = useState<string[]>(["easy", "medium", "hard"]);
+  const [limit, setLimit] = useState(50);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<ApiImportResult | null>(null);
+  const [error, setError] = useState("");
+
+  function toggleDifficulty(d: string) {
+    setDifficulties((prev) =>
+      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
+    );
+  }
+
+  async function handleImport() {
+    setLoading(true);
+    setError("");
+    setResult(null);
+    try {
+      const body: Record<string, unknown> = { limit, created_by: "trivia-api-import" };
+      if (difficulties.length < 3) body.difficulties = difficulties;
+      if (scopeType !== "collection" && scopeValue.trim()) {
+        body.scope_type = scopeType;
+        body.scope_value = scopeValue.trim();
+      }
+      const res = await fetch("/api/games/trivia/import-trivia-api", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (!res.ok) { setError(json.error ?? "Import failed"); return; }
+      setResult(json as ApiImportResult);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-5 space-y-5">
+      <div>
+        <h2 className="text-lg font-black uppercase text-cyan-100">Trivia API Import</h2>
+        <p className="mt-1 text-xs text-stone-400">
+          Pulls real curated music trivia questions from{" "}
+          <span className="text-stone-300">the-trivia-api.com</span> — already formatted with
+          correct answer + 3 wrong options. Questions land in the Question Bank as drafts for review.
+        </p>
+      </div>
+
+      {/* Scope */}
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-400">Filter by</p>
+        <div className="flex gap-2 text-xs">
+          {(["collection", "decade", "genre"] as const).map((s) => (
+            <label key={s} className="flex cursor-pointer items-center gap-1.5 rounded border border-stone-700 px-2 py-1.5 capitalize hover:border-cyan-700">
+              <input type="radio" name="api-scope" checked={scopeType === s} onChange={() => { setScopeType(s); setScopeValue(""); }} className="accent-cyan-400" />
+              {s === "collection" ? "All Music" : s}
+            </label>
+          ))}
+        </div>
+
+        {scopeType === "decade" && (
+          <select value={scopeValue} onChange={(e) => setScopeValue(e.target.value)} className="mt-2 rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm text-stone-200">
+            <option value="">— Select decade —</option>
+            {DECADE_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
+        )}
+        {scopeType === "genre" && (
+          <input type="text" value={scopeValue} onChange={(e) => setScopeValue(e.target.value)} placeholder="e.g. Rock, Pop, Hip Hop" className="mt-2 rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm text-stone-200 placeholder-stone-500 w-64" />
+        )}
+      </div>
+
+      {/* Difficulty */}
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-400">Difficulty</p>
+        <div className="flex gap-2 text-xs">
+          {["easy", "medium", "hard"].map((d) => (
+            <label key={d} className="flex cursor-pointer items-center gap-1.5 rounded border border-stone-700 px-2 py-1.5 capitalize hover:border-cyan-700">
+              <input type="checkbox" checked={difficulties.includes(d)} onChange={() => toggleDifficulty(d)} className="accent-cyan-400" />
+              {d}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Limit */}
+      <div>
+        <label className="text-xs font-semibold text-stone-400">
+          Questions to import <span className="font-normal text-stone-500">(max 50 per request)</span>
+        </label>
+        <input type="number" min={1} max={50} value={limit} onChange={(e) => setLimit(Math.max(1, Math.min(50, Number(e.target.value) || 50)))} className="mt-1 w-24 rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm text-stone-200" />
+      </div>
+
+      {error && <p className="text-xs text-red-400">{error}</p>}
+
+      {result && (
+        <div className="rounded-lg border border-emerald-700 bg-emerald-950/30 p-4 space-y-2">
+          <p className="text-sm font-semibold text-emerald-300">{result.message}</p>
+          <div className="flex gap-4 text-xs text-stone-400">
+            <span>Fetched: <strong className="text-stone-200">{result.total_fetched}</strong></span>
+            <span>New: <strong className="text-emerald-300">{result.imported}</strong></span>
+            <span>Already existed: <strong className="text-stone-400">{result.skipped}</strong></span>
+          </div>
+          <Link href="/admin/games/music-trivia/bank?tag=trivia-api" className="inline-block text-xs text-cyan-400 underline hover:text-cyan-200">
+            Review imported questions in Question Bank →
+          </Link>
+        </div>
+      )}
+
+      <button
+        onClick={handleImport}
+        disabled={loading || difficulties.length === 0 || (scopeType !== "collection" && !scopeValue.trim())}
+        className="rounded border border-cyan-700 bg-cyan-900/30 px-5 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-900/60 disabled:opacity-50"
+      >
+        {loading ? <><Spinner /> Importing…</> : "Import Questions →"}
+      </button>
+    </section>
   );
 }
 

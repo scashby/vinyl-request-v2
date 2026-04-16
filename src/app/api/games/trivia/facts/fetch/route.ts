@@ -460,7 +460,8 @@ export async function POST(request: NextRequest) {
   for (const master of masters) {
     const genres: string[] = master.genres ?? [];
 
-    // Ask Claude Sonnet for counterintuitive, pub-quiz-worthy trivia about the album
+    // Album-level trivia: cover art origins, song backstories, recording surprises,
+    // guest appearances, connections to other albums/artists/events
     try {
       const aiAlbumFacts = await generateRawTrivia(master.title, "album", { genres });
       const { inserted: aiAlbumInserted, skipped: aiAlbumSkipped } = await insertAIFacts(
@@ -472,11 +473,10 @@ export async function POST(request: NextRequest) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[facts/fetch] AI album error for "${master.title}":`, msg);
       apiErrors.push(`album "${master.title}": ${msg}`);
-      // Stop on first API error — likely auth/model issue affecting all calls
       break;
     }
 
-    // Ask Claude Sonnet for surprising artist trivia (once per artist)
+    // Artist-level trivia: crossovers, pre-fame stories, collaborations, stage names
     if (master.main_artist_id && !processedArtists.has(master.main_artist_id)) {
       processedArtists.add(master.main_artist_id);
       const artist = artistMap.get(master.main_artist_id);
@@ -492,6 +492,7 @@ export async function POST(request: NextRequest) {
           const msg = err instanceof Error ? err.message : String(err);
           console.error(`[facts/fetch] AI artist error for "${artist.name}":`, msg);
           apiErrors.push(`artist "${artist.name}": ${msg}`);
+          break;
         }
       }
     }
