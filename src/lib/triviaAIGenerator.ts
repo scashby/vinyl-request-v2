@@ -131,7 +131,7 @@ GREAT EXAMPLES — write questions exactly like these:
 - Q: What was the first video ever played on MTV on August 1, 1981? A: "Video Killed the Radio Star" by The Buggles
 - Q: What Police song contains the lyric "There's a little black spot on the sun today"? A: "King of Pain"
 - Q: Before using his real last name, John Mellencamp went by what stage name? A: John Cougar
-- Q: Steely Dan is named after a steam-powered dildo in whose novel? A: William S. Burroughs
+- Q: Steely Dan named themselves after an object in whose novel "Naked Lunch"? A: William S. Burroughs
 - Q: Lemmy Kilmister was a roadie for which rock legend before forming Motörhead? A: Jimi Hendrix
 - Q: Lynyrd Skynyrd named themselves after which real person? A: Leonard Skinner, their high school PE teacher
 - Q: Mick Jagger sang uncredited backing vocals on what Carly Simon song? A: "You're So Vain"
