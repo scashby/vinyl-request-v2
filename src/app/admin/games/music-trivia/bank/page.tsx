@@ -7,7 +7,7 @@ import { formatSecondsClock, parseCueTimeToSeconds } from "src/lib/triviaBank";
 
 type QuestionStatus = "draft" | "published" | "archived";
 type Difficulty = "easy" | "medium" | "hard";
-type CueSourceType = "inventory_track" | "uploaded_clip";
+type CueSourceType = "inventory_track" | "uploaded_clip" | "none";
 type TriviaAssetRole = "clue_primary" | "clue_secondary" | "answer_visual" | "explanation_media";
 type TriviaAssetType = "image" | "audio" | "video";
 
@@ -98,6 +98,7 @@ type QuestionDetail = {
   primary_cue_end_seconds: number | null;
   primary_cue_instruction: string | null;
   cue_notes_text: string | null;
+  source_note?: string | null;
   assets: TriviaQuestionAsset[];
   sources?: TriviaQuestionSource[];
   scopes?: TriviaQuestionScope[];
@@ -153,8 +154,8 @@ const DEFAULT_FORM: FormState = {
   category: "General Music",
   difficulty: "medium",
   selected_tags: [],
-  cue_source_mode: "inventory_track",
-  cue_start_text: "0:30",
+  cue_source_mode: "none",
+  cue_start_text: "",
   cue_end_text: "",
   cue_instruction: "",
   cue_notes_text: "",
@@ -228,6 +229,33 @@ function mapDetailToForm(detail: QuestionDetail): FormState {
 
   const alternateAnswers = (detail.accepted_answers ?? []).filter((answer) => answer !== detail.answer_key);
 
+  // Auto-populate sources for API/AI questions that have no manual sources yet
+  let autoSources: TriviaQuestionSource[] = [];
+  if (!Array.isArray(detail.sources) || detail.sources.length === 0) {
+    if (typeof detail.source_note === "string" && detail.source_note.startsWith("trivia-api:")) {
+      autoSources = [{
+        ...DEFAULT_SOURCE,
+        source_kind: "api",
+        source_url: "https://the-trivia-api.com",
+        source_title: "The Trivia API",
+        source_domain: "the-trivia-api.com",
+        excerpt_text: `Question ID: ${detail.source_note}`,
+        verification_status: "approved",
+        is_primary: true,
+      }];
+    } else if ((detail.tags ?? []).includes("ai-generated")) {
+      autoSources = [{
+        ...DEFAULT_SOURCE,
+        source_kind: "api",
+        source_url: "",
+        source_title: "AI Generated (Claude Sonnet)",
+        source_domain: "anthropic.com",
+        verification_status: "unreviewed",
+        is_primary: true,
+      }];
+    }
+  }
+
   return {
     question_text: detail.prompt_text,
     correct_answer: detail.answer_key,
@@ -235,14 +263,14 @@ function mapDetailToForm(detail: QuestionDetail): FormState {
     category: detail.default_category,
     difficulty: detail.default_difficulty,
     selected_tags: detail.tags ?? [],
-    cue_source_mode: detail.cue_source_type ?? "inventory_track",
+    cue_source_mode: (detail.cue_source_type ?? "none") as CueSourceType,
     cue_start_text: detail.primary_cue_start_seconds !== null ? formatSecondsClock(detail.primary_cue_start_seconds) : "",
     cue_end_text: detail.primary_cue_end_seconds !== null ? formatSecondsClock(detail.primary_cue_end_seconds) : "",
     cue_instruction: detail.primary_cue_instruction ?? "",
     cue_notes_text: detail.cue_notes_text ?? "",
     selected_track: selectedTrack,
     selected_clip_asset_id: selectedClipAsset?.id ?? null,
-    sources: Array.isArray(detail.sources)
+    sources: Array.isArray(detail.sources) && detail.sources.length > 0
       ? detail.sources.map((source, index) => ({
           ...DEFAULT_SOURCE,
           ...source,
@@ -258,7 +286,7 @@ function mapDetailToForm(detail: QuestionDetail): FormState {
           relationship_type: source.relationship_type ?? "research",
           source_kind: source.source_kind ?? "editorial",
         }))
-      : [],
+      : autoSources,
     scopes: Array.isArray(detail.scopes)
       ? detail.scopes.map((scope) => ({
           id: scope.id,
@@ -302,6 +330,12 @@ export default function MusicTriviaBankPage() {
   const [uploadingAssets, setUploadingAssets] = useState(false);
   const inventorySearchRequestRef = useRef(0);
 
+  // Collection links entity search
+  const [artistLinkQ, setArtistLinkQ] = useState("");
+  const [artistLinkResults, setArtistLinkResults] = useState<Array<{ id: number; label: string }>>([]);
+  const [albumLinkQ, setAlbumLinkQ] = useState("");
+  const [albumLinkResults, setAlbumLinkResults] = useState<Array<{ id: number; label: string }>>([]);
+
   const setFormField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
   };
@@ -326,6 +360,33 @@ export default function MusicTriviaBankPage() {
       scopes: [...current.scopes, scope],
     }));
   };
+
+  const searchArtistLinks = useCallback(async (q: string) => {
+    if (!q.trim()) { setArtistLinkResults([]); return; }
+    const res = await fetch(`/api/games/trivia/search-artists?q=${encodeURIComponent(q.trim())}`);
+    if (!res.ok) return;
+    const payload = await res.json().catch(() => ({}));
+    setArtistLinkResults(Array.isArray(payload) ? payload : []);
+  }, []);
+
+  const searchAlbumLinks = useCallback(async (q: string) => {
+    if (!q.trim()) { setAlbumLinkResults([]); return; }
+    const res = await fetch(`/api/games/trivia/search-albums?q=${encodeURIComponent(q.trim())}`);
+    if (!res.ok) return;
+    const payload = await res.json().catch(() => ({}));
+    setAlbumLinkResults(Array.isArray(payload) ? payload : []);
+  }, []);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => { void searchArtistLinks(artistLinkQ); }, 250);
+    return () => window.clearTimeout(t);
+  }, [artistLinkQ, searchArtistLinks]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => { void searchAlbumLinks(albumLinkQ); }, 250);
+    return () => window.clearTimeout(t);
+  }, [albumLinkQ, searchAlbumLinks]);
+
   const setSourceField = (index: number, key: keyof TriviaQuestionSource, value: string | boolean) => {
     setForm((current) => ({
       ...current,
@@ -372,22 +433,24 @@ export default function MusicTriviaBankPage() {
     if (!form.question_text.trim()) return "Question text is required.";
     if (!form.correct_answer.trim()) return "Correct answer is required.";
 
-    const startSeconds = parseCueTimeToSeconds(form.cue_start_text);
-    if (startSeconds === null) return "Cue start time is required (use m:ss).";
+    // Cue validation only applies when cue is actually configured
+    if (form.cue_source_mode !== "none") {
+      if (form.cue_start_text.trim()) {
+        const startSeconds = parseCueTimeToSeconds(form.cue_start_text);
+        if (startSeconds === null) return "Cue start time format is invalid (use m:ss).";
 
-    if (form.cue_end_text.trim()) {
-      const endSeconds = parseCueTimeToSeconds(form.cue_end_text);
-      if (endSeconds === null) return "Cue end time is invalid.";
-      if (endSeconds < startSeconds) return "Cue end time must be after cue start time.";
+        if (form.cue_end_text.trim()) {
+          const endSeconds = parseCueTimeToSeconds(form.cue_end_text);
+          if (endSeconds === null) return "Cue end time is invalid.";
+          if (endSeconds < startSeconds) return "Cue end time must be after cue start time.";
+        }
+      }
+
+      if (form.cue_source_mode === "uploaded_clip" && !selectedId) {
+        return "Save this question first, then attach and select a clip cue.";
+      }
     }
 
-    if (form.cue_source_mode === "inventory_track") {
-      if (!form.selected_track) return "Pick a vinyl track for cue source.";
-      return null;
-    }
-
-    if (!selectedId) return "Save this question first, then attach and select a clip cue.";
-    if (!form.selected_clip_asset_id) return "Select an uploaded audio/video clip for cue source.";
     return null;
   }, [form, selectedId]);
 
@@ -551,6 +614,8 @@ export default function MusicTriviaBankPage() {
     const selectedTrack = form.selected_track;
     const selectedClip = selectedClipCueAsset;
 
+    const hasCue = cueSourceMode !== "none";
+    const cueSourceType = hasCue ? cueSourceMode : null;
     const cueSourcePayload = cueSourceMode === "inventory_track"
       ? {
           inventory_id: selectedTrack?.inventory_id,
@@ -562,11 +627,13 @@ export default function MusicTriviaBankPage() {
           side: selectedTrack?.side,
           position: selectedTrack?.position,
         }
-      : {
-          asset_id: selectedClip?.id,
-          bucket: selectedClip?.bucket,
-          object_path: selectedClip?.object_path,
-        };
+      : cueSourceMode === "uploaded_clip"
+        ? {
+            asset_id: selectedClip?.id,
+            bucket: selectedClip?.bucket,
+            object_path: selectedClip?.object_path,
+          }
+        : {};
 
     setSaving(true);
     try {
@@ -585,16 +652,13 @@ export default function MusicTriviaBankPage() {
           category: form.category,
           difficulty: form.difficulty,
           tags: form.selected_tags,
-          cue_source_type: cueSourceMode,
+          cue_source_type: cueSourceType,
           cue_source_payload: cueSourcePayload,
-          primary_cue_start_seconds: form.cue_start_text,
-          primary_cue_end_seconds: form.cue_end_text || null,
-          primary_cue_instruction: form.cue_instruction || null,
-          cue_notes_text: form.cue_notes_text || null,
+          primary_cue_start_seconds: hasCue ? (form.cue_start_text || null) : null,
+          primary_cue_end_seconds: hasCue ? (form.cue_end_text || null) : null,
+          primary_cue_instruction: hasCue ? (form.cue_instruction || null) : null,
+          cue_notes_text: hasCue ? (form.cue_notes_text || null) : null,
           explanation_text: null,
-          source_note: cueSourceMode === "inventory_track"
-            ? `Bank cue source: ${formatTrackLabel(selectedTrack)}`
-            : `Bank cue source: uploaded clip ${selectedClip?.object_path ?? ""}`,
           sources: form.sources,
           scopes: form.scopes,
           publish,
@@ -1011,124 +1075,191 @@ export default function MusicTriviaBankPage() {
             </div>
 
             <section className="mt-4 rounded border border-emerald-900/60 bg-emerald-950/20 p-3 text-xs">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="font-semibold text-emerald-200">Question Scopes</p>
-                  <p className="text-[11px] text-emerald-100/70">Attach reusable matching scopes so questions can later be targeted by playlist, crate, artist, album, format, or specific cue track.</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button className="rounded border border-emerald-700 px-2 py-1" onClick={() => addScope({ scope_type: "playlist", scope_ref_id: null, scope_value: "", display_label: "" })}>+ Playlist</button>
-                  <button className="rounded border border-emerald-700 px-2 py-1" onClick={() => addScope({ scope_type: "crate", scope_ref_id: null, scope_value: "", display_label: "" })}>+ Crate</button>
-                  <button className="rounded border border-emerald-700 px-2 py-1" onClick={() => addScope({ scope_type: "artist", scope_ref_id: null, scope_value: form.selected_track?.artist ?? "", display_label: form.selected_track?.artist ?? "" })}>+ Artist</button>
-                  <button className="rounded border border-emerald-700 px-2 py-1" onClick={() => addScope({ scope_type: "album", scope_ref_id: null, scope_value: form.selected_track?.album ?? "", display_label: form.selected_track?.album ?? "" })}>+ Album</button>
-                  <button className="rounded border border-emerald-700 px-2 py-1" onClick={() => addScope({ scope_type: "format", scope_ref_id: null, scope_value: "", display_label: "" })}>+ Format</button>
-                  <button className="rounded border border-emerald-700 px-2 py-1" onClick={() => {
-                    if (!form.selected_track) {
-                      alert("Pick a cue track first, then add a track scope.");
-                      return;
-                    }
-                    addScope({
-                      scope_type: "track",
-                      scope_ref_id: form.selected_track.inventory_id,
-                      scope_value: form.selected_track.track_key ?? String(form.selected_track.inventory_id),
-                      display_label: formatTrackLabel(form.selected_track),
-                    });
-                  }}>+ Cue Track</button>
-                </div>
+              <div className="mb-3">
+                <p className="font-semibold text-emerald-200">Collection Links</p>
+                <p className="mt-0.5 text-[11px] text-emerald-100/60">
+                  Link this question to artists, albums, playlists, or crates in your collection.
+                  Questions linked to artists/albums you own will be surfaced during collection-scoped trivia rounds.
+                  You can also link to artists you <em>don&apos;t</em> own yet — those questions stay in the bank until you do.
+                </p>
               </div>
 
-              {form.scopes.length === 0 ? <p className="mt-2 text-stone-400">No scopes attached yet.</p> : null}
+              {/* Current scopes */}
+              {form.scopes.length > 0 && (
+                <div className="mb-3 flex flex-wrap gap-1.5">
+                  {form.scopes.map((scope, index) => {
+                    const inCollection = scope.scope_ref_id !== null && scope.scope_ref_id !== undefined;
+                    const label = scope.display_label || scope.scope_value || scope.scope_type;
+                    const typeColor: Record<string, string> = {
+                      artist: "border-emerald-700 bg-emerald-950/50 text-emerald-200",
+                      album: "border-cyan-700 bg-cyan-950/50 text-cyan-200",
+                      track: "border-violet-700 bg-violet-950/50 text-violet-200",
+                      playlist: "border-amber-700 bg-amber-950/50 text-amber-200",
+                      crate: "border-amber-700 bg-amber-950/50 text-amber-200",
+                      format: "border-stone-600 bg-stone-900/50 text-stone-300",
+                    };
+                    return (
+                      <span key={`${scope.scope_type ?? "scope"}-${scope.id ?? index}-${index}`}
+                        className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 ${typeColor[scope.scope_type ?? ""] ?? "border-stone-600 bg-stone-900 text-stone-300"}`}>
+                        <span className="text-[9px] uppercase tracking-wide opacity-70">{scope.scope_type}</span>
+                        <span>{label}</span>
+                        {inCollection
+                          ? <span title="In your collection" className="text-emerald-400">✓</span>
+                          : <span title="Not yet in collection" className="text-amber-400">○</span>
+                        }
+                        <button onClick={() => removeScope(index)} className="ml-0.5 opacity-60 hover:opacity-100">×</button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
 
-              <div className="mt-3 space-y-2">
-                {form.scopes.map((scope, index) => (
-                  <div key={`${scope.scope_type ?? "scope"}-${scope.id ?? index}-${index}`} className="rounded border border-stone-800 bg-stone-950/50 p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-semibold text-stone-100">{scope.scope_type?.toUpperCase() ?? "SCOPE"}</p>
-                      <button className="rounded border border-stone-700 px-2 py-0.5" onClick={() => removeScope(index)}>Remove</button>
-                    </div>
+              {form.scopes.length === 0 && (
+                <p className="mb-3 text-stone-500">No collection links yet. Add below.</p>
+              )}
 
-                    {scope.scope_type === "playlist" ? (
-                      <label className="mt-2 block">Playlist
-                        <select
-                          className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1"
-                          value={scope.scope_ref_id ?? ""}
-                          onChange={(e) => {
-                            const selected = playlistOptions.find((option) => option.id === Number(e.target.value));
-                            updateScope(index, {
-                              scope_ref_id: e.target.value ? Number(e.target.value) : null,
-                              scope_value: selected?.name ?? "",
-                              display_label: selected?.name ?? "",
-                            });
-                          }}
-                        >
-                          <option value="">Choose playlist</option>
-                          {playlistOptions.map((option) => (
-                            <option key={option.id} value={option.id}>{option.name}</option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : null}
-
-                    {scope.scope_type === "crate" ? (
-                      <label className="mt-2 block">Crate
-                        <select
-                          className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1"
-                          value={scope.scope_ref_id ?? ""}
-                          onChange={(e) => {
-                            const selected = crateOptions.find((option) => option.id === Number(e.target.value));
-                            updateScope(index, {
-                              scope_ref_id: e.target.value ? Number(e.target.value) : null,
-                              scope_value: selected?.name ?? "",
-                              display_label: selected?.name ?? "",
-                            });
-                          }}
-                        >
-                          <option value="">Choose crate</option>
-                          {crateOptions.map((option) => (
-                            <option key={option.id} value={option.id}>{option.name}</option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : null}
-
-                    {(scope.scope_type === "artist" || scope.scope_type === "album" || scope.scope_type === "format") ? (
-                      <label className="mt-2 block">Value
-                        <input
-                          className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1"
-                          value={scope.scope_value ?? ""}
-                          onChange={(e) => updateScope(index, { scope_value: e.target.value, display_label: e.target.value })}
-                          placeholder={`Enter ${scope.scope_type}`}
-                        />
-                      </label>
-                    ) : null}
-
-                    {scope.scope_type === "track" ? (
-                      <div className="mt-2 rounded border border-stone-800 bg-stone-950/70 p-2 text-stone-200">
-                        <p>{scope.display_label || scope.scope_value || "Track scope"}</p>
-                        <p className="mt-1 text-[11px] text-stone-400">Inventory ref: {scope.scope_ref_id ?? "-"}</p>
-                      </div>
-                    ) : null}
+              {/* Add artist */}
+              <div className="space-y-2 rounded border border-stone-800 bg-stone-950/40 p-2">
+                <p className="font-semibold text-stone-300">+ Artist</p>
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                    value={artistLinkQ}
+                    onChange={(e) => setArtistLinkQ(e.target.value)}
+                    placeholder="Type artist name to search collection…"
+                  />
+                  <button
+                    className="rounded border border-stone-700 px-2 py-1 text-stone-400 hover:text-stone-200"
+                    onClick={() => {
+                      if (artistLinkQ.trim()) {
+                        addScope({ scope_type: "artist", scope_ref_id: null, scope_value: artistLinkQ.trim(), display_label: artistLinkQ.trim() });
+                        setArtistLinkQ("");
+                        setArtistLinkResults([]);
+                      }
+                    }}
+                    title="Add without collection link (not in collection yet)"
+                  >
+                    Add unlinked
+                  </button>
+                </div>
+                {artistLinkResults.length > 0 && (
+                  <div className="max-h-36 overflow-auto rounded border border-stone-800">
+                    {artistLinkResults.map((r) => (
+                      <button key={r.id}
+                        className="block w-full border-b border-stone-900 px-3 py-1.5 text-left text-stone-200 hover:bg-emerald-950/30 last:border-b-0"
+                        onClick={() => {
+                          addScope({ scope_type: "artist", scope_ref_id: r.id, scope_value: r.label, display_label: r.label });
+                          setArtistLinkQ("");
+                          setArtistLinkResults([]);
+                        }}
+                      >
+                        <span>{r.label}</span>
+                        <span className="ml-2 text-[10px] text-emerald-400">✓ in collection</span>
+                      </button>
+                    ))}
                   </div>
-                ))}
+                )}
+                {artistLinkQ.trim() && artistLinkResults.length === 0 && (
+                  <p className="text-[11px] text-amber-400">Not found in collection — use &quot;Add unlinked&quot; to save anyway</p>
+                )}
+              </div>
+
+              {/* Add album */}
+              <div className="mt-2 space-y-2 rounded border border-stone-800 bg-stone-950/40 p-2">
+                <p className="font-semibold text-stone-300">+ Album</p>
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                    value={albumLinkQ}
+                    onChange={(e) => setAlbumLinkQ(e.target.value)}
+                    placeholder="Type album title to search collection…"
+                  />
+                  <button
+                    className="rounded border border-stone-700 px-2 py-1 text-stone-400 hover:text-stone-200"
+                    onClick={() => {
+                      if (albumLinkQ.trim()) {
+                        addScope({ scope_type: "album", scope_ref_id: null, scope_value: albumLinkQ.trim(), display_label: albumLinkQ.trim() });
+                        setAlbumLinkQ("");
+                        setAlbumLinkResults([]);
+                      }
+                    }}
+                    title="Add without collection link"
+                  >
+                    Add unlinked
+                  </button>
+                </div>
+                {albumLinkResults.length > 0 && (
+                  <div className="max-h-36 overflow-auto rounded border border-stone-800">
+                    {albumLinkResults.map((r) => (
+                      <button key={r.id}
+                        className="block w-full border-b border-stone-900 px-3 py-1.5 text-left text-stone-200 hover:bg-cyan-950/30 last:border-b-0"
+                        onClick={() => {
+                          addScope({ scope_type: "album", scope_ref_id: r.id, scope_value: r.label, display_label: r.label });
+                          setAlbumLinkQ("");
+                          setAlbumLinkResults([]);
+                        }}
+                      >
+                        <span>{r.label}</span>
+                        <span className="ml-2 text-[10px] text-cyan-400">✓ in collection</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {albumLinkQ.trim() && albumLinkResults.length === 0 && (
+                  <p className="text-[11px] text-amber-400">Not found in collection — use &quot;Add unlinked&quot; to save anyway</p>
+                )}
+              </div>
+
+              {/* Add playlist/crate */}
+              <div className="mt-2 flex flex-wrap gap-2">
+                <div className="flex-1 min-w-[160px]">
+                  <p className="mb-1 font-semibold text-stone-300">+ Playlist</p>
+                  <select
+                    className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                    value=""
+                    onChange={(e) => {
+                      const selected = playlistOptions.find((o) => o.id === Number(e.target.value));
+                      if (selected) addScope({ scope_type: "playlist", scope_ref_id: selected.id, scope_value: selected.name, display_label: selected.name });
+                    }}
+                  >
+                    <option value="">Choose playlist…</option>
+                    {playlistOptions.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                  </select>
+                </div>
+                <div className="flex-1 min-w-[160px]">
+                  <p className="mb-1 font-semibold text-stone-300">+ Crate</p>
+                  <select
+                    className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1"
+                    value=""
+                    onChange={(e) => {
+                      const selected = crateOptions.find((o) => o.id === Number(e.target.value));
+                      if (selected) addScope({ scope_type: "crate", scope_ref_id: selected.id, scope_value: selected.name, display_label: selected.name });
+                    }}
+                  >
+                    <option value="">Choose crate…</option>
+                    {crateOptions.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                  </select>
+                </div>
               </div>
             </section>
 
             <section className="mt-4 rounded border border-cyan-900/60 bg-cyan-950/20 p-3 text-xs">
-              <p className="font-semibold text-cyan-200">Cue Source (required)</p>
+              <p className="font-semibold text-cyan-200">Vinyl Cue <span className="font-normal text-stone-400">(optional — for knowledge questions, leave as No cue)</span></p>
 
               <label className="mt-2 block">
-                Cue source type
+                Cue source
                 <select
                   className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1"
                   value={form.cue_source_mode}
-                  onChange={(e) => setFormField("cue_source_mode", (e.target.value as CueSourceType) ?? "inventory_track")}
+                  onChange={(e) => setFormField("cue_source_mode", (e.target.value as CueSourceType) ?? "none")}
                 >
-                  <option value="inventory_track">Vinyl inventory track (default)</option>
-                  <option value="uploaded_clip">Uploaded clip (fallback)</option>
+                  <option value="none">No cue — knowledge question</option>
+                  <option value="inventory_track">Vinyl inventory track</option>
+                  <option value="uploaded_clip">Uploaded clip</option>
                 </select>
               </label>
 
-              {form.cue_source_mode === "inventory_track" ? (
+              {form.cue_source_mode !== "none" && form.cue_source_mode === "inventory_track" ? (
                 <div className="mt-2 space-y-2">
                   <div className="grid gap-2 lg:grid-cols-[1fr,120px,auto]">
                     <input
@@ -1179,7 +1310,7 @@ export default function MusicTriviaBankPage() {
                     </div>
                   ) : null}
                 </div>
-              ) : (
+              ) : form.cue_source_mode === "uploaded_clip" ? (
                 <div className="mt-2 space-y-2 rounded border border-stone-800 bg-stone-950/40 p-2">
                   {selectedId ? null : <p className="text-amber-300">Save this question first, then upload a clip and select it here.</p>}
                   {clipCueAssetOptions.length === 0 ? <p className="text-stone-400">No audio/video assets uploaded yet.</p> : null}
@@ -1198,34 +1329,40 @@ export default function MusicTriviaBankPage() {
                     </label>
                   ))}
                 </div>
+              ) : null}
+
+              {form.cue_source_mode === "none" ? (
+                <p className="mt-2 text-stone-500">No vinyl cue — this is a knowledge question. The host asks it verbally; no record needs to be cued.</p>
+              ) : (
+                <>
+                  <div className="mt-2 grid gap-2 lg:grid-cols-3">
+                    <label>Start (m:ss) — optional
+                      <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={form.cue_start_text} onChange={(e) => setFormField("cue_start_text", e.target.value)} placeholder="e.g. 0:30" />
+                    </label>
+                    <label>End (optional)
+                      <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={form.cue_end_text} onChange={(e) => setFormField("cue_end_text", e.target.value)} />
+                    </label>
+                    <label>Instruction
+                      <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={form.cue_instruction} onChange={(e) => setFormField("cue_instruction", e.target.value)} placeholder="Cue original at 1:23" />
+                    </label>
+                  </div>
+
+                  <label className="mt-2 block">Extra cue notes
+                    <textarea className="mt-1 h-16 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={form.cue_notes_text} onChange={(e) => setFormField("cue_notes_text", e.target.value)} placeholder="Play any song on album, start at 2:30" />
+                  </label>
+
+                  <div className="mt-2 rounded border border-cyan-800/70 bg-cyan-950/30 p-2">
+                    <p className="font-semibold uppercase tracking-wide text-cyan-200">Host Pull Card Preview</p>
+                    {form.cue_source_mode === "inventory_track" ? (
+                      <p className="mt-1 text-stone-100">{formatTrackLabel(form.selected_track)}</p>
+                    ) : (
+                      <p className="mt-1 text-stone-100">{selectedClipCueAsset ? `Uploaded clip: ${selectedClipCueAsset.object_path}` : "No uploaded clip selected"}</p>
+                    )}
+                    {form.cue_start_text.trim() && <p className="mt-1 text-stone-200">Cue: {parseCueTimeToSeconds(form.cue_start_text) !== null ? formatSecondsClock(parseCueTimeToSeconds(form.cue_start_text)!) : "invalid time"}</p>}
+                    {form.cue_instruction.trim() ? <p className="mt-1 text-stone-300">Instruction: {form.cue_instruction.trim()}</p> : null}
+                  </div>
+                </>
               )}
-
-              <div className="mt-2 grid gap-2 lg:grid-cols-3">
-                <label>Start (m:ss)
-                  <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={form.cue_start_text} onChange={(e) => setFormField("cue_start_text", e.target.value)} />
-                </label>
-                <label>End (optional)
-                  <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={form.cue_end_text} onChange={(e) => setFormField("cue_end_text", e.target.value)} />
-                </label>
-                <label>Instruction
-                  <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={form.cue_instruction} onChange={(e) => setFormField("cue_instruction", e.target.value)} placeholder="Cue original at 1:23" />
-                </label>
-              </div>
-
-              <label className="mt-2 block">Extra cue notes
-                <textarea className="mt-1 h-16 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1" value={form.cue_notes_text} onChange={(e) => setFormField("cue_notes_text", e.target.value)} placeholder="Play any song on album, start at 2:30" />
-              </label>
-
-              <div className="mt-2 rounded border border-cyan-800/70 bg-cyan-950/30 p-2">
-                <p className="font-semibold uppercase tracking-wide text-cyan-200">Host Pull Card Preview</p>
-                {form.cue_source_mode === "inventory_track" ? (
-                  <p className="mt-1 text-stone-100">{formatTrackLabel(form.selected_track)}</p>
-                ) : (
-                  <p className="mt-1 text-stone-100">{selectedClipCueAsset ? `Uploaded clip: ${selectedClipCueAsset.object_path}` : "No uploaded clip selected"}</p>
-                )}
-                <p className="mt-1 text-stone-200">Cue: {parseCueTimeToSeconds(form.cue_start_text) !== null ? formatSecondsClock(parseCueTimeToSeconds(form.cue_start_text)) : "--:--"}</p>
-                {form.cue_instruction.trim() ? <p className="mt-1 text-stone-300">Instruction: {form.cue_instruction.trim()}</p> : null}
-              </div>
 
               {validationMessage ? <p className="mt-2 text-amber-300">{validationMessage}</p> : null}
             </section>
