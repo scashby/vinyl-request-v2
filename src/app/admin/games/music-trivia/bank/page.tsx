@@ -279,6 +279,8 @@ export default function MusicTriviaBankPage() {
 
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | QuestionStatus>("");
+  const [tagFilter, setTagFilter] = useState("");
+  const [difficultyFilter, setDifficultyFilter] = useState<"" | Difficulty>("");
 
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [tagSearch, setTagSearch] = useState("");
@@ -428,6 +430,8 @@ export default function MusicTriviaBankPage() {
       const params = new URLSearchParams();
       if (q.trim()) params.set("q", q.trim());
       if (statusFilter) params.set("status", statusFilter);
+      if (tagFilter.trim()) params.set("tag", tagFilter.trim());
+      if (difficultyFilter) params.set("difficulty", difficultyFilter);
       params.set("limit", "250");
 
       const res = await fetch(`/api/games/trivia/questions?${params.toString()}`);
@@ -438,7 +442,7 @@ export default function MusicTriviaBankPage() {
     } finally {
       setLoading(false);
     }
-  }, [q, statusFilter]);
+  }, [q, statusFilter, tagFilter, difficultyFilter]);
 
   const loadDetail = useCallback(async (id: number) => {
     const res = await fetch(`/api/games/trivia/questions/${id}`);
@@ -642,6 +646,42 @@ export default function MusicTriviaBankPage() {
     await loadDetail(selectedId);
   };
 
+  const quickPublish = async (id: number) => {
+    const res = await fetch(`/api/games/trivia/questions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "published" }),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(payload.error ?? "Failed to publish question");
+      return;
+    }
+    await loadList();
+    if (selectedId === id) await loadDetail(id);
+  };
+
+  const publishAllVisible = async () => {
+    const draftIds = sortedRows.filter((row) => row.status === "draft").map((row) => row.id);
+    if (draftIds.length === 0) {
+      alert("No draft questions visible to publish.");
+      return;
+    }
+    const yes = confirm(`Publish ${draftIds.length} draft question${draftIds.length !== 1 ? "s" : ""}?`);
+    if (!yes) return;
+    let count = 0;
+    for (const id of draftIds) {
+      const res = await fetch(`/api/games/trivia/questions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "published" }),
+      });
+      if (res.ok) count++;
+    }
+    await loadList();
+    alert(`Published ${count} of ${draftIds.length} questions.`);
+  };
+
   const deleteQuestion = async () => {
     if (!selectedId) return;
     const yes = confirm("Permanently delete this archived question? This cannot be undone.");
@@ -762,6 +802,7 @@ export default function MusicTriviaBankPage() {
         <section className="grid gap-4 lg:grid-cols-[360px,1fr]">
           <aside className="rounded-2xl border border-stone-700 bg-black/45 p-4">
             <div className="space-y-2 text-xs">
+              {/* Status tabs */}
               <div className="flex flex-wrap gap-1">
                 {STATUS_TABS.map((tab) => (
                   <button
@@ -773,44 +814,105 @@ export default function MusicTriviaBankPage() {
                   </button>
                 ))}
               </div>
-              <label className="block">
-                Search
-                <input
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Prompt, answer, source note, or code"
-                  className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1"
-                />
-              </label>
-              <label className="block">
-                Status
-                <select value={statusFilter} onChange={(e) => setStatusFilter((e.target.value as "" | QuestionStatus) ?? "")} className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-2 py-1">
-                  <option value="">All</option>
-                  <option value="draft">draft</option>
-                  <option value="published">published</option>
-                  <option value="archived">archived</option>
-                </select>
-              </label>
-              <button className="rounded border border-stone-700 px-2 py-1" onClick={loadList}>Refresh</button>
+
+              {/* Text search */}
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search question text, code, answer…"
+                className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1"
+              />
+
+              {/* Difficulty filter */}
+              <div>
+                <p className="mb-1 text-[10px] uppercase tracking-wide text-stone-500">Difficulty</p>
+                <div className="flex gap-1">
+                  {(["", "easy", "medium", "hard"] as const).map((d) => (
+                    <button key={d || "any"}
+                      onClick={() => setDifficultyFilter(d)}
+                      className={`rounded border px-2 py-0.5 text-[10px] uppercase tracking-wide ${
+                        difficultyFilter === d
+                          ? d === "easy" ? "border-emerald-600 bg-emerald-950/40 text-emerald-200"
+                            : d === "medium" ? "border-amber-600 bg-amber-950/40 text-amber-200"
+                            : d === "hard" ? "border-rose-600 bg-rose-950/40 text-rose-200"
+                            : "border-emerald-600 bg-emerald-950/40 text-emerald-100"
+                          : "border-stone-700 text-stone-400"
+                      }`}>
+                      {d || "Any"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tag filter chips */}
+              <div>
+                <p className="mb-1 text-[10px] uppercase tracking-wide text-stone-500">Tag</p>
+                <div className="flex flex-wrap gap-1">
+                  {["trivia-api", "ai-generated"].map((tag) => (
+                    <button key={tag}
+                      onClick={() => setTagFilter(tagFilter === tag ? "" : tag)}
+                      className={`rounded border px-2 py-0.5 text-[10px] ${
+                        tagFilter === tag ? "border-fuchsia-600 bg-fuchsia-950/40 text-fuchsia-200" : "border-stone-700 text-stone-400"
+                      }`}>
+                      {tag}
+                    </button>
+                  ))}
+                  {tagFilter && !["trivia-api", "ai-generated"].includes(tagFilter) && (
+                    <button onClick={() => setTagFilter("")}
+                      className="rounded border border-fuchsia-600 bg-fuchsia-950/40 px-2 py-0.5 text-[10px] text-fuchsia-200">
+                      {tagFilter} ×
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2">
+                <button className="rounded border border-stone-700 px-2 py-1" onClick={loadList}>Refresh</button>
+                <button className="rounded border border-cyan-800 px-2 py-1 text-cyan-300" onClick={publishAllVisible}>
+                  Publish All Drafts
+                </button>
+              </div>
             </div>
 
             <div className="mt-3 max-h-[70vh] space-y-2 overflow-auto pr-1 text-xs">
               {loading ? <p className="text-stone-400">Loading...</p> : null}
-              {sortedRows.map((row) => (
-                <button key={row.id} onClick={() => loadDetail(row.id)} className={`w-full rounded border p-2 text-left ${row.id === selectedId ? "border-emerald-600 bg-emerald-950/20" : "border-stone-800 bg-stone-950/60"}`}>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold text-emerald-200">{row.question_code}</p>
-                    <p className="rounded bg-stone-900 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-stone-300">{row.status}</p>
+              {sortedRows.map((row) => {
+                const diffColor = { easy: "text-emerald-400", medium: "text-amber-400", hard: "text-rose-400" }[row.default_difficulty] ?? "text-stone-400";
+                return (
+                  <div key={row.id} className={`rounded border ${row.id === selectedId ? "border-emerald-600 bg-emerald-950/20" : "border-stone-800 bg-stone-950/60"}`}>
+                    <button className="w-full p-2 text-left" onClick={() => loadDetail(row.id)}>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-semibold text-emerald-200">{row.question_code}</span>
+                        <span className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${
+                          row.status === "published" ? "bg-emerald-950/60 text-emerald-300"
+                          : row.status === "archived" ? "bg-stone-900 text-stone-500"
+                          : "bg-stone-900 text-stone-300"
+                        }`}>{row.status}</span>
+                        <span className={`text-[10px] font-semibold uppercase ${diffColor}`}>{row.default_difficulty}</span>
+                      </div>
+                      <p className="mt-1 line-clamp-2 break-words text-stone-100">{row.prompt_text}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span className="text-[11px] text-stone-400">{row.default_category}</span>
+                        {row.facets?.has_required_cue && <span className="text-[10px] text-cyan-400">♪ cue</span>}
+                        {row.facets?.has_media && <span className="text-[10px] text-stone-400">🖼 media</span>}
+                        {row.tags?.includes("trivia-api") && <span className="rounded bg-fuchsia-950/50 px-1 text-[10px] text-fuchsia-400">trivia-api</span>}
+                        {row.tags?.includes("ai-generated") && <span className="rounded bg-violet-950/50 px-1 text-[10px] text-violet-400">ai</span>}
+                      </div>
+                    </button>
+                    {row.status === "draft" && (
+                      <div className="border-t border-stone-800/60 px-2 py-1">
+                        <button
+                          className="rounded border border-cyan-800 px-2 py-0.5 text-[10px] text-cyan-300 hover:bg-cyan-950/30"
+                          onClick={(e) => { e.stopPropagation(); void quickPublish(row.id); }}
+                        >
+                          Publish →
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <p className="mt-1 whitespace-pre-wrap break-words text-stone-100">{row.prompt_text}</p>
-                  <p className="mt-1 text-[11px] text-stone-300">{row.default_category} | {row.default_difficulty.toUpperCase()}</p>
-                  <p className="mt-1 text-[11px] text-stone-400">
-                    Cue: {row.facets?.has_required_cue ? "ready" : "missing"}
-                    {" · "}
-                    Media: {row.facets?.has_media ? "attached" : "none"}
-                  </p>
-                </button>
-              ))}
+                );
+              })}
               {!loading && sortedRows.length === 0 ? <p className="text-stone-400">No questions found.</p> : null}
             </div>
           </aside>
