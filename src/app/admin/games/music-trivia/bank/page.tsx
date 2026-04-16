@@ -366,7 +366,7 @@ export default function MusicTriviaBankPage() {
     const res = await fetch(`/api/games/trivia/search-artists?q=${encodeURIComponent(q.trim())}`);
     if (!res.ok) return;
     const payload = await res.json().catch(() => ({}));
-    setArtistLinkResults(Array.isArray(payload) ? payload : []);
+    setArtistLinkResults(Array.isArray(payload.data) ? payload.data : []);
   }, []);
 
   const searchAlbumLinks = useCallback(async (q: string) => {
@@ -374,7 +374,7 @@ export default function MusicTriviaBankPage() {
     const res = await fetch(`/api/games/trivia/search-albums?q=${encodeURIComponent(q.trim())}`);
     if (!res.ok) return;
     const payload = await res.json().catch(() => ({}));
-    setAlbumLinkResults(Array.isArray(payload) ? payload : []);
+    setAlbumLinkResults(Array.isArray(payload.data) ? payload.data : []);
   }, []);
 
   useEffect(() => {
