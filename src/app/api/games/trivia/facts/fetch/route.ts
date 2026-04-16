@@ -316,6 +316,21 @@ async function insertFact(
 // AI trivia fact insertion (Phase 1 — Claude Sonnet surprising trivia)
 // ---------------------------------------------------------------------------
 
+// Map AI trivia kinds to DB-allowed fact_kind values
+const KIND_MAP: Record<string, string> = {
+  lyric: "song_history",
+  crossover: "connection",
+  cover_version: "song_history",
+  historical_first: "other",
+  stage_name: "name_origin",
+  band_member: "band_history",
+  chart_fact: "chart_fact",
+  collaboration: "collaboration",
+  personal: "personal",
+  connection: "connection",
+  other: "other",
+};
+
 async function insertAIFacts(
   triviaDb: unknown,
   aiFacts: RawTriviaFact[],
@@ -329,19 +344,22 @@ async function insertAIFacts(
   let skipped = 0;
 
   for (const ai of aiFacts) {
-    const factText = ai.fact.trim();
-    if (factText.length < 20) continue;
+    const question = ai.question?.trim();
+    const answer = ai.answer?.trim();
+    if (!question || question.length < 10 || !answer) continue;
 
+    // Store as "Q: ...\nA: ..." so reviewers see both and Phase 2 can parse them
+    const factText = `Q: ${question}\nA: ${answer}`;
     const hash = contentHash(factText);
+    const dbKind = KIND_MAP[ai.kind] ?? "other";
 
-    // Build a minimal TriviaRawFact-shaped object so we can reuse upsertSourceRecord
     const rawFact: TriviaRawFact = {
       entity_type: entityType,
       entity_id: entityId,
       entity_ref: entityRef,
       fact_text: factText,
-      fact_kind: ai.kind,
-      confidence: "high", // Claude Sonnet from its own training
+      fact_kind: dbKind,
+      confidence: "high",
       source_url: null,
       source_domain: null,
       source_title: "Claude AI (training knowledge)",
