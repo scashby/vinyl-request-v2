@@ -28,14 +28,11 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
   if (questionError) return NextResponse.json({ error: questionError.message }, { status: 500 });
   if (!question) return NextResponse.json({ error: "Question not found" }, { status: 404 });
 
-  const hasRequiredCue = hasRequiredCueSource({
+  const hasCue = hasRequiredCueSource({
     cueSourceType: question.cue_source_type,
     cueSourcePayload: question.cue_source_payload,
     primaryCueStartSeconds: question.primary_cue_start_seconds,
   });
-  if (!hasRequiredCue) {
-    return NextResponse.json({ error: "Pick a vinyl track and cue time to continue." }, { status: 400 });
-  }
 
   const { error } = await db
     .from("trivia_questions")
@@ -53,7 +50,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     .from("trivia_question_facets")
     .upsert({
       question_id: questionId,
-      has_required_cue: true,
+      has_required_cue: hasCue,
     }, { onConflict: "question_id" });
 
   return NextResponse.json({ ok: true }, { status: 200 });

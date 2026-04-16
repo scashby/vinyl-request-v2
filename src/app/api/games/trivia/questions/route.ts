@@ -212,9 +212,6 @@ export async function POST(request: NextRequest) {
     if (!normalized.prompt_text || !normalized.answer_key) {
       return NextResponse.json({ error: "prompt_text and answer_key are required" }, { status: 400 });
     }
-    if (normalized.status === "published" && !normalized.has_required_cue) {
-      return NextResponse.json({ error: "Pick a vinyl track and cue time to continue." }, { status: 400 });
-    }
     if (normalized.cue_payload_has_validation_error) {
       return NextResponse.json({ error: "cue_payload has invalid segment timing. Use non-negative times and end >= start." }, { status: 400 });
     }

@@ -173,9 +173,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const nextStatus = (patch.status as string | undefined) ?? undefined;
   const effectiveStatus = nextStatus ?? existingQuestion.status;
-  if (effectiveStatus === "published" && !hasRequiredCue) {
-    return NextResponse.json({ error: "Pick a vinyl track and cue time to continue." }, { status: 400 });
-  }
   if (nextStatus === "published") {
     patch.published_at = now;
     patch.archived_at = null;

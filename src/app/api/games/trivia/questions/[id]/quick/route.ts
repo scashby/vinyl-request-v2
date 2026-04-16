@@ -176,9 +176,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (normalized.cue_payload_has_validation_error) {
       return NextResponse.json({ error: "Cue timing is invalid. Use non-negative times and make sure end is after start." }, { status: 400 });
     }
-    if (normalized.status === "published" && !normalized.has_required_cue) {
-      return NextResponse.json({ error: "Pick a vinyl track and cue time to continue." }, { status: 400 });
-    }
 
     const now = new Date().toISOString();
     const userLabel = asString(body.updated_by) || "admin";
