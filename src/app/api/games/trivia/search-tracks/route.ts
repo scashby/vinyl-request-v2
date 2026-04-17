@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   const { data: inventoryRows, error } = await supabaseAdmin
     .from("inventory")
     .select(
-      "id, status, for_sale, discogs_folder_name, release_id, release:releases(id, release_tracks(id, recording_id, position, side, title_override, recordings(id, title, track_artist)), master:masters(id, title, artist:artists(name)))"
+      "id, status, discogs_folder_name, discogs_folder_id, discogs_instance_id, release_id, release:releases(id, release_tracks(id, recording_id, position, side, title_override, recordings(id, title, track_artist)), master:masters(id, title, artist:artists(name)))"
     )
     .limit(800);
 
