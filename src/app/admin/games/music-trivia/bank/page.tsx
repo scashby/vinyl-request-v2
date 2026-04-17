@@ -391,7 +391,7 @@ export default function MusicTriviaBankPage() {
 
   const searchTrackLinks = useCallback(async (q: string) => {
     if (!q.trim()) { setTrackLinkResults([]); return; }
-    const res = await fetch(`/api/games/trivia/inventory-search?q=${encodeURIComponent(q.trim())}&limit=20`);
+    const res = await fetch(`/api/games/trivia/search-tracks?q=${encodeURIComponent(q.trim())}`);
     if (!res.ok) return;
     const payload = await res.json().catch(() => ({}));
     setTrackLinkResults(Array.isArray(payload.data) ? payload.data : []);
