@@ -9,140 +9,76 @@ export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   if (q.length < 2) return NextResponse.json({ data: [] });
 
-  const db = supabaseAdmin as unknown as { from: (t: string) => unknown };
+  const qLower = q.toLowerCase();
 
-  // Search release_tracks in two ways in parallel:
-  // A) by title_override directly (covers most tracks in vinyl collections)
-  // B) by recordings.title via recording_id (covers tracks linked to recording records)
-  const [{ data: byTitle, error: err1 }, { data: byRecording, error: err2 }] = await Promise.all([
-    db
-      .from("release_tracks")
-      .select("id, release_id, recording_id, position, side, title_override")
-      .ilike("title_override", `%${q}%`)
-      .limit(100) as unknown as Promise<{
-        data: Array<{ id: number; release_id: number; recording_id: number | null; position: string | null; side: string | null; title_override: string | null }> | null;
-        error: { message: string } | null;
-      }>,
-    db
-      .from("release_tracks")
-      .select("id, release_id, recording_id, position, side, title_override, recordings!inner(id, title, track_artist)")
-      .ilike("recordings.title", `%${q}%`)
-      .not("recording_id", "is", null)
-      .limit(100) as unknown as Promise<{
-        data: Array<{ id: number; release_id: number; recording_id: number | null; position: string | null; side: string | null; title_override: string | null; recordings: { id: number; title: string; track_artist: string | null } | null }> | null;
-        error: { message: string } | null;
-      }>,
-  ]);
+  // Start from inventory and join outward — same pattern as library/albums.
+  // This handles tracks where title_override is null (fall back to recording.title)
+  // and avoids the reverse-direction lookup that misses those tracks.
+  const { data: inventoryRows, error } = await supabaseAdmin
+    .from("inventory")
+    .select(
+      "id, status, for_sale, discogs_folder_name, release_id, release:releases(id, release_tracks(id, recording_id, position, side, title_override, recordings(id, title, track_artist)), master:masters(id, title, artist:artists(name)))"
+    )
+    .limit(800);
 
-  if (err1) return NextResponse.json({ error: err1.message }, { status: 500 });
-  if (err2) return NextResponse.json({ error: err2.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Merge, deduplicate by release_track id
-  const seenIds = new Set<number>();
-  const allTracks: Array<{
-    id: number; release_id: number; recording_id: number | null;
-    position: string | null; side: string | null; title_override: string | null;
-    recording_title?: string; track_artist?: string | null;
+  // Deduplicate: same recording_id = same song (LP + compilation = one result)
+  const seenRecordingKeys = new Set<string>();
+  const results: Array<{
+    inventory_id: number;
+    release_id: number | null;
+    release_track_id: number;
+    artist: string;
+    album: string;
+    title: string;
+    side: string | null;
+    position: string | null;
+    track_key: string;
   }> = [];
 
-  for (const rt of [...(byTitle ?? []), ...(byRecording ?? [])]) {
-    if (!seenIds.has(rt.id)) {
-      seenIds.add(rt.id);
-      const rec = (rt as { recordings?: { title: string; track_artist: string | null } | null }).recordings;
-      allTracks.push({ ...rt, recording_title: rec?.title, track_artist: rec?.track_artist ?? null });
+  for (const row of inventoryRows ?? []) {
+    if (isForSaleInventory(row)) continue;
+
+    const release = row.release;
+    if (!release || !release.release_tracks) continue;
+
+    const master = release.master;
+    const albumTitle = master?.title ?? "";
+    const artistName = master?.artist?.name ?? "";
+
+    for (const track of release.release_tracks) {
+      const recording = track.recordings;
+      const trackTitle = track.title_override || recording?.title || "";
+      if (!trackTitle) continue;
+      if (!trackTitle.toLowerCase().includes(qLower)) continue;
+
+      // Same recording on multiple releases = one dedup key
+      const dedupeKey = track.recording_id
+        ? `rec:${track.recording_id}`
+        : `title:${trackTitle.toLowerCase().trim()}:rel:${release.id}`;
+      if (seenRecordingKeys.has(dedupeKey)) continue;
+      seenRecordingKeys.add(dedupeKey);
+
+      const trackArtist = recording?.track_artist ?? artistName;
+
+      results.push({
+        inventory_id: row.id,
+        release_id: release.id,
+        release_track_id: track.id,
+        artist: trackArtist,
+        album: albumTitle,
+        title: trackTitle,
+        side: track.side,
+        position: track.position,
+        track_key: `rt-${track.id}`,
+      });
+
+      if (results.length >= 20) break;
     }
+
+    if (results.length >= 20) break;
   }
-
-  if (!allTracks.length) return NextResponse.json({ data: [] });
-
-  const releaseIds = [...new Set(allTracks.map((rt) => rt.release_id))];
-
-  // Get inventory (non-sale copies) and release→master mapping in parallel
-  const [{ data: inventory, error: invErr }, { data: releases, error: relErr }] = await Promise.all([
-    db
-      .from("inventory")
-      .select("id, release_id, status, for_sale, discogs_folder_name")
-      .in("release_id", releaseIds)
-      .limit(300) as unknown as Promise<{
-        data: Array<{ id: number; release_id: number; status: string | null; for_sale: unknown; discogs_folder_name: string | null }> | null;
-        error: { message: string } | null;
-      }>,
-    db
-      .from("releases")
-      .select("id, master_id")
-      .in("id", releaseIds)
-      .limit(100) as unknown as Promise<{
-        data: Array<{ id: number; master_id: number | null }> | null;
-        error: { message: string } | null;
-      }>,
-  ]);
-
-  if (invErr) return NextResponse.json({ error: invErr.message }, { status: 500 });
-  if (relErr) return NextResponse.json({ error: relErr.message }, { status: 500 });
-
-  // Post-filter: remove any for-sale inventory (catches folder-name-based sale records)
-  const ownedInventory = (inventory ?? []).filter((inv) => !isForSaleInventory(inv));
-  const ownedReleaseIds = new Set(ownedInventory.map((i) => i.release_id));
-  const ownedTracks = allTracks.filter((rt) => ownedReleaseIds.has(rt.release_id));
-  if (!ownedTracks.length) return NextResponse.json({ data: [] });
-
-  // Get master titles + artist names
-  const masterIds = [...new Set(
-    (releases ?? []).map((r) => r.master_id).filter((id): id is number => id !== null)
-  )];
-  const { data: masters, error: masterErr } = await (db
-    .from("masters")
-    .select("id, title, artists:main_artist_id(name)")
-    .in("id", masterIds)
-    .limit(100) as unknown as Promise<{
-      data: Array<{ id: number; title: string; artists: { name: string } | null }> | null;
-      error: { message: string } | null;
-    }>);
-
-  if (masterErr) return NextResponse.json({ error: masterErr.message }, { status: 500 });
-
-  const releaseToMaster = new Map((releases ?? []).map((r) => [r.id, r.master_id]));
-  const masterMap = new Map((masters ?? []).map((m) => [m.id, m]));
-  const inventoryByRelease = new Map<number, number>();
-  for (const inv of ownedInventory) {
-    if (!inventoryByRelease.has(inv.release_id)) {
-      inventoryByRelease.set(inv.release_id, inv.id);
-    }
-  }
-
-  // Deduplicate by recording_id + effective title — same song on LP + compilation = one result
-  const seenRecordingKeys = new Set<string>();
-  const deduped: typeof ownedTracks = [];
-  for (const rt of ownedTracks) {
-    const effectiveTitle = (rt.title_override || rt.recording_title || "").toLowerCase().trim();
-    // Use recording_id if available; otherwise fall back to title+release dedup
-    const key = rt.recording_id ? `rec:${rt.recording_id}` : `title:${effectiveTitle}`;
-    if (!seenRecordingKeys.has(key)) {
-      seenRecordingKeys.add(key);
-      deduped.push(rt);
-    }
-  }
-
-  const results = deduped.slice(0, 20).map((rt) => {
-    const masterId = releaseToMaster.get(rt.release_id);
-    const master = masterId ? masterMap.get(masterId) : undefined;
-    const inventoryId = inventoryByRelease.get(rt.release_id) ?? 0;
-    const trackTitle = rt.title_override || rt.recording_title || "";
-    const artist = rt.track_artist || master?.artists?.name || "";
-    const album = master?.title || "";
-
-    return {
-      inventory_id: inventoryId,
-      release_id: rt.release_id,
-      release_track_id: rt.id,
-      artist,
-      album,
-      title: trackTitle,
-      side: rt.side,
-      position: rt.position,
-      track_key: `rt-${rt.id}`,
-    };
-  });
 
   return NextResponse.json({ data: results });
 }
