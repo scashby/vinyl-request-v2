@@ -6,6 +6,28 @@ import { normalizeArtistDisplay } from "src/lib/artistName";
 
 export const runtime = "nodejs";
 
+const GENERIC_TITLES = new Set([
+  "untitled", "medley", "intro", "(intro)", "interlude",
+  "(silence)", "silence", "side 1", "side 2", "outro", "overture", "reprise",
+]);
+
+// Look up the canonical recording for a given title+artist before inserting a new one.
+// Returns the existing recording id, or null if none found.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function findCanonicalRecording(db: any, title: string, artist: string | null): Promise<number | null> {
+  if (!title.trim() || !artist?.trim()) return null;
+  if (GENERIC_TITLES.has(title.trim().toLowerCase())) return null;
+  const { data } = await db
+    .from("recordings")
+    .select("id")
+    .ilike("title", title.trim())
+    .ilike("track_artist", artist.trim())
+    .order("id", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return data?.id ?? null;
+}
+
 const parseDurationToSeconds = (value: string | null | undefined): number | null => {
   const raw = String(value ?? "").trim();
   if (!raw) return null;
@@ -271,32 +293,37 @@ export async function POST(request: NextRequest, context: { params: Promise<{ re
           const nextArtist = normalizeArtistDisplay(t.artist) ?? null;
           if (nextArtist) incomingCredits.track_artist = nextArtist;
 
-          const { data: insertedRec, error: insertRecError } = await db
-            .from("recordings")
-            .insert({
-              title: t.title,
-              track_artist: nextArtist,
-              duration_seconds: durationSeconds,
-              notes: t.note ?? null,
-              bpm: typeof t.bpm === "number" ? t.bpm : null,
-              musical_key: typeof t.musical_key === "string" ? t.musical_key : null,
-              energy: typeof t.energy === "number" ? t.energy : null,
-              danceability: typeof t.danceability === "number" ? t.danceability : null,
-              valence: typeof t.valence === "number" ? t.valence : null,
-              lyrics_url: typeof t.lyrics_url === "string" ? t.lyrics_url.trim() || null : null,
-              is_cover: typeof t.is_cover === "boolean" ? t.is_cover : null,
-              original_artist: typeof t.original_artist === "string" ? t.original_artist : null,
-              credits: Object.keys(incomingCredits).length > 0 ? incomingCredits : undefined,
-            })
-            .select("id")
-            .single();
+          const canonicalId = await findCanonicalRecording(db, t.title, nextArtist);
+          if (canonicalId) {
+            nextRecordingId = canonicalId;
+          } else {
+            const { data: insertedRec, error: insertRecError } = await db
+              .from("recordings")
+              .insert({
+                title: t.title,
+                track_artist: nextArtist,
+                duration_seconds: durationSeconds,
+                notes: t.note ?? null,
+                bpm: typeof t.bpm === "number" ? t.bpm : null,
+                musical_key: typeof t.musical_key === "string" ? t.musical_key : null,
+                energy: typeof t.energy === "number" ? t.energy : null,
+                danceability: typeof t.danceability === "number" ? t.danceability : null,
+                valence: typeof t.valence === "number" ? t.valence : null,
+                lyrics_url: typeof t.lyrics_url === "string" ? t.lyrics_url.trim() || null : null,
+                is_cover: typeof t.is_cover === "boolean" ? t.is_cover : null,
+                original_artist: typeof t.original_artist === "string" ? t.original_artist : null,
+                credits: Object.keys(incomingCredits).length > 0 ? incomingCredits : undefined,
+              })
+              .select("id")
+              .single();
 
-          if (insertRecError || !insertedRec) {
-            throw new Error(insertRecError?.message || "Failed creating recording");
+            if (insertRecError || !insertedRec) {
+              throw new Error(insertRecError?.message || "Failed creating recording");
+            }
+
+            nextRecordingId = insertedRec.id;
+            insertedRecordingCount += 1;
           }
-
-          nextRecordingId = insertedRec.id;
-          insertedRecordingCount += 1;
         }
 
         // Update release_tracks row
@@ -337,33 +364,40 @@ export async function POST(request: NextRequest, context: { params: Promise<{ re
         const nextArtist = normalizeArtistDisplay(t.artist) ?? null;
         if (nextArtist) incomingCredits.track_artist = nextArtist;
 
-        const { data: insertedRec, error: insertRecError } = await db
-          .from("recordings")
-          .insert({
-            title: t.title,
-            track_artist: nextArtist,
-            duration_seconds: durationSeconds,
-            notes: t.note ?? null,
-            bpm: typeof t.bpm === "number" ? t.bpm : null,
-            musical_key: typeof t.musical_key === "string" ? t.musical_key : null,
-            energy: typeof t.energy === "number" ? t.energy : null,
-            danceability: typeof t.danceability === "number" ? t.danceability : null,
-            valence: typeof t.valence === "number" ? t.valence : null,
-            lyrics_url: typeof t.lyrics_url === "string" ? t.lyrics_url.trim() || null : null,
-            is_cover: typeof t.is_cover === "boolean" ? t.is_cover : null,
-            original_artist: typeof t.original_artist === "string" ? t.original_artist : null,
-            credits: Object.keys(incomingCredits).length > 0 ? incomingCredits : undefined,
-          })
-          .select("id")
-          .single();
-        if (insertRecError || !insertedRec) throw new Error(insertRecError?.message || "Failed creating recording");
-        insertedRecordingCount += 1;
+        const canonicalId = await findCanonicalRecording(db, t.title, nextArtist);
+        let newRecordingId: number;
+        if (canonicalId) {
+          newRecordingId = canonicalId;
+        } else {
+          const { data: insertedRec, error: insertRecError } = await db
+            .from("recordings")
+            .insert({
+              title: t.title,
+              track_artist: nextArtist,
+              duration_seconds: durationSeconds,
+              notes: t.note ?? null,
+              bpm: typeof t.bpm === "number" ? t.bpm : null,
+              musical_key: typeof t.musical_key === "string" ? t.musical_key : null,
+              energy: typeof t.energy === "number" ? t.energy : null,
+              danceability: typeof t.danceability === "number" ? t.danceability : null,
+              valence: typeof t.valence === "number" ? t.valence : null,
+              lyrics_url: typeof t.lyrics_url === "string" ? t.lyrics_url.trim() || null : null,
+              is_cover: typeof t.is_cover === "boolean" ? t.is_cover : null,
+              original_artist: typeof t.original_artist === "string" ? t.original_artist : null,
+              credits: Object.keys(incomingCredits).length > 0 ? incomingCredits : undefined,
+            })
+            .select("id")
+            .single();
+          if (insertRecError || !insertedRec) throw new Error(insertRecError?.message || "Failed creating recording");
+          insertedRecordingCount += 1;
+          newRecordingId = insertedRec.id;
+        }
 
         const { error: insertRtError } = await db
           .from("release_tracks")
           .insert({
             release_id: releaseIdNum,
-            recording_id: insertedRec.id,
+            recording_id: newRecordingId,
             position: t.canonicalPosition,
             side: sideValue,
             title_override: null,
@@ -390,7 +424,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ re
             .eq("id", winnerRow.id);
           if (winnerUpdateError) throw new Error(winnerUpdateError.message);
 
-          await db.from("recordings").delete().eq("id", insertedRec.id);
+          // Only delete if it was a freshly inserted recording (not a canonical we looked up)
+          if (!canonicalId) await db.from("recordings").delete().eq("id", newRecordingId);
           updatedReleaseTrackCount += 1;
           continue;
         }
