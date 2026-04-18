@@ -110,19 +110,17 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Deduplicate by recording_id — same song on LP + compilation = one result
-  const seenRecordingKeys = new Set<string>();
-  const deduped: typeof ownedTracks = [];
-  for (const rt of ownedTracks) {
-    const effectiveTitle = (rt.title_override || rt.recording_title || "").toLowerCase().trim();
-    const key = rt.recording_id ? `rec:${rt.recording_id}` : `title:${effectiveTitle}`;
-    if (!seenRecordingKeys.has(key)) {
-      seenRecordingKeys.add(key);
-      deduped.push(rt);
-    }
-  }
+  // Sort: exact title matches first, then starts-with, then contains
+  const qLower = q.toLowerCase();
+  ownedTracks.sort((a, b) => {
+    const aTitle = (a.title_override || a.recording_title || "").toLowerCase();
+    const bTitle = (b.title_override || b.recording_title || "").toLowerCase();
+    const aExact = aTitle === qLower ? 0 : aTitle.startsWith(qLower) ? 1 : 2;
+    const bExact = bTitle === qLower ? 0 : bTitle.startsWith(qLower) ? 1 : 2;
+    return aExact - bExact;
+  });
 
-  const results = deduped.slice(0, 20).map((rt) => {
+  const results = ownedTracks.slice(0, 20).map((rt) => {
     const masterId = releaseToMaster.get(rt.release_id);
     const master = masterId ? masterMap.get(masterId) : undefined;
     const inventoryId = inventoryByRelease.get(rt.release_id) ?? 0;
