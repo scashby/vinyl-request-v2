@@ -1114,6 +1114,9 @@ export default function MusicTriviaBankPage() {
                   Questions linked to artists/albums you own will be surfaced during collection-scoped trivia rounds.
                   You can also link to artists you <em>don&apos;t</em> own yet — those questions stay in the bank until you do.
                 </p>
+                <p className="mt-1.5 text-[11px] text-emerald-100/40">
+                  Scope guide: use <strong className="text-emerald-100/60">Track</strong> for song-level questions (artist and albums are implied) — use <strong className="text-emerald-100/60">Album + Artist</strong> for album-level questions — use <strong className="text-emerald-100/60">Artist</strong> alone for discography or career questions. Add as many as apply.
+                </p>
               </div>
 
               {/* Current scopes */}
