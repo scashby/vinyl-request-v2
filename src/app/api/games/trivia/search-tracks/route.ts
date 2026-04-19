@@ -96,10 +96,10 @@ export async function GET(request: NextRequest) {
   )];
   const { data: masters, error: masterErr } = await (db
     .from("masters")
-    .select("id, title, artists:main_artist_id(name)")
+    .select("id, title, main_artist_id, artists:main_artist_id(id, name)")
     .in("id", masterIds)
     .limit(200) as unknown as Promise<{
-      data: Array<{ id: number; title: string; artists: { name: string } | null }> | null;
+      data: Array<{ id: number; title: string; main_artist_id: number | null; artists: { id: number; name: string } | null }> | null;
       error: { message: string } | null;
     }>);
 
@@ -126,6 +126,7 @@ export async function GET(request: NextRequest) {
     inventory_id: number;
     release_id: number;
     release_track_id: number;
+    master_id: number | null;
     album: string;
     format: string | null;
     side: string | null;
@@ -135,6 +136,7 @@ export async function GET(request: NextRequest) {
     recording_id: number; // minimum recording_id in the group — stable identifier
     title: string;
     artist: string;
+    artist_id: number | null;
     relevance: number; // 0=exact, 1=starts-with, 2=contains
     appearances: Appearance[];
   };
@@ -147,6 +149,7 @@ export async function GET(request: NextRequest) {
     const inventoryId = inventoryByRelease.get(rt.release_id) ?? 0;
     const trackTitle = rt.title_override || rt.recording_title || "";
     const artist = rt.track_artist || master?.artists?.name || "";
+    const artistId = master?.artists?.id ?? null;
     const album = master?.title || "";
     const format = extractFormatLabel(releaseFormats.get(rt.release_id) ?? null);
 
@@ -162,6 +165,7 @@ export async function GET(request: NextRequest) {
         recording_id: recordingId,
         title: trackTitle,
         artist,
+        artist_id: artistId,
         relevance,
         appearances: [],
       });
@@ -169,13 +173,14 @@ export async function GET(request: NextRequest) {
 
     const song = songMap.get(groupKey)!;
     if (relevance < song.relevance) song.relevance = relevance;
-    // Track the minimum recording_id as the canonical
     if (recordingId < song.recording_id) song.recording_id = recordingId;
+    if (song.artist_id === null && artistId !== null) song.artist_id = artistId;
 
     song.appearances.push({
       inventory_id: inventoryId,
       release_id: rt.release_id,
       release_track_id: rt.id,
+      master_id: masterId ?? null,
       album,
       format,
       side: rt.side,

@@ -28,6 +28,7 @@ type TrackAppearance = {
   inventory_id: number;
   release_id: number;
   release_track_id: number;
+  master_id: number | null;
   album: string;
   format: string | null;
   side: string | null;
@@ -38,6 +39,7 @@ type TrackSearchResult = {
   recording_id: number;
   title: string;
   artist: string;
+  artist_id: number | null;
   appearances: TrackAppearance[];
 };
 
@@ -1261,12 +1263,26 @@ export default function MusicTriviaBankPage() {
                         key={song.recording_id}
                         className="block w-full border-b border-stone-900 px-3 py-2 text-left hover:bg-violet-950/30 last:border-b-0"
                         onClick={() => {
-                          addScope({
-                            scope_type: "track",
-                            scope_ref_id: song.recording_id,
-                            scope_value: song.title,
-                            display_label: `${song.title} — ${song.artist}`,
-                          });
+                          const existing = form.scopes;
+                          const has = (type: string, refId: number | null) =>
+                            existing.some((s) => s.scope_type === type && s.scope_ref_id === refId);
+
+                          // Track
+                          if (!has("track", song.recording_id)) {
+                            addScope({ scope_type: "track", scope_ref_id: song.recording_id, scope_value: song.title, display_label: `${song.title} — ${song.artist}` });
+                          }
+                          // Artist
+                          if (song.artist_id && !has("artist", song.artist_id)) {
+                            addScope({ scope_type: "artist", scope_ref_id: song.artist_id, scope_value: song.artist, display_label: song.artist });
+                          }
+                          // Album — one per unique master
+                          const seenMasters = new Set<number>();
+                          for (const a of song.appearances) {
+                            if (a.master_id && !seenMasters.has(a.master_id) && !has("album", a.master_id)) {
+                              seenMasters.add(a.master_id);
+                              addScope({ scope_type: "album", scope_ref_id: a.master_id, scope_value: a.album, display_label: a.album });
+                            }
+                          }
                           setTrackLinkQ("");
                           setTrackLinkResults([]);
                         }}
