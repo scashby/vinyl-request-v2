@@ -24,6 +24,23 @@ type InventoryTrackResult = {
   score?: number | null;
 };
 
+type TrackAppearance = {
+  inventory_id: number;
+  release_id: number;
+  release_track_id: number;
+  album: string;
+  format: string | null;
+  side: string | null;
+  position: string | null;
+};
+
+type TrackSearchResult = {
+  recording_id: number;
+  title: string;
+  artist: string;
+  appearances: TrackAppearance[];
+};
+
 type TriviaQuestionAsset = {
   id: number;
   asset_role: TriviaAssetRole;
@@ -336,7 +353,7 @@ export default function MusicTriviaBankPage() {
   const [albumLinkQ, setAlbumLinkQ] = useState("");
   const [albumLinkResults, setAlbumLinkResults] = useState<Array<{ id: number; label: string }>>([]);
   const [trackLinkQ, setTrackLinkQ] = useState("");
-  const [trackLinkResults, setTrackLinkResults] = useState<InventoryTrackResult[]>([]);
+  const [trackLinkResults, setTrackLinkResults] = useState<TrackSearchResult[]>([]);
 
   const setFormField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -1235,32 +1252,35 @@ export default function MusicTriviaBankPage() {
                   placeholder="Type song title to search collection…"
                 />
                 {trackLinkResults.length > 0 && (
-                  <div className="max-h-40 overflow-auto rounded border border-stone-800">
-                    {trackLinkResults.map((track) => {
-                      const label = `${track.title} — ${track.artist} (${track.album})`;
-                      return (
-                        <button
-                          key={`${track.inventory_id}-${track.track_key ?? ""}-${track.position ?? ""}`}
-                          className="block w-full border-b border-stone-900 px-3 py-1.5 text-left hover:bg-violet-950/30 last:border-b-0"
-                          onClick={() => {
-                            addScope({
-                              scope_type: "track",
-                              scope_ref_id: track.inventory_id,
-                              scope_value: track.track_key ?? String(track.inventory_id),
-                              display_label: label,
-                            });
-                            setTrackLinkQ("");
-                            setTrackLinkResults([]);
-                          }}
-                        >
-                          <span className="text-stone-200">{track.title}</span>
-                          <span className="ml-2 text-[10px] text-stone-400">{track.artist}</span>
-                          <span className="ml-1 text-[10px] text-stone-500">{track.album}</span>
-                          {track.position && <span className="ml-1 text-[10px] text-stone-600">#{track.position}</span>}
-                          <span className="ml-2 text-[10px] text-violet-400">✓ in collection</span>
-                        </button>
-                      );
-                    })}
+                  <div className="max-h-56 overflow-auto rounded border border-stone-800">
+                    {trackLinkResults.map((song) => (
+                      <button
+                        key={song.recording_id}
+                        className="block w-full border-b border-stone-900 px-3 py-2 text-left hover:bg-violet-950/30 last:border-b-0"
+                        onClick={() => {
+                          addScope({
+                            scope_type: "track",
+                            scope_ref_id: song.recording_id,
+                            scope_value: song.title,
+                            display_label: `${song.title} — ${song.artist}`,
+                          });
+                          setTrackLinkQ("");
+                          setTrackLinkResults([]);
+                        }}
+                      >
+                        <div>
+                          <span className="text-stone-200">{song.title}</span>
+                          <span className="ml-2 text-[11px] text-stone-400">{song.artist}</span>
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap gap-1">
+                          {song.appearances.map((a) => (
+                            <span key={a.release_track_id} className="rounded bg-stone-800 px-1.5 py-0.5 text-[10px] text-stone-400">
+                              {a.album}{a.format ? ` (${a.format})` : ""}{a.position ? ` · ${a.position}` : ""}
+                            </span>
+                          ))}
+                        </div>
+                      </button>
+                    ))}
                   </div>
                 )}
                 {trackLinkQ.trim() && trackLinkResults.length === 0 && (

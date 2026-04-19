@@ -11,8 +11,7 @@ export async function GET(request: NextRequest) {
 
   const db = supabaseAdmin as unknown as { from: (t: string) => unknown };
 
-  // Search release_tracks directly by title — no collection-size limit.
-  // Two queries in parallel: one by title_override, one by recordings.title via left join.
+  // Search release_tracks by title_override and by recordings.title via join.
   const [{ data: byTitle, error: err1 }, { data: byRecording, error: err2 }] = await Promise.all([
     db
       .from("release_tracks")
@@ -56,8 +55,7 @@ export async function GET(request: NextRequest) {
 
   const releaseIds = [...new Set(allTracks.map((rt) => rt.release_id))];
 
-  // Fetch inventory (no status pre-filter — isForSaleInventory covers all sale cases)
-  // and release→master mapping in parallel
+  // Fetch inventory and release→master mapping in parallel
   const [{ data: inventory, error: invErr }, { data: releases, error: relErr }] = await Promise.all([
     db
       .from("inventory")
@@ -69,10 +67,10 @@ export async function GET(request: NextRequest) {
       }>,
     db
       .from("releases")
-      .select("id, master_id")
+      .select("id, master_id, formats")
       .in("id", releaseIds)
       .limit(200) as unknown as Promise<{
-        data: Array<{ id: number; master_id: number | null }> | null;
+        data: Array<{ id: number; master_id: number | null; formats: unknown }> | null;
         error: { message: string } | null;
       }>,
   ]);
@@ -82,7 +80,13 @@ export async function GET(request: NextRequest) {
 
   // Exclude for-sale inventory
   const ownedInventory = (inventory ?? []).filter((inv) => !isForSaleInventory(inv));
-  const ownedReleaseIds = new Set(ownedInventory.map((i) => i.release_id));
+  const inventoryByRelease = new Map<number, number>();
+  for (const inv of ownedInventory) {
+    if (!inventoryByRelease.has(inv.release_id)) {
+      inventoryByRelease.set(inv.release_id, inv.id);
+    }
+  }
+  const ownedReleaseIds = new Set(inventoryByRelease.keys());
   const ownedTracks = allTracks.filter((rt) => ownedReleaseIds.has(rt.release_id));
   if (!ownedTracks.length) return NextResponse.json({ data: [] });
 
@@ -102,44 +106,89 @@ export async function GET(request: NextRequest) {
   if (masterErr) return NextResponse.json({ error: masterErr.message }, { status: 500 });
 
   const releaseToMaster = new Map((releases ?? []).map((r) => [r.id, r.master_id]));
+  const releaseFormats = new Map((releases ?? []).map((r) => [r.id, r.formats]));
   const masterMap = new Map((masters ?? []).map((m) => [m.id, m]));
-  const inventoryByRelease = new Map<number, number>();
-  for (const inv of ownedInventory) {
-    if (!inventoryByRelease.has(inv.release_id)) {
-      inventoryByRelease.set(inv.release_id, inv.id);
+
+  // Extract a short format label from the Discogs formats array
+  function extractFormatLabel(formats: unknown): string | null {
+    if (!Array.isArray(formats) || formats.length === 0) return null;
+    const first = formats[0] as { name?: string; descriptions?: string[] };
+    if (!first?.name) return null;
+    const name = first.name;
+    const descs: string[] = Array.isArray(first.descriptions) ? first.descriptions : [];
+    if (name === "Vinyl") {
+      if (descs.includes('7"')) return '7"';
+      if (descs.includes('10"')) return '10"';
+      if (descs.includes('12"')) return '12"';
+      return "Vinyl";
     }
+    return name;
   }
 
-  // Sort: exact title matches first, then starts-with, then contains
+  // Group owned tracks by canonical recording_id (or release_track id as fallback)
   const qLower = q.toLowerCase();
-  ownedTracks.sort((a, b) => {
-    const aTitle = (a.title_override || a.recording_title || "").toLowerCase();
-    const bTitle = (b.title_override || b.recording_title || "").toLowerCase();
-    const aExact = aTitle === qLower ? 0 : aTitle.startsWith(qLower) ? 1 : 2;
-    const bExact = bTitle === qLower ? 0 : bTitle.startsWith(qLower) ? 1 : 2;
-    return aExact - bExact;
-  });
+  type Appearance = {
+    inventory_id: number;
+    release_id: number;
+    release_track_id: number;
+    album: string;
+    format: string | null;
+    side: string | null;
+    position: string | null;
+  };
+  type SongResult = {
+    recording_id: number;
+    title: string;
+    artist: string;
+    relevance: number; // 0=exact, 1=starts-with, 2=contains
+    appearances: Appearance[];
+  };
 
-  const results = ownedTracks.slice(0, 20).map((rt) => {
+  const songMap = new Map<number, SongResult>();
+
+  for (const rt of ownedTracks) {
+    const groupKey = rt.recording_id ?? rt.id;
     const masterId = releaseToMaster.get(rt.release_id);
     const master = masterId ? masterMap.get(masterId) : undefined;
     const inventoryId = inventoryByRelease.get(rt.release_id) ?? 0;
     const trackTitle = rt.title_override || rt.recording_title || "";
     const artist = rt.track_artist || master?.artists?.name || "";
     const album = master?.title || "";
+    const format = extractFormatLabel(releaseFormats.get(rt.release_id));
 
-    return {
+    const titleLower = trackTitle.toLowerCase();
+    const relevance = titleLower === qLower ? 0 : titleLower.startsWith(qLower) ? 1 : 2;
+
+    if (!songMap.has(groupKey)) {
+      songMap.set(groupKey, {
+        recording_id: groupKey,
+        title: trackTitle,
+        artist,
+        relevance,
+        appearances: [],
+      });
+    }
+
+    const song = songMap.get(groupKey)!;
+    // Keep best relevance score across all appearances
+    if (relevance < song.relevance) song.relevance = relevance;
+
+    song.appearances.push({
       inventory_id: inventoryId,
       release_id: rt.release_id,
       release_track_id: rt.id,
-      artist,
       album,
-      title: trackTitle,
+      format,
       side: rt.side,
       position: rt.position,
-      track_key: `rt-${rt.id}`,
-    };
+    });
+  }
+
+  // Sort songs by relevance then title, return top 10
+  const songs = [...songMap.values()].sort((a, b) => {
+    if (a.relevance !== b.relevance) return a.relevance - b.relevance;
+    return a.title.localeCompare(b.title);
   });
 
-  return NextResponse.json({ data: results });
+  return NextResponse.json({ data: songs.slice(0, 10) });
 }
