@@ -67,10 +67,10 @@ export async function GET(request: NextRequest) {
       }>,
     db
       .from("releases")
-      .select("id, master_id, formats")
+      .select("id, master_id, format_details")
       .in("id", releaseIds)
       .limit(200) as unknown as Promise<{
-        data: Array<{ id: number; master_id: number | null; formats: unknown }> | null;
+        data: Array<{ id: number; master_id: number | null; format_details: string[] | null }> | null;
         error: { message: string } | null;
       }>,
   ]);
@@ -106,23 +106,16 @@ export async function GET(request: NextRequest) {
   if (masterErr) return NextResponse.json({ error: masterErr.message }, { status: 500 });
 
   const releaseToMaster = new Map((releases ?? []).map((r) => [r.id, r.master_id]));
-  const releaseFormats = new Map((releases ?? []).map((r) => [r.id, r.formats]));
+  const releaseFormats = new Map((releases ?? []).map((r) => [r.id, r.format_details]));
   const masterMap = new Map((masters ?? []).map((m) => [m.id, m]));
 
-  // Extract a short format label from the Discogs formats array
-  function extractFormatLabel(formats: unknown): string | null {
-    if (!Array.isArray(formats) || formats.length === 0) return null;
-    const first = formats[0] as { name?: string; descriptions?: string[] };
-    if (!first?.name) return null;
-    const name = first.name;
-    const descs: string[] = Array.isArray(first.descriptions) ? first.descriptions : [];
-    if (name === "Vinyl") {
-      if (descs.includes('7"')) return '7"';
-      if (descs.includes('10"')) return '10"';
-      if (descs.includes('12"')) return '12"';
-      return "Vinyl";
-    }
-    return name;
+  // Extract a short format label from format_details (e.g. ['7"', 'Single'])
+  function extractFormatLabel(details: string[] | null | undefined): string | null {
+    if (!Array.isArray(details) || details.length === 0) return null;
+    if (details.includes('7"')) return '7"';
+    if (details.includes('10"')) return '10"';
+    if (details.includes('12"')) return '12"';
+    return null;
   }
 
   // Group owned tracks by canonical recording_id (or release_track id as fallback)
@@ -154,7 +147,7 @@ export async function GET(request: NextRequest) {
     const trackTitle = rt.title_override || rt.recording_title || "";
     const artist = rt.track_artist || master?.artists?.name || "";
     const album = master?.title || "";
-    const format = extractFormatLabel(releaseFormats.get(rt.release_id));
+    const format = extractFormatLabel(releaseFormats.get(rt.release_id) ?? null);
 
     const titleLower = trackTitle.toLowerCase();
     const relevance = titleLower === qLower ? 0 : titleLower.startsWith(qLower) ? 1 : 2;
