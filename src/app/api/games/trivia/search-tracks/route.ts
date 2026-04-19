@@ -118,7 +118,9 @@ export async function GET(request: NextRequest) {
     return null;
   }
 
-  // Group owned tracks by canonical recording_id (or release_track id as fallback)
+  // Group owned tracks by resolved (title, artist) — works even when recording_ids
+  // haven't been fully canonicalized (e.g. null track_artist on recording row).
+  // Within each group, use the minimum recording_id as the canonical identifier.
   const qLower = q.toLowerCase();
   type Appearance = {
     inventory_id: number;
@@ -130,17 +132,16 @@ export async function GET(request: NextRequest) {
     position: string | null;
   };
   type SongResult = {
-    recording_id: number;
+    recording_id: number; // minimum recording_id in the group — stable identifier
     title: string;
     artist: string;
     relevance: number; // 0=exact, 1=starts-with, 2=contains
     appearances: Appearance[];
   };
 
-  const songMap = new Map<number, SongResult>();
+  const songMap = new Map<string, SongResult>();
 
   for (const rt of ownedTracks) {
-    const groupKey = rt.recording_id ?? rt.id;
     const masterId = releaseToMaster.get(rt.release_id);
     const master = masterId ? masterMap.get(masterId) : undefined;
     const inventoryId = inventoryByRelease.get(rt.release_id) ?? 0;
@@ -149,12 +150,16 @@ export async function GET(request: NextRequest) {
     const album = master?.title || "";
     const format = extractFormatLabel(releaseFormats.get(rt.release_id) ?? null);
 
+    // Group key: normalized title + artist — independent of recording_id
+    const groupKey = `${trackTitle.toLowerCase().trim()}||${artist.toLowerCase().trim()}`;
+
     const titleLower = trackTitle.toLowerCase();
     const relevance = titleLower === qLower ? 0 : titleLower.startsWith(qLower) ? 1 : 2;
+    const recordingId = rt.recording_id ?? rt.id;
 
     if (!songMap.has(groupKey)) {
       songMap.set(groupKey, {
-        recording_id: groupKey,
+        recording_id: recordingId,
         title: trackTitle,
         artist,
         relevance,
@@ -163,8 +168,9 @@ export async function GET(request: NextRequest) {
     }
 
     const song = songMap.get(groupKey)!;
-    // Keep best relevance score across all appearances
     if (relevance < song.relevance) song.relevance = relevance;
+    // Track the minimum recording_id as the canonical
+    if (recordingId < song.recording_id) song.recording_id = recordingId;
 
     song.appearances.push({
       inventory_id: inventoryId,
