@@ -494,6 +494,12 @@ export async function mergeTags(targetId: string, sourceIds: string[]): Promise<
       .update({ tag_id: target.id })
       .in('tag_id', sourceIdsToMerge);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any)
+      .from('recording_tag_links')
+      .update({ tag_id: target.id })
+      .in('tag_id', sourceIdsToMerge);
+
     await supabase.from('master_tags').delete().in('id', sourceIdsToMerge);
     return true;
   } catch { return false; }
@@ -519,6 +525,8 @@ export async function deleteTag(name: string): Promise<boolean> {
     if (tagError || !tag) return false;
 
     await supabase.from('master_tag_links').delete().eq('tag_id', tag.id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from('recording_tag_links').delete().eq('tag_id', tag.id);
     const { error } = await supabase.from('master_tags').delete().eq('id', tag.id);
     return !error;
   } catch { return false; }
@@ -528,6 +536,28 @@ export async function createTag(name: string): Promise<boolean> {
   try {
     const { error } = await supabase.from('master_tags').insert({ name });
     return !error;
+  } catch { return false; }
+}
+
+export async function addTagToRecording(recordingId: number, tagName: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/library/recordings/${recordingId}/tags`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'add', tagName }),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+export async function removeTagFromRecording(recordingId: number, tagName: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/library/recordings/${recordingId}/tags`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'remove', tagName }),
+    });
+    return res.ok;
   } catch { return false; }
 }
 

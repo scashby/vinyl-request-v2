@@ -439,6 +439,21 @@ async function buildCollectionTrackRows(db: BingoDbClient): Promise<CollectionTr
     ((recordings ?? []) as Array<{ id: number; title: string | null; track_artist: string | null; credits: unknown | null; duration_seconds: number | null }>).map((row) => [row.id, row])
   );
 
+  const { data: tagLinks } = recordingIds.length
+    ? await dbAny
+        .from("recording_tag_links")
+        .select("recording_id, master_tags(name)")
+        .in("recording_id", recordingIds)
+    : { data: [] };
+  const trackTagsByRecordingId = new Map<number, string[]>();
+  for (const link of (tagLinks ?? []) as Array<{ recording_id: number; master_tags?: { name?: string | null } | null }>) {
+    const name = link.master_tags?.name;
+    if (!name) continue;
+    const arr = trackTagsByRecordingId.get(link.recording_id) ?? [];
+    arr.push(name);
+    trackTagsByRecordingId.set(link.recording_id, arr);
+  }
+
   const trackRows: CollectionTrackRow[] = [];
 
   for (const inv of inventory) {
@@ -509,6 +524,7 @@ async function buildCollectionTrackRows(db: BingoDbClient): Promise<CollectionTr
         isLive: false,
         genres: master?.genres ?? [],
         labels: release.label ? [release.label] : [],
+        trackTags: recording?.id ? (trackTagsByRecordingId.get(recording.id) ?? []) : [],
       });
     }
   }

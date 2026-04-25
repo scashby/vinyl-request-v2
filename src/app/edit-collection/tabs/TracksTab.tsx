@@ -24,8 +24,12 @@ import { ManageModal } from '../pickers/ManageModal';
 import { EditModal } from '../pickers/EditModal';
 import {
   fetchStorageDevices,
+  fetchTags,
+  addTagToRecording,
+  removeTagFromRecording,
   type PickerDataItem,
 } from '../pickers/pickerDataUtils';
+import { UniversalPicker } from '../pickers/UniversalPicker';
 import { applyAutoCap, DEFAULT_EXCEPTIONS } from '../settings/AutoCapExceptions';
 import {
   importTracksFromDiscogs,
@@ -50,6 +54,8 @@ interface Track {
   original_year?: number | null;
   time_signature?: number | null;
   credits?: Record<string, unknown> | null;
+  recording_id?: number | null;
+  track_tags?: string[];
 }
 
 const inferSideFromPosition = (position: string | null | undefined): string | undefined => {
@@ -142,11 +148,15 @@ function SortableTrackRow({
   isSelected,
   onToggleSelect,
   onUpdate,
+  onRemoveTrackTag,
+  onOpenTrackTagPicker,
 }: {
   track: Track;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
   onUpdate: (id: string, field: keyof Track, value: string | number | boolean | null) => void;
+  onRemoveTrackTag: (id: string, tagName: string) => void;
+  onOpenTrackTagPicker: (id: string) => void;
 }) {
   const {
     attributes,
@@ -295,6 +305,40 @@ function SortableTrackRow({
             Cover track
           </label>
         </div>
+
+        {/* Track Tags row */}
+        <div className="flex items-start mt-2">
+          <div className="flex-1 min-h-[28px] px-1.5 py-1 border border-gray-200 rounded-l border-r-0 bg-white flex flex-wrap gap-1 items-center">
+            {(track.track_tags ?? []).map((tag) => (
+              <span key={tag} className="bg-gray-200 px-2 py-0.5 rounded text-xs flex items-center gap-1 text-gray-700">
+                {tag}
+                <button
+                  onClick={() => onRemoveTrackTag(track.id, tag)}
+                  className="bg-transparent border-none text-gray-500 cursor-pointer p-0 text-sm leading-none hover:text-red-500"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            {!(track.track_tags ?? []).length && (
+              <span className="text-xs text-gray-400 italic">Track tags</span>
+            )}
+          </div>
+          <button
+            onClick={() => onOpenTrackTagPicker(track.id)}
+            className="w-8 min-h-[28px] flex items-center justify-center border border-gray-200 rounded-r bg-white text-gray-500 hover:bg-gray-50"
+            title="Add track tags"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+              <circle cx="1.5" cy="2.5" r="1"/>
+              <rect x="4" y="2" width="10" height="1"/>
+              <circle cx="1.5" cy="7" r="1"/>
+              <rect x="4" y="6.5" width="10" height="1"/>
+              <circle cx="1.5" cy="11.5" r="1"/>
+              <rect x="4" y="11" width="10" height="1"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -328,6 +372,9 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
   const [importSource, setImportSource] = useState<'discogs' | 'spotify'>('discogs');
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+
+  // Track tag picker state: holds the track.id whose picker is open, or null
+  const [trackTagPickerOpen, setTrackTagPickerOpen] = useState<string | null>(null);
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -420,6 +467,8 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
             ? dbTrack.time_signature
             : (Number.isFinite(Number(dbTrack.time_signature)) ? Number(dbTrack.time_signature) : null),
           credits: dbTrack.credits ?? null,
+          recording_id: typeof dbTrack.recording_id === 'number' ? dbTrack.recording_id : null,
+          track_tags: Array.isArray(dbTrack.track_tags) ? dbTrack.track_tags : [],
         };
       }).filter((t) => t !== null) as Track[];
       
@@ -497,6 +546,33 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
 
   const handleCancelSelection = () => {
     setSelectedTracks(new Set());
+  };
+
+  // Track tag handlers
+  const handleAddTrackTag = async (trackId: string, tagName: string) => {
+    const track = tracks.find((t) => t.id === trackId);
+    if (!track?.recording_id || !tagName) return;
+    const ok = await addTagToRecording(track.recording_id, tagName);
+    if (ok) {
+      setTracks(tracks.map((t) =>
+        t.id === trackId
+          ? { ...t, track_tags: Array.from(new Set([...(t.track_tags ?? []), tagName])) }
+          : t
+      ));
+    }
+  };
+
+  const handleRemoveTrackTag = async (trackId: string, tagName: string) => {
+    const track = tracks.find((t) => t.id === trackId);
+    if (!track?.recording_id) return;
+    const ok = await removeTagFromRecording(track.recording_id, tagName);
+    if (ok) {
+      setTracks(tracks.map((t) =>
+        t.id === trackId
+          ? { ...t, track_tags: (t.track_tags ?? []).filter((tag) => tag !== tagName) }
+          : t
+      ));
+    }
   };
 
   // Track operations
@@ -898,6 +974,8 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
                 isSelected={selectedTracks.has(track.id)}
                 onToggleSelect={handleToggleSelect}
                 onUpdate={handleUpdateTrack}
+                onRemoveTrackTag={handleRemoveTrackTag}
+                onOpenTrackTagPicker={(id) => setTrackTagPickerOpen(id)}
               />
             ))}
           </SortableContext>
@@ -1113,6 +1191,34 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
           </div>
         </div>
       )}
+
+      {/* Track tag picker */}
+      {trackTagPickerOpen && (() => {
+        const openTrack = tracks.find((t) => t.id === trackTagPickerOpen);
+        if (!openTrack) return null;
+        return (
+          <UniversalPicker
+            title="Track Tags"
+            isOpen={true}
+            onClose={() => setTrackTagPickerOpen(null)}
+            fetchItems={fetchTags}
+            selectedItems={openTrack.track_tags ?? []}
+            onSelect={(items) => {
+              const current = new Set(openTrack.track_tags ?? []);
+              const next = new Set(items);
+              const toAdd = items.filter((tag) => !current.has(tag));
+              const toRemove = [...current].filter((tag) => !next.has(tag));
+              for (const tag of toAdd) handleAddTrackTag(trackTagPickerOpen, tag);
+              for (const tag of toRemove) handleRemoveTrackTag(trackTagPickerOpen, tag);
+              setTrackTagPickerOpen(null);
+            }}
+            multiSelect={true}
+            canManage={true}
+            newItemLabel="Tag"
+            manageItemsLabel="Manage Tags"
+          />
+        );
+      })()}
     </div>
   );
 });

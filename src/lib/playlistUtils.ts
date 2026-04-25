@@ -228,6 +228,8 @@ function getTrackFieldValue(track: CollectionTrackRow, field: SmartPlaylistRule[
       return track.isLive === true;
     case 'custom_tags':
       return track.customTags ?? [];
+    case 'track_tags':
+      return track.trackTags ?? [];
     case 'genre':
       return track.genres ?? [];
     case 'labels':

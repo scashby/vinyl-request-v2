@@ -106,6 +106,7 @@ export type SmartPlaylistFieldType =
   | 'is_live'
   // Array fields
   | 'custom_tags'
+  | 'track_tags'
   | 'genre'
   | 'labels'
   | 'signed_by'

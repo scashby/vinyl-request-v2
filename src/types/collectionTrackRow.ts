@@ -59,6 +59,7 @@ export interface CollectionTrackRow {
   forSale?: boolean;
   isLive?: boolean;
   customTags?: string[];
+  trackTags?: string[];
   genres?: string[];
   labels?: string[];
   signedBy?: string[];

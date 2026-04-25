@@ -437,6 +437,11 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
               ? discNumberRaw
               : discNumberFromSide(track.side ?? undefined);
 
+          const trackTagLinks = (recording as unknown as { recording_tag_links?: { master_tags?: { name?: string | null } | null }[] | null })?.recording_tag_links ?? [];
+          const trackTags: string[] = trackTagLinks
+            .map((l) => l.master_tags?.name)
+            .filter((n): n is string => Boolean(n));
+
           return {
             position: track.position ?? `${index + 1}`,
             title: track.title_override || recording?.title || '',
@@ -452,6 +457,8 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             original_year: Number.isFinite(originalYear) ? originalYear : null,
             time_signature: Number.isFinite(timeSignature) ? timeSignature : null,
             credits: recordingCredits,
+            recording_id: track.recording_id ?? null,
+            track_tags: trackTags,
           };
         });
         const maxDiscNumber = trackList.reduce((max, track) => Math.max(max, track.disc_number ?? 1), 1);

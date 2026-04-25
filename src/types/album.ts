@@ -98,6 +98,8 @@ export type Album = {
     original_year?: number | null;
     time_signature?: number | null;
     credits?: Record<string, unknown> | null;
+    recording_id?: number | null;
+    track_tags?: string[];
   }> | null;
   disc_metadata?: Array<Record<string, unknown>> | null;
   matrix_numbers?: string[] | null;

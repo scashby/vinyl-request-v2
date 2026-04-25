@@ -79,7 +79,8 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ in
             lyrics_url,
             is_cover,
             original_artist,
-            track_artist
+            track_artist,
+            recording_tag_links ( tag_id, master_tags ( name ) )
           )
         ),
         master:masters (
