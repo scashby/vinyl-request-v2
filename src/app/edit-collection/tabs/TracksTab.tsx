@@ -308,12 +308,16 @@ function SortableTrackRow({
 
         {/* Track Tags row */}
         <div className="flex items-start mt-2">
-          <div className="flex-1 min-h-[28px] px-1.5 py-1 border border-gray-200 rounded-l border-r-0 bg-white flex flex-wrap gap-1 items-center">
+          <div
+            className="flex-1 min-h-[28px] px-1.5 py-1 border border-gray-200 rounded-l border-r-0 bg-white flex flex-wrap gap-1 items-center cursor-pointer hover:bg-gray-50"
+            onClick={() => onOpenTrackTagPicker(track.id)}
+          >
             {(track.track_tags ?? []).map((tag) => (
               <span key={tag} className="bg-gray-200 px-2 py-0.5 rounded text-xs flex items-center gap-1 text-gray-700">
                 {tag}
                 <button
-                  onClick={() => onRemoveTrackTag(track.id, tag)}
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onRemoveTrackTag(track.id, tag); }}
                   className="bg-transparent border-none text-gray-500 cursor-pointer p-0 text-sm leading-none hover:text-red-500"
                 >
                   ×
@@ -325,6 +329,7 @@ function SortableTrackRow({
             )}
           </div>
           <button
+            type="button"
             onClick={() => onOpenTrackTagPicker(track.id)}
             className="w-8 min-h-[28px] flex items-center justify-center border border-gray-200 rounded-r bg-white text-gray-500 hover:bg-gray-50"
             title="Add track tags"
@@ -378,7 +383,11 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
 
   // Drag and drop sensors
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
