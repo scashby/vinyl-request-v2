@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import type { Album } from 'types/album';
 import {
   DndContext,
@@ -149,14 +149,18 @@ function SortableTrackRow({
   onToggleSelect,
   onUpdate,
   onRemoveTrackTag,
+  onAddTrackTag,
   onOpenTrackTagPicker,
+  availableTagNames,
 }: {
   track: Track;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
   onUpdate: (id: string, field: keyof Track, value: string | number | boolean | null) => void;
   onRemoveTrackTag: (id: string, tagName: string) => void;
+  onAddTrackTag: (id: string, tagName: string) => void;
   onOpenTrackTagPicker: (id: string) => void;
+  availableTagNames: string[];
 }) {
   const {
     attributes,
@@ -171,6 +175,36 @@ function SortableTrackRow({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+  };
+
+  const [tagInputValue, setTagInputValue] = useState('');
+  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+  const tagInputRef = useRef<HTMLInputElement>(null);
+
+  const existingTagSet = new Set(track.track_tags ?? []);
+  const filteredSuggestions = tagInputValue.trim()
+    ? availableTagNames
+        .filter((name) => name.toLowerCase().includes(tagInputValue.toLowerCase()) && !existingTagSet.has(name))
+        .slice(0, 8)
+    : [];
+
+  const submitTag = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed || existingTagSet.has(trimmed)) return;
+    onAddTrackTag(track.id, trimmed);
+    setTagInputValue('');
+    setShowTagSuggestions(false);
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submitTag(filteredSuggestions[0] ?? tagInputValue);
+    } else if (e.key === 'Escape') {
+      setTagInputValue('');
+      setShowTagSuggestions(false);
+      tagInputRef.current?.blur();
+    }
   };
 
   // Header row styling
@@ -308,31 +342,49 @@ function SortableTrackRow({
 
         {/* Track Tags row */}
         <div className="flex items-start mt-2">
-          <div
-            className="flex-1 min-h-[28px] px-1.5 py-1 border border-gray-200 rounded-l border-r-0 bg-white flex flex-wrap gap-1 items-center cursor-pointer hover:bg-gray-50"
-            onClick={() => onOpenTrackTagPicker(track.id)}
-          >
+          <div className="relative flex-1 min-h-[28px] px-1.5 py-1 border border-gray-200 rounded-l border-r-0 bg-white flex flex-wrap gap-1 items-center focus-within:border-blue-400">
             {(track.track_tags ?? []).map((tag) => (
-              <span key={tag} className="bg-gray-200 px-2 py-0.5 rounded text-xs flex items-center gap-1 text-gray-700">
+              <span key={tag} className="bg-gray-200 px-2 py-0.5 rounded text-xs flex items-center gap-1 text-gray-700 shrink-0">
                 {tag}
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); onRemoveTrackTag(track.id, tag); }}
+                  onMouseDown={(e) => { e.preventDefault(); onRemoveTrackTag(track.id, tag); }}
                   className="bg-transparent border-none text-gray-500 cursor-pointer p-0 text-sm leading-none hover:text-red-500"
                 >
                   ×
                 </button>
               </span>
             ))}
-            {!(track.track_tags ?? []).length && (
-              <span className="text-xs text-gray-400 italic">Track tags</span>
+            <input
+              ref={tagInputRef}
+              type="text"
+              value={tagInputValue}
+              onChange={(e) => { setTagInputValue(e.target.value); setShowTagSuggestions(e.target.value.trim().length > 0); }}
+              onFocus={() => { if (tagInputValue.trim()) setShowTagSuggestions(true); }}
+              onBlur={() => setTimeout(() => setShowTagSuggestions(false), 150)}
+              onKeyDown={handleTagKeyDown}
+              placeholder={existingTagSet.size === 0 ? 'Add tag...' : ''}
+              className="flex-1 min-w-[80px] text-xs outline-none bg-transparent text-gray-700 placeholder-gray-400 py-0.5"
+            />
+            {showTagSuggestions && filteredSuggestions.length > 0 && (
+              <div className="absolute left-0 top-full mt-0.5 z-50 bg-white border border-gray-200 rounded shadow-md w-full max-h-[180px] overflow-y-auto">
+                {filteredSuggestions.map((name) => (
+                  <div
+                    key={name}
+                    onMouseDown={(e) => { e.preventDefault(); submitTag(name); }}
+                    className="px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 cursor-pointer"
+                  >
+                    {name}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
           <button
             type="button"
             onClick={() => onOpenTrackTagPicker(track.id)}
             className="w-8 min-h-[28px] flex items-center justify-center border border-gray-200 rounded-r bg-white text-gray-500 hover:bg-gray-50"
-            title="Add track tags"
+            title="Browse all tags"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
               <circle cx="1.5" cy="2.5" r="1"/>
@@ -380,6 +432,8 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
 
   // Track tag picker state: holds the track.id whose picker is open, or null
   const [trackTagPickerOpen, setTrackTagPickerOpen] = useState<string | null>(null);
+  // All available tag names for autocomplete
+  const [availableTagNames, setAvailableTagNames] = useState<string[]>([]);
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -521,9 +575,10 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
     }
   }, [album]);
 
-  // Load storage devices
+  // Load storage devices and available tags for autocomplete
   useEffect(() => {
     loadStorageDevices();
+    fetchTags().then((items) => setAvailableTagNames(items.map((t) => t.name)));
   }, []);
 
   const loadStorageDevices = async () => {
@@ -568,6 +623,8 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
           ? { ...t, track_tags: Array.from(new Set([...(t.track_tags ?? []), tagName])) }
           : t
       ));
+      // Keep autocomplete list current if a new tag was just created
+      setAvailableTagNames((prev) => prev.includes(tagName) ? prev : [...prev, tagName].sort());
     }
   };
 
@@ -984,7 +1041,9 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
                 onToggleSelect={handleToggleSelect}
                 onUpdate={handleUpdateTrack}
                 onRemoveTrackTag={handleRemoveTrackTag}
+                onAddTrackTag={handleAddTrackTag}
                 onOpenTrackTagPicker={(id) => setTrackTagPickerOpen(id)}
+                availableTagNames={availableTagNames}
               />
             ))}
           </SortableContext>
