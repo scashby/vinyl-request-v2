@@ -782,8 +782,17 @@ export default function MusicTriviaBankPage() {
 
   const deleteQuestion = async () => {
     if (!selectedId) return;
-    const yes = confirm("Permanently delete this archived question? This cannot be undone.");
+    const yes = confirm("Permanently delete this question? This cannot be undone.");
     if (!yes) return;
+
+    if (selectedDetail?.status !== "archived") {
+      const archiveRes = await fetch(`/api/games/trivia/questions/${selectedId}/archive`, { method: "POST" });
+      const archivePayload = await archiveRes.json().catch(() => ({}));
+      if (!archiveRes.ok) {
+        alert(archivePayload.error ?? "Failed to archive question before deletion");
+        return;
+      }
+    }
 
     const res = await fetch(`/api/games/trivia/questions/${selectedId}`, { method: "DELETE" });
     const payload = await res.json().catch(() => ({}));
@@ -1023,13 +1032,13 @@ export default function MusicTriviaBankPage() {
                 <button className="rounded border border-cyan-700 px-3 py-1" disabled={saving} onClick={() => saveQuestion(true)}>Publish</button>
                 <button className="rounded border border-stone-700 px-3 py-1" disabled={!selectedId || saving} onClick={archiveQuestion}>Archive</button>
                 <button className="rounded border border-amber-700 px-3 py-1" disabled={!selectedId || selectedDetail?.status !== "archived" || saving} onClick={restoreQuestion}>Restore to Draft</button>
-                <button className="rounded border border-rose-700 px-3 py-1" disabled={!selectedId || selectedDetail?.status !== "archived" || saving} onClick={deleteQuestion}>Delete</button>
+                <button className="rounded border border-rose-700 px-3 py-1" disabled={!selectedId || saving} onClick={deleteQuestion}>Delete</button>
               </div>
             </div>
 
             {selectedDetail?.status === "archived" ? (
               <p className="mb-3 rounded border border-amber-800/70 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
-                Archived questions stay editable for review, but must be restored before they can return to active use. Permanent delete is only allowed after archive and only when the question is not used by any deck or session.
+                Archived questions stay editable for review, but must be restored before they can return to active use. Delete is only allowed when the question is not used by any deck or session.
               </p>
             ) : null}
 
