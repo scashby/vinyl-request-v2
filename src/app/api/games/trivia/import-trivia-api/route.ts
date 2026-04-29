@@ -54,30 +54,38 @@ export async function POST(request: NextRequest) {
     if (tag) tags.push(tag);
   }
 
-  const params: TriviaApiFetchParams = {
-    limit: Math.min(limit, 50),
+  const batchParams: TriviaApiFetchParams = {
+    limit: 50,
     difficulties: difficulties?.length ? difficulties : undefined,
     tags: tags.length ? tags : undefined,
   };
 
-  // Fetch from The Trivia API
-  let questions;
-  try {
-    questions = await fetchTriviaApiQuestions(params);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 502 });
-  }
-
-  if (!questions.length) {
-    return NextResponse.json({ imported: 0, skipped: 0, message: "No questions returned from Trivia API" });
-  }
-
   let imported = 0;
   let skipped = 0;
+  let totalFetched = 0;
+  const seenApiIds = new Set<string>();
+  const MAX_ATTEMPTS = Math.min(Math.ceil(limit / 10), 5);
   const now = new Date().toISOString();
 
-  for (const q of questions) {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS && imported < limit; attempt++) {
+    let questions;
+    try {
+      questions = await fetchTriviaApiQuestions(batchParams);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (attempt === 0) return NextResponse.json({ error: msg }, { status: 502 });
+      break;
+    }
+
+    if (!questions.length) break;
+
+    const fresh = questions.filter((q) => !seenApiIds.has(q.id));
+    if (fresh.length === 0) break;
+    fresh.forEach((q) => seenApiIds.add(q.id));
+    totalFetched += fresh.length;
+
+  for (const q of fresh) {
+    if (imported >= limit) break;
     const sourceNote = `trivia-api:${q.id}`;
 
     // Dedup — skip if we already have this question
@@ -181,11 +189,12 @@ export async function POST(request: NextRequest) {
 
     imported++;
   }
+  } // end attempt loop
 
   return NextResponse.json({
     imported,
     skipped,
-    total_fetched: questions.length,
-    message: `Imported ${imported} question${imported !== 1 ? "s" : ""} (${skipped} already existed)`,
+    total_fetched: totalFetched,
+    message: `Imported ${imported} question${imported !== 1 ? "s" : ""} (${skipped} already existed or skipped)`,
   });
 }
