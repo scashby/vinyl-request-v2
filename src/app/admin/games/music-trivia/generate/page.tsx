@@ -289,9 +289,9 @@ function TriviaApiMode() {
       {/* Limit */}
       <div>
         <label className="text-xs font-semibold text-stone-400">
-          Questions to import <span className="font-normal text-stone-500">(max 50 per request)</span>
+          Questions to import <span className="font-normal text-stone-500">(fetched in batches of 50)</span>
         </label>
-        <input type="number" min={1} max={50} value={limit} onChange={(e) => setLimit(Math.max(1, Math.min(50, Number(e.target.value) || 50)))} className="mt-1 w-24 rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm text-stone-200" />
+        <input type="number" min={1} max={500} value={limit} onChange={(e) => setLimit(Math.max(1, Math.min(500, Number(e.target.value) || 50)))} className="mt-1 w-24 rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm text-stone-200" />
       </div>
 
       {error && <p className="text-xs text-red-400">{error}</p>}
