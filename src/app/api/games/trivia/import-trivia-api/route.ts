@@ -68,8 +68,7 @@ export async function POST(request: NextRequest) {
   const { data: invRows } = await (supa
     .from("inventory")
     .select("release_id")
-    .in("status", ["in_collection", "for_sale", "on_order"])
-    as unknown as Promise<{ data: Array<{ release_id: number }> | null }>);
+    .in("status", ["in_collection", "for_sale", "on_order"]) as any);
 
   const releaseIds = [...new Set((invRows ?? []).map((r) => r.release_id).filter(Boolean))];
 
@@ -77,8 +76,7 @@ export async function POST(request: NextRequest) {
     const { data: masterRows } = await (supa
       .from("releases")
       .select("masters(title, artists:main_artist_id(name))")
-      .in("id", releaseIds)
-      as unknown as Promise<{ data: Array<{ masters: { title: string; artists: { name: string } | null } | null }> | null }>);
+      .in("id", releaseIds) as any);
 
     for (const row of masterRows ?? []) {
       if (row.masters?.artists?.name?.length > 2) collectionTerms.add(row.masters.artists.name.toLowerCase());
@@ -88,8 +86,7 @@ export async function POST(request: NextRequest) {
     const { data: trackRows } = await (supa
       .from("release_tracks")
       .select("title_override, recordings(title, track_artist)")
-      .in("release_id", releaseIds)
-      as unknown as Promise<{ data: Array<{ title_override: string | null; recordings: { title: string | null; track_artist: string | null } | null }> | null }>);
+      .in("release_id", releaseIds) as any);
 
     for (const row of trackRows ?? []) {
       const title = row.title_override || row.recordings?.title;
