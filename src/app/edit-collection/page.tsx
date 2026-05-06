@@ -4546,27 +4546,30 @@ function CollectionBrowserPage() {
             </div>
           </div>
 
+          {selectedAlbumId && (
           <div className="hidden lg:flex w-[380px] bg-white border-l border-[#ddd] overflow-auto flex-col shrink-0">
             {/* Action Toolbar */}
             <div className="px-3 py-1.5 border-b border-[#555] flex items-center justify-between bg-[#4a4a4a] h-10 shrink-0">
               <div className="flex gap-1.5 items-center">
+                <button onClick={() => setSelectedAlbumId(null)} title="Close panel" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-sm text-white font-bold leading-none">✕</button>
                 <button onClick={() => selectedAlbumId && handleEditAlbum(selectedAlbumId)} title="Edit album details" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-sm text-white">✏️</button>
                 <button title="Share album" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-sm text-white">↗️</button>
                 <button title="Search on eBay" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-xs text-white font-semibold">eBay</button>
                 <button title="More actions" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-sm text-white">⋮</button>
               </div>
-              
+
               <button title="Select visible fields" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
                 <span>⊞</span>
                 <span className="text-[9px]">▼</span>
               </button>
             </div>
-            
-            <CollectionInfoPanel 
-                album={selectedAlbum} 
+
+            <CollectionInfoPanel
+                album={selectedAlbum}
                 onClose={() => setSelectedAlbumId(null)}
             />
           </div>
+          )}
         </div>
       </div>
 
