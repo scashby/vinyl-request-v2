@@ -1,6 +1,7 @@
 // @ts-nocheck — trivia_questions and related tables not fully typed; use getTriviaDb with cast
 import { NextRequest, NextResponse } from "next/server";
 import { getTriviaDb } from "src/lib/triviaDb";
+import { supabaseAdmin } from "src/lib/supabaseAdmin";
 import { generateTriviaQuestionCode } from "src/lib/triviaBank";
 import {
   fetchTriviaApiQuestions,
@@ -60,8 +61,48 @@ export async function POST(request: NextRequest) {
     tags: tags.length ? tags : undefined,
   };
 
+  // Build collection term set for matching — only import questions about artists/albums/tracks we own
+  const collectionTerms = new Set<string>();
+  const supa = supabaseAdmin as unknown as { from: (t: string) => unknown };
+
+  const { data: invRows } = await (supa
+    .from("inventory")
+    .select("release_id")
+    .in("status", ["in_collection", "for_sale", "on_order"])
+    as unknown as Promise<{ data: Array<{ release_id: number }> | null }>);
+
+  const releaseIds = [...new Set((invRows ?? []).map((r) => r.release_id).filter(Boolean))];
+
+  if (releaseIds.length > 0) {
+    const { data: masterRows } = await (supa
+      .from("releases")
+      .select("masters(title, artists:main_artist_id(name))")
+      .in("id", releaseIds)
+      as unknown as Promise<{ data: Array<{ masters: { title: string; artists: { name: string } | null } | null }> | null }>);
+
+    for (const row of masterRows ?? []) {
+      if (row.masters?.artists?.name?.length > 2) collectionTerms.add(row.masters.artists.name.toLowerCase());
+      if (row.masters?.title?.length > 4) collectionTerms.add(row.masters.title.toLowerCase());
+    }
+
+    const { data: trackRows } = await (supa
+      .from("release_tracks")
+      .select("title_override, recordings(title, track_artist)")
+      .in("release_id", releaseIds)
+      as unknown as Promise<{ data: Array<{ title_override: string | null; recordings: { title: string | null; track_artist: string | null } | null }> | null }>);
+
+    for (const row of trackRows ?? []) {
+      const title = row.title_override || row.recordings?.title;
+      if (title && title.length > 5) collectionTerms.add(title.toLowerCase());
+      if (row.recordings?.track_artist && row.recordings.track_artist.length > 2) {
+        collectionTerms.add(row.recordings.track_artist.toLowerCase());
+      }
+    }
+  }
+
   let imported = 0;
   let skipped = 0;
+  let notInCollection = 0;
   let totalFetched = 0;
   const seenApiIds = new Set<string>();
   const MAX_ATTEMPTS = Math.min(Math.ceil(limit / 10), 5);
@@ -87,6 +128,13 @@ export async function POST(request: NextRequest) {
   for (const q of fresh) {
     if (imported >= limit) break;
     const sourceNote = `trivia-api:${q.id}`;
+
+    // Collection filter — skip questions not about anything we own
+    if (collectionTerms.size > 0) {
+      const haystack = [q.question.text, q.correctAnswer, ...q.incorrectAnswers].join(" ").toLowerCase();
+      const matches = [...collectionTerms].some((term) => haystack.includes(term));
+      if (!matches) { notInCollection++; continue; }
+    }
 
     // Dedup — skip if we already have this question
     const { data: existing } = await (db
@@ -194,7 +242,8 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     imported,
     skipped,
+    not_in_collection: notInCollection,
     total_fetched: totalFetched,
-    message: `Imported ${imported} question${imported !== 1 ? "s" : ""} (${skipped} already existed or skipped)`,
+    message: `Imported ${imported} question${imported !== 1 ? "s" : ""} (${skipped} already existed, ${notInCollection} not in collection)`,
   });
 }

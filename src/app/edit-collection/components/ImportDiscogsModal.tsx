@@ -919,7 +919,20 @@ function compareAlbums(
 
   const compared: ComparedAlbum[] = [];
 
-  for (const parsedAlbum of parsed) {
+  // Two-pass ordering: process instance_id-matchable items first so their DB records are
+  // consumed before release_id fallback matching runs for unmatched items. Without this,
+  // a new item processed before an existing item with the same release_id would see stale
+  // candidates and trigger a spurious "Multiple possible matches" review.
+  const orderedParsed = [
+    ...parsed.filter(
+      p => sourceType === 'collection' && p.discogs_instance_id !== null && instanceIdMap.has(p.discogs_instance_id)
+    ),
+    ...parsed.filter(
+      p => !(sourceType === 'collection' && p.discogs_instance_id !== null && instanceIdMap.has(p.discogs_instance_id))
+    ),
+  ];
+
+  for (const parsedAlbum of orderedParsed) {
     let existingAlbum: ExistingAlbum | undefined;
     let matchType: ComparedAlbum['matchType'] = 'unmatched';
     let weakMatch = false;

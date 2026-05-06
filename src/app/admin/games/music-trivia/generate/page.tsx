@@ -196,10 +196,10 @@ export default function GenerateTriviaPage() {
 // Trivia API Import Mode — pulls real curated trivia from the-trivia-api.com
 // ---------------------------------------------------------------------------
 
-type ApiImportResult = { imported: number; skipped: number; total_fetched: number; message: string };
+type ApiImportResult = { imported: number; skipped: number; not_in_collection: number; total_fetched: number; message: string };
 
 function TriviaApiMode() {
-  const [scopeType, setScopeType] = useState<"collection" | "decade" | "genre">("collection");
+  const [scopeType, setScopeType] = useState<"collection" | "genre">("collection");
   const [scopeValue, setScopeValue] = useState("");
   const [difficulties, setDifficulties] = useState<string[]>(["easy", "medium", "hard"]);
   const [limit, setLimit] = useState(50);
@@ -247,6 +247,7 @@ function TriviaApiMode() {
           Pulls real curated music trivia questions from{" "}
           <span className="text-stone-300">the-trivia-api.com</span> — already formatted with
           correct answer + 3 wrong options. Questions land in the Question Bank as drafts for review.
+          Pool is ~400+ general music questions; genre filter narrows it. Decade filtering is not supported by this API.
         </p>
       </div>
 
@@ -254,7 +255,7 @@ function TriviaApiMode() {
       <div>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-400">Filter by</p>
         <div className="flex gap-2 text-xs">
-          {(["collection", "decade", "genre"] as const).map((s) => (
+          {(["collection", "genre"] as const).map((s) => (
             <label key={s} className="flex cursor-pointer items-center gap-1.5 rounded border border-stone-700 px-2 py-1.5 capitalize hover:border-cyan-700">
               <input type="radio" name="api-scope" checked={scopeType === s} onChange={() => { setScopeType(s); setScopeValue(""); }} className="accent-cyan-400" />
               {s === "collection" ? "All Music" : s}
@@ -262,12 +263,6 @@ function TriviaApiMode() {
           ))}
         </div>
 
-        {scopeType === "decade" && (
-          <select value={scopeValue} onChange={(e) => setScopeValue(e.target.value)} className="mt-2 rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm text-stone-200">
-            <option value="">— Select decade —</option>
-            {DECADE_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
-          </select>
-        )}
         {scopeType === "genre" && (
           <input type="text" value={scopeValue} onChange={(e) => setScopeValue(e.target.value)} placeholder="e.g. Rock, Pop, Hip Hop" className="mt-2 rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm text-stone-200 placeholder-stone-500 w-64" />
         )}
@@ -303,6 +298,9 @@ function TriviaApiMode() {
             <span>Fetched: <strong className="text-stone-200">{result.total_fetched}</strong></span>
             <span>New: <strong className="text-emerald-300">{result.imported}</strong></span>
             <span>Already existed: <strong className="text-stone-400">{result.skipped}</strong></span>
+            {result.not_in_collection > 0 && (
+              <span>Not in collection: <strong className="text-amber-400">{result.not_in_collection}</strong></span>
+            )}
           </div>
           <Link href="/admin/games/music-trivia/bank?tag=trivia-api" className="inline-block text-xs text-cyan-400 underline hover:text-cyan-200">
             Review imported questions in Question Bank →
