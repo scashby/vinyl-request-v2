@@ -1065,6 +1065,7 @@ function CollectionBrowserPage() {
   const tracksHydratedRef = useRef(false);
   const albumsLoadVersionRef = useRef(0);
   const loadingOwnerLoadVersionRef = useRef<number | null>(null);
+  const panelClosedByUserRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchType, setSearchType] = useState<SearchType>('albums');
   const [showSearchTypeDropdown, setShowSearchTypeDropdown] = useState(false);
@@ -1073,6 +1074,7 @@ function CollectionBrowserPage() {
   const [trackSource, setTrackSource] = useState<TrackListSource>('crates');
   const [folderMode, setFolderMode] = useState<SidebarMode>('format');
   const [selectedFolderValue, setSelectedFolderValue] = useState<string | null>(null);
+  const [selectedVinylSubformat, setSelectedVinylSubformat] = useState<string | null>(null);
   const [selectedCrateId, setSelectedCrateId] = useState<number | null>(null);
   const [crates, setCrates] = useState<Crate[]>([]);
   const [crateItemsByCrate, setCrateItemsByCrate] = useState<CrateItemsByCrate>({});
@@ -2171,13 +2173,17 @@ function CollectionBrowserPage() {
         if (searchType === 'both' && !matchesAlbums && !matchesTracks) return false;
       }
 
+      if (selectedVinylSubformat) {
+        if ((album.location || 'Unknown') !== selectedVinylSubformat) return false;
+      }
+
       return true;
     });
 
     if (tableSortState.column && tableSortState.direction) {
       const { column, direction } = tableSortState;
       const multiplier = direction === 'asc' ? 1 : -1;
-      
+
       filtered = [...filtered].sort((a, b) => {
         if (column === 'artist') {
           return multiplier * getAlbumArtist(a).localeCompare(getAlbumArtist(b));
@@ -2222,6 +2228,7 @@ function CollectionBrowserPage() {
     scopedAlbums,
     searchQuery,
     searchType,
+    selectedVinylSubformat,
     sortBy,
     tableSortState,
     viewMode,
@@ -2234,6 +2241,20 @@ function CollectionBrowserPage() {
       return acc;
     }, {} as Record<string, number>);
   }, [nonSaleAlbums]);
+
+  const vinylSubformatCounts = useMemo(() => {
+    return nonSaleAlbums
+      .filter(album => (album.release?.media_type || 'Unknown') === 'Vinyl')
+      .reduce((acc, album) => {
+        const folder = album.location || 'Unknown';
+        acc[folder] = (acc[folder] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+  }, [nonSaleAlbums]);
+
+  const sortedVinylSubformats = useMemo(() => {
+    return Object.entries(vinylSubformatCounts).sort((a, b) => b[1] - a[1]);
+  }, [vinylSubformatCounts]);
 
   const cratesWithCounts = useMemo(() => {
     return crates.map(crate => {
@@ -2713,6 +2734,7 @@ function CollectionBrowserPage() {
 
   useEffect(() => {
     if (selectedAlbumId) return;
+    if (panelClosedByUserRef.current) return;
     if (viewMode === 'collection' && filteredAndSortedAlbums.length > 0) {
       setSelectedAlbumId(filteredAndSortedAlbums[0].id);
       return;
@@ -2787,6 +2809,7 @@ function CollectionBrowserPage() {
   }, [playlists, selectedPlaylistId]);
 
   const handleAlbumClick = useCallback((album: Album) => {
+    panelClosedByUserRef.current = false;
     setSelectedAlbumId(album.id);
   }, []);
 
@@ -4070,17 +4093,33 @@ function CollectionBrowserPage() {
             <div className="flex-1 overflow-y-auto p-1.5 min-h-0">
               {folderMode === 'format' ? (
                 <>
-                  <button onClick={() => setSelectedFolderValue(null)} title="Show all albums" className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${!selectedFolderValue ? 'bg-[#5A9BD5]' : ''}`}>
+                  <button onClick={() => { setSelectedFolderValue(null); setSelectedVinylSubformat(null); }} title="Show all albums" className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${!selectedFolderValue ? 'bg-[#5A9BD5]' : ''}`}>
                     <span>[All Albums]</span>
                     <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${!selectedFolderValue ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{defaultVisibleAlbumCount}</span>
                   </button>
 
-                  {sortedFolderItems.map(([format, count]) => (
-                    <button key={format} onClick={() => setSelectedFolderValue(format)} title={`Filter by ${format}`} className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${selectedFolderValue === format ? 'bg-[#5A9BD5]' : ''}`}>
-                      <span>{format}</span>
-                      <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${selectedFolderValue === format ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{count}</span>
-                    </button>
-                  ))}
+                  {sortedFolderItems.flatMap(([format, count]) => {
+                    const isVinyl = format === 'Vinyl';
+                    const isFormatActive = selectedFolderValue === format && !selectedVinylSubformat;
+                    const items = [
+                      <button key={format} onClick={() => { setSelectedFolderValue(format); setSelectedVinylSubformat(null); }} title={`Filter by ${format}`} className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${isFormatActive ? 'bg-[#5A9BD5]' : ''}`}>
+                        <span>{format}</span>
+                        <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${isFormatActive ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{count}</span>
+                      </button>
+                    ];
+                    if (isVinyl) {
+                      sortedVinylSubformats.forEach(([subformat, subcount]) => {
+                        const isSubActive = selectedVinylSubformat === subformat;
+                        items.push(
+                          <button key={`vinyl-sub-${subformat}`} onClick={() => { setSelectedFolderValue('Vinyl'); setSelectedVinylSubformat(subformat); }} title={`Filter by ${subformat}`} className={`w-full flex justify-between items-center pl-5 pr-2 py-1 bg-transparent border-none rounded cursor-pointer mb-0.5 text-[11px] text-white text-left ${isSubActive ? 'bg-[#5A9BD5]' : ''}`}>
+                            <span className="text-[#ccc]">{subformat}</span>
+                            <span className={`text-white px-1 py-0.5 rounded-[10px] text-[10px] font-semibold ${isSubActive ? 'bg-[#3578b3]' : 'bg-[#444]'}`}>{subcount}</span>
+                          </button>
+                        );
+                      });
+                    }
+                    return items;
+                  })}
                 </>
               ) : folderMode === 'crates' ? (
                 <>
@@ -4551,7 +4590,7 @@ function CollectionBrowserPage() {
             {/* Action Toolbar */}
             <div className="px-3 py-1.5 border-b border-[#555] flex items-center justify-between bg-[#4a4a4a] h-10 shrink-0">
               <div className="flex gap-1.5 items-center">
-                <button onClick={() => setSelectedAlbumId(null)} title="Close panel" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-sm text-white font-bold leading-none">✕</button>
+                <button onClick={() => { panelClosedByUserRef.current = true; setSelectedAlbumId(null); }} title="Close panel" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-sm text-white font-bold leading-none">✕</button>
                 <button onClick={() => selectedAlbumId && handleEditAlbum(selectedAlbumId)} title="Edit album details" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-sm text-white">✏️</button>
                 <button title="Share album" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-sm text-white">↗️</button>
                 <button title="Search on eBay" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-xs text-white font-semibold">eBay</button>
@@ -4566,7 +4605,7 @@ function CollectionBrowserPage() {
 
             <CollectionInfoPanel
                 album={selectedAlbum}
-                onClose={() => setSelectedAlbumId(null)}
+                onClose={() => { panelClosedByUserRef.current = true; setSelectedAlbumId(null); }}
             />
           </div>
           )}
