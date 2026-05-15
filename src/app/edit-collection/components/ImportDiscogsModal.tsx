@@ -2347,7 +2347,12 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   };
 
   const filteredPreview = comparedAlbums.filter((album) => {
-    if (previewFilter !== 'all' && album.status !== previewFilter.toUpperCase()) return false;
+    if (previewFilter === 'all') {
+      // In "All" view, only show rows relevant to the selected sync mode (plus review rows).
+      if (!shouldProcess(album) && album.status !== 'REVIEW') return false;
+    } else if (album.status !== previewFilter.toUpperCase()) {
+      return false;
+    }
     if (previewSearch.trim()) {
       const term = previewSearch.trim().toLowerCase();
       return `${album.artist} ${album.title}`.toLowerCase().includes(term);
