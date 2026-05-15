@@ -3540,8 +3540,10 @@ function CollectionBrowserPage() {
 
   const openTrackContextMenu = useCallback((event: ReactMouseEvent, row: CollectionTrackRow) => {
     if (typeof window !== 'undefined') {
-      const hasFinePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-      if (!hasFinePointer) return;
+      const hasAnyFinePointer = window.matchMedia('(any-pointer: fine)').matches;
+      const hasAnyHover = window.matchMedia('(any-hover: hover)').matches;
+      const isCoarseOnlyInput = window.matchMedia('(pointer: coarse)').matches && !hasAnyFinePointer;
+      if (isCoarseOnlyInput && !hasAnyHover) return;
     }
     event.preventDefault();
     setTrackContextMenu({ x: event.clientX, y: event.clientY, row });
