@@ -166,7 +166,7 @@ export function normalizeArtistAlbum(artist: string, album: string): string {
   return `${normalizeArtist(artist)} ${normalizeTitle(album)}`;
 }
 
-export type SyncMode = 'full_replacement' | 'full_sync' | 'partial_sync' | 'new_only';
+export type SyncMode = 'full_replacement' | 'full_sync' | 'partial_sync' | 'new_and_changed' | 'new_only';
 
 export function isSameAlbum(
   album1: { artist: string; title: string },

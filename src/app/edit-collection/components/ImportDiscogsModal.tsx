@@ -10,7 +10,7 @@ import { stripDiscogsDisambiguationSuffix } from '../../../lib/artistName';
 import { hasValidDiscogsId, hasValidDiscogsMasterId } from '../../../lib/discogs-validation';
 import { isForSaleInventory, isSaleFolderName } from '../../../lib/saleUtils';
 
-type SyncMode = 'full_replacement' | 'full_sync' | 'partial_sync' | 'new_only';
+type SyncMode = 'full_replacement' | 'full_sync' | 'partial_sync' | 'new_and_changed' | 'new_only';
 type ImportStage = 'select_mode' | 'fetching_definitions' | 'fetching' | 'preview' | 'importing' | 'complete';
 type AlbumStatus = 'NEW' | 'CHANGED' | 'UNCHANGED' | 'REMOVED' | 'REVIEW';
 type DiscogsSourceType = 'collection' | 'wantlist';
@@ -1947,7 +1947,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         await ensureSaleCrateExists();
       }
 
-      if (isCollection && syncMode === 'partial_sync') {
+      if (isCollection && (syncMode === 'partial_sync' || syncMode === 'new_and_changed')) {
         const pendingInventorySync = comparedAlbums.filter(
           (album) => album.existingId && album.status !== 'REMOVED' && album.requiresInventorySync
         ).length;
@@ -1984,6 +1984,10 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
       } else if (syncMode === 'partial_sync') {
         albumsToProcess = comparedAlbums.filter(a =>
           a.status === 'NEW' || (a.status === 'CHANGED' && a.needsEnrichment)
+        );
+      } else if (syncMode === 'new_and_changed') {
+        albumsToProcess = comparedAlbums.filter(a =>
+          a.status === 'NEW' || a.status === 'CHANGED'
         );
       } else if (syncMode === 'new_only') {
         albumsToProcess = comparedAlbums.filter(a => a.status === 'NEW');
@@ -2059,6 +2063,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 album.status === 'NEW' ||
                 syncMode === 'full_sync' ||
                 (syncMode === 'partial_sync' && album.needsEnrichment)
+                // new_and_changed: only enrich NEW items, not CHANGED
               ) {
                 enrichedData = await enrichFromDiscogs(album.discogs_release_id);
 
@@ -2302,6 +2307,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     if (syncMode === 'full_replacement') return album.status !== 'REMOVED';
     if (syncMode === 'full_sync') return true;
     if (syncMode === 'new_only') return album.status === 'NEW';
+    if (syncMode === 'new_and_changed') return album.status === 'NEW' || album.status === 'CHANGED';
     if (syncMode === 'partial_sync') return album.status === 'NEW' || (album.status === 'CHANGED' && (album.needsEnrichment || album.requiresInventorySync));
     return true;
   };
@@ -2401,6 +2407,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     <div className="flex flex-col gap-2">
                       {[
                         { value: 'partial_sync', label: 'Partial Sync', desc: 'Add new & enrich items missing data (Recommended)' },
+                        { value: 'new_and_changed', label: 'New & Changed', desc: 'Import new items and sync changed items — no enrichment' },
                         { value: 'new_only', label: 'New Only', desc: 'Only import albums not in database' },
                         { value: 'full_sync', label: 'Full Sync', desc: 'Update everything, remove deleted items' },
                         { value: 'full_replacement', label: 'Full Replacement', desc: 'Wipe database and re-import' },
