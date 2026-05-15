@@ -94,7 +94,7 @@ export default function TrackContextMenu({
   }
 
   return (
-    <div className="fixed inset-0 z-[21050]" onClick={onClose}>
+    <div className="fixed inset-0 z-[21050]" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onClose(); }}>
       <div
         className="fixed w-[272px] rounded-md border border-[#2d3748] bg-[#181a1f] py-1 text-[#e5e7eb] shadow-2xl"
         style={{ left: menuPosition.left, top: menuPosition.top }}

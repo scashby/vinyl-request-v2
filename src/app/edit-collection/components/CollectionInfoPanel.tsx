@@ -2,6 +2,7 @@
 'use client';
 
 import { memo, useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { buildCollectionTrackKey } from '../../../lib/trackKey';
 import Image from 'next/image';
 import type { Album } from '../../../types/album';
 import { toSafeStringArray } from '../../../types/album';
@@ -455,6 +456,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
                         return (
                           <div
                             key={track.id ?? `${track.position}-${idx}`}
+                            data-track-key={buildCollectionTrackKey({ inventoryId: album.id, releaseTrackId: track.id ?? null, position: track.position, recordingId: track.recording?.id ?? null, fallbackIndex: idx })}
                             className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                           >
                             <div className="min-w-[42px] text-gray-500 text-[13px]">{positionLabel}</div>
@@ -492,6 +494,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
                       return (
                         <div
                           key={track.id ?? `${track.position}-${idx}`}
+                          data-track-key={buildCollectionTrackKey({ inventoryId: album.id, releaseTrackId: track.id ?? null, position: track.position, recordingId: track.recording?.id ?? null, fallbackIndex: idx })}
                           className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                         >
                           <div className="min-w-[42px] text-gray-500 text-[13px]">{numericPosition}</div>
