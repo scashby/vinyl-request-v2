@@ -1987,7 +1987,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         );
       } else if (syncMode === 'new_and_changed') {
         albumsToProcess = comparedAlbums.filter(a =>
-          a.status === 'NEW' || a.status === 'CHANGED'
+          a.status === 'NEW' || Boolean(a.discogsIdMismatch || a.requiresInventorySync)
         );
       } else if (syncMode === 'new_only') {
         albumsToProcess = comparedAlbums.filter(a => a.status === 'NEW');
@@ -2274,8 +2274,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     : syncMode === 'full_sync'
       ? comparedAlbums.filter(a => a.status === 'REMOVED').length
       : 0;
-  const changedCount = comparedAlbums.filter(a => a.status === 'CHANGED').length;
-  const enrichmentCount = comparedAlbums.filter(a => a.status === 'CHANGED' && a.needsEnrichment).length;
   const matchedByInstanceId = comparedAlbums.filter(a => a.matchType === 'discogs_instance_id').length;
   const matchedByDateAdded = comparedAlbums.filter(a => a.matchType === 'date_added').length;
   const matchedByDiscogsId = comparedAlbums.filter(a => a.matchType === 'discogs_id').length;
@@ -2288,6 +2286,23 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     sourceType === 'collection' && discogsReportedCount !== null
       ? discogsReportedCount - totalDatabaseCount
       : null;
+
+  const isQuickModeChanged = (album: ComparedAlbum): boolean => {
+    if (album.status !== 'CHANGED') return false;
+    return Boolean(album.discogsIdMismatch || album.requiresInventorySync);
+  };
+
+  const modeChangedCount =
+    syncMode === 'new_and_changed'
+      ? comparedAlbums.filter((a) => isQuickModeChanged(a)).length
+      : comparedAlbums.filter((a) => a.status === 'CHANGED').length;
+  const modeEnrichmentCount =
+    syncMode === 'new_only' || syncMode === 'new_and_changed'
+      ? 0
+      : comparedAlbums.filter((a) => a.status === 'CHANGED' && a.needsEnrichment).length;
+
+  const changedCount = modeChangedCount;
+  const enrichmentCount = modeEnrichmentCount;
 
   const missingFieldCounts = comparedAlbums.reduce<Record<string, number>>((acc, album) => {
     if (!album.missingFields || album.missingFields.length === 0) return acc;
@@ -2307,7 +2322,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     if (syncMode === 'full_replacement') return album.status !== 'REMOVED';
     if (syncMode === 'full_sync') return true;
     if (syncMode === 'new_only') return album.status === 'NEW';
-    if (syncMode === 'new_and_changed') return album.status === 'NEW' || album.status === 'CHANGED';
+    if (syncMode === 'new_and_changed') return album.status === 'NEW' || isQuickModeChanged(album);
     if (syncMode === 'partial_sync') return album.status === 'NEW' || (album.status === 'CHANGED' && (album.needsEnrichment || album.requiresInventorySync));
     return true;
   };
@@ -2318,6 +2333,9 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     if (album.status === 'NEW') return 'ADD';
     if (album.status === 'REMOVED') return 'REMOVE';
     if (album.status === 'CHANGED') {
+      if (syncMode === 'new_and_changed') {
+        return isQuickModeChanged(album) ? 'UPDATE' : 'SKIP';
+      }
       if (syncMode === 'partial_sync') {
         if (album.needsEnrichment) return 'ENRICH';
         if (album.requiresInventorySync) return 'UPDATE';
@@ -2459,7 +2477,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               <div className="text-sm mb-4 bg-blue-50 p-3 rounded text-blue-800 border border-blue-200">
                 Analyzed <strong>{analyzedSourceCount}</strong> items from your {sourceType}.
                 <div className="text-[12px] text-blue-700 mt-1">
-                  “NEW” means not found in your collection. “CHANGED” means an existing album will be updated or enriched.
+                    “NEW” means not found in your collection. “CHANGED” means an existing album will be updated.
+                    {(syncMode === 'partial_sync' || syncMode === 'full_sync') && ' Missing metadata may also be enriched in this mode.'}
                 </div>
               </div>
 
