@@ -1519,7 +1519,7 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
 export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }: ImportDiscogsModalProps) {
   const [stage, setStage] = useState<ImportStage>('select_mode');
   const [sourceType, setSourceType] = useState<DiscogsSourceType>('collection');
-  const [syncMode, setSyncMode] = useState<SyncMode>('partial_sync');
+  const [syncMode, setSyncMode] = useState<SyncMode>('new_and_changed');
   
   const [comparedAlbums, setComparedAlbums] = useState<ComparedAlbum[]>([]);
   const [totalDatabaseCount, setTotalDatabaseCount] = useState<number>(0);
@@ -2314,9 +2314,17 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
   const actionLabel = (album: ComparedAlbum) => {
     if (album.status === 'REVIEW') return 'REVIEW';
+    if (!shouldProcess(album)) return 'SKIP';
     if (album.status === 'NEW') return 'ADD';
     if (album.status === 'REMOVED') return 'REMOVE';
-    if (album.status === 'CHANGED') return album.needsEnrichment ? 'ENRICH' : 'UPDATE';
+    if (album.status === 'CHANGED') {
+      if (syncMode === 'partial_sync') {
+        if (album.needsEnrichment) return 'ENRICH';
+        if (album.requiresInventorySync) return 'UPDATE';
+        return 'SKIP';
+      }
+      return 'UPDATE';
+    }
     return 'SKIP';
   };
 
@@ -2406,9 +2414,9 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Sync Mode</label>
                     <div className="flex flex-col gap-2">
                       {[
-                        { value: 'partial_sync', label: 'Partial Sync', desc: 'Add new & enrich items missing data (Recommended)' },
-                        { value: 'new_and_changed', label: 'New & Changed', desc: 'Import new items and sync changed items — no enrichment' },
-                        { value: 'new_only', label: 'New Only', desc: 'Only import albums not in database' },
+                        { value: 'new_and_changed', label: 'New & Changed', desc: 'Import new items and sync changed items - no enrichment (Recommended)' },
+                        { value: 'new_only', label: 'New Only', desc: 'Only import albums not in database - no enrichment' },
+                        { value: 'partial_sync', label: 'Partial Sync', desc: 'Add new and enrich changed items missing data' },
                         { value: 'full_sync', label: 'Full Sync', desc: 'Update everything, remove deleted items' },
                         { value: 'full_replacement', label: 'Full Replacement', desc: 'Wipe database and re-import' },
                       ].map(mode => (
