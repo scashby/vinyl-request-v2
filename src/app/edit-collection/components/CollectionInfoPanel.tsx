@@ -493,14 +493,6 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
                         <div
                           key={track.id ?? `${track.position}-${idx}`}
                           className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                          onContextMenu={(event) =>
-                            onTrackContextMenu?.(event, {
-                              releaseTrackId: track.id ?? null,
-                              recordingId: track.recording?.id ?? null,
-                              position: rawPosition || null,
-                              title,
-                            })
-                          }
                         >
                           <div className="min-w-[42px] text-gray-500 text-[13px]">{numericPosition}</div>
                           <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{title}</div>
@@ -513,14 +505,6 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
                       <div
                         key={`${fallback.position}-${idx}`}
                         className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                        onContextMenu={(event) =>
-                          onTrackContextMenu?.(event, {
-                            releaseTrackId: null,
-                            recordingId: null,
-                            position: fallback.position ?? null,
-                            title: fallback.title ?? null,
-                          })
-                        }
                       >
                         <div className="min-w-[42px] text-gray-500 text-[13px]">{getTrackNumber(fallback.position, idx)}</div>
                         <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{fallback.title}</div>
