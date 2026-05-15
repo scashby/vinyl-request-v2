@@ -1,11 +1,14 @@
 // src/app/browse/album-detail/[id]/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useEffect, useState, useCallback, Suspense, type MouseEvent as ReactMouseEvent } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from 'src/lib/supabaseClient';
 import type { Database } from 'src/types/supabase';
+import type { CollectionPlaylist } from 'src/types/collectionPlaylist';
+import TrackContextMenu, { type TrackContextMenuPlaylist } from 'src/components/TrackContextMenu';
+import { buildCollectionTrackKey, buildLegacyTrackKeyCandidates } from 'src/lib/trackKey';
 
 // Updated to match new DB Schema
 interface DbTrack {
@@ -130,6 +133,10 @@ function AlbumDetailContent() {
   const [error, setError] = useState<string | null>(null);
   const [requestStatus, setRequestStatus] = useState('');
   const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [canManagePlaylists, setCanManagePlaylists] = useState(false);
+  const [playlists, setPlaylists] = useState<CollectionPlaylist[]>([]);
+  const [trackMenuState, setTrackMenuState] = useState<{ x: number; y: number; track: DbTrack; index: number } | null>(null);
+  const [trackMenuBusy, setTrackMenuBusy] = useState(false);
 
   const buildFormatLabel = (release?: Partial<ReleaseRow> | null) => {
     if (!release) return '';
@@ -297,10 +304,222 @@ function AlbumDetailContent() {
     }
   }, [eventId, eventIdNum]);
 
+  const loadPlaylistContext = useCallback(async () => {
+    const { data: playlistRows, error: playlistError } = await supabase
+      .from('collection_playlists')
+      .select('id, name, icon, color, sort_order, created_at, is_smart, smart_rules, match_rules, live_update')
+      .order('sort_order', { ascending: true });
+
+    if (playlistError) throw playlistError;
+
+    const { data: playlistItems, error: itemsError } = await supabase
+      .from('collection_playlist_items')
+      .select('playlist_id, track_key, sort_order')
+      .order('sort_order', { ascending: true });
+
+    if (itemsError) throw itemsError;
+
+    const tracksByPlaylist = (playlistItems ?? []).reduce((acc, item) => {
+      if (!item.playlist_id || !item.track_key) return acc;
+      if (!acc[item.playlist_id]) {
+        acc[item.playlist_id] = [];
+      }
+      acc[item.playlist_id].push(item.track_key);
+      return acc;
+    }, {} as Record<number, string[]>);
+
+    const mapped: CollectionPlaylist[] = (playlistRows ?? []).map((row) => ({
+      id: row.id,
+      name: row.name,
+      icon: row.icon || '🎵',
+      color: row.color || '#3578b3',
+      trackKeys: tracksByPlaylist[row.id] ?? [],
+      createdAt: row.created_at || new Date().toISOString(),
+      sortOrder: row.sort_order ?? 0,
+      isSmart: row.is_smart === true,
+      smartRules: row.smart_rules,
+      matchRules: row.match_rules === 'any' ? 'any' : 'all',
+      liveUpdate: row.live_update !== false,
+    }));
+
+    setPlaylists(mapped);
+  }, []);
+
+  const resolveTrackKey = useCallback((track: DbTrack, index: number): string => {
+    const inventoryId = album?.id;
+    if (!inventoryId) return '';
+    return buildCollectionTrackKey({
+      inventoryId,
+      releaseTrackId: track.id ?? null,
+      position: track.position,
+      recordingId: track.recording_id ?? null,
+      fallbackIndex: index,
+    });
+  }, [album]);
+
+  const getTrackKeyCandidates = useCallback((track: DbTrack, index: number): string[] => {
+    const inventoryId = album?.id;
+    if (!inventoryId) return [];
+    const canonical = resolveTrackKey(track, index);
+    const legacy = buildLegacyTrackKeyCandidates({
+      inventoryId,
+      releaseTrackId: track.id ?? null,
+      position: track.position,
+      fallbackIndex: index,
+    });
+    return Array.from(new Set([canonical, ...legacy].filter(Boolean)));
+  }, [album, resolveTrackKey]);
+
+  const openTrackPlaylistMenu = useCallback(async (event: ReactMouseEvent, track: DbTrack, index: number) => {
+    if (!canManagePlaylists) return;
+    if (typeof window !== 'undefined') {
+      const hasFinePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+      if (!hasFinePointer) return;
+    }
+    event.preventDefault();
+    if (playlists.length === 0) {
+      try {
+        await loadPlaylistContext();
+      } catch (error) {
+        console.error('Failed to load playlists:', error);
+        alert('Failed to load playlists. Please try again.');
+        return;
+      }
+    }
+    setTrackMenuState({ x: event.clientX, y: event.clientY, track, index });
+  }, [canManagePlaylists, loadPlaylistContext, playlists.length]);
+
+  const editableTrackMenuPlaylists = useCallback((): TrackContextMenuPlaylist[] => {
+    if (!trackMenuState) return [];
+    const candidates = new Set(getTrackKeyCandidates(trackMenuState.track, trackMenuState.index));
+    return playlists
+      .filter((playlist) => !playlist.isSmart || playlist.liveUpdate === false)
+      .map((playlist) => ({
+        id: playlist.id,
+        name: playlist.name,
+        icon: playlist.icon || '🎵',
+        containsTrack: playlist.trackKeys.some((key) => candidates.has(key)),
+      }));
+  }, [getTrackKeyCandidates, playlists, trackMenuState]);
+
+  const handleToggleTrackInPlaylist = useCallback(async (playlistId: number, containsTrack: boolean) => {
+    if (!trackMenuState) return;
+    const candidates = getTrackKeyCandidates(trackMenuState.track, trackMenuState.index);
+    const canonical = resolveTrackKey(trackMenuState.track, trackMenuState.index);
+    if (!canonical) return;
+
+    setTrackMenuBusy(true);
+    try {
+      if (containsTrack) {
+        const { error } = await supabase
+          .from('collection_playlist_items')
+          .delete()
+          .eq('playlist_id', playlistId)
+          .in('track_key', candidates);
+        if (error) throw error;
+      } else {
+        const playlist = playlists.find((item) => item.id === playlistId);
+        if (!playlist) return;
+
+        const existingKeys = new Set(playlist.trackKeys);
+        const alreadyPresent = candidates.some((candidate) => existingKeys.has(candidate));
+        if (!alreadyPresent) {
+          const { error } = await supabase
+            .from('collection_playlist_items')
+            .insert({
+              playlist_id: playlistId,
+              track_key: canonical,
+              sort_order: playlist.trackKeys.length,
+            });
+          if (error) throw error;
+        }
+      }
+
+      await loadPlaylistContext();
+      setTrackMenuState(null);
+    } catch (error) {
+      console.error('Failed to update track playlist membership:', error);
+      alert('Failed to update playlist. Please try again.');
+    } finally {
+      setTrackMenuBusy(false);
+    }
+  }, [getTrackKeyCandidates, loadPlaylistContext, playlists, resolveTrackKey, trackMenuState]);
+
+  const handleCreatePlaylistFromTrack = useCallback(async () => {
+    if (!trackMenuState) return;
+    const trackKey = resolveTrackKey(trackMenuState.track, trackMenuState.index);
+    if (!trackKey) return;
+    const rawName = window.prompt('Name the new playlist');
+    const name = rawName?.trim();
+    if (!name) return;
+
+    setTrackMenuBusy(true);
+    try {
+      const maxSort = playlists.reduce((max, item) => Math.max(max, item.sortOrder ?? 0), -1);
+      const nextSortOrder = maxSort + 1;
+
+      const { data, error } = await supabase
+        .from('collection_playlists')
+        .insert({
+          name,
+          icon: '🎵',
+          color: '#3578b3',
+          sort_order: nextSortOrder,
+          is_smart: false,
+          smart_rules: null,
+          match_rules: 'all',
+          live_update: true,
+        })
+        .select('id')
+        .single();
+
+      if (error || !data) throw error || new Error('Failed to create playlist');
+
+      const { error: itemError } = await supabase
+        .from('collection_playlist_items')
+        .insert({
+          playlist_id: data.id,
+          track_key: trackKey,
+          sort_order: 0,
+        });
+      if (itemError) throw itemError;
+
+      await loadPlaylistContext();
+      setTrackMenuState(null);
+    } catch (error) {
+      console.error('Failed to create playlist from track:', error);
+      alert('Failed to create playlist. Please try again.');
+    } finally {
+      setTrackMenuBusy(false);
+    }
+  }, [loadPlaylistContext, playlists, resolveTrackKey, trackMenuState]);
+
   useEffect(() => {
     if (id) fetchAlbum();
     if (eventId) fetchEventData();
   }, [id, eventId, fetchAlbum, fetchEventData]);
+
+  useEffect(() => {
+    let active = true;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      const hasSession = Boolean(data.session);
+      setCanManagePlaylists(hasSession);
+      if (hasSession) {
+        void loadPlaylistContext().catch((error) => {
+          console.error('Failed to pre-load playlists:', error);
+        });
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [loadPlaylistContext]);
+
+  useEffect(() => {
+    setTrackMenuState(null);
+  }, [album?.id]);
 
   const handleAddToQueue = async (side: string) => {
     if (!eventId || !album) return;
@@ -681,7 +900,12 @@ function AlbumDetailContent() {
                             Side {track.side}
                         </div>
                     )}
-                    <div className={`group flex items-center p-4 hover:bg-white/5 transition-colors ${blocked ? 'opacity-40 grayscale' : ''}`}>
+                    <div
+                      className={`group flex items-center p-4 hover:bg-white/5 transition-colors ${blocked ? 'opacity-40 grayscale' : ''}`}
+                      onContextMenu={(event) => {
+                        void openTrackPlaylistMenu(event, track, i);
+                      }}
+                    >
                       <span className="w-10 text-sm font-mono text-gray-500 text-center">{track.position}</span>
                       <div className="flex-1 px-4 min-w-0">
                         <div className="text-sm font-bold text-white truncate">{track.title}</div>
@@ -728,6 +952,17 @@ function AlbumDetailContent() {
           </div>
         </div>
       )}
+
+      <TrackContextMenu
+        isOpen={Boolean(trackMenuState)}
+        x={trackMenuState?.x ?? 0}
+        y={trackMenuState?.y ?? 0}
+        playlists={editableTrackMenuPlaylists()}
+        busy={trackMenuBusy}
+        onClose={() => setTrackMenuState(null)}
+        onTogglePlaylist={handleToggleTrackInPlaylist}
+        onCreatePlaylist={handleCreatePlaylistFromTrack}
+      />
     </div>
   );
 }

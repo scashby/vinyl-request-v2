@@ -1,11 +1,12 @@
 // src/app/edit-collection/page.tsx
 'use client';
 
-import { useCallback, useEffect, useState, useMemo, useRef, Suspense, Fragment, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, useMemo, useRef, Suspense, Fragment, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase as supabaseTyped } from '../../lib/supabaseClient';
 import CollectionTable, { type AlbumCrateBadge } from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
+import TrackContextMenu, { type TrackContextMenuPlaylist } from '../../components/TrackContextMenu';
 import { ColumnId, COLUMN_DEFINITIONS, COLUMN_GROUPS, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
 import type { Album } from '../../types/album';
 import { toSafeStringArray, toSafeSearchString } from '../../types/album';
@@ -46,6 +47,7 @@ import {
   getAlbumYearValue
 } from './albumHelpers';
 import { hasSaleSmartRule, isForSaleInventory, isSaleFolderName } from '../../lib/saleUtils';
+import { buildCollectionTrackKey, buildLegacyTrackKeyCandidates } from '../../lib/trackKey';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const supabase = supabaseTyped as any;
@@ -1095,6 +1097,8 @@ function CollectionBrowserPage() {
   const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<number>>(new Set());
   const [removingSelectedAlbums, setRemovingSelectedAlbums] = useState(false);
   const [selectedTrackKeys, setSelectedTrackKeys] = useState<Set<string>>(new Set());
+  const [trackContextMenu, setTrackContextMenu] = useState<{ x: number; y: number; row: CollectionTrackRow } | null>(null);
+  const [trackContextBusy, setTrackContextBusy] = useState(false);
   const [expandedAlbumIds, setExpandedAlbumIds] = useState<Set<number>>(new Set());
   const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null);
   const [editingAlbumId, setEditingAlbumId] = useState<number | null>(null);
@@ -2342,7 +2346,13 @@ function CollectionBrowserPage() {
         releaseTracks.forEach((track, index) => {
           const position = normalizeTrackPosition(track.position, index + 1);
           const side = track.side ? track.side.toUpperCase() : null;
-          const key = `${album.id}:${track.id ?? `p:${position}`}:${track.recording?.id ?? index}`;
+          const key = buildCollectionTrackKey({
+            inventoryId: album.id,
+            releaseTrackId: track.id ?? null,
+            position,
+            recordingId: track.recording?.id ?? null,
+            fallbackIndex: index,
+          });
           rows.push({
             key,
             inventoryId: album.id,
@@ -2373,7 +2383,13 @@ function CollectionBrowserPage() {
         if (track.type === 'header') return;
         const position = normalizeTrackPosition(track.position, index + 1);
         const side = track.side ? track.side.toUpperCase() : null;
-        const key = `${album.id}:fallback:${index}:${position}`;
+        const key = buildCollectionTrackKey({
+          inventoryId: album.id,
+          releaseTrackId: null,
+          position,
+          recordingId: null,
+          fallbackIndex: index,
+        });
         rows.push({
           key,
           inventoryId: album.id,
@@ -3513,6 +3529,139 @@ function CollectionBrowserPage() {
     }
   }, [loadPlaylists, selectedPlaylistId, selectedTrackKeys]);
 
+  const getTrackKeyCandidates = useCallback((row: CollectionTrackRow): string[] => {
+    const legacyCandidates = buildLegacyTrackKeyCandidates({
+      inventoryId: row.inventoryId,
+      releaseTrackId: row.releaseTrackId,
+      position: row.position,
+    });
+    return Array.from(new Set([row.key, ...legacyCandidates]));
+  }, []);
+
+  const openTrackContextMenu = useCallback((event: ReactMouseEvent, row: CollectionTrackRow) => {
+    if (typeof window !== 'undefined') {
+      const hasFinePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+      if (!hasFinePointer) return;
+    }
+    event.preventDefault();
+    setTrackContextMenu({ x: event.clientX, y: event.clientY, row });
+  }, []);
+
+  const editablePlaylistMenuItems = useMemo<TrackContextMenuPlaylist[]>(() => {
+    if (!trackContextMenu) return [];
+
+    const candidates = new Set(getTrackKeyCandidates(trackContextMenu.row));
+    return playlists
+      .filter((playlist) => !playlist.isSmart || playlist.liveUpdate === false)
+      .map((playlist) => ({
+        id: playlist.id,
+        name: playlist.name,
+        icon: playlist.icon || '🎵',
+        containsTrack: playlist.trackKeys.some((key) => candidates.has(key)),
+      }));
+  }, [getTrackKeyCandidates, playlists, trackContextMenu]);
+
+  const canRemoveTrackFromCurrentPlaylist = useMemo(() => {
+    if (!trackContextMenu || !selectedPlaylist) return false;
+    const isEditable = !selectedPlaylist.isSmart || selectedPlaylist.liveUpdate === false;
+    if (!isEditable) return false;
+    const candidates = getTrackKeyCandidates(trackContextMenu.row);
+    const existing = new Set(selectedPlaylist.trackKeys);
+    return candidates.some((candidate) => existing.has(candidate));
+  }, [getTrackKeyCandidates, selectedPlaylist, trackContextMenu]);
+
+  const handleToggleTrackPlaylistMembership = useCallback(async (playlistId: number, containsTrack: boolean) => {
+    if (!trackContextMenu) return;
+
+    const row = trackContextMenu.row;
+    const candidates = getTrackKeyCandidates(row);
+    setTrackContextBusy(true);
+    try {
+      if (containsTrack) {
+        const { error } = await supabase
+          .from('collection_playlist_items')
+          .delete()
+          .eq('playlist_id', playlistId)
+          .in('track_key', candidates);
+        if (error) throw error;
+      } else {
+        const targetPlaylist = playlists.find((playlist) => playlist.id === playlistId);
+        if (!targetPlaylist) return;
+
+        const existing = new Set(targetPlaylist.trackKeys);
+        const alreadyPresent = candidates.some((candidate) => existing.has(candidate));
+        if (!alreadyPresent) {
+          const { error } = await supabase
+            .from('collection_playlist_items')
+            .insert({
+              playlist_id: playlistId,
+              track_key: row.key,
+              sort_order: targetPlaylist.trackKeys.length,
+            });
+          if (error) throw error;
+        }
+      }
+
+      await loadPlaylists();
+      setTrackContextMenu(null);
+    } catch (error) {
+      console.error('Failed to update playlist membership:', error);
+      alert('Failed to update playlist membership. Please try again.');
+    } finally {
+      setTrackContextBusy(false);
+    }
+  }, [getTrackKeyCandidates, loadPlaylists, playlists, trackContextMenu]);
+
+  const handleRemoveTrackFromCurrentPlaylist = useCallback(async () => {
+    if (!trackContextMenu || !selectedPlaylistId) return;
+
+    const candidates = getTrackKeyCandidates(trackContextMenu.row);
+    setTrackContextBusy(true);
+    try {
+      const { error } = await supabase
+        .from('collection_playlist_items')
+        .delete()
+        .eq('playlist_id', selectedPlaylistId)
+        .in('track_key', candidates);
+      if (error) throw error;
+
+      await loadPlaylists();
+      setTrackContextMenu(null);
+    } catch (error) {
+      console.error('Failed to remove track from current playlist:', error);
+      alert('Failed to remove from playlist. Please try again.');
+    } finally {
+      setTrackContextBusy(false);
+    }
+  }, [getTrackKeyCandidates, loadPlaylists, selectedPlaylistId, trackContextMenu]);
+
+  const handleCreatePlaylistFromTrackContext = useCallback(async () => {
+    if (!trackContextMenu) return;
+    const rawName = window.prompt('Name the new playlist');
+    const name = rawName?.trim();
+    if (!name) return;
+
+    setTrackContextBusy(true);
+    try {
+      await handleCreatePlaylist({
+        name,
+        icon: '🎵',
+        color: '#3578b3',
+        trackKeys: [trackContextMenu.row.key],
+      });
+      setTrackContextMenu(null);
+    } finally {
+      setTrackContextBusy(false);
+    }
+  }, [handleCreatePlaylist, trackContextMenu]);
+
+  useEffect(() => {
+    if (!trackContextMenu) return;
+    if (viewMode === 'collection') {
+      setTrackContextMenu(null);
+    }
+  }, [trackContextMenu, viewMode]);
+
   const resolvedAlbumTrackColumns = useMemo<TrackViewColumnId[]>(() => {
     const deduped = albumTrackVisibleColumns
       .filter((id, index, arr) => arr.indexOf(id) === index)
@@ -4491,6 +4640,7 @@ function CollectionBrowserPage() {
                                 group.tracks.map((row) => (
                                   <tr
                                     key={row.key}
+                                    onContextMenu={(event) => openTrackContextMenu(event, row)}
                                     onClick={() => setSelectedAlbumId(row.inventoryId)}
                                     className={`border-b border-[#eee] cursor-pointer ${selectedAlbumId === row.inventoryId ? 'bg-[#f8fbff]' : 'hover:bg-[#fafafa]'}`}
                                   >
@@ -4556,6 +4706,7 @@ function CollectionBrowserPage() {
                         {filteredTrackRows.map((row) => (
                           <tr
                             key={row.key}
+                            onContextMenu={(event) => openTrackContextMenu(event, row)}
                             onClick={() => setSelectedAlbumId(row.inventoryId)}
                             className={`border-b border-[#eee] cursor-pointer ${selectedAlbumId === row.inventoryId ? 'bg-[#f8fbff]' : 'hover:bg-[#fafafa]'}`}
                           >
@@ -4611,6 +4762,19 @@ function CollectionBrowserPage() {
           )}
         </div>
       </div>
+
+      <TrackContextMenu
+        isOpen={Boolean(trackContextMenu)}
+        x={trackContextMenu?.x ?? 0}
+        y={trackContextMenu?.y ?? 0}
+        playlists={editablePlaylistMenuItems}
+        busy={trackContextBusy}
+        onClose={() => setTrackContextMenu(null)}
+        onTogglePlaylist={handleToggleTrackPlaylistMembership}
+        onCreatePlaylist={handleCreatePlaylistFromTrackContext}
+        onRemoveFromCurrent={canRemoveTrackFromCurrentPlaylist ? handleRemoveTrackFromCurrentPlaylist : undefined}
+        currentPlaylistName={selectedPlaylist?.name}
+      />
 
       {showColumnSelector && (
         <ColumnSelector
