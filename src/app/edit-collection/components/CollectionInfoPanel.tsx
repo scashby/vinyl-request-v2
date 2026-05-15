@@ -1,7 +1,7 @@
 // src/app/edit-collection/components/CollectionInfoPanel.tsx
 'use client';
 
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import Image from 'next/image';
 import type { Album } from '../../../types/album';
 import { toSafeStringArray } from '../../../types/album';
@@ -9,9 +9,13 @@ import { toSafeStringArray } from '../../../types/album';
 interface CollectionInfoPanelProps {
   album: Album | null;
   onClose?: () => void;
+  onTrackContextMenu?: (
+    event: ReactMouseEvent,
+    track: { releaseTrackId: number | null; recordingId: number | null; position: string | null }
+  ) => void;
 }
 
-const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }: CollectionInfoPanelProps) {
+const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, onTrackContextMenu }: CollectionInfoPanelProps) {
   type ReleaseTrack = NonNullable<NonNullable<Album['release']>['release_tracks']>[number];
 
   const [liveReleaseTracks, setLiveReleaseTracks] = useState<ReleaseTrack[] | null>(null);
@@ -452,7 +456,17 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
                         const numericPosition = getTrackNumber(rawPosition, idx);
                         const positionLabel = `${side}${numericPosition}`;
                         return (
-                          <div key={track.id ?? `${track.position}-${idx}`} className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                          <div
+                            key={track.id ?? `${track.position}-${idx}`}
+                            className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                            onContextMenu={(event) =>
+                              onTrackContextMenu?.(event, {
+                                releaseTrackId: track.id ?? null,
+                                recordingId: track.recording?.id ?? null,
+                                position: rawPosition || null,
+                              })
+                            }
+                          >
                             <div className="min-w-[42px] text-gray-500 text-[13px]">{positionLabel}</div>
                             <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{title}</div>
                             {duration !== '—' && <div className="text-gray-500 text-[13px] min-w-[40px] text-right">{duration}</div>}
@@ -464,7 +478,17 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
                       const numericPosition = getTrackNumber(fallback.position, idx);
                       const fallbackLabel = `${side}${numericPosition}`;
                       return (
-                        <div key={`${fallback.position}-${idx}`} className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                        <div
+                          key={`${fallback.position}-${idx}`}
+                          className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                          onContextMenu={(event) =>
+                            onTrackContextMenu?.(event, {
+                              releaseTrackId: null,
+                              recordingId: null,
+                              position: fallback.position ?? null,
+                            })
+                          }
+                        >
                           <div className="min-w-[42px] text-gray-500 text-[13px]">{fallbackLabel}</div>
                           <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{fallback.title}</div>
                           {fallback.duration && <div className="text-gray-500 text-[13px] min-w-[40px] text-right">{fallback.duration}</div>}
@@ -483,7 +507,17 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
                       const rawPosition = (track.position ?? '').trim();
                       const numericPosition = getTrackNumber(rawPosition, idx);
                       return (
-                        <div key={track.id ?? `${track.position}-${idx}`} className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                        <div
+                          key={track.id ?? `${track.position}-${idx}`}
+                          className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                          onContextMenu={(event) =>
+                            onTrackContextMenu?.(event, {
+                              releaseTrackId: track.id ?? null,
+                              recordingId: track.recording?.id ?? null,
+                              position: rawPosition || null,
+                            })
+                          }
+                        >
                           <div className="min-w-[42px] text-gray-500 text-[13px]">{numericPosition}</div>
                           <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{title}</div>
                           {duration !== '—' && <div className="text-gray-500 text-[13px] min-w-[40px] text-right">{duration}</div>}
@@ -492,7 +526,17 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose }
                     }
                     const fallback = track as NonNullable<Album['tracks']>[number];
                     return (
-                      <div key={`${fallback.position}-${idx}`} className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                      <div
+                        key={`${fallback.position}-${idx}`}
+                        className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                        onContextMenu={(event) =>
+                          onTrackContextMenu?.(event, {
+                            releaseTrackId: null,
+                            recordingId: null,
+                            position: fallback.position ?? null,
+                          })
+                        }
+                      >
                         <div className="min-w-[42px] text-gray-500 text-[13px]">{getTrackNumber(fallback.position, idx)}</div>
                         <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{fallback.title}</div>
                         {fallback.duration && <div className="text-gray-500 text-[13px] min-w-[40px] text-right">{fallback.duration}</div>}

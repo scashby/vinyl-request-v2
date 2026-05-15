@@ -3549,6 +3549,27 @@ function CollectionBrowserPage() {
     setTrackContextMenu({ x: event.clientX, y: event.clientY, row });
   }, []);
 
+  const openInfoPanelTrackContextMenu = useCallback((
+    event: ReactMouseEvent,
+    track: { releaseTrackId: number | null; recordingId: number | null; position: string | null }
+  ) => {
+    if (!selectedAlbumId) return;
+
+    const normalizedPosition = (track.position ?? '').trim().toUpperCase();
+    const matchingRow = allTrackRows.find((row) => {
+      if (row.inventoryId !== selectedAlbumId) return false;
+      if (track.releaseTrackId != null && row.releaseTrackId === track.releaseTrackId) return true;
+      if (track.recordingId != null && row.recordingId === track.recordingId) {
+        return normalizedPosition ? row.position === normalizedPosition : true;
+      }
+      if (normalizedPosition) return row.position === normalizedPosition;
+      return false;
+    });
+
+    if (!matchingRow) return;
+    openTrackContextMenu(event, matchingRow);
+  }, [allTrackRows, openTrackContextMenu, selectedAlbumId]);
+
   const editablePlaylistMenuItems = useMemo<TrackContextMenuPlaylist[]>(() => {
     if (!trackContextMenu) return [];
 
@@ -4759,6 +4780,7 @@ function CollectionBrowserPage() {
             <CollectionInfoPanel
                 album={selectedAlbum}
                 onClose={() => { panelClosedByUserRef.current = true; setSelectedAlbumId(null); }}
+              onTrackContextMenu={openInfoPanelTrackContextMenu}
             />
           </div>
           )}
