@@ -9,13 +9,10 @@ import { toSafeStringArray } from '../../../types/album';
 interface CollectionInfoPanelProps {
   album: Album | null;
   onClose?: () => void;
-  onTrackContextMenu?: (
-    event: ReactMouseEvent,
-    track: { releaseTrackId: number | null; recordingId: number | null; position: string | null }
-  ) => void;
+  onTrackListContextMenu?: (event: ReactMouseEvent) => void;
 }
 
-const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, onTrackContextMenu }: CollectionInfoPanelProps) {
+const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, onTrackListContextMenu }: CollectionInfoPanelProps) {
   type ReleaseTrack = NonNullable<NonNullable<Album['release']>['release_tracks']>[number];
 
   const [liveReleaseTracks, setLiveReleaseTracks] = useState<ReleaseTrack[] | null>(null);
@@ -433,7 +430,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
       </a>
 
       {discGroups.length > 0 && (
-        <div className="mb-4">
+        <div className="mb-4" onContextMenu={onTrackListContextMenu}>
           {discGroups.map((group) => (
             <div key={`disc-${group.disc}`} className="mb-4">
               <div className="text-xs font-bold text-white mb-1.5 p-2 px-3 bg-[#2196F3] rounded flex justify-between items-center shadow-sm uppercase tracking-wider">
@@ -459,13 +456,6 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
                           <div
                             key={track.id ?? `${track.position}-${idx}`}
                             className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                            onContextMenu={(event) =>
-                              onTrackContextMenu?.(event, {
-                                releaseTrackId: track.id ?? null,
-                                recordingId: track.recording?.id ?? null,
-                                position: rawPosition || null,
-                              })
-                            }
                           >
                             <div className="min-w-[42px] text-gray-500 text-[13px]">{positionLabel}</div>
                             <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{title}</div>
@@ -481,13 +471,6 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
                         <div
                           key={`${fallback.position}-${idx}`}
                           className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                          onContextMenu={(event) =>
-                            onTrackContextMenu?.(event, {
-                              releaseTrackId: null,
-                              recordingId: null,
-                              position: fallback.position ?? null,
-                            })
-                          }
                         >
                           <div className="min-w-[42px] text-gray-500 text-[13px]">{fallbackLabel}</div>
                           <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{fallback.title}</div>
@@ -515,6 +498,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
                               releaseTrackId: track.id ?? null,
                               recordingId: track.recording?.id ?? null,
                               position: rawPosition || null,
+                              title,
                             })
                           }
                         >
@@ -534,6 +518,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
                             releaseTrackId: null,
                             recordingId: null,
                             position: fallback.position ?? null,
+                            title: fallback.title ?? null,
                           })
                         }
                       >

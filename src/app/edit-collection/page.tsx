@@ -3016,7 +3016,8 @@ function CollectionBrowserPage() {
 
         const chunkSize = 500;
         for (let i = 0; i < nextAlbumIds.length; i += chunkSize) {
-          const records = nextAlbumIds.slice(i, i + chunkSize).map((albumId) => ({
+          const chunk = nextAlbumIds.slice(i, i + chunkSize);
+          const records = chunk.map((albumId) => ({
             crate_id: crateId,
             inventory_id: albumId,
           }));
@@ -3240,10 +3241,10 @@ function CollectionBrowserPage() {
           track_key: trackKey,
           sort_order: index,
         }));
-        const { error: itemError } = await supabase
+        const { error: itemsError } = await supabase
           .from('collection_playlist_items')
           .insert(rows);
-        if (itemError) throw itemError;
+        if (itemsError) throw itemsError;
       }
 
       await loadPlaylists();
@@ -3539,35 +3540,40 @@ function CollectionBrowserPage() {
   }, []);
 
   const openTrackContextMenu = useCallback((event: ReactMouseEvent, row: CollectionTrackRow) => {
-    if (typeof window !== 'undefined') {
-      const hasAnyFinePointer = window.matchMedia('(any-pointer: fine)').matches;
-      const hasAnyHover = window.matchMedia('(any-hover: hover)').matches;
-      const isCoarseOnlyInput = window.matchMedia('(pointer: coarse)').matches && !hasAnyFinePointer;
-      if (isCoarseOnlyInput && !hasAnyHover) return;
-    }
     event.preventDefault();
     setTrackContextMenu({ x: event.clientX, y: event.clientY, row });
   }, []);
 
-  const openInfoPanelTrackContextMenu = useCallback((
-    event: ReactMouseEvent,
-    track: { releaseTrackId: number | null; recordingId: number | null; position: string | null }
-  ) => {
+  const handleInfoPanelTrackListContextMenu = useCallback((event: ReactMouseEvent) => {
+    event.preventDefault();
     if (!selectedAlbumId) return;
 
-    const normalizedPosition = (track.position ?? '').trim().toUpperCase();
-    const matchingRow = allTrackRows.find((row) => {
-      if (row.inventoryId !== selectedAlbumId) return false;
-      if (track.releaseTrackId != null && row.releaseTrackId === track.releaseTrackId) return true;
-      if (track.recordingId != null && row.recordingId === track.recordingId) {
-        return normalizedPosition ? row.position === normalizedPosition : true;
+    // Find the closest track element by looking at the event target and its parents
+    const target = event.target as HTMLElement;
+    let trackElement = target.closest('[data-track-key]') as HTMLElement | null;
+    
+    if (!trackElement) {
+      // If no explicit track marker, try to find a text node that matches a track title
+      let current = target as HTMLElement | null;
+      while (current) {
+        const title = current.textContent?.trim() ?? '';
+        const matchingRow = allTrackRows.find(
+          (row) => row.inventoryId === selectedAlbumId && row.trackTitle === title
+        );
+        if (matchingRow) {
+          openTrackContextMenu(event as any, matchingRow);
+          return;
+        }
+        current = current.parentElement;
       }
-      if (normalizedPosition) return row.position === normalizedPosition;
-      return false;
-    });
+      return;
+    }
 
-    if (!matchingRow) return;
-    openTrackContextMenu(event, matchingRow);
+    const trackKey = trackElement.getAttribute('data-track-key');
+    const matchingRow = allTrackRows.find((row) => row.key === trackKey);
+    if (matchingRow) {
+      openTrackContextMenu(event as any, matchingRow);
+    }
   }, [allTrackRows, openTrackContextMenu, selectedAlbumId]);
 
   const editablePlaylistMenuItems = useMemo<TrackContextMenuPlaylist[]>(() => {
@@ -3938,7 +3944,9 @@ function CollectionBrowserPage() {
                       <button 
                         key={filter}
                         onClick={() => { setCollectionFilter(filter); setShowCollectionDropdown(false); }}
-                        className={`w-full px-4 py-2 text-left text-[13px] hover:bg-[#3a3a3a] ${collectionFilter === filter ? 'text-[#5A9BD5] font-bold' : 'text-white'}`}
+                        className={`w-full px-4 py-2 text-left text-[13px] hover:bg-[#f4f4f4] ${
+                          collectionFilter === filter ? 'bg-[#5A9BD5] font-bold' : 'text-white'
+                        }`}
                       >
                         {filter}
                       </button>
@@ -4648,7 +4656,7 @@ function CollectionBrowserPage() {
                                 {resolvedAlbumTrackColumns.map((columnId) => {
                                   const isControlCol = TRACK_COLUMN_CONTROL_IDS.has(columnId);
                                   const isRightAligned = TRACK_COLUMN_RIGHT_ALIGN_IDS.has(columnId);
-                                  const textColor = isControlCol ? 'text-[#4b5563]' : columnId === 'track_title' ? 'text-[#111827] font-semibold' : columnId === 'track_artist' ? 'text-[#1f2937]' : 'text-[#4b5563]';
+                                  const textColor = isControlCol ? 'text-[#4b5563]' : columnId === 'track_title' ? 'text-[#111827] font-semibold' : columnId === 'track_artist' ? 'text-[#374151]' : 'text-[#4b5563]';
                                   return (
                                     <td
                                       key={`${group.inventoryId}-${columnId}`}
@@ -4780,7 +4788,7 @@ function CollectionBrowserPage() {
             <CollectionInfoPanel
                 album={selectedAlbum}
                 onClose={() => { panelClosedByUserRef.current = true; setSelectedAlbumId(null); }}
-              onTrackContextMenu={openInfoPanelTrackContextMenu}
+                onTrackListContextMenu={handleInfoPanelTrackListContextMenu}
             />
           </div>
           )}
@@ -5457,4 +5465,3 @@ export default function Page() {
     </Suspense>
   );
 }
-// AUDIT: updated for UI parity (sort control alignment).
