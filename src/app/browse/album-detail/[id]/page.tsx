@@ -108,6 +108,17 @@ const asNumber = (value: unknown): number | null => {
   return null;
 };
 
+const asSmartPlaylistRules = (value: unknown): CollectionPlaylist['smartRules'] => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  const candidate = value as { rules?: unknown };
+  if (!Array.isArray(candidate.rules)) {
+    return null;
+  }
+  return value as CollectionPlaylist['smartRules'];
+};
+
 
 interface EventData {
   id: number;
@@ -337,7 +348,7 @@ function AlbumDetailContent() {
       createdAt: row.created_at || new Date().toISOString(),
       sortOrder: row.sort_order ?? 0,
       isSmart: row.is_smart === true,
-      smartRules: row.smart_rules,
+      smartRules: asSmartPlaylistRules(row.smart_rules),
       matchRules: row.match_rules === 'any' ? 'any' : 'all',
       liveUpdate: row.live_update !== false,
     }));
