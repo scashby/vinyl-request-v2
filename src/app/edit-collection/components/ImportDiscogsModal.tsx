@@ -2056,14 +2056,14 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               releaseUpdates.packaging = formatData.packaging ?? null;
               releaseUpdates.box_set = formatData.box_set ?? null;
 
-              // Enrichment Logic (Only if NEW or Full Sync/Partial Sync needs it)
+              // Enrichment Logic (Only if full_sync or partial_sync with needsEnrichment)
+              // new_and_changed and new_only use data from collection/wantlist response only (no enrichment)
               let enrichedData: Record<string, unknown> | null = null;
 
               if (
-                album.status === 'NEW' ||
                 syncMode === 'full_sync' ||
-                (syncMode === 'partial_sync' && album.needsEnrichment)
-                // new_and_changed: only enrich NEW items, not CHANGED
+                (syncMode === 'partial_sync' && album.needsEnrichment) ||
+                (album.status === 'NEW' && syncMode !== 'new_and_changed' && syncMode !== 'new_only')
               ) {
                 enrichedData = await enrichFromDiscogs(album.discogs_release_id);
 
