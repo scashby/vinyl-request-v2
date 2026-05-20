@@ -2845,6 +2845,37 @@ function CollectionBrowserPage() {
     setEditingAlbumId(albumId);
   }, []);
 
+  const handleAddAlbum = useCallback(async () => {
+    const { data: masterRow, error: masterErr } = await supabase
+      .from('masters')
+      .insert({ title: '', main_artist_id: null })
+      .select('id')
+      .single();
+    if (masterErr || !masterRow) {
+      alert(`Failed to create album: ${masterErr?.message}`);
+      return;
+    }
+    const { data: releaseRow, error: releaseErr } = await supabase
+      .from('releases')
+      .insert({ master_id: masterRow.id, media_type: 'Vinyl' })
+      .select('id')
+      .single();
+    if (releaseErr || !releaseRow) {
+      alert(`Failed to create album: ${releaseErr?.message}`);
+      return;
+    }
+    const { data: inventoryRow, error: inventoryErr } = await supabase
+      .from('inventory')
+      .insert({ release_id: releaseRow.id, status: 'owned', date_added: new Date().toISOString() })
+      .select('id')
+      .single();
+    if (inventoryErr || !inventoryRow) {
+      alert(`Failed to create album: ${inventoryErr?.message}`);
+      return;
+    }
+    setEditingAlbumId(inventoryRow.id);
+  }, []);
+
   const selectedAlbumsAsStrings = useMemo(() => {
     return new Set(Array.from(selectedAlbumIds).map(id => String(id)));
   }, [selectedAlbumIds]);
@@ -3934,7 +3965,7 @@ function CollectionBrowserPage() {
 
         <div className="bg-[#3A3A3A] text-white px-4 py-2 flex items-center justify-between gap-5 h-[48px] shrink-0">
           <div className="flex gap-2 items-center shrink-0">
-            <button title="Add new albums to collection" className="bg-[#368CF8] hover:bg-[#2c72c9] text-white border-none px-3 py-1.5 rounded cursor-pointer text-[13px] font-medium flex items-center gap-1 whitespace-nowrap transition-colors">
+            <button title="Add new album to collection" onClick={handleAddAlbum} className="bg-[#368CF8] hover:bg-[#2c72c9] text-white border-none px-3 py-1.5 rounded cursor-pointer text-[13px] font-medium flex items-center gap-1 whitespace-nowrap transition-colors">
               <span className="text-[16px]">+</span>
               <span>Add Albums</span>
             </button>

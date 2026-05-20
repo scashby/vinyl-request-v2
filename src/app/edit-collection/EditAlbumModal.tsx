@@ -1124,7 +1124,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         {/* Header - BOLD TITLE */}
         <div className="bg-[#F7941D] text-white px-4 py-3 flex justify-between items-center shrink-0">
           <h2 className="m-0 text-lg font-bold font-sans">
-            {album.title} / {album.artist}
+            {album.title || album.artist ? `${album.title || 'New Album'} / ${album.artist || 'Unknown Artist'}` : 'New Album'}
           </h2>
           <button
             onClick={onClose}
