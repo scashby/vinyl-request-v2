@@ -2802,6 +2802,7 @@ export type Database = {
       collection_playlists: {
         Row: {
           color: string
+          cover_image_url: string | null
           created_at: string
           icon: string
           id: number
@@ -2815,6 +2816,7 @@ export type Database = {
         }
         Insert: {
           color?: string
+          cover_image_url?: string | null
           created_at?: string
           icon?: string
           id?: never
@@ -2828,6 +2830,7 @@ export type Database = {
         }
         Update: {
           color?: string
+          cover_image_url?: string | null
           created_at?: string
           icon?: string
           id?: never

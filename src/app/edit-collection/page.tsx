@@ -1976,7 +1976,7 @@ function CollectionBrowserPage() {
   const loadPlaylists = useCallback(async () => {
     const { data: playlistRows, error: playlistError } = await supabase
       .from('collection_playlists')
-      .select('id, name, icon, color, sort_order, created_at, is_smart, smart_rules, match_rules, live_update')
+      .select('id, name, icon, color, cover_image_url, sort_order, created_at, is_smart, smart_rules, match_rules, live_update')
       .order('sort_order', { ascending: true });
 
     if (playlistError) {
@@ -2015,6 +2015,7 @@ function CollectionBrowserPage() {
       name: row.name,
       icon: row.icon || '🎵',
       color: row.color || '#3578b3',
+      coverImageUrl: row.cover_image_url ?? null,
       trackKeys: tracksByPlaylist[row.id] ?? [],
       trackLinkGroups: linkGroupsByPlaylist[row.id] ?? {},
       createdAt: row.created_at || new Date().toISOString(),
@@ -3249,7 +3250,7 @@ function CollectionBrowserPage() {
     });
   }, []);
 
-  const handleCreatePlaylist = useCallback(async (playlist: { name: string; icon: string; color: string; trackKeys: string[]; trackLinkGroups?: Record<string, string> }) => {
+  const handleCreatePlaylist = useCallback(async (playlist: { name: string; icon: string; color: string; coverImageUrl?: string | null; trackKeys: string[]; trackLinkGroups?: Record<string, string> }) => {
     try {
       const maxSort = playlists.reduce((max, item) => Math.max(max, item.sortOrder ?? 0), -1);
       const nextSortOrder = maxSort + 1;
@@ -3261,6 +3262,7 @@ function CollectionBrowserPage() {
           name: playlist.name.trim(),
           icon: playlist.icon,
           color: playlist.color,
+          cover_image_url: playlist.coverImageUrl ?? null,
           sort_order: nextSortOrder,
           is_smart: false,
           smart_rules: null,
@@ -3326,6 +3328,7 @@ function CollectionBrowserPage() {
           name: playlist.name,
           icon: playlist.icon,
           color: playlist.color,
+          cover_image_url: playlist.coverImageUrl ?? null,
           is_smart: playlist.isSmart,
           smart_rules: playlist.smartRules,
           match_rules: playlist.matchRules,

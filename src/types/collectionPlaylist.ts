@@ -3,6 +3,7 @@ export interface CollectionPlaylist {
   name: string;
   icon: string;
   color: string;
+  coverImageUrl?: string | null;
   trackKeys: string[];
   trackLinkGroups?: Record<string, string>; // sparse: trackKey → linkGroup (only linked tracks)
   createdAt: string;

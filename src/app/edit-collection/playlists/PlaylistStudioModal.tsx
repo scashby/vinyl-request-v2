@@ -106,7 +106,7 @@ interface PlaylistStudioModalProps {
   onReorderPlaylists: (playlists: CollectionPlaylist[]) => Promise<void>;
   onDeletePlaylist: (playlistId: number, playlistName: string) => Promise<void>;
   onDeleteAllPlaylists: () => Promise<void>;
-  onCreateManualPlaylist: (playlist: { name: string; icon: string; color: string; trackKeys: string[]; trackLinkGroups?: Record<string, string> }) => Promise<void>;
+  onCreateManualPlaylist: (playlist: { name: string; icon: string; color: string; coverImageUrl?: string | null; trackKeys: string[]; trackLinkGroups?: Record<string, string> }) => Promise<void>;
   onCreateSmartPlaylist: (payload: {
     name: string;
     color: string;
@@ -421,6 +421,9 @@ export function PlaylistStudioModal({
   const [linkingTrackKey, setLinkingTrackKey] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [showEditDetails, setShowEditDetails] = useState(false);
+  const [manualCoverImageUrl, setManualCoverImageUrl] = useState<string | null>(null);
+  const [coverImageUploading, setCoverImageUploading] = useState(false);
+  const coverImageInputRef = useRef<HTMLInputElement | null>(null);
   const [manualTrackSearch, setManualTrackSearch] = useState('');
   const [manualTrackSearchResults, setManualTrackSearchResults] = useState<InventorySearchCandidate[]>([]);
   const [manualTrackSearching, setManualTrackSearching] = useState(false);
@@ -642,6 +645,24 @@ export function PlaylistStudioModal({
     setManualTrackSearching(false);
     setLinkingTrackKey(null);
     setShowEditDetails(false);
+    setManualCoverImageUrl(null);
+  }, []);
+
+  const uploadCoverImage = useCallback(async (file: File): Promise<string | null> => {
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
+    const fileName = `cover-${Date.now()}.${ext}`;
+    setCoverImageUploading(true);
+    try {
+      const { error } = await supabase.storage.from('playlist-covers').upload(fileName, file, { upsert: true });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from('playlist-covers').getPublicUrl(fileName);
+      return urlData.publicUrl ?? null;
+    } catch (err) {
+      console.error('Failed to upload cover image:', err);
+      return null;
+    } finally {
+      setCoverImageUploading(false);
+    }
   }, []);
 
   const resetSmartComposer = useCallback(() => {
@@ -686,6 +707,7 @@ export function PlaylistStudioModal({
     setManualIconInput(playlist.icon || '🎵');
     setManualColor(playlist.color || '#0ea5e9');
     setManualIconSearch('');
+    setManualCoverImageUrl(playlist.coverImageUrl ?? null);
     setManualTracks(
       (playlist.trackKeys ?? []).map((trackKey, index) => ({
         track_key: trackKey,
@@ -943,6 +965,7 @@ export function PlaylistStudioModal({
           name: manualName.trim(),
           icon: manualIcon,
           color: manualColor,
+          coverImageUrl: manualCoverImageUrl,
           trackKeys: manualTrackKeys,
           trackLinkGroups: manualTrackLinkGroups,
         });
@@ -952,6 +975,7 @@ export function PlaylistStudioModal({
           name: manualName.trim(),
           icon: manualIcon,
           color: manualColor,
+          coverImageUrl: manualCoverImageUrl,
           trackKeys: manualTrackKeys,
           trackLinkGroups: manualTrackLinkGroups,
         });
@@ -1639,10 +1663,14 @@ export function PlaylistStudioModal({
                             <div className="flex flex-wrap items-start justify-between gap-3">
                               <div className="flex min-w-[240px] flex-1 items-start gap-3">
                                 <div
-                                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/10 text-2xl"
-                                  style={{ backgroundColor: `${playlist.color}22` }}
+                                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/10 text-2xl overflow-hidden"
+                                  style={playlist.coverImageUrl ? undefined : { backgroundColor: `${playlist.color}22` }}
                                 >
-                                  <span style={{ color: playlist.color }}>{playlist.isSmart ? '⚡' : playlist.icon}</span>
+                                  {playlist.coverImageUrl ? (
+                                    <img src={playlist.coverImageUrl} alt={playlist.name} className="h-full w-full object-cover" />
+                                  ) : (
+                                    <span style={{ color: playlist.color }}>{playlist.isSmart ? '⚡' : playlist.icon}</span>
+                                  )}
                                 </div>
                                 <div className="min-w-0">
                                   <div className="truncate text-base font-semibold text-white">{playlist.name}</div>
@@ -1734,10 +1762,14 @@ export function PlaylistStudioModal({
                   <div className="flex shrink-0 items-end gap-6 bg-gradient-to-b from-[#1c2f50] to-transparent px-8 pb-6 pt-8">
                     <button
                       onClick={() => setShowEditDetails(true)}
-                      className="group relative flex h-32 w-32 shrink-0 items-center justify-center rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] transition"
-                      style={{ backgroundColor: `${manualColor}33`, border: `1px solid ${manualColor}50` }}
+                      className="group relative flex h-32 w-32 shrink-0 items-center justify-center rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] transition overflow-hidden"
+                      style={manualCoverImageUrl ? undefined : { backgroundColor: `${manualColor}33`, border: `1px solid ${manualColor}50` }}
                     >
-                      <span className="text-5xl" style={{ color: manualColor }}>{manualIcon}</span>
+                      {manualCoverImageUrl ? (
+                        <img src={manualCoverImageUrl} alt="Cover" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-5xl" style={{ color: manualColor }}>{manualIcon}</span>
+                      )}
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-lg bg-black/60 opacity-0 transition group-hover:opacity-100">
                         <svg width="20" height="20" fill="white" viewBox="0 0 24 24">
                           <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
@@ -2775,12 +2807,51 @@ export function PlaylistStudioModal({
                 </button>
               </div>
               <div className="flex gap-5">
-                {/* Icon preview */}
-                <div
-                  className="flex h-40 w-40 shrink-0 cursor-default items-center justify-center rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.5)] text-6xl"
-                  style={{ backgroundColor: `${manualColor}33`, border: `1px solid ${manualColor}50` }}
-                >
-                  <span style={{ color: manualColor }}>{manualIcon}</span>
+                {/* Cover photo / icon preview */}
+                <div className="shrink-0">
+                  <div
+                    className="group relative flex h-40 w-40 cursor-pointer items-center justify-center rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.5)] overflow-hidden"
+                    style={manualCoverImageUrl ? undefined : { backgroundColor: `${manualColor}33`, border: `1px solid ${manualColor}50` }}
+                    onClick={() => coverImageInputRef.current?.click()}
+                  >
+                    {manualCoverImageUrl ? (
+                      <img src={manualCoverImageUrl} alt="Cover" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-6xl" style={{ color: manualColor }}>{manualIcon}</span>
+                    )}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 opacity-0 transition group-hover:opacity-100 rounded-lg">
+                      <svg width="24" height="24" fill="white" viewBox="0 0 24 24">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        <circle cx="18" cy="18" r="5" fill="#1db954"/>
+                        <path d="M18 16v4M16 18h4" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                      </svg>
+                      <span className="text-xs font-semibold text-white">Choose photo</span>
+                    </div>
+                  </div>
+                  {manualCoverImageUrl && (
+                    <button
+                      onClick={() => setManualCoverImageUrl(null)}
+                      className="mt-2 w-full text-center text-xs text-[#9ab2dd] underline hover:text-white"
+                    >
+                      Remove photo
+                    </button>
+                  )}
+                  {coverImageUploading && (
+                    <div className="mt-2 text-center text-xs text-[#9ab2dd]">Uploading…</div>
+                  )}
+                  <input
+                    ref={coverImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      e.target.value = '';
+                      const url = await uploadCoverImage(file);
+                      if (url) setManualCoverImageUrl(url);
+                    }}
+                  />
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col gap-3">
                   <div>
