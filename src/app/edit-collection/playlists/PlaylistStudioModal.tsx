@@ -420,6 +420,7 @@ export function PlaylistStudioModal({
   const [manualTracksLoading, setManualTracksLoading] = useState(false);
   const [linkingTrackKey, setLinkingTrackKey] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
+  const [showEditDetails, setShowEditDetails] = useState(false);
   const [manualTrackSearch, setManualTrackSearch] = useState('');
   const [manualTrackSearchResults, setManualTrackSearchResults] = useState<InventorySearchCandidate[]>([]);
   const [manualTrackSearching, setManualTrackSearching] = useState(false);
@@ -640,6 +641,7 @@ export function PlaylistStudioModal({
     setManualTrackSearchResults([]);
     setManualTrackSearching(false);
     setLinkingTrackKey(null);
+    setShowEditDetails(false);
   }, []);
 
   const resetSmartComposer = useCallback(() => {
@@ -1547,7 +1549,7 @@ export function PlaylistStudioModal({
               </div>
             )}
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+            <div className={`min-h-0 flex-1 ${view === 'manual' ? 'overflow-hidden' : 'overflow-y-auto px-4 py-4 md:px-6 md:py-5'}`}>
               {view === 'library' && (
                 <div className="space-y-4">
                   <div className="grid gap-3 sm:grid-cols-3">
@@ -1727,255 +1729,171 @@ export function PlaylistStudioModal({
               )}
 
               {view === 'manual' && (
-                <div className="space-y-5">
-                  <div className="grid gap-5 lg:grid-cols-[340px_1fr]">
-                    <div className="space-y-4 rounded-2xl border border-[#2c3b58] bg-[#121e34] p-4">
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.14em] text-[#8faddd]">
-                          Playlist Name
-                        </label>
-                        <input
-                          value={manualName}
-                          onChange={(event) => setManualName(event.target.value)}
-                          placeholder="Ex: Friday Warmup"
-                          className="w-full rounded-lg border border-[#30466b] bg-[#0f182a] px-3 py-2 text-sm text-white outline-none focus:border-[#5f9bff]"
-                        />
+                <div className="flex h-full flex-col overflow-hidden">
+                  {/* Gradient header — like Spotify playlist page */}
+                  <div className="flex shrink-0 items-end gap-6 bg-gradient-to-b from-[#1c2f50] to-transparent px-8 pb-6 pt-8">
+                    <button
+                      onClick={() => setShowEditDetails(true)}
+                      className="group relative flex h-32 w-32 shrink-0 items-center justify-center rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] transition"
+                      style={{ backgroundColor: `${manualColor}33`, border: `1px solid ${manualColor}50` }}
+                    >
+                      <span className="text-5xl" style={{ color: manualColor }}>{manualIcon}</span>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-lg bg-black/60 opacity-0 transition group-hover:opacity-100">
+                        <svg width="20" height="20" fill="white" viewBox="0 0 24 24">
+                          <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                        </svg>
+                        <span className="text-xs text-white">Edit</span>
                       </div>
+                    </button>
 
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.14em] text-[#8faddd]">
-                          Icon
-                        </label>
-                        <div className="flex gap-2">
-                          <input
-                            value={manualIconInput}
-                            onChange={(event) => {
-                              const value = event.target.value;
-                              setManualIconInput(value);
-                              const parsed = firstIconFromInput(value);
-                              if (parsed) setManualIcon(parsed);
-                            }}
-                            placeholder="Paste emoji"
-                            className="w-full rounded-lg border border-[#30466b] bg-[#0f182a] px-3 py-2 text-sm text-white outline-none focus:border-[#5f9bff]"
-                          />
-                          <input
-                            value={manualIconSearch}
-                            onChange={(event) => setManualIconSearch(event.target.value)}
-                            placeholder="Filter"
-                            className="w-[110px] rounded-lg border border-[#30466b] bg-[#0f182a] px-2 py-2 text-sm text-white outline-none focus:border-[#5f9bff]"
-                          />
-                        </div>
-                        <div className="mt-2 grid max-h-[170px] grid-cols-6 gap-2 overflow-y-auto pr-1">
-                          {filteredManualIcons.map((preset) => (
-                            <button
-                              key={preset.icon}
-                              onClick={() => {
-                                setManualIcon(preset.icon);
-                                setManualIconInput(preset.icon);
-                              }}
-                              title={preset.keywords.join(', ')}
-                              className={`flex h-10 w-10 items-center justify-center rounded-lg border text-xl ${
-                                manualIcon === preset.icon
-                                  ? 'border-[#68a3ff] bg-[#1d3358]'
-                                  : 'border-[#30466b] bg-[#111d34] hover:bg-[#172846]'
-                              }`}
-                            >
-                              {preset.icon}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.14em] text-[#8faddd]">
-                          Accent
-                        </label>
-                        <div className="flex flex-wrap gap-2">
-                          {SHARED_COLOR_PRESETS.map((swatch) => (
-                            <button
-                              key={swatch}
-                              onClick={() => setManualColor(swatch)}
-                              className={`h-8 w-8 rounded-full border ${
-                                manualColor === swatch ? 'border-white ring-2 ring-white/30' : 'border-white/20'
-                              }`}
-                              style={{ backgroundColor: swatch }}
-                            />
-                          ))}
-                          <input
-                            type="color"
-                            value={manualColor}
-                            onChange={(event) => setManualColor(event.target.value)}
-                            className="h-8 w-10 cursor-pointer rounded border border-white/20 bg-transparent"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl border border-[#33496e] bg-[#101b30] p-3">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 text-2xl"
-                            style={{ backgroundColor: `${manualColor}22` }}
-                          >
-                            <span style={{ color: manualColor }}>{manualIcon}</span>
-                          </div>
-                          <div>
-                            <div className="text-sm font-semibold text-white">{manualName || 'Untitled Manual Playlist'}</div>
-                            <div className="text-xs text-[#9ab2dd]">{manualTrackKeys.length} tracks selected</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            resetManualComposer();
-                            setView('library');
-                          }}
-                          className="rounded-lg border border-[#3b4e72] bg-[#1a2640] px-3 py-2 text-sm text-[#cad8f2] hover:bg-[#24375c]"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={() => void saveManualPlaylist()}
-                          disabled={manualSaving || !manualName.trim()}
-                          className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
-                            manualSaving || !manualName.trim()
-                              ? 'cursor-not-allowed border-[#355079] bg-[#203559] text-[#7e9bc7]'
-                              : 'border-[#4e9bff] bg-[#1f4f89] text-white hover:bg-[#2866b1]'
-                          }`}
-                        >
-                          {manualSaving ? 'Saving...' : manualEditingPlaylist ? 'Save Manual Playlist' : 'Create Manual Playlist'}
-                        </button>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 text-xs font-semibold uppercase tracking-widest text-[#a0b4d6]">Manual Playlist</div>
+                      <h1
+                        className="cursor-pointer truncate text-3xl font-bold text-white hover:underline lg:text-4xl"
+                        onClick={() => setShowEditDetails(true)}
+                      >
+                        {manualName.trim() || 'Untitled Playlist'}
+                      </h1>
+                      <div className="mt-2 text-sm text-[#a0b4d6]">
+                        {manualTrackKeys.length} track{manualTrackKeys.length === 1 ? '' : 's'}
                       </div>
                     </div>
 
-                    <div className="space-y-3 rounded-2xl border border-[#2c3b58] bg-[#121e34] p-4">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8faddd]">Track Builder</label>
-                        <div className="text-xs text-[#a9bedf]">{manualTrackKeys.length} track{manualTrackKeys.length === 1 ? '' : 's'}</div>
-                      </div>
-
-                      <div>
-                        <input
-                          value={manualTrackSearch}
-                          onChange={(event) => setManualTrackSearch(event.target.value)}
-                          placeholder="Search inventory tracks to add"
-                          className="w-full rounded-lg border border-[#30466b] bg-[#0f182a] px-3 py-2 text-sm text-white outline-none focus:border-[#5f9bff]"
-                        />
-
-                        {manualTrackSearching && <div className="mt-2 text-xs text-[#93a8cf]">Searching...</div>}
-
-                        {!manualTrackSearching && manualTrackSearchResults.length > 0 && (
-                          <div className="mt-2 max-h-44 overflow-y-auto rounded-lg border border-[#324968] bg-[#0e1729]">
-                            {manualTrackSearchResults.map((candidate) => {
-                              const alreadyAdded = manualTrackKeys.includes(candidate.track_key);
-                              const meta: string[] = [];
-                              if (candidate.album_title) meta.push(candidate.album_title);
-                              if (candidate.inventory_id) meta.push(`#${candidate.inventory_id}`);
-                              if (candidate.position) meta.push(candidate.position);
-                              return (
-                                <button
-                                  key={candidate.track_key}
-                                  disabled={alreadyAdded}
-                                  onClick={() => {
-                                    setManualTracks((prev) => {
-                                      if (prev.some((track) => track.track_key === candidate.track_key)) return prev;
-                                      return [
-                                        ...prev,
-                                        {
-                                          track_key: candidate.track_key,
-                                          sort_order: prev.length,
-                                          track_title: candidate.title,
-                                          artist_name: candidate.artist,
-                                          album_name: candidate.album_title,
-                                          side: candidate.side,
-                                          position: candidate.position,
-                                          link_group: null,
-                                        },
-                                      ];
-                                    });
-                                  }}
-                                  className={`w-full border-b border-[#253652] px-3 py-2 text-left ${
-                                    alreadyAdded
-                                      ? 'cursor-not-allowed bg-[#162237] text-[#61789f]'
-                                      : 'hover:bg-[#1a2843]'
-                                  }`}
-                                >
-                                  <div className="text-sm text-white">
-                                    <span className="font-medium">{candidate.title}</span> - {candidate.artist}
-                                    {meta.length > 0 ? ` (${meta.join(':')})` : ''}
-                                  </div>
-                                  <div className="text-xs text-[#90abd8]">Match {Math.round(candidate.score * 100)}%</div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-
-                      {manualTracksLoading ? (
-                        <div className="rounded-lg border border-[#324968] bg-[#101a2f] px-3 py-2 text-sm text-[#9eb4db]">
-                          Loading playlist tracks...
-                        </div>
-                      ) : manualTracks.length === 0 ? (
-                        <div className="rounded-lg border border-dashed border-[#36527a] bg-[#0e1729] px-4 py-8 text-center text-sm text-[#9eb4db]">
-                          No tracks selected yet.
-                        </div>
-                      ) : (
-                        <div className="flex flex-col gap-1">
-                          {linkingTrackKey !== null && (
-                            <div className="flex items-center justify-between rounded-lg border border-yellow-600/40 bg-yellow-900/10 px-2 py-1.5 text-xs text-yellow-300">
-                              <span>Right-click another track to link it (same bingo column).</span>
-                              <button
-                                onClick={() => setLinkingTrackKey(null)}
-                                className="ml-2 rounded border border-yellow-600/40 px-1.5 py-0.5 text-[10px] hover:bg-yellow-900/30"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          )}
-                          <div className="overflow-y-auto">
-                            <DndContext
-                              sensors={dndSensors}
-                              collisionDetection={closestCenter}
-                              onDragEnd={handleDragEnd}
-                            >
-                              <SortableContext
-                                items={manualTracks.map((t) => t.track_key)}
-                                strategy={verticalListSortingStrategy}
-                              >
-                                {manualTracks.map((track, index) => {
-                                  const isLinkSource = linkingTrackKey === track.track_key;
-                                  const isLinkTarget =
-                                    linkingTrackKey !== null &&
-                                    linkingTrackKey !== track.track_key &&
-                                    !track.link_group;
-                                  const linkColor = track.link_group
-                                    ? (LINK_GROUP_COLORS[
-                                        uniqueLinkGroups.indexOf(track.link_group) %
-                                          LINK_GROUP_COLORS.length
-                                      ] ?? '#3b82f6')
-                                    : null;
-                                  return (
-                                    <SortableManualTrackRow
-                                      key={track.track_key}
-                                      track={track}
-                                      index={index}
-                                      isLinkSource={isLinkSource}
-                                      isLinkTarget={isLinkTarget}
-                                      linkColor={linkColor}
-                                      onContextMenu={openTrackContextMenu}
-                                      onThreeDotClick={openTrackThreeDot}
-                                    />
-                                  );
-                                })}
-                              </SortableContext>
-                            </DndContext>
-                          </div>
-                        </div>
-                      )}
+                    <div className="flex shrink-0 items-center gap-2 pb-1">
+                      <button
+                        onClick={() => { resetManualComposer(); setView('library'); }}
+                        className="rounded-full border border-[#3b4e72] px-4 py-2 text-sm font-medium text-[#cad8f2] hover:border-[#5a7aaa] hover:bg-[#1e2f4a]"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => void saveManualPlaylist()}
+                        disabled={manualSaving || !manualName.trim()}
+                        className={`rounded-full px-5 py-2 text-sm font-semibold ${
+                          manualSaving || !manualName.trim()
+                            ? 'cursor-not-allowed bg-[#1f3a60] text-[#7e9bc7]'
+                            : 'bg-white text-[#0d1320] hover:bg-[#e8e8e8]'
+                        }`}
+                      >
+                        {manualSaving ? 'Saving…' : manualEditingPlaylist ? 'Save' : 'Create'}
+                      </button>
                     </div>
                   </div>
+
+                  {/* Search to add tracks */}
+                  <div className="shrink-0 border-b border-[#1e2d47] px-8 py-3">
+                    <input
+                      value={manualTrackSearch}
+                      onChange={(event) => setManualTrackSearch(event.target.value)}
+                      placeholder="Search inventory tracks to add…"
+                      className="w-full max-w-md rounded-full border border-[#30466b] bg-[#0f182a] px-4 py-2 text-sm text-white outline-none focus:border-[#5f9bff]"
+                    />
+                    {manualTrackSearching && (
+                      <div className="mt-2 text-xs text-[#93a8cf]">Searching…</div>
+                    )}
+                    {!manualTrackSearching && manualTrackSearchResults.length > 0 && (
+                      <div className="mt-2 max-h-44 overflow-y-auto rounded-lg border border-[#324968] bg-[#0e1729]">
+                        {manualTrackSearchResults.map((candidate) => {
+                          const alreadyAdded = manualTrackKeys.includes(candidate.track_key);
+                          const meta: string[] = [];
+                          if (candidate.album_title) meta.push(candidate.album_title);
+                          if (candidate.inventory_id) meta.push(`#${candidate.inventory_id}`);
+                          if (candidate.position) meta.push(candidate.position);
+                          return (
+                            <button
+                              key={candidate.track_key}
+                              disabled={alreadyAdded}
+                              onClick={() => {
+                                setManualTracks((prev) => {
+                                  if (prev.some((t) => t.track_key === candidate.track_key)) return prev;
+                                  return [
+                                    ...prev,
+                                    {
+                                      track_key: candidate.track_key,
+                                      sort_order: prev.length,
+                                      track_title: candidate.title,
+                                      artist_name: candidate.artist,
+                                      album_name: candidate.album_title,
+                                      side: candidate.side,
+                                      position: candidate.position,
+                                      link_group: null,
+                                    },
+                                  ];
+                                });
+                              }}
+                              className={`w-full border-b border-[#253652] px-3 py-2 text-left ${
+                                alreadyAdded ? 'cursor-not-allowed bg-[#162237] text-[#61789f]' : 'hover:bg-[#1a2843]'
+                              }`}
+                            >
+                              <div className="text-sm text-white">
+                                <span className="font-medium">{candidate.title}</span> — {candidate.artist}
+                                {meta.length > 0 ? ` (${meta.join(' · ')})` : ''}
+                              </div>
+                              <div className="text-xs text-[#90abd8]">Match {Math.round(candidate.score * 100)}%</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Column headers */}
+                  <div className="flex shrink-0 items-center gap-3 border-b border-[#1e2d47] px-4 py-2 text-[11px] font-semibold uppercase tracking-widest text-[#3d5580]">
+                    <div className="w-6 shrink-0" />
+                    <div className="w-5 shrink-0 text-right">#</div>
+                    <div className="flex-1">Title</div>
+                    <div className="hidden w-40 shrink-0 lg:block">Album</div>
+                    <div className="w-8 shrink-0" />
+                  </div>
+
+                  {/* Track list */}
+                  {manualTracksLoading ? (
+                    <div className="px-8 py-8 text-sm text-[#9eb4db]">Loading playlist tracks…</div>
+                  ) : manualTracks.length === 0 ? (
+                    <div className="flex flex-1 items-center justify-center text-sm text-[#6a8fbf]">
+                      Search above to add tracks to this playlist.
+                    </div>
+                  ) : (
+                    <div className="min-h-0 flex-1 overflow-y-auto">
+                      {linkingTrackKey !== null && (
+                        <div className="m-3 flex items-center justify-between rounded-lg border border-yellow-600/40 bg-yellow-900/10 px-3 py-1.5 text-xs text-yellow-300">
+                          <span>Right-click another track to link it (same bingo column).</span>
+                          <button
+                            onClick={() => setLinkingTrackKey(null)}
+                            className="ml-2 rounded border border-yellow-600/40 px-1.5 py-0.5 text-[10px] hover:bg-yellow-900/30"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                      <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                        <SortableContext items={manualTracks.map((t) => t.track_key)} strategy={verticalListSortingStrategy}>
+                          {manualTracks.map((track, index) => {
+                            const isLinkSource = linkingTrackKey === track.track_key;
+                            const isLinkTarget =
+                              linkingTrackKey !== null && linkingTrackKey !== track.track_key && !track.link_group;
+                            const linkColor = track.link_group
+                              ? (LINK_GROUP_COLORS[
+                                  uniqueLinkGroups.indexOf(track.link_group) % LINK_GROUP_COLORS.length
+                                ] ?? '#3b82f6')
+                              : null;
+                            return (
+                              <SortableManualTrackRow
+                                key={track.track_key}
+                                track={track}
+                                index={index}
+                                isLinkSource={isLinkSource}
+                                isLinkTarget={isLinkTarget}
+                                linkColor={linkColor}
+                                onContextMenu={openTrackContextMenu}
+                                onThreeDotClick={openTrackThreeDot}
+                              />
+                            );
+                          })}
+                        </SortableContext>
+                      </DndContext>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2834,6 +2752,118 @@ export function PlaylistStudioModal({
             </div>
           </section>
         </div>
+
+        {showEditDetails && (
+          <>
+            <div
+              className="fixed inset-0 z-[40000] bg-black/60 backdrop-blur-sm"
+              onClick={() => setShowEditDetails(false)}
+            />
+            <div
+              className="fixed left-1/2 top-1/2 z-[40001] w-full max-w-[520px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl bg-[#1e1e1e] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.7)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-5 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">Edit details</h2>
+                <button
+                  onClick={() => setShowEditDetails(false)}
+                  className="rounded-full p-1.5 text-[#9ab2dd] hover:bg-white/10 hover:text-white"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M12.72 3.28a1 1 0 0 0-1.41 0L8 6.59 4.69 3.28a1 1 0 0 0-1.41 1.41L6.59 8l-3.31 3.31a1 1 0 1 0 1.41 1.41L8 9.41l3.31 3.31a1 1 0 0 0 1.41-1.41L9.41 8l3.31-3.31a1 1 0 0 0 0-1.41z" />
+                  </svg>
+                </button>
+              </div>
+              <div className="flex gap-5">
+                {/* Icon preview */}
+                <div
+                  className="flex h-40 w-40 shrink-0 cursor-default items-center justify-center rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.5)] text-6xl"
+                  style={{ backgroundColor: `${manualColor}33`, border: `1px solid ${manualColor}50` }}
+                >
+                  <span style={{ color: manualColor }}>{manualIcon}</span>
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col gap-3">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.14em] text-[#8faddd]">Name</label>
+                    <input
+                      value={manualName}
+                      onChange={(e) => setManualName(e.target.value)}
+                      placeholder="Playlist name"
+                      className="w-full rounded-lg border border-[#30466b] bg-[#121e34] px-3 py-2 text-sm text-white outline-none focus:border-[#5f9bff]"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.14em] text-[#8faddd]">Icon</label>
+                    <div className="flex gap-2">
+                      <input
+                        value={manualIconInput}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setManualIconInput(value);
+                          const parsed = firstIconFromInput(value);
+                          if (parsed) setManualIcon(parsed);
+                        }}
+                        placeholder="Paste emoji"
+                        className="w-full rounded-lg border border-[#30466b] bg-[#121e34] px-3 py-2 text-sm text-white outline-none focus:border-[#5f9bff]"
+                      />
+                      <input
+                        value={manualIconSearch}
+                        onChange={(e) => setManualIconSearch(e.target.value)}
+                        placeholder="Filter"
+                        className="w-24 rounded-lg border border-[#30466b] bg-[#121e34] px-2 py-2 text-sm text-white outline-none focus:border-[#5f9bff]"
+                      />
+                    </div>
+                    <div className="mt-2 grid max-h-[120px] grid-cols-8 gap-1.5 overflow-y-auto pr-1">
+                      {filteredManualIcons.map((preset) => (
+                        <button
+                          key={preset.icon}
+                          onClick={() => { setManualIcon(preset.icon); setManualIconInput(preset.icon); }}
+                          title={preset.keywords.join(', ')}
+                          className={`flex h-9 w-9 items-center justify-center rounded-lg border text-lg ${
+                            manualIcon === preset.icon
+                              ? 'border-[#68a3ff] bg-[#1d3358]'
+                              : 'border-[#30466b] bg-[#111d34] hover:bg-[#172846]'
+                          }`}
+                        >
+                          {preset.icon}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.14em] text-[#8faddd]">Accent color</label>
+                    <div className="flex flex-wrap gap-2">
+                      {SHARED_COLOR_PRESETS.map((swatch) => (
+                        <button
+                          key={swatch}
+                          onClick={() => setManualColor(swatch)}
+                          className={`h-7 w-7 rounded-full border ${
+                            manualColor === swatch ? 'border-white ring-2 ring-white/30' : 'border-white/20'
+                          }`}
+                          style={{ backgroundColor: swatch }}
+                        />
+                      ))}
+                      <input
+                        type="color"
+                        value={manualColor}
+                        onChange={(e) => setManualColor(e.target.value)}
+                        className="h-7 w-9 cursor-pointer rounded border border-white/20 bg-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  onClick={() => setShowEditDetails(false)}
+                  className="rounded-full border border-[#3b4e72] px-4 py-2 text-sm font-medium text-[#cad8f2] hover:bg-[#1e2f4a]"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </>
+        )}
 
         {contextMenu && (
           <>
