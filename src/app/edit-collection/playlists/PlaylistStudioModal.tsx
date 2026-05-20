@@ -1,6 +1,23 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { supabase as supabaseTyped } from 'src/lib/supabaseClient';
 import type {
   CollectionPlaylist,
@@ -276,6 +293,101 @@ const toCsvCell = (value: string | undefined) => {
   return `"${raw.replace(/"/g, '""')}"`;
 };
 
+type ContextMenuState = { trackKey: string; index: number; x: number; y: number } | null;
+
+type SortableManualTrackRowProps = {
+  track: PlaylistTrackItem;
+  index: number;
+  isLinkSource: boolean;
+  isLinkTarget: boolean;
+  linkColor: string | null;
+  onContextMenu: (e: React.MouseEvent, trackKey: string, index: number) => void;
+  onThreeDotClick: (e: React.MouseEvent, trackKey: string, index: number) => void;
+};
+
+function SortableManualTrackRow({
+  track,
+  index,
+  isLinkSource,
+  isLinkTarget,
+  linkColor,
+  onContextMenu,
+  onThreeDotClick,
+}: SortableManualTrackRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: track.track_key,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+
+  const accentColor = linkColor ?? (isLinkSource ? '#eab308' : isLinkTarget ? '#3b82f6' : null);
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="group flex items-center gap-3 rounded-md px-2 py-2 transition hover:bg-[#1a2840]"
+      onContextMenu={(e) => onContextMenu(e, track.track_key, index)}
+    >
+      {/* Drag handle */}
+      <button
+        {...attributes}
+        {...listeners}
+        className="shrink-0 cursor-grab touch-none p-1 text-[#394f72] opacity-0 transition hover:text-[#7a9fd5] group-hover:opacity-100 active:cursor-grabbing"
+        tabIndex={-1}
+        aria-label="Drag to reorder"
+      >
+        <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor">
+          <circle cx="3" cy="3.5" r="1.4" />
+          <circle cx="9" cy="3.5" r="1.4" />
+          <circle cx="3" cy="8" r="1.4" />
+          <circle cx="9" cy="8" r="1.4" />
+          <circle cx="3" cy="12.5" r="1.4" />
+          <circle cx="9" cy="12.5" r="1.4" />
+        </svg>
+      </button>
+
+      {/* Row number */}
+      <div className="w-5 shrink-0 text-right text-xs text-[#4a6394]">{index + 1}</div>
+
+      {/* Title + Artist */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          {accentColor && (
+            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: accentColor }} />
+          )}
+          <span className="truncate text-sm font-medium text-white">
+            {track.track_title ?? track.track_key}
+          </span>
+        </div>
+        <div className="truncate text-xs text-[#6a8fbf]">{track.artist_name ?? ''}</div>
+      </div>
+
+      {/* Album */}
+      <div className="hidden w-40 shrink-0 truncate text-xs text-[#4a6394] lg:block">
+        {track.album_name ?? ''}
+      </div>
+
+      {/* Three-dot menu button */}
+      <button
+        onClick={(e) => onThreeDotClick(e, track.track_key, index)}
+        className="shrink-0 rounded-md px-1.5 py-1 text-[#4a6394] opacity-0 transition hover:bg-[#253656] hover:text-[#d0e5ff] group-hover:opacity-100"
+        aria-label="Track options"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <circle cx="8" cy="3" r="1.4" />
+          <circle cx="8" cy="8" r="1.4" />
+          <circle cx="8" cy="13" r="1.4" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 export function PlaylistStudioModal({
   isOpen,
   onClose,
@@ -307,6 +419,7 @@ export function PlaylistStudioModal({
   const [manualTracks, setManualTracks] = useState<PlaylistTrackItem[]>([]);
   const [manualTracksLoading, setManualTracksLoading] = useState(false);
   const [linkingTrackKey, setLinkingTrackKey] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [manualTrackSearch, setManualTrackSearch] = useState('');
   const [manualTrackSearchResults, setManualTrackSearchResults] = useState<InventorySearchCandidate[]>([]);
   const [manualTrackSearching, setManualTrackSearching] = useState(false);
@@ -430,6 +543,40 @@ export function PlaylistStudioModal({
       formatDetails: matchFortyFiveOnly ? ['45 rpm', '7"'] : [],
     };
   }, [matchFortyFiveOnly, matchVinylOnly]);
+
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setManualTracks((prev) => {
+      const oldIndex = prev.findIndex((t) => t.track_key === active.id);
+      const newIndex = prev.findIndex((t) => t.track_key === over.id);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      return arrayMove(prev, oldIndex, newIndex).map((row, idx) => ({ ...row, sort_order: idx }));
+    });
+  }, []);
+
+  const openTrackContextMenu = useCallback(
+    (e: React.MouseEvent, trackKey: string, index: number) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu({ trackKey, index, x: e.clientX, y: e.clientY });
+    },
+    []
+  );
+
+  const openTrackThreeDot = useCallback(
+    (e: React.MouseEvent, trackKey: string, index: number) => {
+      e.stopPropagation();
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      setContextMenu({ trackKey, index, x: rect.right - 180, y: rect.bottom + 4 });
+    },
+    []
+  );
 
   const formatApiError = (payload: unknown, res: Response) => {
     const typedPayload = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
@@ -768,16 +915,6 @@ export function PlaylistStudioModal({
     } finally {
       setLibraryBusy(false);
     }
-  };
-
-  const moveManualTrack = (index: number, direction: 'up' | 'down') => {
-    const target = direction === 'up' ? index - 1 : index + 1;
-    if (target < 0 || target >= manualTracks.length) return;
-
-    const next = [...manualTracks];
-    const [item] = next.splice(index, 1);
-    next.splice(target, 0, item);
-    setManualTracks(next.map((row, idx) => ({ ...row, sort_order: idx })));
   };
 
   const removeManualTrack = (index: number) => {
@@ -1316,15 +1453,8 @@ export function PlaylistStudioModal({
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[30020] bg-[#04060f]/85 backdrop-blur-sm p-3 sm:p-6"
-      onClick={handleClose}
-    >
-      <div
-        className="mx-auto h-full max-h-[920px] w-full max-w-[1240px] overflow-hidden rounded-[28px] border border-[#26324a] bg-[#0d1320] shadow-[0_24px_90px_rgba(0,0,0,0.55)]"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="grid h-full min-h-0 grid-cols-1 md:grid-cols-[270px_1fr]">
+    <div className="fixed inset-0 z-[30020] overflow-hidden bg-[#0d1320]">
+      <div className="grid h-full min-h-0 grid-cols-1 md:grid-cols-[270px_1fr]">
           <aside className="border-b border-[#26324a] bg-[radial-gradient(circle_at_top,_#1f2b45,_#10182b_55%,_#0a101c)] p-4 md:border-b-0 md:border-r md:p-5">
             <div className="mb-4 rounded-2xl border border-[#2d3d5f] bg-black/25 p-4">
               <div className="text-xs uppercase tracking-[0.2em] text-[#7ba6ff]">New System</div>
@@ -1792,10 +1922,10 @@ export function PlaylistStudioModal({
                           No tracks selected yet.
                         </div>
                       ) : (
-                        <div className="space-y-2">
+                        <div className="flex flex-col gap-1">
                           {linkingTrackKey !== null && (
-                            <div className="flex items-center justify-between rounded-lg border border-yellow-600/40 bg-yellow-900/10 px-3 py-1.5 text-xs text-yellow-300">
-                              <span>Click 🔗 on another track to link it to the same bingo column.</span>
+                            <div className="flex items-center justify-between rounded-lg border border-yellow-600/40 bg-yellow-900/10 px-2 py-1.5 text-xs text-yellow-300">
+                              <span>Right-click another track to link it (same bingo column).</span>
                               <button
                                 onClick={() => setLinkingTrackKey(null)}
                                 className="ml-2 rounded border border-yellow-600/40 px-1.5 py-0.5 text-[10px] hover:bg-yellow-900/30"
@@ -1804,103 +1934,44 @@ export function PlaylistStudioModal({
                               </button>
                             </div>
                           )}
-                        <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
-                          {manualTracks.map((track, index) => {
-                            const subtitleParts = [
-                              track.artist_name,
-                              track.album_name,
-                              formatTrackPositionLabel(track.side, track.position),
-                            ].filter(Boolean);
-                            const isLinkSource = linkingTrackKey === track.track_key;
-                            const isLinkTarget = linkingTrackKey !== null && linkingTrackKey !== track.track_key && !track.link_group;
-                            const isLinked = !!track.link_group;
-                            const linkColor = isLinked
-                              ? (LINK_GROUP_COLORS[uniqueLinkGroups.indexOf(track.link_group!) % LINK_GROUP_COLORS.length] ?? '#3b82f6')
-                              : null;
-                            return (
-                              <div
-                                key={`${track.track_key}-${index}`}
-                                className="flex items-center gap-2 rounded-lg border bg-[#101a2d] px-3 py-2"
-                                style={{ borderColor: linkColor ?? (isLinkSource ? '#eab308' : '#314764') }}
+                          <div className="overflow-y-auto">
+                            <DndContext
+                              sensors={dndSensors}
+                              collisionDetection={closestCenter}
+                              onDragEnd={handleDragEnd}
+                            >
+                              <SortableContext
+                                items={manualTracks.map((t) => t.track_key)}
+                                strategy={verticalListSortingStrategy}
                               >
-                                <div className="flex flex-col gap-1">
-                                  <button
-                                    onClick={() => moveManualTrack(index, 'up')}
-                                    disabled={index === 0}
-                                    className={`h-5 w-6 rounded border text-[10px] ${
-                                      index === 0
-                                        ? 'cursor-not-allowed border-[#344866] bg-[#16253c] text-[#6882aa]'
-                                        : 'border-[#43608b] bg-[#1b3154] text-[#cce1ff] hover:bg-[#234270]'
-                                    }`}
-                                  >
-                                    ▲
-                                  </button>
-                                  <button
-                                    onClick={() => moveManualTrack(index, 'down')}
-                                    disabled={index === manualTracks.length - 1}
-                                    className={`h-5 w-6 rounded border text-[10px] ${
-                                      index === manualTracks.length - 1
-                                        ? 'cursor-not-allowed border-[#344866] bg-[#16253c] text-[#6882aa]'
-                                        : 'border-[#43608b] bg-[#1b3154] text-[#cce1ff] hover:bg-[#234270]'
-                                    }`}
-                                  >
-                                    ▼
-                                  </button>
-                                  <button
-                                    onClick={() => removeManualTrack(index)}
-                                    className="h-5 w-6 rounded border border-red-600/50 bg-red-800/25 text-[10px] text-red-100 hover:bg-red-800/40"
-                                    title="Remove track"
-                                  >
-                                    ✕
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      if (isLinked) {
-                                        unlinkTrack(track.track_key);
-                                      } else if (isLinkSource) {
-                                        setLinkingTrackKey(null);
-                                      } else if (linkingTrackKey !== null) {
-                                        linkTracks(linkingTrackKey, track.track_key);
-                                      } else {
-                                        setLinkingTrackKey(track.track_key);
-                                      }
-                                    }}
-                                    title={
-                                      isLinked ? 'Unlink this pair' :
-                                      isLinkSource ? 'Cancel linking' :
-                                      isLinkTarget ? 'Link with selected track' :
-                                      'Link with another track (same bingo column)'
-                                    }
-                                    className={`h-5 w-6 rounded border text-[10px] ${
-                                      isLinked
-                                        ? 'border-current font-bold'
-                                        : isLinkSource
-                                        ? 'border-yellow-500/70 bg-yellow-900/20 text-yellow-300'
-                                        : isLinkTarget
-                                        ? 'border-blue-400/70 bg-blue-900/20 text-blue-300'
-                                        : 'border-[#344866] bg-[#16253c] text-[#6882aa] hover:border-[#43608b] hover:text-[#cce1ff]'
-                                    }`}
-                                    style={isLinked ? { borderColor: linkColor ?? undefined, color: linkColor ?? undefined } : {}}
-                                  >
-                                    🔗
-                                  </button>
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="truncate text-sm font-medium text-white">{track.track_title ?? track.track_key}</div>
-                                  {subtitleParts.length > 0 && (
-                                    <div className="truncate text-xs text-[#9db5de]">{subtitleParts.join(' • ')}</div>
-                                  )}
-                                </div>
-                                <button
-                                  onClick={() => removeManualTrack(index)}
-                                  className="shrink-0 rounded-md border border-red-600/40 bg-red-800/20 px-2 py-1 text-xs text-red-100 hover:bg-red-800/35"
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
+                                {manualTracks.map((track, index) => {
+                                  const isLinkSource = linkingTrackKey === track.track_key;
+                                  const isLinkTarget =
+                                    linkingTrackKey !== null &&
+                                    linkingTrackKey !== track.track_key &&
+                                    !track.link_group;
+                                  const linkColor = track.link_group
+                                    ? (LINK_GROUP_COLORS[
+                                        uniqueLinkGroups.indexOf(track.link_group) %
+                                          LINK_GROUP_COLORS.length
+                                      ] ?? '#3b82f6')
+                                    : null;
+                                  return (
+                                    <SortableManualTrackRow
+                                      key={track.track_key}
+                                      track={track}
+                                      index={index}
+                                      isLinkSource={isLinkSource}
+                                      isLinkTarget={isLinkTarget}
+                                      linkColor={linkColor}
+                                      onContextMenu={openTrackContextMenu}
+                                      onThreeDotClick={openTrackThreeDot}
+                                    />
+                                  );
+                                })}
+                              </SortableContext>
+                            </DndContext>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2763,7 +2834,63 @@ export function PlaylistStudioModal({
             </div>
           </section>
         </div>
-      </div>
+
+        {contextMenu && (
+          <>
+            <div
+              className="fixed inset-0 z-[40000]"
+              onClick={() => setContextMenu(null)}
+              onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }}
+            />
+            <div
+              className="fixed z-[40001] min-w-[200px] overflow-hidden rounded-xl border border-[#2c3e5c] bg-[#101d30] py-1 shadow-[0_12px_40px_rgba(0,0,0,0.65)]"
+              style={{
+                left: Math.min(contextMenu.x, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 210),
+                top: Math.min(contextMenu.y, (typeof window !== 'undefined' ? window.innerHeight : 800) - 130),
+              }}
+            >
+              <button
+                className="w-full px-4 py-2 text-left text-sm text-red-300 hover:bg-[#1e3050]"
+                onClick={() => { removeManualTrack(contextMenu.index); setContextMenu(null); }}
+              >
+                Remove from playlist
+              </button>
+              {manualTracks.find((t) => t.track_key === contextMenu.trackKey)?.link_group ? (
+                <button
+                  className="w-full px-4 py-2 text-left text-sm text-[#d0e5ff] hover:bg-[#1e3050]"
+                  onClick={() => { unlinkTrack(contextMenu.trackKey); setContextMenu(null); }}
+                >
+                  Unlink pair
+                </button>
+              ) : linkingTrackKey !== null && linkingTrackKey !== contextMenu.trackKey ? (
+                <button
+                  className="w-full px-4 py-2 text-left text-sm text-[#60c3ff] hover:bg-[#1e3050]"
+                  onClick={() => {
+                    linkTracks(linkingTrackKey, contextMenu.trackKey);
+                    setLinkingTrackKey(null);
+                    setContextMenu(null);
+                  }}
+                >
+                  Link with selected track
+                </button>
+              ) : linkingTrackKey === contextMenu.trackKey ? (
+                <button
+                  className="w-full px-4 py-2 text-left text-sm text-yellow-300 hover:bg-[#1e3050]"
+                  onClick={() => { setLinkingTrackKey(null); setContextMenu(null); }}
+                >
+                  Cancel linking
+                </button>
+              ) : (
+                <button
+                  className="w-full px-4 py-2 text-left text-sm text-[#d0e5ff] hover:bg-[#1e3050]"
+                  onClick={() => { setLinkingTrackKey(contextMenu.trackKey); setContextMenu(null); }}
+                >
+                  Link with another track…
+                </button>
+              )}
+            </div>
+          </>
+        )}
     </div>
   );
 }
