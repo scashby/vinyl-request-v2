@@ -23,6 +23,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       album_name: track.albumName ?? null,
       side: track.side ?? null,
       position: track.position ?? null,
+      link_group: track.linkGroup ?? null,
     }));
     return NextResponse.json({ ok: true, items }, { status: 200 });
   } catch (error) {

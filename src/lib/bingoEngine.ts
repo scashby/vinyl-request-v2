@@ -22,6 +22,7 @@ export type ResolvedPlaylistTrack = {
   albumName: string | null;
   side: string | null;
   position: string | null;
+  linkGroup: string | null;
 };
 
 type PlaylistConfigRow = {
@@ -79,6 +80,7 @@ type DbPlaylistItem = {
   playlist_id: number;
   track_key: string;
   sort_order: number;
+  link_group: string | null;
 };
 
 type DbInventory = { id: number; release_id: number | null };
@@ -102,6 +104,7 @@ type SessionCallRow = {
   column_letter: string;
   track_title: string;
   artist_name: string;
+  link_group?: string | null;
   playlist_track_key?: string;
   album_name?: string | null;
   side?: string | null;
@@ -186,6 +189,7 @@ type PlannedSessionCall = {
   album_name: string | null;
   side: string | null;
   position: string | null;
+  link_group: string | null;
 };
 
 function hashString(value: string): number {
@@ -211,6 +215,45 @@ function stableRoundSort<T>(items: T[], seed: string, keyForItem: (item: T) => s
     .map((entry) => entry.item);
 }
 
+function enforceColumnLinks(pool: ResolvedPlaylistTrack[]): ResolvedPlaylistTrack[] {
+  // pool is exactly GAME_BALL_COUNT (75) tracks.
+  // Column of position i = Math.floor(i / 15): 0=B, 1=I, 2=N, 3=G, 4=O.
+  // For each linked pair, ensure both tracks are in the same column by swapping
+  // a misplaced member with an unlinked track in the target column range.
+  const result = [...pool];
+
+  const groups = new Map<string, number[]>(); // linkGroup → indices in result
+  for (let i = 0; i < result.length; i++) {
+    const lg = result[i].linkGroup;
+    if (!lg) continue;
+    if (!groups.has(lg)) groups.set(lg, []);
+    groups.get(lg)!.push(i);
+  }
+
+  for (const [, indices] of groups) {
+    if (indices.length < 2) continue;
+
+    const targetColIdx = Math.floor(indices[0] / 15);
+    const targetStart = targetColIdx * 15;
+    const targetEnd = targetStart + 15;
+
+    // Collect unlinked positions in target column (available for swapping).
+    const availableInTarget: number[] = [];
+    for (let j = targetStart; j < targetEnd; j++) {
+      if (!result[j].linkGroup) availableInTarget.push(j);
+    }
+
+    for (const idx of indices) {
+      if (Math.floor(idx / 15) === targetColIdx) continue; // already in target column
+      const swapIdx = availableInTarget.shift();
+      if (swapIdx === undefined) break; // no room left — skip gracefully
+      [result[idx], result[swapIdx]] = [result[swapIdx], result[idx]];
+    }
+  }
+
+  return result;
+}
+
 export function buildRoundTrackPool(
   tracks: ResolvedPlaylistTrack[],
   sessionId: number,
@@ -223,7 +266,7 @@ export function buildRoundTrackPool(
       ? `session:${sessionId}:playlist-order:gen:${generation}:v1`
       : `session:${sessionId}:playlist-order:v1`;
   const ordered = stableRoundSort(tracks, seed, (track) => track.trackKey);
-  return ordered.slice(0, GAME_BALL_COUNT);
+  return enforceColumnLinks(ordered.slice(0, GAME_BALL_COUNT));
 }
 
 export function planRoundSessionCalls(
@@ -268,6 +311,7 @@ export function planRoundSessionCalls(
     album_name: entry.track.albumName,
     side: entry.track.side,
     position: entry.track.position,
+    link_group: entry.track.linkGroup ?? null,
   }));
 }
 
@@ -573,12 +617,13 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
       albumName: row.albumTitle,
       side: row.side,
       position: row.position,
+      linkGroup: null,
     }));
   }
 
   const { data: playlistItems, error: itemError } = await db
     .from("collection_playlist_items")
-    .select("id, playlist_id, track_key, sort_order")
+    .select("id, playlist_id, track_key, sort_order, link_group")
     .eq("playlist_id", playlistId)
     .order("sort_order", { ascending: true });
 
@@ -731,6 +776,7 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
       albumName: master?.title ?? null,
       side: releaseTrack?.side ?? null,
       position: releaseTrack?.position ?? parsed.fallbackPosition,
+      linkGroup: item.link_group ?? null,
     });
   }
 
@@ -960,6 +1006,7 @@ export async function generateSessionCallsFromTracks(
     album_name: entry.album_name,
     side: entry.side,
     position: entry.position,
+    link_group: entry.link_group ?? null,
     status: "pending",
   }));
 
@@ -1067,7 +1114,7 @@ export async function generateCardRows(
 ): Promise<GeneratedCardRow[]> {
   const { data, error } = await db
     .from("bingo_session_calls")
-    .select("id, call_index, ball_number, column_letter, track_title, artist_name")
+    .select("id, call_index, ball_number, column_letter, track_title, artist_name, link_group")
     .eq("session_id", sessionId)
     .order("call_index", { ascending: true });
 
@@ -1087,13 +1134,31 @@ export async function generateCardRows(
   const signatures = new Set(options?.existingSignatures ?? []);
   const startCardNumber = Math.max(1, Math.floor(options?.startCardNumber ?? 1));
 
+  function pickFive(calls: SessionCallRow[]): SessionCallRow[] {
+    const shuffled = shuffle(calls);
+    const picked: SessionCallRow[] = [];
+    const usedGroups = new Set<string>();
+    for (const call of shuffled) {
+      if (picked.length >= 5) break;
+      if (call.link_group && usedGroups.has(call.link_group)) continue;
+      picked.push(call);
+      if (call.link_group) usedGroups.add(call.link_group);
+    }
+    // Fallback: fill any remaining slots ignoring link constraints (edge case with many linked pairs)
+    for (const call of shuffled) {
+      if (picked.length >= 5) break;
+      if (!picked.includes(call)) picked.push(call);
+    }
+    return picked;
+  }
+
   function buildCardGrid(): BingoCardCell[] {
     const picked = {
-      B: shuffle(byColumn.B).slice(0, 5),
-      I: shuffle(byColumn.I).slice(0, 5),
-      N: shuffle(byColumn.N).slice(0, 5),
-      G: shuffle(byColumn.G).slice(0, 5),
-      O: shuffle(byColumn.O).slice(0, 5),
+      B: pickFive(byColumn.B),
+      I: pickFive(byColumn.I),
+      N: pickFive(byColumn.N),
+      G: pickFive(byColumn.G),
+      O: pickFive(byColumn.O),
     };
 
     const grid: BingoCardCell[] = [];

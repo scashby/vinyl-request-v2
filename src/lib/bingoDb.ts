@@ -54,6 +54,7 @@ export type BingoDatabase = {
           playlist_id: number;
           track_key: string;
           sort_order: number;
+          link_group: string | null;
           created_at: string;
         };
         Insert: {
@@ -61,6 +62,7 @@ export type BingoDatabase = {
           playlist_id: number;
           track_key: string;
           sort_order?: number;
+          link_group?: string | null;
           created_at?: string;
         };
         Update: {
@@ -68,6 +70,7 @@ export type BingoDatabase = {
           playlist_id?: number;
           track_key?: string;
           sort_order?: number;
+          link_group?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -499,6 +502,7 @@ export type BingoDatabase = {
           album_name: string | null;
           side: string | null;
           position: string | null;
+          link_group: string | null;
           metadata_locked: boolean;
           metadata_synced_at: string | null;
           status: string;
@@ -519,6 +523,7 @@ export type BingoDatabase = {
           album_name?: string | null;
           side?: string | null;
           position?: string | null;
+          link_group?: string | null;
           metadata_locked?: boolean;
           metadata_synced_at?: string | null;
           status?: string;
@@ -539,6 +544,7 @@ export type BingoDatabase = {
           album_name?: string | null;
           side?: string | null;
           position?: string | null;
+          link_group?: string | null;
           metadata_locked?: boolean;
           metadata_synced_at?: string | null;
           status?: string;
@@ -592,6 +598,7 @@ export type BingoDatabase = {
           album_name: string | null;
           side: string | null;
           position: string | null;
+          link_group: string | null;
           created_at: string;
         };
         Insert: {
@@ -606,6 +613,7 @@ export type BingoDatabase = {
           album_name?: string | null;
           side?: string | null;
           position?: string | null;
+          link_group?: string | null;
           created_at?: string;
         };
         Update: {
@@ -620,6 +628,7 @@ export type BingoDatabase = {
           album_name?: string | null;
           side?: string | null;
           position?: string | null;
+          link_group?: string | null;
           created_at?: string;
         };
         Relationships: [];

@@ -1630,6 +1630,7 @@ export type Database = {
           completed_at: string | null
           created_at: string
           id: number
+          link_group: string | null
           metadata_locked: boolean
           metadata_synced_at: string | null
           playlist_track_key: string | null
@@ -1650,6 +1651,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           id?: number
+          link_group?: string | null
           metadata_locked?: boolean
           metadata_synced_at?: string | null
           playlist_track_key?: string | null
@@ -1670,6 +1672,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           id?: number
+          link_group?: string | null
           metadata_locked?: boolean
           metadata_synced_at?: string | null
           playlist_track_key?: string | null
@@ -1766,6 +1769,7 @@ export type Database = {
           artist_name: string
           created_at: string
           id: number
+          link_group: string | null
           playlist_track_key: string
           position: string | null
           round_number: number
@@ -1780,6 +1784,7 @@ export type Database = {
           artist_name: string
           created_at?: string
           id?: number
+          link_group?: string | null
           playlist_track_key: string
           position?: string | null
           round_number: number
@@ -1794,6 +1799,7 @@ export type Database = {
           artist_name?: string
           created_at?: string
           id?: number
+          link_group?: string | null
           playlist_track_key?: string
           position?: string | null
           round_number?: number
@@ -2762,6 +2768,7 @@ export type Database = {
         Row: {
           created_at: string
           id: number
+          link_group: string | null
           playlist_id: number
           sort_order: number
           track_key: string
@@ -2769,6 +2776,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: never
+          link_group?: string | null
           playlist_id: number
           sort_order?: number
           track_key: string
@@ -2776,6 +2784,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: never
+          link_group?: string | null
           playlist_id?: number
           sort_order?: number
           track_key?: string

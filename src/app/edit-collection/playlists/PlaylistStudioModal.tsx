@@ -26,6 +26,7 @@ type PlaylistTrackItem = {
   album_name: string | null;
   side: string | null;
   position: string | null;
+  link_group: string | null;
 };
 
 type InventorySearchCandidate = {
@@ -88,7 +89,7 @@ interface PlaylistStudioModalProps {
   onReorderPlaylists: (playlists: CollectionPlaylist[]) => Promise<void>;
   onDeletePlaylist: (playlistId: number, playlistName: string) => Promise<void>;
   onDeleteAllPlaylists: () => Promise<void>;
-  onCreateManualPlaylist: (playlist: { name: string; icon: string; color: string; trackKeys: string[] }) => Promise<void>;
+  onCreateManualPlaylist: (playlist: { name: string; icon: string; color: string; trackKeys: string[]; trackLinkGroups?: Record<string, string> }) => Promise<void>;
   onCreateSmartPlaylist: (payload: {
     name: string;
     color: string;
@@ -231,6 +232,8 @@ const firstIconFromInput = (value: string): string => {
   return Array.from(trimmed)[0] ?? '';
 };
 
+const LINK_GROUP_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
+
 const dedupeTrackKeys = (keys: string[]) => {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -303,6 +306,7 @@ export function PlaylistStudioModal({
   const [manualIconInput, setManualIconInput] = useState('🎵');
   const [manualTracks, setManualTracks] = useState<PlaylistTrackItem[]>([]);
   const [manualTracksLoading, setManualTracksLoading] = useState(false);
+  const [linkingTrackKey, setLinkingTrackKey] = useState<string | null>(null);
   const [manualTrackSearch, setManualTrackSearch] = useState('');
   const [manualTrackSearchResults, setManualTrackSearchResults] = useState<InventorySearchCandidate[]>([]);
   const [manualTrackSearching, setManualTrackSearching] = useState(false);
@@ -390,6 +394,22 @@ export function PlaylistStudioModal({
     return dedupeTrackKeys(manualTracks.map((track) => track.track_key));
   }, [manualTracks]);
 
+  const manualTrackLinkGroups = useMemo(() => {
+    const groups: Record<string, string> = {};
+    for (const track of manualTracks) {
+      if (track.link_group) groups[track.track_key] = track.link_group;
+    }
+    return groups;
+  }, [manualTracks]);
+
+  const uniqueLinkGroups = useMemo(() => {
+    const seen = new Set<string>();
+    for (const track of manualTracks) {
+      if (track.link_group) seen.add(track.link_group);
+    }
+    return Array.from(seen);
+  }, [manualTracks]);
+
   const filteredSpotifyPlaylists = useMemo(() => {
     const query = spotifyQuery.trim().toLowerCase();
     if (!query) return spotifyPlaylists;
@@ -433,6 +453,34 @@ export function PlaylistStudioModal({
     }));
   };
 
+  const linkTracks = useCallback((trackKeyA: string, trackKeyB: string) => {
+    const newGroupId = `lg-${Date.now()}`;
+    setManualTracks((prev) => {
+      const groupA = prev.find((t) => t.track_key === trackKeyA)?.link_group ?? null;
+      const groupB = prev.find((t) => t.track_key === trackKeyB)?.link_group ?? null;
+      return prev.map((track) => {
+        if (track.track_key === trackKeyA || track.track_key === trackKeyB) {
+          return { ...track, link_group: newGroupId };
+        }
+        // Break any old pairs that included A or B
+        if (groupA && track.link_group === groupA) return { ...track, link_group: null };
+        if (groupB && track.link_group === groupB) return { ...track, link_group: null };
+        return track;
+      });
+    });
+    setLinkingTrackKey(null);
+  }, []);
+
+  const unlinkTrack = useCallback((trackKey: string) => {
+    setManualTracks((prev) => {
+      const groupId = prev.find((t) => t.track_key === trackKey)?.link_group ?? null;
+      if (!groupId) return prev;
+      return prev.map((track) =>
+        track.link_group === groupId ? { ...track, link_group: null } : track
+      );
+    });
+  }, []);
+
   const resetManualComposer = useCallback(() => {
     setManualEditingId(null);
     setManualName('');
@@ -444,6 +492,7 @@ export function PlaylistStudioModal({
     setManualTrackSearch('');
     setManualTrackSearchResults([]);
     setManualTrackSearching(false);
+    setLinkingTrackKey(null);
   }, []);
 
   const resetSmartComposer = useCallback(() => {
@@ -497,6 +546,7 @@ export function PlaylistStudioModal({
         album_name: null,
         side: null,
         position: null,
+        link_group: playlist.trackLinkGroups?.[trackKey] ?? null,
       }))
     );
     setManualTrackSearch('');
@@ -755,6 +805,7 @@ export function PlaylistStudioModal({
           icon: manualIcon,
           color: manualColor,
           trackKeys: manualTrackKeys,
+          trackLinkGroups: manualTrackLinkGroups,
         });
         setNotice(`Updated "${manualName.trim()}"`);
       } else {
@@ -763,6 +814,7 @@ export function PlaylistStudioModal({
           icon: manualIcon,
           color: manualColor,
           trackKeys: manualTrackKeys,
+          trackLinkGroups: manualTrackLinkGroups,
         });
         setNotice(`Created "${manualName.trim()}"`);
       }
@@ -1708,6 +1760,7 @@ export function PlaylistStudioModal({
                                           album_name: candidate.album_title,
                                           side: candidate.side,
                                           position: candidate.position,
+                                          link_group: null,
                                         },
                                       ];
                                     });
@@ -1739,6 +1792,18 @@ export function PlaylistStudioModal({
                           No tracks selected yet.
                         </div>
                       ) : (
+                        <div className="space-y-2">
+                          {linkingTrackKey !== null && (
+                            <div className="flex items-center justify-between rounded-lg border border-yellow-600/40 bg-yellow-900/10 px-3 py-1.5 text-xs text-yellow-300">
+                              <span>Click 🔗 on another track to link it to the same bingo column.</span>
+                              <button
+                                onClick={() => setLinkingTrackKey(null)}
+                                className="ml-2 rounded border border-yellow-600/40 px-1.5 py-0.5 text-[10px] hover:bg-yellow-900/30"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
                         <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
                           {manualTracks.map((track, index) => {
                             const subtitleParts = [
@@ -1746,10 +1811,17 @@ export function PlaylistStudioModal({
                               track.album_name,
                               formatTrackPositionLabel(track.side, track.position),
                             ].filter(Boolean);
+                            const isLinkSource = linkingTrackKey === track.track_key;
+                            const isLinkTarget = linkingTrackKey !== null && linkingTrackKey !== track.track_key && !track.link_group;
+                            const isLinked = !!track.link_group;
+                            const linkColor = isLinked
+                              ? (LINK_GROUP_COLORS[uniqueLinkGroups.indexOf(track.link_group!) % LINK_GROUP_COLORS.length] ?? '#3b82f6')
+                              : null;
                             return (
                               <div
                                 key={`${track.track_key}-${index}`}
-                                className="flex items-center gap-2 rounded-lg border border-[#314764] bg-[#101a2d] px-3 py-2"
+                                className="flex items-center gap-2 rounded-lg border bg-[#101a2d] px-3 py-2"
+                                style={{ borderColor: linkColor ?? (isLinkSource ? '#eab308' : '#314764') }}
                               >
                                 <div className="flex flex-col gap-1">
                                   <button
@@ -1781,6 +1853,37 @@ export function PlaylistStudioModal({
                                   >
                                     ✕
                                   </button>
+                                  <button
+                                    onClick={() => {
+                                      if (isLinked) {
+                                        unlinkTrack(track.track_key);
+                                      } else if (isLinkSource) {
+                                        setLinkingTrackKey(null);
+                                      } else if (linkingTrackKey !== null) {
+                                        linkTracks(linkingTrackKey, track.track_key);
+                                      } else {
+                                        setLinkingTrackKey(track.track_key);
+                                      }
+                                    }}
+                                    title={
+                                      isLinked ? 'Unlink this pair' :
+                                      isLinkSource ? 'Cancel linking' :
+                                      isLinkTarget ? 'Link with selected track' :
+                                      'Link with another track (same bingo column)'
+                                    }
+                                    className={`h-5 w-6 rounded border text-[10px] ${
+                                      isLinked
+                                        ? 'border-current font-bold'
+                                        : isLinkSource
+                                        ? 'border-yellow-500/70 bg-yellow-900/20 text-yellow-300'
+                                        : isLinkTarget
+                                        ? 'border-blue-400/70 bg-blue-900/20 text-blue-300'
+                                        : 'border-[#344866] bg-[#16253c] text-[#6882aa] hover:border-[#43608b] hover:text-[#cce1ff]'
+                                    }`}
+                                    style={isLinked ? { borderColor: linkColor ?? undefined, color: linkColor ?? undefined } : {}}
+                                  >
+                                    🔗
+                                  </button>
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <div className="truncate text-sm font-medium text-white">{track.track_title ?? track.track_key}</div>
@@ -1797,6 +1900,7 @@ export function PlaylistStudioModal({
                               </div>
                             );
                           })}
+                        </div>
                         </div>
                       )}
                     </div>

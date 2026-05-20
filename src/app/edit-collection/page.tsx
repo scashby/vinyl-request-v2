@@ -1986,7 +1986,7 @@ function CollectionBrowserPage() {
 
     const { data: playlistItems, error: itemsError } = await supabase
       .from('collection_playlist_items')
-      .select('playlist_id, track_key, sort_order')
+      .select('playlist_id, track_key, sort_order, link_group')
       .order('sort_order', { ascending: true });
 
     if (itemsError) {
@@ -2003,12 +2003,20 @@ function CollectionBrowserPage() {
       return acc;
     }, {} as Record<number, string[]>);
 
+    const linkGroupsByPlaylist = (playlistItems ?? []).reduce((acc, item) => {
+      if (!item.playlist_id || !item.track_key || !item.link_group) return acc;
+      if (!acc[item.playlist_id]) acc[item.playlist_id] = {};
+      acc[item.playlist_id][item.track_key] = item.link_group;
+      return acc;
+    }, {} as Record<number, Record<string, string>>);
+
     const mapped: Playlist[] = (playlistRows ?? []).map((row) => ({
       id: row.id,
       name: row.name,
       icon: row.icon || '🎵',
       color: row.color || '#3578b3',
       trackKeys: tracksByPlaylist[row.id] ?? [],
+      trackLinkGroups: linkGroupsByPlaylist[row.id] ?? {},
       createdAt: row.created_at || new Date().toISOString(),
       sortOrder: row.sort_order ?? 0,
       isSmart: !!row.is_smart,
@@ -3210,7 +3218,7 @@ function CollectionBrowserPage() {
     });
   }, []);
 
-  const handleCreatePlaylist = useCallback(async (playlist: { name: string; icon: string; color: string; trackKeys: string[] }) => {
+  const handleCreatePlaylist = useCallback(async (playlist: { name: string; icon: string; color: string; trackKeys: string[]; trackLinkGroups?: Record<string, string> }) => {
     try {
       const maxSort = playlists.reduce((max, item) => Math.max(max, item.sortOrder ?? 0), -1);
       const nextSortOrder = maxSort + 1;
@@ -3240,6 +3248,7 @@ function CollectionBrowserPage() {
           playlist_id: data.id,
           track_key: trackKey,
           sort_order: index,
+          link_group: playlist.trackLinkGroups?.[trackKey] ?? null,
         }));
         const { error: itemsError } = await supabase
           .from('collection_playlist_items')
@@ -3309,6 +3318,7 @@ function CollectionBrowserPage() {
             playlist_id: playlist.id,
             track_key: trackKey,
             sort_order: i + index,
+            link_group: playlist.trackLinkGroups?.[trackKey] ?? null,
           }));
           const { error: insertItemsError } = await supabase
             .from('collection_playlist_items')

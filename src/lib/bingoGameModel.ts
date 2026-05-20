@@ -74,6 +74,7 @@ export async function createRoundTrackSnapshots(
     album_name: string | null;
     side: string | null;
     position: string | null;
+    link_group: string | null;
   }> = [];
 
   for (const [roundNumber, playlistIds] of Array.from(resolvedPlaylistsByRound.entries()).sort((left, right) => left[0] - right[0])) {
@@ -92,6 +93,7 @@ export async function createRoundTrackSnapshots(
         album_name: track.albumName,
         side: track.side,
         position: track.position,
+        link_group: track.linkGroup ?? null,
       });
     });
   }
@@ -117,6 +119,7 @@ export async function createRoundTrackSnapshotsFromTracks(
     album_name: string | null;
     side: string | null;
     position: string | null;
+    link_group: string | null;
   }> = [];
 
   const normalizedRoundCount = Math.max(1, Math.floor(roundCount || 1));
@@ -134,6 +137,7 @@ export async function createRoundTrackSnapshotsFromTracks(
         album_name: track.albumName,
         side: track.side,
         position: track.position,
+        link_group: track.linkGroup ?? null,
       });
     });
   }
@@ -149,7 +153,7 @@ export async function getRoundSnapshotTracks(
 ): Promise<ResolvedPlaylistTrack[]> {
   const { data, error } = await db
     .from("bingo_session_round_tracks")
-    .select("slot_index, playlist_track_key, track_title, artist_name, album_name, side, position")
+    .select("slot_index, playlist_track_key, track_title, artist_name, album_name, side, position, link_group")
     .eq("session_id", sessionId)
     .eq("round_number", roundNumber)
     .order("slot_index", { ascending: true });
@@ -164,6 +168,7 @@ export async function getRoundSnapshotTracks(
     album_name: string | null;
     side: string | null;
     position: string | null;
+    link_group: string | null;
   }>).map((row) => ({
     trackKey: row.playlist_track_key,
     sortOrder: row.slot_index,
@@ -172,6 +177,7 @@ export async function getRoundSnapshotTracks(
     albumName: row.album_name,
     side: row.side,
     position: row.position,
+    linkGroup: row.link_group ?? null,
   }));
 }
 

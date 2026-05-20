@@ -97,6 +97,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           album_name: typeof row.album_name === "string" ? row.album_name : null,
           side: typeof row.side === "string" ? row.side : null,
           position: typeof row.position === "string" ? row.position : null,
+          link_group: typeof row.link_group === "string" ? row.link_group : null,
         }));
       }
     }
@@ -169,6 +170,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           album_name: planned.album_name,
           side: planned.side,
           position: planned.position,
+          link_group: planned.link_group ?? null,
           status: "pending",
           called_at: null,
           completed_at: null,

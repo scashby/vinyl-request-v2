@@ -4,6 +4,7 @@ export interface CollectionPlaylist {
   icon: string;
   color: string;
   trackKeys: string[];
+  trackLinkGroups?: Record<string, string>; // sparse: trackKey → linkGroup (only linked tracks)
   createdAt: string;
   sortOrder: number;
   isSmart: boolean;

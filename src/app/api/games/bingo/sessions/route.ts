@@ -144,6 +144,7 @@ async function loadPresetPoolTracks(db: ReturnType<typeof getBingoDb>, presetId:
       albumName: row.album_name,
       side: row.side,
       position: row.position,
+      linkGroup: null,
     });
   });
 

@@ -121,6 +121,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
       album_name: planned.album_name,
       side: planned.side,
       position: planned.position,
+      link_group: planned.link_group ?? null,
       status: "pending",
     }));
 
@@ -165,6 +166,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
             album_name: planned.album_name,
             side: planned.side,
             position: planned.position,
+            link_group: planned.link_group ?? null,
             status: "pending",
             called_at: null,
             completed_at: null,
