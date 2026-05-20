@@ -806,16 +806,7 @@ export async function fetchStorageDevices(): Promise<PickerDataItem[]> {
 }
 
 export async function fetchPackaging(): Promise<PickerDataItem[]> {
-  const [detailValues, formatValues] = await Promise.all([
-    fetchAlbumDetailsList('packaging'),
-    fetchFormats(),
-  ]);
-  const map = new Map<string, PickerDataItem>();
-  detailValues.forEach((item) => map.set(item.name, item));
-  formatValues.forEach((item) => {
-    if (!map.has(item.name)) map.set(item.name, item);
-  });
-  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  return fetchAlbumDetailsList('packaging');
 }
 
 export async function fetchStudios(): Promise<PickerDataItem[]> {
@@ -875,16 +866,7 @@ export async function fetchVinylColors(): Promise<PickerDataItem[]> {
 }
 
 export async function fetchVinylWeights(): Promise<PickerDataItem[]> {
-  const [detailValues, formatValues] = await Promise.all([
-    fetchAlbumDetailsList('vinyl_weight'),
-    fetchFormats(),
-  ]);
-  const map = new Map<string, PickerDataItem>();
-  detailValues.forEach((item) => map.set(item.name, item));
-  formatValues.forEach((item) => {
-    if (!map.has(item.name)) map.set(item.name, item);
-  });
-  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  return fetchAlbumDetailsList('vinyl_weight');
 }
 
 export async function fetchSPARS(): Promise<PickerDataItem[]> {

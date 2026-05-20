@@ -148,6 +148,7 @@ function SortableTrackRow({
   isSelected,
   onToggleSelect,
   onUpdate,
+  onUpdatePosition,
   onRemoveTrackTag,
   onAddTrackTag,
   onOpenTrackTagPicker,
@@ -156,6 +157,7 @@ function SortableTrackRow({
   track: Track;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
+  onUpdatePosition: (id: string, raw: string) => void;
   onUpdate: (id: string, field: keyof Track, value: string | number | boolean | null) => void;
   onRemoveTrackTag: (id: string, tagName: string) => void;
   onAddTrackTag: (id: string, tagName: string) => void;
@@ -259,7 +261,13 @@ function SortableTrackRow({
           <span className="text-base">≡</span>
         </div>
         <div className="text-center text-gray-500 text-sm">
-          {positionLabel}
+          <input
+            type="text"
+            value={positionLabel}
+            onChange={(e) => onUpdatePosition(track.id, e.target.value)}
+            className="w-full text-center px-1 py-1 border border-gray-200 rounded text-sm text-gray-700 bg-white focus:outline-none focus:border-blue-500"
+            title="Position (e.g. A1, B3, or plain number)"
+          />
         </div>
         <div className="px-1">
           <input
@@ -648,15 +656,29 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
     ));
   };
 
+  const handleUpdateTrackPosition = (trackId: string, raw: string) => {
+    const trimmed = raw.trim().toUpperCase();
+    const sideMatch = trimmed.match(/^([A-Z]+)/);
+    const numMatch = trimmed.match(/(\d+)$/);
+    const side = sideMatch ? sideMatch[1] : undefined;
+    const position = numMatch ? parseInt(numMatch[1], 10) : 0;
+    setTracks(tracks.map(track =>
+      track.id === trackId ? { ...track, side, position: position || track.position } : track
+    ));
+  };
+
   const handleAddTrack = () => {
+    const nextPosition = activeDiscTracks.length > 0 ? Math.max(...activeDiscTracks.map(t => t.position)) + 1 : 1;
+    const lastSide = activeDiscTracks.length > 0 ? activeDiscTracks[activeDiscTracks.length - 1].side : undefined;
     const newTrack: Track = {
       id: `track-${Date.now()}`,
-      position: activeDiscTracks.length + 1,
+      position: nextPosition,
       title: '',
       artist: album.artist || '',
       duration: '0:00',
       note: '',
       disc_number: activeDisc,
+      side: lastSide,
       lyrics_url: '',
       is_cover: null,
       original_artist: '',
@@ -668,9 +690,10 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
   };
 
   const handleAddHeader = () => {
+    const nextPosition = activeDiscTracks.length > 0 ? Math.max(...activeDiscTracks.map(t => t.position)) + 1 : 1;
     const newHeader: Track = {
       id: `header-${Date.now()}`,
-      position: activeDiscTracks.length + 1,
+      position: nextPosition,
       title: '',
       artist: '',
       duration: '',
@@ -1040,6 +1063,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
                 isSelected={selectedTracks.has(track.id)}
                 onToggleSelect={handleToggleSelect}
                 onUpdate={handleUpdateTrack}
+                onUpdatePosition={handleUpdateTrackPosition}
                 onRemoveTrackTag={handleRemoveTrackTag}
                 onAddTrackTag={handleAddTrackTag}
                 onOpenTrackTagPicker={(id) => setTrackTagPickerOpen(id)}
