@@ -2866,7 +2866,7 @@ function CollectionBrowserPage() {
     }
     const { data: inventoryRow, error: inventoryErr } = await supabase
       .from('inventory')
-      .insert({ release_id: releaseRow.id, status: 'owned', date_added: new Date().toISOString() })
+      .insert({ release_id: releaseRow.id, status: 'active', date_added: new Date().toISOString() })
       .select('id')
       .single();
     if (inventoryErr || !inventoryRow) {
