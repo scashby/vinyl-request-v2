@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
     const orderArgs = sortMap[sortBy] ?? sortMap["date_added"];
 
     const db = supabaseAdmin;
-    let query = db.from("inventory").select(includeTracks ? selectWithTracks : selectWithoutTracks, { count: "exact" });
+    let query = db.from("inventory").select(includeTracks ? selectWithTracks : selectWithoutTracks, { count: "planned" });
     if (!includeForSale) query = query.neq("status", "for_sale");
 
     if (location) query = query.eq("location", location);

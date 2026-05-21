@@ -122,7 +122,7 @@ export function ManageModal({
           </button>
         </div>
 
-        {/* Search + Merge Mode Toggle */}
+        {/* Search */}
         <div className="px-4 py-3 border-b border-gray-200 flex gap-2 items-center bg-white">
           <input
             type="text"
@@ -131,16 +131,6 @@ export function ManageModal({
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 px-2.5 py-1.5 border border-gray-300 rounded text-[13px] outline-none text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
-          {allowMerge && (
-            <button
-              onClick={handleMergeToggle}
-              className={`px-3 py-1.5 border-none rounded text-[13px] font-medium cursor-pointer whitespace-nowrap text-white ${
-                mergeMode ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-500 hover:bg-gray-600'
-              }`}
-            >
-              {mergeMode ? 'Cancel Merge' : 'Merge Mode'}
-            </button>
-          )}
         </div>
 
         {/* Yellow Banner in Merge Mode */}
@@ -271,7 +261,7 @@ export function ManageModal({
         </div>
 
         {/* Footer */}
-        <div className={`px-4 py-3 border-t border-gray-200 flex gap-2 ${mergeMode ? 'justify-between' : 'justify-center'}`}>
+        <div className="px-4 py-3 border-t border-gray-200 flex justify-between items-center">
           {mergeMode ? (
             <>
               <button
@@ -287,8 +277,8 @@ export function ManageModal({
                 onClick={handleMergeConfirm}
                 disabled={selectedForMerge.length < 2}
                 className={`px-4 py-1.5 border-none rounded text-[13px] font-semibold text-white ${
-                  selectedForMerge.length >= 2 
-                    ? 'bg-blue-500 cursor-pointer hover:bg-blue-600' 
+                  selectedForMerge.length >= 2
+                    ? 'bg-blue-500 cursor-pointer hover:bg-blue-600'
                     : 'bg-gray-300 cursor-not-allowed'
                 }`}
               >
@@ -296,12 +286,22 @@ export function ManageModal({
               </button>
             </>
           ) : (
-            <button
-              onClick={onClose}
-              className="px-6 py-1.5 bg-gray-200 text-gray-700 border-none rounded text-[13px] font-medium cursor-pointer hover:bg-gray-300"
-            >
-              Close
-            </button>
+            <>
+              <button
+                onClick={onClose}
+                className="px-6 py-1.5 bg-gray-200 text-gray-700 border-none rounded text-[13px] font-medium cursor-pointer hover:bg-gray-300"
+              >
+                Close
+              </button>
+              {allowMerge && (
+                <button
+                  onClick={handleMergeToggle}
+                  className="px-3 py-1.5 bg-gray-500 text-white border-none rounded text-[13px] font-medium cursor-pointer hover:bg-gray-600"
+                >
+                  Merge Mode
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

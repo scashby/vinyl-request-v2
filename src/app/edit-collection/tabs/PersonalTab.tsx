@@ -5,11 +5,12 @@ import { useState, useEffect } from 'react';
 import type { Album } from 'types/album';
 import { DatePicker } from 'components/DatePicker';
 import { UniversalPicker } from '../pickers/UniversalPicker';
-import { 
-  fetchPurchaseStores, 
-  fetchOwners, 
-  fetchSignees, 
+import {
+  fetchPurchaseStores,
+  fetchOwners,
+  fetchSignees,
   fetchTags,
+  mergeTags,
 } from '../pickers/pickerDataUtils';
 
 interface PersonalTabProps {
@@ -576,6 +577,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
           canManage={true}
           newItemLabel="Tag"
           manageItemsLabel="Manage Tags"
+          onMerge={mergeTags}
         />
       )}
 

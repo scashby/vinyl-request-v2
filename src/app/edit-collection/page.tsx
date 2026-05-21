@@ -1927,7 +1927,7 @@ function CollectionBrowserPage() {
       url.searchParams.set('page', '0');
       url.searchParams.set('pageSize', '250');
       url.searchParams.set('includeTracks', 'false');
-      url.searchParams.set('includeForSale', 'true');
+      url.searchParams.set('includeForSale', 'false');
       if (params.q) url.searchParams.set('q', params.q);
       if (params.mediaType) url.searchParams.set('mediaType', params.mediaType);
       if (params.location) url.searchParams.set('location', params.location);
@@ -1966,7 +1966,7 @@ function CollectionBrowserPage() {
       url.searchParams.set('page', String(page));
       url.searchParams.set('pageSize', '250');
       url.searchParams.set('includeTracks', 'false');
-      url.searchParams.set('includeForSale', 'true');
+      url.searchParams.set('includeForSale', 'false');
       if (params.q) url.searchParams.set('q', params.q);
       if (params.mediaType) url.searchParams.set('mediaType', params.mediaType);
       if (params.location) url.searchParams.set('location', params.location);
@@ -2163,11 +2163,25 @@ function CollectionBrowserPage() {
     tracksHydratedRef.current = false;
     setTracksHydrated(false);
     const sortParams = getSortParams(sortBy);
+
+    // Read initial filter from localStorage so the first API call uses the correct params,
+    // preventing a second load when the localStorage-restore effect fires.
+    let initialMediaType: string | null = null;
+    try {
+      const stored = localStorage.getItem(COLLECTION_UI_CONTEXT_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as PersistedCollectionUiContext;
+        if ((parsed.folderMode === 'format' || !parsed.folderMode) && typeof parsed.selectedFolderValue === 'string') {
+          initialMediaType = parsed.selectedFolderValue;
+        }
+      }
+    } catch { /* ignore */ }
+
     void loadAlbums({
       includeTracks: false,
       showSpinner: true,
       q: '',
-      mediaType: null,
+      mediaType: initialMediaType,
       location: null,
       ...sortParams,
     });
@@ -2185,6 +2199,23 @@ function CollectionBrowserPage() {
       return;
     }
     const sortParams = getSortParams(sortBy);
+    const newQ = debouncedSearchQuery;
+    const newMediaType = (folderMode === 'format' && selectedFolderValue) ? selectedFolderValue : null;
+    const newLocation = selectedVinylSubformat ?? null;
+
+    // Skip if the params match what's already loaded — prevents double-load when
+    // localStorage state is restored after the mount effect already loaded with those params.
+    const cur = activeParamsRef.current;
+    if (
+      cur.q === newQ &&
+      cur.mediaType === newMediaType &&
+      cur.location === newLocation &&
+      cur.sortBy === sortParams.apiSortBy &&
+      cur.sortDir === sortParams.apiSortDir
+    ) {
+      return;
+    }
+
     setAlbums([]);
     nextPageRef.current = 1;
     tracksHydratedRef.current = false;
@@ -2192,9 +2223,9 @@ function CollectionBrowserPage() {
     void loadAlbums({
       includeTracks: false,
       showSpinner: true,
-      q: debouncedSearchQuery,
-      mediaType: (folderMode === 'format' && selectedFolderValue) ? selectedFolderValue : null,
-      location: selectedVinylSubformat ?? null,
+      q: newQ,
+      mediaType: newMediaType,
+      location: newLocation,
       ...sortParams,
     });
   }, [debouncedSearchQuery, selectedFolderValue, selectedVinylSubformat, sortBy, folderMode, getSortParams, loadAlbums]);

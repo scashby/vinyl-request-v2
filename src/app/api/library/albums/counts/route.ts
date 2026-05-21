@@ -14,38 +14,47 @@ export async function GET(request: NextRequest) {
     const mediaType = (url.searchParams.get("mediaType") ?? "").trim();
 
     if (mediaType) {
-      // Sublocation counts for a specific media type (e.g. Vinyl → location breakdown)
+      // Sublocation counts for a specific media type — fetch all and filter in JS
+      // (PostgREST nested-table eq filters are unreliable for aliased relations)
       const { data, error } = await supabaseAdmin
         .from("inventory")
-        .select("location, release:releases!inner(media_type)")
-        .eq("release.media_type", mediaType)
+        .select("location, status, releases(media_type)")
         .neq("status", "for_sale");
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
       const counts: Record<string, number> = {};
       for (const row of data ?? []) {
+        const rel = Array.isArray(row.releases) ? row.releases[0] : row.releases;
+        const mt = (rel as { media_type?: string } | null)?.media_type ?? "Unknown";
+        if (mt !== mediaType) continue;
         const loc = (row.location as string | null) ?? "Unknown";
         counts[loc] = (counts[loc] ?? 0) + 1;
       }
-      return NextResponse.json({ ok: true, data: Object.entries(counts).map(([location, count]) => ({ location, count })) });
+      return NextResponse.json({
+        ok: true,
+        data: Object.entries(counts).map(([location, count]) => ({ location, count })),
+      });
     }
 
-    // Format counts across all non-sale inventory
+    // Format counts — fetch all non-sale inventory and group by media_type in JS
     const { data, error } = await supabaseAdmin
       .from("inventory")
-      .select("release:releases!inner(media_type)")
+      .select("status, releases(media_type)")
       .neq("status", "for_sale");
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     const counts: Record<string, number> = {};
     for (const row of data ?? []) {
-      const rel = Array.isArray(row.release) ? row.release[0] : row.release;
+      const rel = Array.isArray(row.releases) ? row.releases[0] : row.releases;
       const mt = (rel as { media_type?: string } | null)?.media_type ?? "Unknown";
       counts[mt] = (counts[mt] ?? 0) + 1;
     }
-    return NextResponse.json({ ok: true, data: Object.entries(counts).map(([media_type, count]) => ({ media_type, count })) });
+    return NextResponse.json({
+      ok: true,
+      data: Object.entries(counts).map(([media_type, count]) => ({ media_type, count })),
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to load counts";
     return NextResponse.json({ error: message }, { status: 500 });

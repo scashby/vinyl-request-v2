@@ -228,12 +228,29 @@ export async function fetchCountries(): Promise<PickerDataItem[]> {
     const countryCounts = new Map<string, number>();
     data?.forEach(row => { if (row.country) countryCounts.set(row.country, (countryCounts.get(row.country) || 0) + 1); });
     const allCountries = new Set([...standardCountries, ...countryCounts.keys()]);
+    const PINNED = ['US', 'Canada', 'Europe'];
+    const pinnedSort = (a: { name: string }, b: { name: string }) => {
+      const ai = PINNED.indexOf(a.name);
+      const bi = PINNED.indexOf(b.name);
+      if (ai !== -1 && bi !== -1) return ai - bi;
+      if (ai !== -1) return -1;
+      if (bi !== -1) return 1;
+      return a.name.localeCompare(b.name);
+    };
     return Array.from(allCountries)
       .map(name => ({ id: name, name, count: countryCounts.get(name) || 0 }))
-      .sort((a, b) => (a.name === 'US' ? -1 : b.name === 'US' ? 1 : a.name.localeCompare(b.name)));
+      .sort(pinnedSort);
   } catch {
+    const PINNED = ['US', 'Canada', 'Europe'];
     return standardCountries.map(name => ({ id: name, name, count: 0 }))
-      .sort((a, b) => (a.name === 'US' ? -1 : b.name === 'US' ? 1 : a.name.localeCompare(b.name)));
+      .sort((a, b) => {
+        const ai = PINNED.indexOf(a.name);
+        const bi = PINNED.indexOf(b.name);
+        if (ai !== -1 && bi !== -1) return ai - bi;
+        if (ai !== -1) return -1;
+        if (bi !== -1) return 1;
+        return a.name.localeCompare(b.name);
+      });
   }
 }
 
