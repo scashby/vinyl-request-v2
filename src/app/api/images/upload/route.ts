@@ -5,12 +5,11 @@ import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 
 export const runtime = "nodejs";
 
-const EVENT_IMAGE_BUCKET = "event-images";
+const ALLOWED_BUCKETS = new Set(["album-images", "playlist-covers", "event-images", "venue-logos"]);
 
 function getFileExtension(file: File): string {
   const fromName = file.name.trim().split(".").pop()?.toLowerCase();
   if (fromName && /^[a-z0-9]+$/.test(fromName)) return fromName;
-
   const fromMime = file.type.split("/").pop()?.toLowerCase();
   if (!fromMime) return "bin";
   if (fromMime === "jpeg") return "jpg";
@@ -23,55 +22,47 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const authClient = supabaseServer(authHeader);
-  const {
-    data: { user },
-    error: authError,
-  } = await authClient.auth.getUser();
-
+  const { data: { user }, error: authError } = await supabaseServer(authHeader).auth.getUser();
   if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const formData = await request.formData();
-  const file = formData.get("file");
-
-  if (!file || typeof file === "string") {
-    return NextResponse.json({ error: "No file provided" }, { status: 400 });
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
   }
 
+  const file = formData.get("file");
+  const bucket = formData.get("bucket");
+  const customPath = formData.get("path");
+
+  if (!(file instanceof File)) {
+    return NextResponse.json({ error: "No file provided" }, { status: 400 });
+  }
+  if (typeof bucket !== "string" || !ALLOWED_BUCKETS.has(bucket)) {
+    return NextResponse.json({ error: "Invalid bucket" }, { status: 400 });
+  }
   if (!file.type.startsWith("image/")) {
     return NextResponse.json({ error: "Only image uploads are supported" }, { status: 400 });
   }
 
-  const fileExt = getFileExtension(file);
-  const objectPath = `event-images/${Date.now()}-${randomUUID().slice(0, 8)}.${fileExt}`;
+  const ext = getFileExtension(file);
+  const path =
+    typeof customPath === "string" && customPath.trim()
+      ? customPath.trim()
+      : `${bucket}/${Date.now()}-${randomUUID().slice(0, 8)}.${ext}`;
 
   const { error: uploadError } = await supabaseAdmin.storage
-    .from(EVENT_IMAGE_BUCKET)
-    .upload(objectPath, file, {
-      cacheControl: "3600",
-      upsert: false,
-      contentType: file.type || undefined,
-    });
+    .from(bucket)
+    .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type || undefined });
 
   if (uploadError) {
-    console.error("Error uploading event image:", uploadError);
-    return NextResponse.json(
-      { error: uploadError.message || "Failed to upload event image" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: uploadError.message }, { status: 500 });
   }
 
-  const {
-    data: { publicUrl },
-  } = supabaseAdmin.storage.from(EVENT_IMAGE_BUCKET).getPublicUrl(objectPath);
+  const { data: { publicUrl } } = supabaseAdmin.storage.from(bucket).getPublicUrl(path);
 
-  return NextResponse.json(
-    {
-      path: objectPath,
-      publicUrl,
-    },
-    { status: 200 }
-  );
+  return NextResponse.json({ path, publicUrl });
 }

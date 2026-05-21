@@ -649,29 +649,27 @@ export function PlaylistStudioModal({
   }, []);
 
   const uploadCoverImage = useCallback(async (file: File): Promise<string | null> => {
-    const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
-    const fileName = `cover-${Date.now()}.${ext}`;
     setCoverImageUploading(true);
     setError(null);
     try {
-      const { error: uploadError } = await supabase.storage.from('playlist-covers').upload(fileName, file, { upsert: true });
-      if (uploadError) {
-        if ((uploadError as { error?: string }).error === 'Bucket not found' || uploadError.message?.includes('Bucket not found')) {
-          setError('Storage bucket "playlist-covers" not found. Create a public bucket with that name in your Supabase dashboard under Storage.');
-        } else {
-          setError(`Upload failed: ${uploadError.message}`);
-        }
+      const headers = await getSupabaseAuthHeaders();
+      const body = new FormData();
+      body.append('file', file);
+      body.append('bucket', 'playlist-covers');
+      const res = await fetch('/api/images/upload', { method: 'POST', headers, body });
+      const json = await res.json() as { publicUrl?: string; error?: string };
+      if (!res.ok || !json.publicUrl) {
+        setError(json.error ?? 'Upload failed');
         return null;
       }
-      const { data: urlData } = supabase.storage.from('playlist-covers').getPublicUrl(fileName);
-      return urlData.publicUrl ?? null;
+      return json.publicUrl;
     } catch (err) {
       setError(err instanceof Error ? `Upload failed: ${err.message}` : 'Upload failed');
       return null;
     } finally {
       setCoverImageUploading(false);
     }
-  }, []);
+  }, [getSupabaseAuthHeaders]);
 
   const resetSmartComposer = useCallback(() => {
     setSmartEditingId(null);

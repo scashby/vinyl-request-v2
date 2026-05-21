@@ -8,6 +8,21 @@ import { supabase } from 'lib/supabaseClient';
 import { FindCoverModal } from '../enrichment/FindCoverModal';
 import { CropRotateModal } from '../enrichment/CropRotateModal';
 
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function deleteStorageFile(path: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  await fetch('/api/images/delete', {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bucket: 'album-images', path }),
+  });
+}
+
 interface CoverTabProps {
   album: Album;
   onChange: (field: keyof Album, value: unknown) => void;
@@ -30,7 +45,7 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    
+
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
@@ -42,18 +57,15 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
         const fileName = `${album.id || Date.now()}-${coverType}-${Date.now()}.${fileExt}`;
         const filePath = `album-covers/${fileName}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('album-images')
-          .upload(filePath, file, {
-            cacheControl: '3600',
-            upsert: false
-          });
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('album-images')
-          .getPublicUrl(filePath);
+        const headers = await getAuthHeaders();
+        const body = new FormData();
+        body.append('file', file);
+        body.append('bucket', 'album-images');
+        body.append('path', filePath);
+        const res = await fetch('/api/images/upload', { method: 'POST', headers, body });
+        const json = await res.json() as { publicUrl?: string; error?: string };
+        if (!res.ok || !json.publicUrl) throw new Error(json.error ?? 'Upload failed');
+        const publicUrl = json.publicUrl;
 
         if (coverType === 'inner') {
           const currentImages = album.inner_sleeve_images || [];
@@ -88,13 +100,7 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
       try {
         const urlParts = currentUrl.split('/album-images/');
         if (urlParts.length > 1) {
-          const filePath = `album-images/${urlParts[1].split('?')[0]}`;
-          
-          const { error } = await supabase.storage
-            .from('album-images')
-            .remove([filePath]);
-
-          if (error) console.error('Error deleting file:', error);
+          await deleteStorageFile(urlParts[1].split('?')[0]);
         }
       } catch (error) {
         console.error('Error removing file:', error);
@@ -112,13 +118,7 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
       try {
         const urlParts = imageUrl.split('/album-images/');
         if (urlParts.length > 1) {
-          const filePath = `album-images/${urlParts[1].split('?')[0]}`;
-          
-          const { error } = await supabase.storage
-            .from('album-images')
-            .remove([filePath]);
-
-          if (error) console.error('Error deleting file:', error);
+          await deleteStorageFile(urlParts[1].split('?')[0]);
         }
       } catch (error) {
         console.error('Error removing file:', error);
@@ -139,13 +139,7 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
       try {
         const urlParts = imageUrl.split('/album-images/');
         if (urlParts.length > 1) {
-          const filePath = `album-images/${urlParts[1].split('?')[0]}`;
-          
-          const { error } = await supabase.storage
-            .from('album-images')
-            .remove([filePath]);
-
-          if (error) console.error('Error deleting file:', error);
+          await deleteStorageFile(urlParts[1].split('?')[0]);
         }
       } catch (error) {
         console.error('Error removing file:', error);

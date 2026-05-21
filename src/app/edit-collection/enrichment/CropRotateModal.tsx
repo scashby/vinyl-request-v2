@@ -92,38 +92,38 @@ export function CropRotateModal({
     try {
       setSaving(true);
 
-      // Create cropped image blob
       const croppedBlob = await getCroppedImg(imageUrl, croppedAreaPixels, rotation);
 
-      // Generate unique filename
       const fileName = `${albumId}-${coverType}-${Date.now()}.jpg`;
       const filePath = `album-covers/${fileName}`;
+      const file = new File([croppedBlob], fileName, { type: 'image/jpeg' });
 
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('album-images')
-        .upload(filePath, croppedBlob, {
-          cacheControl: '3600',
-          upsert: false,
-        });
+      const { data: { session } } = await supabase.auth.getSession();
+      const authHeaders: Record<string, string> = session?.access_token
+        ? { Authorization: `Bearer ${session.access_token}` }
+        : {};
 
-      if (uploadError) throw uploadError;
+      const body = new FormData();
+      body.append('file', file);
+      body.append('bucket', 'album-images');
+      body.append('path', filePath);
+      const res = await fetch('/api/images/upload', { method: 'POST', headers: authHeaders, body });
+      const json = await res.json() as { publicUrl?: string; error?: string };
+      if (!res.ok || !json.publicUrl) throw new Error(json.error ?? 'Upload failed');
 
-      // Get public URL
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('album-images').getPublicUrl(filePath);
-
-      // Delete old image if it exists and is in our storage
       if (imageUrl.includes('album-images/')) {
         const urlParts = imageUrl.split('/album-images/');
         if (urlParts.length > 1) {
-          const oldFilePath = `album-images/${urlParts[1].split('?')[0]}`;
-          await supabase.storage.from('album-images').remove([oldFilePath]);
+          const oldPath = urlParts[1].split('?')[0];
+          await fetch('/api/images/delete', {
+            method: 'POST',
+            headers: { ...authHeaders, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bucket: 'album-images', path: oldPath }),
+          });
         }
       }
 
-      onSave(publicUrl);
+      onSave(json.publicUrl);
       onClose();
     } catch (error) {
       console.error('Error saving cropped image:', error);
