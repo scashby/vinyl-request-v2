@@ -702,6 +702,24 @@ const mergeAlbumDetailsFieldName = async (key: string, targetId: string, sourceI
   }
 };
 
+const fetchFromFormatAbbreviations = async (category: string): Promise<PickerDataItem[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('format_abbreviations')
+      .select('full_name, use_count')
+      .eq('category', category)
+      .order('full_name');
+    if (error) return [];
+    return (data ?? []).map((row) => ({
+      id: row.full_name,
+      name: row.full_name,
+      count: row.use_count ?? 0,
+    }));
+  } catch {
+    return [];
+  }
+};
+
 const fetchAlbumDetailsList = async (key: string): Promise<PickerDataItem[]> => {
   try {
     const { data, error } = await supabase
@@ -806,7 +824,7 @@ export async function fetchStorageDevices(): Promise<PickerDataItem[]> {
 }
 
 export async function fetchPackaging(): Promise<PickerDataItem[]> {
-  return fetchAlbumDetailsList('packaging');
+  return fetchFromFormatAbbreviations('packaging');
 }
 
 export async function fetchStudios(): Promise<PickerDataItem[]> {
@@ -853,20 +871,11 @@ const fetchStylesAsSounds = async (): Promise<PickerDataItem[]> => {
 };
 
 export async function fetchVinylColors(): Promise<PickerDataItem[]> {
-  const [detailValues, formatValues] = await Promise.all([
-    fetchAlbumDetailsList('vinyl_color'),
-    fetchFormats(),
-  ]);
-  const map = new Map<string, PickerDataItem>();
-  detailValues.forEach((item) => map.set(item.name, item));
-  formatValues.forEach((item) => {
-    if (!map.has(item.name)) map.set(item.name, item);
-  });
-  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  return fetchFromFormatAbbreviations('color');
 }
 
 export async function fetchVinylWeights(): Promise<PickerDataItem[]> {
-  return fetchAlbumDetailsList('vinyl_weight');
+  return fetchFromFormatAbbreviations('vinyl_material');
 }
 
 export async function fetchSPARS(): Promise<PickerDataItem[]> {
