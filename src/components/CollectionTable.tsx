@@ -431,7 +431,7 @@ const CollectionTable = memo(function CollectionTable({
   const lockedWidth = locked.reduce((sum, col) => sum + parseInt(col.width), 0);
 
   return (
-    <div ref={scrollRef} className="w-full h-full overflow-auto relative">
+    <div ref={scrollRef} className="w-full h-full overflow-auto relative [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-gray-400 hover:[&::-webkit-scrollbar-thumb]:bg-gray-500">
       <div className="sticky top-0 z-[2] flex items-stretch bg-[#e8e8e8] min-w-fit">
         {locked.map((col, index) => {
           const leftPosition = locked.slice(0, index).reduce((sum, c) => sum + parseInt(c.width), 0);
