@@ -1839,7 +1839,7 @@ function CollectionBrowserPage() {
     }
 
     try {
-      const pageSize = includeTracks ? 80 : 100;
+      const pageSize = includeTracks ? 100 : 250;
       const fetchPage = async (page: number) => {
         const url = new URL('/api/library/albums', window.location.origin);
         url.searchParams.set('page', String(page));
@@ -1881,15 +1881,27 @@ function CollectionBrowserPage() {
         return;
       }
 
+      // Fetch remaining pages in parallel batches of 4
       let page = 1;
       while (true) {
-        const next = await fetchPage(page);
+        const pageNums = [page, page + 1, page + 2, page + 3];
+        const results = await Promise.all(pageNums.map(p => fetchPage(p)));
         if (loadVersion !== albumsLoadVersionRef.current) return;
-        if (!next || next.batch.length === 0) break;
-        all = all.concat(next.batch);
-        setAlbums(all);
-        if (!next.hasMore) break;
-        page += 1;
+
+        let anyData = false;
+        let hasMoreData = false;
+        for (const result of results) {
+          if (result && result.batch.length > 0) {
+            anyData = true;
+            all = all.concat(result.batch);
+            if (result.hasMore) hasMoreData = true;
+          }
+        }
+
+        if (!anyData) break;
+        setAlbums([...all]);
+        if (!hasMoreData) break;
+        page += 4;
       }
 
       if (includeTracks && loadVersion === albumsLoadVersionRef.current) {

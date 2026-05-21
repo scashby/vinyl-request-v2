@@ -330,14 +330,14 @@ function SortableManualTrackRow({
     <div
       ref={setNodeRef}
       style={style}
-      className="group grid grid-cols-[24px_20px_minmax(0,1fr)_32px] lg:grid-cols-[24px_20px_minmax(0,2fr)_minmax(0,1fr)_32px] items-center gap-x-3 rounded-md px-2 py-2 transition hover:bg-[#1a2840]"
+      className="group flex items-center gap-x-3 rounded-md px-2 py-2 transition hover:bg-[#1a2840]"
       onContextMenu={(e) => onContextMenu(e, track.track_key, index)}
     >
       {/* Drag handle */}
       <button
         {...attributes}
         {...listeners}
-        className="cursor-grab touch-none p-1 text-[#394f72] opacity-0 transition hover:text-[#7a9fd5] group-hover:opacity-100 active:cursor-grabbing"
+        className="w-6 shrink-0 cursor-grab touch-none p-1 text-[#394f72] opacity-0 transition hover:text-[#7a9fd5] group-hover:opacity-100 active:cursor-grabbing"
         tabIndex={-1}
         aria-label="Drag to reorder"
       >
@@ -352,30 +352,30 @@ function SortableManualTrackRow({
       </button>
 
       {/* Row number */}
-      <div className="text-right text-xs text-[#4a6394]">{index + 1}</div>
+      <div className="w-5 shrink-0 text-right text-xs text-[#4a6394]">{index + 1}</div>
 
-      {/* Title + Artist */}
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5">
-          {accentColor && (
-            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: accentColor }} />
-          )}
-          <span className="truncate text-sm font-medium text-white">
-            {track.track_title ?? track.track_key}
-          </span>
+      {/* Title+Artist | Album — equal flex split */}
+      <div className="flex min-w-0 flex-1 items-center gap-x-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            {accentColor && (
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: accentColor }} />
+            )}
+            <span className="truncate text-sm font-medium text-white">
+              {track.track_title ?? track.track_key}
+            </span>
+          </div>
+          <div className="truncate text-xs text-[#6a8fbf]">{track.artist_name ?? ''}</div>
         </div>
-        <div className="truncate text-xs text-[#6a8fbf]">{track.artist_name ?? ''}</div>
+        <div className="hidden min-w-0 flex-1 truncate text-xs text-[#4a6394] lg:block">
+          {track.album_name ?? ''}
+        </div>
       </div>
 
-      {/* Album */}
-      <div className="hidden min-w-0 truncate text-xs text-[#4a6394] lg:block">
-        {track.album_name ?? ''}
-      </div>
-
-      {/* Three-dot menu button */}
+      {/* Three-dot menu button — always visible */}
       <button
         onClick={(e) => onThreeDotClick(e, track.track_key, index)}
-        className="rounded-md px-1.5 py-1 text-[#4a6394] opacity-0 transition hover:bg-[#253656] hover:text-[#d0e5ff] group-hover:opacity-100"
+        className="w-8 shrink-0 rounded-md px-1.5 py-1 text-[#4a6394] transition hover:bg-[#253656] hover:text-[#d0e5ff]"
         aria-label="Track options"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -1878,12 +1878,14 @@ export function PlaylistStudioModal({
                   </div>
 
                   {/* Column headers */}
-                  <div className="grid grid-cols-[24px_20px_minmax(0,1fr)_32px] lg:grid-cols-[24px_20px_minmax(0,2fr)_minmax(0,1fr)_32px] items-center gap-x-3 border-b border-[#1e2d47] px-2 py-2 text-[11px] font-semibold uppercase tracking-widest text-[#3d5580]">
-                    <div />
-                    <div className="text-right">#</div>
-                    <div>Title</div>
-                    <div className="hidden lg:block">Album</div>
-                    <div />
+                  <div className="flex shrink-0 items-center gap-x-3 border-b border-[#1e2d47] px-2 py-2 text-[11px] font-semibold uppercase tracking-widest text-[#3d5580]">
+                    <div className="w-6 shrink-0" />
+                    <div className="w-5 shrink-0 text-right">#</div>
+                    <div className="flex flex-1 items-center gap-x-4">
+                      <div className="flex-1">Title</div>
+                      <div className="hidden flex-1 lg:block">Album</div>
+                    </div>
+                    <div className="w-8 shrink-0" />
                   </div>
 
                   {/* Track list */}
