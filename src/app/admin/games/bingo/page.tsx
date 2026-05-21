@@ -863,6 +863,9 @@ export default function BingoSetupPage() {
             </label>
             <label className="text-sm">Estimated # of Players <InlineFieldHelp label="Card Count" />
               <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={1} value={cardCount} onChange={(e) => setCardCount(Number(e.target.value) || 1)} />
+              <p className="mt-1 text-xs text-stone-400">
+                {cardCount * (roundCount + Math.floor(roundCount / 2))} cards will be generated ({roundCount + Math.floor(roundCount / 2)} sets: {roundCount} rounds + {Math.floor(roundCount / 2)} extra)
+              </p>
             </label>
           </div>
 

@@ -264,8 +264,10 @@ export async function POST(request: NextRequest) {
     }
 
     const gameMode = body.game_mode ?? "single_line";
-    const cardCount = Math.max(1, Math.floor(body.card_count ?? 40));
+    const estimatedPlayers = Math.max(1, Math.floor(body.card_count ?? 40));
     const roundCount = Math.max(1, Math.floor(body.round_count ?? 3));
+    const setsNeeded = roundCount + Math.floor(roundCount / 2);
+    const cardCount = estimatedPlayers * setsNeeded;
     const roundModes = normalizeRoundModes(body.round_modes, roundCount);
     const roundPlaylistIds = normalizeRoundPlaylistIds(body.round_playlist_ids, roundCount);
     const resolvedPlaylistsByRound = collectResolvedPlaylistIdsByRound(
