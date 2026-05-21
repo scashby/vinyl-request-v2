@@ -205,3 +205,93 @@ INSERT INTO public.format_abbreviations (category, full_name, abbreviation) VALU
   ('cd_feature', 'XRCD',          'XRCD')
 ON CONFLICT DO NOTHING;
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- CASSETTE FEATURES  (source: user-provided IEC tape type specs)
+-- ─────────────────────────────────────────────────────────────────────────────
+INSERT INTO public.format_abbreviations (category, full_name, abbreviation) VALUES
+  ('cassette_feature', 'Normal (IEC Type I)',        'Nor'),
+  ('cassette_feature', 'Chrome (IEC Type II)',        'Cr'),
+  ('cassette_feature', 'Ferrichrome (IEC Type III)', 'FeCr'),
+  ('cassette_feature', 'Metal (IEC Type IV)',         'Met'),
+  ('cassette_feature', 'Dolby B',                    'Dolby B'),
+  ('cassette_feature', 'Dolby C',                    'Dolby C'),
+  ('cassette_feature', 'Dolby HX Pro',               'HX Pro'),
+  ('cassette_feature', 'DBX',                        'DBX')
+ON CONFLICT DO NOTHING;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- PACKAGING  (source: user-provided LP/CD/Singles specs)
+-- ─────────────────────────────────────────────────────────────────────────────
+INSERT INTO public.format_abbreviations (category, full_name, abbreviation) VALUES
+  -- LP
+  ('packaging', 'Solo Sleeve', 'Sol'),
+  ('packaging', 'Flipback',    'Fli'),
+  ('packaging', 'Gatefold',    'Gat'),
+  ('packaging', 'Tri-fold',    'Tri'),
+  ('packaging', 'Flyout',      'Fly'),
+  ('packaging', 'Poster',      'Pos'),
+  ('packaging', 'Die-cut',     'Die'),
+  ('packaging', 'Embossed',    'Emb'),
+  ('packaging', 'Gimmick',     'Gim'),
+  ('packaging', 'Obi',         'Obi'),
+  -- CD
+  ('packaging', 'Jewelcase',   'Jew'),
+  ('packaging', 'Slimline',    'Sli'),
+  ('packaging', 'JHybrid',     'JHy'),
+  ('packaging', 'Carded',      'Car'),
+  ('packaging', 'Digipak',     'Dig'),
+  ('packaging', 'Slipcase',    'Slip'),
+  ('packaging', 'O-case',      'O-c'),
+  ('packaging', 'Paper',       'Pap'),
+  -- Singles
+  ('packaging', 'Picture',     'Pic'),
+  ('packaging', 'Company',     'Com'),
+  ('packaging', 'Plain',       'Pla'),
+  ('packaging', 'DJP',         'DJP')
+ON CONFLICT DO NOTHING;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- PRESSING PLANTS  (source: user-provided runout etchings guide)
+-- ─────────────────────────────────────────────────────────────────────────────
+INSERT INTO public.format_abbreviations (category, full_name, abbreviation) VALUES
+  ('pressing_plant', 'Abbey Record Mfg.',           'AB'),
+  ('pressing_plant', 'Allentown Record Co.',         'AL'),
+  ('pressing_plant', 'Allied Record Company',        'AR'),
+  ('pressing_plant', 'American Record Pressing',     'ARP'),
+  ('pressing_plant', 'Bestway',                      'BW'),
+  ('pressing_plant', 'Capitol Records Jacksonville', 'JW'),
+  ('pressing_plant', 'Capitol Records Los Angeles',  'LW'),
+  ('pressing_plant', 'Capitol Records Scranton',     'IAM'),
+  ('pressing_plant', 'Capitol Records Winchester',   'W'),
+  ('pressing_plant', 'Columbia Records Carrollton',  'G'),
+  ('pressing_plant', 'Columbia Records Pitman',      'P'),
+  ('pressing_plant', 'Columbia Records Santa Maria', 'S'),
+  ('pressing_plant', 'Columbia Records Terre Haute', 'T'),
+  ('pressing_plant', 'Electrosound Midwest',         'B'),
+  ('pressing_plant', 'Goldisc',                      'GoL'),
+  ('pressing_plant', 'GZ Media',                     'GZ'),
+  ('pressing_plant', 'Hauppauge',                    'HRM'),
+  ('pressing_plant', 'Hub-Servall',                  'HuB'),
+  ('pressing_plant', 'H.V. Waddell',                 'HVW'),
+  ('pressing_plant', 'MCA Gloversville',             'MCA-G'),
+  ('pressing_plant', 'MCA Pinckneyville',            'MCA-P'),
+  ('pressing_plant', 'MGM',                          'MG'),
+  ('pressing_plant', 'Monarch',                      'MR'),
+  ('pressing_plant', 'Optimal Media',                'OPTIMAL'),
+  ('pressing_plant', 'Pallas',                       'PALLAS'),
+  ('pressing_plant', 'Plastic Products',             'PL'),
+  ('pressing_plant', 'PRC Richmond',                 'PRC'),
+  ('pressing_plant', 'PRC Compton',                  'PRC-C'),
+  ('pressing_plant', 'Presswell',                    'PR'),
+  ('pressing_plant', 'Quality Records Toronto',      'Q'),
+  ('pressing_plant', 'RCA Hollywood',                'H'),
+  ('pressing_plant', 'RCA Indianapolis',             'I'),
+  ('pressing_plant', 'RCA Rockaway',                 'R'),
+  ('pressing_plant', 'Shelley Products',             'LY'),
+  ('pressing_plant', 'Sonic Recording',              'SON'),
+  ('pressing_plant', 'Specialty Records',            'SP'),
+  ('pressing_plant', 'Sterling Sound',               'SS'),
+  ('pressing_plant', 'United Record Pressing',       'URP'),
+  ('pressing_plant', 'Wakefield Manufacturing',      'YK')
+ON CONFLICT DO NOTHING;
+
