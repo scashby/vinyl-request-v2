@@ -487,7 +487,7 @@ export async function mergeOwners(targetId: string, sourceIds: string[]): Promis
 }
 
 // Tags management (Master Tags)
-export async function mergeTags(targetId: string, sourceIds: string[]): Promise<boolean> {
+export async function mergeTags(sourceIds: string[], targetId: string): Promise<boolean> {
   try {
     if (!sourceIds.length) return true;
     const { data: target, error: targetError } = await supabase
