@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { type PrintableCard } from "src/lib/bingoCardPrintPack";
 import { generateBingoCardsPdf } from "src/lib/bingoCardsPdf";
-import { generateBingoCallSheetPdf } from "src/lib/bingoCallSheetPdf";
+import { generateBingoCallSheetPdf, type RoundCallSection } from "src/lib/bingoCallSheetPdf";
 import { formatBallLabel, getBingoColumnTextClass } from "src/lib/bingoBall";
 
 type Session = {
@@ -74,11 +74,20 @@ export default function BingoPrepPage() {
   const preflightComplete = useMemo(() => Object.values(preflight).every(Boolean), [preflight]);
 
   const downloadCratePullSheet = async () => {
-    const res = await fetch(`/api/games/bingo/sessions/${sessionId}/calls`);
-    if (!res.ok) return;
-    const payload = await res.json();
-    const title = session ? `Crate Pull Order · ${session.playlist_name} · ${session.session_code}` : `Crate Pull Order · Session ${sessionId}`;
-    const doc = generateBingoCallSheetPdf(payload.data ?? [], title);
+    const totalRounds = session?.round_count ?? 1;
+    const roundSections: RoundCallSection[] = [];
+
+    for (let r = 1; r <= totalRounds; r++) {
+      const res = await fetch(`/api/games/bingo/sessions/${sessionId}/calls?round=${r}`);
+      if (!res.ok) continue;
+      const payload = await res.json();
+      roundSections.push({ roundNumber: r, calls: payload.data ?? [] });
+    }
+
+    const title = session
+      ? `Crate Pull Order · ${session.playlist_name} · ${session.session_code}`
+      : `Crate Pull Order · Session ${sessionId}`;
+    const doc = generateBingoCallSheetPdf(roundSections, title);
     doc.save(`bingo-${sessionId}-crate-pull.pdf`);
   };
 
