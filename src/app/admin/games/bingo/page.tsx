@@ -720,7 +720,7 @@ export default function BingoSetupPage() {
 
   const downloadPlaylistSheet = (session: Session, playlist: BingoSessionPlaylistInfo) => {
     const title = `${session.session_code} · Playlist ${playlist.playlist_letter}`;
-    const doc = generateBingoCallSheetPdf(playlist.call_order, title);
+    const doc = generateBingoCallSheetPdf([{ roundNumber: 1, calls: playlist.call_order }], title);
     doc.save(`bingo-${session.id}-playlist-${playlist.playlist_letter.toLowerCase()}.pdf`);
   };
 
@@ -785,7 +785,7 @@ export default function BingoSetupPage() {
     }
     const payload = await res.json();
     const title = round ? `Music Bingo Session ${sessionId} Round ${round}` : `Music Bingo Session ${sessionId}`;
-    const doc = generateBingoCallSheetPdf(payload.data ?? [], title);
+    const doc = generateBingoCallSheetPdf([{ roundNumber: round ?? 1, calls: payload.data ?? [] }], title);
     const filename = round ? `bingo-${sessionId}-round-${round}-call-sheet.pdf` : `bingo-${sessionId}-call-sheet.pdf`;
     doc.save(filename);
     return true;
