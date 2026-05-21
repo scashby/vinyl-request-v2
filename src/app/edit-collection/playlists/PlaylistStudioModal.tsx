@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { supabase as supabaseTyped } from 'src/lib/supabaseClient';
+import { resizeImageFile } from 'src/lib/resizeImage';
 import type {
   CollectionPlaylist,
   SmartPlaylistFieldType,
@@ -653,8 +654,9 @@ export function PlaylistStudioModal({
     setError(null);
     try {
       const headers = await getSupabaseAuthHeaders();
+      const uploadFile = await resizeImageFile(file);
       const body = new FormData();
-      body.append('file', file);
+      body.append('file', uploadFile);
       body.append('bucket', 'playlist-covers');
       const res = await fetch('/api/images/upload', { method: 'POST', headers, body });
       const json = await res.json() as { publicUrl?: string; error?: string };

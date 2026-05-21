@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import type { Album } from 'types/album';
 import { supabase } from 'lib/supabaseClient';
+import { resizeImageFile } from 'lib/resizeImage';
 import { FindCoverModal } from '../enrichment/FindCoverModal';
 import { CropRotateModal } from '../enrichment/CropRotateModal';
 
@@ -58,8 +59,9 @@ export function CoverTab({ album: baseAlbum, onChange }: CoverTabProps) {
         const filePath = `album-covers/${fileName}`;
 
         const headers = await getAuthHeaders();
+        const uploadFile = await resizeImageFile(file);
         const body = new FormData();
-        body.append('file', file);
+        body.append('file', uploadFile);
         body.append('bucket', 'album-images');
         body.append('path', filePath);
         const res = await fetch('/api/images/upload', { method: 'POST', headers, body });
