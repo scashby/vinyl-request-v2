@@ -205,8 +205,3 @@ INSERT INTO public.format_abbreviations (category, full_name, abbreviation) VALU
   ('cd_feature', 'XRCD',          'XRCD')
 ON CONFLICT DO NOTHING;
 
--- ─────────────────────────────────────────────────────────────────────────────
--- PACKAGING    → PENDING: paste content from Discogs DB Guidelines article
--- CASSETTE_FEATURE → PENDING: paste content from Discogs DB Guidelines article
--- PRESSING_PLANT   → PENDING: provide source data
--- ─────────────────────────────────────────────────────────────────────────────

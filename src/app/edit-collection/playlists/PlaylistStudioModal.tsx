@@ -330,14 +330,14 @@ function SortableManualTrackRow({
     <div
       ref={setNodeRef}
       style={style}
-      className="group flex items-center gap-3 rounded-md px-2 py-2 transition hover:bg-[#1a2840]"
+      className="group grid grid-cols-[24px_20px_minmax(0,1fr)_32px] lg:grid-cols-[24px_20px_minmax(0,2fr)_minmax(0,1fr)_32px] items-center gap-x-3 rounded-md px-2 py-2 transition hover:bg-[#1a2840]"
       onContextMenu={(e) => onContextMenu(e, track.track_key, index)}
     >
       {/* Drag handle */}
       <button
         {...attributes}
         {...listeners}
-        className="shrink-0 cursor-grab touch-none p-1 text-[#394f72] opacity-0 transition hover:text-[#7a9fd5] group-hover:opacity-100 active:cursor-grabbing"
+        className="cursor-grab touch-none p-1 text-[#394f72] opacity-0 transition hover:text-[#7a9fd5] group-hover:opacity-100 active:cursor-grabbing"
         tabIndex={-1}
         aria-label="Drag to reorder"
       >
@@ -352,10 +352,10 @@ function SortableManualTrackRow({
       </button>
 
       {/* Row number */}
-      <div className="w-5 shrink-0 text-right text-xs text-[#4a6394]">{index + 1}</div>
+      <div className="text-right text-xs text-[#4a6394]">{index + 1}</div>
 
       {/* Title + Artist */}
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0">
         <div className="flex items-center gap-1.5">
           {accentColor && (
             <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: accentColor }} />
@@ -368,14 +368,14 @@ function SortableManualTrackRow({
       </div>
 
       {/* Album */}
-      <div className="hidden w-40 shrink-0 truncate text-xs text-[#4a6394] lg:block">
+      <div className="hidden min-w-0 truncate text-xs text-[#4a6394] lg:block">
         {track.album_name ?? ''}
       </div>
 
       {/* Three-dot menu button */}
       <button
         onClick={(e) => onThreeDotClick(e, track.track_key, index)}
-        className="shrink-0 rounded-md px-1.5 py-1 text-[#4a6394] opacity-0 transition hover:bg-[#253656] hover:text-[#d0e5ff] group-hover:opacity-100"
+        className="rounded-md px-1.5 py-1 text-[#4a6394] opacity-0 transition hover:bg-[#253656] hover:text-[#d0e5ff] group-hover:opacity-100"
         aria-label="Track options"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -652,13 +652,21 @@ export function PlaylistStudioModal({
     const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
     const fileName = `cover-${Date.now()}.${ext}`;
     setCoverImageUploading(true);
+    setError(null);
     try {
-      const { error } = await supabase.storage.from('playlist-covers').upload(fileName, file, { upsert: true });
-      if (error) throw error;
+      const { error: uploadError } = await supabase.storage.from('playlist-covers').upload(fileName, file, { upsert: true });
+      if (uploadError) {
+        if ((uploadError as { error?: string }).error === 'Bucket not found' || uploadError.message?.includes('Bucket not found')) {
+          setError('Storage bucket "playlist-covers" not found. Create a public bucket with that name in your Supabase dashboard under Storage.');
+        } else {
+          setError(`Upload failed: ${uploadError.message}`);
+        }
+        return null;
+      }
       const { data: urlData } = supabase.storage.from('playlist-covers').getPublicUrl(fileName);
       return urlData.publicUrl ?? null;
     } catch (err) {
-      console.error('Failed to upload cover image:', err);
+      setError(err instanceof Error ? `Upload failed: ${err.message}` : 'Upload failed');
       return null;
     } finally {
       setCoverImageUploading(false);
@@ -1870,12 +1878,12 @@ export function PlaylistStudioModal({
                   </div>
 
                   {/* Column headers */}
-                  <div className="flex shrink-0 items-center gap-3 border-b border-[#1e2d47] px-4 py-2 text-[11px] font-semibold uppercase tracking-widest text-[#3d5580]">
-                    <div className="w-6 shrink-0" />
-                    <div className="w-5 shrink-0 text-right">#</div>
-                    <div className="flex-1">Title</div>
-                    <div className="hidden w-40 shrink-0 lg:block">Album</div>
-                    <div className="w-8 shrink-0" />
+                  <div className="grid grid-cols-[24px_20px_minmax(0,1fr)_32px] lg:grid-cols-[24px_20px_minmax(0,2fr)_minmax(0,1fr)_32px] items-center gap-x-3 border-b border-[#1e2d47] px-2 py-2 text-[11px] font-semibold uppercase tracking-widest text-[#3d5580]">
+                    <div />
+                    <div className="text-right">#</div>
+                    <div>Title</div>
+                    <div className="hidden lg:block">Album</div>
+                    <div />
                   </div>
 
                   {/* Track list */}
