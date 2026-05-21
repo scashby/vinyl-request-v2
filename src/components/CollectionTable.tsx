@@ -1,7 +1,7 @@
 // src/components/CollectionTable.tsx
 'use client';
 
-import React, { memo, useCallback, useMemo, useRef } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Album } from '@/types/album';
 import { 
@@ -36,6 +36,7 @@ interface CollectionTableProps {
   onSelectCrate: (crateId: number) => void;
   onOpenAlbumCratePicker: (albumId: number) => void;
   onRemoveAlbumFromCrate: (albumId: number, crateId: number) => void | Promise<void>;
+  onLoadMore?: () => void;
 }
 
 const ROW_HEIGHT = 32;
@@ -54,6 +55,7 @@ const CollectionTable = memo(function CollectionTable({
   onSelectCrate,
   onOpenAlbumCratePicker,
   onRemoveAlbumFromCrate,
+  onLoadMore,
 }: CollectionTableProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   
@@ -68,6 +70,22 @@ const CollectionTable = memo(function CollectionTable({
     getScrollElement: () => scrollRef.current,
     estimateSize: () => ROW_HEIGHT,
     overscan: 5,
+  });
+
+  // Trigger load-more when the user scrolls within 20 rows of the end
+  const onLoadMoreRef = useRef(onLoadMore);
+  onLoadMoreRef.current = onLoadMore;
+  const albumsLengthRef = useRef(albums.length);
+  albumsLengthRef.current = albums.length;
+
+  useEffect(() => {
+    if (!onLoadMoreRef.current || albumsLengthRef.current === 0) return;
+    const virtualItems = virtualizer.getVirtualItems();
+    if (virtualItems.length === 0) return;
+    const lastVisible = virtualItems[virtualItems.length - 1];
+    if (lastVisible.index >= albumsLengthRef.current - 20) {
+      onLoadMoreRef.current();
+    }
   });
 
   const formatters = useMemo(() => {

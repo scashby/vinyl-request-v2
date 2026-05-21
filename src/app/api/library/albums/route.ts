@@ -144,22 +144,35 @@ export async function GET(request: NextRequest) {
         )
       )` as const;
 
+    const sortBy = (url.searchParams.get("sortBy") ?? "date_added").trim();
+    const sortDir = (url.searchParams.get("sortDir") ?? "desc").trim();
+    const ascending = sortDir === "asc";
+
+    // Map sortBy param to PostgREST order args
+    type OrderArgs = { column: string; referencedTable?: string; ascending: boolean };
+    const sortMap: Record<string, OrderArgs> = {
+      date_added:     { column: "date_added",     ascending },
+      id:             { column: "id",             ascending },
+      media_condition:{ column: "media_condition", ascending },
+      release_year:   { column: "release_year",   referencedTable: "release", ascending },
+      media_type:     { column: "media_type",     referencedTable: "release", ascending },
+    };
+    const orderArgs = sortMap[sortBy] ?? sortMap["date_added"];
+
     const db = supabaseAdmin;
-    let query = db.from("inventory").select(includeTracks ? selectWithTracks : selectWithoutTracks);
+    let query = db.from("inventory").select(includeTracks ? selectWithTracks : selectWithoutTracks, { count: "exact" });
     if (!includeForSale) query = query.neq("status", "for_sale");
 
     if (location) query = query.eq("location", location);
-    // Note: filtering by nested release fields via PostgREST can be environment-dependent.
-    // Keep as best-effort; callers should not assume it's always enforced.
     if (mediaType) query = query.eq("release.media_type", mediaType);
 
-    // Text search filters are best-effort; these use PostgREST nested filters and can vary by schema.
-    // If they fail in some environments, the UI can fall back to client-side filtering.
     if (q) query = query.or(`release.master.title.ilike.%${q}%,release.master.artist.name.ilike.%${q}%`);
     if (artist) query = query.ilike("release.master.artist.name", `%${artist}%`);
     if (title) query = query.ilike("release.master.title", `%${title}%`);
 
-    const { data, error } = await query.order("id", { ascending: true }).range(from, to);
+    const { data, error, count } = await query
+      .order(orderArgs.column, { referencedTable: orderArgs.referencedTable, ascending: orderArgs.ascending })
+      .range(from, to);
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -187,6 +200,7 @@ export async function GET(request: NextRequest) {
         ok: true,
         page,
         pageSize,
+        total: count ?? null,
         hasMore: (data ?? []).length === pageSize,
         data: albums,
       },

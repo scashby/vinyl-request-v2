@@ -1068,6 +1068,19 @@ function CollectionBrowserPage() {
   const albumsLoadVersionRef = useRef(0);
   const loadingOwnerLoadVersionRef = useRef<number | null>(null);
   const panelClosedByUserRef = useRef(false);
+  // Pagination / server-filter state
+  const [totalCount, setTotalCount] = useState<number | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const nextPageRef = useRef(1);
+  // Debounced search for API calls (searchQuery drives the input, debouncedSearchQuery drives the API)
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Params ref: stores the filter/sort params used by the current load so loadMore can reuse them
+  const activeParamsRef = useRef<{ q: string; mediaType: string | null; location: string | null; sortBy: string; sortDir: string }>({ q: '', mediaType: null, location: null, sortBy: 'date_added', sortDir: 'desc' });
+  // Counts from API (sidebar totals — not recomputed from loaded albums)
+  const [folderCountsApi, setFolderCountsApi] = useState<Record<string, number>>({});
+  const [vinylSubformatCountsApi, setVinylSubformatCountsApi] = useState<Record<string, number>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [searchType, setSearchType] = useState<SearchType>('albums');
   const [showSearchTypeDropdown, setShowSearchTypeDropdown] = useState(false);
@@ -1820,9 +1833,18 @@ function CollectionBrowserPage() {
     });
   }, []);
 
-  const loadAlbums = useCallback(async (options?: { includeTracks?: boolean; showSpinner?: boolean }) => {
+  const loadAlbums = useCallback(async (options?: {
+    includeTracks?: boolean;
+    showSpinner?: boolean;
+    // Collection-view server params (only used when includeTracks: false)
+    q?: string;
+    mediaType?: string | null;
+    location?: string | null;
+    apiSortBy?: string;
+    apiSortDir?: string;
+  }) => {
     const includeTracks = options?.includeTracks ?? tracksHydratedRef.current;
-    const showSpinner = options?.showSpinner ?? !includeTracks;
+    const showSpinner = options?.showSpinner ?? (!includeTracks);
     const loadVersion = albumsLoadVersionRef.current + 1;
     albumsLoadVersionRef.current = loadVersion;
 
@@ -1839,78 +1861,157 @@ function CollectionBrowserPage() {
     }
 
     try {
-      const pageSize = includeTracks ? 100 : 250;
-      const fetchPage = async (page: number) => {
-        const url = new URL('/api/library/albums', window.location.origin);
-        url.searchParams.set('page', String(page));
-        url.searchParams.set('pageSize', String(pageSize));
-        url.searchParams.set('includeTracks', includeTracks ? 'true' : 'false');
-        url.searchParams.set('includeForSale', 'true');
-        const res = await fetch(url.toString(), { cache: 'no-store' });
-        const payload = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          console.error('Error loading albums via library API:', payload?.error || res.status);
-          return null;
-        }
-        return {
-          batch: Array.isArray(payload?.data) ? (payload.data as Album[]) : [],
-          hasMore: Boolean(payload?.hasMore),
+      if (includeTracks) {
+        // Track view: load all pages with parallel batching
+        const pageSize = 100;
+        const fetchPage = async (page: number) => {
+          const url = new URL('/api/library/albums', window.location.origin);
+          url.searchParams.set('page', String(page));
+          url.searchParams.set('pageSize', String(pageSize));
+          url.searchParams.set('includeTracks', 'true');
+          url.searchParams.set('includeForSale', 'true');
+          const res = await fetch(url.toString(), { cache: 'no-store' });
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok) return null;
+          return { batch: Array.isArray(payload?.data) ? (payload.data as Album[]) : [], hasMore: Boolean(payload?.hasMore) };
         };
-      };
 
-      const first = await fetchPage(0);
-      if (loadVersion !== albumsLoadVersionRef.current) {
+        const first = await fetchPage(0);
+        if (loadVersion !== albumsLoadVersionRef.current) { stopSpinnerIfOwner(); return; }
+        if (!first) { stopSpinnerIfOwner(); return; }
+
+        let all = [...first.batch];
+        setAlbums(all);
         stopSpinnerIfOwner();
-        return;
-      }
 
-      if (!first) {
-        stopSpinnerIfOwner();
-        return;
-      }
+        if (first.hasMore && first.batch.length > 0) {
+          let page = 1;
+          while (true) {
+            const pageNums = [page, page + 1, page + 2, page + 3];
+            const results = await Promise.all(pageNums.map(p => fetchPage(p)));
+            if (loadVersion !== albumsLoadVersionRef.current) return;
+            let anyData = false;
+            let hasMoreData = false;
+            for (const result of results) {
+              if (result && result.batch.length > 0) {
+                anyData = true;
+                all = all.concat(result.batch);
+                if (result.hasMore) hasMoreData = true;
+              }
+            }
+            if (!anyData) break;
+            setAlbums([...all]);
+            if (!hasMoreData) break;
+            page += 4;
+          }
+        }
 
-      let all = [...first.batch];
-      setAlbums(all);
-      stopSpinnerIfOwner();
-
-      if (!first.hasMore || first.batch.length === 0) {
-        if (includeTracks) {
+        if (loadVersion === albumsLoadVersionRef.current) {
           tracksHydratedRef.current = true;
           setTracksHydrated(true);
         }
         return;
       }
 
-      // Fetch remaining pages in parallel batches of 4
-      let page = 1;
-      while (true) {
-        const pageNums = [page, page + 1, page + 2, page + 3];
-        const results = await Promise.all(pageNums.map(p => fetchPage(p)));
-        if (loadVersion !== albumsLoadVersionRef.current) return;
+      // Collection view: server-filtered single page
+      const params = {
+        q: options?.q ?? '',
+        mediaType: options?.mediaType ?? null,
+        location: options?.location ?? null,
+        sortBy: options?.apiSortBy ?? 'date_added',
+        sortDir: options?.apiSortDir ?? 'desc',
+      };
+      activeParamsRef.current = params;
 
-        let anyData = false;
-        let hasMoreData = false;
-        for (const result of results) {
-          if (result && result.batch.length > 0) {
-            anyData = true;
-            all = all.concat(result.batch);
-            if (result.hasMore) hasMoreData = true;
-          }
-        }
+      const url = new URL('/api/library/albums', window.location.origin);
+      url.searchParams.set('page', '0');
+      url.searchParams.set('pageSize', '250');
+      url.searchParams.set('includeTracks', 'false');
+      url.searchParams.set('includeForSale', 'true');
+      if (params.q) url.searchParams.set('q', params.q);
+      if (params.mediaType) url.searchParams.set('mediaType', params.mediaType);
+      if (params.location) url.searchParams.set('location', params.location);
+      url.searchParams.set('sortBy', params.sortBy);
+      url.searchParams.set('sortDir', params.sortDir);
 
-        if (!anyData) break;
-        setAlbums([...all]);
-        if (!hasMoreData) break;
-        page += 4;
+      const res = await fetch(url.toString(), { cache: 'no-store' });
+      const payload = await res.json().catch(() => ({}));
+      if (loadVersion !== albumsLoadVersionRef.current) { stopSpinnerIfOwner(); return; }
+      if (!res.ok) {
+        console.error('Error loading albums:', payload?.error || res.status);
+        stopSpinnerIfOwner();
+        return;
       }
 
-      if (includeTracks && loadVersion === albumsLoadVersionRef.current) {
-        tracksHydratedRef.current = true;
-        setTracksHydrated(true);
-      }
+      const batch = Array.isArray(payload?.data) ? (payload.data as Album[]) : [];
+      setAlbums(batch);
+      setHasMore(Boolean(payload?.hasMore));
+      setTotalCount(typeof payload?.total === 'number' ? payload.total : null);
+      nextPageRef.current = 1;
+      stopSpinnerIfOwner();
     } catch (error) {
       console.error('Unexpected error loading albums:', error);
       stopSpinnerIfOwner();
+    }
+  }, []);
+
+  const loadMoreAlbums = useCallback(async () => {
+    if (!hasMore || isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const params = activeParamsRef.current;
+      const page = nextPageRef.current;
+
+      const url = new URL('/api/library/albums', window.location.origin);
+      url.searchParams.set('page', String(page));
+      url.searchParams.set('pageSize', '250');
+      url.searchParams.set('includeTracks', 'false');
+      url.searchParams.set('includeForSale', 'true');
+      if (params.q) url.searchParams.set('q', params.q);
+      if (params.mediaType) url.searchParams.set('mediaType', params.mediaType);
+      if (params.location) url.searchParams.set('location', params.location);
+      url.searchParams.set('sortBy', params.sortBy);
+      url.searchParams.set('sortDir', params.sortDir);
+
+      const res = await fetch(url.toString(), { cache: 'no-store' });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) return;
+
+      const batch = Array.isArray(payload?.data) ? (payload.data as Album[]) : [];
+      if (batch.length > 0) {
+        setAlbums(prev => [...prev, ...batch]);
+        nextPageRef.current = page + 1;
+      }
+      setHasMore(Boolean(payload?.hasMore));
+    } catch (error) {
+      console.error('Error loading more albums:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [hasMore, isLoadingMore]);
+
+  const loadCounts = useCallback(async () => {
+    try {
+      const [formatRes, vinylRes] = await Promise.all([
+        fetch('/api/library/albums/counts'),
+        fetch('/api/library/albums/counts?mediaType=Vinyl'),
+      ]);
+      const formatData = await formatRes.json().catch(() => ({}));
+      const vinylData = await vinylRes.json().catch(() => ({}));
+
+      const newFolderCounts: Record<string, number> = {};
+      for (const { media_type, count } of (formatData.data ?? [])) {
+        newFolderCounts[media_type as string] = count as number;
+      }
+      setFolderCountsApi(newFolderCounts);
+
+      const newVinylCounts: Record<string, number> = {};
+      for (const { location, count } of (vinylData.data ?? [])) {
+        newVinylCounts[location as string] = count as number;
+      }
+      setVinylSubformatCountsApi(newVinylCounts);
+    } catch (err) {
+      console.error('Failed to load counts:', err);
     }
   }, []);
 
@@ -2043,13 +2144,60 @@ function CollectionBrowserPage() {
     clearPlaylistRecoveryStorage();
   }, []);
 
+  // Compute the server sort params for the current sortBy state
+  const getSortParams = useCallback((currentSortBy: string) => {
+    const serverSortMap: Record<string, { apiSortBy: string; apiSortDir: string }> = {
+      'added-desc':     { apiSortBy: 'date_added',     apiSortDir: 'desc' },
+      'added-asc':      { apiSortBy: 'date_added',     apiSortDir: 'asc'  },
+      'year-desc':      { apiSortBy: 'release_year',   apiSortDir: 'desc' },
+      'year-asc':       { apiSortBy: 'release_year',   apiSortDir: 'asc'  },
+      'format-asc':     { apiSortBy: 'media_type',     apiSortDir: 'asc'  },
+      'format-desc':    { apiSortBy: 'media_type',     apiSortDir: 'desc' },
+      'condition-asc':  { apiSortBy: 'media_condition',apiSortDir: 'asc'  },
+      'condition-desc': { apiSortBy: 'media_condition',apiSortDir: 'desc' },
+    };
+    return serverSortMap[currentSortBy] ?? { apiSortBy: 'date_added', apiSortDir: 'desc' };
+  }, []);
+
   useEffect(() => {
     tracksHydratedRef.current = false;
     setTracksHydrated(false);
-    void loadAlbums({ includeTracks: false, showSpinner: true });
+    const sortParams = getSortParams(sortBy);
+    void loadAlbums({
+      includeTracks: false,
+      showSpinner: true,
+      q: '',
+      mediaType: null,
+      location: null,
+      ...sortParams,
+    });
+    void loadCounts();
     loadCrates();
     loadPlaylists();
-  }, [loadAlbums, loadCrates, loadPlaylists]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reload from page 0 whenever server-side filter/sort params change
+  const isFirstFilterRender = useRef(true);
+  useEffect(() => {
+    if (isFirstFilterRender.current) {
+      isFirstFilterRender.current = false;
+      return;
+    }
+    const sortParams = getSortParams(sortBy);
+    setAlbums([]);
+    nextPageRef.current = 1;
+    tracksHydratedRef.current = false;
+    setTracksHydrated(false);
+    void loadAlbums({
+      includeTracks: false,
+      showSpinner: true,
+      q: debouncedSearchQuery,
+      mediaType: (folderMode === 'format' && selectedFolderValue) ? selectedFolderValue : null,
+      location: selectedVinylSubformat ?? null,
+      ...sortParams,
+    });
+  }, [debouncedSearchQuery, selectedFolderValue, selectedVinylSubformat, sortBy, folderMode, getSortParams, loadAlbums]);
 
   useEffect(() => {
     if (viewMode !== 'collection') {
@@ -2095,7 +2243,8 @@ function CollectionBrowserPage() {
   );
 
   const nonSaleAlbums = useMemo(() => albums.filter((album) => !isAlbumForSale(album)), [albums]);
-  const defaultVisibleAlbumCount = nonSaleAlbums.length;
+  // totalCount from API is authoritative; fall back to loaded count while API is pending
+  const defaultVisibleAlbumCount = totalCount ?? nonSaleAlbums.length;
 
   const scopedAlbums = useMemo(() => {
     return albums.filter((album) => {
@@ -2168,6 +2317,8 @@ function CollectionBrowserPage() {
   }, [searchType, viewMode]);
 
   const filteredAndSortedAlbums = useMemo(() => {
+    // Server already handles: text search, mediaType, location/subformat.
+    // Client handles: album format filter (toolbar dropdown), crate/letter/folder (via scopedAlbums), and sort.
     let filtered = scopedAlbums.filter((album) => {
       if (albumFormatFilters.size > 0) {
         const formatLabel = getAlbumFormatLabel(album);
@@ -2177,31 +2328,6 @@ function CollectionBrowserPage() {
           return false;
         }
       }
-
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        const albumSearchable = [
-          getAlbumArtist(album),
-          getAlbumTitle(album),
-          getAlbumFormatLabel(album),
-          getAlbumYearValue(album),
-          toSafeSearchString(getAlbumTags(album)),
-          toSafeSearchString(getAlbumGenres(album)),
-          toSafeSearchString(album.release?.label),
-        ].join(' ').toLowerCase();
-        const trackSearchable = getAlbumTrackSearchText(album).toLowerCase();
-        const matchesAlbums = albumSearchable.includes(q);
-        const matchesTracks = trackSearchable.includes(q);
-
-        if (searchType === 'albums' && !matchesAlbums) return false;
-        if (searchType === 'tracks' && !matchesTracks) return false;
-        if (searchType === 'both' && !matchesAlbums && !matchesTracks) return false;
-      }
-
-      if (selectedVinylSubformat) {
-        if ((album.location || 'Unknown') !== selectedVinylSubformat) return false;
-      }
-
       return true;
     });
 
@@ -2220,29 +2346,24 @@ function CollectionBrowserPage() {
     } else if (viewMode === 'collection' && activeCollectionSortFields.length > 0) {
       filtered = sortAlbumsByFavoriteFields(filtered, activeCollectionSortFields);
     } else {
-      filtered = [...filtered].sort((a, b) => {
-        switch (sortBy) {
-          case 'artist-asc': return getAlbumArtist(a).localeCompare(getAlbumArtist(b));
-          case 'artist-desc': return getAlbumArtist(b).localeCompare(getAlbumArtist(a));
-          case 'title-asc': return getAlbumTitle(a).localeCompare(getAlbumTitle(b));
-          case 'title-desc': return getAlbumTitle(b).localeCompare(getAlbumTitle(a));
-          case 'year-desc': return (getAlbumYearInt(b) || 0) - (getAlbumYearInt(a) || 0);
-          case 'year-asc': return (getAlbumYearInt(a) || 0) - (getAlbumYearInt(b) || 0);
-          case 'decade-desc': return (getAlbumDecade(b) || 0) - (getAlbumDecade(a) || 0);
-          case 'decade-asc': return (getAlbumDecade(a) || 0) - (getAlbumDecade(b) || 0);
-          case 'added-desc': return (b.date_added || '').localeCompare(a.date_added || '');
-          case 'added-asc': return (a.date_added || '').localeCompare(b.date_added || '');
-          case 'format-asc':
-            return getDisplayFormat(getAlbumFormat(a)).localeCompare(getDisplayFormat(getAlbumFormat(b)));
-          case 'format-desc':
-            return getDisplayFormat(getAlbumFormat(b)).localeCompare(getDisplayFormat(getAlbumFormat(a)));
-          case 'condition-asc': return (a.media_condition || '').localeCompare(b.media_condition || '');
-          case 'condition-desc': return (b.media_condition || '').localeCompare(a.media_condition || '');
-          case 'tags-count-desc': return toSafeStringArray(getAlbumTags(b)).length - toSafeStringArray(getAlbumTags(a)).length;
-          case 'tags-count-asc': return toSafeStringArray(getAlbumTags(a)).length - toSafeStringArray(getAlbumTags(b)).length;
-          default: return 0;
-        }
-      });
+      // Client-side sort for fields that can't easily be done server-side
+      const needsClientSort = ['artist-asc','artist-desc','title-asc','title-desc','decade-desc','decade-asc','tags-count-desc','tags-count-asc'].includes(sortBy);
+      if (needsClientSort) {
+        filtered = [...filtered].sort((a, b) => {
+          switch (sortBy) {
+            case 'artist-asc': return getAlbumArtist(a).localeCompare(getAlbumArtist(b));
+            case 'artist-desc': return getAlbumArtist(b).localeCompare(getAlbumArtist(a));
+            case 'title-asc': return getAlbumTitle(a).localeCompare(getAlbumTitle(b));
+            case 'title-desc': return getAlbumTitle(b).localeCompare(getAlbumTitle(a));
+            case 'decade-desc': return (getAlbumDecade(b) || 0) - (getAlbumDecade(a) || 0);
+            case 'decade-asc': return (getAlbumDecade(a) || 0) - (getAlbumDecade(b) || 0);
+            case 'tags-count-desc': return toSafeStringArray(getAlbumTags(b)).length - toSafeStringArray(getAlbumTags(a)).length;
+            case 'tags-count-asc': return toSafeStringArray(getAlbumTags(a)).length - toSafeStringArray(getAlbumTags(b)).length;
+            default: return 0;
+          }
+        });
+      }
+      // Server-sortable sorts (added, year, format, condition) are already ordered by the API
     }
 
     return filtered;
@@ -2251,31 +2372,14 @@ function CollectionBrowserPage() {
     albumFormatFilterMode,
     albumFormatFilters,
     scopedAlbums,
-    searchQuery,
-    searchType,
-    selectedVinylSubformat,
     sortBy,
     tableSortState,
     viewMode,
   ]);
 
-  const folderCounts = useMemo(() => {
-    return nonSaleAlbums.reduce((acc, album) => {
-      const itemKey = album.release?.media_type || 'Unknown';
-      acc[itemKey] = (acc[itemKey] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-  }, [nonSaleAlbums]);
-
-  const vinylSubformatCounts = useMemo(() => {
-    return nonSaleAlbums
-      .filter(album => (album.release?.media_type || 'Unknown') === 'Vinyl')
-      .reduce((acc, album) => {
-        const folder = album.location || 'Unknown';
-        acc[folder] = (acc[folder] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-  }, [nonSaleAlbums]);
+  // Sidebar format/location counts come from the API (not computed from loaded albums)
+  const folderCounts = folderCountsApi;
+  const vinylSubformatCounts = vinylSubformatCountsApi;
 
   const sortedVinylSubformats = useMemo(() => {
     return Object.entries(vinylSubformatCounts).sort((a, b) => b[1] - a[1]);
@@ -4175,7 +4279,12 @@ function CollectionBrowserPage() {
                 </>
               )}
             </div>
-            <input type="text" placeholder={searchPlaceholder} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} title="Search your collection" className="bg-[#2a2a2a] text-white border border-[#555] border-l-0 px-3 py-1.5 rounded-r text-[13px] w-[220px] h-8 outline-none" />
+            <input type="text" placeholder={searchPlaceholder} value={searchQuery} onChange={(e) => {
+                const val = e.target.value;
+                setSearchQuery(val);
+                if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+                searchDebounceRef.current = setTimeout(() => setDebouncedSearchQuery(val), 300);
+              }} title="Search your collection" className="bg-[#2a2a2a] text-white border border-[#555] border-l-0 px-3 py-1.5 rounded-r text-[13px] w-[220px] h-8 outline-none" />
           </div>
         </div>
 
@@ -4550,7 +4659,7 @@ function CollectionBrowserPage() {
                 {loading
                   ? 'Loading...'
                   : viewMode === 'collection'
-                    ? `${filteredAndSortedAlbums.length} albums`
+                    ? `${totalCount ?? filteredAndSortedAlbums.length} albums${isLoadingMore ? ' (loading more...)' : ''}`
                     : `${filteredTrackRows.length} tracks${tracksHydrating ? ' (loading track data...)' : ''}`}
               </div>
               {viewMode === 'album-track' && groupedTrackRows.length > 0 && (
@@ -4661,7 +4770,7 @@ function CollectionBrowserPage() {
                 <div className="p-10 text-center text-[#666]">Loading track data...</div>
               ) : (
                 viewMode === 'collection' ? (
-                  <CollectionTable albums={filteredAndSortedAlbums} visibleColumns={collectionVisibleColumns} lockedColumns={lockedColumns} onAlbumClick={handleAlbumClick} selectedAlbums={selectedAlbumsAsStrings} onSelectionChange={handleSelectionChange} sortState={tableSortState} onSortChange={handleTableSortChange} onEditAlbum={handleEditAlbum} crateBadgesByAlbumId={crateBadgesByAlbumId} onSelectCrate={handleSelectCrate} onOpenAlbumCratePicker={handleOpenSingleAlbumCratePicker} onRemoveAlbumFromCrate={handleRemoveAlbumFromCrate} />
+                  <CollectionTable albums={filteredAndSortedAlbums} visibleColumns={collectionVisibleColumns} lockedColumns={lockedColumns} onAlbumClick={handleAlbumClick} selectedAlbums={selectedAlbumsAsStrings} onSelectionChange={handleSelectionChange} sortState={tableSortState} onSortChange={handleTableSortChange} onEditAlbum={handleEditAlbum} crateBadgesByAlbumId={crateBadgesByAlbumId} onSelectCrate={handleSelectCrate} onOpenAlbumCratePicker={handleOpenSingleAlbumCratePicker} onRemoveAlbumFromCrate={handleRemoveAlbumFromCrate} onLoadMore={hasMore ? loadMoreAlbums : undefined} />
                 ) : viewMode === 'album-track' ? (
                   <div className="h-full overflow-auto">
                     <table className="w-full border-collapse text-sm">
