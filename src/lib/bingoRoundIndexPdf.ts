@@ -5,14 +5,16 @@ import { type RoundCallSection } from "src/lib/bingoCallSheetPdf";
 type TrackEntry = {
   artist_name: string;
   album_name: string;
-  drawByRound: Map<number, number[]>;
+  side: string;
+  position: string;
+  drawByRound: Map<number, number>;
 };
 
 /**
  * Generate an album-prep index for a bingo session.
  *
- * Produces one row per album (keyed by artist · album),
- * with a separate column for each round's draw numbers.
+ * Produces one row per unique track (keyed by artist · album · side · position),
+ * with a separate column for each round's draw number.
  * Sorted by draw order so prep sheets stay aligned with the locked round pull.
  */
 export function generateBingoRoundIndexPdf(rounds: RoundCallSection[], title: string): jsPDF {
@@ -21,16 +23,17 @@ export function generateBingoRoundIndexPdf(rounds: RoundCallSection[], title: st
 
   for (const round of rounds) {
     for (const call of round.calls) {
-      const key = `${call.artist_name}::${call.album_name ?? ""}`;
+      const key = `${call.artist_name}::${call.album_name ?? ""}::${call.side ?? ""}::${call.position ?? ""}`;
       const existing = trackMap.get(key);
       if (existing) {
-        const existingDraws = existing.drawByRound.get(round.roundNumber) ?? [];
-        existing.drawByRound.set(round.roundNumber, [...existingDraws, call.call_index].sort((a, b) => a - b));
+        existing.drawByRound.set(round.roundNumber, call.call_index);
       } else {
         trackMap.set(key, {
           artist_name: call.artist_name,
           album_name: call.album_name ?? "",
-          drawByRound: new Map([[round.roundNumber, [call.call_index]]]),
+          side: call.side ?? "",
+          position: call.position ?? "",
+          drawByRound: new Map([[round.roundNumber, call.call_index]]),
         });
       }
     }
@@ -40,14 +43,16 @@ export function generateBingoRoundIndexPdf(rounds: RoundCallSection[], title: st
 
   const tracks = Array.from(trackMap.values()).sort((a, b) => {
     for (const roundNumber of roundNumbers) {
-      const leftDraw = a.drawByRound.get(roundNumber)?.[0] ?? Number.MAX_SAFE_INTEGER;
-      const rightDraw = b.drawByRound.get(roundNumber)?.[0] ?? Number.MAX_SAFE_INTEGER;
+      const leftDraw = a.drawByRound.get(roundNumber) ?? Number.MAX_SAFE_INTEGER;
+      const rightDraw = b.drawByRound.get(roundNumber) ?? Number.MAX_SAFE_INTEGER;
       if (leftDraw !== rightDraw) return leftDraw - rightDraw;
     }
 
     return (
       a.artist_name.localeCompare(b.artist_name) ||
-      a.album_name.localeCompare(b.album_name)
+      a.album_name.localeCompare(b.album_name) ||
+      a.side.localeCompare(b.side) ||
+      a.position.localeCompare(b.position)
     );
   });
 
@@ -68,13 +73,15 @@ export function generateBingoRoundIndexPdf(rounds: RoundCallSection[], title: st
   autoTable(doc, {
     startY: 22,
     margin: { top: 8, bottom: 8, left: 6, right: 6 },
-    head: [["Artist", "Album", ...roundNumbers.map((r) => `R${r}`)]],
+    head: [["Artist", "Album", "Side", "Pos", ...roundNumbers.map((r) => `R${r}`)]],
     body: tracks.map((track) => [
       track.artist_name,
       track.album_name,
+      track.side,
+      track.position,
       ...roundNumbers.map((r) => {
-        const draws = track.drawByRound.get(r) ?? [];
-        return draws.length > 0 ? draws.join(", ") : "—";
+        const draw = track.drawByRound.get(r);
+        return draw ?? "—";
       }),
     ]),
     styles: {
@@ -90,11 +97,13 @@ export function generateBingoRoundIndexPdf(rounds: RoundCallSection[], title: st
     },
     columnStyles: {
       0: { cellWidth: 72 },  // Artist
-      1: { cellWidth: 86 },  // Album
-      // Round draw columns — R1 at index 2, R2 at 3, etc.
+      1: { cellWidth: 74 },  // Album
+      2: { cellWidth: 12 },  // Side
+      3: { cellWidth: 12 },  // Pos
+      // Round draw columns — R1 at index 4, R2 at 5, etc.
       ...Object.fromEntries(
         roundNumbers.map((_, i) => [
-          2 + i,
+          4 + i,
           { cellWidth: roundColWidth, halign: "center" as const, fontStyle: "bold" as const },
         ])
       ),
