@@ -18,6 +18,18 @@ const PLAYLIST_NAMES = [
   "Lemur", "Okapi", "Narwhal", "Viper", "Lynx", "Mink", "Ibis", "Tapir", "Dingo", "Finch",
 ];
 
+const GAME_PLAYLISTS_TABLE = "bingo_session_game_playlists";
+const LEGACY_CRATES_TABLE = "bingo_session_crates";
+const ACTIVE_PLAYLIST_FIELD = "active_playlist_letter_by_round";
+const ACTIVE_CRATE_FIELD = "active_crate_letter_by_round";
+const GAME_PLAYLIST_SELECT = "id, session_id, round_number, playlist_name, playlist_letter, call_order, created_at";
+const LEGACY_CRATE_SELECT = "id, session_id, round_number, playlist_name:crate_name, playlist_letter:crate_letter, call_order, created_at";
+
+type SessionActivePlaylistEntry = {
+  round: number;
+  letter: string;
+};
+
 type SessionCodeRow = {
   session_code: string;
 };
@@ -52,8 +64,128 @@ type SessionPlaylistBackfillRow = {
   round_playlist_ids: RoundPlaylistEntry[] | null;
   round_count: number;
   current_round: number;
-  active_playlist_letter_by_round: { round: number; letter: string }[] | null;
+  active_playlist_letter_by_round: SessionActivePlaylistEntry[] | null;
 };
+
+function isMissingSchemaObject(error: unknown, schemaObject: string): boolean {
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message.toLowerCase();
+  const normalizedSchemaObject = schemaObject.toLowerCase();
+
+  return (
+    message.includes(normalizedSchemaObject) &&
+    (message.includes("does not exist") ||
+      message.includes("could not find") ||
+      message.includes("schema cache") ||
+      message.includes("column") ||
+      message.includes("relation"))
+  );
+}
+
+async function withPlaylistTableFallback<T>(
+  operation: (tableName: typeof GAME_PLAYLISTS_TABLE | typeof LEGACY_CRATES_TABLE, selectClause: string, letterColumn: string, nameColumn: string) => Promise<T>
+): Promise<T> {
+  try {
+    return await operation(GAME_PLAYLISTS_TABLE, GAME_PLAYLIST_SELECT, "playlist_letter", "playlist_name");
+  } catch (error) {
+    if (!isMissingSchemaObject(error, GAME_PLAYLISTS_TABLE)) {
+      throw error;
+    }
+
+    return operation(LEGACY_CRATES_TABLE, LEGACY_CRATE_SELECT, "crate_letter", "crate_name");
+  }
+}
+
+async function selectSessionPlaylistBackfillRow(
+  db: ReturnType<typeof getBingoDb>,
+  sessionId: number
+): Promise<SessionPlaylistBackfillRow | null> {
+  const baseFields = "playlist_id, playlist_ids, round_playlist_ids, round_count, current_round";
+
+  try {
+    const { data, error } = await db
+      .from("bingo_sessions")
+      .select(`${baseFields}, ${ACTIVE_PLAYLIST_FIELD}`)
+      .eq("id", sessionId)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    return (data as SessionPlaylistBackfillRow | null) ?? null;
+  } catch (error) {
+    if (!isMissingSchemaObject(error, ACTIVE_PLAYLIST_FIELD)) {
+      throw error;
+    }
+
+    const { data, error: legacyError } = await db
+      .from("bingo_sessions")
+      .select(`${baseFields}, ${ACTIVE_CRATE_FIELD}`)
+      .eq("id", sessionId)
+      .maybeSingle();
+
+    if (legacyError) throw new Error(legacyError.message);
+    if (!data) return null;
+
+    const row = data as Record<string, unknown>;
+    return {
+      playlist_id: (row.playlist_id as number | null) ?? null,
+      playlist_ids: (row.playlist_ids as number[] | null) ?? null,
+      round_playlist_ids: (row.round_playlist_ids as RoundPlaylistEntry[] | null) ?? null,
+      round_count: (row.round_count as number | null) ?? 1,
+      current_round: (row.current_round as number | null) ?? 1,
+      active_playlist_letter_by_round: (row[ACTIVE_CRATE_FIELD] as SessionActivePlaylistEntry[] | null) ?? null,
+    };
+  }
+}
+
+async function selectActivePlaylistLetters(
+  db: ReturnType<typeof getBingoDb>,
+  sessionId: number
+): Promise<{ entries: SessionActivePlaylistEntry[]; fieldName: typeof ACTIVE_PLAYLIST_FIELD | typeof ACTIVE_CRATE_FIELD }> {
+  try {
+    const { data, error } = await db
+      .from("bingo_sessions")
+      .select(ACTIVE_PLAYLIST_FIELD)
+      .eq("id", sessionId)
+      .single();
+
+    if (error) throw new Error(error.message);
+    return {
+      entries: ((data as Record<string, unknown> | null)?.[ACTIVE_PLAYLIST_FIELD] as SessionActivePlaylistEntry[] | null) ?? [],
+      fieldName: ACTIVE_PLAYLIST_FIELD,
+    };
+  } catch (error) {
+    if (!isMissingSchemaObject(error, ACTIVE_PLAYLIST_FIELD)) {
+      throw error;
+    }
+
+    const { data, error: legacyError } = await db
+      .from("bingo_sessions")
+      .select(ACTIVE_CRATE_FIELD)
+      .eq("id", sessionId)
+      .single();
+
+    if (legacyError) throw new Error(legacyError.message);
+    return {
+      entries: ((data as Record<string, unknown> | null)?.[ACTIVE_CRATE_FIELD] as SessionActivePlaylistEntry[] | null) ?? [],
+      fieldName: ACTIVE_CRATE_FIELD,
+    };
+  }
+}
+
+async function updateActivePlaylistLetters(
+  db: ReturnType<typeof getBingoDb>,
+  sessionId: number,
+  fieldName: typeof ACTIVE_PLAYLIST_FIELD | typeof ACTIVE_CRATE_FIELD,
+  entries: SessionActivePlaylistEntry[]
+): Promise<void> {
+  const { error } = await db
+    .from("bingo_sessions")
+    .update({ [fieldName]: entries })
+    .eq("id", sessionId);
+
+  if (error) throw new Error(error.message);
+}
 
 async function deriveRoundCallOrder(
   db: ReturnType<typeof getBingoDb>,
@@ -132,11 +264,16 @@ async function getNextPlaylistLetter(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number
 ): Promise<string> {
-  const { data } = await db
-    .from("bingo_session_game_playlists")
-    .select("playlist_letter")
-    .eq("session_id", sessionId)
-    .order("playlist_letter", { ascending: true });
+  const data = await withPlaylistTableFallback(async (tableName, selectClause, letterColumn) => {
+    const { data: rows, error } = await (db as ReturnType<typeof getBingoDb> & Record<string, unknown>)
+      .from(tableName)
+      .select(tableName === GAME_PLAYLISTS_TABLE ? "playlist_letter" : "playlist_letter:crate_letter")
+      .eq("session_id", sessionId)
+      .order(letterColumn, { ascending: true });
+
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
 
   const usedLetters = new Set((data ?? []).map((row) => row.playlist_letter as string));
   const next = PLAYLIST_NAMES.find((l) => !usedLetters.has(l));
@@ -244,11 +381,7 @@ export async function syncCollectionPlaylistMirrorsForSession(
 ): Promise<void> {
   // Fetch session source data so we can re-derive call orders for playlists that pre-date
   // the track_key field and therefore have no keys in their stored call_order JSON.
-  const { data: sessionRow } = await db
-    .from("bingo_sessions")
-    .select("playlist_id, playlist_ids, round_playlist_ids, round_count, current_round, active_playlist_letter_by_round")
-    .eq("id", sessionId)
-    .maybeSingle();
+  const sessionRow = await selectSessionPlaylistBackfillRow(db, sessionId);
 
   const playlists = await getPlaylistsForSession(db, sessionId);
   for (const playlist of playlists) {
@@ -295,19 +428,33 @@ export async function savePlaylistForRound(
   const sessionCode = await getSessionCode(db, sessionId);
   const playlistName = formatPlaylistName(sessionCode, sessionId, letter);
 
-  const { data, error } = await db
-    .from("bingo_session_game_playlists")
-    .insert({
-      session_id: sessionId,
-      round_number: roundNumber,
-      playlist_name: playlistName,
-      playlist_letter: letter,
-      call_order: calls as unknown as Record<string, unknown>[],
-    })
-    .select()
-    .single();
+  const data = await withPlaylistTableFallback(async (tableName, selectClause) => {
+    const insertRow =
+      tableName === GAME_PLAYLISTS_TABLE
+        ? {
+            session_id: sessionId,
+            round_number: roundNumber,
+            playlist_name: playlistName,
+            playlist_letter: letter,
+            call_order: calls as unknown as Record<string, unknown>[],
+          }
+        : {
+            session_id: sessionId,
+            round_number: roundNumber,
+            crate_name: playlistName,
+            crate_letter: letter,
+            call_order: calls as unknown as Record<string, unknown>[],
+          };
 
-  if (error || !data) throw new Error(error?.message ?? "Failed to save game playlist.");
+    const { data: created, error } = await (db as ReturnType<typeof getBingoDb> & Record<string, unknown>)
+      .from(tableName)
+      .insert(insertRow)
+      .select(selectClause)
+      .single();
+
+    if (error || !created) throw new Error(error?.message ?? "Failed to save game playlist.");
+    return created;
+  });
 
   const saved: BingoSessionGamePlaylist = {
     ...data,
@@ -329,13 +476,17 @@ export async function getPlaylistsForSession(
   sessionId: number
 ): Promise<BingoSessionGamePlaylist[]> {
   const sessionCode = await getSessionCode(db, sessionId);
-  const { data, error } = await db
-    .from("bingo_session_game_playlists")
-    .select("*")
-    .eq("session_id", sessionId)
-    .order("playlist_letter", { ascending: true });
+  const data = await withPlaylistTableFallback(async (tableName, selectClause, letterColumn) => {
+    const { data: rows, error } = await (db as ReturnType<typeof getBingoDb> & Record<string, unknown>)
+      .from(tableName)
+      .select(selectClause)
+      .eq("session_id", sessionId)
+      .order(letterColumn, { ascending: true });
 
-  if (error) throw new Error(error.message);
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
+
   return (data ?? []).map((row) => ({
     ...row,
     playlist_name: formatPlaylistName(sessionCode, sessionId, row.playlist_letter),
@@ -350,14 +501,18 @@ export async function getPlaylistByLetter(
   playlistLetter: string
 ): Promise<BingoSessionGamePlaylist | null> {
   const sessionCode = await getSessionCode(db, sessionId);
-  const { data, error } = await db
-    .from("bingo_session_game_playlists")
-    .select("*")
-    .eq("session_id", sessionId)
-    .eq("playlist_letter", playlistLetter)
-    .maybeSingle();
+  const data = await withPlaylistTableFallback(async (tableName, selectClause, letterColumn) => {
+    const { data: row, error } = await (db as ReturnType<typeof getBingoDb> & Record<string, unknown>)
+      .from(tableName)
+      .select(selectClause)
+      .eq("session_id", sessionId)
+      .eq(letterColumn, playlistLetter)
+      .maybeSingle();
 
-  if (error) throw new Error(error.message);
+    if (error) throw new Error(error.message);
+    return row;
+  });
+
   if (!data) return null;
   return {
     ...data,
@@ -373,14 +528,18 @@ export async function getPlaylistsForRound(
   roundNumber: number
 ): Promise<BingoSessionGamePlaylist[]> {
   const sessionCode = await getSessionCode(db, sessionId);
-  const { data, error } = await db
-    .from("bingo_session_game_playlists")
-    .select("*")
-    .eq("session_id", sessionId)
-    .eq("round_number", roundNumber)
-    .order("playlist_letter", { ascending: true });
+  const data = await withPlaylistTableFallback(async (tableName, selectClause, letterColumn) => {
+    const { data: rows, error } = await (db as ReturnType<typeof getBingoDb> & Record<string, unknown>)
+      .from(tableName)
+      .select(selectClause)
+      .eq("session_id", sessionId)
+      .eq("round_number", roundNumber)
+      .order(letterColumn, { ascending: true });
 
-  if (error) throw new Error(error.message);
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
+
   return (data ?? []).map((row) => ({
     ...row,
     playlist_name: formatPlaylistName(sessionCode, sessionId, row.playlist_letter),
@@ -401,13 +560,7 @@ export async function backfillMissingLegacyPlaylists(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number
 ): Promise<void> {
-  const { data: session, error: sessionError } = await db
-    .from("bingo_sessions")
-    .select("playlist_id, playlist_ids, round_playlist_ids, round_count, current_round, active_playlist_letter_by_round")
-    .eq("id", sessionId)
-    .maybeSingle();
-
-  if (sessionError) throw new Error(sessionError.message);
+  const session = await selectSessionPlaylistBackfillRow(db, sessionId);
   if (!session) return;
 
   const typedSession = session as SessionPlaylistBackfillRow;
@@ -449,23 +602,22 @@ export async function createPlaylistFromSessionData(
   sessionId: number,
   roundNumber?: number
 ): Promise<BingoSessionGamePlaylist | null> {
-  const { data: session, error } = await db
-    .from("bingo_sessions")
-    .select("playlist_id, playlist_ids, round_playlist_ids, current_round, round_count, active_playlist_letter_by_round")
-    .eq("id", sessionId)
-    .maybeSingle();
-
-  if (error) throw new Error(error.message);
+  const session = await selectSessionPlaylistBackfillRow(db, sessionId);
   if (!session) return null;
 
   const typedSession = session as SessionPlaylistBackfillRow;
   const effectiveRound = (roundNumber != null && roundNumber >= 1) ? roundNumber : (typedSession.current_round ?? 1);
 
   // Count ALL existing game playlists for this session so the new one gets a unique shuffle seed.
-  const { data: existingAll } = await db
-    .from("bingo_session_game_playlists")
-    .select("id")
-    .eq("session_id", sessionId);
+  const existingAll = await withPlaylistTableFallback(async (tableName) => {
+    const { data, error } = await (db as ReturnType<typeof getBingoDb> & Record<string, unknown>)
+      .from(tableName)
+      .select("id")
+      .eq("session_id", sessionId);
+
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
   const generation = existingAll?.length ?? 0;
 
   const callOrder = await deriveRoundCallOrder(db, sessionId, effectiveRound, typedSession, generation);
@@ -488,13 +640,7 @@ export async function reshuffleAllPlaylists(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number
 ): Promise<void> {
-  const { data: session, error: sessionError } = await db
-    .from("bingo_sessions")
-    .select("playlist_id, playlist_ids, round_playlist_ids, current_round, round_count, active_playlist_letter_by_round")
-    .eq("id", sessionId)
-    .maybeSingle();
-
-  if (sessionError) throw new Error(sessionError.message);
+  const session = await selectSessionPlaylistBackfillRow(db, sessionId);
   if (!session) throw new Error("Session not found");
 
   const typedSession = session as SessionPlaylistBackfillRow;
@@ -509,10 +655,14 @@ export async function reshuffleAllPlaylists(
     const newCallOrder = await deriveRoundCallOrder(db, sessionId, playlist.round_number, typedSession, generation);
     if (newCallOrder.length === 0) continue;
 
-    await db
-      .from("bingo_session_game_playlists")
-      .update({ call_order: newCallOrder as unknown as Record<string, unknown>[] })
-      .eq("id", playlist.id);
+    await withPlaylistTableFallback(async (tableName) => {
+      const { error } = await (db as ReturnType<typeof getBingoDb> & Record<string, unknown>)
+        .from(tableName)
+        .update({ call_order: newCallOrder as unknown as Record<string, unknown>[] })
+        .eq("id", playlist.id);
+
+      if (error) throw new Error(error.message);
+    });
 
     await syncPlaylistToCollection(db, { ...playlist, call_order: newCallOrder });
   }
@@ -528,14 +678,7 @@ export async function setActivePlaylistForRound(
   roundNumber: number,
   playlistLetterOrNull: string | null
 ): Promise<void> {
-  const { data: session } = await db
-    .from("bingo_sessions")
-    .select("active_playlist_letter_by_round")
-    .eq("id", sessionId)
-    .single();
-
-  const existing: { round: number; letter: string }[] =
-    (session?.active_playlist_letter_by_round as { round: number; letter: string }[] | null) ?? [];
+  const { entries: existing, fieldName } = await selectActivePlaylistLetters(db, sessionId);
 
   const without = existing.filter((entry) => entry.round !== roundNumber);
   const next =
@@ -543,10 +686,7 @@ export async function setActivePlaylistForRound(
       ? [...without, { round: roundNumber, letter: playlistLetterOrNull }].sort((a, b) => a.round - b.round)
       : without;
 
-  await db
-    .from("bingo_sessions")
-    .update({ active_playlist_letter_by_round: next })
-    .eq("id", sessionId);
+  await updateActivePlaylistLetters(db, sessionId, fieldName, next);
 }
 
 /** Return the active playlist letter for a round (null = none selected yet). */
@@ -570,29 +710,20 @@ export async function deletePlaylistByLetter(
   const sessionCode = await getSessionCode(db, sessionId);
   const playlistName = formatPlaylistName(sessionCode, sessionId, playlistLetter);
 
-  const { error } = await db
-    .from("bingo_session_game_playlists")
-    .delete()
-    .eq("session_id", sessionId)
-    .eq("playlist_letter", playlistLetter);
+  await withPlaylistTableFallback(async (tableName, _selectClause, letterColumn) => {
+    const { error } = await (db as ReturnType<typeof getBingoDb> & Record<string, unknown>)
+      .from(tableName)
+      .delete()
+      .eq("session_id", sessionId)
+      .eq(letterColumn, playlistLetter);
 
-  if (error) throw new Error(error.message);
+    if (error) throw new Error(error.message);
+  });
 
   // Remove from active_playlist_letter_by_round if present
-  const { data: session } = await db
-    .from("bingo_sessions")
-    .select("active_playlist_letter_by_round")
-    .eq("id", sessionId)
-    .single();
-
-  if (session) {
-    const existing = (session.active_playlist_letter_by_round as { round: number; letter: string }[] | null) ?? [];
-    const updated = existing.filter((entry) => entry.letter !== playlistLetter);
-    await db
-      .from("bingo_sessions")
-      .update({ active_playlist_letter_by_round: updated })
-      .eq("id", sessionId);
-  }
+  const { entries: existing, fieldName } = await selectActivePlaylistLetters(db, sessionId);
+  const updated = existing.filter((entry) => entry.letter !== playlistLetter);
+  await updateActivePlaylistLetters(db, sessionId, fieldName, updated);
 
   // Delete collection playlist mirror (non-fatal)
   try {
