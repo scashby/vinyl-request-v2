@@ -52,8 +52,8 @@ export function generateBingoRoundIndexPdf(rounds: RoundCallSection[], title: st
   });
 
   // ── Layout ───────────────────────────────────────────────────────────────────
-  // A4 landscape keeps the album-prep sheet compact enough to print as a working crate reference.
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  // Portrait letter keeps the sheet aligned with the crate pull format and maximizes vertical density.
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
@@ -67,6 +67,7 @@ export function generateBingoRoundIndexPdf(rounds: RoundCallSection[], title: st
 
   autoTable(doc, {
     startY: 22,
+    margin: { top: 8, bottom: 8, left: 6, right: 6 },
     head: [["Artist", "Album", ...roundNumbers.map((r) => `R${r}`)]],
     body: tracks.map((track) => [
       track.artist_name,
@@ -80,6 +81,7 @@ export function generateBingoRoundIndexPdf(rounds: RoundCallSection[], title: st
       fontSize: 7,
       cellPadding: 1.2,
       overflow: "ellipsize",
+      valign: "middle",
     },
     headStyles: {
       fillColor: [33, 33, 33],
@@ -87,8 +89,8 @@ export function generateBingoRoundIndexPdf(rounds: RoundCallSection[], title: st
       halign: "left",
     },
     columnStyles: {
-      0: { cellWidth: 78 },  // Artist
-      1: { cellWidth: 110 },  // Album
+      0: { cellWidth: 72 },  // Artist
+      1: { cellWidth: 86 },  // Album
       // Round draw columns — R1 at index 2, R2 at 3, etc.
       ...Object.fromEntries(
         roundNumbers.map((_, i) => [
@@ -98,6 +100,7 @@ export function generateBingoRoundIndexPdf(rounds: RoundCallSection[], title: st
       ),
     },
     alternateRowStyles: { fillColor: [245, 245, 240] },
+    tableLineWidth: 0.1,
   });
 
   return doc;
