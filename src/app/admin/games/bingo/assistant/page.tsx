@@ -109,6 +109,12 @@ export default function BingoAssistantPage() {
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
             <button
               className="rounded border border-stone-600 px-2 py-1"
+              onClick={() => openWindow(`/admin/games/bingo/prep?sessionId=${sessionId}`, `bingo_prep_${sessionId}`, "width=1280,height=900,left=40,top=20,noopener,noreferrer")}
+            >
+              Prep
+            </button>
+            <button
+              className="rounded border border-stone-600 px-2 py-1"
               onClick={() => openWindow(`/admin/games/bingo/host?sessionId=${sessionId}`, "bingo_host", "width=1280,height=960,left=0,top=0,noopener,noreferrer")}
             >
               Host

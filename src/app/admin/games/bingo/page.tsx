@@ -1269,6 +1269,7 @@ export default function BingoSetupPage() {
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
                     <button className="rounded border border-amber-700/70 bg-amber-950/30 px-2 py-1 text-amber-200" onClick={() => openGameWindow(`/admin/games/bingo/edit?sessionId=${session.id}`, `bingo_edit_${session.id}`, "width=1320,height=960,left=80,top=40,noopener,noreferrer")}>Edit</button>
+                    <button className="rounded border border-amber-700/70 bg-amber-950/30 px-2 py-1 text-amber-200" onClick={() => openGameWindow(`/admin/games/bingo/prep?sessionId=${session.id}`, `bingo_prep_${session.id}`, "width=1280,height=900,left=40,top=20,noopener,noreferrer")}>Prep</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/host?sessionId=${session.id}`, "bingo_host", "width=1280,height=960,left=0,top=0,noopener,noreferrer")}>Host</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/assistant?sessionId=${session.id}`, "bingo_assistant", "width=1024,height=800,left=1300,top=0,noopener,noreferrer")}>Assistant</button>
                     <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/jumbotron?sessionId=${session.id}`, "bingo_jumbotron", "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
