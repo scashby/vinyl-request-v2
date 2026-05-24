@@ -45,6 +45,7 @@ export default function BingoPrepPage() {
   const sessionId = Number(useSearchParams().get("sessionId"));
   const [session, setSession] = useState<Session | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
+  const [selectedRound, setSelectedRound] = useState(1);
 
   const [preflight, setPreflight] = useState({
     cratePulled: false,
@@ -53,23 +54,40 @@ export default function BingoPrepPage() {
     sparesReady: false,
   });
 
-  const load = useCallback(async () => {
+  const loadSession = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
-    const [sRes, cRes] = await Promise.all([
-      fetch(`/api/games/bingo/sessions/${sessionId}`),
-      fetch(`/api/games/bingo/sessions/${sessionId}/calls`),
-    ]);
+    const sRes = await fetch(`/api/games/bingo/sessions/${sessionId}`);
 
-    if (sRes.ok) setSession(await sRes.json());
-    if (cRes.ok) {
-      const payload = await cRes.json();
-      setCalls(payload.data ?? []);
+    if (sRes.ok) {
+      const loadedSession = (await sRes.json()) as Session;
+      setSession(loadedSession);
+      const roundCount = Math.max(1, loadedSession.round_count ?? 1);
+      setSelectedRound((current) => {
+        if (!Number.isFinite(current) || current < 1) return 1;
+        return Math.min(current, roundCount);
+      });
     }
   }, [sessionId]);
 
+  const loadRoundCalls = useCallback(async () => {
+    if (!Number.isFinite(sessionId)) return;
+    const round = Math.max(1, Math.floor(selectedRound || 1));
+    const cRes = await fetch(`/api/games/bingo/sessions/${sessionId}/calls?round=${round}`);
+    if (!cRes.ok) {
+      setCalls([]);
+      return;
+    }
+    const payload = await cRes.json();
+    setCalls(payload.data ?? []);
+  }, [selectedRound, sessionId]);
+
   useEffect(() => {
-    load();
-  }, [load]);
+    void loadSession();
+  }, [loadSession]);
+
+  useEffect(() => {
+    void loadRoundCalls();
+  }, [loadRoundCalls]);
 
   const pulledCount = useMemo(() => calls.length, [calls.length]);
   const preflightComplete = useMemo(() => Object.values(preflight).every(Boolean), [preflight]);
@@ -141,7 +159,8 @@ export default function BingoPrepPage() {
       body: JSON.stringify({ sessionId, count: additionalCount }),
     });
     if (!response.ok) return;
-    await load();
+    await loadSession();
+    await loadRoundCalls();
   };
 
   return (
@@ -153,7 +172,7 @@ export default function BingoPrepPage() {
               <p className="text-xs uppercase tracking-[0.28em] text-amber-300">Pre-Game Prep</p>
               <h1 className="mt-1 text-4xl font-black uppercase text-amber-100">Crate Pull</h1>
               <p className="mt-2 text-sm text-stone-300">
-                {session?.playlist_name ?? "Loading…"} · {session?.session_code ?? ""} · Round {session?.current_round ?? 1} of {session?.round_count ?? 3}
+                {session?.playlist_name ?? "Loading…"} · {session?.session_code ?? ""} · Prep View Round {selectedRound} of {session?.round_count ?? 3}
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
@@ -167,7 +186,21 @@ export default function BingoPrepPage() {
           <div className="rounded-2xl border border-stone-700 bg-black/45 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-bold uppercase tracking-wide text-amber-200">Call Order (Game Playlist)</h2>
-              <p className="text-xs text-stone-400">{pulledCount} items</p>
+              <div className="flex items-center gap-3">
+                <label className="text-xs text-stone-300">
+                  Round
+                  <select
+                    className="ml-2 rounded border border-stone-700 bg-stone-950 px-2 py-1 text-xs text-stone-200"
+                    value={selectedRound}
+                    onChange={(event) => setSelectedRound(Number(event.target.value))}
+                  >
+                    {Array.from({ length: Math.max(1, session?.round_count ?? 1) }, (_, idx) => idx + 1).map((round) => (
+                      <option key={round} value={round}>Round {round}</option>
+                    ))}
+                  </select>
+                </label>
+                <p className="text-xs text-stone-400">{pulledCount} items</p>
+              </div>
             </div>
 
             <div className="mt-3 overflow-x-auto">

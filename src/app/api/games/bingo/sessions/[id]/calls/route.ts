@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
 import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
 import { getRoundSnapshotTracks } from "src/lib/bingoGameModel";
+import { getPlaylistsForRound } from "src/lib/bingoCrateModel";
 import { autoSyncSessionPlaylistMetadata } from "src/lib/playlistMetadataSync";
 import { resolveRoundPlaylistIds, type RoundPlaylistEntry } from "src/lib/bingoRoundPlaylists";
 
@@ -13,6 +14,7 @@ type SessionRow = {
   playlist_ids: number[] | null;
   round_playlist_ids: RoundPlaylistEntry[] | null;
   round_count: number;
+  active_playlist_letter_by_round: { round: number; letter: string }[] | null;
 };
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -28,7 +30,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const sessionQuery = (db
     .from("bingo_sessions")
-    .select("id, playlist_id, playlist_ids, round_playlist_ids, round_count") as unknown as {
+    .select("id, playlist_id, playlist_ids, round_playlist_ids, round_count, active_playlist_letter_by_round") as unknown as {
       eq: (column: string, value: number) => {
         maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
       };
@@ -56,6 +58,45 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     try {
+      // Prefer immutable saved game playlist call_order for this round.
+      const roundPlaylists = await getPlaylistsForRound(db, sessionId, requestedRound);
+      if (roundPlaylists.length > 0) {
+        const activeLetter = (typedSession.active_playlist_letter_by_round ?? []).find((entry) => entry.round === requestedRound)?.letter ?? null;
+        const selectedPlaylist = activeLetter
+          ? roundPlaylists.find((playlist) => playlist.playlist_letter === activeLetter) ?? null
+          : null;
+        const fallbackPlaylist = [...roundPlaylists].sort((left, right) => left.playlist_letter.localeCompare(right.playlist_letter))[0] ?? null;
+        const lockedPlaylist = selectedPlaylist ?? fallbackPlaylist;
+
+        const lockedRows = Array.isArray(lockedPlaylist?.call_order)
+          ? lockedPlaylist.call_order.map((call, index) => ({
+              id: -(index + 1),
+              session_id: sessionId,
+              playlist_track_key: call.track_key ?? null,
+              call_index: call.call_index,
+              ball_number: call.ball_number,
+              column_letter: call.column_letter,
+              track_title: call.track_title,
+              artist_name: call.artist_name,
+              album_name: call.album_name,
+              side: call.side,
+              position: call.position,
+              metadata_locked: false,
+              metadata_synced_at: null,
+              status: "pending",
+              prep_started_at: null,
+              called_at: null,
+              completed_at: null,
+              created_at: new Date(0).toISOString(),
+            }))
+          : [];
+
+        if (lockedRows.length > 0) {
+          return NextResponse.json({ data: lockedRows }, { status: 200 });
+        }
+      }
+
+      // Legacy fallback for sessions without saved game playlists.
       const snapshotTracks = await getRoundSnapshotTracks(db, sessionId, requestedRound);
       const tracks = snapshotTracks.length > 0
         ? snapshotTracks
