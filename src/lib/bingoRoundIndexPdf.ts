@@ -68,7 +68,7 @@ export function generateBingoRoundIndexPdf(rounds: RoundCallSection[], title: st
   doc.setFontSize(8);
   doc.text(`Generated: ${new Date().toLocaleString()}`, 10, 19);
 
-  const roundColWidth = 16;
+  const roundColWidth = 15;
 
   autoTable(doc, {
     startY: 22,
@@ -96,10 +96,10 @@ export function generateBingoRoundIndexPdf(rounds: RoundCallSection[], title: st
       halign: "left",
     },
     columnStyles: {
-      0: { cellWidth: 72 },  // Artist
-      1: { cellWidth: 74 },  // Album
-      2: { cellWidth: 12 },  // Side
-      3: { cellWidth: 12 },  // Pos
+      0: { cellWidth: 56 },  // Artist
+      1: { cellWidth: 68 },  // Album
+      2: { cellWidth: 10 },  // Side
+      3: { cellWidth: 10 },  // Pos
       // Round draw columns — R1 at index 4, R2 at 5, etc.
       ...Object.fromEntries(
         roundNumbers.map((_, i) => [
