@@ -24,6 +24,7 @@ const ACTIVE_PLAYLIST_FIELD = "active_playlist_letter_by_round";
 const ACTIVE_CRATE_FIELD = "active_crate_letter_by_round";
 const GAME_PLAYLIST_SELECT = "id, session_id, round_number, playlist_name, playlist_letter, call_order, created_at";
 const LEGACY_CRATE_SELECT = "id, session_id, round_number, playlist_name:crate_name, playlist_letter:crate_letter, call_order, created_at";
+const PLAYLIST_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 type SessionActivePlaylistEntry = {
   round: number;
@@ -358,9 +359,26 @@ async function getNextPlaylistLetter(
     return (rows ?? []) as Array<{ playlist_letter: string }>;
   });
 
-  const usedLetters = new Set((data ?? []).map((row) => row.playlist_letter as string));
-  const next = PLAYLIST_NAMES.find((l) => !usedLetters.has(l));
-  if (!next) throw new Error("All game playlist names exhausted for this session.");
+  const usedLetters = new Set<string>();
+  for (const row of data ?? []) {
+    const raw = String(row.playlist_letter ?? "").trim();
+    if (!raw) continue;
+
+    if (/^[A-Z]$/.test(raw)) {
+      usedLetters.add(raw);
+      continue;
+    }
+
+    // Compatibility: if prior code stored animal names in playlist_letter,
+    // map them back to canonical A-Z slots before selecting the next letter.
+    const legacyNameIndex = PLAYLIST_NAMES.findIndex((name) => name.toLowerCase() === raw.toLowerCase());
+    if (legacyNameIndex >= 0 && legacyNameIndex < PLAYLIST_LETTERS.length) {
+      usedLetters.add(PLAYLIST_LETTERS[legacyNameIndex]);
+    }
+  }
+
+  const next = PLAYLIST_LETTERS.find((letter) => !usedLetters.has(letter));
+  if (!next) throw new Error("All game playlist letters exhausted for this session.");
   return next;
 }
 
