@@ -5,16 +5,14 @@ import { type RoundCallSection } from "src/lib/bingoCallSheetPdf";
 type TrackEntry = {
   artist_name: string;
   album_name: string;
-  side: string;
-  position: string;
-  drawByRound: Map<number, number>;
+  drawByRound: Map<number, number[]>;
 };
 
 /**
- * Generate a cross-round draw-order index for a bingo session.
+ * Generate an album-prep index for a bingo session.
  *
- * Produces one row per unique track (keyed by artist · album · side · position),
- * with a separate column for each round's draw number.
+ * Produces one row per album (keyed by artist · album),
+ * with a separate column for each round's draw numbers.
  * Sorted by draw order so prep sheets stay aligned with the locked round pull.
  */
 export function generateBingoRoundIndexPdf(rounds: RoundCallSection[], title: string): jsPDF {
@@ -23,17 +21,16 @@ export function generateBingoRoundIndexPdf(rounds: RoundCallSection[], title: st
 
   for (const round of rounds) {
     for (const call of round.calls) {
-      const key = `${call.artist_name}::${call.album_name ?? ""}::${call.side ?? ""}::${call.position ?? ""}`;
+      const key = `${call.artist_name}::${call.album_name ?? ""}`;
       const existing = trackMap.get(key);
       if (existing) {
-        existing.drawByRound.set(round.roundNumber, call.call_index);
+        const existingDraws = existing.drawByRound.get(round.roundNumber) ?? [];
+        existing.drawByRound.set(round.roundNumber, [...existingDraws, call.call_index].sort((a, b) => a - b));
       } else {
         trackMap.set(key, {
           artist_name: call.artist_name,
           album_name: call.album_name ?? "",
-          side: call.side ?? "",
-          position: call.position ?? "",
-          drawByRound: new Map([[round.roundNumber, call.call_index]]),
+          drawByRound: new Map([[round.roundNumber, [call.call_index]]]),
         });
       }
     }
@@ -43,21 +40,19 @@ export function generateBingoRoundIndexPdf(rounds: RoundCallSection[], title: st
 
   const tracks = Array.from(trackMap.values()).sort((a, b) => {
     for (const roundNumber of roundNumbers) {
-      const leftDraw = a.drawByRound.get(roundNumber) ?? Number.MAX_SAFE_INTEGER;
-      const rightDraw = b.drawByRound.get(roundNumber) ?? Number.MAX_SAFE_INTEGER;
+      const leftDraw = a.drawByRound.get(roundNumber)?.[0] ?? Number.MAX_SAFE_INTEGER;
+      const rightDraw = b.drawByRound.get(roundNumber)?.[0] ?? Number.MAX_SAFE_INTEGER;
       if (leftDraw !== rightDraw) return leftDraw - rightDraw;
     }
 
     return (
       a.artist_name.localeCompare(b.artist_name) ||
-      a.album_name.localeCompare(b.album_name) ||
-      a.side.localeCompare(b.side) ||
-      a.position.localeCompare(b.position)
+      a.album_name.localeCompare(b.album_name)
     );
   });
 
   // ── Layout ───────────────────────────────────────────────────────────────────
-  // A4 landscape (~297×210mm) gives comfortable width for artist + album + round cols
+  // A4 landscape keeps the album-prep sheet compact enough to print as a working crate reference.
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
   doc.setFont("helvetica", "bold");
@@ -65,40 +60,39 @@ export function generateBingoRoundIndexPdf(rounds: RoundCallSection[], title: st
   doc.text(title, 10, 12);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.text(`Generated: ${new Date().toLocaleString()}`, 10, 19);
 
-  const roundColWidth = 22;
+  const roundColWidth = 16;
 
   autoTable(doc, {
-    startY: 24,
-    head: [["Artist", "Album", "Side", "Pos", ...roundNumbers.map((r) => `R${r} Draw`)]],
+    startY: 22,
+    head: [["Artist", "Album", ...roundNumbers.map((r) => `R${r}`)]],
     body: tracks.map((track) => [
       track.artist_name,
       track.album_name,
-      track.side,
-      track.position,
-      ...roundNumbers.map((r) => track.drawByRound.get(r) ?? "—"),
+      ...roundNumbers.map((r) => {
+        const draws = track.drawByRound.get(r) ?? [];
+        return draws.length > 0 ? draws.join(", ") : "—";
+      }),
     ]),
     styles: {
-      fontSize: 8,
-      cellPadding: 2,
+      fontSize: 7,
+      cellPadding: 1.2,
       overflow: "ellipsize",
     },
     headStyles: {
       fillColor: [33, 33, 33],
-      fontSize: 8,
+      fontSize: 7,
       halign: "left",
     },
     columnStyles: {
-      0: { cellWidth: 60 },  // Artist
-      1: { cellWidth: 60 },  // Album
-      2: { cellWidth: 14 },  // Side
-      3: { cellWidth: 14 },  // Pos
-      // Round draw columns — R1 at index 4, R2 at 5, etc.
+      0: { cellWidth: 78 },  // Artist
+      1: { cellWidth: 110 },  // Album
+      // Round draw columns — R1 at index 2, R2 at 3, etc.
       ...Object.fromEntries(
         roundNumbers.map((_, i) => [
-          4 + i,
+          2 + i,
           { cellWidth: roundColWidth, halign: "center" as const, fontStyle: "bold" as const },
         ])
       ),
