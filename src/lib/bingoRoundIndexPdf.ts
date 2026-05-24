@@ -15,8 +15,7 @@ type TrackEntry = {
  *
  * Produces one row per unique track (keyed by artist · album · side · position),
  * with a separate column for each round's draw number.
- * Sorted alphabetically by artist so you can quickly locate any album in the crate
- * and write all its round numbers on a single label before the event.
+ * Sorted by draw order so prep sheets stay aligned with the locked round pull.
  */
 export function generateBingoRoundIndexPdf(rounds: RoundCallSection[], title: string): jsPDF {
   // ── Build track map ──────────────────────────────────────────────────────────
@@ -40,12 +39,22 @@ export function generateBingoRoundIndexPdf(rounds: RoundCallSection[], title: st
     }
   }
 
-  // Sort alphabetically by artist
-  const tracks = Array.from(trackMap.values()).sort((a, b) =>
-    a.artist_name.localeCompare(b.artist_name)
-  );
-
   const roundNumbers = rounds.map((r) => r.roundNumber).sort((a, b) => a - b);
+
+  const tracks = Array.from(trackMap.values()).sort((a, b) => {
+    for (const roundNumber of roundNumbers) {
+      const leftDraw = a.drawByRound.get(roundNumber) ?? Number.MAX_SAFE_INTEGER;
+      const rightDraw = b.drawByRound.get(roundNumber) ?? Number.MAX_SAFE_INTEGER;
+      if (leftDraw !== rightDraw) return leftDraw - rightDraw;
+    }
+
+    return (
+      a.artist_name.localeCompare(b.artist_name) ||
+      a.album_name.localeCompare(b.album_name) ||
+      a.side.localeCompare(b.side) ||
+      a.position.localeCompare(b.position)
+    );
+  });
 
   // ── Layout ───────────────────────────────────────────────────────────────────
   // A4 landscape (~297×210mm) gives comfortable width for artist + album + round cols
