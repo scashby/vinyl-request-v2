@@ -67,6 +67,68 @@ type SessionPlaylistBackfillRow = {
   active_playlist_letter_by_round: SessionActivePlaylistEntry[] | null;
 };
 
+function getDynamicTableDb(db: ReturnType<typeof getBingoDb>): {
+  from: (tableName: string) => {
+    select: (columns: string) => {
+      eq: (column: string, value: string | number) => {
+        eq: (column: string, value: string | number) => {
+          order: (column: string, options: { ascending: boolean }) => Promise<{ data: unknown; error: { message: string } | null }>;
+          maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
+        };
+        order: (column: string, options: { ascending: boolean }) => Promise<{ data: unknown; error: { message: string } | null }>;
+        maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
+      };
+      order: (column: string, options: { ascending: boolean }) => Promise<{ data: unknown; error: { message: string } | null }>;
+      maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
+      single: () => Promise<{ data: unknown; error: { message: string } | null }>;
+    };
+    insert: (payload: unknown) => {
+      select: (columns: string) => {
+        single: () => Promise<{ data: unknown; error: { message: string } | null }>;
+      };
+    };
+    update: (payload: Record<string, unknown>) => {
+      eq: (column: string, value: string | number) => Promise<{ error: { message: string } | null }>;
+    };
+    delete: () => {
+      eq: (column: string, value: string | number) => {
+        eq: (column: string, value: string | number) => Promise<{ error: { message: string } | null }>;
+      };
+    };
+  };
+} {
+  return db as unknown as {
+    from: (tableName: string) => {
+      select: (columns: string) => {
+        eq: (column: string, value: string | number) => {
+          eq: (column: string, value: string | number) => {
+            order: (column: string, options: { ascending: boolean }) => Promise<{ data: unknown; error: { message: string } | null }>;
+            maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
+          };
+          order: (column: string, options: { ascending: boolean }) => Promise<{ data: unknown; error: { message: string } | null }>;
+          maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
+        };
+        order: (column: string, options: { ascending: boolean }) => Promise<{ data: unknown; error: { message: string } | null }>;
+        maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
+        single: () => Promise<{ data: unknown; error: { message: string } | null }>;
+      };
+      insert: (payload: unknown) => {
+        select: (columns: string) => {
+          single: () => Promise<{ data: unknown; error: { message: string } | null }>;
+        };
+      };
+      update: (payload: Record<string, unknown>) => {
+        eq: (column: string, value: string | number) => Promise<{ error: { message: string } | null }>;
+      };
+      delete: () => {
+        eq: (column: string, value: string | number) => {
+          eq: (column: string, value: string | number) => Promise<{ error: { message: string } | null }>;
+        };
+      };
+    };
+  };
+}
+
 function isMissingSchemaObject(error: unknown, schemaObject: string): boolean {
   if (!(error instanceof Error)) return false;
 
@@ -126,7 +188,7 @@ async function selectSessionPlaylistBackfillRow(
     if (legacyError) throw new Error(legacyError.message);
     if (!data) return null;
 
-    const row = data as Record<string, unknown>;
+    const row = data as unknown as Record<string, unknown>;
     return {
       playlist_id: (row.playlist_id as number | null) ?? null,
       playlist_ids: (row.playlist_ids as number[] | null) ?? null,
@@ -151,7 +213,7 @@ async function selectActivePlaylistLetters(
 
     if (error) throw new Error(error.message);
     return {
-      entries: ((data as Record<string, unknown> | null)?.[ACTIVE_PLAYLIST_FIELD] as SessionActivePlaylistEntry[] | null) ?? [],
+      entries: ((data as unknown as Record<string, unknown> | null)?.[ACTIVE_PLAYLIST_FIELD] as SessionActivePlaylistEntry[] | null) ?? [],
       fieldName: ACTIVE_PLAYLIST_FIELD,
     };
   } catch (error) {
@@ -167,7 +229,7 @@ async function selectActivePlaylistLetters(
 
     if (legacyError) throw new Error(legacyError.message);
     return {
-      entries: ((data as Record<string, unknown> | null)?.[ACTIVE_CRATE_FIELD] as SessionActivePlaylistEntry[] | null) ?? [],
+      entries: ((data as unknown as Record<string, unknown> | null)?.[ACTIVE_CRATE_FIELD] as SessionActivePlaylistEntry[] | null) ?? [],
       fieldName: ACTIVE_CRATE_FIELD,
     };
   }
@@ -179,10 +241,31 @@ async function updateActivePlaylistLetters(
   fieldName: typeof ACTIVE_PLAYLIST_FIELD | typeof ACTIVE_CRATE_FIELD,
   entries: SessionActivePlaylistEntry[]
 ): Promise<void> {
-  const { error } = await db
-    .from("bingo_sessions")
-    .update({ [fieldName]: entries })
-    .eq("id", sessionId);
+  let error: { message: string } | null = null;
+
+  if (fieldName === ACTIVE_PLAYLIST_FIELD) {
+    const result = await db
+      .from("bingo_sessions")
+      .update({ active_playlist_letter_by_round: entries })
+      .eq("id", sessionId);
+
+    error = result.error;
+  } else {
+    const legacyDb = db as unknown as {
+      from: (tableName: string) => {
+        update: (payload: Record<string, unknown>) => {
+          eq: (column: string, value: number) => Promise<{ error: { message: string } | null }>;
+        };
+      };
+    };
+
+    const result = await legacyDb
+      .from("bingo_sessions")
+      .update({ [ACTIVE_CRATE_FIELD]: entries })
+      .eq("id", sessionId);
+
+    error = result.error;
+  }
 
   if (error) throw new Error(error.message);
 }
@@ -264,15 +347,15 @@ async function getNextPlaylistLetter(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number
 ): Promise<string> {
-  const data = await withPlaylistTableFallback(async (tableName, selectClause, letterColumn) => {
-    const { data: rows, error } = await (db as ReturnType<typeof getBingoDb> & Record<string, unknown>)
+  const data = await withPlaylistTableFallback<Array<{ playlist_letter: string }>>(async (tableName, selectClause, letterColumn) => {
+    const { data: rows, error } = await getDynamicTableDb(db)
       .from(tableName)
       .select(tableName === GAME_PLAYLISTS_TABLE ? "playlist_letter" : "playlist_letter:crate_letter")
       .eq("session_id", sessionId)
       .order(letterColumn, { ascending: true });
 
     if (error) throw new Error(error.message);
-    return rows ?? [];
+    return (rows ?? []) as Array<{ playlist_letter: string }>;
   });
 
   const usedLetters = new Set((data ?? []).map((row) => row.playlist_letter as string));
@@ -428,7 +511,15 @@ export async function savePlaylistForRound(
   const sessionCode = await getSessionCode(db, sessionId);
   const playlistName = formatPlaylistName(sessionCode, sessionId, letter);
 
-  const data = await withPlaylistTableFallback(async (tableName, selectClause) => {
+  const data = await withPlaylistTableFallback<{
+    id: number;
+    session_id: number;
+    round_number: number;
+    playlist_name: string;
+    playlist_letter: string;
+    call_order: Record<string, unknown>[];
+    created_at: string;
+  }>(async (tableName, selectClause) => {
     const insertRow =
       tableName === GAME_PLAYLISTS_TABLE
         ? {
@@ -446,14 +537,22 @@ export async function savePlaylistForRound(
             call_order: calls as unknown as Record<string, unknown>[],
           };
 
-    const { data: created, error } = await (db as ReturnType<typeof getBingoDb> & Record<string, unknown>)
+    const { data: created, error } = await getDynamicTableDb(db)
       .from(tableName)
       .insert(insertRow)
       .select(selectClause)
       .single();
 
     if (error || !created) throw new Error(error?.message ?? "Failed to save game playlist.");
-    return created;
+    return created as {
+      id: number;
+      session_id: number;
+      round_number: number;
+      playlist_name: string;
+      playlist_letter: string;
+      call_order: Record<string, unknown>[];
+      created_at: string;
+    };
   });
 
   const saved: BingoSessionGamePlaylist = {
@@ -476,15 +575,31 @@ export async function getPlaylistsForSession(
   sessionId: number
 ): Promise<BingoSessionGamePlaylist[]> {
   const sessionCode = await getSessionCode(db, sessionId);
-  const data = await withPlaylistTableFallback(async (tableName, selectClause, letterColumn) => {
-    const { data: rows, error } = await (db as ReturnType<typeof getBingoDb> & Record<string, unknown>)
+  const data = await withPlaylistTableFallback<Array<{
+    id: number;
+    session_id: number;
+    round_number: number;
+    playlist_name: string;
+    playlist_letter: string;
+    call_order: Record<string, unknown>[];
+    created_at: string;
+  }>>(async (tableName, selectClause, letterColumn) => {
+    const { data: rows, error } = await getDynamicTableDb(db)
       .from(tableName)
       .select(selectClause)
       .eq("session_id", sessionId)
       .order(letterColumn, { ascending: true });
 
     if (error) throw new Error(error.message);
-    return rows ?? [];
+    return (rows ?? []) as Array<{
+      id: number;
+      session_id: number;
+      round_number: number;
+      playlist_name: string;
+      playlist_letter: string;
+      call_order: Record<string, unknown>[];
+      created_at: string;
+    }>;
   });
 
   return (data ?? []).map((row) => ({
@@ -501,8 +616,16 @@ export async function getPlaylistByLetter(
   playlistLetter: string
 ): Promise<BingoSessionGamePlaylist | null> {
   const sessionCode = await getSessionCode(db, sessionId);
-  const data = await withPlaylistTableFallback(async (tableName, selectClause, letterColumn) => {
-    const { data: row, error } = await (db as ReturnType<typeof getBingoDb> & Record<string, unknown>)
+  const data = await withPlaylistTableFallback<{
+    id: number;
+    session_id: number;
+    round_number: number;
+    playlist_name: string;
+    playlist_letter: string;
+    call_order: Record<string, unknown>[];
+    created_at: string;
+  } | null>(async (tableName, selectClause, letterColumn) => {
+    const { data: row, error } = await getDynamicTableDb(db)
       .from(tableName)
       .select(selectClause)
       .eq("session_id", sessionId)
@@ -510,7 +633,15 @@ export async function getPlaylistByLetter(
       .maybeSingle();
 
     if (error) throw new Error(error.message);
-    return row;
+    return (row as {
+      id: number;
+      session_id: number;
+      round_number: number;
+      playlist_name: string;
+      playlist_letter: string;
+      call_order: Record<string, unknown>[];
+      created_at: string;
+    } | null) ?? null;
   });
 
   if (!data) return null;
@@ -528,8 +659,16 @@ export async function getPlaylistsForRound(
   roundNumber: number
 ): Promise<BingoSessionGamePlaylist[]> {
   const sessionCode = await getSessionCode(db, sessionId);
-  const data = await withPlaylistTableFallback(async (tableName, selectClause, letterColumn) => {
-    const { data: rows, error } = await (db as ReturnType<typeof getBingoDb> & Record<string, unknown>)
+  const data = await withPlaylistTableFallback<Array<{
+    id: number;
+    session_id: number;
+    round_number: number;
+    playlist_name: string;
+    playlist_letter: string;
+    call_order: Record<string, unknown>[];
+    created_at: string;
+  }>>(async (tableName, selectClause, letterColumn) => {
+    const { data: rows, error } = await getDynamicTableDb(db)
       .from(tableName)
       .select(selectClause)
       .eq("session_id", sessionId)
@@ -537,7 +676,15 @@ export async function getPlaylistsForRound(
       .order(letterColumn, { ascending: true });
 
     if (error) throw new Error(error.message);
-    return rows ?? [];
+    return (rows ?? []) as Array<{
+      id: number;
+      session_id: number;
+      round_number: number;
+      playlist_name: string;
+      playlist_letter: string;
+      call_order: Record<string, unknown>[];
+      created_at: string;
+    }>;
   });
 
   return (data ?? []).map((row) => ({
@@ -609,14 +756,17 @@ export async function createPlaylistFromSessionData(
   const effectiveRound = (roundNumber != null && roundNumber >= 1) ? roundNumber : (typedSession.current_round ?? 1);
 
   // Count ALL existing game playlists for this session so the new one gets a unique shuffle seed.
-  const existingAll = await withPlaylistTableFallback(async (tableName) => {
-    const { data, error } = await (db as ReturnType<typeof getBingoDb> & Record<string, unknown>)
+  const existingAll = await withPlaylistTableFallback<Array<{ id: number }>>(async (tableName) => {
+    const { data, error } = await (getDynamicTableDb(db)
       .from(tableName)
       .select("id")
-      .eq("session_id", sessionId);
+      .eq("session_id", sessionId) as unknown as Promise<{
+        data: unknown;
+        error: { message: string } | null;
+      }>);
 
     if (error) throw new Error(error.message);
-    return data ?? [];
+    return (data ?? []) as Array<{ id: number }>;
   });
   const generation = existingAll?.length ?? 0;
 
@@ -656,7 +806,7 @@ export async function reshuffleAllPlaylists(
     if (newCallOrder.length === 0) continue;
 
     await withPlaylistTableFallback(async (tableName) => {
-      const { error } = await (db as ReturnType<typeof getBingoDb> & Record<string, unknown>)
+      const { error } = await getDynamicTableDb(db)
         .from(tableName)
         .update({ call_order: newCallOrder as unknown as Record<string, unknown>[] })
         .eq("id", playlist.id);
@@ -711,7 +861,7 @@ export async function deletePlaylistByLetter(
   const playlistName = formatPlaylistName(sessionCode, sessionId, playlistLetter);
 
   await withPlaylistTableFallback(async (tableName, _selectClause, letterColumn) => {
-    const { error } = await (db as ReturnType<typeof getBingoDb> & Record<string, unknown>)
+    const { error } = await getDynamicTableDb(db)
       .from(tableName)
       .delete()
       .eq("session_id", sessionId)
