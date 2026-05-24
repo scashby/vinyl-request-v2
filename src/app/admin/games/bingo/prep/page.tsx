@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { type PrintableCard } from "src/lib/bingoCardPrintPack";
 import { generateBingoCardsPdf } from "src/lib/bingoCardsPdf";
 import { generateBingoCallSheetPdf, type RoundCallSection } from "src/lib/bingoCallSheetPdf";
+import { generateBingoRoundIndexPdf } from "src/lib/bingoRoundIndexPdf";
 import { formatBallLabel, getBingoColumnTextClass } from "src/lib/bingoBall";
 
 type Session = {
@@ -89,6 +90,24 @@ export default function BingoPrepPage() {
       : `Crate Pull Order · Session ${sessionId}`;
     const doc = generateBingoCallSheetPdf(roundSections, title);
     doc.save(`bingo-${sessionId}-crate-pull.pdf`);
+  };
+
+  const downloadRoundIndex = async () => {
+    const totalRounds = session?.round_count ?? 1;
+    const roundSections: RoundCallSection[] = [];
+
+    for (let r = 1; r <= totalRounds; r++) {
+      const res = await fetch(`/api/games/bingo/sessions/${sessionId}/calls?round=${r}`);
+      if (!res.ok) continue;
+      const payload = await res.json();
+      roundSections.push({ roundNumber: r, calls: payload.data ?? [] });
+    }
+
+    const title = session
+      ? `Round Draw Index · ${session.playlist_name} · ${session.session_code}`
+      : `Round Draw Index · Session ${sessionId}`;
+    const doc = generateBingoRoundIndexPdf(roundSections, title);
+    doc.save(`bingo-${sessionId}-round-index.pdf`);
   };
 
   const downloadCards = async (layout: "2-up" | "4-up") => {
@@ -196,6 +215,7 @@ export default function BingoPrepPage() {
               <h2 className="text-sm font-bold uppercase tracking-wide text-amber-200">Downloads</h2>
               <div className="mt-3 flex flex-wrap gap-2 text-xs">
                 <button onClick={downloadCratePullSheet} className="rounded bg-amber-700 px-3 py-2">Crate Pull PDF</button>
+                <button onClick={downloadRoundIndex} className="rounded bg-amber-700 px-3 py-2">Round Index PDF</button>
                 <button onClick={createAdditionalCards} className="rounded bg-stone-800 px-3 py-2">Add {Math.max(1, session?.round_count ?? 1) * 100} Cards</button>
                 <button onClick={() => downloadCards("4-up")} className="rounded bg-stone-800 px-3 py-2">Cards Pack PDF (4-up)</button>
               </div>
