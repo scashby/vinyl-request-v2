@@ -16,6 +16,7 @@ import {
   createRoundTrackSnapshotsFromTracks,
   getRoundSnapshotTracks,
 } from "src/lib/bingoGameModel";
+import { savePlaylistForRound, setActivePlaylistForRound } from "src/lib/bingoCrateModel";
 import { normalizeRoundModes } from "src/lib/bingoModes";
 import {
   collectResolvedPlaylistIdsByRound,
@@ -455,6 +456,35 @@ export async function POST(request: NextRequest) {
         await createRoundTrackSnapshotsFromTracks(db, session.id, roundCount, fixedPoolTracks);
       } else {
         await createRoundTrackSnapshots(db, session.id, resolvedPlaylistsByRound);
+      }
+
+      for (let round = 1; round <= roundCount; round += 1) {
+        const snapshotTracks = await getRoundSnapshotTracks(db, session.id, round);
+        if (snapshotTracks.length === 0) {
+          throw new Error(`Failed to build immutable game playlist for round ${round}.`);
+        }
+
+        const plannedCalls = planRoundSessionCalls(snapshotTracks, session.id, round);
+        const createdPlaylist = await savePlaylistForRound(
+          db,
+          session.id,
+          round,
+          plannedCalls.map((planned) => ({
+            id: -(planned.call_index ?? round),
+            call_index: planned.call_index,
+            ball_number: planned.ball_number,
+            column_letter: planned.column_letter,
+            track_title: planned.track_title,
+            artist_name: planned.artist_name,
+            album_name: planned.album_name,
+            side: planned.side,
+            position: planned.position,
+            status: "pending",
+            track_key: planned.playlist_track_key,
+          }))
+        );
+
+        await setActivePlaylistForRound(db, session.id, round, createdPlaylist.playlist_letter);
       }
 
       const roundOneTracks = await getRoundSnapshotTracks(db, session.id, 1);
