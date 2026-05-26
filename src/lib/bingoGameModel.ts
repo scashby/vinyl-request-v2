@@ -387,24 +387,45 @@ export async function validateCardByIdentifier(
   cardIdentifier: string,
   roundOverride?: number
 ): Promise<BingoCardValidationResult> {
-  const { data: card, error: cardError } = await db
+  const { data: session, error: sessionError } = await db
+    .from("bingo_sessions")
+    .select("current_round, game_mode, round_modes, is_sandbox, sandbox_source_session_id")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (sessionError) throw new Error(sessionError.message);
+  if (!session) throw new Error("Session not found.");
+
+  let card: { session_id: number; card_identifier: string; grid: unknown } | null = null;
+  const { data: sessionCard, error: sessionCardError } = await db
     .from("bingo_cards")
     .select("session_id, card_identifier, grid")
     .eq("session_id", sessionId)
     .eq("card_identifier", cardIdentifier)
     .maybeSingle();
 
-  if (cardError) throw new Error(cardError.message);
+  if (sessionCardError) throw new Error(sessionCardError.message);
+  if (sessionCard) {
+    card = sessionCard as { session_id: number; card_identifier: string; grid: unknown };
+  } else {
+    const isSandbox = Boolean((session as { is_sandbox?: unknown }).is_sandbox);
+    const sourceSessionId = Number((session as { sandbox_source_session_id?: unknown }).sandbox_source_session_id);
+    if (isSandbox && Number.isFinite(sourceSessionId)) {
+      const { data: sourceCard, error: sourceCardError } = await db
+        .from("bingo_cards")
+        .select("session_id, card_identifier, grid")
+        .eq("session_id", sourceSessionId)
+        .eq("card_identifier", cardIdentifier)
+        .maybeSingle();
+
+      if (sourceCardError) throw new Error(sourceCardError.message);
+      if (sourceCard) {
+        card = sourceCard as { session_id: number; card_identifier: string; grid: unknown };
+      }
+    }
+  }
+
   if (!card) throw new Error("Card not found for this session.");
-
-  const { data: session, error: sessionError } = await db
-    .from("bingo_sessions")
-    .select("current_round, game_mode, round_modes")
-    .eq("id", sessionId)
-    .maybeSingle();
-
-  if (sessionError) throw new Error(sessionError.message);
-  if (!session) throw new Error("Session not found.");
 
   const round = roundOverride && Number.isFinite(roundOverride)
     ? Math.max(1, Math.floor(roundOverride))
@@ -413,14 +434,35 @@ export async function validateCardByIdentifier(
 
   const { data: calls, error: callsError } = await db
     .from("bingo_session_calls")
-    .select("id, status")
+    .select("id, call_index, status")
     .eq("session_id", sessionId);
 
   if (callsError) throw new Error(callsError.message);
 
-  const calledCallIds = new Set(
-    ((calls ?? []) as Array<{ id: number; status: string }>).filter((call) => call.status === "called" || call.status === "completed").map((call) => call.id)
-  );
+  const sessionCalls = (calls ?? []) as Array<{ id: number; call_index: number; status: string }>;
+  const calledSessionCalls = sessionCalls.filter((call) => call.status === "called" || call.status === "completed");
+  const calledCallIds = new Set<number>(calledSessionCalls.map((call) => call.id));
+
+  const isSandbox = Boolean((session as { is_sandbox?: unknown }).is_sandbox);
+  const sourceSessionId = Number((session as { sandbox_source_session_id?: unknown }).sandbox_source_session_id);
+  if (isSandbox && Number.isFinite(sourceSessionId)) {
+    const { data: sourceCalls, error: sourceCallsError } = await db
+      .from("bingo_session_calls")
+      .select("id, call_index")
+      .eq("session_id", sourceSessionId);
+
+    if (sourceCallsError) throw new Error(sourceCallsError.message);
+
+    const sourceIdByIndex = new Map<number, number>(
+      ((sourceCalls ?? []) as Array<{ id: number; call_index: number }>).map((call) => [call.call_index, call.id])
+    );
+
+    // Include source-session call ids that align with called sandbox rows so source cards validate in sandbox.
+    calledSessionCalls.forEach((call) => {
+      const sourceCallId = sourceIdByIndex.get(call.call_index);
+      if (sourceCallId) calledCallIds.add(sourceCallId);
+    });
+  }
 
   const grid = coerceCardGrid((card as { grid?: unknown }).grid);
   const linePatterns = buildLinePatterns(grid);
