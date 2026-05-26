@@ -77,6 +77,10 @@ type Session = {
   thanks_events_heading_text?: string | null;
   is_favorite?: boolean;
   favorite_note?: string | null;
+  is_sandbox?: boolean;
+  sandbox_source_session_id?: number | null;
+  sandbox_source_session_code?: string | null;
+  sandbox_expires_at?: string | null;
 };
 
 type SessionTemplateOption = {
@@ -154,6 +158,7 @@ export default function BingoSetupPage() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [presets, setPresets] = useState<BingoPreset[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [sandboxSessions, setSandboxSessions] = useState<Session[]>([]);
   const [templateSessions, setTemplateSessions] = useState<SessionTemplateOption[]>([]);
   const [eventId, setEventId] = useState<number | null>(Number.isFinite(eventIdFromUrl) ? eventIdFromUrl : null);
   const [showCreateEventModal, setShowCreateEventModal] = useState(false);
@@ -426,12 +431,13 @@ export default function BingoSetupPage() {
   }, [eventId]);
 
   const load = useCallback(async () => {
-    const [eRes, pRes, presetsRes, sRes, allSessionsRes] = await Promise.all([
+    const [eRes, pRes, presetsRes, sRes, allSessionsRes, sandboxRes] = await Promise.all([
       fetch("/api/games/bingo/events"),
       fetch("/api/games/playlists"),
       fetch("/api/games/bingo/presets"),
       fetch(`/api/games/bingo/sessions${eventId ? `?eventId=${eventId}` : ""}`),
       fetch("/api/games/bingo/sessions"),
+      fetch(`/api/games/bingo/sessions?includeSandbox=true${eventId ? `&eventId=${eventId}` : ""}`),
     ]);
 
     if (eRes.ok) {
@@ -477,6 +483,12 @@ export default function BingoSetupPage() {
             favorite_note: session.favorite_note ?? null,
           }))
       );
+    }
+
+    if (sandboxRes.ok) {
+      const payload = await sandboxRes.json();
+      const all = (payload.data ?? []) as Session[];
+      setSandboxSessions(all.filter((session) => Boolean(session.is_sandbox)));
     }
   }, [eventId]);
 
@@ -1330,6 +1342,38 @@ export default function BingoSetupPage() {
                         </div>
                       );
                     })()}
+                    <button className="rounded border border-red-800/60 bg-red-950/30 px-2 py-1 text-red-200" onClick={() => deleteSession(session.id, session.session_code)}>Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-3xl border border-cyan-900/40 bg-black/45 p-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-xl font-black uppercase text-cyan-100">Sandbox Sessions</h2>
+            <button onClick={load} className="rounded border border-stone-700 px-3 py-1 text-sm">Refresh</button>
+          </div>
+
+          {sandboxSessions.length === 0 ? (
+            <p className="text-sm text-stone-400">No active sandbox sessions.</p>
+          ) : (
+            <div className="space-y-3">
+              {sandboxSessions.map((session) => (
+                <div key={session.id} className="rounded-xl border border-cyan-900/50 bg-cyan-950/10 p-3">
+                  <div className="text-sm">
+                    <span className="rounded border border-amber-500/70 bg-amber-950/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em] text-amber-200">Sandbox</span>
+                    <span className="ml-2">{session.session_code} · {(session.playlist_names?.length ? session.playlist_names.join(" + ") : session.playlist_name)}</span>
+                  </div>
+                  <div className="mt-1 text-xs text-stone-400">
+                    Source: {session.sandbox_source_session_code ?? "Unknown"} · Expires: {session.sandbox_expires_at ? new Date(session.sandbox_expires_at).toLocaleString() : "N/A"}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/prep?sessionId=${session.id}`, `bingo_sandbox_prep_${session.id}`, "width=1280,height=900,left=40,top=20,noopener,noreferrer")}>Prep</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/host?sessionId=${session.id}`, `bingo_sandbox_host_${session.id}`, "width=1280,height=960,left=0,top=0,noopener,noreferrer")}>Host</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/assistant?sessionId=${session.id}`, `bingo_sandbox_assistant_${session.id}`, "width=1024,height=800,left=1300,top=0,noopener,noreferrer")}>Assistant</button>
+                    <button className="rounded border border-stone-600 px-2 py-1" onClick={() => openGameWindow(`/admin/games/bingo/jumbotron?sessionId=${session.id}`, `bingo_sandbox_jumbotron_${session.id}`, "width=1920,height=1080,noopener,noreferrer")}>Jumbotron</button>
                     <button className="rounded border border-red-800/60 bg-red-950/30 px-2 py-1 text-red-200" onClick={() => deleteSession(session.id, session.session_code)}>Delete</button>
                   </div>
                 </div>

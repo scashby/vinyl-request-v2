@@ -26,6 +26,9 @@ type Session = {
   bingo_overlay: string;
   default_intermission_seconds: number;
   active_playlist_letter_by_round: { round: number; letter: string }[] | null;
+  is_sandbox?: boolean;
+  sandbox_source_session_id?: number | null;
+  sandbox_expires_at?: string | null;
 };
 
 type BingoGamePlaylist = {
@@ -514,6 +517,11 @@ export default function BingoHostPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-3xl font-black uppercase">Music Bingo Host</h1>
+              {session?.is_sandbox ? (
+                <p className="mt-2 inline-flex items-center rounded border border-amber-500/70 bg-amber-950/40 px-2 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-amber-200">
+                  Sandbox Dry Run {session.sandbox_expires_at ? `· Expires ${new Date(session.sandbox_expires_at).toLocaleString()}` : ""}
+                </p>
+              ) : null}
               <p className="text-sm text-stone-400">{session?.playlist_name} · {session?.session_code}</p>
             </div>
 

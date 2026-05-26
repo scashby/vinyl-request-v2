@@ -245,6 +245,9 @@ export type BingoDatabase = {
           is_favorite: boolean;
           favorite_note: string | null;
           active_playlist_letter_by_round: { round: number; letter: string }[] | null;
+          is_sandbox: boolean;
+          sandbox_source_session_id: number | null;
+          sandbox_expires_at: string | null;
         };
         Insert: {
           id?: number;
@@ -304,6 +307,9 @@ export type BingoDatabase = {
           is_favorite?: boolean;
           favorite_note?: string | null;
           active_playlist_letter_by_round?: { round: number; letter: string }[] | null;
+          is_sandbox?: boolean;
+          sandbox_source_session_id?: number | null;
+          sandbox_expires_at?: string | null;
         };
         Update: {
           id?: number;
@@ -363,6 +369,9 @@ export type BingoDatabase = {
           is_favorite?: boolean;
           favorite_note?: string | null;
           active_playlist_letter_by_round?: { round: number; letter: string }[] | null;
+          is_sandbox?: boolean;
+          sandbox_source_session_id?: number | null;
+          sandbox_expires_at?: string | null;
         };
         Relationships: [];
       };

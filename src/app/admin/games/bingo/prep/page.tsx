@@ -18,6 +18,8 @@ type Session = {
   round_count: number;
   card_layout: "2-up" | "4-up";
   status: string;
+  is_sandbox?: boolean;
+  sandbox_expires_at?: string | null;
 };
 
 type Call = {
@@ -46,6 +48,7 @@ export default function BingoPrepPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
   const [selectedRound, setSelectedRound] = useState(1);
+  const [creatingSandbox, setCreatingSandbox] = useState(false);
 
   const [preflight, setPreflight] = useState({
     cratePulled: false,
@@ -163,6 +166,32 @@ export default function BingoPrepPage() {
     await loadRoundCalls();
   };
 
+  const startSandboxDryRun = async () => {
+    if (!Number.isFinite(sessionId) || creatingSandbox) return;
+    setCreatingSandbox(true);
+    try {
+      const response = await fetch(`/api/games/bingo/sessions/${sessionId}/sandbox`, {
+        method: "POST",
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        id?: number;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.id) {
+        alert(payload.error ?? "Failed to start sandbox dry run");
+        return;
+      }
+
+      const sandboxSessionId = payload.id;
+      window.open(`/admin/games/bingo/host?sessionId=${sandboxSessionId}`, `bingo_sandbox_host_${sandboxSessionId}`, "width=1280,height=960,left=0,top=0,noopener,noreferrer");
+      window.open(`/admin/games/bingo/assistant?sessionId=${sandboxSessionId}`, `bingo_sandbox_assistant_${sandboxSessionId}`, "width=1024,height=800,left=1300,top=0,noopener,noreferrer");
+      window.open(`/admin/games/bingo/jumbotron?sessionId=${sandboxSessionId}`, `bingo_sandbox_jumbotron_${sandboxSessionId}`, "width=1920,height=1080,noopener,noreferrer");
+    } finally {
+      setCreatingSandbox(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_35%_0%,#2b0f0d,transparent_45%),linear-gradient(180deg,#0b0b0b,#121212)] p-6 text-stone-100">
       <div className="mx-auto max-w-7xl space-y-4">
@@ -171,6 +200,11 @@ export default function BingoPrepPage() {
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-amber-300">Pre-Game Prep</p>
               <h1 className="mt-1 text-4xl font-black uppercase text-amber-100">Crate Pull</h1>
+              {session?.is_sandbox ? (
+                <p className="mt-2 inline-flex items-center rounded border border-amber-500/70 bg-amber-950/40 px-2 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-amber-200">
+                  Sandbox Dry Run {session.sandbox_expires_at ? `· Expires ${new Date(session.sandbox_expires_at).toLocaleString()}` : ""}
+                </p>
+              ) : null}
               <p className="mt-2 text-sm text-stone-300">
                 {session?.playlist_name ?? "Loading…"} · {session?.session_code ?? ""} · Prep View Round {selectedRound} of {session?.round_count ?? 3}
               </p>
@@ -251,6 +285,15 @@ export default function BingoPrepPage() {
                 <button onClick={downloadRoundIndex} className="rounded bg-amber-700 px-3 py-2">Round Index PDF</button>
                 <button onClick={createAdditionalCards} className="rounded bg-stone-800 px-3 py-2">Add {Math.max(1, session?.round_count ?? 1) * 100} Cards</button>
                 <button onClick={() => downloadCards("4-up")} className="rounded bg-stone-800 px-3 py-2">Cards Pack PDF (4-up)</button>
+                {!session?.is_sandbox ? (
+                  <button
+                    onClick={startSandboxDryRun}
+                    disabled={creatingSandbox}
+                    className="rounded border border-cyan-700/70 bg-cyan-950/30 px-3 py-2 font-semibold text-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {creatingSandbox ? "Starting Sandbox..." : "Start Sandbox Dry Run"}
+                  </button>
+                ) : null}
               </div>
               <p className="mt-3 text-xs text-stone-400">
                 Prep goal: pull and stack records by <span className="font-semibold text-stone-200">Draw</span> order (1 → 75). The <span className="font-semibold text-stone-200">Ball</span> label is what you announce/show during gameplay.

@@ -98,11 +98,15 @@ type SessionListRow = {
   next_game_rules_text: string | null;
   is_favorite: boolean;
   favorite_note: string | null;
+  is_sandbox: boolean;
+  sandbox_source_session_id: number | null;
+  sandbox_expires_at: string | null;
   created_at: string;
 };
 
 type PlaylistRow = { id: number; name: string };
 type EventRow = { id: number; title: string };
+type SourceSessionRow = { id: number; session_code: string };
 type PresetRow = {
   id: number;
   source_playlist_ids: number[] | null;
@@ -110,6 +114,17 @@ type PresetRow = {
 };
 
 const DEFAULT_POOL_SIZE = 75;
+
+async function purgeExpiredSandboxSessions(db: ReturnType<typeof getBingoDb>) {
+  const nowIso = new Date().toISOString();
+  const { error } = await db
+    .from("bingo_sessions")
+    .delete()
+    .eq("is_sandbox", true)
+    .lt("sandbox_expires_at", nowIso);
+
+  if (error) throw new Error(error.message);
+}
 
 function sampleTracks(tracks: ResolvedPlaylistTrack[], targetSize: number): ResolvedPlaylistTrack[] {
   const copy = [...tracks];
@@ -169,21 +184,26 @@ async function generateUniqueSessionCode() {
 
 export async function GET(request: NextRequest) {
   const db = getBingoDb();
+  await purgeExpiredSandboxSessions(db);
+
   const eventId = request.nextUrl.searchParams.get("eventId");
+  const includeSandbox = request.nextUrl.searchParams.get("includeSandbox") === "true";
 
-  const queryBase = (db
+  const queryBase = db
     .from("bingo_sessions")
-    .select("id, event_id, game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, session_code, game_mode, round_modes, card_count, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, is_favorite, favorite_note, created_at") as unknown as {
-      order: (column: string, options: { ascending: boolean }) => {
-        eq: (column: string, value: number) => Promise<{ data: unknown; error: { message: string } | null }>;
-        then?: unknown;
-      } & Promise<{ data: unknown; error: { message: string } | null }>;
-    });
+    .select("id, event_id, game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, session_code, game_mode, round_modes, card_count, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, is_favorite, favorite_note, is_sandbox, sandbox_source_session_id, sandbox_expires_at, created_at") as any;
 
-  const orderedQuery = queryBase.order("created_at", { ascending: false });
-  const result = eventId
-    ? await orderedQuery.eq("event_id", Number(eventId))
-    : await (orderedQuery as unknown as Promise<{ data: unknown; error: { message: string } | null }>);
+  let result: { data: unknown; error: { message: string } | null };
+  if (includeSandbox) {
+    result = eventId
+      ? await queryBase.eq("event_id", Number(eventId)).order("created_at", { ascending: false })
+      : await queryBase.order("created_at", { ascending: false });
+  } else {
+    const liveOnly = queryBase.eq("is_sandbox", false);
+    result = eventId
+      ? await liveOnly.eq("event_id", Number(eventId)).order("created_at", { ascending: false })
+      : await liveOnly.order("created_at", { ascending: false });
+  }
 
   const { data, error } = result;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -200,6 +220,13 @@ export async function GET(request: NextRequest) {
     )
   );
   const eventIds = Array.from(new Set(sessions.map((row) => row.event_id).filter((value): value is number => Number.isFinite(value))));
+  const sourceSessionIds = Array.from(
+    new Set(
+      sessions
+        .map((row) => row.sandbox_source_session_id)
+        .filter((value): value is number => Number.isFinite(value))
+    )
+  );
 
   const { data: playlists } = playlistIds.length
     ? await db.from("collection_playlists").select("id, name").in("id", playlistIds)
@@ -211,6 +238,11 @@ export async function GET(request: NextRequest) {
     : { data: [] as EventRow[] };
   const eventsById = new Map<number, EventRow>(((events ?? []) as EventRow[]).map((row) => [row.id, row]));
 
+  const { data: sourceSessions } = sourceSessionIds.length
+    ? await db.from("bingo_sessions").select("id, session_code").in("id", sourceSessionIds)
+    : { data: [] as SourceSessionRow[] };
+  const sourceCodeById = new Map<number, string>(((sourceSessions ?? []) as SourceSessionRow[]).map((row) => [row.id, row.session_code]));
+
   return NextResponse.json(
     {
       data: sessions.map((row) => ({
@@ -219,6 +251,7 @@ export async function GET(request: NextRequest) {
         playlist_names: (Array.isArray(row.master_playlist_ids) && row.master_playlist_ids.length > 0 ? row.master_playlist_ids : Array.isArray(row.playlist_ids) && row.playlist_ids.length > 0 ? row.playlist_ids : [row.playlist_id])
           .map((id) => playlistById.get(id) ?? `Playlist ${id}`),
         event_title: row.event_id ? eventsById.get(row.event_id)?.title ?? null : null,
+        sandbox_source_session_code: row.sandbox_source_session_id ? sourceCodeById.get(row.sandbox_source_session_id) ?? null : null,
       })),
     },
     { status: 200 }

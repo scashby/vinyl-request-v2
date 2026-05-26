@@ -14,6 +14,8 @@ type Session = {
   transport_queue_call_ids?: number[];
   status: string;
   seconds_to_next_call: number;
+  is_sandbox?: boolean;
+  sandbox_expires_at?: string | null;
 };
 type Call = BingoTransportCall;
 
@@ -88,6 +90,11 @@ export default function BingoAssistantPage() {
             <div>
               <p className="text-xs uppercase tracking-[0.25em] text-cyan-300">Sidekick</p>
               <h1 className="text-3xl font-black uppercase">Assistant Board</h1>
+              {session?.is_sandbox ? (
+                <p className="mt-2 inline-flex items-center rounded border border-amber-500/70 bg-amber-950/40 px-2 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-amber-200">
+                  Sandbox Dry Run {session.sandbox_expires_at ? `· Expires ${new Date(session.sandbox_expires_at).toLocaleString()}` : ""}
+                </p>
+              ) : null}
               <p className="text-sm text-stone-400">
                 {session?.playlist_name} · {session?.session_code} · Round {session?.current_round} of {session?.round_count}
               </p>

@@ -39,6 +39,8 @@ type Session = {
     date: string;
     venue_logo_url: string | null;
   } | null;
+  is_sandbox?: boolean;
+  sandbox_expires_at?: string | null;
 };
 
 type UpcomingEvent = {
@@ -431,6 +433,12 @@ export default function BingoJumbotronPage() {
         aria-label="Toggle fullscreen"
         title="Toggle fullscreen (F)"
       />
+
+      {session?.is_sandbox ? (
+        <div className="pointer-events-none absolute left-4 top-4 z-[90] rounded border border-amber-500/80 bg-amber-950/65 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-amber-200">
+          Sandbox Dry Run {session.sandbox_expires_at ? `· Expires ${new Date(session.sandbox_expires_at).toLocaleString()}` : ""}
+        </div>
+      ) : null}
 
       {showWelcome ? (
         <div className="relative flex min-h-screen flex-col items-center justify-center gap-[2vw] px-8 py-[4vh] text-center">
