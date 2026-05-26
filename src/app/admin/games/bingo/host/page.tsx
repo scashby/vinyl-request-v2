@@ -727,14 +727,32 @@ export default function BingoHostPage() {
 
               {winnerCheckError ? (
                 <div className="rounded border border-red-900/70 bg-red-950/40 p-2 text-[11px] text-red-200">
-                  {winnerCheckError}
+                  <div className="flex items-start justify-between gap-2">
+                    <p>{winnerCheckError}</p>
+                    <button
+                      type="button"
+                      onClick={() => setWinnerCheckError(null)}
+                      className="rounded border border-red-800/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] text-red-200 hover:bg-red-900/40"
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
               ) : null}
               {winnerCheckResult ? (
                 <div className={`rounded border p-2 text-[11px] ${winnerCheckResult.is_winner ? "border-emerald-800/70 bg-emerald-950/30 text-emerald-100" : "border-amber-800/70 bg-amber-950/30 text-amber-100"}`}>
-                  <p className="font-bold uppercase tracking-[0.08em]">
-                    {winnerCheckResult.card_identifier} · {winnerCheckResult.is_winner ? "Winner" : "Not Yet Winning"}
-                  </p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-bold uppercase tracking-[0.08em]">
+                      {winnerCheckResult.card_identifier} · {winnerCheckResult.is_winner ? "Winner" : "Not Yet Winning"}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setWinnerCheckResult(null)}
+                      className="rounded border border-stone-700 px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] text-stone-200 hover:bg-stone-900/40"
+                    >
+                      Close
+                    </button>
+                  </div>
                   <p className="mt-1 text-stone-300">
                     Free squares {winnerCheckResult.actual_free_square_count}/{winnerCheckResult.expected_free_square_count} · Marked {winnerCheckResult.marked_square_count}/{winnerCheckResult.playable_square_count + winnerCheckResult.actual_free_square_count}
                   </p>
