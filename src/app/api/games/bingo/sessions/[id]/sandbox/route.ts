@@ -6,6 +6,8 @@ import { generateBingoSessionCode } from "src/lib/bingoSessionCode";
 
 export const runtime = "nodejs";
 
+type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+
 type SourceSessionRow = {
   id: number;
   event_id: number | null;
@@ -76,7 +78,7 @@ type SessionPlaylistRow = {
 type CardRow = {
   card_number: number;
   has_free_space: boolean;
-  grid: unknown;
+  grid: Json;
 };
 
 type SourceCallRow = {
