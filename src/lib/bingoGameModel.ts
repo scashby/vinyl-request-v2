@@ -272,8 +272,15 @@ function buildLinePatterns(grid: ValidationCell[]): ValidationPattern[] {
   return patterns;
 }
 
-function getMissingCells(pattern: ValidationPattern, calledCallIds: Set<number>): ValidationCell[] {
-  return pattern.cells.filter((cell) => !cell.free && (!cell.call_id || !calledCallIds.has(cell.call_id)));
+function buildTrackIdentity(trackTitle: string, artistName: string): string {
+  const title = (trackTitle || "").trim().toLowerCase();
+  const artist = (artistName || "").trim().toLowerCase();
+  if (!title && !artist) return "";
+  return `${title}::${artist}`;
+}
+
+function getMissingCells(pattern: ValidationPattern, isCellMarked: (cell: ValidationCell) => boolean): ValidationCell[] {
+  return pattern.cells.filter((cell) => !cell.free && !isCellMarked(cell));
 }
 
 function summarizeMissing(mode: GameMode, message: string, cells: ValidationCell[]) {
@@ -306,11 +313,11 @@ function validateSingleLikeMode(
   mode: Extract<GameMode, "single_line" | "double_line" | "triple_line">,
   requiredLines: number,
   linePatterns: ValidationPattern[],
-  calledCallIds: Set<number>
+  isCellMarked: (cell: ValidationCell) => boolean
 ): { passed: boolean; winners: string[]; mistake: BingoCardValidationResult["mistakes"][number] | null } {
   const summaries = linePatterns.map((pattern) => ({
     pattern,
-    missing: getMissingCells(pattern, calledCallIds),
+    missing: getMissingCells(pattern, isCellMarked),
   }));
   const complete = summaries.filter((entry) => entry.missing.length === 0);
   if (complete.length >= requiredLines) {
@@ -339,7 +346,7 @@ function validateSingleLikeMode(
 
 function validateCrissCross(
   linePatterns: ValidationPattern[],
-  calledCallIds: Set<number>
+  isCellMarked: (cell: ValidationCell) => boolean
 ): { passed: boolean; winners: string[]; mistake: BingoCardValidationResult["mistakes"][number] | null } {
   const rows = linePatterns.filter((pattern) => pattern.label.startsWith("Row "));
   const cols = linePatterns.filter((pattern) => pattern.label.startsWith("Column "));
@@ -350,14 +357,14 @@ function validateCrissCross(
     for (const col of cols) {
       combinations.push({
         labels: [row.label, col.label],
-        missing: uniqueMissingCells([...getMissingCells(row, calledCallIds), ...getMissingCells(col, calledCallIds)]),
+        missing: uniqueMissingCells([...getMissingCells(row, isCellMarked), ...getMissingCells(col, isCellMarked)]),
       });
     }
   }
   if (diagonals.length === 2) {
     combinations.push({
       labels: diagonals.map((pattern) => pattern.label),
-      missing: uniqueMissingCells(diagonals.flatMap((pattern) => getMissingCells(pattern, calledCallIds))),
+      missing: uniqueMissingCells(diagonals.flatMap((pattern) => getMissingCells(pattern, isCellMarked))),
     });
   }
 
@@ -376,10 +383,10 @@ function validateCrissCross(
 
 function validateFourCorners(
   grid: ValidationCell[],
-  calledCallIds: Set<number>
+  isCellMarked: (cell: ValidationCell) => boolean
 ): { passed: boolean; winners: string[]; mistake: BingoCardValidationResult["mistakes"][number] | null } {
   const corners = grid.filter((cell) => (cell.row === 0 || cell.row === 4) && (cell.col === 0 || cell.col === 4));
-  const missing = corners.filter((cell) => !cell.free && (!cell.call_id || !calledCallIds.has(cell.call_id)));
+  const missing = corners.filter((cell) => !cell.free && !isCellMarked(cell));
   if (missing.length === 0) {
     return { passed: true, winners: ["Four Corners"], mistake: null };
   }
@@ -392,9 +399,9 @@ function validateFourCorners(
 
 function validateBlackout(
   grid: ValidationCell[],
-  calledCallIds: Set<number>
+  isCellMarked: (cell: ValidationCell) => boolean
 ): { passed: boolean; winners: string[]; mistake: BingoCardValidationResult["mistakes"][number] | null } {
-  const missing = grid.filter((cell) => !cell.free && (!cell.call_id || !calledCallIds.has(cell.call_id)));
+  const missing = grid.filter((cell) => !cell.free && !isCellMarked(cell));
   if (missing.length === 0) {
     return { passed: true, winners: ["Blackout"], mistake: null };
   }
@@ -412,7 +419,7 @@ function sortCells(cells: ValidationCell[]): ValidationCell[] {
   });
 }
 
-function toPreviewCell(cell: ValidationCell, calledCallIds: Set<number>) {
+function toPreviewCell(cell: ValidationCell, isCellMarked: (cell: ValidationCell) => boolean) {
   return {
     row: cell.row,
     col: cell.col,
@@ -420,7 +427,7 @@ function toPreviewCell(cell: ValidationCell, calledCallIds: Set<number>) {
     track_title: cell.track_title,
     artist_name: cell.artist_name,
     free: cell.free,
-    marked: cell.free || (cell.call_id !== null && calledCallIds.has(cell.call_id)),
+    marked: isCellMarked(cell),
     call_id: cell.call_id,
   };
 }
@@ -500,28 +507,35 @@ export async function validateCardByIdentifier(
 
   const { data: calls, error: callsError } = await db
     .from("bingo_session_calls")
-    .select("id, call_index, status")
+    .select("id, call_index, status, track_title, artist_name")
     .eq("session_id", sessionId);
 
   if (callsError) throw new Error(callsError.message);
 
-  const sessionCalls = (calls ?? []) as Array<{ id: number; call_index: number; status: string }>;
+  const sessionCalls = (calls ?? []) as Array<{ id: number; call_index: number; status: string; track_title: string; artist_name: string }>;
   const calledSessionCalls = sessionCalls.filter((call) => call.status === "called" || call.status === "completed");
   const calledCallIds = new Set<number>(calledSessionCalls.map((call) => call.id));
+  const calledTrackByCallId = new Map<number, string>(
+    sessionCalls.map((call) => [call.id, buildTrackIdentity(call.track_title, call.artist_name)])
+  );
 
   const isSandbox = Boolean((session as { is_sandbox?: unknown }).is_sandbox);
   const sourceSessionId = Number((session as { sandbox_source_session_id?: unknown }).sandbox_source_session_id);
   if (isSandbox && Number.isFinite(sourceSessionId)) {
     const { data: sourceCalls, error: sourceCallsError } = await db
       .from("bingo_session_calls")
-      .select("id, call_index")
+      .select("id, call_index, track_title, artist_name")
       .eq("session_id", sourceSessionId);
 
     if (sourceCallsError) throw new Error(sourceCallsError.message);
 
+    const typedSourceCalls = (sourceCalls ?? []) as Array<{ id: number; call_index: number; track_title: string; artist_name: string }>;
     const sourceIdByIndex = new Map<number, number>(
-      ((sourceCalls ?? []) as Array<{ id: number; call_index: number }>).map((call) => [call.call_index, call.id])
+      typedSourceCalls.map((call) => [call.call_index, call.id])
     );
+    typedSourceCalls.forEach((call) => {
+      calledTrackByCallId.set(call.id, buildTrackIdentity(call.track_title, call.artist_name));
+    });
 
     // Include source-session call ids that align with called sandbox rows so source cards validate in sandbox.
     calledSessionCalls.forEach((call) => {
@@ -530,6 +544,27 @@ export async function validateCardByIdentifier(
     });
   }
 
+  const calledTrackKeys = new Set<string>();
+  calledCallIds.forEach((callId) => {
+    const key = calledTrackByCallId.get(callId);
+    if (key) calledTrackKeys.add(key);
+  });
+
+  const isCellMarked = (cell: ValidationCell): boolean => {
+    if (cell.free) return true;
+
+    const cellTrackKey = buildTrackIdentity(cell.track_title, cell.artist_name);
+
+    if (cell.call_id !== null && calledCallIds.has(cell.call_id)) {
+      const calledTrackKey = calledTrackByCallId.get(cell.call_id) ?? "";
+      if (!calledTrackKey || !cellTrackKey || calledTrackKey === cellTrackKey) {
+        return true;
+      }
+    }
+
+    return cellTrackKey.length > 0 && calledTrackKeys.has(cellTrackKey);
+  };
+
   const grid = coerceCardGrid((card as { grid?: unknown }).grid);
   const linePatterns = buildLinePatterns(grid);
   const winningPatterns: Array<{ mode: GameMode; label: string }> = [];
@@ -537,7 +572,7 @@ export async function validateCardByIdentifier(
 
   for (const mode of activeModes) {
     if (mode === "single_line") {
-      const result = validateSingleLikeMode(mode, 1, linePatterns, calledCallIds);
+      const result = validateSingleLikeMode(mode, 1, linePatterns, isCellMarked);
       if (result.passed) {
         winningPatterns.push(...result.winners.map((label) => ({ mode, label })));
       } else if (result.mistake) {
@@ -547,7 +582,7 @@ export async function validateCardByIdentifier(
     }
 
     if (mode === "double_line") {
-      const result = validateSingleLikeMode(mode, 2, linePatterns, calledCallIds);
+      const result = validateSingleLikeMode(mode, 2, linePatterns, isCellMarked);
       if (result.passed) {
         winningPatterns.push(...result.winners.map((label) => ({ mode, label })));
       } else if (result.mistake) {
@@ -557,7 +592,7 @@ export async function validateCardByIdentifier(
     }
 
     if (mode === "triple_line") {
-      const result = validateSingleLikeMode(mode, 3, linePatterns, calledCallIds);
+      const result = validateSingleLikeMode(mode, 3, linePatterns, isCellMarked);
       if (result.passed) {
         winningPatterns.push(...result.winners.map((label) => ({ mode, label })));
       } else if (result.mistake) {
@@ -567,7 +602,7 @@ export async function validateCardByIdentifier(
     }
 
     if (mode === "criss_cross") {
-      const result = validateCrissCross(linePatterns, calledCallIds);
+      const result = validateCrissCross(linePatterns, isCellMarked);
       if (result.passed) {
         winningPatterns.push(...result.winners.map((label) => ({ mode, label })));
       } else if (result.mistake) {
@@ -577,7 +612,7 @@ export async function validateCardByIdentifier(
     }
 
     if (mode === "four_corners") {
-      const result = validateFourCorners(grid, calledCallIds);
+      const result = validateFourCorners(grid, isCellMarked);
       if (result.passed) {
         winningPatterns.push(...result.winners.map((label) => ({ mode, label })));
       } else if (result.mistake) {
@@ -587,7 +622,7 @@ export async function validateCardByIdentifier(
     }
 
     if (mode === "blackout") {
-      const result = validateBlackout(grid, calledCallIds);
+      const result = validateBlackout(grid, isCellMarked);
       if (result.passed) {
         winningPatterns.push(...result.winners.map((label) => ({ mode, label })));
       } else if (result.mistake) {
@@ -606,13 +641,13 @@ export async function validateCardByIdentifier(
   }
 
   const actualFreeSquareCount = grid.filter((cell) => cell.free).length;
-  const markedSquareCount = grid.filter((cell) => cell.free || (cell.call_id !== null && calledCallIds.has(cell.call_id))).length;
-  const completeLineCount = linePatterns.filter((pattern) => getMissingCells(pattern, calledCallIds).length === 0).length;
-  const cardPreview = sortCells(grid).map((cell) => toPreviewCell(cell, calledCallIds));
+  const markedSquareCount = grid.filter((cell) => isCellMarked(cell)).length;
+  const completeLineCount = linePatterns.filter((pattern) => getMissingCells(pattern, isCellMarked).length === 0).length;
+  const cardPreview = sortCells(grid).map((cell) => toPreviewCell(cell, isCellMarked));
   const winningLineCalls = winningPatterns.map((pattern) => ({
     mode: pattern.mode,
     label: pattern.label,
-    calls: collectWinningLineCells(pattern.mode, pattern.label, linePatterns, grid).map((cell) => toPreviewCell(cell, calledCallIds)),
+    calls: collectWinningLineCells(pattern.mode, pattern.label, linePatterns, grid).map((cell) => toPreviewCell(cell, isCellMarked)),
   }));
 
   return {
