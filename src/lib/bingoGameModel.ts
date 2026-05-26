@@ -47,6 +47,30 @@ export type BingoCardValidationResult = {
   marked_square_count: number;
   playable_square_count: number;
   complete_line_count: number;
+  card_preview: Array<{
+    row: number;
+    col: number;
+    label: string;
+    track_title: string;
+    artist_name: string;
+    free: boolean;
+    marked: boolean;
+    call_id: number | null;
+  }>;
+  winning_line_calls: Array<{
+    mode: GameMode;
+    label: string;
+    calls: Array<{
+      row: number;
+      col: number;
+      label: string;
+      track_title: string;
+      artist_name: string;
+      free: boolean;
+      marked: boolean;
+      call_id: number | null;
+    }>;
+  }>;
 };
 
 function coerceInteger(value: unknown): number | null {
@@ -381,6 +405,48 @@ function validateBlackout(
   };
 }
 
+function sortCells(cells: ValidationCell[]): ValidationCell[] {
+  return [...cells].sort((left, right) => {
+    if (left.row !== right.row) return left.row - right.row;
+    return left.col - right.col;
+  });
+}
+
+function toPreviewCell(cell: ValidationCell, calledCallIds: Set<number>) {
+  return {
+    row: cell.row,
+    col: cell.col,
+    label: cell.label,
+    track_title: cell.track_title,
+    artist_name: cell.artist_name,
+    free: cell.free,
+    marked: cell.free || (cell.call_id !== null && calledCallIds.has(cell.call_id)),
+    call_id: cell.call_id,
+  };
+}
+
+function collectWinningLineCells(
+  mode: GameMode,
+  label: string,
+  linePatterns: ValidationPattern[],
+  grid: ValidationCell[]
+): ValidationCell[] {
+  if (label.startsWith("Row ") || label.startsWith("Column ") || label.startsWith("Diagonal")) {
+    const pattern = linePatterns.find((entry) => entry.label === label);
+    return pattern ? sortCells(pattern.cells) : [];
+  }
+
+  if (mode === "four_corners" || label === "Four Corners") {
+    return sortCells(grid.filter((cell) => (cell.row === 0 || cell.row === 4) && (cell.col === 0 || cell.col === 4)));
+  }
+
+  if (mode === "blackout" || label === "Blackout") {
+    return sortCells(grid);
+  }
+
+  return [];
+}
+
 export async function validateCardByIdentifier(
   db: BingoDbClient,
   sessionId: number,
@@ -542,6 +608,12 @@ export async function validateCardByIdentifier(
   const actualFreeSquareCount = grid.filter((cell) => cell.free).length;
   const markedSquareCount = grid.filter((cell) => cell.free || (cell.call_id !== null && calledCallIds.has(cell.call_id))).length;
   const completeLineCount = linePatterns.filter((pattern) => getMissingCells(pattern, calledCallIds).length === 0).length;
+  const cardPreview = sortCells(grid).map((cell) => toPreviewCell(cell, calledCallIds));
+  const winningLineCalls = winningPatterns.map((pattern) => ({
+    mode: pattern.mode,
+    label: pattern.label,
+    calls: collectWinningLineCells(pattern.mode, pattern.label, linePatterns, grid).map((cell) => toPreviewCell(cell, calledCallIds)),
+  }));
 
   return {
     session_id: sessionId,
@@ -556,5 +628,7 @@ export async function validateCardByIdentifier(
     marked_square_count: markedSquareCount,
     playable_square_count: grid.filter((cell) => !cell.free).length,
     complete_line_count: completeLineCount,
+    card_preview: cardPreview,
+    winning_line_calls: winningLineCalls,
   };
 }

@@ -56,6 +56,30 @@ type CardValidationResponse = {
   actual_free_square_count: number;
   marked_square_count: number;
   playable_square_count: number;
+  card_preview?: Array<{
+    row: number;
+    col: number;
+    label: string;
+    track_title: string;
+    artist_name: string;
+    free: boolean;
+    marked: boolean;
+    call_id: number | null;
+  }>;
+  winning_line_calls?: Array<{
+    mode: GameMode;
+    label: string;
+    calls: Array<{
+      row: number;
+      col: number;
+      label: string;
+      track_title: string;
+      artist_name: string;
+      free: boolean;
+      marked: boolean;
+      call_id: number | null;
+    }>;
+  }>;
 };
 
 export default function BingoHostPage() {
@@ -727,6 +751,41 @@ export default function BingoHostPage() {
                           {mistake.missing_cells.length > 0 ? ` Missing: ${mistake.missing_cells.slice(0, 4).map((cell) => cell.label).join(", ")}` : ""}
                         </p>
                       ))}
+                    </div>
+                  ) : null}
+                  {winnerCheckResult.winning_line_calls && winnerCheckResult.winning_line_calls.length > 0 ? (
+                    <div className="mt-2 rounded border border-emerald-900/70 bg-emerald-950/30 p-2 text-emerald-100">
+                      <p className="font-semibold uppercase tracking-[0.08em]">Winning Line Calls</p>
+                      <div className="mt-1 space-y-1">
+                        {winnerCheckResult.winning_line_calls.map((line) => (
+                          <div key={`${line.mode}-${line.label}`}>
+                            <p className="text-[10px] uppercase tracking-[0.08em] text-emerald-200">{line.mode.replace("_", " ")} · {line.label}</p>
+                            <p className="text-[11px] text-emerald-50">
+                              {line.calls
+                                .map((cell) => `${cell.label}${cell.free ? " (FREE)" : ""}${cell.marked ? "" : " *"}`)
+                                .join(" | ")}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  {winnerCheckResult.card_preview && winnerCheckResult.card_preview.length > 0 ? (
+                    <div className="mt-2">
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-stone-300">Card Preview</p>
+                      <div className="grid grid-cols-5 gap-1">
+                        {winnerCheckResult.card_preview.map((cell) => (
+                          <div
+                            key={`${cell.row}-${cell.col}`}
+                            title={`${cell.track_title} - ${cell.artist_name}`}
+                            className={`rounded border px-1 py-1 text-center text-[10px] leading-tight ${cell.marked ? "border-emerald-700 bg-emerald-900/40 text-emerald-100" : "border-stone-700 bg-stone-950/50 text-stone-300"}`}
+                          >
+                            <div className="font-semibold">{cell.label || "-"}</div>
+                            {cell.free ? <div className="text-[9px] text-emerald-200">FREE</div> : null}
+                          </div>
+                        ))}
+                      </div>
+                      <p className="mt-1 text-[10px] text-stone-400">Marked squares are highlighted in green.</p>
                     </div>
                   ) : null}
                 </div>
