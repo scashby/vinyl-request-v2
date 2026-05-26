@@ -518,6 +518,11 @@ export async function validateCardByIdentifier(
   const calledTrackByCallId = new Map<number, string>(
     sessionCalls.map((call) => [call.id, buildTrackIdentity(call.track_title, call.artist_name)])
   );
+  const calledSessionTrackKeys = new Set<string>(
+    calledSessionCalls
+      .map((call) => buildTrackIdentity(call.track_title, call.artist_name))
+      .filter((key) => key.length > 0)
+  );
 
   const isSandbox = Boolean((session as { is_sandbox?: unknown }).is_sandbox);
   const sourceSessionId = Number((session as { sandbox_source_session_id?: unknown }).sandbox_source_session_id);
@@ -530,17 +535,17 @@ export async function validateCardByIdentifier(
     if (sourceCallsError) throw new Error(sourceCallsError.message);
 
     const typedSourceCalls = (sourceCalls ?? []) as Array<{ id: number; call_index: number; track_title: string; artist_name: string }>;
-    const sourceIdByIndex = new Map<number, number>(
-      typedSourceCalls.map((call) => [call.call_index, call.id])
-    );
     typedSourceCalls.forEach((call) => {
       calledTrackByCallId.set(call.id, buildTrackIdentity(call.track_title, call.artist_name));
     });
 
-    // Include source-session call ids that align with called sandbox rows so source cards validate in sandbox.
-    calledSessionCalls.forEach((call) => {
-      const sourceCallId = sourceIdByIndex.get(call.call_index);
-      if (sourceCallId) calledCallIds.add(sourceCallId);
+    // Include source-session call ids by matching called track identity.
+    // This remains correct even if sandbox call order changes during dry run.
+    typedSourceCalls.forEach((sourceCall) => {
+      const sourceTrackKey = buildTrackIdentity(sourceCall.track_title, sourceCall.artist_name);
+      if (sourceTrackKey.length > 0 && calledSessionTrackKeys.has(sourceTrackKey)) {
+        calledCallIds.add(sourceCall.id);
+      }
     });
   }
 
