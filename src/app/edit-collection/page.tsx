@@ -1932,7 +1932,7 @@ function CollectionBrowserPage() {
         url.searchParams.set('page', String(page));
         url.searchParams.set('pageSize', String(pageSize));
         url.searchParams.set('includeTracks', 'false');
-        url.searchParams.set('includeForSale', 'false');
+        url.searchParams.set('includeForSale', 'true');
         if (params.q) url.searchParams.set('q', params.q);
         if (params.mediaType) url.searchParams.set('mediaType', params.mediaType);
         if (params.location) url.searchParams.set('location', params.location);
@@ -1959,7 +1959,7 @@ function CollectionBrowserPage() {
 
       setAlbums(fetched);
       setHasMore(false);
-      setTotalCount(fetched.length);
+      setTotalCount(fetched.filter((album) => !isAlbumForSale(album)).length);
       nextPageRef.current = page;
       stopSpinnerIfOwner();
     } catch (error) {
@@ -1979,7 +1979,7 @@ function CollectionBrowserPage() {
       url.searchParams.set('page', String(page));
       url.searchParams.set('pageSize', '1000');
       url.searchParams.set('includeTracks', 'false');
-      url.searchParams.set('includeForSale', 'false');
+      url.searchParams.set('includeForSale', 'true');
       if (params.q) url.searchParams.set('q', params.q);
       if (params.mediaType) url.searchParams.set('mediaType', params.mediaType);
       if (params.location) url.searchParams.set('location', params.location);
@@ -5259,7 +5259,7 @@ function ExportCsvTxtModal({
   ];
 
   const [formatType, setFormatType] = useState<'csv' | 'txt'>('csv');
-  const [scope, setScope] = useState<'all' | 'current' | 'selected'>('current');
+  const [scope, setScope] = useState<'all' | 'current' | 'selected'>(viewMode === 'collection' ? 'all' : 'current');
   const [delimiter, setDelimiter] = useState<string>(',');
   const [enclosure, setEnclosure] = useState<'double' | 'single' | 'none'>('double');
   const [includeHeaders, setIncludeHeaders] = useState(true);
