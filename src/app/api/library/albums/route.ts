@@ -23,10 +23,10 @@ export async function GET(request: NextRequest) {
     const includeTracks = (url.searchParams.get("includeTracks") ?? "false").toLowerCase() === "true";
     const includeForSale = (url.searchParams.get("includeForSale") ?? "false").toLowerCase() === "true";
     const page = clamp(Number(url.searchParams.get("page") ?? 0), 0, 100000);
-    const requestedPageSize = Number(url.searchParams.get("pageSize") ?? (includeTracks ? 10000 : 10000));
+    const requestedPageSize = Number(url.searchParams.get("pageSize") ?? 1000);
     const pageSize = includeTracks
-      ? clamp(requestedPageSize, 10, 10000)
-      : clamp(requestedPageSize, 50, 10000);
+      ? clamp(requestedPageSize, 10, 1000)
+      : clamp(requestedPageSize, 50, 1000);
 
     const from = page * pageSize;
     const to = from + pageSize - 1;

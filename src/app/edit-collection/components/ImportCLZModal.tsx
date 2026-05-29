@@ -691,7 +691,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
       const existingRows: ExistingRow[] = [];
       let from = 0;
       // Batch size controls request chunking only; loop continues until all rows are read.
-      const batchSize = 2000;
+      const batchSize = 1000;
       let keepGoing = true;
 
       while (keepGoing) {

@@ -2025,21 +2025,30 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     let resolutions: ResolutionHistory[] | null = null;
     const albumIds = results.map(r => r.album.id);
     if (historyWriteEnabled && !historyReadDisabledRef.current) {
-      const { data, error: resError } = await supabase
-        .from('import_conflict_resolutions')
-        .select('album_id, field_name, source')
-        .in('album_id', albumIds)
-        .limit(10000);
+      const resolutionMap = new Map<string, ResolutionHistory>();
+      const chunkSize = 1000;
+      for (let index = 0; index < albumIds.length; index += chunkSize) {
+        const chunk = albumIds.slice(index, index + chunkSize);
+        const { data, error: resError } = await supabase
+          .from('import_conflict_resolutions')
+          .select('album_id, field_name, source')
+          .in('album_id', chunk);
 
-      if (resError) {
-        console.error('Error fetching history:', resError);
-        if (isSupabaseOutageError(resError)) {
-          historyReadDisabledRef.current = true;
-          addLog('System', 'skipped', `Temporarily disabled conflict history reads due to Supabase outage signals: ${resError.message || 'Unknown error'}`);
+        if (resError) {
+          console.error('Error fetching history:', resError);
+          if (isSupabaseOutageError(resError)) {
+            historyReadDisabledRef.current = true;
+            addLog('System', 'skipped', `Temporarily disabled conflict history reads due to Supabase outage signals: ${resError.message || 'Unknown error'}`);
+          }
+          break;
         }
-      } else {
-        resolutions = (data ?? []) as ResolutionHistory[];
+
+        for (const row of data ?? []) {
+          const typedRow = row as ResolutionHistory;
+          resolutionMap.set(`${typedRow.album_id}:${typedRow.field_name}:${typedRow.source}`, typedRow);
+        }
       }
+      resolutions = Array.from(resolutionMap.values());
     }
 
     const autoUpdates: { album: Album; fields: Record<string, unknown> }[] = [];

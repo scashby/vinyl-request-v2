@@ -1863,7 +1863,7 @@ function CollectionBrowserPage() {
     try {
       if (includeTracks) {
         // Track view: load all pages with parallel batching
-        const pageSize = 10000;
+        const pageSize = 1000;
         const fetchPage = async (page: number) => {
           const url = new URL('/api/library/albums', window.location.origin);
           url.searchParams.set('page', String(page));
@@ -1922,7 +1922,7 @@ function CollectionBrowserPage() {
         sortDir: options?.apiSortDir ?? 'desc',
       };
       activeParamsRef.current = params;
-      const pageSize = 10000;
+      const pageSize = 1000;
       let page = 0;
       let hasMorePages = true;
       const fetched: Album[] = [];
@@ -1977,7 +1977,7 @@ function CollectionBrowserPage() {
 
       const url = new URL('/api/library/albums', window.location.origin);
       url.searchParams.set('page', String(page));
-      url.searchParams.set('pageSize', '10000');
+      url.searchParams.set('pageSize', '1000');
       url.searchParams.set('includeTracks', 'false');
       url.searchParams.set('includeForSale', 'false');
       if (params.q) url.searchParams.set('q', params.q);

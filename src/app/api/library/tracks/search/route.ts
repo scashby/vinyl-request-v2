@@ -164,7 +164,7 @@ function asNumber(value: unknown): number | null {
 }
 
 async function fetchCollectionTrackRowsFromLibraryAlbumsApi(request: NextRequest, authHeader: string | undefined, includeForSale: boolean): Promise<CollectionTrackSearchRow[]> {
-  const pageSize = 10000;
+  const pageSize = 1000;
   const rows: CollectionTrackSearchRow[] = [];
 
   for (let page = 0; page < 100000; page += 1) {

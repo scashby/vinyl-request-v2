@@ -137,7 +137,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
       let allAlbums: Album[] = [];
       let from = 0;
       // Batch size controls request chunking only; loop continues until all rows are read.
-      const batchSize = 2000;
+      const batchSize = 1000;
       let hasMore = true;
 
       while (hasMore) {
