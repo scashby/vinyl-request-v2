@@ -1069,7 +1069,6 @@ function CollectionBrowserPage() {
   const loadingOwnerLoadVersionRef = useRef<number | null>(null);
   const panelClosedByUserRef = useRef(false);
   // Pagination / server-filter state
-  const [totalCount, setTotalCount] = useState<number | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const nextPageRef = useRef(1);
@@ -1959,7 +1958,6 @@ function CollectionBrowserPage() {
 
       setAlbums(fetched);
       setHasMore(false);
-      setTotalCount(fetched.filter((album) => !isAlbumForSale(album)).length);
       nextPageRef.current = page;
       stopSpinnerIfOwner();
     } catch (error) {
@@ -2287,8 +2285,13 @@ function CollectionBrowserPage() {
   );
 
   const nonSaleAlbums = useMemo(() => albums.filter((album) => !isAlbumForSale(album)), [albums]);
-  // totalCount from API is authoritative; fall back to loaded count while API is pending
-  const defaultVisibleAlbumCount = totalCount ?? nonSaleAlbums.length;
+  const hasServerFolderCounts = useMemo(() => Object.keys(folderCountsApi).length > 0, [folderCountsApi]);
+  const allAlbumsCount = useMemo(
+    () => Object.values(folderCountsApi).reduce((sum, count) => sum + count, 0),
+    [folderCountsApi]
+  );
+  // [All Albums] badge should always represent the full library total, not the current filter scope.
+  const defaultVisibleAlbumCount = hasServerFolderCounts ? allAlbumsCount : nonSaleAlbums.length;
 
   const scopedAlbums = useMemo(() => {
     return albums.filter((album) => {
@@ -4703,7 +4706,7 @@ function CollectionBrowserPage() {
                 {loading
                   ? 'Loading...'
                   : viewMode === 'collection'
-                    ? `${totalCount ?? filteredAndSortedAlbums.length} albums${isLoadingMore ? ' (loading more...)' : ''}`
+                    ? `${filteredAndSortedAlbums.length} albums${isLoadingMore ? ' (loading more...)' : ''}`
                     : `${filteredTrackRows.length} tracks${tracksHydrating ? ' (loading track data...)' : ''}`}
               </div>
               {viewMode === 'album-track' && groupedTrackRows.length > 0 && (
