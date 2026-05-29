@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       // (PostgREST nested-table eq filters are unreliable for aliased relations)
       const { data, error } = await supabaseAdmin
         .from("inventory")
-        .select("location, status, for_sale, discogs_folder_name, discogs_folder_id, discogs_instance_id, releases(media_type)");
+        .select("location, status, discogs_folder_name, discogs_folder_id, discogs_instance_id, releases(media_type)");
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     // Format counts — fetch all non-sale inventory and group by media_type in JS
     const { data, error } = await supabaseAdmin
       .from("inventory")
-      .select("status, for_sale, discogs_folder_name, discogs_folder_id, discogs_instance_id, releases(media_type)");
+      .select("status, discogs_folder_name, discogs_folder_id, discogs_instance_id, releases(media_type)");
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
