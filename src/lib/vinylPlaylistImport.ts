@@ -3,7 +3,8 @@ import { supabaseServer } from "src/lib/supabaseServer";
 import { stripDiscogsDisambiguationSuffix } from "src/lib/artistName";
 import { isForSaleInventory } from "src/lib/saleUtils";
 
-const PAGE_SIZE = 1000;
+// Chunk size for paged reads; does not cap total rows because callers iterate until exhaustion.
+const PAGE_SIZE = 2000;
 
 export type InventoryTrack = {
   inventory_id: number | null;

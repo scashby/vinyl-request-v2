@@ -385,7 +385,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: true, results }, { status: 200, headers: CACHE_HEADERS });
     }
 
-    const smartLimit = limit === Number.MAX_SAFE_INTEGER ? 50 : limit;
+    // Smart mode defaults to a practical top-N; callers can pass an explicit limit when needed.
+    const smartLimit = limit === Number.MAX_SAFE_INTEGER ? 500 : limit;
     const index = await getCachedInventoryIndex(authHeader, { includeForSale });
     const candidates = await searchInventoryCandidates({
       title: q,
