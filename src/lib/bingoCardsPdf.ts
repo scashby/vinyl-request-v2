@@ -16,17 +16,17 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
 
-  const marginX = layout === "4-up" ? 18 : 16;
-  const marginY = layout === "4-up" ? 18 : 16;
-  const gutterX = layout === "4-up" ? 16 : 24; // extra space for center cut on 2-up
-  const gutterY = layout === "4-up" ? 16 : 0;
+  const marginX = layout === "4-up" ? 22 : 16;
+  const marginY = layout === "4-up" ? 26 : 16;
+  const gutterX = layout === "4-up" ? 22 : 24; // extra space for center cut on 2-up
+  const gutterY = layout === "4-up" ? 28 : 0;  // wide gutter gives bleed room when cutting 4-up rows
 
   const columns = layout === "4-up" ? 2 : 2;
   const rows = layout === "4-up" ? 2 : 1;
   const cardWidth = (pageW - marginX * 2 - gutterX * (columns - 1)) / columns;
   const cardHeight = (pageH - marginY * 2 - gutterY * (rows - 1)) / rows;
 
-  const identifierOffsetY = layout === "4-up" ? 5 : 6;
+  const identifierOffsetY = layout === "4-up" ? 5 : 6; // kept for 2-up; 4-up identifier moves inside card
   const columnHeaderH = layout === "4-up" ? 20 : 26;
   const columnHeaderGap = layout === "4-up" ? 3 : 4;
 
@@ -263,14 +263,22 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
       }
     }
 
-    // Print the card identifier outside the card border so it doesn't consume card space.
+    // For 4-up, print the card identifier inside the column-header area (top-right corner) so it
+    // can never be cut off when trimming rows. For 2-up, keep it above the card border as before.
     doc.setFont("helvetica", "normal");
     doc.setFontSize(layout === "4-up" ? 5.5 : 6.5);
     doc.setTextColor(110, 110, 110);
-    doc.text(card.card_identifier ?? `CARD ${card.card_number}`, baseX + cardWidth - 2, baseY - identifierOffsetY, {
-      align: "right",
-      baseline: "bottom",
-    });
+    if (layout === "4-up") {
+      doc.text(card.card_identifier ?? `CARD ${card.card_number}`, baseX + cardWidth - 3, baseY + columnHeaderH - 3, {
+        align: "right",
+        baseline: "bottom",
+      });
+    } else {
+      doc.text(card.card_identifier ?? `CARD ${card.card_number}`, baseX + cardWidth - 2, baseY - identifierOffsetY, {
+        align: "right",
+        baseline: "bottom",
+      });
+    }
     doc.setTextColor(0, 0, 0);
   });
 
