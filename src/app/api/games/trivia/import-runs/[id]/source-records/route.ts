@@ -39,7 +39,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     .select("id, import_run_id, source_kind, source_url, source_domain, source_title, excerpt_text, claim_text, verification_status, verification_notes, fetched_at, published_at, content_hash, metadata_payload, created_by, created_at, updated_at")
     .eq("import_run_id", runId)
     .order("created_at", { ascending: false })
-    .limit(250);
+    .limit(10000);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -363,7 +364,7 @@ export default function MusicTriviaAssistantPage() {
                   <p className="mt-3 text-xs text-stone-400">Cue setup: {cueSourceSummary} · Display: {callForControls.display_element_type}</p>
                   {callForControls.cue_notes_text ? <p className="mt-3 text-sm text-stone-400">Cue notes: {callForControls.cue_notes_text}</p> : null}
                   {callForControls.effective_display_image_url ? (
-                    <img
+                    <Image unoptimized width={1200} height={1200}
                       alt={`Trivia asset ${callForControls.call_index}`}
                       className="mt-3 h-48 w-full rounded-2xl border border-cyan-900/40 object-cover"
                       src={callForControls.effective_display_image_url}
@@ -376,7 +377,7 @@ export default function MusicTriviaAssistantPage() {
                       {revealMediaAssets.length > 0 ? (
                         <div className="mt-3 grid gap-3 sm:grid-cols-2">
                           {revealMediaAssets.map((asset, index) => (
-                            <img
+                            <Image unoptimized width={1200} height={1200}
                               key={`${asset.signed_url}-${index}`}
                               alt={`Reveal asset ${index + 1}`}
                               className="h-32 w-full rounded border border-amber-700/40 object-cover"

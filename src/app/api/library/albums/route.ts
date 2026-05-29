@@ -5,6 +5,11 @@ import { isForSaleInventory } from "src/lib/saleUtils";
 
 export const runtime = "nodejs";
 
+const CACHE_HEADERS = {
+  "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
+  Vary: "Cookie, Authorization",
+};
+
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 export async function GET(request: NextRequest) {
@@ -17,11 +22,11 @@ export async function GET(request: NextRequest) {
     const mediaType = (url.searchParams.get("mediaType") ?? "").trim();
     const includeTracks = (url.searchParams.get("includeTracks") ?? "false").toLowerCase() === "true";
     const includeForSale = (url.searchParams.get("includeForSale") ?? "false").toLowerCase() === "true";
-    const page = clamp(Number(url.searchParams.get("page") ?? 0), 0, 5000);
-    const requestedPageSize = Number(url.searchParams.get("pageSize") ?? (includeTracks ? 100 : 250));
+    const page = clamp(Number(url.searchParams.get("page") ?? 0), 0, 100000);
+    const requestedPageSize = Number(url.searchParams.get("pageSize") ?? (includeTracks ? 10000 : 10000));
     const pageSize = includeTracks
-      ? clamp(requestedPageSize, 10, 250)
-      : clamp(requestedPageSize, 50, 1000);
+      ? clamp(requestedPageSize, 10, 10000)
+      : clamp(requestedPageSize, 50, 10000);
 
     const from = page * pageSize;
     const to = from + pageSize - 1;
@@ -204,7 +209,7 @@ export async function GET(request: NextRequest) {
         hasMore: (data ?? []).length === pageSize,
         data: albums,
       },
-      { status: 200 }
+      { status: 200, headers: CACHE_HEADERS }
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to load albums";

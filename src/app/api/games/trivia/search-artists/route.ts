@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     .select("id, name")
     .ilike("name", `%${q}%`)
     .order("name", { ascending: true })
-    .limit(20) as unknown as Promise<{
+    .limit(10000) as unknown as Promise<{
       data: Array<{ id: number; name: string }> | null;
       error: { message: string } | null;
     }>;

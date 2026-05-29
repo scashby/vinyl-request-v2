@@ -6,6 +6,11 @@ import { gameBlueprints, type GameStatus } from "src/lib/gameBlueprints";
 
 export const runtime = "nodejs";
 
+const CACHE_HEADERS = {
+  "Cache-Control": "private, max-age=300, stale-while-revalidate=900",
+  Vary: "Cookie, Authorization",
+};
+
 type GameOverride = {
   title?: string;
   status?: GameStatus;
@@ -43,5 +48,5 @@ export async function GET() {
     };
   });
 
-  return NextResponse.json({ data: merged }, { status: 200 });
+  return NextResponse.json({ data: merged }, { status: 200, headers: CACHE_HEADERS });
 }

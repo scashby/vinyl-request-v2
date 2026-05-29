@@ -243,7 +243,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       .eq("session_id", sessionId)
       .eq("event_type", "pull_promote")
       .order("id", { ascending: false })
-      .limit(100),
+      .limit(10000),
     db
       .from("bingo_session_calls")
       .select("id, call_index, status")
@@ -254,7 +254,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       .eq("session_id", sessionId)
       .in("event_type", ["cue_set", "pull_set", "pull_promote", "call_set"])
       .order("id", { ascending: true })
-      .limit(5000),
+      .limit(10000),
   ]);
 
   const typedPullEvent = (pullEvent ?? null) as SessionEventRow | null;

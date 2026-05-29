@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -151,7 +152,7 @@ export default function NameThatTuneJumbotronPage() {
       <div className="mx-auto max-w-7xl space-y-6">
         <header className="rounded-3xl border border-rose-700/40 bg-black/35 p-6">
           {session?.show_logo && session?.event?.venue_logo_url ? (
-            <img
+            <Image unoptimized width={1200} height={1200}
               alt="Venue logo"
               className="mb-4 h-20 w-auto rounded border border-rose-700/40 bg-black/50 p-2"
               src={session.event.venue_logo_url}

@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -492,7 +493,7 @@ export default function MusicTriviaHostPage() {
                     : "Answer hidden until reveal"}
                 </p>
                 {callForControls?.effective_display_image_url ? (
-                  <img
+                  <Image unoptimized width={1200} height={1200}
                     alt={`Display asset for question ${callForControls.call_index}`}
                     className="mt-3 h-28 w-full rounded border border-cyan-700/40 object-cover"
                     src={callForControls.effective_display_image_url}
@@ -510,7 +511,7 @@ export default function MusicTriviaHostPage() {
                     {revealMediaAssets.length > 0 ? (
                       <div className="mt-2 grid gap-2 sm:grid-cols-2">
                         {revealMediaAssets.map((asset, index) => (
-                          <img
+                          <Image unoptimized width={1200} height={1200}
                             key={`${asset.signed_url}-${index}`}
                             alt={`Reveal asset ${index + 1}`}
                             className="h-28 w-full rounded border border-amber-700/40 object-cover"

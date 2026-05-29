@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { existsSync } from "fs";
@@ -134,7 +135,7 @@ async function loadGameEvents(slug: string): Promise<GameEvent[]> {
     .from(table)
     .select("event_id")
     .not("event_id", "is", null)
-    .limit(1000);
+    .limit(10000);
 
   if (error) {
     console.error(`Failed to load events from ${table}`, error.message);
@@ -219,7 +220,7 @@ export default async function GamePage({
             <div className="flex items-center justify-center w-20 h-20 rounded-2xl bg-black/60 ring-1 ring-white/15 overflow-hidden shrink-0">
               {logoPath ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <Image unoptimized width={1200} height={1200}
                   src={logoPath}
                   alt={`${game.title} logo`}
                   className="w-14 h-14 object-contain"

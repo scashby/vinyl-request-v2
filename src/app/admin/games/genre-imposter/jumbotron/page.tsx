@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -162,7 +163,7 @@ export default function GenreImposterJumbotronPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               {session?.show_logo && session?.event?.venue_logo_url ? (
-                <img
+                <Image unoptimized width={1200} height={1200}
                   alt="Venue logo"
                   className="mb-3 h-16 w-auto rounded border border-emerald-700/40 bg-black/50 p-2"
                   src={session.event.venue_logo_url}

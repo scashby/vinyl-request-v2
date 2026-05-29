@@ -28,7 +28,7 @@ const CollectionInfoPanel = memo(function CollectionInfoPanel({ album, onClose, 
       }
 
       try {
-        const res = await fetch(`/api/library/albums/${album.id}/tracks`, { cache: 'no-store' });
+        const res = await fetch(`/api/library/albums/${album.id}/tracks`);
         const payload = await res.json().catch(() => ({}));
         if (!res.ok || !Array.isArray((payload as { items?: unknown[] }).items)) {
           if (!cancelled) setLiveReleaseTracks(null);

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { existsSync } from "fs";
 import { join } from "path";
@@ -173,7 +174,7 @@ async function loadUpcomingGameNights(
         .from(entry.table)
         .select("event_id")
         .not("event_id", "is", null)
-        .limit(1000);
+        .limit(10000);
 
       if (error) {
         console.error(
@@ -252,7 +253,7 @@ function GameTile({ game }: { game: PublicGame }) {
         <div className="mb-4 flex items-center justify-center w-16 h-16 rounded-xl bg-black/40 ring-1 ring-white/10 overflow-hidden shrink-0">
           {game.logoPath ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image unoptimized width={1200} height={1200}
               src={game.logoPath}
               alt={`${game.title} logo`}
               className="w-12 h-12 object-contain"

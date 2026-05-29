@@ -92,7 +92,7 @@ export default function AdminDashboardPage() {
         .gte('date', today)
         .lte('date', nextMonth)
         .order('date', { ascending: true })
-        .limit(5);
+        .limit(10000);
 
       setStats({
         totalAlbums: albumCount || 0,

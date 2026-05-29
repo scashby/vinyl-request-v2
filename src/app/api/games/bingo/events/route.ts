@@ -19,7 +19,7 @@ export async function GET() {
     .from("events")
     .select("id, title, date, time, location, venue_logo_url")
     .order("date", { ascending: false })
-    .limit(100);
+    .limit(10000);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

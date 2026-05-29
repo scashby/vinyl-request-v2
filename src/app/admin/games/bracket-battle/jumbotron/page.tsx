@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -172,7 +173,7 @@ export default function BracketBattleJumbotronPage() {
         <>
         <div className="flex items-center justify-between gap-3">
           <div>
-            {logoUrl ? <img src={logoUrl} alt="Venue logo" className="mb-3 h-14 w-auto object-contain" /> : null}
+            {logoUrl ? <Image unoptimized width={1200} height={1200} src={logoUrl} alt="Venue logo" className="mb-3 h-14 w-auto object-contain" /> : null}
             {session?.show_title ? <h1 className="text-3xl font-black uppercase text-fuchsia-100">{session?.title ?? "Bracket Battle"}</h1> : null}
             <p className="mt-2 text-sm text-stone-300">
               Session: {session?.session_code ?? (Number.isFinite(sessionId) ? sessionId : "(none selected)")} · Status: {session?.status ?? "-"}
@@ -272,7 +273,7 @@ export default function BracketBattleJumbotronPage() {
         {!showThanksOverlay && session?.host_overlay === "welcome" ? (
           <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1a0a2e,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
             <div className="max-w-4xl rounded-3xl border border-fuchsia-700/40 bg-black/70 p-10">
-              {logoUrl ? <img src={logoUrl} alt="Venue logo" className="mx-auto mb-6 h-20 w-auto object-contain" /> : null}
+              {logoUrl ? <Image unoptimized width={1200} height={1200} src={logoUrl} alt="Venue logo" className="mx-auto mb-6 h-20 w-auto object-contain" /> : null}
               <p className="text-6xl font-black text-fuchsia-200">{session.welcome_heading_text ?? "Welcome to Bracket Battle"}</p>
               <p className="mt-4 text-2xl text-stone-200">{session.welcome_message_text ?? "Vote for your favourite track in each matchup to advance seeds through the bracket."}</p>
             </div>
@@ -293,7 +294,7 @@ export default function BracketBattleJumbotronPage() {
         {!showThanksOverlay && session?.host_overlay === "intermission" ? (
           <section className="fixed inset-0 z-40 flex items-center justify-center bg-[linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
             <div className="max-w-4xl rounded-3xl border border-fuchsia-700/40 bg-black/70 p-10">
-              {logoUrl ? <img src={logoUrl} alt="Venue logo" className="mx-auto mb-6 h-20 w-auto object-contain" /> : null}
+              {logoUrl ? <Image unoptimized width={1200} height={1200} src={logoUrl} alt="Venue logo" className="mx-auto mb-6 h-20 w-auto object-contain" /> : null}
               <p className="text-6xl font-black text-fuchsia-200">{session.intermission_heading_text ?? "Intermission"}</p>
               <p className="mt-4 text-2xl text-stone-200">{session.intermission_message_text ?? "Short break before the next round."}</p>
               {overlayRemaining > 0 ? <p className="mt-6 text-4xl font-bold text-fuchsia-300">{overlayRemaining}s</p> : null}
@@ -305,7 +306,7 @@ export default function BracketBattleJumbotronPage() {
         {showThanksOverlay ? (
           <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1f2937,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
             <div className="max-w-4xl rounded-3xl border border-fuchsia-700/40 bg-black/70 p-10">
-              {logoUrl ? <img src={logoUrl} alt="Venue logo" className="mx-auto mb-6 h-20 w-auto object-contain" /> : null}
+              {logoUrl ? <Image unoptimized width={1200} height={1200} src={logoUrl} alt="Venue logo" className="mx-auto mb-6 h-20 w-auto object-contain" /> : null}
               <p className="text-6xl font-black text-fuchsia-200">{session?.thanks_heading_text ?? "Thanks for Playing"}</p>
               <p className="mt-4 text-2xl text-stone-200">{session?.thanks_subheading_text ?? "See you at the next round."}</p>
             </div>

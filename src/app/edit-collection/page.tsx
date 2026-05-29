@@ -1863,14 +1863,14 @@ function CollectionBrowserPage() {
     try {
       if (includeTracks) {
         // Track view: load all pages with parallel batching
-        const pageSize = 100;
+        const pageSize = 10000;
         const fetchPage = async (page: number) => {
           const url = new URL('/api/library/albums', window.location.origin);
           url.searchParams.set('page', String(page));
           url.searchParams.set('pageSize', String(pageSize));
           url.searchParams.set('includeTracks', 'true');
           url.searchParams.set('includeForSale', 'true');
-          const res = await fetch(url.toString(), { cache: 'no-store' });
+          const res = await fetch(url.toString());
           const payload = await res.json().catch(() => ({}));
           if (!res.ok) return null;
           return { batch: Array.isArray(payload?.data) ? (payload.data as Album[]) : [], hasMore: Boolean(payload?.hasMore) };
@@ -1922,32 +1922,45 @@ function CollectionBrowserPage() {
         sortDir: options?.apiSortDir ?? 'desc',
       };
       activeParamsRef.current = params;
+      const pageSize = 10000;
+      let page = 0;
+      let hasMorePages = true;
+      const fetched: Album[] = [];
 
-      const url = new URL('/api/library/albums', window.location.origin);
-      url.searchParams.set('page', '0');
-      url.searchParams.set('pageSize', '250');
-      url.searchParams.set('includeTracks', 'false');
-      url.searchParams.set('includeForSale', 'false');
-      if (params.q) url.searchParams.set('q', params.q);
-      if (params.mediaType) url.searchParams.set('mediaType', params.mediaType);
-      if (params.location) url.searchParams.set('location', params.location);
-      url.searchParams.set('sortBy', params.sortBy);
-      url.searchParams.set('sortDir', params.sortDir);
+      while (hasMorePages) {
+        const url = new URL('/api/library/albums', window.location.origin);
+        url.searchParams.set('page', String(page));
+        url.searchParams.set('pageSize', String(pageSize));
+        url.searchParams.set('includeTracks', 'false');
+        url.searchParams.set('includeForSale', 'false');
+        if (params.q) url.searchParams.set('q', params.q);
+        if (params.mediaType) url.searchParams.set('mediaType', params.mediaType);
+        if (params.location) url.searchParams.set('location', params.location);
+        url.searchParams.set('sortBy', params.sortBy);
+        url.searchParams.set('sortDir', params.sortDir);
 
-      const res = await fetch(url.toString(), { cache: 'no-store' });
-      const payload = await res.json().catch(() => ({}));
-      if (loadVersion !== albumsLoadVersionRef.current) { stopSpinnerIfOwner(); return; }
-      if (!res.ok) {
-        console.error('Error loading albums:', payload?.error || res.status);
-        stopSpinnerIfOwner();
-        return;
+        const res = await fetch(url.toString());
+        const payload = await res.json().catch(() => ({}));
+        if (loadVersion !== albumsLoadVersionRef.current) { stopSpinnerIfOwner(); return; }
+        if (!res.ok) {
+          console.error('Error loading albums:', payload?.error || res.status);
+          stopSpinnerIfOwner();
+          return;
+        }
+
+        const batch = Array.isArray(payload?.data) ? (payload.data as Album[]) : [];
+        if (batch.length > 0) {
+          fetched.push(...batch);
+        }
+
+        hasMorePages = Boolean(payload?.hasMore) && batch.length > 0;
+        page += 1;
       }
 
-      const batch = Array.isArray(payload?.data) ? (payload.data as Album[]) : [];
-      setAlbums(batch);
-      setHasMore(Boolean(payload?.hasMore));
-      setTotalCount(typeof payload?.total === 'number' ? payload.total : null);
-      nextPageRef.current = 1;
+      setAlbums(fetched);
+      setHasMore(false);
+      setTotalCount(fetched.length);
+      nextPageRef.current = page;
       stopSpinnerIfOwner();
     } catch (error) {
       console.error('Unexpected error loading albums:', error);
@@ -1964,7 +1977,7 @@ function CollectionBrowserPage() {
 
       const url = new URL('/api/library/albums', window.location.origin);
       url.searchParams.set('page', String(page));
-      url.searchParams.set('pageSize', '250');
+      url.searchParams.set('pageSize', '10000');
       url.searchParams.set('includeTracks', 'false');
       url.searchParams.set('includeForSale', 'false');
       if (params.q) url.searchParams.set('q', params.q);
@@ -1973,7 +1986,7 @@ function CollectionBrowserPage() {
       url.searchParams.set('sortBy', params.sortBy);
       url.searchParams.set('sortDir', params.sortDir);
 
-      const res = await fetch(url.toString(), { cache: 'no-store' });
+      const res = await fetch(url.toString());
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) return;
 

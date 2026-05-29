@@ -169,7 +169,7 @@ function parseTrackKey(trackKey: string) {
 // Paged + batched DB helpers
 // ---------------------------------------------------------------------------
 
-async function fetchAllRows(queryFactory: () => unknown, pageSize = 1000): Promise<unknown[]> {
+async function fetchAllRows(queryFactory: () => unknown, pageSize = 10000): Promise<unknown[]> {
   const rows: unknown[] = [];
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await (queryFactory() as { range: (f: number, t: number) => Promise<{ data: unknown[]; error: unknown }> }).range(from, from + pageSize - 1);

@@ -1129,7 +1129,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
       for (let attempt = 1; attempt <= attempts; attempt++) {
         try {
-          const res = await fetch('/api/enrich-sources/stats', { cache: 'no-store' });
+          const res = await fetch('/api/enrich-sources/stats');
           const payload = await res.json().catch(() => null);
           if (!res.ok || !payload?.success) {
             throw new Error(payload?.error || `Failed to load stats (${res.status})`);

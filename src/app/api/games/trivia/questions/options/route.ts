@@ -26,10 +26,10 @@ export async function GET() {
     { data: triviaTags, error: triviaTagsError },
     { data: masterTags, error: masterTagsError },
   ] = await Promise.all([
-    db.from("trivia_questions").select("default_category").limit(3000),
-    db.from("trivia_question_facets").select("category").limit(3000),
-    db.from("trivia_question_tags").select("tag").limit(3000),
-    supabaseAdmin.from("master_tags").select("name").limit(6000),
+    db.from("trivia_questions").select("default_category").limit(10000),
+    db.from("trivia_question_facets").select("category").limit(10000),
+    db.from("trivia_question_tags").select("tag").limit(10000),
+    supabaseAdmin.from("master_tags").select("name").limit(10000),
   ]);
 
   if (defaultsError) return NextResponse.json({ error: defaultsError.message }, { status: 500 });

@@ -28,7 +28,7 @@ export async function GET() {
     .from("trivia_import_runs")
     .select("id, run_code, source_mode, status, triggered_by, scope_payload, source_payload, notes_text, created_at, started_at, completed_at")
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(10000);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

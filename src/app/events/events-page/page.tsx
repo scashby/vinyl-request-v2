@@ -108,7 +108,7 @@ export default function Page() {
           .from("dj_sets")
           .select(`*, events ( id, title, date, location )`)
           .order("recorded_at", { ascending: false })
-          .limit(6);
+          .limit(10000);
 
         if (setsError) {
           console.error("Error loading dj_sets", setsError);

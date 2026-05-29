@@ -8,6 +8,11 @@ import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 
 export const runtime = "nodejs";
 
+const CACHE_HEADERS = {
+  "Cache-Control": "private, max-age=120, stale-while-revalidate=300",
+  Vary: "Cookie, Authorization",
+};
+
 type SearchMode = "smart" | "collection";
 
 type CollectionTrackSearchRow = LibraryTrackSearchResult & {
@@ -159,10 +164,10 @@ function asNumber(value: unknown): number | null {
 }
 
 async function fetchCollectionTrackRowsFromLibraryAlbumsApi(request: NextRequest, authHeader: string | undefined, includeForSale: boolean): Promise<CollectionTrackSearchRow[]> {
-  const pageSize = 80;
+  const pageSize = 10000;
   const rows: CollectionTrackSearchRow[] = [];
 
-  for (let page = 0; page < 1000; page += 1) {
+  for (let page = 0; page < 100000; page += 1) {
     const url = new URL("/api/library/albums", request.url);
     url.searchParams.set("page", String(page));
     url.searchParams.set("pageSize", String(pageSize));
@@ -377,7 +382,7 @@ export async function GET(request: NextRequest) {
         formatDetails,
         limit,
       });
-      return NextResponse.json({ ok: true, results }, { status: 200 });
+      return NextResponse.json({ ok: true, results }, { status: 200, headers: CACHE_HEADERS });
     }
 
     const smartLimit = limit === Number.MAX_SAFE_INTEGER ? 50 : limit;
@@ -440,7 +445,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ ok: true, results: results.slice(0, smartLimit) }, { status: 200 });
+    return NextResponse.json({ ok: true, results: results.slice(0, smartLimit) }, { status: 200, headers: CACHE_HEADERS });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Search failed";
     return NextResponse.json({ error: message }, { status: 500 });

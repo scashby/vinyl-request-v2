@@ -19,7 +19,7 @@ export async function GET() {
     .from("bingo_sessions")
     .select("id, playlist_id, session_code, status, created_at")
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(10000);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -1155,7 +1156,7 @@ export default function BingoSetupPage() {
                 {eventId ? (
                   <div className="mt-2">
                     {venueLogoUrl ? (
-                      <img src={venueLogoUrl} alt="Venue logo" className="mb-2 h-12 rounded object-contain" />
+                      <Image unoptimized width={1200} height={1200} src={venueLogoUrl} alt="Venue logo" className="mb-2 h-12 rounded object-contain" />
                     ) : (
                       <p className="mb-2 text-xs text-stone-500">No logo set for this event.</p>
                     )}

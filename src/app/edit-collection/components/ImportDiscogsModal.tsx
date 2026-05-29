@@ -1751,7 +1751,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         // 2. Fetch Existing from DB to Compare
         let existing: ExistingAlbum[] = [];
         if (sourceType === 'collection') {
-          const pageSize = 1000;
+          const pageSize = 10000;
           let from = 0;
           let hasMore = true;
           const fetched: ExistingAlbum[] = [];
@@ -1873,7 +1873,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
           existing = fetched;
         } else {
-          const pageSize = 1000;
+          const pageSize = 10000;
           let from = 0;
           let hasMore = true;
           const fetched: ExistingAlbum[] = [];

@@ -4,6 +4,11 @@ import { toSingle } from "src/lib/library/mappers";
 
 export const runtime = "nodejs";
 
+const CACHE_HEADERS = {
+  "Cache-Control": "private, max-age=300, stale-while-revalidate=900",
+  Vary: "Cookie, Authorization",
+};
+
 export async function GET(_request: NextRequest, context: { params: Promise<{ inventoryId: string }> }) {
   try {
     const { inventoryId } = await context.params;
@@ -69,7 +74,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ in
         album_artist: artist?.name ?? null,
         items: tracks ?? [],
       },
-      { status: 200 }
+      { status: 200, headers: CACHE_HEADERS }
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to load tracks";

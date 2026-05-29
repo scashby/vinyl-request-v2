@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     .from("gi_sessions")
     .select("id, event_id, session_code, title, status, current_round, current_call_index, created_at")
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(10000);
 
   if (eventId) query = query.eq("event_id", Number(eventId));
 

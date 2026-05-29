@@ -225,7 +225,7 @@ export default function GamesHub({ initialGames }: { initialGames: EnrichedBluep
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/admin/game-blueprints", { cache: "no-store" });
+    const res = await fetch("/api/admin/game-blueprints");
     if (!res.ok) return;
     const payload = await res.json();
     setGames(payload.data ?? []);

@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -139,7 +140,7 @@ export default function BackToBackConnectionJumbotronPage() {
           <>
             <header className="rounded-3xl border border-amber-700/40 bg-black/35 p-6">
               {logoUrl ? (
-                <img src={logoUrl} alt="Venue logo" className="mb-4 h-16 w-auto object-contain" />
+                <Image unoptimized width={1200} height={1200} src={logoUrl} alt="Venue logo" className="mb-4 h-16 w-auto object-contain" />
               ) : null}
               {session?.show_title ? <h1 className="text-5xl font-black uppercase tracking-tight text-amber-200">{session?.title ?? "Back-to-Back Connection"}</h1> : null}
 
@@ -193,7 +194,7 @@ export default function BackToBackConnectionJumbotronPage() {
         {!showThanksOverlay && session?.host_overlay === "welcome" ? (
           <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#5f3a11,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
             <div className="max-w-4xl rounded-3xl border border-amber-700/40 bg-black/70 p-10">
-              {logoUrl ? <img src={logoUrl} alt="Venue logo" className="mx-auto mb-6 h-20 w-auto object-contain" /> : null}
+              {logoUrl ? <Image unoptimized width={1200} height={1200} src={logoUrl} alt="Venue logo" className="mx-auto mb-6 h-20 w-auto object-contain" /> : null}
               <p className="text-6xl font-black text-amber-200">{session.welcome_heading_text ?? "Welcome to Back-to-Back Connection"}</p>
               <p className="mt-4 text-2xl text-stone-200">{session.welcome_message_text ?? "Identify the hidden musical connection between two back-to-back tracks."}</p>
             </div>
@@ -214,7 +215,7 @@ export default function BackToBackConnectionJumbotronPage() {
         {!showThanksOverlay && session?.host_overlay === "intermission" ? (
           <section className="fixed inset-0 z-40 flex items-center justify-center bg-[linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
             <div className="max-w-4xl rounded-3xl border border-amber-700/40 bg-black/70 p-10">
-              {logoUrl ? <img src={logoUrl} alt="Venue logo" className="mx-auto mb-6 h-20 w-auto object-contain" /> : null}
+              {logoUrl ? <Image unoptimized width={1200} height={1200} src={logoUrl} alt="Venue logo" className="mx-auto mb-6 h-20 w-auto object-contain" /> : null}
               <p className="text-6xl font-black text-amber-200">{session.intermission_heading_text ?? "Intermission"}</p>
               <p className="mt-4 text-2xl text-stone-200">{session.intermission_message_text ?? "Short break before the next round."}</p>
               {overlayRemaining > 0 ? (
@@ -228,7 +229,7 @@ export default function BackToBackConnectionJumbotronPage() {
         {showThanksOverlay ? (
           <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1f2937,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
             <div className="max-w-4xl rounded-3xl border border-amber-700/40 bg-black/70 p-10">
-              {logoUrl ? <img src={logoUrl} alt="Venue logo" className="mx-auto mb-6 h-20 w-auto object-contain" /> : null}
+              {logoUrl ? <Image unoptimized width={1200} height={1200} src={logoUrl} alt="Venue logo" className="mx-auto mb-6 h-20 w-auto object-contain" /> : null}
               <p className="text-6xl font-black text-amber-200">{session?.thanks_heading_text ?? "Thanks for Playing"}</p>
               <p className="mt-4 text-2xl text-stone-200">{session?.thanks_subheading_text ?? "See you at the next round."}</p>
             </div>

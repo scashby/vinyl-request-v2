@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -134,7 +135,7 @@ export default function ArtistAliasJumbotronPage() {
 
         {logoUrl ? (
           <div className="mt-4 flex justify-center">
-            <img src={logoUrl} alt="Venue logo" className="max-h-20 object-contain" />
+            <Image unoptimized width={1200} height={1200} src={logoUrl} alt="Venue logo" className="max-h-20 object-contain" />
           </div>
         ) : null}
 
@@ -198,7 +199,7 @@ export default function ArtistAliasJumbotronPage() {
         {session?.host_overlay === "welcome" ? (
           <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1f0f3a,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
             <div className="max-w-4xl rounded-3xl border border-violet-700/40 bg-black/70 p-10">
-              {logoUrl ? <img src={logoUrl} alt="Venue logo" className="mx-auto mb-6 max-h-20 object-contain" /> : null}
+              {logoUrl ? <Image unoptimized width={1200} height={1200} src={logoUrl} alt="Venue logo" className="mx-auto mb-6 max-h-20 object-contain" /> : null}
               <p className="text-5xl font-black text-violet-100">{session.welcome_heading_text ?? "Welcome to Artist Alias"}</p>
               <p className="mt-4 text-2xl text-stone-300">{session.welcome_message_text ?? "Name the artist from the clues revealed one stage at a time."}</p>
             </div>
@@ -208,7 +209,7 @@ export default function ArtistAliasJumbotronPage() {
         {session?.host_overlay === "countdown" ? (
           <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1f0f3a,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
             <div className="max-w-4xl rounded-3xl border border-violet-700/40 bg-black/70 p-10">
-              {logoUrl ? <img src={logoUrl} alt="Venue logo" className="mx-auto mb-6 max-h-20 object-contain" /> : null}
+              {logoUrl ? <Image unoptimized width={1200} height={1200} src={logoUrl} alt="Venue logo" className="mx-auto mb-6 max-h-20 object-contain" /> : null}
               <p className="text-sm uppercase tracking-[0.2em] text-violet-300">Starting in</p>
               <p className="mt-4 text-8xl font-black tabular-nums text-violet-100">{overlayRemaining}</p>
             </div>
@@ -218,7 +219,7 @@ export default function ArtistAliasJumbotronPage() {
         {session?.host_overlay === "intermission" ? (
           <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1f0f3a,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
             <div className="max-w-4xl rounded-3xl border border-violet-700/40 bg-black/70 p-10">
-              {logoUrl ? <img src={logoUrl} alt="Venue logo" className="mx-auto mb-6 max-h-20 object-contain" /> : null}
+              {logoUrl ? <Image unoptimized width={1200} height={1200} src={logoUrl} alt="Venue logo" className="mx-auto mb-6 max-h-20 object-contain" /> : null}
               <p className="text-5xl font-black text-violet-100">{session.intermission_heading_text ?? "Intermission"}</p>
               <p className="mt-4 text-2xl text-stone-300">{session.intermission_message_text ?? "Short break before the next round."}</p>
               {overlayRemaining > 0 ? <p className="mt-6 text-6xl font-black tabular-nums text-violet-200">{overlayRemaining}s</p> : null}
@@ -229,7 +230,7 @@ export default function ArtistAliasJumbotronPage() {
         {showThanksOverlay ? (
           <section className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,#1f2937,transparent_45%),linear-gradient(180deg,#020202,#0b0b0b)] p-8 text-center">
             <div className="max-w-4xl rounded-3xl border border-violet-700/40 bg-black/70 p-10">
-              {logoUrl ? <img src={logoUrl} alt="Venue logo" className="mx-auto mb-6 max-h-20 object-contain" /> : null}
+              {logoUrl ? <Image unoptimized width={1200} height={1200} src={logoUrl} alt="Venue logo" className="mx-auto mb-6 max-h-20 object-contain" /> : null}
               <p className="text-5xl font-black text-violet-100">{session?.thanks_heading_text ?? "Thanks for Playing"}</p>
               <p className="mt-4 text-2xl text-stone-300">{session?.thanks_subheading_text ?? "See you at the next round."}</p>
             </div>

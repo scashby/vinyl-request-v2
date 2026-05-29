@@ -386,7 +386,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch(`/api/library/albums/${albumId}`, { cache: 'no-store' });
+        const res = await fetch(`/api/library/albums/${albumId}`);
         const payload = await res.json().catch(() => ({}));
         if (!res.ok) {
           const message = payload?.error || `Failed to load album (${res.status})`;

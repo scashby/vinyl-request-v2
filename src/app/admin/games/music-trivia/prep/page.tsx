@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -303,7 +304,7 @@ export default function MusicTriviaPrepPage() {
                   </div>
 
                   {call.effective_display_image_url ? (
-                    <img
+                    <Image unoptimized width={1200} height={1200}
                       alt={`Trivia display asset for question ${call.call_index}`}
                       className="h-32 w-full rounded border border-stone-700 object-cover"
                       src={call.effective_display_image_url}

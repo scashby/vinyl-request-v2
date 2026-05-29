@@ -1,4 +1,5 @@
 'use client';
+import Image from "next/image";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -1675,7 +1676,7 @@ export function PlaylistStudioModal({
                                   style={playlist.coverImageUrl ? undefined : { backgroundColor: `${playlist.color}22` }}
                                 >
                                   {playlist.coverImageUrl ? (
-                                    <img src={playlist.coverImageUrl} alt={playlist.name} className="h-full w-full object-cover" />
+                                    <Image unoptimized width={1200} height={1200} src={playlist.coverImageUrl} alt={playlist.name} className="h-full w-full object-cover" />
                                   ) : (
                                     <span style={{ color: playlist.color }}>{playlist.isSmart ? '⚡' : playlist.icon}</span>
                                   )}
@@ -1774,7 +1775,7 @@ export function PlaylistStudioModal({
                       style={manualCoverImageUrl ? undefined : { backgroundColor: `${manualColor}33`, border: `1px solid ${manualColor}50` }}
                     >
                       {manualCoverImageUrl ? (
-                        <img src={manualCoverImageUrl} alt="Cover" className="h-full w-full object-cover" />
+                        <Image unoptimized width={1200} height={1200} src={manualCoverImageUrl} alt="Cover" className="h-full w-full object-cover" />
                       ) : (
                         <span className="text-5xl" style={{ color: manualColor }}>{manualIcon}</span>
                       )}
@@ -2825,7 +2826,7 @@ export function PlaylistStudioModal({
                     onClick={() => coverImageInputRef.current?.click()}
                   >
                     {manualCoverImageUrl ? (
-                      <img src={manualCoverImageUrl} alt="Cover" className="h-full w-full object-cover" />
+                      <Image unoptimized width={1200} height={1200} src={manualCoverImageUrl} alt="Cover" className="h-full w-full object-cover" />
                     ) : (
                       <span className="text-6xl" style={{ color: manualColor }}>{manualIcon}</span>
                     )}

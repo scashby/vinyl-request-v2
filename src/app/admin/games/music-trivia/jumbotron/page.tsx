@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -207,7 +208,7 @@ export default function MusicTriviaJumbotronPage() {
       <div className="mx-auto max-w-7xl space-y-6">
         <header className="rounded-3xl border border-cyan-700/40 bg-black/35 p-6">
           {session?.show_logo && session?.event?.venue_logo_url ? (
-            <img
+            <Image unoptimized width={1200} height={1200}
               alt="Venue logo"
               className="mb-4 h-20 w-auto rounded border border-cyan-700/40 bg-black/50 p-2"
               src={session.event.venue_logo_url}
@@ -237,7 +238,7 @@ export default function MusicTriviaJumbotronPage() {
           <section className="rounded-3xl border border-stone-700 bg-black/45 p-8">
           <p className="text-sm uppercase tracking-[0.2em] text-stone-300">Current Question</p>
           {currentCall?.effective_display_image_url ? (
-            <img
+            <Image unoptimized width={1200} height={1200}
               alt={`Trivia display asset for question ${currentCall.call_index}`}
               className="mt-3 h-64 w-full rounded-2xl border border-cyan-700/40 object-cover"
               src={currentCall.effective_display_image_url}
@@ -275,7 +276,7 @@ export default function MusicTriviaJumbotronPage() {
               {revealMediaAssets.length > 0 ? (
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   {revealMediaAssets.map((asset, index) => (
-                    <img
+                    <Image unoptimized width={1200} height={1200}
                       key={`${asset.signed_url}-${index}`}
                       alt={`Reveal media ${index + 1}`}
                       className="h-48 w-full rounded border border-amber-700/40 object-cover"

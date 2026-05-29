@@ -100,7 +100,7 @@ export async function GET(request: Request) {
     };
 
     const rows: DiagnosticReadRow[] = [];
-    const pageSize = 1000;
+    const pageSize = 10000;
     let cursor = 0;
     while (cursor < MAX_ROWS) {
       const { data, error } = await fetchPage(cursor, cursor + pageSize - 1);

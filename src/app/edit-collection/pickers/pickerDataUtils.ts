@@ -125,7 +125,7 @@ export async function fetchLocations(): Promise<PickerDataItem[]> {
 export async function fetchArtists(): Promise<PickerDataItem[]> {
   try {
     const artistMap = new Map<string, number>();
-    const pageSize = 1000;
+    const pageSize = 10000;
     let from = 0;
 
     while (true) {

@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -167,7 +168,7 @@ function BrandingLogos({
   return (
     <div className="relative z-10 flex flex-wrap items-center justify-center gap-4">
       <div className={deadWaxShellClass}>
-        <img
+        <Image unoptimized width={1200} height={1200}
           src="/images/dwd-logo.PNG"
           alt="Dead Wax Dialogues"
           className="h-[5.8vw] min-h-[52px] max-h-[96px] w-auto object-contain"
@@ -175,7 +176,7 @@ function BrandingLogos({
       </div>
       {venueLogoUrl ? (
         <div className={venueShellClass}>
-          <img
+          <Image unoptimized width={1200} height={1200}
             src={venueLogoUrl}
             alt={venueName ? `${venueName} logo` : "Venue logo"}
             className="h-[5.8vw] min-h-[52px] max-h-[96px] w-auto object-contain"
@@ -692,7 +693,7 @@ export default function BingoJumbotronPage() {
           {/* ── PENDING is the ONLY overlay ── */}
           {session?.bingo_overlay === "pending" ? (
             <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-8 bg-black/85 text-center">
-              <img
+              <Image unoptimized width={1200} height={1200}
                 src="/images/bingo/bingo-pending.svg"
                 alt="Bingo pending"
                 className="animate-spin"

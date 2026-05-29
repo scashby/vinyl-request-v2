@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -202,7 +203,7 @@ export default function DecadeDashJumbotronPage() {
         {/* Welcome Overlay */}
         {session?.host_overlay === "welcome" && !showThanksOverlay && (
           <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-gradient-to-b from-pink-900/90 via-stone-900/80 to-stone-950/90 backdrop-blur-sm">
-            {logoUrl && session.show_logo && <img src={logoUrl} alt="Venue" className="h-16 mb-4 object-contain" />}
+            {logoUrl && session.show_logo && <Image unoptimized width={1200} height={1200} src={logoUrl} alt="Venue" className="h-16 mb-4 object-contain" />}
             <div className="text-center">
               <h2 className="text-4xl font-black text-pink-300 mb-4">{session?.welcome_heading_text}</h2>
               <p className="text-lg text-stone-300">{session?.welcome_message_text}</p>
@@ -234,7 +235,7 @@ export default function DecadeDashJumbotronPage() {
         {/* Thanks Overlay */}
         {showThanksOverlay && (
           <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-gradient-to-b from-pink-900/90 via-stone-900/80 to-stone-950/90 backdrop-blur-sm">
-            {logoUrl && session.show_logo && <img src={logoUrl} alt="Venue" className="h-20 mb-6 object-contain" />}
+            {logoUrl && session.show_logo && <Image unoptimized width={1200} height={1200} src={logoUrl} alt="Venue" className="h-20 mb-6 object-contain" />}
             <div className="text-center">
               <h2 className="text-5xl font-black text-pink-300 mb-4">{session?.thanks_heading_text}</h2>
               <p className="text-2xl text-stone-300">{session?.thanks_subheading_text}</p>

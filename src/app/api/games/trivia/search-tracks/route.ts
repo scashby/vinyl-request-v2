@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       .from("release_tracks")
       .select("id, release_id, recording_id, position, side, title_override")
       .ilike("title_override", `%${q}%`)
-      .limit(200) as unknown as Promise<{
+      .limit(10000) as unknown as Promise<{
         data: Array<{ id: number; release_id: number; recording_id: number | null; position: string | null; side: string | null; title_override: string | null }> | null;
         error: { message: string } | null;
       }>,
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       .select("id, release_id, recording_id, position, side, title_override, recordings(id, title, track_artist)")
       .ilike("recordings.title", `%${q}%`)
       .not("recording_id", "is", null)
-      .limit(200) as unknown as Promise<{
+      .limit(10000) as unknown as Promise<{
         data: Array<{ id: number; release_id: number; recording_id: number | null; position: string | null; side: string | null; title_override: string | null; recordings: { id: number; title: string; track_artist: string | null } | null }> | null;
         error: { message: string } | null;
       }>,
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       .from("inventory")
       .select("id, release_id, status, discogs_folder_name, discogs_folder_id, discogs_instance_id")
       .in("release_id", releaseIds)
-      .limit(600) as unknown as Promise<{
+      .limit(10000) as unknown as Promise<{
         data: Array<{ id: number; release_id: number; status: string | null; discogs_folder_name: string | null; discogs_folder_id: number | null; discogs_instance_id: number | null }> | null;
         error: { message: string } | null;
       }>,
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
       .from("releases")
       .select("id, master_id, format_details")
       .in("id", releaseIds)
-      .limit(200) as unknown as Promise<{
+      .limit(10000) as unknown as Promise<{
         data: Array<{ id: number; master_id: number | null; format_details: string[] | null }> | null;
         error: { message: string } | null;
       }>,
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
     .from("masters")
     .select("id, title, main_artist_id, artists:main_artist_id(id, name)")
     .in("id", masterIds)
-    .limit(200) as unknown as Promise<{
+    .limit(10000) as unknown as Promise<{
       data: Array<{ id: number; title: string; main_artist_id: number | null; artists: { id: number; name: string } | null }> | null;
       error: { message: string } | null;
     }>);

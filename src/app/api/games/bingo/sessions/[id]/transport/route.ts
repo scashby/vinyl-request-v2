@@ -64,7 +64,7 @@ async function getQueueCalls(db: ReturnType<typeof getBingoDb>, sessionId: numbe
       .eq("session_id", sessionId)
       .in("event_type", ["cue_set", "pull_set", "pull_promote", "call_set"])
       .order("id", { ascending: true })
-      .limit(5000),
+      .limit(10000),
   ]);
 
   if (callsError) throw new Error(callsError.message);

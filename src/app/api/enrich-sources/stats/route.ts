@@ -4,6 +4,11 @@ import { DATA_CATEGORY_CHECK_FIELDS } from "src/lib/enrichment-data-mapping";
 
 export const dynamic = 'force-dynamic';
 
+const CACHE_HEADERS = {
+  'Cache-Control': 'private, max-age=120, stale-while-revalidate=300',
+  Vary: 'Cookie, Authorization',
+};
+
 const NON_ENRICHABLE_FIELDS = new Set<string>([
   'samples',
   'sampled_by',
@@ -787,7 +792,7 @@ export async function GET(request: Request) {
       success: true, 
       stats,
       folders: Array.from(folders).sort()
-    });
+    }, { headers: CACHE_HEADERS });
 
   } catch (error) {
     console.error("Stats Error:", error);

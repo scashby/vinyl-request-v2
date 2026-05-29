@@ -21,7 +21,7 @@ export async function GET() {
     .from("trivia_sessions")
     .select("id, session_code, title, status, current_call_index, created_at")
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(10000);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
