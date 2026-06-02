@@ -16,7 +16,6 @@ type BingoCallPatch = {
   position?: string | null;
   metadata_locked?: boolean;
   metadata_synced_at?: string | null;
-  reveal_context?: string | null;
 };
 
 type CallPatchBody = {
@@ -27,7 +26,6 @@ type CallPatchBody = {
   side?: string | null;
   position?: string | null;
   metadata_locked?: boolean;
-  reveal_context?: string | null;
 };
 
 type CallRow = {
@@ -54,8 +52,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     typeof body.position === "string" ||
     body.position === null ||
     typeof body.metadata_locked === "boolean";
-  const hasRevealContextPatch = "reveal_context" in body;
-  if (!body.status && !hasMetadataPatch && !hasRevealContextPatch) {
+  if (!body.status && !hasMetadataPatch) {
     return NextResponse.json({ error: "No valid fields provided" }, { status: 400 });
   }
 
@@ -97,9 +94,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
   if (hasMetadataPatch) {
     patch.metadata_synced_at = now;
-  }
-  if (hasRevealContextPatch) {
-    patch.reveal_context = typeof body.reveal_context === "string" ? body.reveal_context.trim() || null : null;
   }
 
   const { error } = await db.from("bingo_session_calls").update(patch).eq("id", callId);

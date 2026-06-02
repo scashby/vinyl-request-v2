@@ -60,10 +60,9 @@ type Call = {
   track_title: string;
   artist_name: string;
   status: string;
-  reveal_context: string | null;
 };
 
-type RevealPhase = "hidden" | "context" | "artist" | "full";
+type RevealPhase = "hidden" | "artist" | "full";
 
 const COLUMN_ROTATION = ["B", "I", "N", "G", "O"];
 
@@ -330,26 +329,13 @@ export default function BingoJumbotronPage() {
 
     if (now < firstRevealAt) return "hidden";
 
-    const hasContext = Boolean(current?.reveal_context);
-    if (hasContext) {
-      const artistRevealAt = firstRevealAt + delaySeconds * 1000;
-      if (now < artistRevealAt) return "context";
-
-      const titleRevealAt = artistRevealAt + delaySeconds * 1000;
-      if (now < titleRevealAt) return "artist";
-
-      return "full";
-    }
-
-    // No context: original two-phase behavior
     const titleRevealAt = firstRevealAt + delaySeconds * 1000;
     if (now < titleRevealAt) return "artist";
 
     return "full";
   }, [session?.call_reveal_at, session?.call_reveal_delay_seconds, session?.current_call_index, current, now]);
 
-  const contextHidden = revealPhase === "hidden";
-  const artistHidden = revealPhase === "hidden" || revealPhase === "context";
+  const artistHidden = revealPhase === "hidden";
   const titleHidden = revealPhase !== "full";
 
   const maskTextClass = (hidden: boolean) => (hidden ? "blur-[0.28em] select-none opacity-80" : "transition-all duration-500");
@@ -642,11 +628,6 @@ export default function BingoJumbotronPage() {
                     >
                       {current ? current.column_letter : "?"}
                     </p>
-                    {current?.reveal_context ? (
-                      <p className={`mt-[0.5vw] font-semibold italic text-amber-400 ${maskTextClass(contextHidden)}`} style={{ fontSize: "2.4vw" }}>
-                        {current.reveal_context}
-                      </p>
-                    ) : null}
                     <p className={`mt-[0.4vw] font-black leading-tight text-amber-100 ${maskTextClass(titleHidden)}`} style={{ fontSize: "4.5vw" }}>
                       {current ? current.track_title : "..."}
                     </p>

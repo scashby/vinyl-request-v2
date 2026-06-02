@@ -1,8 +1,10 @@
--- Theme context reveal: per-call context text (e.g. "From the movie Fight Club") shown as
--- an extra reveal phase before the artist, and a persistent preset store for reuse.
--- Safe to re-run; uses ADD COLUMN IF NOT EXISTS and CREATE TABLE IF NOT EXISTS.
+-- THIS MIGRATION HAS BEEN ROLLED BACK. Delete this file.
+-- Run the following SQL to revert the changes it made:
+--
+-- ALTER TABLE public.bingo_sessions DROP COLUMN IF EXISTS theme_name;
+-- ALTER TABLE public.bingo_session_calls DROP COLUMN IF EXISTS reveal_context;
+-- DROP TABLE IF EXISTS public.bingo_theme_contexts;
 
-BEGIN;
 
 -- Display label for the session's theme (e.g. "Songs from Movies and TV").
 -- When set, the Context Reveals editor uses this to load / save theme presets.

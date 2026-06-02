@@ -53,7 +53,6 @@ type Session = {
   show_countdown: boolean;
   recent_calls_limit: number;
   next_game_rules_text: string | null;
-  theme_name?: string | null;
 };
 
 type BingoGamePlaylist = {
@@ -94,29 +93,11 @@ export default function BingoEditSessionPage() {
   const [showCountdown, setShowCountdown] = useState(true);
   const [recentCallsLimit, setRecentCallsLimit] = useState(5);
   const [nextGameRulesText, setNextGameRulesText] = useState("");
-  const [themeName, setThemeName] = useState("");
   const [selectedPresetId, setSelectedPresetId] = useState<number | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  type CallEntry = {
-    id: number;
-    call_index: number;
-    ball_number: number | null;
-    column_letter: string;
-    track_title: string;
-    artist_name: string;
-    playlist_track_key: string | null;
-    reveal_context: string | null;
-  };
-
-  const [contextRevealCalls, setContextRevealCalls] = useState<CallEntry[]>([]);
-  const [contextInputs, setContextInputs] = useState<Record<number, string>>({});
-  const [contextLoading, setContextLoading] = useState(false);
-  const [contextError, setContextError] = useState<string | null>(null);
-  const [contextMessage, setContextMessage] = useState<string | null>(null);
 
   const selectedPreset = useMemo(
     () => (selectedPresetId ? presets.find((preset) => preset.id === selectedPresetId) ?? null : null),
@@ -207,7 +188,6 @@ export default function BingoEditSessionPage() {
       setShowCountdown(Boolean(sessionPayload.show_countdown));
       setRecentCallsLimit(sessionPayload.recent_calls_limit ?? 5);
       setNextGameRulesText(sessionPayload.next_game_rules_text ?? "");
-      setThemeName(sessionPayload.theme_name ?? "");
       setGamePlaylists(gamePlaylistsPayload.data ?? []);
       setActivePlaylistByRound(sessionPayload.active_playlist_letter_by_round ?? []);
     } catch (loadError) {
@@ -337,7 +317,6 @@ export default function BingoEditSessionPage() {
           show_countdown: showCountdown,
           recent_calls_limit: recentCallsLimit,
           next_game_rules_text: nextGameRulesText.trim() || null,
-          theme_name: themeName.trim() || null,
         }),
       });
 
@@ -432,137 +411,6 @@ export default function BingoEditSessionPage() {
     }
   };
 
-  function toThemeSlug(name: string): string {
-    return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  }
-
-  const loadContextCalls = async () => {
-    if (!Number.isFinite(sessionId)) return;
-    setContextLoading(true);
-    setContextError(null);
-    setContextMessage(null);
-    try {
-      const res = await fetch(`/api/games/bingo/sessions/${sessionId}/calls`, { cache: "no-store" });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error((payload as { error?: string }).error ?? "Failed to load calls");
-      const calls = (payload as { data?: CallEntry[] }).data ?? [];
-      setContextRevealCalls(calls);
-      const inputs: Record<number, string> = {};
-      for (const call of calls) inputs[call.id] = call.reveal_context ?? "";
-      setContextInputs(inputs);
-    } catch (err) {
-      setContextError(err instanceof Error ? err.message : "Failed to load calls");
-    } finally {
-      setContextLoading(false);
-    }
-  };
-
-  const saveCallContext = async (callId: number) => {
-    const value = contextInputs[callId] ?? "";
-    try {
-      const res = await fetch(`/api/games/bingo/calls/${callId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reveal_context: value.trim() || null }),
-      });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
-        throw new Error((payload as { error?: string }).error ?? "Failed to save context");
-      }
-      setContextRevealCalls((prev) =>
-        prev.map((c) => (c.id === callId ? { ...c, reveal_context: value.trim() || null } : c))
-      );
-    } catch (err) {
-      setContextError(err instanceof Error ? err.message : "Failed to save context");
-    }
-  };
-
-  const loadFromTheme = async () => {
-    const slug = toThemeSlug(themeName);
-    if (!slug) return;
-    setContextLoading(true);
-    setContextError(null);
-    setContextMessage(null);
-    try {
-      const res = await fetch(`/api/games/bingo/theme-contexts/${slug}`, { cache: "no-store" });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error((payload as { error?: string }).error ?? "Failed to load theme contexts");
-      const entries = (payload as { data?: { playlist_track_key: string; context_text: string }[] }).data ?? [];
-      const byKey = new Map(entries.map((e) => [e.playlist_track_key, e.context_text]));
-      let populated = 0;
-      const patchPromises: Promise<void>[] = [];
-      setContextRevealCalls((prev) => {
-        const updated = prev.map((call) => {
-          const text = call.playlist_track_key ? byKey.get(call.playlist_track_key) : undefined;
-          if (text !== undefined && text !== (call.reveal_context ?? "")) {
-            populated += 1;
-            patchPromises.push(
-              fetch(`/api/games/bingo/calls/${call.id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ reveal_context: text || null }),
-              }).then(() => undefined)
-            );
-            return { ...call, reveal_context: text || null };
-          }
-          return call;
-        });
-        setContextInputs((prev2) => {
-          const next = { ...prev2 };
-          for (const call of updated) next[call.id] = call.reveal_context ?? "";
-          return next;
-        });
-        return updated;
-      });
-      await Promise.all(patchPromises);
-      setContextMessage(populated > 0 ? `Loaded context for ${populated} track${populated !== 1 ? "s" : ""} from theme.` : "No matching tracks found in theme preset.");
-    } catch (err) {
-      setContextError(err instanceof Error ? err.message : "Failed to load from theme");
-    } finally {
-      setContextLoading(false);
-    }
-  };
-
-  const saveContextsToTheme = async () => {
-    const slug = toThemeSlug(themeName);
-    if (!slug || !themeName.trim()) return;
-    const toSave = contextRevealCalls.filter((c) => c.playlist_track_key && (contextInputs[c.id] ?? c.reveal_context ?? "").trim());
-    if (toSave.length === 0) {
-      setContextMessage("No context entries to save.");
-      return;
-    }
-    setContextLoading(true);
-    setContextError(null);
-    setContextMessage(null);
-    try {
-      const results = await Promise.allSettled(
-        toSave.map((call) =>
-          fetch("/api/games/bingo/theme-contexts", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              theme_slug: slug,
-              theme_name: themeName.trim(),
-              playlist_track_key: call.playlist_track_key,
-              context_text: (contextInputs[call.id] ?? call.reveal_context ?? "").trim(),
-            }),
-          })
-        )
-      );
-      const saved = results.filter((r) => r.status === "fulfilled").length;
-      const failed = results.length - saved;
-      setContextMessage(
-        failed > 0
-          ? `Saved ${saved} of ${results.length} entries to theme (${failed} failed).`
-          : `Saved ${saved} entr${saved !== 1 ? "ies" : "y"} to theme "${themeName.trim()}".`
-      );
-    } catch (err) {
-      setContextError(err instanceof Error ? err.message : "Failed to save to theme");
-    } finally {
-      setContextLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,#3f130f,transparent_40%),linear-gradient(180deg,#171717,#090909)] p-6 text-stone-100">
       <div className="mx-auto max-w-6xl space-y-6">
@@ -645,11 +493,6 @@ export default function BingoEditSessionPage() {
 
                 <label className="text-sm">Call Reveal Step (sec)
                   <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="number" min={0} max={300} value={callRevealDelay} onChange={(e) => setCallRevealDelay(Math.max(0, Math.min(300, Number(e.target.value) || 0)))} />
-                </label>
-
-                <label className="text-sm">Theme Name (optional)
-                  <input className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" type="text" placeholder="e.g. Songs from Movies and TV" value={themeName} onChange={(e) => setThemeName(e.target.value)} />
-                  <p className="mt-1 text-xs text-stone-500">Used to save and reload per-track context reveals across sessions.</p>
                 </label>
 
                 <label className="text-sm">Intermission (min)
@@ -827,93 +670,6 @@ export default function BingoEditSessionPage() {
               </div>
             </div>
           ) : null}
-        </section>
-
-        <section className="rounded-3xl border border-amber-900/40 bg-black/45 p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-black uppercase text-amber-100">Context Reveals</h2>
-              <p className="mt-1 text-xs text-stone-400">
-                Optional hint text shown as a first reveal on the jumbotron (e.g. &quot;From the movie Fight Club&quot;).
-                Set a Theme Name in the config above to save and reload presets across sessions.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => { void loadContextCalls(); }}
-                disabled={contextLoading}
-                className="rounded border border-stone-700 px-3 py-1 text-xs text-stone-300 hover:border-amber-500 hover:text-amber-200 disabled:opacity-50"
-              >
-                {contextLoading ? "Loading..." : contextRevealCalls.length > 0 ? "Refresh Calls" : "Load Calls"}
-              </button>
-              {themeName.trim() && contextRevealCalls.length > 0 ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => { void loadFromTheme(); }}
-                    disabled={contextLoading}
-                    className="rounded border border-amber-700/70 bg-amber-950/30 px-3 py-1 text-xs text-amber-200 disabled:opacity-50"
-                  >
-                    Load from Theme
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { void saveContextsToTheme(); }}
-                    disabled={contextLoading}
-                    className="rounded border border-amber-700/70 bg-amber-950/30 px-3 py-1 text-xs text-amber-200 disabled:opacity-50"
-                  >
-                    Save Contexts to Theme
-                  </button>
-                </>
-              ) : null}
-            </div>
-
-            {contextError ? <p className="text-xs text-red-400">{contextError}</p> : null}
-            {contextMessage ? <p className="text-xs text-amber-300">{contextMessage}</p> : null}
-
-            {contextRevealCalls.length > 0 ? (
-              <div className="max-h-[60vh] overflow-y-auto rounded border border-stone-700/60 bg-stone-950/40">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-stone-900">
-                    <tr className="border-b border-stone-700/60 text-left">
-                      <th className="px-3 py-2 font-semibold text-stone-400">Ball</th>
-                      <th className="px-3 py-2 font-semibold text-stone-400">Artist / Track</th>
-                      <th className="px-3 py-2 font-semibold text-stone-400">Context Text (first reveal)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {contextRevealCalls.map((call) => (
-                      <tr key={call.id} className="border-b border-stone-800/60 hover:bg-stone-900/30">
-                        <td className="px-3 py-2 tabular-nums text-stone-500">
-                          <span className="font-black text-stone-300">{call.column_letter}</span>
-                          <span className="ml-0.5 text-stone-500">{call.ball_number ?? ""}</span>
-                        </td>
-                        <td className="px-3 py-2">
-                          <p className="font-semibold text-amber-100 leading-tight">{call.artist_name}</p>
-                          <p className="text-stone-400 leading-tight">{call.track_title}</p>
-                        </td>
-                        <td className="px-3 py-2">
-                          <input
-                            type="text"
-                            className="w-full rounded border border-stone-700 bg-stone-950 px-2 py-1 text-xs focus:border-amber-500 focus:outline-none"
-                            placeholder="e.g. From the movie Fight Club"
-                            value={contextInputs[call.id] ?? ""}
-                            onChange={(e) => setContextInputs((prev) => ({ ...prev, [call.id]: e.target.value }))}
-                            onBlur={() => { void saveCallContext(call.id); }}
-                            onKeyDown={(e) => { if (e.key === "Enter") void saveCallContext(call.id); }}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
-          </div>
         </section>
       </div>
     </div>

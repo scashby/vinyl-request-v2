@@ -248,7 +248,6 @@ export type BingoDatabase = {
           is_sandbox: boolean;
           sandbox_source_session_id: number | null;
           sandbox_expires_at: string | null;
-          theme_name: string | null;
         };
         Insert: {
           id?: number;
@@ -311,7 +310,6 @@ export type BingoDatabase = {
           is_sandbox?: boolean;
           sandbox_source_session_id?: number | null;
           sandbox_expires_at?: string | null;
-          theme_name?: string | null;
         };
         Update: {
           id?: number;
@@ -374,7 +372,6 @@ export type BingoDatabase = {
           is_sandbox?: boolean;
           sandbox_source_session_id?: number | null;
           sandbox_expires_at?: string | null;
-          theme_name?: string | null;
         };
         Relationships: [];
       };
@@ -517,7 +514,6 @@ export type BingoDatabase = {
           link_group: string | null;
           metadata_locked: boolean;
           metadata_synced_at: string | null;
-          reveal_context: string | null;
           status: string;
           prep_started_at: string | null;
           called_at: string | null;
@@ -539,7 +535,6 @@ export type BingoDatabase = {
           link_group?: string | null;
           metadata_locked?: boolean;
           metadata_synced_at?: string | null;
-          reveal_context?: string | null;
           status?: string;
           prep_started_at?: string | null;
           called_at?: string | null;
@@ -561,7 +556,6 @@ export type BingoDatabase = {
           link_group?: string | null;
           metadata_locked?: boolean;
           metadata_synced_at?: string | null;
-          reveal_context?: string | null;
           status?: string;
           prep_started_at?: string | null;
           called_at?: string | null;
@@ -669,36 +663,6 @@ export type BingoDatabase = {
           event_type?: string;
           payload?: Json | null;
           created_at?: string;
-        };
-        Relationships: [];
-      };
-      bingo_theme_contexts: {
-        Row: {
-          id: number;
-          theme_slug: string;
-          theme_name: string;
-          playlist_track_key: string;
-          context_text: string;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: number;
-          theme_slug: string;
-          theme_name: string;
-          playlist_track_key: string;
-          context_text: string;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: number;
-          theme_slug?: string;
-          theme_name?: string;
-          playlist_track_key?: string;
-          context_text?: string;
-          created_at?: string;
-          updated_at?: string;
         };
         Relationships: [];
       };
