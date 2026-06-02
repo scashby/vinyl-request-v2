@@ -102,7 +102,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     patch.reveal_context = typeof body.reveal_context === "string" ? body.reveal_context.trim() || null : null;
   }
 
-  const { error } = await db.from("bingo_session_calls").update(patch).eq("id", callId);
+  const { error } = await db.from("bingo_session_calls").update(patch as Record<string, unknown>).eq("id", callId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   if (hasMetadataPatch && (typeof body.track_title === "string" || typeof body.artist_name === "string")) {
