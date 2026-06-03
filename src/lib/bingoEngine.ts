@@ -23,6 +23,7 @@ export type ResolvedPlaylistTrack = {
   side: string | null;
   position: string | null;
   linkGroup: string | null;
+  themeHint: string | null;
 };
 
 type PlaylistConfigRow = {
@@ -81,6 +82,7 @@ type DbPlaylistItem = {
   track_key: string;
   sort_order: number;
   link_group: string | null;
+  theme_hint: string | null;
 };
 
 type DbInventory = { id: number; release_id: number | null };
@@ -312,6 +314,7 @@ export function planRoundSessionCalls(
     side: entry.track.side,
     position: entry.track.position,
     link_group: entry.track.linkGroup ?? null,
+    theme_hint: entry.track.themeHint ?? null,
   }));
 }
 
@@ -618,12 +621,13 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
       side: row.side,
       position: row.position,
       linkGroup: null,
+      themeHint: null,
     }));
   }
 
   const { data: playlistItems, error: itemError } = await db
     .from("collection_playlist_items")
-    .select("id, playlist_id, track_key, sort_order, link_group")
+    .select("id, playlist_id, track_key, sort_order, link_group, theme_hint")
     .eq("playlist_id", playlistId)
     .order("sort_order", { ascending: true });
 
@@ -777,6 +781,7 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
       side: releaseTrack?.side ?? null,
       position: releaseTrack?.position ?? parsed.fallbackPosition,
       linkGroup: item.link_group ?? null,
+      themeHint: item.theme_hint ?? null,
     });
   }
 

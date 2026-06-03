@@ -136,7 +136,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const { data, error } = await db
     .from("bingo_session_calls")
-    .select("id, session_id, playlist_track_key, call_index, ball_number, column_letter, track_title, artist_name, album_name, side, position, link_group, metadata_locked, metadata_synced_at, status, prep_started_at, called_at, completed_at, created_at")
+    .select("id, session_id, playlist_track_key, call_index, ball_number, column_letter, track_title, artist_name, album_name, side, position, link_group, theme_hint, metadata_locked, metadata_synced_at, status, prep_started_at, called_at, completed_at, created_at")
     .eq("session_id", sessionId)
     .order("call_index", { ascending: true });
 
