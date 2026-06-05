@@ -2496,6 +2496,36 @@ function CollectionBrowserPage() {
     [cratesWithCounts, selectedCrate]
   );
 
+  const collectionHeaderCount = useMemo(() => {
+    if (folderMode === 'format') {
+      if (selectedVinylSubformat) {
+        return vinylSubformatCounts[selectedVinylSubformat] ?? filteredAndSortedAlbums.length;
+      }
+      if (selectedFolderValue) {
+        return folderCounts[selectedFolderValue] ?? filteredAndSortedAlbums.length;
+      }
+      return defaultVisibleAlbumCount;
+    }
+
+    if (folderMode === 'crates') {
+      if (selectedCrateWithCount) {
+        return selectedCrateWithCount.album_count ?? 0;
+      }
+      return defaultVisibleAlbumCount;
+    }
+
+    return filteredAndSortedAlbums.length;
+  }, [
+    defaultVisibleAlbumCount,
+    filteredAndSortedAlbums.length,
+    folderCounts,
+    folderMode,
+    selectedCrateWithCount,
+    selectedFolderValue,
+    selectedVinylSubformat,
+    vinylSubformatCounts,
+  ]);
+
   const allTrackRows = useMemo<CollectionTrackRow[]>(() => {
     const rows: CollectionTrackRow[] = [];
 
@@ -4706,7 +4736,7 @@ function CollectionBrowserPage() {
                 {loading
                   ? 'Loading...'
                   : viewMode === 'collection'
-                    ? `${filteredAndSortedAlbums.length} albums${isLoadingMore ? ' (loading more...)' : ''}`
+                    ? `${collectionHeaderCount} albums${isLoadingMore ? ' (loading more...)' : ''}`
                     : `${filteredTrackRows.length} tracks${tracksHydrating ? ' (loading track data...)' : ''}`}
               </div>
               {viewMode === 'album-track' && groupedTrackRows.length > 0 && (
