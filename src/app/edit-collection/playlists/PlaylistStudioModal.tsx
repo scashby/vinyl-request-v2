@@ -1888,6 +1888,7 @@ export function PlaylistStudioModal({
                                       side: candidate.side,
                                       position: candidate.position,
                                       link_group: null,
+                                      theme_hint: null,
                                     },
                                   ];
                                 });

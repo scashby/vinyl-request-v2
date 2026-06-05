@@ -99,6 +99,7 @@ export async function createRoundTrackSnapshots(
     side: string | null;
     position: string | null;
     link_group: string | null;
+    theme_hint: string | null;
   }> = [];
 
   for (const [roundNumber, playlistIds] of Array.from(resolvedPlaylistsByRound.entries()).sort((left, right) => left[0] - right[0])) {
@@ -118,6 +119,7 @@ export async function createRoundTrackSnapshots(
         side: track.side,
         position: track.position,
         link_group: track.linkGroup ?? null,
+        theme_hint: track.themeHint ?? null,
       });
     });
   }
@@ -144,6 +146,7 @@ export async function createRoundTrackSnapshotsFromTracks(
     side: string | null;
     position: string | null;
     link_group: string | null;
+    theme_hint: string | null;
   }> = [];
 
   const normalizedRoundCount = Math.max(1, Math.floor(roundCount || 1));
@@ -162,6 +165,7 @@ export async function createRoundTrackSnapshotsFromTracks(
         side: track.side,
         position: track.position,
         link_group: track.linkGroup ?? null,
+        theme_hint: track.themeHint ?? null,
       });
     });
   }
@@ -177,7 +181,7 @@ export async function getRoundSnapshotTracks(
 ): Promise<ResolvedPlaylistTrack[]> {
   const { data, error } = await db
     .from("bingo_session_round_tracks")
-    .select("slot_index, playlist_track_key, track_title, artist_name, album_name, side, position, link_group")
+    .select("slot_index, playlist_track_key, track_title, artist_name, album_name, side, position, link_group, theme_hint")
     .eq("session_id", sessionId)
     .eq("round_number", roundNumber)
     .order("slot_index", { ascending: true });
@@ -193,6 +197,7 @@ export async function getRoundSnapshotTracks(
     side: string | null;
     position: string | null;
     link_group: string | null;
+    theme_hint: string | null;
   }>).map((row) => ({
     trackKey: row.playlist_track_key,
     sortOrder: row.slot_index,
@@ -202,6 +207,7 @@ export async function getRoundSnapshotTracks(
     side: row.side,
     position: row.position,
     linkGroup: row.link_group ?? null,
+    themeHint: row.theme_hint ?? null,
   }));
 }
 

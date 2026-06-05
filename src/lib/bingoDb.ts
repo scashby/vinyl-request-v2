@@ -55,6 +55,7 @@ export type BingoDatabase = {
           track_key: string;
           sort_order: number;
           link_group: string | null;
+          theme_hint: string | null;
           created_at: string;
         };
         Insert: {
@@ -63,6 +64,7 @@ export type BingoDatabase = {
           track_key: string;
           sort_order?: number;
           link_group?: string | null;
+          theme_hint?: string | null;
           created_at?: string;
         };
         Update: {
@@ -71,6 +73,7 @@ export type BingoDatabase = {
           track_key?: string;
           sort_order?: number;
           link_group?: string | null;
+          theme_hint?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -241,6 +244,8 @@ export type BingoDatabase = {
           call_reveal_delay_seconds: number;
           call_reveal_at: string | null;
           bingo_overlay: string;
+          theme_enabled: boolean;
+          theme_name: string | null;
           default_intermission_seconds: number;
           is_favorite: boolean;
           favorite_note: string | null;
@@ -304,6 +309,8 @@ export type BingoDatabase = {
           call_reveal_delay_seconds?: number;
           call_reveal_at?: string | null;
           bingo_overlay?: string;
+          theme_enabled?: boolean;
+          theme_name?: string | null;
           is_favorite?: boolean;
           favorite_note?: string | null;
           active_playlist_letter_by_round?: { round: number; letter: string }[] | null;
@@ -366,6 +373,8 @@ export type BingoDatabase = {
           call_reveal_delay_seconds?: number;
           call_reveal_at?: string | null;
           bingo_overlay?: string;
+          theme_enabled?: boolean;
+          theme_name?: string | null;
           is_favorite?: boolean;
           favorite_note?: string | null;
           active_playlist_letter_by_round?: { round: number; letter: string }[] | null;
@@ -512,6 +521,7 @@ export type BingoDatabase = {
           side: string | null;
           position: string | null;
           link_group: string | null;
+          theme_hint: string | null;
           metadata_locked: boolean;
           metadata_synced_at: string | null;
           status: string;
@@ -533,6 +543,7 @@ export type BingoDatabase = {
           side?: string | null;
           position?: string | null;
           link_group?: string | null;
+          theme_hint?: string | null;
           metadata_locked?: boolean;
           metadata_synced_at?: string | null;
           status?: string;
@@ -554,6 +565,7 @@ export type BingoDatabase = {
           side?: string | null;
           position?: string | null;
           link_group?: string | null;
+          theme_hint?: string | null;
           metadata_locked?: boolean;
           metadata_synced_at?: string | null;
           status?: string;
@@ -608,6 +620,7 @@ export type BingoDatabase = {
           side: string | null;
           position: string | null;
           link_group: string | null;
+          theme_hint: string | null;
           created_at: string;
         };
         Insert: {
@@ -623,6 +636,7 @@ export type BingoDatabase = {
           side?: string | null;
           position?: string | null;
           link_group?: string | null;
+          theme_hint?: string | null;
           created_at?: string;
         };
         Update: {
@@ -638,6 +652,7 @@ export type BingoDatabase = {
           side?: string | null;
           position?: string | null;
           link_group?: string | null;
+          theme_hint?: string | null;
           created_at?: string;
         };
         Relationships: [];

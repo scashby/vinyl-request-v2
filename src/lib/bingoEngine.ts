@@ -192,6 +192,7 @@ type PlannedSessionCall = {
   side: string | null;
   position: string | null;
   link_group: string | null;
+  theme_hint: string | null;
 };
 
 function hashString(value: string): number {
