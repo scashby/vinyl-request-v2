@@ -82,6 +82,8 @@ type Session = {
   sandbox_source_session_id?: number | null;
   sandbox_source_session_code?: string | null;
   sandbox_expires_at?: string | null;
+  theme_enabled?: boolean;
+  theme_name?: string | null;
 };
 
 type SessionTemplateOption = {
@@ -193,6 +195,8 @@ export default function BingoSetupPage() {
   const [venueLogoUrl, setVenueLogoUrl] = useState<string | null>(null);
   const [uploadingVenueLogo, setUploadingVenueLogo] = useState(false);
   const [applyingTemplate, setApplyingTemplate] = useState(false);
+  const [themeEnabled, setThemeEnabled] = useState(false);
+  const [themeName, setThemeName] = useState('');
 
   const [creating, setCreating] = useState(false);
   const [downloadingRoundsSessionId, setDownloadingRoundsSessionId] = useState<number | null>(null);
@@ -285,6 +289,9 @@ export default function BingoSetupPage() {
         setHostBufferSeconds(Math.max(0, Number(templateSession.host_buffer_seconds ?? 2)));
         setSonosDelayMs(Math.max(0, Number(templateSession.sonos_output_delay_ms ?? 75)));
         setCallRevealDelaySeconds(Math.max(0, Number(templateSession.call_reveal_delay_seconds ?? 10)));
+
+        setThemeEnabled(templateSession.theme_enabled ?? false);
+        setThemeName(templateSession.theme_name ?? '');
 
         const templateIntermissionSeconds = Number(templateSession.default_intermission_seconds ?? 600);
         setDefaultIntermissionMinutes(Math.max(0, Math.round(templateIntermissionSeconds / 60)));
@@ -561,6 +568,8 @@ export default function BingoSetupPage() {
         thanks_heading_text: thankYouHeadingText.trim() || null,
         thanks_subheading_text: thankYouSubheadingText.trim() || null,
         thanks_events_heading_text: thankYouEventsHeadingText.trim() || null,
+        theme_enabled: themeEnabled,
+        theme_name: themeEnabled ? themeName.trim() || null : null,
       };
 
       const res = await fetch("/api/games/bingo/sessions", {
@@ -964,6 +973,26 @@ export default function BingoSetupPage() {
                 Open Playlist Editor
               </a>
             </label>
+          </div>
+
+          {/* Theme */}
+          <div className="mt-4">
+            <label className="flex items-center gap-3 text-sm">
+              <input type="checkbox" className="h-4 w-4" checked={themeEnabled} onChange={(e) => setThemeEnabled(e.target.checked)} />
+              <span>Enable Theme Reveal</span>
+            </label>
+            {themeEnabled ? (
+              <div className="mt-2">
+                <input
+                  type="text"
+                  className="w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm"
+                  placeholder="Theme name (e.g. Songs from Movies and TV)"
+                  value={themeName}
+                  onChange={(e) => setThemeName(e.target.value)}
+                />
+                <p className="mt-1 text-xs text-stone-500">When enabled, the jumbotron will reveal: Column → Theme Hint → Artist → Song Title. Each step uses the Call Reveal Step delay. All 75 playlist tracks must have a theme hint set in the Playlist Editor.</p>
+              </div>
+            ) : null}
           </div>
 
           {/* Rounds with inline per-round game modes */}

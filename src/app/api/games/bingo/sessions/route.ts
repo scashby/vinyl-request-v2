@@ -68,6 +68,8 @@ type CreateSessionBody = {
   show_countdown?: boolean;
   is_favorite?: boolean;
   favorite_note?: string | null;
+  theme_enabled?: boolean;
+  theme_name?: string | null;
 };
 
 type SessionListRow = {
@@ -162,6 +164,7 @@ async function loadPresetPoolTracks(db: ReturnType<typeof getBingoDb>, presetId:
       side: row.side,
       position: row.position,
       linkGroup: null,
+      themeHint: null,
     });
   });
 
@@ -437,6 +440,8 @@ export async function POST(request: NextRequest) {
         thanks_events_heading_text: body.thanks_events_heading_text ?? null,
         is_favorite: body.is_favorite ?? false,
         favorite_note: body.favorite_note?.trim() || null,
+        theme_enabled: body.theme_enabled ?? false,
+        theme_name: body.theme_enabled ? (body.theme_name?.trim() || null) : null,
       })
       .select("id, session_code, playlist_id, card_count, card_label_mode")
       .single();

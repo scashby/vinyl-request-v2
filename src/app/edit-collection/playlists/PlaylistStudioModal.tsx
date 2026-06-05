@@ -46,6 +46,7 @@ type PlaylistTrackItem = {
   side: string | null;
   position: string | null;
   link_group: string | null;
+  theme_hint: string | null;
 };
 
 type InventorySearchCandidate = {
@@ -108,7 +109,7 @@ interface PlaylistStudioModalProps {
   onReorderPlaylists: (playlists: CollectionPlaylist[]) => Promise<void>;
   onDeletePlaylist: (playlistId: number, playlistName: string) => Promise<void>;
   onDeleteAllPlaylists: () => Promise<void>;
-  onCreateManualPlaylist: (playlist: { name: string; icon: string; color: string; coverImageUrl?: string | null; trackKeys: string[]; trackLinkGroups?: Record<string, string> }) => Promise<void>;
+  onCreateManualPlaylist: (playlist: { name: string; icon: string; color: string; coverImageUrl?: string | null; trackKeys: string[]; trackLinkGroups?: Record<string, string>; trackThemeHints?: Record<string, string> }) => Promise<void>;
   onCreateSmartPlaylist: (payload: {
     name: string;
     color: string;
@@ -305,6 +306,7 @@ type SortableManualTrackRowProps = {
   linkColor: string | null;
   onContextMenu: (e: React.MouseEvent, trackKey: string, index: number) => void;
   onThreeDotClick: (e: React.MouseEvent, trackKey: string, index: number) => void;
+  onThemeHintChange: (trackKey: string, value: string) => void;
 };
 
 function SortableManualTrackRow({
@@ -315,6 +317,7 @@ function SortableManualTrackRow({
   linkColor,
   onContextMenu,
   onThreeDotClick,
+  onThemeHintChange,
 }: SortableManualTrackRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: track.track_key,
@@ -368,6 +371,16 @@ function SortableManualTrackRow({
             </span>
           </div>
           <div className="truncate text-xs text-[#6a8fbf]">{track.artist_name ?? ''}</div>
+          {track.theme_hint !== undefined && (
+            <input
+              type="text"
+              value={track.theme_hint ?? ''}
+              onChange={(e) => onThemeHintChange(track.track_key, e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              placeholder="Theme hint (e.g. From the movie Fight Club)"
+              className="mt-1 w-full rounded border border-[#2f4a70] bg-[#0d1a2e] px-2 py-0.5 text-xs text-[#c8daff] placeholder-[#3a5070] focus:border-[#4a7fcc] focus:outline-none"
+            />
+          )}
         </div>
         <div className="hidden min-w-0 flex-1 truncate text-xs text-[#4a6394] lg:block">
           {track.album_name ?? ''}
@@ -521,6 +534,14 @@ export function PlaylistStudioModal({
     return groups;
   }, [manualTracks]);
 
+  const manualTrackThemeHints = useMemo(() => {
+    const hints: Record<string, string> = {};
+    for (const track of manualTracks) {
+      if (track.theme_hint) hints[track.track_key] = track.theme_hint;
+    }
+    return hints;
+  }, [manualTracks]);
+
   const uniqueLinkGroups = useMemo(() => {
     const seen = new Set<string>();
     for (const track of manualTracks) {
@@ -583,6 +604,12 @@ export function PlaylistStudioModal({
     },
     []
   );
+
+  const handleThemeHintChange = useCallback((trackKey: string, value: string) => {
+    setManualTracks((prev) =>
+      prev.map((t) => t.track_key === trackKey ? { ...t, theme_hint: value } : t)
+    );
+  }, []);
 
   const formatApiError = (payload: unknown, res: Response) => {
     const typedPayload = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
@@ -727,6 +754,7 @@ export function PlaylistStudioModal({
         side: null,
         position: null,
         link_group: playlist.trackLinkGroups?.[trackKey] ?? null,
+        theme_hint: playlist.trackThemeHints?.[trackKey] ?? null,
       }))
     );
     setManualTrackSearch('');
@@ -977,6 +1005,7 @@ export function PlaylistStudioModal({
           coverImageUrl: manualCoverImageUrl,
           trackKeys: manualTrackKeys,
           trackLinkGroups: manualTrackLinkGroups,
+          trackThemeHints: manualTrackThemeHints,
         });
         setNotice(`Updated "${manualName.trim()}"`);
       } else {
@@ -987,6 +1016,7 @@ export function PlaylistStudioModal({
           coverImageUrl: manualCoverImageUrl,
           trackKeys: manualTrackKeys,
           trackLinkGroups: manualTrackLinkGroups,
+          trackThemeHints: manualTrackThemeHints,
         });
         setNotice(`Created "${manualName.trim()}"`);
       }
@@ -1930,6 +1960,7 @@ export function PlaylistStudioModal({
                                 linkColor={linkColor}
                                 onContextMenu={openTrackContextMenu}
                                 onThreeDotClick={openTrackThreeDot}
+                                onThemeHintChange={handleThemeHintChange}
                               />
                             );
                           })}

@@ -2110,7 +2110,7 @@ function CollectionBrowserPage() {
 
     const { data: playlistItems, error: itemsError } = await supabase
       .from('collection_playlist_items')
-      .select('playlist_id, track_key, sort_order, link_group')
+      .select('playlist_id, track_key, sort_order, link_group, theme_hint')
       .order('sort_order', { ascending: true });
 
     if (itemsError) {
@@ -2134,6 +2134,13 @@ function CollectionBrowserPage() {
       return acc;
     }, {} as Record<number, Record<string, string>>);
 
+    const themeHintsByPlaylist = (playlistItems ?? []).reduce((acc, item) => {
+      if (!item.playlist_id || !item.track_key || !item.theme_hint) return acc;
+      if (!acc[item.playlist_id]) acc[item.playlist_id] = {};
+      acc[item.playlist_id][item.track_key] = item.theme_hint;
+      return acc;
+    }, {} as Record<number, Record<string, string>>);
+
     const mapped: Playlist[] = (playlistRows ?? []).map((row) => ({
       id: row.id,
       name: row.name,
@@ -2142,6 +2149,7 @@ function CollectionBrowserPage() {
       coverImageUrl: row.cover_image_url ?? null,
       trackKeys: tracksByPlaylist[row.id] ?? [],
       trackLinkGroups: linkGroupsByPlaylist[row.id] ?? {},
+      trackThemeHints: themeHintsByPlaylist[row.id] ?? {},
       createdAt: row.created_at || new Date().toISOString(),
       sortOrder: row.sort_order ?? 0,
       isSmart: !!row.is_smart,
@@ -3443,7 +3451,7 @@ function CollectionBrowserPage() {
     });
   }, []);
 
-  const handleCreatePlaylist = useCallback(async (playlist: { name: string; icon: string; color: string; coverImageUrl?: string | null; trackKeys: string[]; trackLinkGroups?: Record<string, string> }) => {
+  const handleCreatePlaylist = useCallback(async (playlist: { name: string; icon: string; color: string; coverImageUrl?: string | null; trackKeys: string[]; trackLinkGroups?: Record<string, string>; trackThemeHints?: Record<string, string> }) => {
     try {
       const maxSort = playlists.reduce((max, item) => Math.max(max, item.sortOrder ?? 0), -1);
       const nextSortOrder = maxSort + 1;
@@ -3475,6 +3483,7 @@ function CollectionBrowserPage() {
           track_key: trackKey,
           sort_order: index,
           link_group: playlist.trackLinkGroups?.[trackKey] ?? null,
+          theme_hint: playlist.trackThemeHints?.[trackKey] ?? null,
         }));
         const { error: itemsError } = await supabase
           .from('collection_playlist_items')
@@ -3546,6 +3555,7 @@ function CollectionBrowserPage() {
             track_key: trackKey,
             sort_order: i + index,
             link_group: playlist.trackLinkGroups?.[trackKey] ?? null,
+            theme_hint: playlist.trackThemeHints?.[trackKey] ?? null,
           }));
           const { error: insertItemsError } = await supabase
             .from('collection_playlist_items')

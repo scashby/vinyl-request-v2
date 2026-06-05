@@ -53,6 +53,8 @@ type Session = {
   show_countdown: boolean;
   recent_calls_limit: number;
   next_game_rules_text: string | null;
+  theme_enabled?: boolean;
+  theme_name?: string | null;
 };
 
 type BingoGamePlaylist = {
@@ -94,6 +96,8 @@ export default function BingoEditSessionPage() {
   const [recentCallsLimit, setRecentCallsLimit] = useState(5);
   const [nextGameRulesText, setNextGameRulesText] = useState("");
   const [selectedPresetId, setSelectedPresetId] = useState<number | null>(null);
+  const [themeEnabled, setThemeEnabled] = useState(false);
+  const [themeName, setThemeName] = useState('');
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -187,8 +191,8 @@ export default function BingoEditSessionPage() {
       setDefaultIntermissionMinutes(Math.round((sessionPayload.default_intermission_seconds ?? 600) / 60));
       setShowCountdown(Boolean(sessionPayload.show_countdown));
       setRecentCallsLimit(sessionPayload.recent_calls_limit ?? 5);
-      setNextGameRulesText(sessionPayload.next_game_rules_text ?? "");
-      setGamePlaylists(gamePlaylistsPayload.data ?? []);
+      setNextGameRulesText(sessionPayload.next_game_rules_text ?? "");      setThemeEnabled(sessionPayload.theme_enabled ?? false);
+      setThemeName(sessionPayload.theme_name ?? '');      setGamePlaylists(gamePlaylistsPayload.data ?? []);
       setActivePlaylistByRound(sessionPayload.active_playlist_letter_by_round ?? []);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load session edit data.");
@@ -317,6 +321,8 @@ export default function BingoEditSessionPage() {
           show_countdown: showCountdown,
           recent_calls_limit: recentCallsLimit,
           next_game_rules_text: nextGameRulesText.trim() || null,
+          theme_enabled: themeEnabled,
+          theme_name: themeEnabled ? themeName.trim() || null : null,
         }),
       });
 
@@ -474,6 +480,22 @@ export default function BingoEditSessionPage() {
                   </select>
                   <p className="mt-2 text-xs text-stone-500">{usingPreset ? "Preset-backed sessions keep the preset's fixed pool and source playlists." : "Leave this empty only if every round below has its own playlist override."}</p>
                 </label>
+
+                <div>
+                  <label className="flex items-center gap-3 text-sm">
+                    <input type="checkbox" className="h-4 w-4" checked={themeEnabled} onChange={(e) => setThemeEnabled(e.target.checked)} />
+                    <span>Enable Theme Reveal</span>
+                  </label>
+                  {themeEnabled ? (
+                    <input
+                      type="text"
+                      className="mt-2 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 text-sm"
+                      placeholder="Theme name (e.g. Songs from Movies and TV)"
+                      value={themeName}
+                      onChange={(e) => setThemeName(e.target.value)}
+                    />
+                  ) : null}
+                </div>
 
                 <label className="text-sm">Default Game Mode
                   <select className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2" value={gameMode} onChange={(e) => setGameMode(e.target.value as GameMode)}>

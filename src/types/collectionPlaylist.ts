@@ -6,6 +6,7 @@ export interface CollectionPlaylist {
   coverImageUrl?: string | null;
   trackKeys: string[];
   trackLinkGroups?: Record<string, string>; // sparse: trackKey → linkGroup (only linked tracks)
+  trackThemeHints?: Record<string, string>; // sparse: trackKey → theme hint (e.g. "From the movie Fight Club")
   createdAt: string;
   sortOrder: number;
   isSmart: boolean;

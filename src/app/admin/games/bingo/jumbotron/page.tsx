@@ -42,6 +42,8 @@ type Session = {
   } | null;
   is_sandbox?: boolean;
   sandbox_expires_at?: string | null;
+  theme_enabled?: boolean;
+  theme_name?: string | null;
 };
 
 type UpcomingEvent = {
@@ -60,9 +62,10 @@ type Call = {
   track_title: string;
   artist_name: string;
   status: string;
+  theme_hint?: string | null;
 };
 
-type RevealPhase = "hidden" | "artist" | "full";
+type RevealPhase = "hidden" | "theme" | "artist" | "full";
 
 const COLUMN_ROTATION = ["B", "I", "N", "G", "O"];
 
@@ -324,18 +327,25 @@ export default function BingoJumbotronPage() {
 
     if (!session?.call_reveal_at) return "hidden";
 
-    const artistRevealAt = new Date(session.call_reveal_at).getTime();
-    if (!Number.isFinite(artistRevealAt)) return "full";
+    const firstRevealAt = new Date(session.call_reveal_at).getTime();
+    if (!Number.isFinite(firstRevealAt)) return "full";
 
-    if (now < artistRevealAt) return "hidden";
+    if (now < firstRevealAt) return "hidden";
 
-    const titleRevealAt = artistRevealAt + delaySeconds * 1000;
-    if (now < titleRevealAt) return "artist";
+    const artistRevealAt = firstRevealAt + delaySeconds * 1000;
+    if (session?.theme_enabled && current?.theme_hint) {
+      if (now < artistRevealAt) return "theme";
+      const titleRevealAt = artistRevealAt + delaySeconds * 1000;
+      if (now < titleRevealAt) return "artist";
+      return "full";
+    }
+
+    if (now < artistRevealAt) return "artist";
 
     return "full";
-  }, [session?.call_reveal_at, session?.call_reveal_delay_seconds, session?.current_call_index, current, now]);
+  }, [session?.call_reveal_at, session?.call_reveal_delay_seconds, session?.current_call_index, session?.theme_enabled, current, now]);
 
-  const artistHidden = revealPhase === "hidden";
+  const artistHidden = revealPhase === "hidden" || revealPhase === "theme";
   const titleHidden = revealPhase !== "full";
 
   const maskTextClass = (hidden: boolean) => (hidden ? "blur-[0.28em] select-none opacity-80" : "transition-all duration-500");
@@ -631,6 +641,14 @@ export default function BingoJumbotronPage() {
                     <p className={`mt-[0.4vw] font-black leading-tight text-amber-100 ${maskTextClass(titleHidden)}`} style={{ fontSize: "4.5vw" }}>
                       {current ? current.track_title : "..."}
                     </p>
+                    {session?.theme_enabled && current?.theme_hint ? (
+                      <p
+                        className={`mt-[0.3vw] font-semibold text-amber-300 transition-all duration-500 ${revealPhase === "hidden" || revealPhase === "full" ? "opacity-0" : "opacity-100"}`}
+                        style={{ fontSize: "2.2vw" }}
+                      >
+                        {current.theme_hint}
+                      </p>
+                    ) : null}
                     <p className={`mt-[0.2vw] font-semibold text-stone-300 ${maskTextClass(artistHidden)}`} style={{ fontSize: "2.7vw" }}>
                       {current ? current.artist_name : ""}
                     </p>
