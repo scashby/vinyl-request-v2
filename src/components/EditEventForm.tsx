@@ -28,6 +28,26 @@ const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 const GOOGLE_MAPS_LIBRARIES = 'places';
 let googleMapsScriptPromise: Promise<void> | null = null;
 
+const slugifyConfigId = (value: string, fallback: string) => {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return normalized || fallback;
+};
+
+const defaultTypeIdByLabel = new Map(
+  defaultEventTypeConfig.types.map((type) => [type.label.trim().toLowerCase(), type.id])
+);
+
+const defaultSubtypeIdsByTypeLabel = new Map(
+  defaultEventTypeConfig.types.map((type) => [
+    type.label.trim().toLowerCase(),
+    new Map((type.subtypes ?? []).map((subtype) => [subtype.label.trim().toLowerCase(), subtype.id])),
+  ])
+);
+
 const loadGoogleMapsScript = () => {
   if (!GOOGLE_MAPS_API_KEY) return Promise.resolve();
   if (googleMapsScriptPromise) return googleMapsScriptPromise;
@@ -50,34 +70,83 @@ const loadGoogleMapsScript = () => {
   return googleMapsScriptPromise;
 };
 
-const normalizeEventTypeConfig = (config: EventTypeConfigState): EventTypeConfigState => ({
-  types: config.types.map((type) => ({
-    ...type,
-    template_fields:
-      type.template_fields?.length
-        ? type.template_fields
-        : type.defaults?.enabled_fields?.length
-          ? type.defaults.enabled_fields
-          : TEMPLATE_FIELDS,
-    defaults: type.defaults
-      ? {
-          ...type.defaults,
-          prefill_fields:
-            type.defaults.prefill_fields ?? type.defaults.enabled_fields ?? [],
-        }
-      : type.defaults,
-    subtypes: (type.subtypes || []).map((subtype) => ({
-      ...subtype,
-      defaults: subtype.defaults
+const normalizeEventTypeConfig = (config: EventTypeConfigState): EventTypeConfigState => {
+  const usedTypeIds = new Set<string>();
+
+  const types = config.types.map((type, index) => {
+    const normalizedTypeLabel = (type.label ?? '').trim();
+    const typeLabelKey = normalizedTypeLabel.toLowerCase();
+    const preferredTypeIdFromLabel = defaultTypeIdByLabel.get(typeLabelKey);
+    const rawTypeId = (type.id ?? '').trim();
+    const baseTypeId =
+      rawTypeId ||
+      preferredTypeIdFromLabel ||
+      slugifyConfigId(normalizedTypeLabel, `event-type-${index + 1}`);
+
+    let safeTypeId = baseTypeId;
+    let dedupeCounter = 2;
+    while (usedTypeIds.has(safeTypeId)) {
+      safeTypeId = `${baseTypeId}-${dedupeCounter}`;
+      dedupeCounter += 1;
+    }
+    usedTypeIds.add(safeTypeId);
+
+    const subtypeIdByLabel = defaultSubtypeIdsByTypeLabel.get(typeLabelKey) ?? new Map<string, string>();
+    const usedSubtypeIds = new Set<string>();
+
+    return {
+      ...type,
+      id: safeTypeId,
+      label: normalizedTypeLabel,
+      template_fields:
+        type.template_fields?.length
+          ? type.template_fields
+          : type.defaults?.enabled_fields?.length
+            ? type.defaults.enabled_fields
+            : TEMPLATE_FIELDS,
+      defaults: type.defaults
         ? {
-            ...subtype.defaults,
+            ...type.defaults,
             prefill_fields:
-              subtype.defaults.prefill_fields ?? subtype.defaults.enabled_fields ?? [],
+              type.defaults.prefill_fields ?? type.defaults.enabled_fields ?? [],
           }
-        : subtype.defaults,
-    })),
-  })),
-});
+        : type.defaults,
+      subtypes: (type.subtypes || []).map((subtype, subtypeIndex) => {
+        const normalizedSubtypeLabel = (subtype.label ?? '').trim();
+        const subtypeLabelKey = normalizedSubtypeLabel.toLowerCase();
+        const preferredSubtypeIdFromLabel = subtypeIdByLabel.get(subtypeLabelKey);
+        const rawSubtypeId = (subtype.id ?? '').trim();
+        const baseSubtypeId =
+          rawSubtypeId ||
+          preferredSubtypeIdFromLabel ||
+          slugifyConfigId(normalizedSubtypeLabel, `event-subtype-${subtypeIndex + 1}`);
+
+        let safeSubtypeId = baseSubtypeId;
+        let subtypeDedupeCounter = 2;
+        while (usedSubtypeIds.has(safeSubtypeId)) {
+          safeSubtypeId = `${baseSubtypeId}-${subtypeDedupeCounter}`;
+          subtypeDedupeCounter += 1;
+        }
+        usedSubtypeIds.add(safeSubtypeId);
+
+        return {
+          ...subtype,
+          id: safeSubtypeId,
+          label: normalizedSubtypeLabel,
+          defaults: subtype.defaults
+            ? {
+                ...subtype.defaults,
+                prefill_fields:
+                  subtype.defaults.prefill_fields ?? subtype.defaults.enabled_fields ?? [],
+              }
+            : subtype.defaults,
+        };
+      }),
+    };
+  });
+
+  return { types };
+};
 
 interface EventData {
   event_type: string;
