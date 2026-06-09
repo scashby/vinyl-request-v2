@@ -3503,7 +3503,6 @@ function CollectionBrowserPage() {
 
   const handleUpdatePlaylist = useCallback(async (playlist: Playlist) => {
     try {
-      const previous = playlists.find((item) => item.id === playlist.id);
       const dedupeTrackKeys = (keys: string[]) => {
         const seen = new Set<string>();
         const out: string[] = [];
@@ -3518,11 +3517,6 @@ function CollectionBrowserPage() {
       };
 
       const nextManualTrackKeys = !playlist.isSmart ? dedupeTrackKeys(playlist.trackKeys ?? []) : [];
-      const prevManualTrackKeys = previous && !previous.isSmart ? dedupeTrackKeys(previous.trackKeys ?? []) : [];
-      const manualTracksChanged =
-        !playlist.isSmart &&
-        (nextManualTrackKeys.length !== prevManualTrackKeys.length ||
-          nextManualTrackKeys.some((key, idx) => key !== prevManualTrackKeys[idx]));
 
       const { error } = await supabase
         .from('collection_playlists')
@@ -3540,7 +3534,7 @@ function CollectionBrowserPage() {
 
       if (error) throw error;
 
-      if (manualTracksChanged) {
+      if (!playlist.isSmart) {
         const { error: deleteItemsError } = await supabase
           .from('collection_playlist_items')
           .delete()
@@ -3568,7 +3562,7 @@ function CollectionBrowserPage() {
       if (
         playlist.isSmart &&
         playlist.smartRules &&
-        previous?.liveUpdate === true &&
+        playlists.find((item) => item.id === playlist.id)?.liveUpdate === true &&
         playlist.liveUpdate === false
       ) {
         const snapshotTrackKeys = buildSmartPlaylistTrackKeys(allTrackRows, {

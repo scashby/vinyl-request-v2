@@ -978,10 +978,10 @@ export function PlaylistStudioModal({
     }
   };
 
-  const removeManualTrack = (index: number) => {
+  const removeManualTrack = (trackKey: string) => {
     setManualTracks((prev) =>
       prev
-        .filter((_, itemIndex) => itemIndex !== index)
+        .filter((item) => item.track_key !== trackKey)
         .map((item, itemIndex) => ({ ...item, sort_order: itemIndex }))
     );
   };
@@ -2995,7 +2995,7 @@ export function PlaylistStudioModal({
             >
               <button
                 className="w-full px-4 py-2 text-left text-sm text-red-300 hover:bg-[#1e3050]"
-                onClick={() => { removeManualTrack(contextMenu.index); setContextMenu(null); }}
+                onClick={() => { removeManualTrack(contextMenu.trackKey); setContextMenu(null); }}
               >
                 Remove from playlist
               </button>
