@@ -52,6 +52,8 @@ type SourceSessionRow = {
   call_reveal_delay_seconds: number;
   default_intermission_seconds: number;
   active_playlist_letter_by_round: { round: number; letter: string }[] | null;
+  theme_enabled: boolean;
+  theme_name: string | null;
   is_sandbox: boolean;
 };
 
@@ -66,6 +68,7 @@ type RoundTrackRow = {
   side: string | null;
   position: string | null;
   link_group: string | null;
+  theme_hint: string | null;
 };
 
 type SessionPlaylistRow = {
@@ -92,6 +95,7 @@ type SourceCallRow = {
   position: string | null;
   link_group: string | null;
   playlist_track_key: string | null;
+  theme_hint: string | null;
 };
 
 function parseSessionId(id: string): number | null {
@@ -135,7 +139,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
   const db = getBingoDb();
   const sourceQuery = (db
     .from("bingo_sessions")
-    .select("id, event_id, game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, session_code, game_mode, round_modes, card_count, card_layout, card_label_mode, round_count, round_end_policy, tie_break_policy, pool_exhaustion_policy, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, seconds_to_next_call, sonos_output_delay_ms, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, next_game_rules_text, welcome_heading_text, welcome_message_text, welcome_rules_text, welcome_tiebreak_text, intermission_heading_text, intermission_message_text, intermission_footer_text, thanks_heading_text, thanks_subheading_text, thanks_events_heading_text, call_reveal_delay_seconds, default_intermission_seconds, active_playlist_letter_by_round, is_sandbox") as unknown as {
+    .select("id, event_id, game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, session_code, game_mode, round_modes, card_count, card_layout, card_label_mode, round_count, round_end_policy, tie_break_policy, pool_exhaustion_policy, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, seconds_to_next_call, sonos_output_delay_ms, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, next_game_rules_text, welcome_heading_text, welcome_message_text, welcome_rules_text, welcome_tiebreak_text, intermission_heading_text, intermission_message_text, intermission_footer_text, thanks_heading_text, thanks_subheading_text, thanks_events_heading_text, call_reveal_delay_seconds, default_intermission_seconds, active_playlist_letter_by_round, theme_enabled, theme_name, is_sandbox") as unknown as {
       eq: (column: string, value: number) => {
         maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
       };
@@ -212,6 +216,8 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
         bingo_overlay: "welcome",
         default_intermission_seconds: typedSource.default_intermission_seconds,
         active_playlist_letter_by_round: typedSource.active_playlist_letter_by_round,
+        theme_enabled: typedSource.theme_enabled,
+        theme_name: typedSource.theme_name,
         is_sandbox: true,
         sandbox_source_session_id: typedSource.id,
         sandbox_expires_at: sandboxExpiresAt,
@@ -227,7 +233,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
 
     const { data: sourceTracks, error: sourceTracksError } = await db
       .from("bingo_session_round_tracks")
-      .select("round_number, slot_index, playlist_track_key, source_playlist_id, track_title, artist_name, album_name, side, position, link_group")
+      .select("round_number, slot_index, playlist_track_key, source_playlist_id, track_title, artist_name, album_name, side, position, link_group, theme_hint")
       .eq("session_id", sourceSessionId)
       .order("round_number", { ascending: true })
       .order("slot_index", { ascending: true });
@@ -249,6 +255,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
           side: row.side,
           position: row.position,
           link_group: row.link_group,
+          theme_hint: row.theme_hint,
         }))
       );
       if (trackInsertError) throw new Error(trackInsertError.message);
@@ -310,6 +317,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
       side: string | null;
       position: string | null;
       link_group: string | null;
+      theme_hint: string | null;
     }> = [];
 
     const roundOneActiveLetter = (typedSource.active_playlist_letter_by_round ?? []).find((entry) => entry.round === 1)?.letter ?? null;
@@ -335,6 +343,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
         side: typeof row.side === "string" ? row.side : null,
         position: typeof row.position === "string" ? row.position : null,
         link_group: typeof row.link_group === "string" ? row.link_group : null,
+        theme_hint: typeof row.theme_hint === "string" ? row.theme_hint : null,
       }));
     }
 
@@ -352,6 +361,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
           side: call.side,
           position: call.position,
           link_group: call.link_group ?? null,
+          theme_hint: call.theme_hint ?? null,
         }));
       }
     }
@@ -359,7 +369,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
     if (callRows.length === 0) {
       const { data: sourceCalls, error: sourceCallsError } = await db
         .from("bingo_session_calls")
-        .select("call_index, ball_number, column_letter, track_title, artist_name, album_name, side, position, link_group, playlist_track_key")
+        .select("call_index, ball_number, column_letter, track_title, artist_name, album_name, side, position, link_group, playlist_track_key, theme_hint")
         .eq("session_id", sourceSessionId)
         .order("call_index", { ascending: true });
 
@@ -376,6 +386,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
         side: row.side,
         position: row.position,
         link_group: row.link_group,
+        theme_hint: row.theme_hint,
       }));
     }
 
@@ -396,6 +407,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
         side: row.side,
         position: row.position,
         link_group: row.link_group,
+        theme_hint: row.theme_hint,
         status: "pending",
       }))
     );
