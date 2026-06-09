@@ -347,6 +347,7 @@ export default function BingoJumbotronPage() {
 
   const artistHidden = revealPhase === "hidden" || revealPhase === "theme";
   const titleHidden = revealPhase !== "full";
+  const themeHidden = revealPhase === "hidden";
 
   const maskTextClass = (hidden: boolean) => (hidden ? "blur-[0.28em] select-none opacity-80" : "transition-all duration-500");
 
@@ -641,17 +642,17 @@ export default function BingoJumbotronPage() {
                     <p className={`mt-[0.4vw] font-black leading-tight text-amber-100 ${maskTextClass(titleHidden)}`} style={{ fontSize: "4.5vw" }}>
                       {current ? current.track_title : "..."}
                     </p>
+                    <p className={`mt-[0.2vw] font-semibold text-stone-300 ${maskTextClass(artistHidden)}`} style={{ fontSize: "2.7vw" }}>
+                      {current ? current.artist_name : ""}
+                    </p>
                     {session?.theme_enabled && current?.theme_hint ? (
                       <p
-                        className={`mt-[0.3vw] font-semibold text-amber-300 transition-all duration-500 ${revealPhase === "hidden" || revealPhase === "full" ? "opacity-0" : "opacity-100"}`}
+                        className={`mt-[0.45vw] font-semibold text-amber-300 ${maskTextClass(themeHidden)}`}
                         style={{ fontSize: "2.2vw" }}
                       >
                         {current.theme_hint}
                       </p>
                     ) : null}
-                    <p className={`mt-[0.2vw] font-semibold text-stone-300 ${maskTextClass(artistHidden)}`} style={{ fontSize: "2.7vw" }}>
-                      {current ? current.artist_name : ""}
-                    </p>
                   </>
                 ) : null}
               </div>
