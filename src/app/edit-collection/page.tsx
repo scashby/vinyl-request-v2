@@ -3503,6 +3503,8 @@ function CollectionBrowserPage() {
 
   const handleUpdatePlaylist = useCallback(async (playlist: Playlist) => {
     try {
+      const previous = playlists.find((item) => item.id === playlist.id);
+
       const dedupeTrackKeys = (keys: string[]) => {
         const seen = new Set<string>();
         const out: string[] = [];
@@ -3562,7 +3564,7 @@ function CollectionBrowserPage() {
       if (
         playlist.isSmart &&
         playlist.smartRules &&
-        playlists.find((item) => item.id === playlist.id)?.liveUpdate === true &&
+        previous?.liveUpdate === true &&
         playlist.liveUpdate === false
       ) {
         const snapshotTrackKeys = buildSmartPlaylistTrackKeys(allTrackRows, {
