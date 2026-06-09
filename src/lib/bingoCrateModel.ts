@@ -47,6 +47,9 @@ export type PlaylistCallEntry = {
   position: string | null;
   status: string;
   track_key?: string | null;
+  playlist_track_key?: string | null;
+  link_group?: string | null;
+  theme_hint?: string | null;
 };
 
 export type BingoSessionGamePlaylist = {
