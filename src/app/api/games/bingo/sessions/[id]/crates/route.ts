@@ -10,6 +10,7 @@ import {
   savePlaylistForRound,
   setActivePlaylistForRound,
 } from "src/lib/bingoCrateModel";
+import { rehydrateBingoCardLabels } from "src/lib/playlistMetadataSync";
 import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
 import { resolveRoundPlaylistIds, type RoundPlaylistEntry } from "src/lib/bingoRoundPlaylists";
 
@@ -21,12 +22,13 @@ type SessionSourceRow = {
   playlist_ids: number[] | null;
   round_playlist_ids: RoundPlaylistEntry[] | null;
   round_count: number;
+  current_round?: number;
 };
 
 async function loadSessionSourceRow(db: ReturnType<typeof getBingoDb>, sessionId: number): Promise<SessionSourceRow | null> {
   const query = (db
     .from("bingo_sessions")
-    .select("id, playlist_id, playlist_ids, round_playlist_ids, round_count") as unknown as {
+    .select("id, playlist_id, playlist_ids, round_playlist_ids, round_count, current_round") as unknown as {
       eq: (column: string, value: number) => {
         maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
       };
@@ -35,6 +37,142 @@ async function loadSessionSourceRow(db: ReturnType<typeof getBingoDb>, sessionId
   const { data, error } = await query.eq("id", sessionId).maybeSingle();
   if (error) throw new Error(error.message);
   return (data as SessionSourceRow | null) ?? null;
+}
+
+type SessionCallUpsertRow = {
+  playlist_track_key: string;
+  call_index: number;
+  ball_number: number;
+  column_letter: string;
+  track_title: string;
+  artist_name: string;
+  album_name: string | null;
+  side: string | null;
+  position: string | null;
+  link_group: string | null;
+  theme_hint: string | null;
+  status: "pending";
+  called_at: null;
+  completed_at: null;
+};
+
+function normalizeCallOrderRow(row: Record<string, unknown>, index: number): SessionCallUpsertRow {
+  const callIndexRaw = Number(row.call_index);
+  const callIndex = Number.isFinite(callIndexRaw) && callIndexRaw > 0 ? Math.floor(callIndexRaw) : index + 1;
+
+  const ballNumberRaw = Number(row.ball_number);
+  const fallbackBall = Math.max(1, Math.min(75, index + 1));
+  const ballNumber = Number.isFinite(ballNumberRaw) ? Math.max(1, Math.min(75, Math.floor(ballNumberRaw))) : fallbackBall;
+
+  const columnLetterRaw = typeof row.column_letter === "string" ? row.column_letter.toUpperCase().trim() : "B";
+  const columnLetter = ["B", "G", "I", "N", "O"].includes(columnLetterRaw) ? columnLetterRaw : "B";
+
+  const playlistTrackKey =
+    typeof row.playlist_track_key === "string" && row.playlist_track_key.length > 0
+      ? row.playlist_track_key
+      : typeof row.track_key === "string" && row.track_key.length > 0
+        ? row.track_key
+        : `missing:${index + 1}`;
+
+  return {
+    playlist_track_key: playlistTrackKey,
+    call_index: callIndex,
+    ball_number: ballNumber,
+    column_letter: columnLetter,
+    track_title: typeof row.track_title === "string" ? row.track_title : "",
+    artist_name: typeof row.artist_name === "string" ? row.artist_name : "",
+    album_name: typeof row.album_name === "string" ? row.album_name : null,
+    side: typeof row.side === "string" ? row.side : null,
+    position: typeof row.position === "string" ? row.position : null,
+    link_group: typeof row.link_group === "string" ? row.link_group : null,
+    theme_hint: typeof row.theme_hint === "string" ? row.theme_hint : null,
+    status: "pending",
+    called_at: null,
+    completed_at: null,
+  };
+}
+
+async function replaceSessionCallsFromCallOrder(
+  db: ReturnType<typeof getBingoDb>,
+  sessionId: number,
+  callOrder: Array<Record<string, unknown>>
+) {
+  const normalized = callOrder.map((row, index) => normalizeCallOrderRow(row, index));
+
+  const { data: existingCalls, error: existingError } = await db
+    .from("bingo_session_calls")
+    .select("id")
+    .eq("session_id", sessionId)
+    .order("id", { ascending: true });
+
+  if (existingError) throw new Error(existingError.message);
+
+  const typedExisting = (existingCalls ?? []) as Array<{ id: number }>;
+  if (typedExisting.length !== normalized.length) {
+    const { error: deleteCallsError } = await db
+      .from("bingo_session_calls")
+      .delete()
+      .eq("session_id", sessionId);
+    if (deleteCallsError) throw new Error(deleteCallsError.message);
+
+    const { error: insertCallsError } = await db
+      .from("bingo_session_calls")
+      .insert(normalized.map((row) => ({ session_id: sessionId, ...row })));
+    if (insertCallsError) throw new Error(insertCallsError.message);
+    return;
+  }
+
+  for (let index = 0; index < typedExisting.length; index += 1) {
+    const existing = typedExisting[index];
+    const { error } = await db
+      .from("bingo_session_calls")
+      .update({
+        call_index: 1000 + index + 1,
+        ball_number: null,
+        status: "pending",
+        called_at: null,
+        completed_at: null,
+      })
+      .eq("id", existing.id);
+    if (error) throw new Error(error.message);
+  }
+
+  for (let index = 0; index < normalized.length; index += 1) {
+    const existing = typedExisting[index];
+    const next = normalized[index];
+    const { error } = await db
+      .from("bingo_session_calls")
+      .update(next)
+      .eq("id", existing.id);
+    if (error) throw new Error(error.message);
+  }
+}
+
+async function resetSessionAfterPlaylistReset(db: ReturnType<typeof getBingoDb>, sessionId: number) {
+  const { error: clearEventsError } = await db
+    .from("bingo_session_events")
+    .delete()
+    .eq("session_id", sessionId);
+  if (clearEventsError) throw new Error(clearEventsError.message);
+
+  const { error: sessionError } = await db
+    .from("bingo_sessions")
+    .update({
+      status: "pending",
+      current_call_index: 0,
+      current_round: 1,
+      started_at: null,
+      ended_at: null,
+      paused_at: null,
+      paused_remaining_seconds: null,
+      countdown_started_at: null,
+      call_reveal_at: null,
+      bingo_overlay: "welcome",
+      next_game_scheduled_at: null,
+      next_game_rules_text: null,
+    })
+    .eq("id", sessionId);
+  if (sessionError) throw new Error(sessionError.message);
 }
 
 async function regenerateRoundFromLiveSources(
@@ -184,6 +322,17 @@ export async function POST(
         createdPlaylists.push(created);
       }
 
+      const roundOnePlaylist = createdPlaylists.find((playlist) => playlist.round_number === 1);
+      if (roundOnePlaylist) {
+        await replaceSessionCallsFromCallOrder(
+          db,
+          sessionId,
+          (roundOnePlaylist.call_order ?? []) as Array<Record<string, unknown>>
+        );
+        await resetSessionAfterPlaylistReset(db, sessionId);
+        await rehydrateBingoCardLabels(sessionId);
+      }
+
       return NextResponse.json({ data: createdPlaylists }, { status: 201 });
     }
 
@@ -204,6 +353,17 @@ export async function POST(
       }
 
       const created = await regenerateRoundFromLiveSources(db, sessionId, session, roundNumber, true, roundNumber);
+
+      const currentRound = Math.max(1, Math.floor(Number(session.current_round ?? 1)));
+      if (roundNumber === currentRound) {
+        await replaceSessionCallsFromCallOrder(
+          db,
+          sessionId,
+          (created.call_order ?? []) as Array<Record<string, unknown>>
+        );
+        await rehydrateBingoCardLabels(sessionId);
+      }
+
       return NextResponse.json({ data: created }, { status: 201 });
     }
 

@@ -8,7 +8,6 @@ type Card = {
 };
 
 export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", title: string) {
-  void title;
   // Use US Letter landscape for predictable printing in the US.
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "letter" });
 
@@ -26,9 +25,10 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
   const cardWidth = (pageW - marginX * 2 - gutterX * (columns - 1)) / columns;
   const cardHeight = (pageH - marginY * 2 - gutterY * (rows - 1)) / rows;
 
-  const identifierOffsetY = layout === "4-up" ? 5 : 6; // kept for 2-up; 4-up identifier moves inside card
   const columnHeaderH = layout === "4-up" ? 20 : 26;
   const columnHeaderGap = layout === "4-up" ? 3 : 4;
+  const footerGap = layout === "4-up" ? 3 : 4;
+  const footerH = layout === "4-up" ? 12 : 14;
 
   const cellPaddingX = layout === "4-up" ? 2.5 : 3.0;
   const cellPaddingY = layout === "4-up" ? 2.5 : 3.0;
@@ -57,6 +57,26 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
       xOffsets.push(marginX + c * (cardWidth + gutterX));
       yOffsets.push(marginY + r * (cardHeight + gutterY));
     }
+  }
+
+  function drawPageCutMarks() {
+    if (layout !== "4-up") return;
+
+    const cutX = marginX + cardWidth + gutterX / 2;
+    const cutY = marginY + cardHeight + gutterY / 2;
+    const markLen = 10;
+    const markInset = 4;
+
+    doc.setDrawColor(120, 120, 120);
+    doc.setLineWidth(0.6);
+
+    doc.line(cutX, markInset, cutX, markInset + markLen);
+    doc.line(cutX, pageH - markInset - markLen, cutX, pageH - markInset);
+    doc.line(markInset, cutY, markInset + markLen, cutY);
+    doc.line(pageW - markInset - markLen, cutY, pageW - markInset, cutY);
+
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.2);
   }
 
   function wrapTextToWidth(text: string, maxWidth: number): string[] {
@@ -226,6 +246,7 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
 
   cards.forEach((card, index) => {
     if (index > 0 && index % cardsPerPage === 0) doc.addPage();
+    if (index % cardsPerPage === 0) drawPageCutMarks();
 
     const slot = index % cardsPerPage;
     const baseX = xOffsets[slot] ?? 10;
@@ -236,7 +257,8 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
     const gridX = baseX;
     const gridY = baseY + columnHeaderH + columnHeaderGap;
     const gridW = cardWidth;
-    const gridH = cardHeight - (columnHeaderH + columnHeaderGap);
+    const gridH = cardHeight - (columnHeaderH + columnHeaderGap + footerGap + footerH);
+    const footerY = gridY + gridH + footerGap;
 
     const cellW = gridW / 5;
     const cellH = gridH / 5;
@@ -263,22 +285,26 @@ export function generateBingoCardsPdf(cards: Card[], layout: "2-up" | "4-up", ti
       }
     }
 
-    // For 4-up, print the card identifier inside the column-header area (top-right corner) so it
-    // can never be cut off when trimming rows. For 2-up, keep it above the card border as before.
+    doc.line(baseX, footerY, baseX + cardWidth, footerY);
+
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(layout === "4-up" ? 5.5 : 6.5);
+    doc.setFontSize(layout === "4-up" ? 5.25 : 6.0);
     doc.setTextColor(110, 110, 110);
-    if (layout === "4-up") {
-      doc.text(card.card_identifier ?? `CARD ${card.card_number}`, baseX + cardWidth - 3, baseY + columnHeaderH - 3, {
-        align: "right",
-        baseline: "bottom",
-      });
-    } else {
-      doc.text(card.card_identifier ?? `CARD ${card.card_number}`, baseX + cardWidth - 2, baseY - identifierOffsetY, {
-        align: "right",
-        baseline: "bottom",
-      });
-    }
+
+    const footerLabel = normalizePdfText(title) || "Music Bingo";
+    const footerIdentifier = normalizePdfText(card.card_identifier ?? `Card ${card.card_number}`);
+    const footerBaselineY = footerY + footerH / 2;
+
+    doc.text(footerLabel, baseX + 4, footerBaselineY, {
+      align: "left",
+      baseline: "middle",
+    });
+
+    doc.text(footerIdentifier, baseX + cardWidth - 4, footerBaselineY, {
+      align: "right",
+      baseline: "middle",
+    });
+
     doc.setTextColor(0, 0, 0);
   });
 

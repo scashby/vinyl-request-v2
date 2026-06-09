@@ -1,13 +1,30 @@
 BEGIN;
 
-WITH target_playlist AS (
-  SELECT id
-  FROM collection_playlists
-  WHERE name = 'Movie and TV Game'
-  ORDER BY id DESC
-  LIMIT 1
-),
-desired(ord, track_title, track_artist, theme_hint) AS (
+CREATE TEMP TABLE restore_target_playlist AS
+SELECT id
+FROM collection_playlists
+WHERE name = 'Movie and TV Game'
+ORDER BY id DESC
+LIMIT 1;
+
+CREATE TEMP TABLE restore_desired_tracks (
+  ord integer PRIMARY KEY,
+  track_title text NOT NULL,
+  track_artist text NOT NULL,
+  theme_hint text NOT NULL,
+  n_title text NOT NULL,
+  n_artist text NOT NULL
+) ON COMMIT DROP;
+
+INSERT INTO restore_desired_tracks (ord, track_title, track_artist, theme_hint, n_title, n_artist)
+SELECT
+  ord,
+  track_title,
+  track_artist,
+  theme_hint,
+  regexp_replace(lower(track_title), '[^a-z0-9]+', '', 'g'),
+  regexp_replace(lower(track_artist), '[^a-z0-9]+', '', 'g')
+FROM (
   VALUES
     (1,  'Sister Christian', 'Night Ranger', 'It takes a lot of BDE to scam a drug dealer with baking soda, but that''s the type of thing Boogie Nights excels at.'),
     (2,  'In The Air Tonight', 'Phil Collins', 'This song made it clear in the debut episode that Miami Vice was going to be a different show.'),
@@ -84,106 +101,191 @@ desired(ord, track_title, track_artist, theme_hint) AS (
     (73, 'The Pink Panther Theme', 'Henry Mancini And His Orchestra', 'Peter Sellers snoops around as Inspector Clouseau in this film franchise.'),
     (74, 'God Only Knows', 'The Beach Boys', 'Name another song that is just as comfortable in Boogie Nights as it is in Love, Actually...'),
     (75, 'Flowers On The Wall', 'The Statler Brothers', 'Tarantino is the king of pulling jukebox gems, and Pulp Fiction is no exception. Be careful though, if you hear this song the gimp may not be far away.')
-),
-norm_desired AS (
+) AS src(ord, track_title, track_artist, theme_hint);
+
+CREATE TEMP TABLE restore_current_playlist_tracks AS
+WITH playlist_items AS (
   SELECT
-    ord,
-    track_title,
-    track_artist,
-    theme_hint,
-    regexp_replace(lower(coalesce(track_title, '')), '[^a-z0-9]+', '', 'g') AS n_title,
-    regexp_replace(lower(coalesce(track_artist, '')), '[^a-z0-9]+', '', 'g') AS n_artist
-  FROM desired
-),
-playlist_rows AS (
-  SELECT
-    i.id AS item_id,
-    i.sort_order,
+    i.id AS playlist_item_id,
     i.track_key,
+    i.sort_order,
     split_part(i.track_key, ':', 1)::int AS inventory_id,
-    CASE WHEN split_part(i.track_key, ':', 2) ~ '^[0-9]+$' THEN split_part(i.track_key, ':', 2)::int ELSE NULL END AS release_track_id,
-    CASE WHEN split_part(i.track_key, ':', 2) = 'p' THEN split_part(i.track_key, ':', 3) ELSE NULL END AS fallback_position
+    CASE
+      WHEN array_length(string_to_array(i.track_key, ':'), 1) = 2 THEN NULL
+      WHEN split_part(i.track_key, ':', 2) ~ '^[0-9]+$' THEN split_part(i.track_key, ':', 2)::int
+      ELSE NULL
+    END AS release_track_id,
+    CASE
+      WHEN array_length(string_to_array(i.track_key, ':'), 1) = 2 THEN split_part(i.track_key, ':', 2)
+      WHEN split_part(i.track_key, ':', 2) = 'fallback' THEN split_part(i.track_key, ':', 4)
+      WHEN split_part(i.track_key, ':', 2) LIKE 'p:%' THEN substr(split_part(i.track_key, ':', 2), 3)
+      WHEN split_part(i.track_key, ':', 2) ~ '^[0-9]+$' THEN NULL
+      ELSE NULLIF(split_part(i.track_key, ':', 2), '')
+    END AS fallback_position,
+    CASE
+      WHEN array_length(string_to_array(i.track_key, ':'), 1) >= 3 AND split_part(i.track_key, ':', 3) ~ '^[0-9]+$'
+        THEN split_part(i.track_key, ':', 3)::int
+      ELSE NULL
+    END AS recording_id
   FROM collection_playlist_items i
-  JOIN target_playlist p ON p.id = i.playlist_id
+  JOIN restore_target_playlist p ON p.id = i.playlist_id
 ),
 resolved AS (
   SELECT
-    pr.item_id,
-    pr.sort_order,
-    COALESCE(rt_exact.title_override, rt_pos.title_override, rec.title, '') AS title_raw,
-    COALESCE(rec.track_artist, art.name, '') AS artist_raw,
-    regexp_replace(lower(COALESCE(rt_exact.title_override, rt_pos.title_override, rec.title, '')), '[^a-z0-9]+', '', 'g') AS n_title,
-    regexp_replace(lower(COALESCE(rec.track_artist, art.name, '')), '[^a-z0-9]+', '', 'g') AS n_artist
-  FROM playlist_rows pr
-  LEFT JOIN inventory inv ON inv.id = pr.inventory_id
-  LEFT JOIN release_tracks rt_exact ON rt_exact.id = pr.release_track_id
-  LEFT JOIN release_tracks rt_pos
-    ON rt_pos.release_id = inv.release_id
-   AND pr.release_track_id IS NULL
-   AND pr.fallback_position IS NOT NULL
-   AND upper(coalesce(rt_pos.position, '')) = upper(pr.fallback_position)
-  LEFT JOIN recordings rec ON rec.id = COALESCE(rt_exact.recording_id, rt_pos.recording_id)
+    pi.playlist_item_id,
+    pi.track_key,
+    pi.sort_order,
+    COALESCE(NULLIF(rt_exact.title_override, ''), NULLIF(rt_pos.title_override, ''), NULLIF(rec.title, ''), 'Track ' || (pi.sort_order + 1)::text) AS track_title,
+    COALESCE(
+      NULLIF(regexp_replace(COALESCE(rec.track_artist, ''), '\\s+\\(\\d+\\)\\s*$', ''), ''),
+      NULLIF(regexp_replace(COALESCE(rec.credits ->> 'track_artist', ''), '\\s+\\(\\d+\\)\\s*$', ''), ''),
+      NULLIF(regexp_replace(COALESCE(art.name, ''), '\\s+\\(\\d+\\)\\s*$', ''), ''),
+      'Unknown Artist'
+    ) AS track_artist
+  FROM playlist_items pi
+  LEFT JOIN inventory inv ON inv.id = pi.inventory_id
   LEFT JOIN releases rel ON rel.id = inv.release_id
   LEFT JOIN masters m ON m.id = rel.master_id
   LEFT JOIN artists art ON art.id = m.main_artist_id
+  LEFT JOIN release_tracks rt_exact ON rt_exact.id = pi.release_track_id
+  LEFT JOIN release_tracks rt_pos
+    ON rt_pos.release_id = inv.release_id
+   AND pi.release_track_id IS NULL
+   AND pi.fallback_position IS NOT NULL
+   AND regexp_replace(upper(COALESCE(rt_pos.position, '')), '[^A-Z0-9]+', '', 'g') IN (
+     regexp_replace(upper(pi.fallback_position), '[^A-Z0-9]+', '', 'g'),
+     regexp_replace(upper(regexp_replace(pi.fallback_position, '^[A-Z]+', '')), '[^A-Z0-9]+', '', 'g')
+   )
+  LEFT JOIN recordings rec ON rec.id = COALESCE(rt_exact.recording_id, rt_pos.recording_id, pi.recording_id)
+)
+SELECT
+  playlist_item_id,
+  track_key,
+  sort_order,
+  track_title,
+  track_artist,
+  regexp_replace(lower(track_title), '[^a-z0-9]+', '', 'g') AS n_title,
+  regexp_replace(
+    replace(replace(lower(track_artist), '''', ''), '"', ''),
+    '[^a-z0-9]+',
+    '',
+    'g'
+  ) AS n_artist
+FROM resolved;
+
+CREATE TEMP TABLE restore_matches AS
+WITH strict_candidates AS (
+  SELECT
+    d.ord,
+    d.theme_hint,
+    c.track_key,
+    c.sort_order,
+    ROW_NUMBER() OVER (PARTITION BY d.ord ORDER BY c.sort_order, c.playlist_item_id) AS rn,
+    COUNT(*) OVER (PARTITION BY d.ord) AS cnt
+  FROM restore_desired_tracks d
+  JOIN restore_current_playlist_tracks c
+    ON c.n_title = d.n_title
+   AND c.n_artist = d.n_artist
 ),
-strict_matches AS (
-  SELECT d.ord, d.theme_hint, r.item_id
-  FROM norm_desired d
-  JOIN resolved r
-    ON r.n_title = d.n_title
-   AND r.n_artist = d.n_artist
+strict_unique AS (
+  SELECT ord, theme_hint, track_key, sort_order
+  FROM strict_candidates
+  WHERE cnt = 1 AND rn = 1
 ),
 remaining_desired AS (
   SELECT d.*
-  FROM norm_desired d
-  LEFT JOIN strict_matches sm ON sm.ord = d.ord
-  WHERE sm.ord IS NULL
+  FROM restore_desired_tracks d
+  LEFT JOIN strict_unique s ON s.ord = d.ord
+  WHERE s.ord IS NULL
 ),
-remaining_rows AS (
-  SELECT r.*
-  FROM resolved r
-  LEFT JOIN strict_matches sm ON sm.item_id = r.item_id
-  WHERE sm.item_id IS NULL
+remaining_candidates AS (
+  SELECT c.*
+  FROM restore_current_playlist_tracks c
+  LEFT JOIN strict_unique s ON s.track_key = c.track_key
+  WHERE s.track_key IS NULL
 ),
 title_only_candidates AS (
-  SELECT d.ord, d.theme_hint, r.item_id
+  SELECT
+    d.ord,
+    d.theme_hint,
+    c.track_key,
+    c.sort_order,
+    ROW_NUMBER() OVER (PARTITION BY d.ord ORDER BY c.sort_order, c.playlist_item_id) AS rn,
+    COUNT(*) OVER (PARTITION BY d.ord) AS desired_cnt,
+    COUNT(*) OVER (PARTITION BY c.track_key) AS key_cnt
   FROM remaining_desired d
-  JOIN remaining_rows r ON r.n_title = d.n_title
+  JOIN remaining_candidates c ON c.n_title = d.n_title
 ),
 title_only_unique AS (
-  SELECT c.ord, c.theme_hint, c.item_id
-  FROM title_only_candidates c
-  JOIN (
-    SELECT ord, COUNT(*) AS cnt FROM title_only_candidates GROUP BY ord
-  ) dcnt ON dcnt.ord = c.ord
-  JOIN (
-    SELECT item_id, COUNT(*) AS cnt FROM title_only_candidates GROUP BY item_id
-  ) icnt ON icnt.item_id = c.item_id
-  WHERE dcnt.cnt = 1 AND icnt.cnt = 1
-),
-matches AS (
-  SELECT * FROM strict_matches
-  UNION ALL
-  SELECT * FROM title_only_unique
-),
-sort_base AS (
-  SELECT CASE WHEN MIN(sort_order) = 0 THEN 0 ELSE 1 END AS base
-  FROM playlist_rows
-),
-updated AS (
-  UPDATE collection_playlist_items i
-  SET
-    theme_hint = m.theme_hint,
-    sort_order = (m.ord - 1) + sb.base
-  FROM matches m
-  CROSS JOIN sort_base sb
-  WHERE i.id = m.item_id
-  RETURNING i.id
+  SELECT ord, theme_hint, track_key, sort_order
+  FROM title_only_candidates
+  WHERE desired_cnt = 1 AND key_cnt = 1 AND rn = 1
+)
+SELECT * FROM strict_unique
+UNION ALL
+SELECT * FROM title_only_unique;
+
+DO $$
+DECLARE
+  wanted_count integer;
+  matched_count integer;
+  duplicate_keys integer;
+BEGIN
+  SELECT COUNT(*) INTO wanted_count FROM restore_desired_tracks;
+  SELECT COUNT(*) INTO matched_count FROM restore_matches;
+  SELECT COUNT(*) INTO duplicate_keys
+  FROM (
+    SELECT track_key
+    FROM restore_matches
+    GROUP BY track_key
+    HAVING COUNT(*) > 1
+  ) dup;
+
+  IF NOT EXISTS (SELECT 1 FROM restore_target_playlist) THEN
+    RAISE EXCEPTION 'Playlist "Movie and TV Game" was not found.';
+  END IF;
+
+  IF duplicate_keys > 0 THEN
+    RAISE EXCEPTION 'Replacement aborted: duplicate track matches detected (% duplicate keys).', duplicate_keys;
+  END IF;
+
+  IF matched_count <> wanted_count THEN
+    RAISE EXCEPTION 'Replacement aborted: matched % of % desired tracks. No changes were applied.', matched_count, wanted_count;
+  END IF;
+END $$;
+
+DELETE FROM collection_playlist_items i
+USING restore_target_playlist p
+WHERE i.playlist_id = p.id;
+
+INSERT INTO collection_playlist_items (
+  playlist_id,
+  track_key,
+  sort_order,
+  link_group,
+  theme_hint
 )
 SELECT
-  (SELECT COUNT(*) FROM updated) AS updated_rows,
-  (SELECT COUNT(*) FROM desired) AS desired_rows,
-  (SELECT COUNT(*) FROM desired) - (SELECT COUNT(*) FROM updated) AS unmatched_rows;
+  p.id,
+  m.track_key,
+  d.ord - 1,
+  NULL,
+  d.theme_hint
+FROM restore_target_playlist p
+JOIN restore_matches m ON TRUE
+JOIN restore_desired_tracks d ON d.ord = m.ord
+ORDER BY d.ord;
+
+SELECT
+  (SELECT COUNT(*) FROM restore_desired_tracks) AS desired_rows,
+  (SELECT COUNT(*) FROM restore_matches) AS matched_rows,
+  (SELECT COUNT(*) FROM collection_playlist_items i JOIN restore_target_playlist p ON p.id = i.playlist_id) AS playlist_rows_after_replace;
 
 COMMIT;
+
+-- If this aborts again, run this after the temp-table section and before the DO block:
+-- SELECT d.ord, d.track_title, d.track_artist
+-- FROM restore_desired_tracks d
+-- LEFT JOIN restore_matches m ON m.ord = d.ord
+-- WHERE m.ord IS NULL
+-- ORDER BY d.ord;
