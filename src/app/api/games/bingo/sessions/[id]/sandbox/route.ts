@@ -306,6 +306,26 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
       if (cardInsertError) throw new Error(cardInsertError.message);
     }
 
+    const { data: sourceCallsForHints, error: sourceCallsForHintsError } = await db
+      .from("bingo_session_calls")
+      .select("call_index, playlist_track_key, theme_hint")
+      .eq("session_id", sourceSessionId)
+      .order("call_index", { ascending: true });
+
+    if (sourceCallsForHintsError) throw new Error(sourceCallsForHintsError.message);
+
+    const sourceHintByTrackKey = new Map<string, string>();
+    const sourceHintByCallIndex = new Map<number, string>();
+    for (const row of (sourceCallsForHints ?? []) as Array<{ call_index: number; playlist_track_key: string | null; theme_hint: string | null }>) {
+      if (typeof row.theme_hint !== "string" || row.theme_hint.length === 0) continue;
+      if (typeof row.playlist_track_key === "string" && row.playlist_track_key.length > 0) {
+        sourceHintByTrackKey.set(row.playlist_track_key, row.theme_hint);
+      }
+      if (Number.isFinite(row.call_index) && row.call_index > 0) {
+        sourceHintByCallIndex.set(row.call_index, row.theme_hint);
+      }
+    }
+
     let callRows: Array<{
       playlist_track_key: string | null;
       call_index: number;
@@ -328,23 +348,31 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
       : fallbackPlaylist;
 
     if (selectedPlaylist && Array.isArray(selectedPlaylist.call_order) && selectedPlaylist.call_order.length > 0) {
-      callRows = selectedPlaylist.call_order.map((row, index) => ({
-        playlist_track_key: typeof row.playlist_track_key === "string"
+      callRows = selectedPlaylist.call_order.map((row, index) => {
+        const resolvedTrackKey = typeof row.playlist_track_key === "string"
           ? row.playlist_track_key
           : typeof row.track_key === "string"
             ? row.track_key
-            : null,
-        call_index: Number(row.call_index) || index + 1,
-        ball_number: coerceBallNumber(row.ball_number, index + 1),
-        column_letter: coerceColumnLetter(row.column_letter),
-        track_title: typeof row.track_title === "string" ? row.track_title : "",
-        artist_name: typeof row.artist_name === "string" ? row.artist_name : "",
-        album_name: typeof row.album_name === "string" ? row.album_name : null,
-        side: typeof row.side === "string" ? row.side : null,
-        position: typeof row.position === "string" ? row.position : null,
-        link_group: typeof row.link_group === "string" ? row.link_group : null,
-        theme_hint: typeof row.theme_hint === "string" ? row.theme_hint : null,
-      }));
+            : null;
+        const resolvedCallIndex = Number(row.call_index) || index + 1;
+        const directHint = typeof row.theme_hint === "string" ? row.theme_hint : null;
+        const fallbackHintByTrack = resolvedTrackKey ? sourceHintByTrackKey.get(resolvedTrackKey) ?? null : null;
+        const fallbackHintByIndex = sourceHintByCallIndex.get(resolvedCallIndex) ?? null;
+
+        return {
+          playlist_track_key: resolvedTrackKey,
+          call_index: resolvedCallIndex,
+          ball_number: coerceBallNumber(row.ball_number, index + 1),
+          column_letter: coerceColumnLetter(row.column_letter),
+          track_title: typeof row.track_title === "string" ? row.track_title : "",
+          artist_name: typeof row.artist_name === "string" ? row.artist_name : "",
+          album_name: typeof row.album_name === "string" ? row.album_name : null,
+          side: typeof row.side === "string" ? row.side : null,
+          position: typeof row.position === "string" ? row.position : null,
+          link_group: typeof row.link_group === "string" ? row.link_group : null,
+          theme_hint: directHint ?? fallbackHintByTrack ?? fallbackHintByIndex,
+        };
+      });
     }
 
     if (callRows.length === 0) {
