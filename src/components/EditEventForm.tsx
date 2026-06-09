@@ -366,6 +366,15 @@ export default function EditEventForm({
   const selectedType = eventTypeConfig.types.find((option) => option.id === eventData.event_type);
   const selectedTypeSubtypes = selectedType?.subtypes ?? [];
   const hasSelectedTypeSubtypes = selectedTypeSubtypes.length > 0;
+  const fallbackSubtypeOptions = eventTypeConfig.types
+    .flatMap((option) => option.subtypes ?? [])
+    .reduce<Array<{ id: string; label: string; description?: string; defaults?: EventSubtypeDefaults }>>((acc, subtype) => {
+      const alreadyExists = acc.some((item) => item.id === subtype.id || item.label === subtype.label);
+      if (!alreadyExists) acc.push(subtype);
+      return acc;
+    }, []);
+  const availableSubtypeOptions = hasSelectedTypeSubtypes ? selectedTypeSubtypes : fallbackSubtypeOptions;
+  const hasSubtypeOptions = availableSubtypeOptions.length > 0;
   const selectedTypeDefaults = selectedType?.defaults;
   const selectedSubtypeDefaults = selectedType?.subtypes?.find(
     (item) => item.id === eventData.event_subtype
@@ -1430,7 +1439,7 @@ export default function EditEventForm({
                 </p>
               )}
             </div>
-            {hasSelectedTypeSubtypes && (
+            {eventData.event_type && hasSubtypeOptions && (
               <div>
                 <label className="text-sm font-medium text-gray-700">Event subtype</label>
                 <select
@@ -1440,7 +1449,7 @@ export default function EditEventForm({
                   className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
                 >
                   <option value="">Select a subtype</option>
-                  {selectedTypeSubtypes.map(
+                  {availableSubtypeOptions.map(
                     (option) => (
                       <option key={option.id} value={option.id}>
                         {option.label}
