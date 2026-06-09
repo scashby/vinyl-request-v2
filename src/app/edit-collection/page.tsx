@@ -3548,8 +3548,8 @@ function CollectionBrowserPage() {
             playlist_id: playlist.id,
             track_key: trackKey,
             sort_order: i + index,
-            link_group: playlist.trackLinkGroups?.[trackKey] ?? null,
-            theme_hint: playlist.trackThemeHints?.[trackKey] ?? null,
+            link_group: playlist.trackLinkGroups?.[trackKey] ?? previous?.trackLinkGroups?.[trackKey] ?? null,
+            theme_hint: playlist.trackThemeHints?.[trackKey] ?? previous?.trackThemeHints?.[trackKey] ?? null,
           }));
           const { error: insertItemsError } = await supabase
             .from('collection_playlist_items')

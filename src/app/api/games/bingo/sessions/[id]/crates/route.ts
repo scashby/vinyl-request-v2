@@ -4,12 +4,87 @@ import {
   backfillMissingLegacyPlaylists,
   createPlaylistFromSessionData,
   deletePlaylistByLetter,
+  getPlaylistsForRound,
   getPlaylistsForSession,
   reshuffleAllPlaylists,
+  savePlaylistForRound,
   setActivePlaylistForRound,
 } from "src/lib/bingoCrateModel";
+import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
+import { resolveRoundPlaylistIds, type RoundPlaylistEntry } from "src/lib/bingoRoundPlaylists";
 
 export const runtime = "nodejs";
+
+type SessionSourceRow = {
+  id: number;
+  playlist_id: number;
+  playlist_ids: number[] | null;
+  round_playlist_ids: RoundPlaylistEntry[] | null;
+  round_count: number;
+};
+
+async function loadSessionSourceRow(db: ReturnType<typeof getBingoDb>, sessionId: number): Promise<SessionSourceRow | null> {
+  const query = (db
+    .from("bingo_sessions")
+    .select("id, playlist_id, playlist_ids, round_playlist_ids, round_count") as unknown as {
+      eq: (column: string, value: number) => {
+        maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
+      };
+    });
+
+  const { data, error } = await query.eq("id", sessionId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as SessionSourceRow | null) ?? null;
+}
+
+async function regenerateRoundFromLiveSources(
+  db: ReturnType<typeof getBingoDb>,
+  sessionId: number,
+  session: SessionSourceRow,
+  roundNumber: number,
+  replaceRound: boolean,
+  generation = 0
+) {
+  const playlistIdsForRound = resolveRoundPlaylistIds(session, roundNumber);
+  if (playlistIdsForRound.length === 0) {
+    throw new Error(`Round ${roundNumber} has no configured playlists`);
+  }
+
+  const tracks = await resolvePlaylistTracksForPlaylists(db, playlistIdsForRound);
+  if (tracks.length === 0) {
+    throw new Error(`Round ${roundNumber} has no resolvable tracks`);
+  }
+
+  const planned = planRoundSessionCalls(tracks, sessionId, roundNumber, generation);
+  const callOrder = planned.map((row, index) => ({
+    id: -(index + 1),
+    call_index: row.call_index,
+    ball_number: row.ball_number,
+    column_letter: row.column_letter,
+    track_title: row.track_title,
+    artist_name: row.artist_name,
+    album_name: row.album_name,
+    side: row.side,
+    position: row.position,
+    status: "pending",
+    track_key: row.playlist_track_key,
+    link_group: row.link_group ?? null,
+    theme_hint: row.theme_hint ?? null,
+  }));
+
+  const existingRoundPlaylists = await getPlaylistsForRound(db, sessionId, roundNumber);
+  const created = await savePlaylistForRound(db, sessionId, roundNumber, callOrder);
+
+  if (replaceRound) {
+    for (const playlist of existingRoundPlaylists) {
+      if (playlist.playlist_letter === created.playlist_letter) continue;
+      await deletePlaylistByLetter(db, sessionId, playlist.playlist_letter);
+    }
+    await setActivePlaylistForRound(db, sessionId, roundNumber, created.playlist_letter);
+  }
+
+  return created;
+}
 
 export async function GET(
   _: NextRequest,
@@ -91,15 +166,65 @@ export async function POST(
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const roundNumberRaw = Number(body.round_number);
   const roundNumber = Number.isFinite(roundNumberRaw) && roundNumberRaw >= 1 ? Math.floor(roundNumberRaw) : undefined;
+  const replaceRound = body.replace_round === true;
+  const replaceAllRounds = body.replace_all_rounds === true;
 
   const db = getBingoDb();
   try {
+    if (replaceAllRounds) {
+      const session = await loadSessionSourceRow(db, sessionId);
+      if (!session) {
+        return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      }
+
+      const totalRounds = Math.max(1, session.round_count ?? 1);
+      const createdPlaylists = [];
+      for (let round = 1; round <= totalRounds; round += 1) {
+        const created = await regenerateRoundFromLiveSources(db, sessionId, session, round, true, round);
+        createdPlaylists.push(created);
+      }
+
+      return NextResponse.json({ data: createdPlaylists }, { status: 201 });
+    }
+
+    if (replaceRound) {
+      if (!roundNumber) {
+        return NextResponse.json({ error: "round_number is required when replace_round is true" }, { status: 400 });
+      }
+
+      const session = await loadSessionSourceRow(db, sessionId);
+      if (!session) {
+        return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      }
+      if (roundNumber > Math.max(1, session.round_count ?? 1)) {
+        return NextResponse.json(
+          { error: `round_number must be between 1 and ${Math.max(1, session.round_count ?? 1)}` },
+          { status: 400 }
+        );
+      }
+
+      const created = await regenerateRoundFromLiveSources(db, sessionId, session, roundNumber, true, roundNumber);
+      return NextResponse.json({ data: created }, { status: 201 });
+    }
+
+    const existingRoundPlaylists = roundNumber
+      ? await getPlaylistsForRound(db, sessionId, roundNumber)
+      : [];
+
     const created = await createPlaylistFromSessionData(db, sessionId, roundNumber);
     if (!created) {
       return NextResponse.json(
         { error: "No existing round call-order data available to create a playlist for that round" },
         { status: 400 }
       );
+    }
+
+    if (replaceRound) {
+      for (const playlist of existingRoundPlaylists) {
+        if (playlist.playlist_letter === created.playlist_letter) continue;
+        await deletePlaylistByLetter(db, sessionId, playlist.playlist_letter);
+      }
+      await setActivePlaylistForRound(db, sessionId, created.round_number, created.playlist_letter);
     }
 
     return NextResponse.json({ data: created }, { status: 201 });

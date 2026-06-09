@@ -92,6 +92,7 @@ export default function BingoEditSessionPage() {
   const [gamePlaylists, setGamePlaylists] = useState<BingoGamePlaylist[]>([]);
   const [activePlaylistByRound, setActivePlaylistByRound] = useState<{ round: number; letter: string }[]>([]);
   const [playlistBusyRound, setPlaylistBusyRound] = useState<number | null>(null);
+  const [playlistBusyAll, setPlaylistBusyAll] = useState(false);
   const [showCountdown, setShowCountdown] = useState(true);
   const [recentCallsLimit, setRecentCallsLimit] = useState(5);
   const [nextGameRulesText, setNextGameRulesText] = useState("");
@@ -102,6 +103,25 @@ export default function BingoEditSessionPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const refreshGamePlaylistState = useCallback(async () => {
+    if (!Number.isFinite(sessionId)) return;
+
+    const [sessionRes, gamePlaylistsRes] = await Promise.all([
+      fetch(`/api/games/bingo/sessions/${sessionId}`, { cache: "no-store" }),
+      fetch(`/api/games/bingo/sessions/${sessionId}/crates`, { cache: "no-store" }),
+    ]);
+
+    if (!sessionRes.ok || !gamePlaylistsRes.ok) {
+      throw new Error("Failed to refresh round playlists");
+    }
+
+    const sessionPayload = (await sessionRes.json()) as Session;
+    const gamePlaylistsPayload = (await gamePlaylistsRes.json()) as { data?: BingoGamePlaylist[] };
+
+    setGamePlaylists(gamePlaylistsPayload.data ?? []);
+    setActivePlaylistByRound(sessionPayload.active_playlist_letter_by_round ?? []);
+  }, [sessionId]);
 
   const selectedPreset = useMemo(
     () => (selectedPresetId ? presets.find((preset) => preset.id === selectedPresetId) ?? null : null),
@@ -358,26 +378,26 @@ export default function BingoEditSessionPage() {
         });
         const payload = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error((payload as { error?: string }).error ?? "Failed to set playlist");
-        await load();
+        await refreshGamePlaylistState();
       } catch (playlistError) {
         setError(playlistError instanceof Error ? playlistError.message : "Failed to set playlist");
       } finally {
         setPlaylistBusyRound(null);
       }
     },
-    [load, sessionId]
+    [refreshGamePlaylistState, sessionId]
   );
 
   const createPlaylistForRound = useCallback(
     async (round: number) => {
-      if (!Number.isFinite(sessionId)) return;
+      if (!Number.isFinite(sessionId) || playlistBusyAll) return;
       setPlaylistBusyRound(round);
       setError(null);
       try {
         const res = await fetch(`/api/games/bingo/sessions/${sessionId}/crates`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ round_number: round }),
+          body: JSON.stringify({ round_number: round, replace_round: true }),
         });
         const payload = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error((payload as { error?: string }).error ?? "Failed to create game playlist");
@@ -390,15 +410,35 @@ export default function BingoEditSessionPage() {
             body: JSON.stringify({ round_number: round, playlist_letter: created.playlist_letter }),
           });
         }
-        await load();
+        await refreshGamePlaylistState();
       } catch (playlistError) {
         setError(playlistError instanceof Error ? playlistError.message : "Failed to create game playlist");
       } finally {
         setPlaylistBusyRound(null);
       }
     },
-    [load, sessionId]
+    [playlistBusyAll, refreshGamePlaylistState, sessionId]
   );
+
+  const regenerateAllRoundPlaylists = useCallback(async () => {
+    if (!Number.isFinite(sessionId)) return;
+    setPlaylistBusyAll(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/games/bingo/sessions/${sessionId}/crates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ replace_all_rounds: true }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((payload as { error?: string }).error ?? "Failed to regenerate all round playlists");
+      await refreshGamePlaylistState();
+    } catch (playlistError) {
+      setError(playlistError instanceof Error ? playlistError.message : "Failed to regenerate all round playlists");
+    } finally {
+      setPlaylistBusyAll(false);
+    }
+  }, [refreshGamePlaylistState, sessionId]);
 
   const resetGame = async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -557,6 +597,16 @@ export default function BingoEditSessionPage() {
               <div className="rounded border border-stone-700 bg-stone-950/40 p-3">
                 <p className="text-sm font-semibold text-amber-200">Round Win Modes</p>
                 <p className="mt-1 text-xs text-stone-400">Set one or more modes per round. If a round has none selected, it uses the default mode. Playlist overrides are optional and fall back to the master crate.</p>
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => { void regenerateAllRoundPlaylists(); }}
+                    disabled={playlistBusyAll || playlistBusyRound !== null}
+                    className="rounded border border-amber-700/70 bg-amber-950/30 px-3 py-1.5 text-xs font-semibold text-amber-200 disabled:opacity-50"
+                  >
+                    {playlistBusyAll ? "Regenerating All Rounds..." : "Regenerate All Round Playlists"}
+                  </button>
+                </div>
                 <div className="mt-3 space-y-3">
                   {Array.from({ length: roundCount }, (_, index) => {
                     const round = index + 1;
@@ -640,7 +690,7 @@ export default function BingoEditSessionPage() {
                             <select
                               className="rounded border border-stone-700 bg-stone-950 px-2 py-1 text-xs"
                               value={getActivePlaylistForRound(round)}
-                              disabled={playlistBusyRound === round}
+                              disabled={playlistBusyAll || playlistBusyRound === round}
                               onChange={(event) => {
                                 void selectPlaylistForRound(round, event.target.value);
                               }}
@@ -655,7 +705,7 @@ export default function BingoEditSessionPage() {
                             <button
                               type="button"
                               onClick={() => { void createPlaylistForRound(round); }}
-                              disabled={playlistBusyRound === round}
+                              disabled={playlistBusyAll || playlistBusyRound === round}
                               className="rounded border border-amber-700/70 bg-amber-950/30 px-2 py-1 text-xs text-amber-200 disabled:opacity-50"
                             >
                               {playlistBusyRound === round ? "Generating..." : "Generate New Playlist"}
