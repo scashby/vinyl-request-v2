@@ -1969,6 +1969,33 @@ export function PlaylistStudioModal({
                       </DndContext>
                     </div>
                   )}
+
+                  <div className="shrink-0 border-t border-[#1e2d47] bg-[#0d1728]/95 px-8 py-3 backdrop-blur">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-xs text-[#8fa7cf]">
+                        {manualTrackKeys.length} track{manualTrackKeys.length === 1 ? '' : 's'} queued. Changes are only persisted after Save.
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => { resetManualComposer(); setView('library'); }}
+                          className="rounded-full border border-[#3b4e72] px-4 py-2 text-sm font-medium text-[#cad8f2] hover:border-[#5a7aaa] hover:bg-[#1e2f4a]"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => void saveManualPlaylist()}
+                          disabled={manualSaving || !manualName.trim()}
+                          className={`rounded-full px-5 py-2 text-sm font-semibold ${
+                            manualSaving || !manualName.trim()
+                              ? 'cursor-not-allowed bg-[#1f3a60] text-[#7e9bc7]'
+                              : 'bg-white text-[#0d1320] hover:bg-[#e8e8e8]'
+                          }`}
+                        >
+                          {manualSaving ? 'Saving…' : manualEditingPlaylist ? 'Save Playlist' : 'Create Playlist'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
