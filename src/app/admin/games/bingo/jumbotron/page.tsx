@@ -20,6 +20,9 @@ type Session = {
   status: string;
   recent_calls_limit: number;
   show_countdown: boolean;
+  countdown_started_at: string | null;
+  paused_remaining_seconds: number | null;
+  paused_at: string | null;
   next_game_scheduled_at: string | null;
   next_game_rules_text: string | null;
   welcome_heading_text?: string | null;
@@ -220,7 +223,6 @@ export default function BingoJumbotronPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
-  const [remaining, setRemaining] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
 
@@ -235,7 +237,6 @@ export default function BingoJumbotronPage() {
     if (sRes.ok) {
       const payload = await sRes.json();
       setSession(payload);
-      setRemaining(payload.seconds_to_next_call ?? 0);
     }
 
     if (cRes.ok) {
@@ -278,15 +279,34 @@ export default function BingoJumbotronPage() {
   useEffect(() => {
     const tick = setInterval(() => {
       setNow(Date.now());
-      setRemaining((value) => {
-        if (!session || session.status === "paused" || session.status === "completed") return value;
-        // Only freeze the countdown for the pending overlay
-        if (session.bingo_overlay === "pending") return value;
-        return value - 1;
-      });
-    }, 1000);
+    }, 250);
     return () => clearInterval(tick);
-  }, [session]);
+  }, []);
+
+  const remaining = useMemo(() => {
+    if (!session) return 0;
+
+    // Keep countdown fixed while paused/completed/pending to match gameplay state.
+    if (session.status === "paused" || session.status === "completed" || session.bingo_overlay === "pending") {
+      return Math.max(0, session.paused_remaining_seconds ?? session.seconds_to_next_call ?? 0);
+    }
+
+    if (session.paused_at) {
+      return Math.max(0, session.paused_remaining_seconds ?? session.seconds_to_next_call ?? 0);
+    }
+
+    if (!session.countdown_started_at) {
+      return Math.max(0, session.seconds_to_next_call ?? 0);
+    }
+
+    const startedAt = new Date(session.countdown_started_at).getTime();
+    if (!Number.isFinite(startedAt)) {
+      return Math.max(0, session.seconds_to_next_call ?? 0);
+    }
+
+    const remainingMs = (session.seconds_to_next_call ?? 0) * 1000 - (now - startedAt);
+    return Math.max(0, Math.ceil(remainingMs / 1000));
+  }, [session, now]);
 
   // F key shortcut for fullscreen. Keep control hidden on-screen.
   const toggleFullscreen = useCallback(() => {
