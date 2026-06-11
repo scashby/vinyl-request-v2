@@ -126,19 +126,29 @@ export async function POST(request: NextRequest) {
     if (imported >= limit) break;
     const sourceNote = `trivia-api:${q.id}`;
 
-    // Collection filter — only import questions whose subject is in the collection.
-    // Check question text + correct answer only (not wrong answers, which could be
-    // collection entities used as distractors for an unrelated question).
-    // Use whole-word matching so "america" (the band) doesn't match "american".
+    // Collection filter — only import if BOTH:
+    //   1. The correct answer references something in the collection
+    //   2. Every quoted title in the question text is also in the collection
+    // This prevents questions about albums/artists the user doesn't own from
+    // slipping through because the answer happens to be a collection artist.
     if (collectionTerms.size === 0) { notInCollection++; continue; }
-    const haystack = [q.question.text, q.correctAnswer].join(" ").toLowerCase();
-    const haystackWords = new Set(haystack.split(/\W+/).filter(Boolean));
-    const matches = [...collectionTerms].some((term) => {
-      const termWords = term.split(/\s+/);
-      if (termWords.length === 1) return haystackWords.has(term);
-      return haystack.includes(term);
-    });
-    if (!matches) { notInCollection++; continue; }
+
+    const termInText = (text: string) => {
+      const words = new Set(text.toLowerCase().split(/\W+/).filter(Boolean));
+      return [...collectionTerms].some((term) =>
+        term.includes(" ") ? text.toLowerCase().includes(term) : words.has(term)
+      );
+    };
+
+    // 1. Correct answer must be in the collection
+    if (!termInText(q.correctAnswer)) { notInCollection++; continue; }
+
+    // 2. Every quoted title in the question (e.g. 'The Final Cut') must be in the collection
+    const quotedTitles = [...q.question.text.matchAll(/'([^']{4,})'/g)].map(m => m[1]);
+    const allTitlesOwned = quotedTitles.every(title =>
+      [...collectionTerms].some(term => term.length >= 5 && (term === title.toLowerCase() || term.includes(title.toLowerCase()) || title.toLowerCase().includes(term)))
+    );
+    if (!allTitlesOwned) { notInCollection++; continue; }
 
     // Dedup — skip if we already have this question
     const { data: existing } = await (db
