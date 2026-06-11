@@ -102,6 +102,7 @@ export default function BingoHostPage() {
   const [winnerCheckResult, setWinnerCheckResult] = useState<CardValidationResponse | null>(null);
   const [winnerCheckError, setWinnerCheckError] = useState<string | null>(null);
   const [checkingWinner, setCheckingWinner] = useState(false);
+  const [jumbotronCopyStatus, setJumbotronCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   const currentCallRowRef = useRef<HTMLTableRowElement>(null);
   const autoCallLockRef = useRef(false);
   const revealDelayEditingRef = useRef(false);
@@ -110,6 +111,31 @@ export default function BingoHostPage() {
   const START_GAME_COUNTDOWN_SECONDS = 300;
   const DEFAULT_NEXT_CALL_SECONDS = 45;
   const nextCallConfiguredSecondsRef = useRef<number>(DEFAULT_NEXT_CALL_SECONDS);
+
+  const jumbotronPath = useMemo(() => {
+    if (!Number.isFinite(sessionId)) return "";
+    return `/admin/games/bingo/jumbotron?sessionId=${sessionId}`;
+  }, [sessionId]);
+
+  const jumbotronShareUrl = useMemo(() => {
+    if (!jumbotronPath) return "";
+    if (typeof window === "undefined") return jumbotronPath;
+    return `${window.location.origin}${jumbotronPath}`;
+  }, [jumbotronPath]);
+
+  const copyJumbotronUrl = useCallback(async () => {
+    if (!jumbotronShareUrl) return;
+    try {
+      await navigator.clipboard.writeText(jumbotronShareUrl);
+      setJumbotronCopyStatus("copied");
+    } catch {
+      setJumbotronCopyStatus("failed");
+    }
+
+    window.setTimeout(() => {
+      setJumbotronCopyStatus("idle");
+    }, 1800);
+  }, [jumbotronShareUrl]);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -582,6 +608,25 @@ export default function BingoHostPage() {
             <button className="rounded border border-stone-600 px-2 py-1" onClick={() => (window.location.href = "/admin/games")}>
               Main
             </button>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+            <label className="text-stone-400">Jumbotron URL</label>
+            <input
+              readOnly
+              value={jumbotronShareUrl}
+              className="min-w-[18rem] flex-1 rounded border border-stone-700 bg-black/45 px-2 py-1 font-mono text-[11px] text-stone-200"
+            />
+            <button
+              type="button"
+              onClick={() => void copyJumbotronUrl()}
+              disabled={!jumbotronShareUrl}
+              className="rounded border border-stone-600 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Copy
+            </button>
+            {jumbotronCopyStatus === "copied" ? <span className="text-emerald-300">Copied</span> : null}
+            {jumbotronCopyStatus === "failed" ? <span className="text-rose-300">Copy failed</span> : null}
           </div>
         </header>
 
