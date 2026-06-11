@@ -126,12 +126,19 @@ export async function POST(request: NextRequest) {
     if (imported >= limit) break;
     const sourceNote = `trivia-api:${q.id}`;
 
-    // Collection filter — skip questions not about anything we own
-    if (collectionTerms.size > 0) {
-      const haystack = [q.question.text, q.correctAnswer, ...q.incorrectAnswers].join(" ").toLowerCase();
-      const matches = [...collectionTerms].some((term) => haystack.includes(term));
-      if (!matches) { notInCollection++; continue; }
-    }
+    // Collection filter — only import questions whose subject is in the collection.
+    // Check question text + correct answer only (not wrong answers, which could be
+    // collection entities used as distractors for an unrelated question).
+    // Use whole-word matching so "america" (the band) doesn't match "american".
+    if (collectionTerms.size === 0) { notInCollection++; continue; }
+    const haystack = [q.question.text, q.correctAnswer].join(" ").toLowerCase();
+    const haystackWords = new Set(haystack.split(/\W+/).filter(Boolean));
+    const matches = [...collectionTerms].some((term) => {
+      const termWords = term.split(/\s+/);
+      if (termWords.length === 1) return haystackWords.has(term);
+      return haystack.includes(term);
+    });
+    if (!matches) { notInCollection++; continue; }
 
     // Dedup — skip if we already have this question
     const { data: existing } = await (db
