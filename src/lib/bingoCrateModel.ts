@@ -399,12 +399,8 @@ async function getSessionCode(
   return (data as SessionCodeRow | null)?.session_code ?? null;
 }
 
-function formatPlaylistName(sessionCode: string | null, sessionId: number, playlistLetter: string): string {
-  // Legacy rows stored single uppercase letters (A, B, C…) — map them to the animal name at the same index.
-  const displayName = /^[A-Z]$/.test(playlistLetter)
-    ? (PLAYLIST_NAMES[playlistLetter.charCodeAt(0) - 65] ?? playlistLetter)
-    : playlistLetter;
-  return `${sessionCode ?? sessionId} Playlist ${displayName}`;
+function formatPlaylistName(sessionCode: string | null, sessionId: number, roundNumber: number): string {
+  return `${sessionCode ?? sessionId} Round ${roundNumber}`;
 }
 
 /** Sync a single game playlist to collection_playlists and collection_playlist_items. */
@@ -530,7 +526,7 @@ export async function savePlaylistForRound(
 ): Promise<BingoSessionGamePlaylist> {
   const letter = await getNextPlaylistLetter(db, sessionId);
   const sessionCode = await getSessionCode(db, sessionId);
-  const playlistName = formatPlaylistName(sessionCode, sessionId, letter);
+  const playlistName = formatPlaylistName(sessionCode, sessionId, roundNumber);
 
   const data = await withPlaylistTableFallback<{
     id: number;
@@ -625,7 +621,7 @@ export async function getPlaylistsForSession(
 
   return (data ?? []).map((row) => ({
     ...row,
-    playlist_name: formatPlaylistName(sessionCode, sessionId, row.playlist_letter),
+    playlist_name: formatPlaylistName(sessionCode, sessionId, row.round_number),
     call_order: row.call_order as unknown as PlaylistCallEntry[],
   }));
 }
@@ -668,7 +664,7 @@ export async function getPlaylistByLetter(
   if (!data) return null;
   return {
     ...data,
-    playlist_name: formatPlaylistName(sessionCode, sessionId, data.playlist_letter),
+    playlist_name: formatPlaylistName(sessionCode, sessionId, data.round_number),
     call_order: data.call_order as unknown as PlaylistCallEntry[],
   };
 }
@@ -710,7 +706,7 @@ export async function getPlaylistsForRound(
 
   return (data ?? []).map((row) => ({
     ...row,
-    playlist_name: formatPlaylistName(sessionCode, sessionId, row.playlist_letter),
+    playlist_name: formatPlaylistName(sessionCode, sessionId, row.round_number),
     call_order: row.call_order as unknown as PlaylistCallEntry[],
   }));
 }
@@ -876,10 +872,12 @@ export function getActivePlaylistLetter(
 export async function deletePlaylistByLetter(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number,
-  playlistLetter: string
+  playlistLetter: string,
+  roundNumber?: number
 ): Promise<void> {
   const sessionCode = await getSessionCode(db, sessionId);
-  const playlistName = formatPlaylistName(sessionCode, sessionId, playlistLetter);
+  const roundNum = roundNumber ?? 1; // Default fallback for cleanup operations
+  const playlistName = formatPlaylistName(sessionCode, sessionId, roundNum);
 
   await withPlaylistTableFallback(async (tableName, _selectClause, letterColumn) => {
     const { error } = await getDynamicTableDb(db)

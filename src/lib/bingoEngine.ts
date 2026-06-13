@@ -263,13 +263,83 @@ export function buildRoundTrackPool(
   roundNumber: number,
   generation = 0
 ): ResolvedPlaylistTrack[] {
-  void roundNumber;
+
   const seed =
     generation > 0
       ? `session:${sessionId}:playlist-order:gen:${generation}:v1`
       : `session:${sessionId}:playlist-order:v1`;
   const ordered = stableRoundSort(tracks, seed, (track) => track.trackKey);
-  return enforceColumnLinks(ordered.slice(0, GAME_BALL_COUNT));
+  const sliced = ordered.slice(0, GAME_BALL_COUNT);
+  
+  // Apply cross-round position constraints if history is provided
+  if (positionHistory && positionHistory.size > 0) {
+    return applyPositionConstraints(sliced, positionHistory);
+  }
+  
+  return enforceColumnLinks(sliced);
+}
+
+function applyPositionConstraints(
+  tracks: ResolvedPlaylistTrack[],
+  positionHistory: Map<string, number[]>
+): ResolvedPlaylistTrack[] {
+  const result: ResolvedPlaylistTrack[] = [];
+  const available = [...tracks];
+  
+  for (let pos = 0; pos < GAME_BALL_COUNT; pos++) {
+    let selected: ResolvedPlaylistTrack | undefined;
+    
+    // Find a track that satisfies constraints for this position
+    for (let i = 0; i < available.length; i++) {
+      const track = available[i];
+      const previousPositions = positionHistory.get(track.trackKey) ?? [];
+      
+      if (canPlaceAtPosition(pos, previousPositions)) {
+        selected = track;
+        available.splice(i, 1);
+        break;
+      }
+    }
+    
+    // Fallback: if no constrained track found, take the first available
+    if (!selected) {
+      selected = available.shift();
+    }
+    
+    if (selected) {
+      result.push(selected);
+    }
+  }
+  
+  // Enforce column links on the constrained reordering
+  return enforceColumnLinks(result);
+}
+
+function canPlaceAtPosition(position: number, previousPositions: number[]): boolean {
+  // Rule A: No track at same position across rounds
+  if (previousPositions.includes(position)) {
+    return false;
+  }
+  
+  // Rule C: 5+ position separation from immediately previous round
+  if (previousPositions.length > 0) {
+    const lastPos = previousPositions[previousPositions.length - 1];
+    if (Math.abs(position - lastPos) < 5) {
+      return false;
+    }
+  }
+  
+  // Rule B: Thirds distribution - at most once per band per 3 rounds
+  const band = Math.floor(position / 25);
+  const bandsInHistory = previousPositions.map(pos => Math.floor(pos / 25));
+  const recentBands = bandsInHistory.slice(-3);
+  if (recentBands.filter(b => b === band).length >= 1) {
+    return false;
+  }
+  
+  return true;
+}
+
 }
 
 export function planRoundSessionCalls(
@@ -1191,7 +1261,8 @@ export async function generateCardRows(
           row,
           col,
           free: false,
-          column_letter: letter,
+          // Derive column_letter from ball_number for integrity (not from stored call.column_letter)
+          column_letter: source.ball_number !== null ? getColumnLetterForBallNumber(source.ball_number) : letter,
           call_id: source.id,
           track_title: source.track_title,
           artist_name: source.artist_name,

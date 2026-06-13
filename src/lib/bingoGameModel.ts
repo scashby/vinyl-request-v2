@@ -105,6 +105,18 @@ export async function createRoundTrackSnapshots(
   for (const [roundNumber, playlistIds] of Array.from(resolvedPlaylistsByRound.entries()).sort((left, right) => left[0] - right[0])) {
     const tracks = await resolvePlaylistTracksForPlaylists(db, playlistIds);
     const gameTracks = buildRoundTrackPool(tracks, sessionId, roundNumber);
+  const positionHistory = new Map<string, number[]>();
+
+  for (const [roundNumber, playlistIds] of Array.from(resolvedPlaylistsByRound.entries()).sort((left, right) => left[0] - right[0])) {
+    const tracks = await resolvePlaylistTracksForPlaylists(db, playlistIds);
+    const gameTracks = buildRoundTrackPool(tracks, sessionId, roundNumber, 0, positionHistory);
+    
+    // Update position history for next round
+    gameTracks.forEach((track, index) => {
+      const history = positionHistory.get(track.trackKey) ?? [];
+      history.push(index);
+      positionHistory.set(track.trackKey, history);
+    });
 
     gameTracks.forEach((track, index) => {
       rows.push({
@@ -152,6 +164,19 @@ export async function createRoundTrackSnapshotsFromTracks(
   const normalizedRoundCount = Math.max(1, Math.floor(roundCount || 1));
   for (let roundNumber = 1; roundNumber <= normalizedRoundCount; roundNumber += 1) {
     const gameTracks = buildRoundTrackPool(poolTracks, sessionId, roundNumber);
+      const positionHistory = new Map<string, number[]>();
+
+      const normalizedRoundCount = Math.max(1, Math.floor(roundCount || 1));
+      for (let roundNumber = 1; roundNumber <= normalizedRoundCount; roundNumber += 1) {
+        const gameTracks = buildRoundTrackPool(poolTracks, sessionId, roundNumber, 0, positionHistory);
+    
+        // Update position history for next round
+        gameTracks.forEach((track, index) => {
+          const history = positionHistory.get(track.trackKey) ?? [];
+          history.push(index);
+          positionHistory.set(track.trackKey, history);
+        });
+
     gameTracks.forEach((track, index) => {
       rows.push({
         session_id: sessionId,
@@ -573,7 +598,6 @@ export async function validateCardByIdentifier(
       }
     }
 
-    return cellTrackKey.length > 0 && calledTrackKeys.has(cellTrackKey);
   };
 
   const grid = coerceCardGrid((card as { grid?: unknown }).grid);
