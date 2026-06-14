@@ -261,8 +261,10 @@ export function buildRoundTrackPool(
   tracks: ResolvedPlaylistTrack[],
   sessionId: number,
   roundNumber: number,
-  generation = 0
+  generation = 0,
+  positionHistory?: Map<string, number[]>
 ): ResolvedPlaylistTrack[] {
+  void roundNumber;
 
   const seed =
     generation > 0
@@ -338,8 +340,6 @@ function canPlaceAtPosition(position: number, previousPositions: number[]): bool
   }
   
   return true;
-}
-
 }
 
 export function planRoundSessionCalls(
