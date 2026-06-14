@@ -107,7 +107,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       const tracks = snapshotTracks.length > 0
         ? snapshotTracks
         : await resolvePlaylistTracksForPlaylists(db, playlistIdsForRound);
-      const rows = planRoundSessionCalls(tracks, sessionId, requestedRound).map((call, index) => ({
+      const rows = planRoundSessionCalls(tracks, sessionId, requestedRound, 0, { preservePlacement: snapshotTracks.length > 0 }).map((call, index) => ({
         id: -(index + 1),
         session_id: sessionId,
         playlist_track_key: call.playlist_track_key,

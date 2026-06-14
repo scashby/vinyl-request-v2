@@ -497,13 +497,25 @@ export async function POST(request: NextRequest) {
         await createRoundTrackSnapshots(db, session.id, resolvedPlaylistsByRound);
       }
 
+      const drawOrderHistory = new Map<string, number[]>();
       for (let round = 1; round <= roundCount; round += 1) {
         const snapshotTracks = await getRoundSnapshotTracks(db, session.id, round);
         if (snapshotTracks.length === 0) {
           throw new Error(`Failed to build immutable game playlist for round ${round}.`);
         }
 
-        const plannedCalls = planRoundSessionCalls(snapshotTracks, session.id, round);
+        const plannedCalls = planRoundSessionCalls(snapshotTracks, session.id, round, 0, {
+          preservePlacement: true,
+          drawOrderHistory,
+        });
+
+        // Record each track's call_index for use when planning subsequent rounds.
+        for (const call of plannedCalls) {
+          const hist = drawOrderHistory.get(call.playlist_track_key) ?? [];
+          hist.push(call.call_index);
+          drawOrderHistory.set(call.playlist_track_key, hist);
+        }
+
         const createdPlaylist = await savePlaylistForRound(
           db,
           session.id,

@@ -90,7 +90,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
     const tracks = snapshotTracks.length > 0
       ? snapshotTracks
       : await resolvePlaylistTracksForPlaylists(db, resolveSessionPlaylistIds(typedSession));
-    plannedCalls = planRoundSessionCalls(tracks, sessionId, 1);
+    plannedCalls = planRoundSessionCalls(tracks, sessionId, 1, 0, { preservePlacement: snapshotTracks.length > 0 });
   }
 
   const { data: existingCalls, error: existingError } = await db

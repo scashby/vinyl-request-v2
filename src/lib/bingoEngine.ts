@@ -261,8 +261,7 @@ export function buildRoundTrackPool(
   tracks: ResolvedPlaylistTrack[],
   sessionId: number,
   roundNumber: number,
-  generation = 0,
-  positionHistory?: Map<string, number[]>
+  generation = 0
 ): ResolvedPlaylistTrack[] {
   void roundNumber;
 
@@ -272,84 +271,28 @@ export function buildRoundTrackPool(
       : `session:${sessionId}:playlist-order:v1`;
   const ordered = stableRoundSort(tracks, seed, (track) => track.trackKey);
   const sliced = ordered.slice(0, GAME_BALL_COUNT);
-  
-  // Apply cross-round position constraints if history is provided
-  if (positionHistory && positionHistory.size > 0) {
-    return applyPositionConstraints(sliced, positionHistory);
-  }
-  
+
   return enforceColumnLinks(sliced);
-}
-
-function applyPositionConstraints(
-  tracks: ResolvedPlaylistTrack[],
-  positionHistory: Map<string, number[]>
-): ResolvedPlaylistTrack[] {
-  const result: ResolvedPlaylistTrack[] = [];
-  const available = [...tracks];
-  
-  for (let pos = 0; pos < GAME_BALL_COUNT; pos++) {
-    let selected: ResolvedPlaylistTrack | undefined;
-    
-    // Find a track that satisfies constraints for this position
-    for (let i = 0; i < available.length; i++) {
-      const track = available[i];
-      const previousPositions = positionHistory.get(track.trackKey) ?? [];
-      
-      if (canPlaceAtPosition(pos, previousPositions)) {
-        selected = track;
-        available.splice(i, 1);
-        break;
-      }
-    }
-    
-    // Fallback: if no constrained track found, take the first available
-    if (!selected) {
-      selected = available.shift();
-    }
-    
-    if (selected) {
-      result.push(selected);
-    }
-  }
-  
-  // Enforce column links on the constrained reordering
-  return enforceColumnLinks(result);
-}
-
-function canPlaceAtPosition(position: number, previousPositions: number[]): boolean {
-  // Rule A: No track at same position across rounds
-  if (previousPositions.includes(position)) {
-    return false;
-  }
-  
-  // Rule C: 5+ position separation from immediately previous round
-  if (previousPositions.length > 0) {
-    const lastPos = previousPositions[previousPositions.length - 1];
-    if (Math.abs(position - lastPos) < 5) {
-      return false;
-    }
-  }
-  
-  // Rule B: Thirds distribution - at most once per band per 3 rounds
-  const band = Math.floor(position / 25);
-  const bandsInHistory = previousPositions.map(pos => Math.floor(pos / 25));
-  const recentBands = bandsInHistory.slice(-3);
-  if (recentBands.filter(b => b === band).length >= 1) {
-    return false;
-  }
-  
-  return true;
 }
 
 export function planRoundSessionCalls(
   tracks: ResolvedPlaylistTrack[],
   sessionId: number,
   roundNumber: number,
-  generation = 0
+  generation = 0,
+  options?: {
+    preservePlacement?: boolean;
+    // trackKey → list of call_index positions used in prior rounds (1-based). Used to enforce
+    // cross-round draw-order constraints so the same track doesn't always get called early/late.
+    drawOrderHistory?: Map<string, number[]>;
+  }
 ): PlannedSessionCall[] {
   const normalizedRound = Math.max(1, Math.floor(roundNumber || 1));
-  const roundTracks = buildRoundTrackPool(tracks, sessionId, normalizedRound, generation);
+  const roundTracks = options?.preservePlacement
+    ? [...tracks]
+      .sort((left, right) => (left.sortOrder ?? Number.MAX_SAFE_INTEGER) - (right.sortOrder ?? Number.MAX_SAFE_INTEGER))
+      .slice(0, GAME_BALL_COUNT)
+    : buildRoundTrackPool(tracks, sessionId, normalizedRound, generation);
 
   if (roundTracks.length < GAME_BALL_COUNT) {
     throw new Error(`Playlist must contain at least ${GAME_BALL_COUNT} tracks to build a bingo crate.`);
@@ -368,13 +311,24 @@ export function planRoundSessionCalls(
     generation > 0
       ? `session:${sessionId}:round:${normalizedRound}:gen:${generation}:draw-order:v1`
       : `session:${sessionId}:round:${normalizedRound}:draw-order:v1`;
-  const drawOrder = stableRoundSort(
+  const baseDrawOrder = stableRoundSort(
     boardSlots,
     drawSeed,
     (slot) => `${slot.track.trackKey}:${slot.ballNumber}`
   );
 
-  return drawOrder.map((entry, drawIndex) => ({
+  // Apply cross-round draw-order constraints when history is provided.
+  // Rules (applied to call_index 1-75):
+  //   A) A track may not occupy the same call position it held in any prior round.
+  //   B) Thirds: positions 1-25, 26-50, 51-75 count as bands. A track may appear in each
+  //      band at most once per three rounds (so repeating a band requires a 4th round).
+  //   C) Minimum 5-position separation from its immediately preceding round's call position.
+  const history = options?.drawOrderHistory;
+  const orderedSlots = history && history.size > 0
+    ? applyDrawOrderConstraints(baseDrawOrder, history)
+    : baseDrawOrder;
+
+  return orderedSlots.map((entry, drawIndex) => ({
     playlist_track_key: entry.track.trackKey,
     call_index: drawIndex + 1,
     ball_number: entry.ballNumber,
@@ -387,6 +341,63 @@ export function planRoundSessionCalls(
     link_group: entry.track.linkGroup ?? null,
     theme_hint: entry.track.themeHint ?? null,
   }));
+}
+
+type DrawSlot = { ballNumber: number; columnLetter: BingoColumn; track: ResolvedPlaylistTrack };
+
+function applyDrawOrderConstraints(
+  slots: DrawSlot[],
+  history: Map<string, number[]>
+): DrawSlot[] {
+  // Work with 0-based position indices internally; call_index = position + 1.
+  const result: Array<DrawSlot | null> = new Array(slots.length).fill(null);
+  const unplaced = [...slots];
+
+  // Score a candidate slot at a given 0-based position: 0 = all constraints satisfied,
+  // higher = more violations. We prefer 0; fall back to lowest score when nothing is perfect.
+  function violationScore(slot: DrawSlot, position: number): number {
+    const prevPositions = history.get(slot.track.trackKey) ?? [];
+    if (prevPositions.length === 0) return 0;
+
+    const callPos = position + 1; // 1-based
+    let score = 0;
+
+    // Rule A: same position as any prior round
+    if (prevPositions.includes(callPos)) score += 100;
+
+    // Rule C: within 5 of immediately preceding round
+    const lastPos = prevPositions[prevPositions.length - 1];
+    if (Math.abs(callPos - lastPos) < 5) score += 50;
+
+    // Rule B: thirds band
+    const band = Math.floor((callPos - 1) / 25); // 0, 1, 2
+    const recentBands = prevPositions.slice(-3).map(p => Math.floor((p - 1) / 25));
+    const bandCount = recentBands.filter(b => b === band).length;
+    if (bandCount >= 1) score += 30;
+
+    return score;
+  }
+
+  for (let pos = 0; pos < slots.length; pos++) {
+    if (unplaced.length === 0) break;
+
+    // Find the unplaced slot with the lowest violation score for this position.
+    let bestIndex = 0;
+    let bestScore = violationScore(unplaced[0], pos);
+
+    for (let i = 1; i < unplaced.length; i++) {
+      const s = violationScore(unplaced[i], pos);
+      if (s < bestScore) {
+        bestScore = s;
+        bestIndex = i;
+        if (s === 0) break; // perfect — no need to keep scanning
+      }
+    }
+
+    result[pos] = unplaced.splice(bestIndex, 1)[0];
+  }
+
+  return result.filter((s): s is DrawSlot => s !== null);
 }
 
 function canonicalizeFormatFacet(value: string): string | null {

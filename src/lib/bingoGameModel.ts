@@ -102,16 +102,11 @@ export async function createRoundTrackSnapshots(
     theme_hint: string | null;
   }> = [];
 
-  const positionHistory = new Map<string, number[]>();
   for (const [roundNumber, playlistIds] of Array.from(resolvedPlaylistsByRound.entries()).sort((left, right) => left[0] - right[0])) {
     const tracks = await resolvePlaylistTracksForPlaylists(db, playlistIds);
-    const gameTracks = buildRoundTrackPool(tracks, sessionId, roundNumber, 0, positionHistory);
+    const gameTracks = buildRoundTrackPool(tracks, sessionId, roundNumber);
 
     gameTracks.forEach((track, index) => {
-      const history = positionHistory.get(track.trackKey) ?? [];
-      history.push(index);
-      positionHistory.set(track.trackKey, history);
-
       rows.push({
         session_id: sessionId,
         round_number: roundNumber,
@@ -154,16 +149,11 @@ export async function createRoundTrackSnapshotsFromTracks(
     theme_hint: string | null;
   }> = [];
 
-  const positionHistory = new Map<string, number[]>();
   const normalizedRoundCount = Math.max(1, Math.floor(roundCount || 1));
   for (let roundNumber = 1; roundNumber <= normalizedRoundCount; roundNumber += 1) {
-    const gameTracks = buildRoundTrackPool(poolTracks, sessionId, roundNumber, 0, positionHistory);
+    const gameTracks = buildRoundTrackPool(poolTracks, sessionId, roundNumber);
 
     gameTracks.forEach((track, index) => {
-      const history = positionHistory.get(track.trackKey) ?? [];
-      history.push(index);
-      positionHistory.set(track.trackKey, history);
-
       rows.push({
         session_id: sessionId,
         round_number: roundNumber,
@@ -515,6 +505,19 @@ export async function validateCardByIdentifier(
     }
   }
 
+  if (!card) {
+    const { data: fallbackCards, error: fallbackError } = await db
+      .from("bingo_cards")
+      .select("session_id, card_identifier, grid")
+      .eq("card_identifier", cardIdentifier)
+      .limit(1);
+
+    if (fallbackError) throw new Error(fallbackError.message);
+    if (Array.isArray(fallbackCards) && fallbackCards.length > 0) {
+      card = fallbackCards[0] as { session_id: number; card_identifier: string; grid: unknown };
+    }
+  }
+
   if (!card) throw new Error("Card not found for this session.");
 
   const round = roundOverride && Number.isFinite(roundOverride)
@@ -585,7 +588,6 @@ export async function validateCardByIdentifier(
     }
 
     return cellTrackKey.length > 0 && calledTrackKeys.has(cellTrackKey);
-
   };
 
   const grid = coerceCardGrid((card as { grid?: unknown }).grid);

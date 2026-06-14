@@ -3,20 +3,13 @@
  *
  * Helpers for managing immutable game playlists (call orders) attached to bingo sessions.
  * Each game playlist captures the generated call order at a point in time and is named with a
- * sequential letter (A, B, C…) scoped to the session so hosts can identify them easily.
+ * stable round label while retaining internal letter ids (A, B, C…) per session.
  */
 
 import { getBingoDb } from "./bingoDb";
 import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "./bingoEngine";
 import { getRoundSnapshotTracks } from "./bingoGameModel";
 import { resolveRoundPlaylistIds, type RoundPlaylistEntry } from "./bingoRoundPlaylists";
-
-const PLAYLIST_NAMES = [
-  "Fox", "Owl", "Bear", "Wolf", "Hawk", "Elk", "Crow", "Deer", "Seal", "Wren",
-  "Crane", "Heron", "Stork", "Robin", "Swift", "Falcon", "Eagle", "Dove", "Otter", "Whale",
-  "Beaver", "Badger", "Moose", "Bison", "Cobra", "Gecko", "Quail", "Panda", "Koala", "Sloth",
-  "Lemur", "Okapi", "Narwhal", "Viper", "Lynx", "Mink", "Ibis", "Tapir", "Dingo", "Finch",
-];
 
 const GAME_PLAYLISTS_TABLE = "bingo_session_game_playlists";
 const LEGACY_CRATES_TABLE = "bingo_session_crates";
@@ -283,7 +276,7 @@ async function deriveRoundCallOrder(
 ): Promise<PlaylistCallEntry[]> {
   const snapshotTracks = await getRoundSnapshotTracks(db, sessionId, roundNumber);
   if (snapshotTracks.length > 0) {
-    const planned = planRoundSessionCalls(snapshotTracks, sessionId, roundNumber, generation);
+    const planned = planRoundSessionCalls(snapshotTracks, sessionId, roundNumber, generation, { preservePlacement: true });
     return planned.map((row, index) => ({
       id: -(index + 1),
       call_index: row.call_index,
@@ -872,12 +865,27 @@ export function getActivePlaylistLetter(
 export async function deletePlaylistByLetter(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number,
-  playlistLetter: string,
-  roundNumber?: number
+  playlistLetter: string
 ): Promise<void> {
   const sessionCode = await getSessionCode(db, sessionId);
-  const roundNum = roundNumber ?? 1; // Default fallback for cleanup operations
-  const playlistName = formatPlaylistName(sessionCode, sessionId, roundNum);
+  const playlistRow = await withPlaylistTableFallback<{
+    round_number: number;
+    playlist_name: string;
+  } | null>(async (tableName, selectClause, letterColumn) => {
+    const { data, error } = await getDynamicTableDb(db)
+      .from(tableName)
+      .select(selectClause)
+      .eq("session_id", sessionId)
+      .eq(letterColumn, playlistLetter)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    return (data as { round_number: number; playlist_name: string } | null) ?? null;
+  });
+
+  const playlistName = playlistRow
+    ? formatPlaylistName(sessionCode, sessionId, playlistRow.round_number)
+    : `${sessionCode ?? sessionId} Playlist ${playlistLetter}`;
 
   await withPlaylistTableFallback(async (tableName, _selectClause, letterColumn) => {
     const { error } = await getDynamicTableDb(db)
