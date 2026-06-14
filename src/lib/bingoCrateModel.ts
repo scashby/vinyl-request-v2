@@ -17,6 +17,13 @@ const ACTIVE_PLAYLIST_FIELD = "active_playlist_letter_by_round";
 const ACTIVE_CRATE_FIELD = "active_crate_letter_by_round";
 const GAME_PLAYLIST_SELECT = "id, session_id, round_number, playlist_name, playlist_letter, call_order, created_at";
 const LEGACY_CRATE_SELECT = "id, session_id, round_number, playlist_name:crate_name, playlist_letter:crate_letter, call_order, created_at";
+const PLAYLIST_NAMES = [
+  "Fox", "Owl", "Bear", "Wolf", "Hawk", "Elk", "Crow", "Deer", "Seal", "Wren",
+  "Crane", "Heron", "Stork", "Robin", "Swift", "Falcon", "Eagle", "Dove", "Otter", "Whale",
+  "Beaver", "Badger", "Moose", "Bison", "Cobra", "Gecko", "Quail", "Panda", "Koala", "Sloth",
+  "Lemur", "Okapi", "Narwhal", "Viper", "Lynx", "Mink", "Ibis", "Tapir", "Dingo", "Finch",
+];
+
 const PLAYLIST_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 type SessionActivePlaylistEntry = {
