@@ -142,6 +142,29 @@ export async function POST(req: Request) {
       missingDataOnly = false
     } = body;
 
+    const requestedServices =
+      services && typeof services === 'object'
+        ? (services as Record<string, boolean>)
+        : {};
+    const requestedLimit =
+      typeof limit === 'number' && Number.isFinite(limit) && limit > 0
+        ? limit
+        : 10;
+    const usesQueuedSources = Boolean(requestedServices.spotify || requestedServices.discogs);
+    const usesSlowNarrativeSources = Boolean(
+      requestedServices.appleMusicEnhanced ||
+      requestedServices.wikipedia ||
+      requestedServices.wikidata ||
+      requestedServices.pitchfork
+    );
+    const effectiveLimit = albumIds && albumIds.length > 0
+      ? requestedLimit
+      : usesQueuedSources
+        ? Math.min(requestedLimit, 10)
+        : usesSlowNarrativeSources
+          ? Math.min(requestedLimit, 15)
+          : requestedLimit;
+
     // Preflight: fail fast when selected fields depend on services that are definitely unavailable.
     const selectedFields = Array.isArray(fields)
       ? fields.filter((value): value is string => typeof value === 'string' && value.length > 0)
@@ -290,7 +313,8 @@ export async function POST(req: Request) {
           format_details,
           qty,${masterSelect}${releaseTrackSelect}
         )
-      `) as any;
+      // Dynamic select strings trip Supabase parser typing here; keep the builder flexible.
+      `) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
     if (albumIds && albumIds.length > 0) {
       const { data, error } = await baseQuery.in('id', albumIds);
@@ -300,7 +324,7 @@ export async function POST(req: Request) {
       let query = baseQuery
         .gt('id', cursor)
         .order('id', { ascending: true })
-        .limit(limit);
+        .limit(effectiveLimit);
 
       if (location) query = query.eq('discogs_folder_name', location);
       if (typeof maxId === 'number' && Number.isFinite(maxId) && maxId > 0) {

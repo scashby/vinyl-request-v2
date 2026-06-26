@@ -728,6 +728,22 @@ const isTransientNetworkError = (error: unknown): boolean => {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const parseRetryAfterMs = (value: string | null): number | null => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const seconds = Number.parseInt(trimmed, 10);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return seconds * 1000;
+  }
+
+  const absoluteTs = Date.parse(trimmed);
+  if (Number.isNaN(absoluteTs)) return null;
+
+  return Math.max(absoluteTs - Date.now(), 0);
+};
+
 const fetchWithRetry = async (
   input: RequestInfo | URL,
   init?: RequestInit,
@@ -743,6 +759,10 @@ const fetchWithRetry = async (
       if (response.ok || !RETRYABLE_HTTP_STATUSES.has(response.status) || attempt === retries) {
         return response;
       }
+
+      const retryAfterMs = parseRetryAfterMs(response.headers.get('Retry-After'));
+      await sleep(retryAfterMs ?? baseDelayMs * (attempt + 1));
+      continue;
     } catch (error) {
       lastError = error;
       if (!isTransientNetworkError(error) || attempt === retries) {
@@ -1643,9 +1663,19 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
             
             const res = await fetchWithRetry(`${endpoint}?page=${page}`, undefined, {
               retries: 3,
-              baseDelayMs: 700,
+              baseDelayMs: 1200,
             });
-            if (!res.ok) throw new Error('Failed to fetch from Discogs API');
+            if (!res.ok) {
+              const retryAfterMs = parseRetryAfterMs(res.headers.get('Retry-After'));
+              if (res.status === 429 && retryAfterMs) {
+                setProgress({
+                  current: allFetchedItems.length,
+                  total: reportedCount ?? 0,
+                  status: `Discogs rate limit hit. Waiting ${Math.ceil(retryAfterMs / 1000)}s before retrying...`
+                });
+              }
+              throw new Error('Failed to fetch from Discogs API');
+            }
             
             const data: DiscogsCollectionResponse | DiscogsWantlistResponse = await res.json();
             if (typeof data.pagination?.items === 'number' && Number.isFinite(data.pagination.items)) {
@@ -1745,6 +1775,9 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 hasMore = false;
             } else {
                 page++;
+              if (sourceType === 'collection') {
+                await sleep(1100);
+              }
             }
         }
 

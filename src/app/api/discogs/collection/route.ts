@@ -35,8 +35,15 @@ export async function GET(req: Request) {
     });
 
     if (!response.ok) {
-        // Return the actual error from Discogs (e.g. 429 Rate Limit) instead of crashing with 500
-        return NextResponse.json({ error: response.statusText }, { status: response.status });
+        // Return the actual error from Discogs (e.g. 429 Rate Limit) instead of crashing with 500.
+        const retryAfter = response.headers.get('Retry-After');
+        return NextResponse.json(
+          { error: response.statusText },
+          {
+            status: response.status,
+            headers: retryAfter ? { 'Retry-After': retryAfter } : undefined,
+          }
+        );
     }
 
     const data = await response.json();

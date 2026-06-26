@@ -8,8 +8,8 @@ export async function POST() {
   const db = getBingoDb();
 
   try {
-    await syncCollectionPlaylistMirrorsForAllSessions(db);
-    return NextResponse.json({ ok: true }, { status: 200 });
+    const summary = await syncCollectionPlaylistMirrorsForAllSessions(db);
+    return NextResponse.json({ ok: true, ...summary }, { status: 200 });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to sync Bingo game playlists into collection crates" },

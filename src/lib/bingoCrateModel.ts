@@ -510,11 +510,31 @@ export async function syncCollectionPlaylistMirrorsForSession(
 /** Sync all game playlists across all sessions to their collection mirrors. */
 export async function syncCollectionPlaylistMirrorsForAllSessions(
   db: ReturnType<typeof getBingoDb>
-): Promise<void> {
-  const { data: sessions } = await db.from("bingo_sessions").select("id");
+): Promise<{ syncedSessionCount: number; failedSessionCount: number; failures: Array<{ sessionId: number; error: string }> }> {
+  const { data: sessions, error } = await db.from("bingo_sessions").select("id");
+  if (error) throw new Error(error.message);
+
+  let syncedSessionCount = 0;
+  const failures: Array<{ sessionId: number; error: string }> = [];
+
   for (const session of sessions ?? []) {
-    await syncCollectionPlaylistMirrorsForSession(db, (session as { id: number }).id);
+    const sessionId = (session as { id: number }).id;
+    try {
+      await syncCollectionPlaylistMirrorsForSession(db, sessionId);
+      syncedSessionCount += 1;
+    } catch (syncError) {
+      failures.push({
+        sessionId,
+        error: syncError instanceof Error ? syncError.message : 'Unknown sync error',
+      });
+    }
   }
+
+  return {
+    syncedSessionCount,
+    failedSessionCount: failures.length,
+    failures,
+  };
 }
 
 /**
