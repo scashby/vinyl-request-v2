@@ -1574,7 +1574,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const row = diagByFieldSource.get(`${field}::${source}`);
         if (!row) {
           outcomeCodes.push(`${source}:source_not_called`);
-          return `${source}=not called`;
+          return `${source}=no source call`;
         }
         outcomeCodes.push(`${source}:${row.outcome_code}`);
         if (row.outcome_code === 'source_not_called') return `${source}=not called`;
@@ -1590,12 +1590,12 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const diagSource = toDiagnosticsSourceKey(source);
         const sourcePayload = (candidates[diagSource] ?? candidates[source]) as Record<string, unknown> | undefined;
         const hits = candidateKeys.filter((key) => returnedKeys.includes(key));
-        if (row.outcome_code === 'returned_other_fields' || hits.length === 0) return `${source}=returned other fields`;
+        if (row.outcome_code === 'returned_other_fields' || hits.length === 0) return `${source}=no matching field data`;
         hasAnyFieldValue = true;
         const valueDetails = hits
           .map((key) => `${key}:${summarizeLogValue(sourcePayload?.[key])}`)
           .join(', ');
-        return `${source}=returned ${valueDetails}`;
+        return `${source}=source data returned ${valueDetails}`;
       });
 
       addLog(albumLabel, 'info', `${field.replace(/_/g, ' ')} -> ${sourceDetails.join(' | ')}`);
@@ -1603,7 +1603,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         addLog(
           albumLabel,
           'skipped',
-          `NOT ENRICHED anywhere for ${field.replace(/_/g, ' ')} [codes: ${outcomeCodes.join(' | ')}]`
+          `No source data found for ${field.replace(/_/g, ' ')} [codes: ${outcomeCodes.join(' | ')}]`
         );
       }
     });
@@ -2185,7 +2185,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             .join(', ');
             
          if (summary) {
-             addLog(formatAlbumLogLabel(album), 'info', `Found: ${summary}`);
+           addLog(formatAlbumLogLabel(album), 'info', `Source data returned for: ${summary} (candidate values; apply step follows)`);
          }
       }
 
@@ -2193,7 +2193,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         addLog(
           formatAlbumLogLabel(album),
           'skipped',
-          `No enrichable data returned from selected sources (${checkedSources.join(', ') || 'none'}) for selected fields (${selectedFields.join(', ') || 'none'}).`
+          `No source data found from selected sources (${checkedSources.join(', ') || 'none'}) for selected fields (${selectedFields.join(', ') || 'none'}).`
         );
         pendingAuditRows.push({
           run_id: runId,
@@ -2578,6 +2578,14 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         .filter(c => c.album_id === album.id)
         .map(c => c.field_name);
 
+      if (allowedSummaryKeys.length > 0 && Object.keys(updatesForAlbum).length === 0 && conflictFieldsForAlbum.length === 0) {
+        addLog(
+          formatAlbumLogLabel(album),
+          'info',
+          'No new data applied (returned values matched existing data or were empty after normalization).'
+        );
+      }
+
       pendingAuditRows.push({
         run_id: runId,
         album_id: album.id,
@@ -2634,6 +2642,34 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const albumId = autoUpdates[index].album.id;
         if (res.status === 'fulfilled') {
           appliedUpdatesByAlbumId.add(albumId);
+          const appliedFields = Object.keys(autoUpdates[index].fields).filter((field) => field !== 'last_reviewed_at');
+          if (appliedFields.length > 0) {
+            const appendedFields = appliedFields.filter((field) => {
+              const value = autoUpdates[index].fields[field];
+              return Array.isArray(value) || (typeof value === 'object' && value !== null);
+            });
+            const addedFields = appliedFields.filter((field) => !appendedFields.includes(field));
+
+            const actionParts: string[] = [];
+            if (addedFields.length > 0) {
+              actionParts.push(`Added: ${addedFields.map((field) => field.replace(/_/g, ' ')).join(', ')}`);
+            }
+            if (appendedFields.length > 0) {
+              actionParts.push(`Appended/Merged: ${appendedFields.map((field) => field.replace(/_/g, ' ')).join(', ')}`);
+            }
+
+            addLog(
+              formatAlbumLogLabel(autoUpdates[index].album),
+              'auto-fill',
+              actionParts.join(' | ')
+            );
+          } else {
+            addLog(
+              formatAlbumLogLabel(autoUpdates[index].album),
+              'info',
+              'No new data applied (review timestamp only).'
+            );
+          }
         } else {
           failedAutoApplyAlbumIds.add(albumId);
           if (isSupabaseOutageError(res.reason)) {

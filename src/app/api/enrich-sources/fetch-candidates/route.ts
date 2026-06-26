@@ -68,8 +68,8 @@ export async function POST(req: Request) {
       wikipedia: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_WIKIPEDIA_MS, 25000),
       musicbrainz: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_MUSICBRAINZ_MS, 25000),
       discogs: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_DISCOGS_MS, 25000),
-      spotify: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_SPOTIFY_MS, 25000),
-      appleMusic: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_APPLEMUSIC_MS, 25000),
+      spotify: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_SPOTIFY_MS, 12000),
+      appleMusic: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_APPLEMUSIC_MS, 20000),
       lastfm: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_LASTFM_MS, 25000),
       genius: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_GENIUS_MS, 25000),
       secondhandsongs: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_SECONDHANDSONGS_MS, 25000),
@@ -160,7 +160,7 @@ export async function POST(req: Request) {
     const effectiveLimit = albumIds && albumIds.length > 0
       ? requestedLimit
       : usesQueuedSources
-        ? Math.min(requestedLimit, 5)
+        ? Math.min(requestedLimit, 2)
         : usesSlowNarrativeSources
           ? Math.min(requestedLimit, 15)
           : requestedLimit;

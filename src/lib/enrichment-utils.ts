@@ -1190,6 +1190,46 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
 // ============================================================================
 const AM_TOKEN = getEnv('APPLE_MUSIC_TOKEN');
 
+async function amFetchJson(
+  url: string,
+  maxAttempts = 3
+): Promise<{ ok: true; data: any } | { ok: false; status: number; text: string; data: any | null }> {
+  let lastStatus = 0;
+  let lastText = '';
+  let lastData: any | null = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${AM_TOKEN}` }
+    });
+    const { json, text } = await readJsonResponse(res);
+
+    if (res.ok) {
+      return { ok: true, data: json };
+    }
+
+    lastStatus = res.status;
+    lastText = text;
+    lastData = json;
+
+    if (res.status === 429 && attempt < maxAttempts) {
+      const retryAfterRaw = Number(res.headers.get('retry-after') ?? '1');
+      const retryAfterSec = Number.isFinite(retryAfterRaw) && retryAfterRaw > 0 ? retryAfterRaw : 1;
+      await sleep(Math.min(retryAfterSec, 20) * 1000);
+      continue;
+    }
+
+    if (res.status >= 500 && attempt < maxAttempts) {
+      await sleep(500 * attempt);
+      continue;
+    }
+
+    break;
+  }
+
+  return { ok: false, status: lastStatus, text: lastText, data: lastData };
+}
+
 export async function fetchAppleMusicData(album: { artist: string, title: string, apple_music_id?: string }): Promise<EnrichmentResult> {
   try {
     if (!AM_TOKEN) return { success: false, source: 'appleMusic', error: 'No Token' };
@@ -1198,20 +1238,30 @@ export async function fetchAppleMusicData(album: { artist: string, title: string
     let amId = album.apple_music_id;
     if (!amId) {
         const q = `${searchArtist} ${album.title}`;
-        const searchRes = await fetch(`https://api.music.apple.com/v1/catalog/us/search?term=${encodeURIComponent(q)}&types=albums&limit=1`, {
-            headers: { 'Authorization': `Bearer ${AM_TOKEN}` }
-        });
-        const searchData = await searchRes.json();
-        amId = searchData.results?.albums?.data?.[0]?.id;
+        const searchResult = await amFetchJson(
+          `https://api.music.apple.com/v1/catalog/us/search?term=${encodeURIComponent(q)}&types=albums&limit=1`
+        );
+        if (!searchResult.ok) {
+          const failed = searchResult as { ok: false; status: number; text: string; data: any | null };
+          throw new Error(`Apple Music search failed (${failed.status}): ${failed.text.slice(0, 120).replace(/\s+/g, ' ')}`);
+        }
+        amId = searchResult.data?.results?.albums?.data?.[0]?.id;
     }
 
     if (!amId) return { success: false, source: 'appleMusic', error: 'Not found' };
 
     // UPDATED: Added ?include=tracks,editorial-notes
-    const albumRes = await fetch(`https://api.music.apple.com/v1/catalog/us/albums/${amId}?include=tracks,editorial-notes`, {
-        headers: { 'Authorization': `Bearer ${AM_TOKEN}` }
-    });
-    const data = await albumRes.json();
+    const albumResult = await amFetchJson(
+      `https://api.music.apple.com/v1/catalog/us/albums/${amId}?include=tracks,editorial-notes`
+    );
+    if (!albumResult.ok) {
+      const failed = albumResult as { ok: false; status: number; text: string; data: any | null };
+      throw new Error(`Apple Music album lookup failed (${failed.status}): ${failed.text.slice(0, 120).replace(/\s+/g, ' ')}`);
+    }
+    const data = albumResult.data;
+    if (!data?.data?.[0]) {
+      return { success: false, source: 'appleMusic', error: 'Not found' };
+    }
     const attrs = data.data?.[0]?.attributes;
 
     const editorialNotes = attrs?.editorialNotes?.standard || attrs?.editorialNotes?.short;
