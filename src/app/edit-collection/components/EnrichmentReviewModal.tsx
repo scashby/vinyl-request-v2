@@ -19,7 +19,7 @@ interface EnrichmentReviewModalProps {
     resolutions: Record<string, { value: unknown, source: string, selectedSources?: string[] }>,
     finalizedFields: Record<string, boolean>,
     albumId: number
-  ) => void;
+  ) => void | Promise<void>;
   onSkip: (albumId: number, mode?: 'snooze' | 'ignore', note?: string) => void;
   onCancel: () => void;
 }
@@ -508,6 +508,7 @@ export default function EnrichmentReviewModal({
 
   const [resolutions, setResolutions] = useState<Record<string, { value: unknown, source: string, selectedSources?: string[] }>>({});
   const [finalizedFields, setFinalizedFields] = useState<Record<string, boolean>>({});
+  const [isApplyingQueueUseAllNew, setIsApplyingQueueUseAllNew] = useState(false);
 
   useEffect(() => {
     if (!currentAlbumId) return;
@@ -671,8 +672,8 @@ export default function EnrichmentReviewModal({
       setFinalizedFields(prev => ({ ...prev, [key]: val }));
   }, []);
 
-  const handleSelectAllNew = useCallback(() => {
-    const newResolutions: Record<string, { value: unknown, source: string, selectedSources?: string[] }> = {};
+  const buildAllNewSelectionForConflicts = useCallback((albumConflicts: ExtendedFieldConflict[]) => {
+    const nextResolutions: Record<string, { value: unknown, source: string, selectedSources?: string[] }> = {};
     const mergeableArrayFields = new Set([
       'genres', 'styles', 'musicians', 'credits', 'producers', 'engineers', 'tags',
       'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url',
@@ -689,7 +690,7 @@ export default function EnrichmentReviewModal({
         .filter(Boolean);
     };
 
-    currentConflicts.forEach(c => {
+    albumConflicts.forEach(c => {
       const key = `${c.album_id}-${c.field_name}`;
       const defaultSource = c.source || 'enrichment';
 
@@ -712,7 +713,7 @@ export default function EnrichmentReviewModal({
           selectedSources.add(defaultSource);
         }
 
-        newResolutions[key] = {
+        nextResolutions[key] = {
           value: Array.from(merged),
           source: 'custom_merge',
           selectedSources: Array.from(selectedSources)
@@ -720,14 +721,36 @@ export default function EnrichmentReviewModal({
         return;
       }
 
-      newResolutions[key] = {
+      nextResolutions[key] = {
         value: c.new_value,
         source: defaultSource,
         selectedSources: [defaultSource]
       };
     });
-    setResolutions(newResolutions);
-  }, [currentConflicts]);
+
+    return nextResolutions;
+  }, []);
+
+  const buildFinalizeStaticForConflicts = useCallback((albumConflicts: ExtendedFieldConflict[]) => {
+    const NON_STATIC_FIELDS = new Set([
+      'genres', 'styles', 'musicians', 'credits', 'producers', 'tags',
+      'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url',
+      'label', 'labels', 'engineers', 'writers', 'mixers', 'composer',
+      'lyricist', 'arranger', 'songwriters', 'tracks',
+      'awards', 'certifications', 'enriched_metadata'
+    ]);
+    const nextFinalized: Record<string, boolean> = {};
+    albumConflicts.forEach(c => {
+      if (!NON_STATIC_FIELDS.has(c.field_name)) {
+        nextFinalized[`${c.album_id}-${c.field_name}`] = true;
+      }
+    });
+    return nextFinalized;
+  }, []);
+
+  const handleSelectAllNew = useCallback(() => {
+    setResolutions(buildAllNewSelectionForConflicts(currentConflicts));
+  }, [buildAllNewSelectionForConflicts, currentConflicts]);
 
   const handleSelectAllCurrent = useCallback(() => {
     const newResolutions: Record<string, { value: unknown, source: string, selectedSources?: string[] }> = {};
@@ -739,22 +762,34 @@ export default function EnrichmentReviewModal({
   }, [currentConflicts]);
 
   const handleFinalizeStatic = useCallback(() => {
-    const NON_STATIC_FIELDS = [
-      'genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 
-      'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url', 
-      'label', 'labels', 'engineers', 'writers', 'mixers', 'composer', 
-      'lyricist', 'arranger', 'songwriters', 'tracks', 
-      'awards', 'certifications', 'enriched_metadata'
-    ];
+    setFinalizedFields(prev => ({
+      ...prev,
+      ...buildFinalizeStaticForConflicts(currentConflicts),
+    }));
+  }, [buildFinalizeStaticForConflicts, currentConflicts]);
 
-    const newFinalized = { ...finalizedFields };
-    currentConflicts.forEach(c => {
-      if (!NON_STATIC_FIELDS.includes(c.field_name)) {
-         newFinalized[`${c.album_id}-${c.field_name}`] = true;
+  const handleUseAllNewForQueue = useCallback(async () => {
+    if (isApplyingQueueUseAllNew || conflicts.length === 0) return;
+    setIsApplyingQueueUseAllNew(true);
+    try {
+      const albumIdsInQueue = Array.from(new Set(conflicts.map(c => c.album_id)));
+      for (const albumId of albumIdsInQueue) {
+        const albumConflicts = conflicts.filter(c => c.album_id === albumId);
+        if (albumConflicts.length === 0) continue;
+        const queueResolutions = buildAllNewSelectionForConflicts(albumConflicts);
+        const queueFinalized = buildFinalizeStaticForConflicts(albumConflicts);
+        await onSave(queueResolutions, queueFinalized, albumId);
       }
-    });
-    setFinalizedFields(newFinalized);
-  }, [currentConflicts, finalizedFields]);
+    } finally {
+      setIsApplyingQueueUseAllNew(false);
+    }
+  }, [
+    buildAllNewSelectionForConflicts,
+    buildFinalizeStaticForConflicts,
+    conflicts,
+    isApplyingQueueUseAllNew,
+    onSave,
+  ]);
 
   if (!currentAlbumId || currentConflicts.length === 0) {
     return (
@@ -827,16 +862,8 @@ export default function EnrichmentReviewModal({
             </div>
           </div>
           
-          <div className="flex gap-3">
-             <button onClick={handleFinalizeStatic} className="px-3 py-2 text-[12px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-md hover:bg-violet-100">
-               Finalize Static Fields
-             </button>
-             <button onClick={handleSelectAllCurrent} className="px-3 py-2 text-[12px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100">
-               Reset to Current
-             </button>
-             <button onClick={handleSelectAllNew} className="px-3 py-2 text-[12px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100">
-               Use All New
-             </button>
+          <div className="text-xs text-gray-500 font-medium italic">
+            Album-level shortcuts and queue actions are available above the save controls.
           </div>
         </div>
 
@@ -877,7 +904,27 @@ export default function EnrichmentReviewModal({
              Changes are saved to the database immediately upon clicking Save & Next.
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-col items-end gap-3">
+            <div className="flex flex-wrap justify-end gap-2">
+              <button onClick={handleFinalizeStatic} className="px-3 py-2 text-[12px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-md hover:bg-violet-100">
+                Finalize Static Fields
+              </button>
+              <button onClick={handleSelectAllCurrent} className="px-3 py-2 text-[12px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100">
+                Reset to Current
+              </button>
+              <button onClick={handleSelectAllNew} className="px-3 py-2 text-[12px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100">
+                Use All New
+              </button>
+              <button
+                onClick={handleUseAllNewForQueue}
+                disabled={isApplyingQueueUseAllNew}
+                className="px-3 py-2 text-[12px] font-semibold text-cyan-700 bg-cyan-50 border border-cyan-200 rounded-md hover:bg-cyan-100 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isApplyingQueueUseAllNew ? 'Applying Queue...' : 'Use All New For All Albums In Queue'}
+              </button>
+            </div>
+
+            <div className="flex gap-3">
             <button onClick={onCancel} className="px-4 py-2 bg-white border border-gray-300 rounded text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-50">
                Stop Review
             </button>
@@ -899,6 +946,7 @@ export default function EnrichmentReviewModal({
             >
               Save & Next Album →
             </button>
+            </div>
           </div>
         </div>
 
