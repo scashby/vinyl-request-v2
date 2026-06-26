@@ -68,7 +68,7 @@ export async function POST(req: Request) {
       wikipedia: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_WIKIPEDIA_MS, 25000),
       musicbrainz: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_MUSICBRAINZ_MS, 25000),
       discogs: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_DISCOGS_MS, 25000),
-      spotify: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_SPOTIFY_MS, 18000),
+      spotify: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_SPOTIFY_MS, 45000),
       appleMusic: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_APPLEMUSIC_MS, 20000),
       lastfm: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_LASTFM_MS, 25000),
       genius: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_GENIUS_MS, 25000),
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
     ): Promise<EnrichmentResult> => {
       const pending = discogsQueue
         .catch(() => undefined)
-        .then(() => fetchDiscogsData(album, { oauth: discogsOAuth }))
+        .then(() => withSourceTimeout('discogs', fetchDiscogsData(album, { oauth: discogsOAuth })))
         .finally(async () => {
           await sleep(250);
         });
@@ -122,7 +122,7 @@ export async function POST(req: Request) {
     ): Promise<EnrichmentResult> => {
       const pending = spotifyQueue
         .catch(() => undefined)
-        .then(() => fetchSpotifyData(album, opts))
+        .then(() => withSourceTimeout('spotify', fetchSpotifyData(album, opts)))
         .finally(async () => {
           await sleep(800);
         });
@@ -688,16 +688,27 @@ export async function POST(req: Request) {
             };
           });
 
-          const addTask = (source: string, promise: Promise<EnrichmentResult | null>) => {
-            tasks.push({ source, promise: withSourceTimeout(source, promise) });
+          const addTask = (
+            source: string,
+            promise: Promise<EnrichmentResult | null>,
+            options?: { skipTimeoutWrap?: boolean }
+          ) => {
+            tasks.push({
+              source,
+              promise: options?.skipTimeoutWrap ? promise : withSourceTimeout(source, promise)
+            });
           };
 
           // Always fetch requested services
           if (services.musicbrainz) addTask('musicbrainz', fetchMusicBrainzData(typedAlbum));
           if (services.discogs && !unavailableServices.has('discogs')) {
-            addTask('discogs', runDiscogsQueued(typedAlbum));
+            addTask('discogs', runDiscogsQueued(typedAlbum), { skipTimeoutWrap: true });
           }
-          if (services.spotify) addTask('spotify', runSpotifyQueued(typedAlbum, { includeAudioFeatures: needsSpotifyAudioFeatures }));
+          if (services.spotify) {
+            addTask('spotify', runSpotifyQueued(typedAlbum, { includeAudioFeatures: needsSpotifyAudioFeatures }), {
+              skipTimeoutWrap: true,
+            });
+          }
           if (services.appleMusicEnhanced) addTask('appleMusic', runAppleMusicGuarded(typedAlbum));
           if (services.lastfm) addTask('lastfm', fetchLastFmData(typedAlbum));
           if (services.wikipedia) addTask('wikipedia', fetchWikipediaData(typedAlbum));
