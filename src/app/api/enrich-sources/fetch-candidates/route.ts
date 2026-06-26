@@ -160,7 +160,7 @@ export async function POST(req: Request) {
     const effectiveLimit = albumIds && albumIds.length > 0
       ? requestedLimit
       : usesQueuedSources
-        ? Math.min(requestedLimit, 10)
+        ? Math.min(requestedLimit, 5)
         : usesSlowNarrativeSources
           ? Math.min(requestedLimit, 15)
           : requestedLimit;

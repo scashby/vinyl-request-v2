@@ -1696,12 +1696,12 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     while (hasMoreRef.current) {
       const { start, end } = scanRangeRef.current;
       const rangeLabel = end ? `${start}-${end}` : `${start}+`;
+      const queuedAlbumId = specificAlbumQueueRef.current && specificAlbumQueueRef.current.length > 0
+        ? specificAlbumQueueRef.current[0]
+        : undefined;
+      const currentScanId = getCurrentScanId(queuedAlbumId);
 
       try {
-        const queuedAlbumId = specificAlbumQueueRef.current && specificAlbumQueueRef.current.length > 0
-          ? specificAlbumQueueRef.current[0]
-          : undefined;
-        const currentScanId = getCurrentScanId(queuedAlbumId);
         setStatus(`Scanning by ID (range ${rangeLabel})... Currently scanning ID: ${currentScanId}. Found ${collectedConflicts.length} conflict(s).`);
         const parsedBatchSize = Number.parseInt(batchSize, 10);
         const effectiveBatchSize = Number.isFinite(parsedBatchSize) && parsedBatchSize > 0
@@ -1725,7 +1725,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
         const fetchCandidatesWithRetry = async (requestPayload: Record<string, unknown>) => {
           const maxAttempts = 4;
-          const requestTimeoutMs = 45000;
+          const requestTimeoutMs = 90000;
           let attempt = 0;
           let lastError: Error | null = null;
 
@@ -1802,7 +1802,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           throw lastError ?? new Error('Candidate fetch failed after retries');
         };
 
-        const { result, attempts } = await fetchCandidatesWithRetry(payload);
+        const { result, attempts } = await fetchCandidatesWithRetry(payload).catch((fetchError) => {
+          const message = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
+          throw new Error(`fetch-candidates: ${message}`);
+        });
         if (attempts > 1) {
           addLog('System', 'info', `Candidate fetch recovered after ${attempts} attempts.`);
         }
@@ -1890,6 +1893,37 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
+        const isFetchCandidatesFailure = message.startsWith('fetch-candidates:');
+        if (isFetchCandidatesFailure) {
+          const shortMessage = message.replace(/^fetch-candidates:\s*/, '').trim() || 'Unknown fetch error';
+
+          if (specificAlbumQueueRef.current && specificAlbumQueueRef.current.length > 0) {
+            specificAlbumQueueRef.current.shift();
+            if (specificAlbumQueueRef.current.length === 0) {
+              hasMoreRef.current = false;
+            }
+          } else {
+            cursorRef.current = currentScanId;
+            if (scanRangeRef.current.end !== null && currentScanId >= scanRangeRef.current.end) {
+              hasMoreRef.current = false;
+            }
+          }
+
+          processedDuringScanRef.current += 1;
+          while (processedDuringScanRef.current >= nextStatsRefreshAtRef.current) {
+            nextStatsRefreshAtRef.current += 25;
+          }
+
+          const nextScanId = getCurrentScanId(
+            specificAlbumQueueRef.current && specificAlbumQueueRef.current.length > 0
+              ? specificAlbumQueueRef.current[0]
+              : undefined
+          );
+          addLog('System', 'skipped', `Skipped album #${currentScanId} after candidate fetch failure: ${shortMessage}`);
+          setStatus(`⚠️ Skipped ID ${currentScanId} after fetch error (${shortMessage}). Continuing at ID ${nextScanId}. Processed: ${processedDuringScanRef.current}. Found ${collectedConflicts.length} conflict(s).`);
+          continue;
+        }
+
         setStatus(`❌ Error: ${message}`);
         addLog('System', 'skipped', `Scan stopped: ${message}`);
         setEnriching(false);
