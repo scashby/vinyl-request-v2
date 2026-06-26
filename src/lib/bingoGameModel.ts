@@ -152,6 +152,7 @@ export async function createRoundTrackSnapshotsFromTracks(
   const normalizedRoundCount = Math.max(1, Math.floor(roundCount || 1));
   for (let roundNumber = 1; roundNumber <= normalizedRoundCount; roundNumber += 1) {
     const gameTracks = buildRoundTrackPool(poolTracks, sessionId, roundNumber);
+
     gameTracks.forEach((track, index) => {
       rows.push({
         session_id: sessionId,
@@ -501,6 +502,19 @@ export async function validateCardByIdentifier(
       if (sourceCard) {
         card = sourceCard as { session_id: number; card_identifier: string; grid: unknown };
       }
+    }
+  }
+
+  if (!card) {
+    const { data: fallbackCards, error: fallbackError } = await db
+      .from("bingo_cards")
+      .select("session_id, card_identifier, grid")
+      .eq("card_identifier", cardIdentifier)
+      .limit(1);
+
+    if (fallbackError) throw new Error(fallbackError.message);
+    if (Array.isArray(fallbackCards) && fallbackCards.length > 0) {
+      card = fallbackCards[0] as { session_id: number; card_identifier: string; grid: unknown };
     }
   }
 

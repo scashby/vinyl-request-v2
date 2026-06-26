@@ -343,7 +343,7 @@ export default function BingoJumbotronPage() {
 
     // If the calls realtime update arrived before the session update, session.current_call_index
     // will lag behind current.call_index. Treat this as "hidden" to prevent a flash of unblurred text.
-    if (current !== null && (session?.current_call_index ?? -1) < current.call_index) return "hidden";
+    if (current !== null && (session?.current_call_index ?? -1) < current.call_index - 1) return "hidden";
 
     if (!session?.call_reveal_at) return "hidden";
 

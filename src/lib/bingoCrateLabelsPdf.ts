@@ -38,10 +38,10 @@ function normalize(text: string): string {
     .trim();
 }
 
-/** Extract the animal/letter name from "QFTD46 Playlist Fox" → "Fox" */
+/** Extract the round number from "QFTD46 Round 1" → "Round 1" */
 function shortName(playlistName: string): string {
-  const m = /Playlist\s+(\S.*)$/.exec(playlistName);
-  return m ? m[1].trim() : playlistName;
+  const m = /Round\s+(\d+)/.exec(playlistName);
+  return m ? `Round ${m[1]}` : playlistName;
 }
 
 function wrapToWidth(doc: jsPDF, text: string, maxWidth: number): string[] {

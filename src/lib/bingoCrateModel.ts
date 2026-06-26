@@ -3,7 +3,7 @@
  *
  * Helpers for managing immutable game playlists (call orders) attached to bingo sessions.
  * Each game playlist captures the generated call order at a point in time and is named with a
- * sequential letter (A, B, C…) scoped to the session so hosts can identify them easily.
+ * stable round label while retaining internal letter ids (A, B, C…) per session.
  */
 
 import { getBingoDb } from "./bingoDb";
@@ -11,6 +11,12 @@ import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "./bing
 import { getRoundSnapshotTracks } from "./bingoGameModel";
 import { resolveRoundPlaylistIds, type RoundPlaylistEntry } from "./bingoRoundPlaylists";
 
+const GAME_PLAYLISTS_TABLE = "bingo_session_game_playlists";
+const LEGACY_CRATES_TABLE = "bingo_session_crates";
+const ACTIVE_PLAYLIST_FIELD = "active_playlist_letter_by_round";
+const ACTIVE_CRATE_FIELD = "active_crate_letter_by_round";
+const GAME_PLAYLIST_SELECT = "id, session_id, round_number, playlist_name, playlist_letter, call_order, created_at";
+const LEGACY_CRATE_SELECT = "id, session_id, round_number, playlist_name:crate_name, playlist_letter:crate_letter, call_order, created_at";
 const PLAYLIST_NAMES = [
   "Fox", "Owl", "Bear", "Wolf", "Hawk", "Elk", "Crow", "Deer", "Seal", "Wren",
   "Crane", "Heron", "Stork", "Robin", "Swift", "Falcon", "Eagle", "Dove", "Otter", "Whale",
@@ -18,12 +24,6 @@ const PLAYLIST_NAMES = [
   "Lemur", "Okapi", "Narwhal", "Viper", "Lynx", "Mink", "Ibis", "Tapir", "Dingo", "Finch",
 ];
 
-const GAME_PLAYLISTS_TABLE = "bingo_session_game_playlists";
-const LEGACY_CRATES_TABLE = "bingo_session_crates";
-const ACTIVE_PLAYLIST_FIELD = "active_playlist_letter_by_round";
-const ACTIVE_CRATE_FIELD = "active_crate_letter_by_round";
-const GAME_PLAYLIST_SELECT = "id, session_id, round_number, playlist_name, playlist_letter, call_order, created_at";
-const LEGACY_CRATE_SELECT = "id, session_id, round_number, playlist_name:crate_name, playlist_letter:crate_letter, call_order, created_at";
 const PLAYLIST_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 type SessionActivePlaylistEntry = {
@@ -283,7 +283,7 @@ async function deriveRoundCallOrder(
 ): Promise<PlaylistCallEntry[]> {
   const snapshotTracks = await getRoundSnapshotTracks(db, sessionId, roundNumber);
   if (snapshotTracks.length > 0) {
-    const planned = planRoundSessionCalls(snapshotTracks, sessionId, roundNumber, generation);
+    const planned = planRoundSessionCalls(snapshotTracks, sessionId, roundNumber, generation, { preservePlacement: true });
     return planned.map((row, index) => ({
       id: -(index + 1),
       call_index: row.call_index,
@@ -399,12 +399,8 @@ async function getSessionCode(
   return (data as SessionCodeRow | null)?.session_code ?? null;
 }
 
-function formatPlaylistName(sessionCode: string | null, sessionId: number, playlistLetter: string): string {
-  // Legacy rows stored single uppercase letters (A, B, C…) — map them to the animal name at the same index.
-  const displayName = /^[A-Z]$/.test(playlistLetter)
-    ? (PLAYLIST_NAMES[playlistLetter.charCodeAt(0) - 65] ?? playlistLetter)
-    : playlistLetter;
-  return `${sessionCode ?? sessionId} Playlist ${displayName}`;
+function formatPlaylistName(sessionCode: string | null, sessionId: number, roundNumber: number): string {
+  return `${sessionCode ?? sessionId} Round ${roundNumber}`;
 }
 
 /** Sync a single game playlist to collection_playlists and collection_playlist_items. */
@@ -550,7 +546,7 @@ export async function savePlaylistForRound(
 ): Promise<BingoSessionGamePlaylist> {
   const letter = await getNextPlaylistLetter(db, sessionId);
   const sessionCode = await getSessionCode(db, sessionId);
-  const playlistName = formatPlaylistName(sessionCode, sessionId, letter);
+  const playlistName = formatPlaylistName(sessionCode, sessionId, roundNumber);
 
   const data = await withPlaylistTableFallback<{
     id: number;
@@ -645,7 +641,7 @@ export async function getPlaylistsForSession(
 
   return (data ?? []).map((row) => ({
     ...row,
-    playlist_name: formatPlaylistName(sessionCode, sessionId, row.playlist_letter),
+    playlist_name: formatPlaylistName(sessionCode, sessionId, row.round_number),
     call_order: row.call_order as unknown as PlaylistCallEntry[],
   }));
 }
@@ -688,7 +684,7 @@ export async function getPlaylistByLetter(
   if (!data) return null;
   return {
     ...data,
-    playlist_name: formatPlaylistName(sessionCode, sessionId, data.playlist_letter),
+    playlist_name: formatPlaylistName(sessionCode, sessionId, data.round_number),
     call_order: data.call_order as unknown as PlaylistCallEntry[],
   };
 }
@@ -730,7 +726,7 @@ export async function getPlaylistsForRound(
 
   return (data ?? []).map((row) => ({
     ...row,
-    playlist_name: formatPlaylistName(sessionCode, sessionId, row.playlist_letter),
+    playlist_name: formatPlaylistName(sessionCode, sessionId, row.round_number),
     call_order: row.call_order as unknown as PlaylistCallEntry[],
   }));
 }
@@ -899,7 +895,24 @@ export async function deletePlaylistByLetter(
   playlistLetter: string
 ): Promise<void> {
   const sessionCode = await getSessionCode(db, sessionId);
-  const playlistName = formatPlaylistName(sessionCode, sessionId, playlistLetter);
+  const playlistRow = await withPlaylistTableFallback<{
+    round_number: number;
+    playlist_name: string;
+  } | null>(async (tableName, selectClause, letterColumn) => {
+    const { data, error } = await getDynamicTableDb(db)
+      .from(tableName)
+      .select(selectClause)
+      .eq("session_id", sessionId)
+      .eq(letterColumn, playlistLetter)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    return (data as { round_number: number; playlist_name: string } | null) ?? null;
+  });
+
+  const playlistName = playlistRow
+    ? formatPlaylistName(sessionCode, sessionId, playlistRow.round_number)
+    : `${sessionCode ?? sessionId} Playlist ${playlistLetter}`;
 
   await withPlaylistTableFallback(async (tableName, _selectClause, letterColumn) => {
     const { error } = await getDynamicTableDb(db)

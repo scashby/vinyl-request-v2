@@ -378,7 +378,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
     if (callRows.length === 0) {
       const snapshotTracks = await getRoundSnapshotTracks(db, sandboxSessionId, 1);
       if (snapshotTracks.length > 0) {
-        callRows = planRoundSessionCalls(snapshotTracks, sandboxSessionId, 1).map((call) => ({
+        callRows = planRoundSessionCalls(snapshotTracks, sandboxSessionId, 1, 0, { preservePlacement: true }).map((call) => ({
           playlist_track_key: call.playlist_track_key,
           call_index: call.call_index,
           ball_number: call.ball_number,
