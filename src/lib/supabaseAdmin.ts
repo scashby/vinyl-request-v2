@@ -2,12 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
 
 const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim();
-const supabaseServiceRoleKey = (
-  process.env.SUPABASE_SERVICE_ROLE_KEY ??
-  process.env.SUPABASE_SERVICE_KEY ??
-  process.env.SUPABASE_SECRET_KEY ??
-  ''
-).trim();
+const supabaseServiceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim();
 
 if (!supabaseUrl || !supabaseServiceRoleKey) {
   throw new Error(

@@ -24,11 +24,11 @@ loadEnvFromFile(path.join(process.cwd(), ".env.local"));
 loadEnvFromFile(path.join(process.cwd(), ".env"));
 
 const url = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
-const key = String(process.env.SUPABASE_SECRET_KEY || "").trim();
+const key = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
 const sampleSize = Math.min(200, Math.max(5, Number(process.env.CONSISTENCY_SAMPLE || 25)));
 
 if (!url || !key) {
-  console.error("Missing env vars: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY");
+  console.error("Missing env vars: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY");
   process.exit(2);
 }
 
