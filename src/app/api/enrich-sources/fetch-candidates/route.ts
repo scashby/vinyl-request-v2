@@ -68,7 +68,7 @@ export async function POST(req: Request) {
       wikipedia: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_WIKIPEDIA_MS, 25000),
       musicbrainz: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_MUSICBRAINZ_MS, 25000),
       discogs: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_DISCOGS_MS, 25000),
-      spotify: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_SPOTIFY_MS, 12000),
+      spotify: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_SPOTIFY_MS, 18000),
       appleMusic: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_APPLEMUSIC_MS, 20000),
       lastfm: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_LASTFM_MS, 25000),
       genius: parseTimeout(process.env.ENRICH_SOURCE_TIMEOUT_GENIUS_MS, 25000),
@@ -103,6 +103,7 @@ export async function POST(req: Request) {
       : getDiscogsOAuthFromCookieHeader(fallbackCookieHeader);
     let discogsQueue: Promise<void> = Promise.resolve();
     let spotifyQueue: Promise<void> = Promise.resolve();
+    let appleMusicUnauthorized = false;
     const runDiscogsQueued = async (
       album: { artist: string; title: string; discogs_release_id?: string }
     ): Promise<EnrichmentResult> => {
@@ -116,16 +117,30 @@ export async function POST(req: Request) {
       return pending;
     };
     const runSpotifyQueued = async (
-      album: { artist: string; title: string; spotify_id?: string }
+      album: { artist: string; title: string; spotify_id?: string },
+      opts?: { includeAudioFeatures?: boolean }
     ): Promise<EnrichmentResult> => {
       const pending = spotifyQueue
         .catch(() => undefined)
-        .then(() => fetchSpotifyData(album))
+        .then(() => fetchSpotifyData(album, opts))
         .finally(async () => {
           await sleep(800);
         });
       spotifyQueue = pending.then(() => undefined, () => undefined);
       return pending;
+    };
+    const runAppleMusicGuarded = async (
+      album: { artist: string; title: string; apple_music_id?: string }
+    ): Promise<EnrichmentResult> => {
+      if (appleMusicUnauthorized) {
+        return { success: false, source: 'appleMusic', error: 'Apple Music disabled for this request (unauthorized)' };
+      }
+      const result = await fetchAppleMusicData(album);
+      const errorText = String(result.error ?? '').toLowerCase();
+      if (!result.success && (errorText.includes('401') || errorText.includes('unauthorized'))) {
+        appleMusicUnauthorized = true;
+      }
+      return result;
     };
 
     const body = await req.json();
@@ -201,6 +216,21 @@ export async function POST(req: Request) {
       applicableServices.forEach((svc) => requiredServices.add(svc));
     });
     const selectedRootFields = new Set(selectedFields.map((field) => field.split('.')[0]));
+    const spotifyAudioFeatureFields = new Set([
+      'tempo_bpm',
+      'musical_key',
+      'time_signature',
+      'energy',
+      'danceability',
+      'mood_acoustic',
+      'mood_happy',
+      'mood_sad',
+      'mood_party',
+      'mood_relaxed',
+      'mood_aggressive',
+      'mood_electronic',
+    ]);
+    const needsSpotifyAudioFeatures = selectedFields.some((field) => spotifyAudioFeatureFields.has(field));
     const targetedFieldRun = missingDataOnly && selectedFields.length > 0;
 
     const unavailableServices = new Set<string>();
@@ -667,8 +697,8 @@ export async function POST(req: Request) {
           if (services.discogs && !unavailableServices.has('discogs')) {
             addTask('discogs', runDiscogsQueued(typedAlbum));
           }
-          if (services.spotify) addTask('spotify', runSpotifyQueued(typedAlbum));
-          if (services.appleMusicEnhanced) addTask('appleMusic', fetchAppleMusicData(typedAlbum));
+          if (services.spotify) addTask('spotify', runSpotifyQueued(typedAlbum, { includeAudioFeatures: needsSpotifyAudioFeatures }));
+          if (services.appleMusicEnhanced) addTask('appleMusic', runAppleMusicGuarded(typedAlbum));
           if (services.lastfm) addTask('lastfm', fetchLastFmData(typedAlbum));
           if (services.wikipedia) addTask('wikipedia', fetchWikipediaData(typedAlbum));
           if (services.genius) addTask('genius', fetchGeniusData(typedAlbum));

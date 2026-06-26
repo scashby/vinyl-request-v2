@@ -1017,7 +1017,10 @@ async function spFetchJson(
   return { ok: false, status: lastStatus, text: lastText, data: lastData ?? null };
 }
 
-export async function fetchSpotifyData(album: { artist: string, title: string, spotify_id?: string }): Promise<EnrichmentResult> {
+export async function fetchSpotifyData(
+  album: { artist: string, title: string, spotify_id?: string },
+  opts?: { includeAudioFeatures?: boolean }
+): Promise<EnrichmentResult> {
   try {
     const token = await spGetToken();
     let spId = album.spotify_id;
@@ -1087,8 +1090,9 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
     }
 
     const spotifyWarnings: string[] = [];
+    const includeAudioFeatures = opts?.includeAudioFeatures !== false;
 
-    if (data.tracks?.items?.length > 0) {
+    if (includeAudioFeatures && data.tracks?.items?.length > 0) {
         const trackIds = data.tracks.items.map((t: SpotifyTrack) => t.id).slice(0, 50).join(',');
         const featuresResult = await spFetchJson(
           `https://api.spotify.com/v1/audio-features?ids=${trackIds}`,

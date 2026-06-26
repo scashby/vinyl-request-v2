@@ -1240,7 +1240,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     context: string,
     chunkSize: number,
     writeChunk: (chunk: T[]) => Promise<{ error: { message?: string | null } | null }>,
-    onPermanentFailure: (error: { message?: string | null } | null, failedContext: string) => void,
+    onPermanentFailure: (error: { message?: string | null } | null, failedContext: string) => boolean | void,
   ) {
     const chunks = chunkRows(rows, chunkSize);
     for (let index = 0; index < chunks.length; index += 1) {
@@ -1264,12 +1264,17 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           continue;
         }
 
-        onPermanentFailure(error, chunkContext);
+        const shouldContinue = onPermanentFailure(error, chunkContext) === true;
+        if (shouldContinue) {
+          lastError = null;
+          break;
+        }
         return;
       }
 
       if (lastError) {
-        onPermanentFailure(lastError, chunkContext);
+        const shouldContinue = onPermanentFailure(lastError, chunkContext) === true;
+        if (shouldContinue) continue;
         return;
       }
     }
@@ -1311,6 +1316,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         200,
         async (chunk) => await supabase.from('import_conflict_resolutions').insert(chunk),
         (error, failedContext) => {
+          const message = (error?.message || '').toLowerCase();
+          const isDuplicateConflict =
+            message.includes('duplicate key') ||
+            message.includes('already exists') ||
+            message.includes('409') ||
+            message.includes('conflict');
+          if (isDuplicateConflict) {
+            addLog('System', 'info', `Ignoring duplicate conflict-history rows (${failedContext}).`);
+            return true;
+          }
           disableHistoryWrites(failedContext, error);
         }
       );
