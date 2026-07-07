@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBingoDb } from "src/lib/bingoDb";
+import { syncCollectionPlaylistMirrorsForSession } from "src/lib/bingoCrateModel";
 import { syncSessionPlaylistMetadata } from "src/lib/playlistMetadataSync";
 
 export const runtime = "nodejs";
@@ -13,6 +15,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const dryRun = request.nextUrl.searchParams.get("dryRun") === "1";
     const result = await syncSessionPlaylistMetadata("bingo", sessionId, { dryRun });
+    if (!dryRun) {
+      await syncCollectionPlaylistMirrorsForSession(getBingoDb(), sessionId);
+    }
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
     return NextResponse.json(
