@@ -203,6 +203,7 @@ export async function getRoundSnapshotTracks(
     trackKey: row.playlist_track_key,
     sortOrder: row.slot_index,
     trackTitle: row.track_title,
+    displayTitle: null,
     artistName: row.artist_name,
     albumName: row.album_name,
     side: row.side,
