@@ -214,6 +214,48 @@ export async function syncSessionPlaylistMetadata(
     )
   );
   const resolvedMap = await resolveTrackKeys(db, keys);
+
+  // For bingo sessions, apply per-playlist display_title overrides on top of the
+  // resolved titles so that Refresh Metadata respects user-set display titles.
+  if (game === "bingo") {
+    const { data: sessionRow } = await dbAny
+      .from("bingo_sessions")
+      .select("playlist_id, playlist_ids, round_playlist_ids")
+      .eq("id", sessionId)
+      .maybeSingle();
+
+    if (sessionRow) {
+      const roundPlaylistIds = Array.isArray(sessionRow.round_playlist_ids)
+        ? (sessionRow.round_playlist_ids as Array<{ playlist_ids?: number[] }>).flatMap((r) => r.playlist_ids ?? [])
+        : [];
+      const sourceIds = Array.from(
+        new Set(
+          [
+            typeof sessionRow.playlist_id === "number" ? sessionRow.playlist_id : null,
+            ...(Array.isArray(sessionRow.playlist_ids) ? (sessionRow.playlist_ids as number[]) : []),
+            ...roundPlaylistIds,
+          ].filter((id): id is number => typeof id === "number" && id > 0)
+        )
+      );
+
+      if (sourceIds.length > 0) {
+        const { data: overrideRows } = await dbAny
+          .from("collection_playlist_items")
+          .select("track_key, display_title")
+          .in("playlist_id", sourceIds)
+          .not("display_title", "is", null);
+
+        for (const row of (overrideRows ?? []) as Array<{ track_key: string; display_title: string | null }>) {
+          if (!row.display_title) continue;
+          const existing = resolvedMap.get(row.track_key);
+          if (existing) {
+            resolvedMap.set(row.track_key, { ...existing, track_title: row.display_title });
+          }
+        }
+      }
+    }
+  }
+
   const nowIso = new Date().toISOString();
 
   for (const row of rows) {

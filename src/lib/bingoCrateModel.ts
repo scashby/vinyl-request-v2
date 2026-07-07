@@ -204,6 +204,42 @@ async function selectSessionPlaylistBackfillRow(
   }
 }
 
+async function loadDisplayTitleOverridesForSession(
+  db: ReturnType<typeof getBingoDb>,
+  session: SessionPlaylistBackfillRow | null
+): Promise<Map<string, string> | undefined> {
+  const sourcePlaylistIds = Array.from(
+    new Set(
+      [
+        session?.playlist_id,
+        ...(session?.playlist_ids ?? []),
+        ...(session?.round_playlist_ids?.flatMap((row) => row.playlist_ids) ?? []),
+      ].filter((id): id is number => typeof id === "number" && id > 0)
+    )
+  );
+
+  if (sourcePlaylistIds.length === 0) {
+    return undefined;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: overrideRows } = await (db as any)
+    .from("collection_playlist_items")
+    .select("track_key, display_title")
+    .in("playlist_id", sourcePlaylistIds)
+    .not("display_title", "is", null);
+
+  if (!Array.isArray(overrideRows) || overrideRows.length === 0) {
+    return undefined;
+  }
+
+  return new Map(
+    (overrideRows as Array<{ track_key: string; display_title: string | null }>)
+      .filter((row) => row.display_title)
+      .map((row) => [row.track_key, row.display_title as string])
+  );
+}
+
 async function selectActivePlaylistLetters(
   db: ReturnType<typeof getBingoDb>,
   sessionId: number
@@ -484,36 +520,7 @@ export async function syncCollectionPlaylistMirrorsForSession(
   // Fetch session source data so we can re-derive call orders for playlists that pre-date
   // the track_key field and therefore have no keys in their stored call_order JSON.
   const sessionRow = await selectSessionPlaylistBackfillRow(db, sessionId);
-
-  // Build a map of display_title overrides from the session's source playlists so that
-  // per-playlist title overrides carry through into round sub-playlist mirrors.
-  const sourcePlaylistIds = Array.from(
-    new Set(
-      [
-        sessionRow?.playlist_id,
-        ...(sessionRow?.playlist_ids ?? []),
-        ...(sessionRow?.round_playlist_ids?.flatMap((r) => r.playlist_ids) ?? []),
-      ].filter((id): id is number => typeof id === "number" && id > 0)
-    )
-  );
-
-  let displayTitleOverrides: Map<string, string> | undefined;
-  if (sourcePlaylistIds.length > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: overrideRows } = await (db as any)
-      .from("collection_playlist_items")
-      .select("track_key, display_title")
-      .in("playlist_id", sourcePlaylistIds)
-      .not("display_title", "is", null);
-
-    if (Array.isArray(overrideRows) && overrideRows.length > 0) {
-      displayTitleOverrides = new Map(
-        (overrideRows as Array<{ track_key: string; display_title: string | null }>)
-          .filter((r) => r.display_title)
-          .map((r) => [r.track_key, r.display_title as string])
-      );
-    }
-  }
+  const displayTitleOverrides = await loadDisplayTitleOverridesForSession(db, sessionRow);
 
   const playlists = await getPlaylistsForSession(db, sessionId);
   for (const playlist of playlists) {
@@ -630,10 +637,18 @@ export async function savePlaylistForRound(
   };
 
   // Mirror to collection in the background (non-blocking, non-fatal)
-  void syncPlaylistToCollection(db, {
-    ...saved,
-    call_order: calls, // use the in-memory call_order which already has track_key populated
-  });
+  void (async () => {
+    const session = await selectSessionPlaylistBackfillRow(db, sessionId);
+    const displayTitleOverrides = await loadDisplayTitleOverridesForSession(db, session);
+    await syncPlaylistToCollection(
+      db,
+      {
+        ...saved,
+        call_order: calls, // use the in-memory call_order which already has track_key populated
+      },
+      displayTitleOverrides
+    );
+  })();
 
   return saved;
 }
@@ -865,6 +880,7 @@ export async function reshuffleAllPlaylists(
   const typedSession = session as SessionPlaylistBackfillRow;
   const playlists = await getPlaylistsForSession(db, sessionId);
   if (playlists.length === 0) return;
+  const displayTitleOverrides = await loadDisplayTitleOverridesForSession(db, typedSession);
 
   const sorted = [...playlists].sort((a, b) => a.playlist_letter.localeCompare(b.playlist_letter));
 
@@ -883,7 +899,7 @@ export async function reshuffleAllPlaylists(
       if (error) throw new Error(error.message);
     });
 
-    await syncPlaylistToCollection(db, { ...playlist, call_order: newCallOrder });
+    await syncPlaylistToCollection(db, { ...playlist, call_order: newCallOrder }, displayTitleOverrides);
   }
 }
 
