@@ -159,6 +159,7 @@ async function loadPresetPoolTracks(db: ReturnType<typeof getBingoDb>, presetId:
       trackKey,
       sortOrder: index,
       trackTitle: row.track_title,
+      displayTitle: null,
       artistName: row.artist_name,
       albumName: row.album_name,
       side: row.side,

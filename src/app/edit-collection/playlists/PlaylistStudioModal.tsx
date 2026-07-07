@@ -41,6 +41,7 @@ type PlaylistTrackItem = {
   track_key: string;
   sort_order: number;
   track_title: string | null;
+  display_title: string | null;
   artist_name: string | null;
   album_name: string | null;
   side: string | null;
@@ -307,6 +308,11 @@ type SortableManualTrackRowProps = {
   onContextMenu: (e: React.MouseEvent, trackKey: string, index: number) => void;
   onThreeDotClick: (e: React.MouseEvent, trackKey: string, index: number) => void;
   onThemeHintChange: (trackKey: string, value: string) => void;
+  isEditingTitle: boolean;
+  editingTitleValue: string;
+  onEditingTitleValueChange: (value: string) => void;
+  onEditingTitleSave: () => void;
+  onEditingTitleCancel: () => void;
 };
 
 function SortableManualTrackRow({
@@ -318,6 +324,11 @@ function SortableManualTrackRow({
   onContextMenu,
   onThreeDotClick,
   onThemeHintChange,
+  isEditingTitle,
+  editingTitleValue,
+  onEditingTitleValueChange,
+  onEditingTitleSave,
+  onEditingTitleCancel,
 }: SortableManualTrackRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: track.track_key,
@@ -366,9 +377,28 @@ function SortableManualTrackRow({
             {accentColor && (
               <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: accentColor }} />
             )}
-            <span className="truncate text-sm font-medium text-white">
-              {track.track_title ?? track.track_key}
-            </span>
+            {isEditingTitle ? (
+              <input
+                autoFocus
+                type="text"
+                value={editingTitleValue}
+                onChange={(e) => onEditingTitleValueChange(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); onEditingTitleSave(); }
+                  if (e.key === 'Escape') { e.preventDefault(); onEditingTitleCancel(); }
+                }}
+                onBlur={onEditingTitleSave}
+                className="w-full rounded border border-[#4a7fcc] bg-[#0d1a2e] px-2 py-0.5 text-sm font-medium text-white focus:outline-none"
+              />
+            ) : (
+              <span className="truncate text-sm font-medium text-white">
+                {track.display_title ?? track.track_title ?? track.track_key}
+                {track.display_title && track.display_title !== track.track_title && (
+                  <span className="ml-1.5 text-xs font-normal text-[#60a5fa]" title={`Original: ${track.track_title ?? ''}`}>✎</span>
+                )}
+              </span>
+            )}
           </div>
           <div className="truncate text-xs text-[#6a8fbf]">{track.artist_name ?? ''}</div>
           {track.theme_hint !== undefined && (
@@ -435,6 +465,8 @@ export function PlaylistStudioModal({
   const [manualTracksLoading, setManualTracksLoading] = useState(false);
   const [linkingTrackKey, setLinkingTrackKey] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
+  const [editingTitleKey, setEditingTitleKey] = useState<string | null>(null);
+  const [editingTitleValue, setEditingTitleValue] = useState('');
   const [showEditDetails, setShowEditDetails] = useState(false);
   const [manualCoverImageUrl, setManualCoverImageUrl] = useState<string | null>(null);
   const [coverImageUploading, setCoverImageUploading] = useState(false);
@@ -609,6 +641,48 @@ export function PlaylistStudioModal({
     setManualTracks((prev) =>
       prev.map((t) => t.track_key === trackKey ? { ...t, theme_hint: value } : t)
     );
+  }, []);
+
+  const startEditingTitle = useCallback((trackKey: string) => {
+    const track = manualTracks.find((t) => t.track_key === trackKey);
+    setEditingTitleKey(trackKey);
+    setEditingTitleValue(track?.display_title ?? track?.track_title ?? '');
+  }, [manualTracks]);
+
+  const saveDisplayTitle = useCallback(async () => {
+    if (!editingTitleKey || !manualEditingPlaylist) return;
+    const newTitle = editingTitleValue.trim() || null;
+    const track = manualTracks.find((t) => t.track_key === editingTitleKey);
+    const originalTitle = track?.track_title ?? null;
+    // Only store as display_title if it differs from the original resolved title
+    const titleToSave = newTitle === originalTitle ? null : newTitle;
+
+    setEditingTitleKey(null);
+    setEditingTitleValue('');
+
+    // Optimistic update
+    setManualTracks((prev) =>
+      prev.map((t) => t.track_key === editingTitleKey ? { ...t, display_title: titleToSave } : t)
+    );
+
+    try {
+      const headers = await getSupabaseAuthHeaders();
+      await fetch(`/api/playlists/${manualEditingPlaylist.id}/tracks`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ track_key: editingTitleKey, display_title: titleToSave }),
+      });
+    } catch {
+      // Non-fatal — revert optimistic update on failure
+      setManualTracks((prev) =>
+        prev.map((t) => t.track_key === editingTitleKey ? { ...t, display_title: track?.display_title ?? null } : t)
+      );
+    }
+  }, [editingTitleKey, editingTitleValue, getSupabaseAuthHeaders, manualEditingPlaylist, manualTracks]);
+
+  const cancelEditingTitle = useCallback(() => {
+    setEditingTitleKey(null);
+    setEditingTitleValue('');
   }, []);
 
   const formatApiError = (payload: unknown, res: Response) => {
@@ -1962,6 +2036,11 @@ export function PlaylistStudioModal({
                                 onContextMenu={openTrackContextMenu}
                                 onThreeDotClick={openTrackThreeDot}
                                 onThemeHintChange={handleThemeHintChange}
+                                isEditingTitle={editingTitleKey === track.track_key}
+                                editingTitleValue={editingTitleValue}
+                                onEditingTitleValueChange={setEditingTitleValue}
+                                onEditingTitleSave={saveDisplayTitle}
+                                onEditingTitleCancel={cancelEditingTitle}
                               />
                             );
                           })}
@@ -3026,6 +3105,37 @@ export function PlaylistStudioModal({
               >
                 Remove from playlist
               </button>
+              <button
+                className="w-full px-4 py-2 text-left text-sm text-[#d0e5ff] hover:bg-[#1e3050]"
+                onClick={() => {
+                  startEditingTitle(contextMenu.trackKey);
+                  setContextMenu(null);
+                }}
+              >
+                Edit display title…
+              </button>
+              {manualTracks.find((t) => t.track_key === contextMenu.trackKey)?.display_title && (
+                <button
+                  className="w-full px-4 py-2 text-left text-sm text-[#94a3b8] hover:bg-[#1e3050]"
+                  onClick={async () => {
+                    const trackKey = contextMenu.trackKey;
+                    setContextMenu(null);
+                    setManualTracks((prev) =>
+                      prev.map((t) => t.track_key === trackKey ? { ...t, display_title: null } : t)
+                    );
+                    try {
+                      const headers = await getSupabaseAuthHeaders();
+                      await fetch(`/api/playlists/${manualEditingPlaylist!.id}/tracks`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json', ...headers },
+                        body: JSON.stringify({ track_key: trackKey, display_title: null }),
+                      });
+                    } catch { /* non-fatal */ }
+                  }}
+                >
+                  Clear display title
+                </button>
+              )}
               {manualTracks.find((t) => t.track_key === contextMenu.trackKey)?.link_group ? (
                 <button
                   className="w-full px-4 py-2 text-left text-sm text-[#d0e5ff] hover:bg-[#1e3050]"

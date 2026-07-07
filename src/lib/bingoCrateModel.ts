@@ -406,7 +406,8 @@ function formatPlaylistName(sessionCode: string | null, sessionId: number, round
 /** Sync a single game playlist to collection_playlists and collection_playlist_items. */
 async function syncPlaylistToCollection(
   db: ReturnType<typeof getBingoDb>,
-  playlist: BingoSessionGamePlaylist
+  playlist: BingoSessionGamePlaylist,
+  displayTitleOverrides?: Map<string, string>
 ): Promise<void> {
   try {
     const { data: existing } = await db
@@ -466,6 +467,7 @@ async function syncPlaylistToCollection(
           playlist_id: collectionPlaylistId,
           track_key: trackKey,
           sort_order: idx + 1,
+          display_title: displayTitleOverrides?.get(trackKey) ?? null,
         }))
       );
     }
@@ -483,6 +485,36 @@ export async function syncCollectionPlaylistMirrorsForSession(
   // the track_key field and therefore have no keys in their stored call_order JSON.
   const sessionRow = await selectSessionPlaylistBackfillRow(db, sessionId);
 
+  // Build a map of display_title overrides from the session's source playlists so that
+  // per-playlist title overrides carry through into round sub-playlist mirrors.
+  const sourcePlaylistIds = Array.from(
+    new Set(
+      [
+        sessionRow?.playlist_id,
+        ...(sessionRow?.playlist_ids ?? []),
+        ...(sessionRow?.round_playlist_ids?.flatMap((r) => r.playlist_ids) ?? []),
+      ].filter((id): id is number => typeof id === "number" && id > 0)
+    )
+  );
+
+  let displayTitleOverrides: Map<string, string> | undefined;
+  if (sourcePlaylistIds.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: overrideRows } = await (db as any)
+      .from("collection_playlist_items")
+      .select("track_key, display_title")
+      .in("playlist_id", sourcePlaylistIds)
+      .not("display_title", "is", null);
+
+    if (Array.isArray(overrideRows) && overrideRows.length > 0) {
+      displayTitleOverrides = new Map(
+        (overrideRows as Array<{ track_key: string; display_title: string | null }>)
+          .filter((r) => r.display_title)
+          .map((r) => [r.track_key, r.display_title as string])
+      );
+    }
+  }
+
   const playlists = await getPlaylistsForSession(db, sessionId);
   for (const playlist of playlists) {
     const hasTrackKeys = playlist.call_order.some(
@@ -496,9 +528,9 @@ export async function syncCollectionPlaylistMirrorsForSession(
         playlist.round_number,
         sessionRow as SessionPlaylistBackfillRow
       );
-      await syncPlaylistToCollection(db, { ...playlist, call_order: freshCalls });
+      await syncPlaylistToCollection(db, { ...playlist, call_order: freshCalls }, displayTitleOverrides);
     } else {
-      await syncPlaylistToCollection(db, playlist);
+      await syncPlaylistToCollection(db, playlist, displayTitleOverrides);
     }
   }
 }

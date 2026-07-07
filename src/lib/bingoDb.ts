@@ -56,6 +56,7 @@ export type BingoDatabase = {
           sort_order: number;
           link_group: string | null;
           theme_hint: string | null;
+          display_title: string | null;
           created_at: string;
         };
         Insert: {
@@ -65,6 +66,7 @@ export type BingoDatabase = {
           sort_order?: number;
           link_group?: string | null;
           theme_hint?: string | null;
+          display_title?: string | null;
           created_at?: string;
         };
         Update: {
@@ -74,6 +76,7 @@ export type BingoDatabase = {
           sort_order?: number;
           link_group?: string | null;
           theme_hint?: string | null;
+          display_title?: string | null;
           created_at?: string;
         };
         Relationships: [];

@@ -18,6 +18,7 @@ export type ResolvedPlaylistTrack = {
   trackKey: string;
   sortOrder: number;
   trackTitle: string;
+  displayTitle: string | null;
   artistName: string;
   albumName: string | null;
   side: string | null;
@@ -83,6 +84,7 @@ type DbPlaylistItem = {
   sort_order: number;
   link_group: string | null;
   theme_hint: string | null;
+  display_title: string | null;
 };
 
 type DbInventory = { id: number; release_id: number | null };
@@ -698,6 +700,7 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
       trackKey: row.key,
       sortOrder: index,
       trackTitle: row.trackTitle,
+      displayTitle: null,
       artistName: row.trackArtist,
       albumName: row.albumTitle,
       side: row.side,
@@ -709,7 +712,7 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
 
   const { data: playlistItems, error: itemError } = await db
     .from("collection_playlist_items")
-    .select("id, playlist_id, track_key, sort_order, link_group, theme_hint")
+    .select("id, playlist_id, track_key, sort_order, link_group, theme_hint, display_title")
     .eq("playlist_id", playlistId)
     .order("sort_order", { ascending: true });
 
@@ -847,7 +850,7 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
 
     const position = releaseTrack?.position ?? parsed.fallbackPosition ?? null;
     const fallbackTitle = position ? `Track ${position}` : `Track ${item.sort_order + 1}`;
-    const trackTitle = releaseTrack?.title_override ?? recording?.title ?? fallbackTitle;
+    const trackTitle = item.display_title ?? releaseTrack?.title_override ?? recording?.title ?? fallbackTitle;
     const artistName = resolveTrackArtist({
       trackArtist: recording?.track_artist,
       credits: recording?.credits,
@@ -858,6 +861,7 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
       trackKey: item.track_key,
       sortOrder: item.sort_order,
       trackTitle,
+      displayTitle: item.display_title ?? null,
       artistName,
       albumName: master?.title ?? null,
       side: releaseTrack?.side ?? null,
