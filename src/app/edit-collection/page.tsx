@@ -2108,14 +2108,34 @@ function CollectionBrowserPage() {
       return;
     }
 
-    const { data: playlistItems, error: itemsError } = await supabase
-      .from('collection_playlist_items')
-      .select('playlist_id, track_key, sort_order, link_group, theme_hint, display_title')
-      .order('sort_order', { ascending: true });
+    const playlistItems: Array<{
+      playlist_id: number | null;
+      track_key: string | null;
+      sort_order: number | null;
+      link_group: string | null;
+      theme_hint: string | null;
+      display_title: string | null;
+    }> = [];
+    const playlistItemPageSize = 1000;
+    let playlistItemOffset = 0;
 
-    if (itemsError) {
-      console.error('Error loading playlist items:', itemsError);
-      return;
+    while (true) {
+      const { data: pageRows, error: itemsError } = await supabase
+        .from('collection_playlist_items')
+        .select('playlist_id, track_key, sort_order, link_group, theme_hint, display_title')
+        .order('playlist_id', { ascending: true })
+        .order('sort_order', { ascending: true })
+        .range(playlistItemOffset, playlistItemOffset + playlistItemPageSize - 1);
+
+      if (itemsError) {
+        console.error('Error loading playlist items:', itemsError);
+        return;
+      }
+
+      const rows = Array.isArray(pageRows) ? pageRows : [];
+      playlistItems.push(...rows);
+      if (rows.length < playlistItemPageSize) break;
+      playlistItemOffset += playlistItemPageSize;
     }
 
     const tracksByPlaylist = (playlistItems ?? []).reduce((acc, item) => {
@@ -3567,6 +3587,17 @@ function CollectionBrowserPage() {
             .from('collection_playlist_items')
             .insert(items);
           if (insertItemsError) throw insertItemsError;
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        const accessToken = session?.access_token;
+        const propagateResponse = await fetch(`/api/playlists/${playlist.id}`, {
+          method: 'POST',
+          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+        });
+        const propagatePayload = await propagateResponse.json().catch(() => ({}));
+        if (!propagateResponse.ok) {
+          throw new Error(propagatePayload?.error || `Failed to propagate playlist changes (${propagateResponse.status})`);
         }
       }
 

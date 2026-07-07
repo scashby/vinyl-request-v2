@@ -1,7 +1,25 @@
 import { NextResponse } from "next/server";
+import { propagateDisplayTitleChangesForPlaylist } from "src/lib/playlistDisplayTitlePropagation";
 import { getAuthHeader, supabaseServer } from "src/lib/supabaseServer";
 
 export const runtime = "nodejs";
+
+export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await context.params;
+    const playlistId = Number(id);
+
+    if (!Number.isFinite(playlistId) || playlistId <= 0) {
+      return NextResponse.json({ error: "Invalid playlist id" }, { status: 400 });
+    }
+
+    const summary = await propagateDisplayTitleChangesForPlaylist(playlistId);
+    return NextResponse.json({ ok: true, summary }, { status: 200 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to propagate playlist title changes";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
 
 export async function DELETE(req: Request, context: { params: Promise<{ id: string }> }) {
   try {

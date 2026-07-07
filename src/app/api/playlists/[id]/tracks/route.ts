@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
 import { resolvePlaylistTracks } from "src/lib/bingoEngine";
+import { propagateDisplayTitleChangesForPlaylist } from "src/lib/playlistDisplayTitlePropagation";
 
 export const runtime = "nodejs";
 
@@ -80,6 +81,8 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  await propagateDisplayTitleChangesForPlaylist(playlistId);
 
   return NextResponse.json({ ok: true }, { status: 200 });
 }
