@@ -72,11 +72,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           ? lockedPlaylist.call_order.map((call, index) => ({
               id: -(index + 1),
               session_id: sessionId,
-              playlist_track_key:
-                (typeof call.playlist_track_key === "string" && call.playlist_track_key.length > 0
-                  ? call.playlist_track_key
-                  : null) ??
-                (typeof call.track_key === "string" && call.track_key.length > 0 ? call.track_key : null),
+              playlist_track_key: call.track_key ?? null,
               call_index: call.call_index,
               ball_number: call.ball_number,
               column_letter: call.column_letter,
@@ -85,8 +81,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
               album_name: call.album_name,
               side: call.side,
               position: call.position,
-              link_group: call.link_group ?? null,
-              theme_hint: call.theme_hint ?? null,
               metadata_locked: false,
               metadata_synced_at: null,
               status: "pending",
@@ -107,7 +101,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       const tracks = snapshotTracks.length > 0
         ? snapshotTracks
         : await resolvePlaylistTracksForPlaylists(db, playlistIdsForRound);
-      const rows = planRoundSessionCalls(tracks, sessionId, requestedRound, 0, { preservePlacement: snapshotTracks.length > 0 }).map((call, index) => ({
+      const rows = planRoundSessionCalls(tracks, sessionId, requestedRound).map((call, index) => ({
         id: -(index + 1),
         session_id: sessionId,
         playlist_track_key: call.playlist_track_key,
@@ -119,8 +113,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         album_name: call.album_name,
         side: call.side,
         position: call.position,
-        link_group: call.link_group ?? null,
-        theme_hint: call.theme_hint ?? null,
         metadata_locked: false,
         metadata_synced_at: null,
         status: "pending",

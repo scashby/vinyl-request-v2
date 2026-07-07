@@ -20,9 +20,6 @@ type Session = {
   status: string;
   recent_calls_limit: number;
   show_countdown: boolean;
-  countdown_started_at: string | null;
-  paused_remaining_seconds: number | null;
-  paused_at: string | null;
   next_game_scheduled_at: string | null;
   next_game_rules_text: string | null;
   welcome_heading_text?: string | null;
@@ -223,6 +220,7 @@ export default function BingoJumbotronPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
+  const [remaining, setRemaining] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
 
@@ -237,6 +235,7 @@ export default function BingoJumbotronPage() {
     if (sRes.ok) {
       const payload = await sRes.json();
       setSession(payload);
+      setRemaining(payload.seconds_to_next_call ?? 0);
     }
 
     if (cRes.ok) {
@@ -279,34 +278,15 @@ export default function BingoJumbotronPage() {
   useEffect(() => {
     const tick = setInterval(() => {
       setNow(Date.now());
-    }, 250);
+      setRemaining((value) => {
+        if (!session || session.status === "paused" || session.status === "completed") return value;
+        // Only freeze the countdown for the pending overlay
+        if (session.bingo_overlay === "pending") return value;
+        return value - 1;
+      });
+    }, 1000);
     return () => clearInterval(tick);
-  }, []);
-
-  const remaining = useMemo(() => {
-    if (!session) return 0;
-
-    // Keep countdown fixed while paused/completed/pending to match gameplay state.
-    if (session.status === "paused" || session.status === "completed" || session.bingo_overlay === "pending") {
-      return Math.max(0, session.paused_remaining_seconds ?? session.seconds_to_next_call ?? 0);
-    }
-
-    if (session.paused_at) {
-      return Math.max(0, session.paused_remaining_seconds ?? session.seconds_to_next_call ?? 0);
-    }
-
-    if (!session.countdown_started_at) {
-      return Math.max(0, session.seconds_to_next_call ?? 0);
-    }
-
-    const startedAt = new Date(session.countdown_started_at).getTime();
-    if (!Number.isFinite(startedAt)) {
-      return Math.max(0, session.seconds_to_next_call ?? 0);
-    }
-
-    const remainingMs = (session.seconds_to_next_call ?? 0) * 1000 - (now - startedAt);
-    return Math.max(0, Math.ceil(remainingMs / 1000));
-  }, [session, now]);
+  }, [session]);
 
   // F key shortcut for fullscreen. Keep control hidden on-screen.
   const toggleFullscreen = useCallback(() => {
@@ -343,7 +323,7 @@ export default function BingoJumbotronPage() {
 
     // If the calls realtime update arrived before the session update, session.current_call_index
     // will lag behind current.call_index. Treat this as "hidden" to prevent a flash of unblurred text.
-    if (current !== null && (session?.current_call_index ?? -1) < current.call_index - 1) return "hidden";
+    if (current !== null && (session?.current_call_index ?? -1) < current.call_index) return "hidden";
 
     if (!session?.call_reveal_at) return "hidden";
 
@@ -367,7 +347,6 @@ export default function BingoJumbotronPage() {
 
   const artistHidden = revealPhase === "hidden" || revealPhase === "theme";
   const titleHidden = revealPhase !== "full";
-  const themeHidden = revealPhase === "hidden";
 
   const maskTextClass = (hidden: boolean) => (hidden ? "blur-[0.28em] select-none opacity-80" : "transition-all duration-500");
 
@@ -662,17 +641,17 @@ export default function BingoJumbotronPage() {
                     <p className={`mt-[0.4vw] font-black leading-tight text-amber-100 ${maskTextClass(titleHidden)}`} style={{ fontSize: "4.5vw" }}>
                       {current ? current.track_title : "..."}
                     </p>
-                    <p className={`mt-[0.2vw] font-semibold text-stone-300 ${maskTextClass(artistHidden)}`} style={{ fontSize: "2.7vw" }}>
-                      {current ? current.artist_name : ""}
-                    </p>
                     {session?.theme_enabled && current?.theme_hint ? (
                       <p
-                        className={`mt-[0.45vw] font-semibold text-amber-300 ${maskTextClass(themeHidden)}`}
+                        className={`mt-[0.3vw] font-semibold text-amber-300 transition-all duration-500 ${revealPhase === "hidden" || revealPhase === "full" ? "opacity-0" : "opacity-100"}`}
                         style={{ fontSize: "2.2vw" }}
                       >
                         {current.theme_hint}
                       </p>
                     ) : null}
+                    <p className={`mt-[0.2vw] font-semibold text-stone-300 ${maskTextClass(artistHidden)}`} style={{ fontSize: "2.7vw" }}>
+                      {current ? current.artist_name : ""}
+                    </p>
                   </>
                 ) : null}
               </div>
