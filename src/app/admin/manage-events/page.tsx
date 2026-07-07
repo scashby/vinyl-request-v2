@@ -71,7 +71,7 @@ export default function Page() {
       const { data: eventsData, error } = await supabase
         .from('events')
         .select('*')
-        .order('date', { ascending: true });
+        .order('date', { ascending: false });
         
       if (!error && eventsData) setEvents(eventsData as Event[]);
     }
@@ -79,7 +79,7 @@ export default function Page() {
   }, []);
 
   const refreshEvents = async () => {
-    const { data } = await supabase.from('events').select('*').order('date', { ascending: true });
+    const { data } = await supabase.from('events').select('*').order('date', { ascending: false });
     setEvents((data as Event[]) || []);
   };
 

@@ -39,6 +39,10 @@ interface DateObj {
 }
 
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
+const IMAGE_FOCUS_COVER_TAG_PREFIX = 'image_focus_cover:';
+const IMAGE_FOCUS_SQUARE_TAG_PREFIX = 'image_focus_square:';
+
+type ImageFocusPoint = { x: number; y: number };
 
 const normalizeStringArray = (value: unknown): string[] => {
   if (Array.isArray(value)) return value;
@@ -58,6 +62,22 @@ const getDisplayTitle = (event: Event): string => {
   const eventType = getTagValue(tags, EVENT_TYPE_TAG_PREFIX);
   if (eventType === 'private-dj') return 'Private Event';
   return event.title;
+};
+
+const clampFocusValue = (value: number): number => {
+  if (!Number.isFinite(value)) return 50;
+  return Math.min(100, Math.max(0, Math.round(value)));
+};
+
+const getImageFocusFromTags = (tagsValue: unknown, prefix: string): ImageFocusPoint => {
+  const tags = normalizeStringArray(tagsValue);
+  const raw = getTagValue(tags, prefix);
+  if (!raw) return { x: 50, y: 50 };
+  const [xRaw, yRaw] = raw.split(':');
+  return {
+    x: clampFocusValue(Number.parseFloat(xRaw ?? '50')),
+    y: clampFocusValue(Number.parseFloat(yRaw ?? '50')),
+  };
 };
 
 export default function Page() {
@@ -250,6 +270,10 @@ export default function Page() {
                         ev.date === "" ||
                         ev.date === "9999-12-31";
                       const displayTitle = getDisplayTitle(ev);
+                      const coverFocus = getImageFocusFromTags(
+                        ev.allowed_tags,
+                        IMAGE_FOCUS_COVER_TAG_PREFIX
+                      );
 
                       return (
                         <Link
@@ -265,6 +289,7 @@ export default function Page() {
                                 fill
                                 sizes="(max-width:900px) 100vw, 700px"
                                 className="object-cover"
+                                style={{ objectPosition: `${coverFocus.x}% ${coverFocus.y}%` }}
                                 unoptimized
                               />
                             </div>
@@ -302,6 +327,10 @@ export default function Page() {
                       const d = compactDate(e.date);
                       const tba = !e.date || e.date === "" || e.date === "9999-12-31";
                       const displayTitle = getDisplayTitle(e);
+                      const squareFocus = getImageFocusFromTags(
+                        e.allowed_tags,
+                        IMAGE_FOCUS_SQUARE_TAG_PREFIX
+                      );
 
                       return (
                         <Link
@@ -317,6 +346,7 @@ export default function Page() {
                                 fill
                                 sizes="280px"
                                 className="object-cover"
+                                style={{ objectPosition: `${squareFocus.x}% ${squareFocus.y}%` }}
                                 unoptimized
                               />
                             </div>
@@ -351,6 +381,10 @@ export default function Page() {
                       const img =
                         e.image_url || "/images/coverplaceholder.png";
                       const displayTitle = getDisplayTitle(e);
+                      const squareFocus = getImageFocusFromTags(
+                        e.allowed_tags,
+                        IMAGE_FOCUS_SQUARE_TAG_PREFIX
+                      );
 
                       return (
                         <Link
@@ -368,6 +402,7 @@ export default function Page() {
                                 fill
                                 sizes="150px"
                                 className="object-cover"
+                                style={{ objectPosition: `${squareFocus.x}% ${squareFocus.y}%` }}
                                 unoptimized
                               />
                             </div>

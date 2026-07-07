@@ -22,6 +22,12 @@ const EVENT_TYPE_SETTINGS_KEY = 'event_type_config';
 
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
 const EVENT_SUBTYPE_TAG_PREFIX = 'event_subtype:';
+const IMAGE_FOCUS_COVER_TAG_PREFIX = 'image_focus_cover:';
+const IMAGE_FOCUS_SQUARE_TAG_PREFIX = 'image_focus_square:';
+
+type ImageFocusPoint = { x: number; y: number };
+
+const DEFAULT_IMAGE_FOCUS: ImageFocusPoint = { x: 50, y: 50 };
 
 const TEMPLATE_FIELDS = ['date', 'time', 'location', 'image_url', 'venue_logo_url', 'info', 'info_url', 'queue', 'recurrence', 'crate', 'formats'];
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
@@ -213,6 +219,27 @@ function buildTag(prefix: string, value?: string) {
   return `${prefix}${value}`;
 }
 
+function clampFocusValue(value: number): number {
+  if (!Number.isFinite(value)) return 50;
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+function parseImageFocusTag(tags: string[], prefix: string): ImageFocusPoint {
+  const value = getTagValue(tags, prefix);
+  if (!value) return DEFAULT_IMAGE_FOCUS;
+  const [xRaw, yRaw] = value.split(':');
+  const x = Number.parseFloat(xRaw ?? '50');
+  const y = Number.parseFloat(yRaw ?? '50');
+  return {
+    x: clampFocusValue(x),
+    y: clampFocusValue(y),
+  };
+}
+
+function buildImageFocusTag(prefix: string, focus: ImageFocusPoint): string {
+  return `${prefix}${clampFocusValue(focus.x)}:${clampFocusValue(focus.y)}`;
+}
+
 function normalizeOptionalText(value: unknown): string {
   if (typeof value !== 'string') return '';
   return value.trim();
@@ -334,6 +361,8 @@ export default function EditEventForm({
   const [isRegeneratingChildren, setIsRegeneratingChildren] = useState(false);
   const [showImageSelector, setShowImageSelector] = useState(false);
   const [showVenueLogoSelector, setShowVenueLogoSelector] = useState(false);
+  const [imageFocusCover, setImageFocusCover] = useState<ImageFocusPoint>(DEFAULT_IMAGE_FOCUS);
+  const [imageFocusSquare, setImageFocusSquare] = useState<ImageFocusPoint>(DEFAULT_IMAGE_FOCUS);
   const [selectedGameSlug, setSelectedGameSlug] = useState<string>(EVENT_GAME_OPTIONS[0]?.slug ?? 'bingo');
   const [eventTypeConfig, setEventTypeConfig] = useState<EventTypeConfigState>(() =>
     normalizeEventTypeConfig(defaultEventTypeConfig)
@@ -583,6 +612,8 @@ export default function EditEventForm({
           info_url: copiedEvent?.info_url ?? '',
           is_recurring: false
         }));
+        setImageFocusCover(parseImageFocusTag(normalizedTags, IMAGE_FOCUS_COVER_TAG_PREFIX));
+        setImageFocusSquare(parseImageFocusTag(normalizedTags, IMAGE_FOCUS_SQUARE_TAG_PREFIX));
       } else if (editEventId) {
         const { data, error } = await supabase
           .from('events')
@@ -624,6 +655,8 @@ export default function EditEventForm({
             is_featured_upnext: !!dbEvent.is_featured_upnext,
             featured_priority: dbEvent.featured_priority ?? null,
           });
+          setImageFocusCover(parseImageFocusTag(normalizedTags, IMAGE_FOCUS_COVER_TAG_PREFIX));
+          setImageFocusSquare(parseImageFocusTag(normalizedTags, IMAGE_FOCUS_SQUARE_TAG_PREFIX));
           
           setSeriesParentId(parentId);
           setSelectedSeriesEventId(dbEvent.id);
@@ -740,6 +773,8 @@ export default function EditEventForm({
         is_featured_upnext: !!dbEvent.is_featured_upnext,
         featured_priority: dbEvent.featured_priority ?? null,
       }));
+      setImageFocusCover(parseImageFocusTag(normalizedTags, IMAGE_FOCUS_COVER_TAG_PREFIX));
+      setImageFocusSquare(parseImageFocusTag(normalizedTags, IMAGE_FOCUS_SQUARE_TAG_PREFIX));
     }
   };
 
@@ -982,6 +1017,8 @@ export default function EditEventForm({
       const allowedTags = [
         buildTag(EVENT_TYPE_TAG_PREFIX, eventData.event_type),
         buildTag(EVENT_SUBTYPE_TAG_PREFIX, eventData.event_subtype),
+        buildImageFocusTag(IMAGE_FOCUS_COVER_TAG_PREFIX, imageFocusCover),
+        buildImageFocusTag(IMAGE_FOCUS_SQUARE_TAG_PREFIX, imageFocusSquare),
       ].filter(Boolean) as string[];
       const normalizedFormats = eventData.allowed_formats
         .map((format) => format.trim())
@@ -1612,6 +1649,7 @@ export default function EditEventForm({
                             alt="Event"
                             fill
                             className="object-cover"
+                            style={{ objectPosition: `${imageFocusCover.x}% ${imageFocusCover.y}%` }}
                             unoptimized
                           />
                         ) : (
@@ -1644,6 +1682,105 @@ export default function EditEventForm({
                         className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
                         disabled={!showEventImage}
                       />
+                      {eventData.image_url ? (
+                        <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-3">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                            Crop / focal point
+                          </p>
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold text-gray-600">Cover / widescreen (16:9)</p>
+                              <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-gray-200 bg-black/60">
+                                <Image
+                                  src={eventData.image_url}
+                                  alt="Cover focus preview"
+                                  fill
+                                  className="object-cover"
+                                  style={{ objectPosition: `${imageFocusCover.x}% ${imageFocusCover.y}%` }}
+                                  unoptimized
+                                />
+                              </div>
+                              <label className="block text-[11px] font-medium text-gray-500">
+                                Horizontal {imageFocusCover.x}%
+                              </label>
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={imageFocusCover.x}
+                                onChange={(e) =>
+                                  setImageFocusCover((prev) => ({
+                                    ...prev,
+                                    x: clampFocusValue(Number.parseInt(e.target.value, 10)),
+                                  }))
+                                }
+                                className="w-full"
+                              />
+                              <label className="block text-[11px] font-medium text-gray-500">
+                                Vertical {imageFocusCover.y}%
+                              </label>
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={imageFocusCover.y}
+                                onChange={(e) =>
+                                  setImageFocusCover((prev) => ({
+                                    ...prev,
+                                    y: clampFocusValue(Number.parseInt(e.target.value, 10)),
+                                  }))
+                                }
+                                className="w-full"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold text-gray-600">Square / profile (1:1)</p>
+                              <div className="relative w-full aspect-square rounded-lg overflow-hidden border border-gray-200 bg-black/60">
+                                <Image
+                                  src={eventData.image_url}
+                                  alt="Square focus preview"
+                                  fill
+                                  className="object-cover"
+                                  style={{ objectPosition: `${imageFocusSquare.x}% ${imageFocusSquare.y}%` }}
+                                  unoptimized
+                                />
+                              </div>
+                              <label className="block text-[11px] font-medium text-gray-500">
+                                Horizontal {imageFocusSquare.x}%
+                              </label>
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={imageFocusSquare.x}
+                                onChange={(e) =>
+                                  setImageFocusSquare((prev) => ({
+                                    ...prev,
+                                    x: clampFocusValue(Number.parseInt(e.target.value, 10)),
+                                  }))
+                                }
+                                className="w-full"
+                              />
+                              <label className="block text-[11px] font-medium text-gray-500">
+                                Vertical {imageFocusSquare.y}%
+                              </label>
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={imageFocusSquare.y}
+                                onChange={(e) =>
+                                  setImageFocusSquare((prev) => ({
+                                    ...prev,
+                                    y: clampFocusValue(Number.parseInt(e.target.value, 10)),
+                                  }))
+                                }
+                                className="w-full"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   )}
 

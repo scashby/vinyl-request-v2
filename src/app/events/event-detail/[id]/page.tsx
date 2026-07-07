@@ -28,6 +28,7 @@ interface EventData {
 }
 
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
+const IMAGE_FOCUS_SQUARE_TAG_PREFIX = 'image_focus_square:';
 
 const normalizeStringArray = (value: unknown): string[] => {
   if (Array.isArray(value)) return value;
@@ -47,6 +48,22 @@ const getDisplayTitle = (eventData: EventData): string => {
   const eventType = getTagValue(tags, EVENT_TYPE_TAG_PREFIX);
   if (eventType === 'private-dj') return 'Private Event';
   return eventData.title;
+};
+
+const clampFocusValue = (value: number): number => {
+  if (!Number.isFinite(value)) return 50;
+  return Math.min(100, Math.max(0, Math.round(value)));
+};
+
+const getImageFocusFromTags = (tagsValue: unknown, prefix: string): { x: number; y: number } => {
+  const tags = normalizeStringArray(tagsValue);
+  const raw = getTagValue(tags, prefix);
+  if (!raw) return { x: 50, y: 50 };
+  const [xRaw, yRaw] = raw.split(':');
+  return {
+    x: clampFocusValue(Number.parseFloat(xRaw ?? '50')),
+    y: clampFocusValue(Number.parseFloat(yRaw ?? '50')),
+  };
 };
 
 export default function Page() {
@@ -141,6 +158,7 @@ export default function Page() {
   const imageSrc = image_url?.includes('dropbox.com')
     ? image_url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace(/\?.*$/, '')
     : image_url || '/images/event-header-still.jpg';
+  const squareFocus = getImageFocusFromTags(allowed_tags, IMAGE_FOCUS_SQUARE_TAG_PREFIX);
 
   const goToBrowse = () => {
     router.push(`/browse/browse-albums?eventId=${event.id}`);
@@ -201,6 +219,7 @@ export default function Page() {
                   alt={displayTitle}
                   fill
                   className="object-cover"
+                  style={{ objectPosition: `${squareFocus.x}% ${squareFocus.y}%` }}
                   unoptimized
                 />
               </div>

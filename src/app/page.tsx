@@ -291,20 +291,8 @@ export default function Page() {
   };
 
   const tickerItems = useMemo(() => {
-    const ids = new Set<number>();
-    const items: Event[] = [];
-    const addItems = (list: Event[]) => {
-      list.forEach((event) => {
-        if (ids.has(event.id)) return;
-        ids.add(event.id);
-        items.push(event);
-      });
-    };
-    addItems(upcomingEvents.slice(0, 8));
-    addItems(justAddedEvents.slice(0, 6));
-    addItems(featuredEvents.slice(0, 6));
-    return items;
-  }, [upcomingEvents, justAddedEvents, featuredEvents]);
+    return upcomingEvents.slice(0, 12);
+  }, [upcomingEvents]);
 
   return (
     <div className="min-h-screen font-sans bg-black flex flex-col justify-between">

@@ -381,35 +381,25 @@ export default async function GamesPage() {
           )}
 
           {/* Upcoming events */}
-          <section className="mb-14">
-            <div className="flex items-end justify-between gap-6 flex-wrap mb-6">
-              <div>
-                <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
-                  Upcoming game nights
-                </h2>
-                <p className="mt-1 text-zinc-400 text-sm">
-                  All events with a game session attached.
-                </p>
-              </div>
-              <Link
-                href="/events/events-page"
-                className="text-sm text-[#b8efff] hover:text-white transition-colors font-medium"
-              >
-                All events →
-              </Link>
-            </div>
-
-            {gameNights.length === 0 ? (
-              <div className="rounded-2xl bg-zinc-950/70 ring-1 ring-white/10 p-8 text-center">
-                <p className="text-zinc-400">No upcoming game nights yet.</p>
+          {gameNights.length > 0 ? (
+            <section className="mb-14">
+              <div className="flex items-end justify-between gap-6 flex-wrap mb-6">
+                <div>
+                  <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
+                    Upcoming game nights
+                  </h2>
+                  <p className="mt-1 text-zinc-400 text-sm">
+                    All events with a game session attached.
+                  </p>
+                </div>
                 <Link
-                  href="/about"
-                  className="mt-4 inline-flex items-center text-sm font-semibold text-[#b8efff] hover:text-white transition-colors"
+                  href="/events/events-page"
+                  className="text-sm text-[#b8efff] hover:text-white transition-colors font-medium"
                 >
-                  Book the first one →
+                  All events →
                 </Link>
               </div>
-            ) : (
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {gameNights.map((event) => (
                   <Link
@@ -453,8 +443,16 @@ export default async function GamesPage() {
                   </Link>
                 ))}
               </div>
-            )}
-          </section>
+            </section>
+          ) : (
+            <section className="mb-14">
+              <div className="rounded-2xl bg-zinc-950/70 ring-1 ring-white/10 p-8 text-center">
+                <p className="text-zinc-300">
+                  Follow us on Instagram, Facebook, and other socials @deadwaxdialogues.
+                </p>
+              </div>
+            </section>
+          )}
 
           {/* Coming soon */}
           {comingSoonGames.length > 0 && (
