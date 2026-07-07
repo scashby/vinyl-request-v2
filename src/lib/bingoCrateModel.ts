@@ -71,6 +71,10 @@ type SessionPlaylistBackfillRow = {
   active_playlist_letter_by_round: SessionActivePlaylistEntry[] | null;
 };
 
+type DynamicUpdateResult = Promise<{ error: { message: string } | null }> & {
+  eq: (column: string, value: string | number) => Promise<{ error: { message: string } | null }>;
+};
+
 function getDynamicTableDb(db: ReturnType<typeof getBingoDb>): {
   from: (tableName: string) => {
     select: (columns: string) => {
@@ -92,9 +96,7 @@ function getDynamicTableDb(db: ReturnType<typeof getBingoDb>): {
       };
     };
     update: (payload: Record<string, unknown>) => {
-      eq: (column: string, value: string | number) => {
-        eq: (column: string, value: string | number) => Promise<{ error: { message: string } | null }>;
-      };
+      eq: (column: string, value: string | number) => DynamicUpdateResult;
     };
     delete: () => {
       eq: (column: string, value: string | number) => {
@@ -124,9 +126,7 @@ function getDynamicTableDb(db: ReturnType<typeof getBingoDb>): {
         };
       };
       update: (payload: Record<string, unknown>) => {
-        eq: (column: string, value: string | number) => {
-          eq: (column: string, value: string | number) => Promise<{ error: { message: string } | null }>;
-        };
+        eq: (column: string, value: string | number) => DynamicUpdateResult;
       };
       delete: () => {
         eq: (column: string, value: string | number) => {
