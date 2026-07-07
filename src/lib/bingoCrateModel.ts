@@ -92,7 +92,9 @@ function getDynamicTableDb(db: ReturnType<typeof getBingoDb>): {
       };
     };
     update: (payload: Record<string, unknown>) => {
-      eq: (column: string, value: string | number) => Promise<{ error: { message: string } | null }>;
+      eq: (column: string, value: string | number) => {
+        eq: (column: string, value: string | number) => Promise<{ error: { message: string } | null }>;
+      };
     };
     delete: () => {
       eq: (column: string, value: string | number) => {
@@ -122,7 +124,9 @@ function getDynamicTableDb(db: ReturnType<typeof getBingoDb>): {
         };
       };
       update: (payload: Record<string, unknown>) => {
-        eq: (column: string, value: string | number) => Promise<{ error: { message: string } | null }>;
+        eq: (column: string, value: string | number) => {
+          eq: (column: string, value: string | number) => Promise<{ error: { message: string } | null }>;
+        };
       };
       delete: () => {
         eq: (column: string, value: string | number) => {
