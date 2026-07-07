@@ -35,6 +35,13 @@ const GAME_CONFIG: Record<PlaylistSeededGameSlug, GameConfig> = {
   "genre-imposter": { callTable: "gi_session_calls", titleField: "title" },
 };
 
+const GAME_SESSION_TABLE: Record<PlaylistSeededGameSlug, string> = {
+  bingo: "bingo_sessions",
+  trivia: "trivia_sessions",
+  "name-that-tune": "ntt_sessions",
+  "genre-imposter": "gi_sessions",
+};
+
 const PLACEHOLDER_TITLE_RE = /^track\s+[a-z]?\d+[a-z]?$/i;
 
 function isPlaceholderTitle(value: unknown): boolean {
@@ -79,6 +86,65 @@ function hasDiff(row: Record<string, unknown>, patch: Record<string, unknown>): 
     const current = row[key];
     return current !== nextValue;
   });
+}
+
+async function loadDisplayTitleOverridesForGameSession(
+  game: PlaylistSeededGameSlug,
+  sessionId: number,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  dbAny: any
+): Promise<Map<string, string> | undefined> {
+  const sessionTable = GAME_SESSION_TABLE[game];
+  const selectClause = game === "bingo"
+    ? "playlist_id, playlist_ids, round_playlist_ids"
+    : "playlist_id";
+
+  const { data: sessionRow, error } = await dbAny
+    .from(sessionTable)
+    .select(selectClause)
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!sessionRow) return undefined;
+
+  const sourceIds = game === "bingo"
+    ? (() => {
+        const roundPlaylistIds = Array.isArray(sessionRow.round_playlist_ids)
+          ? (sessionRow.round_playlist_ids as Array<{ playlist_ids?: number[] }>).flatMap((row) => row.playlist_ids ?? [])
+          : [];
+
+        return Array.from(
+          new Set(
+            [
+              typeof sessionRow.playlist_id === "number" ? sessionRow.playlist_id : null,
+              ...(Array.isArray(sessionRow.playlist_ids) ? (sessionRow.playlist_ids as number[]) : []),
+              ...roundPlaylistIds,
+            ].filter((id): id is number => typeof id === "number" && id > 0)
+          )
+        );
+      })()
+    : (() => {
+        const playlistId = typeof sessionRow.playlist_id === "number" ? sessionRow.playlist_id : null;
+        return playlistId && playlistId > 0 ? [playlistId] : [];
+      })();
+
+  if (sourceIds.length === 0) return undefined;
+
+  const { data: overrideRows, error: overrideError } = await dbAny
+    .from("collection_playlist_items")
+    .select("track_key, display_title")
+    .in("playlist_id", sourceIds)
+    .not("display_title", "is", null);
+
+  if (overrideError) throw new Error(overrideError.message);
+  if (!Array.isArray(overrideRows) || overrideRows.length === 0) return undefined;
+
+  return new Map(
+    (overrideRows as Array<{ track_key: string; display_title: string | null }>)
+      .filter((row) => row.display_title)
+      .map((row) => [row.track_key, row.display_title as string])
+  );
 }
 
 export async function rehydrateBingoCardLabels(sessionId: number): Promise<void> {
@@ -215,43 +281,12 @@ export async function syncSessionPlaylistMetadata(
   );
   const resolvedMap = await resolveTrackKeys(db, keys);
 
-  // For bingo sessions, apply per-playlist display_title overrides on top of the
-  // resolved titles so that Refresh Metadata respects user-set display titles.
-  if (game === "bingo") {
-    const { data: sessionRow } = await dbAny
-      .from("bingo_sessions")
-      .select("playlist_id, playlist_ids, round_playlist_ids")
-      .eq("id", sessionId)
-      .maybeSingle();
-
-    if (sessionRow) {
-      const roundPlaylistIds = Array.isArray(sessionRow.round_playlist_ids)
-        ? (sessionRow.round_playlist_ids as Array<{ playlist_ids?: number[] }>).flatMap((r) => r.playlist_ids ?? [])
-        : [];
-      const sourceIds = Array.from(
-        new Set(
-          [
-            typeof sessionRow.playlist_id === "number" ? sessionRow.playlist_id : null,
-            ...(Array.isArray(sessionRow.playlist_ids) ? (sessionRow.playlist_ids as number[]) : []),
-            ...roundPlaylistIds,
-          ].filter((id): id is number => typeof id === "number" && id > 0)
-        )
-      );
-
-      if (sourceIds.length > 0) {
-        const { data: overrideRows } = await dbAny
-          .from("collection_playlist_items")
-          .select("track_key, display_title")
-          .in("playlist_id", sourceIds)
-          .not("display_title", "is", null);
-
-        for (const row of (overrideRows ?? []) as Array<{ track_key: string; display_title: string | null }>) {
-          if (!row.display_title) continue;
-          const existing = resolvedMap.get(row.track_key);
-          if (existing) {
-            resolvedMap.set(row.track_key, { ...existing, track_title: row.display_title });
-          }
-        }
+  const displayTitleOverrides = await loadDisplayTitleOverridesForGameSession(game, sessionId, dbAny);
+  if (displayTitleOverrides && displayTitleOverrides.size > 0) {
+    for (const [trackKey, displayTitle] of displayTitleOverrides.entries()) {
+      const existing = resolvedMap.get(trackKey);
+      if (existing) {
+        resolvedMap.set(trackKey, { ...existing, track_title: displayTitle });
       }
     }
   }

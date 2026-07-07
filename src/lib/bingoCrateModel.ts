@@ -542,6 +542,49 @@ export async function syncCollectionPlaylistMirrorsForSession(
   }
 }
 
+export async function syncStoredPlaylistCallOrderTitlesForSession(
+  db: ReturnType<typeof getBingoDb>,
+  sessionId: number
+): Promise<void> {
+  const sessionRow = await selectSessionPlaylistBackfillRow(db, sessionId);
+  const displayTitleOverrides = await loadDisplayTitleOverridesForSession(db, sessionRow);
+  if (!displayTitleOverrides || displayTitleOverrides.size === 0) {
+    return;
+  }
+
+  const playlists = await getPlaylistsForSession(db, sessionId);
+  for (const playlist of playlists) {
+    const nextCallOrder = playlist.call_order.map((entry) => {
+      const trackKey =
+        (typeof entry.track_key === "string" && entry.track_key.length > 0 ? entry.track_key : null) ??
+        (typeof entry.playlist_track_key === "string" && entry.playlist_track_key.length > 0 ? entry.playlist_track_key : null);
+      const displayTitle = trackKey ? displayTitleOverrides.get(trackKey) : undefined;
+      if (!displayTitle || displayTitle === entry.track_title) {
+        return entry;
+      }
+
+      return {
+        ...entry,
+        track_title: displayTitle,
+      };
+    });
+
+    const changed = nextCallOrder.some((entry, index) => entry !== playlist.call_order[index]);
+    if (!changed) continue;
+
+    await withPlaylistTableFallback<void>(async (tableName, _selectClause, letterColumn) => {
+      const updateColumn = tableName === GAME_PLAYLISTS_TABLE ? "playlist_letter" : "crate_letter";
+      const { error } = await getDynamicTableDb(db)
+        .from(tableName)
+        .update({ call_order: nextCallOrder as unknown as Record<string, unknown>[] })
+        .eq("session_id", sessionId)
+        .eq(updateColumn, playlist.playlist_letter);
+
+      if (error) throw new Error(error.message);
+    });
+  }
+}
+
 /** Sync all game playlists across all sessions to their collection mirrors. */
 export async function syncCollectionPlaylistMirrorsForAllSessions(
   db: ReturnType<typeof getBingoDb>
