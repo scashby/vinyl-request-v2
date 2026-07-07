@@ -2110,7 +2110,7 @@ function CollectionBrowserPage() {
 
     const { data: playlistItems, error: itemsError } = await supabase
       .from('collection_playlist_items')
-      .select('playlist_id, track_key, sort_order, link_group, theme_hint')
+      .select('playlist_id, track_key, sort_order, link_group, theme_hint, display_title')
       .order('sort_order', { ascending: true });
 
     if (itemsError) {
@@ -2134,6 +2134,13 @@ function CollectionBrowserPage() {
       return acc;
     }, {} as Record<number, Record<string, string>>);
 
+    const displayTitlesByPlaylist = (playlistItems ?? []).reduce((acc, item) => {
+      if (!item.playlist_id || !item.track_key || !item.display_title) return acc;
+      if (!acc[item.playlist_id]) acc[item.playlist_id] = {};
+      acc[item.playlist_id][item.track_key] = item.display_title;
+      return acc;
+    }, {} as Record<number, Record<string, string>>);
+
     const themeHintsByPlaylist = (playlistItems ?? []).reduce((acc, item) => {
       if (!item.playlist_id || !item.track_key || !item.theme_hint) return acc;
       if (!acc[item.playlist_id]) acc[item.playlist_id] = {};
@@ -2148,6 +2155,7 @@ function CollectionBrowserPage() {
       color: row.color || '#3578b3',
       coverImageUrl: row.cover_image_url ?? null,
       trackKeys: tracksByPlaylist[row.id] ?? [],
+      trackDisplayTitles: displayTitlesByPlaylist[row.id] ?? {},
       trackLinkGroups: linkGroupsByPlaylist[row.id] ?? {},
       trackThemeHints: themeHintsByPlaylist[row.id] ?? {},
       createdAt: row.created_at || new Date().toISOString(),
@@ -3451,7 +3459,7 @@ function CollectionBrowserPage() {
     });
   }, []);
 
-  const handleCreatePlaylist = useCallback(async (playlist: { name: string; icon: string; color: string; coverImageUrl?: string | null; trackKeys: string[]; trackLinkGroups?: Record<string, string>; trackThemeHints?: Record<string, string> }) => {
+  const handleCreatePlaylist = useCallback(async (playlist: { name: string; icon: string; color: string; coverImageUrl?: string | null; trackKeys: string[]; trackDisplayTitles?: Record<string, string>; trackLinkGroups?: Record<string, string>; trackThemeHints?: Record<string, string> }) => {
     try {
       const maxSort = playlists.reduce((max, item) => Math.max(max, item.sortOrder ?? 0), -1);
       const nextSortOrder = maxSort + 1;
@@ -3482,6 +3490,7 @@ function CollectionBrowserPage() {
           playlist_id: data.id,
           track_key: trackKey,
           sort_order: index,
+          display_title: playlist.trackDisplayTitles?.[trackKey] ?? null,
           link_group: playlist.trackLinkGroups?.[trackKey] ?? null,
           theme_hint: playlist.trackThemeHints?.[trackKey] ?? null,
         }));
@@ -3550,6 +3559,7 @@ function CollectionBrowserPage() {
             playlist_id: playlist.id,
             track_key: trackKey,
             sort_order: i + index,
+            display_title: playlist.trackDisplayTitles?.[trackKey] ?? previous?.trackDisplayTitles?.[trackKey] ?? null,
             link_group: playlist.trackLinkGroups?.[trackKey] ?? previous?.trackLinkGroups?.[trackKey] ?? null,
             theme_hint: playlist.trackThemeHints?.[trackKey] ?? previous?.trackThemeHints?.[trackKey] ?? null,
           }));

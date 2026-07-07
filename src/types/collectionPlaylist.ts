@@ -5,6 +5,7 @@ export interface CollectionPlaylist {
   color: string;
   coverImageUrl?: string | null;
   trackKeys: string[];
+  trackDisplayTitles?: Record<string, string>; // sparse: trackKey → per-playlist display title override
   trackLinkGroups?: Record<string, string>; // sparse: trackKey → linkGroup (only linked tracks)
   trackThemeHints?: Record<string, string>; // sparse: trackKey → theme hint (e.g. "From the movie Fight Club")
   createdAt: string;

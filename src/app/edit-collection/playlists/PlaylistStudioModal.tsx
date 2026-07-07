@@ -110,7 +110,7 @@ interface PlaylistStudioModalProps {
   onReorderPlaylists: (playlists: CollectionPlaylist[]) => Promise<void>;
   onDeletePlaylist: (playlistId: number, playlistName: string) => Promise<void>;
   onDeleteAllPlaylists: () => Promise<void>;
-  onCreateManualPlaylist: (playlist: { name: string; icon: string; color: string; coverImageUrl?: string | null; trackKeys: string[]; trackLinkGroups?: Record<string, string>; trackThemeHints?: Record<string, string> }) => Promise<void>;
+  onCreateManualPlaylist: (playlist: { name: string; icon: string; color: string; coverImageUrl?: string | null; trackKeys: string[]; trackDisplayTitles?: Record<string, string>; trackLinkGroups?: Record<string, string>; trackThemeHints?: Record<string, string> }) => Promise<void>;
   onCreateSmartPlaylist: (payload: {
     name: string;
     color: string;
@@ -564,6 +564,14 @@ export function PlaylistStudioModal({
       if (track.link_group) groups[track.track_key] = track.link_group;
     }
     return groups;
+  }, [manualTracks]);
+
+  const manualTrackDisplayTitles = useMemo(() => {
+    const titles: Record<string, string> = {};
+    for (const track of manualTracks) {
+      if (track.display_title) titles[track.track_key] = track.display_title;
+    }
+    return titles;
   }, [manualTracks]);
 
   const manualTrackThemeHints = useMemo(() => {
@@ -1079,6 +1087,7 @@ export function PlaylistStudioModal({
           color: manualColor,
           coverImageUrl: manualCoverImageUrl,
           trackKeys: manualTrackKeys,
+          trackDisplayTitles: manualTrackDisplayTitles,
           trackLinkGroups: manualTrackLinkGroups,
           trackThemeHints: manualTrackThemeHints,
         });
@@ -1090,6 +1099,7 @@ export function PlaylistStudioModal({
           color: manualColor,
           coverImageUrl: manualCoverImageUrl,
           trackKeys: manualTrackKeys,
+          trackDisplayTitles: manualTrackDisplayTitles,
           trackLinkGroups: manualTrackLinkGroups,
           trackThemeHints: manualTrackThemeHints,
         });
