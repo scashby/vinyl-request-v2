@@ -28,6 +28,7 @@ type Call = {
   id: number;
   round_number: number;
   call_index: number;
+  playlist_track_key: string | null;
   source_label: string | null;
   artist_answer: string;
   title_answer: string;
@@ -48,6 +49,17 @@ type LeaderboardRow = {
 };
 
 type ScoreDraft = Record<number, { artist_correct: boolean; title_correct: boolean; awarded_points: string }>;
+
+type InventorySearchCandidate = {
+  track_key: string;
+  inventory_id: number | null;
+  title: string;
+  artist: string;
+  album_title: string | null;
+  side: string | null;
+  position: string | null;
+  score: number;
+};
 
 function getDefaultPoints(artistCorrect: boolean, titleCorrect: boolean): number {
   if (artistCorrect && titleCorrect) return 2;
@@ -70,6 +82,12 @@ export default function NameThatTuneHostPage() {
   const [savingGap, setSavingGap] = useState(false);
   const [overlaySecondsInput, setOverlaySecondsInput] = useState(600);
   const [overlayBusy, setOverlayBusy] = useState(false);
+  const [swapTargetCall, setSwapTargetCall] = useState<Call | null>(null);
+  const [swapQuery, setSwapQuery] = useState("");
+  const [swapResults, setSwapResults] = useState<InventorySearchCandidate[]>([]);
+  const [swapSearching, setSwapSearching] = useState(false);
+  const [swapApplyingTrackKey, setSwapApplyingTrackKey] = useState<string | null>(null);
+  const [swapMessage, setSwapMessage] = useState<string | null>(null);
 
   const autoAdvanceLockRef = useRef(false);
 
@@ -360,6 +378,86 @@ export default function NameThatTuneHostPage() {
     }
   };
 
+  const searchSwapCandidates = useCallback(async () => {
+    const query = swapQuery.trim();
+    if (query.length < 2) {
+      setSwapResults([]);
+      return;
+    }
+
+    setSwapSearching(true);
+    try {
+      const url = new URL("/api/library/tracks/search", window.location.origin);
+      url.searchParams.set("q", query);
+      url.searchParams.set("limit", "12");
+
+      const response = await fetch(url.toString(), { cache: "no-store" });
+      const payload = (await response.json().catch(() => ({}))) as { results?: Array<Record<string, unknown>>; error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error ?? `Track search failed (${response.status})`);
+      }
+
+      const mapped = Array.isArray(payload.results)
+        ? payload.results
+            .map((row) => ({
+              track_key: String(row.track_key ?? "").trim(),
+              inventory_id: typeof row.inventory_id === "number" ? row.inventory_id : null,
+              title: String(row.track_title ?? row.title ?? "").trim(),
+              artist: String(row.track_artist ?? row.artist ?? "").trim(),
+              album_title: typeof row.album_title === "string" ? row.album_title : null,
+              side: typeof row.side === "string" ? row.side : null,
+              position: typeof row.position === "string" ? row.position : null,
+              score: typeof row.score === "number" ? row.score : 0,
+            }))
+            .filter((row) => row.track_key.length > 0)
+        : [];
+
+      setSwapResults(mapped);
+    } catch (error) {
+      setSwapMessage(error instanceof Error ? error.message : "Track search failed");
+      setSwapResults([]);
+    } finally {
+      setSwapSearching(false);
+    }
+  }, [swapQuery]);
+
+  const runSessionSwap = useCallback(async (candidate: InventorySearchCandidate) => {
+    if (!swapTargetCall?.playlist_track_key) return;
+
+    setSwapApplyingTrackKey(candidate.track_key);
+    setSwapMessage(null);
+    try {
+      const response = await fetch(`/api/games/name-that-tune/sessions/${sessionId}/swap-track`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fromTrackKey: swapTargetCall.playlist_track_key,
+          toTrackKey: candidate.track_key,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        counts?: { updated_session_calls?: number };
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? `Swap failed (${response.status})`);
+      }
+
+      const callsUpdated = payload.counts?.updated_session_calls ?? 0;
+      setSwapMessage(`Swap complete. Calls updated: ${callsUpdated}.`);
+      setSwapTargetCall(null);
+      setSwapQuery("");
+      setSwapResults([]);
+      await load();
+    } catch (error) {
+      setSwapMessage(error instanceof Error ? error.message : "Swap failed");
+    } finally {
+      setSwapApplyingTrackKey(null);
+    }
+  }, [load, sessionId, swapTargetCall]);
+
   const openWindow = useCallback((url: string, name: string, features: string) => {
     const opened = window.open(url, name, features);
     if (opened) {
@@ -499,6 +597,7 @@ export default function NameThatTuneHostPage() {
                     <th className="pb-2">Source</th>
                     <th className="pb-2">Snippet</th>
                     <th className="pb-2">Status</th>
+                    <th className="pb-2">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -526,11 +625,30 @@ export default function NameThatTuneHostPage() {
                       </td>
                       <td className="py-2">{call.snippet_duration_seconds}s</td>
                       <td className="py-2 text-stone-400">{call.status}</td>
+                      <td className="py-2">
+                        <button
+                          disabled={!call.playlist_track_key}
+                          onClick={() => {
+                            setSwapTargetCall(call);
+                            setSwapQuery("");
+                            setSwapResults([]);
+                            setSwapMessage(null);
+                          }}
+                          className={`rounded border px-2 py-1 text-[11px] font-semibold ${
+                            call.playlist_track_key
+                              ? "border-cyan-700/70 bg-cyan-950/30 text-cyan-200 hover:bg-cyan-900/45"
+                              : "cursor-not-allowed border-stone-800 bg-stone-900 text-stone-500"
+                          }`}
+                        >
+                          Swap
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            {swapMessage ? <p className="mt-2 text-xs text-cyan-200">{swapMessage}</p> : null}
           </section>
 
           <section className="space-y-4">
@@ -647,6 +765,86 @@ export default function NameThatTuneHostPage() {
           </section>
         </div>
       </div>
+
+      {swapTargetCall ? (
+        <div className="fixed inset-0 z-[5000] bg-black/70 p-4" onClick={() => setSwapTargetCall(null)}>
+          <div
+            className="mx-auto mt-10 w-full max-w-3xl rounded-2xl border border-cyan-900/60 bg-[#0a121d] p-4"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Swap Track</p>
+                <p className="mt-1 text-sm text-stone-200">
+                  Replacing: <span className="font-semibold">{swapTargetCall.title_answer}</span> - {swapTargetCall.artist_answer}
+                </p>
+              </div>
+              <button
+                onClick={() => setSwapTargetCall(null)}
+                className="rounded border border-stone-700 px-2 py-1 text-xs text-stone-300 hover:bg-stone-900"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                value={swapQuery}
+                onChange={(event) => setSwapQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void searchSwapCandidates();
+                  }
+                }}
+                placeholder="Search replacement track by title / artist"
+                className="w-full rounded border border-cyan-900/60 bg-[#0d1a2b] px-3 py-2 text-sm text-white"
+              />
+              <button
+                onClick={() => void searchSwapCandidates()}
+                disabled={swapSearching}
+                className={`rounded px-3 py-2 text-xs font-semibold ${
+                  swapSearching ? "bg-stone-700 text-stone-300" : "bg-cyan-800 text-white hover:bg-cyan-700"
+                }`}
+              >
+                {swapSearching ? "Searching..." : "Search"}
+              </button>
+            </div>
+
+            <div className="mt-3 max-h-[420px] overflow-y-auto rounded border border-cyan-950/60">
+              {swapResults.length === 0 ? (
+                <div className="px-3 py-6 text-xs text-stone-400">No results yet. Search to find a replacement track.</div>
+              ) : (
+                <div className="divide-y divide-cyan-950/40">
+                  {swapResults.map((row) => (
+                    <div key={row.track_key} className="flex items-center justify-between gap-3 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm text-stone-100">{row.title} - {row.artist}</p>
+                        <p className="truncate text-[11px] text-stone-400">
+                          {row.album_title ?? "Unknown Album"}
+                          {row.position ? ` · ${row.position}` : ""}
+                          {row.inventory_id ? ` · #${row.inventory_id}` : ""}
+                        </p>
+                      </div>
+                      <button
+                        disabled={swapApplyingTrackKey === row.track_key || row.track_key === swapTargetCall.playlist_track_key}
+                        onClick={() => void runSessionSwap(row)}
+                        className={`shrink-0 rounded px-2 py-1 text-xs font-semibold ${
+                          swapApplyingTrackKey === row.track_key || row.track_key === swapTargetCall.playlist_track_key
+                            ? "bg-stone-700 text-stone-300"
+                            : "bg-emerald-700 text-white hover:bg-emerald-600"
+                        }`}
+                      >
+                        {swapApplyingTrackKey === row.track_key ? "Applying..." : row.track_key === swapTargetCall.playlist_track_key ? "Current" : "Swap To This"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

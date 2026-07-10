@@ -299,6 +299,12 @@ const toCsvCell = (value: string | undefined) => {
 
 type ContextMenuState = { trackKey: string; index: number; x: number; y: number } | null;
 
+type SwapTrackModalState = {
+  sourceTrackKey: string;
+  sourceTitle: string;
+  sourceArtist: string;
+} | null;
+
 type SortableManualTrackRowProps = {
   track: PlaylistTrackItem;
   index: number;
@@ -474,6 +480,11 @@ export function PlaylistStudioModal({
   const [manualTrackSearch, setManualTrackSearch] = useState('');
   const [manualTrackSearchResults, setManualTrackSearchResults] = useState<InventorySearchCandidate[]>([]);
   const [manualTrackSearching, setManualTrackSearching] = useState(false);
+  const [swapTrackModal, setSwapTrackModal] = useState<SwapTrackModalState>(null);
+  const [swapTrackQuery, setSwapTrackQuery] = useState('');
+  const [swapTrackResults, setSwapTrackResults] = useState<InventorySearchCandidate[]>([]);
+  const [swapTrackSearching, setSwapTrackSearching] = useState(false);
+  const [swapTrackApplying, setSwapTrackApplying] = useState(false);
   const [manualSaving, setManualSaving] = useState(false);
 
   const [smartEditingId, setSmartEditingId] = useState<number | null>(null);
@@ -1068,6 +1079,126 @@ export function PlaylistStudioModal({
         .map((item, itemIndex) => ({ ...item, sort_order: itemIndex }))
     );
   };
+
+  const searchSwapTrackCandidates = useCallback(async () => {
+    const query = swapTrackQuery.trim();
+    if (query.length < 2) {
+      setSwapTrackResults([]);
+      return;
+    }
+
+    setSwapTrackSearching(true);
+    setError(null);
+    try {
+      const url = new URL('/api/library/tracks/search', window.location.origin);
+      url.searchParams.set('q', query);
+      url.searchParams.set('limit', '12');
+
+      const headers = await getSupabaseAuthHeaders();
+      const res = await fetch(url.toString(), { headers });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(payload, res));
+
+      const mapped = Array.isArray(payload.results)
+        ? (payload.results as Array<Record<string, unknown>>).map((item) => ({
+            track_key: String(item.track_key ?? '').trim(),
+            inventory_id: typeof item.inventory_id === 'number' ? item.inventory_id : null,
+            title: String(item.track_title ?? item.title ?? '').trim(),
+            artist: String(item.track_artist ?? item.artist ?? '').trim(),
+            album_title: typeof item.album_title === 'string' ? item.album_title.trim() : null,
+            side: typeof item.side === 'string' ? item.side : null,
+            position: typeof item.position === 'string' ? item.position : null,
+            score: typeof item.score === 'number' ? item.score : 0,
+          }))
+        : [];
+
+      setSwapTrackResults(mapped.filter((item) => item.track_key.length > 0));
+    } catch (searchError) {
+      setError(searchError instanceof Error ? searchError.message : 'Swap track search failed');
+      setSwapTrackResults([]);
+    } finally {
+      setSwapTrackSearching(false);
+    }
+  }, [formatApiError, getSupabaseAuthHeaders, swapTrackQuery]);
+
+  const applySwapTrack = useCallback(async (candidate: InventorySearchCandidate) => {
+    if (!swapTrackModal) return;
+
+    if (candidate.track_key === swapTrackModal.sourceTrackKey) {
+      setSwapTrackModal(null);
+      return;
+    }
+
+    const duplicate = manualTracks.some((track) => track.track_key === candidate.track_key);
+    if (duplicate) {
+      setError('That destination track is already in this playlist.');
+      return;
+    }
+
+    setSwapTrackApplying(true);
+    setError(null);
+    try {
+      if (manualEditingPlaylist?.id) {
+        const headers = await getSupabaseAuthHeaders();
+        const response = await fetch(`/api/playlists/${manualEditingPlaylist.id}/swap-track`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...headers,
+          },
+          body: JSON.stringify({
+            fromTrackKey: swapTrackModal.sourceTrackKey,
+            toTrackKey: candidate.track_key,
+          }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok && response.status !== 207) {
+          throw new Error(formatApiError(payload, response));
+        }
+
+        const failures = Array.isArray((payload as { failures?: unknown }).failures)
+          ? ((payload as { failures?: Array<{ game?: string; session_id?: number; error?: string }> }).failures ?? [])
+          : [];
+        if (failures.length > 0) {
+          const first = failures[0];
+          const summary = `${first.game ?? 'game'} session ${first.session_id ?? '?'}: ${first.error ?? 'failed'}`;
+          setNotice(`Playlist swap completed with warnings. ${summary}`);
+        } else {
+          setNotice(`Swapped track to "${candidate.title}" by ${candidate.artist}`);
+        }
+      }
+
+      setManualTracks((prev) => prev.map((track) => {
+        if (track.track_key !== swapTrackModal.sourceTrackKey) return track;
+        return {
+          ...track,
+          track_key: candidate.track_key,
+          track_title: candidate.title,
+          artist_name: candidate.artist,
+          album_name: candidate.album_title,
+          side: candidate.side,
+          position: candidate.position,
+          display_title: null,
+        };
+      }));
+
+      if (linkingTrackKey === swapTrackModal.sourceTrackKey) {
+        setLinkingTrackKey(candidate.track_key);
+      }
+      if (editingTitleKey === swapTrackModal.sourceTrackKey) {
+        setEditingTitleKey(null);
+        setEditingTitleValue('');
+      }
+
+      setSwapTrackModal(null);
+      setSwapTrackQuery('');
+      setSwapTrackResults([]);
+    } catch (swapError) {
+      setError(swapError instanceof Error ? swapError.message : 'Swap track failed');
+    } finally {
+      setSwapTrackApplying(false);
+    }
+  }, [editingTitleKey, formatApiError, getSupabaseAuthHeaders, linkingTrackKey, manualEditingPlaylist?.id, manualTracks, swapTrackModal]);
 
   const saveManualPlaylist = async () => {
     if (!manualName.trim()) {
@@ -3126,6 +3257,22 @@ export function PlaylistStudioModal({
               >
                 Edit display title…
               </button>
+              <button
+                className="w-full px-4 py-2 text-left text-sm text-[#7dd3fc] hover:bg-[#1e3050]"
+                onClick={() => {
+                  const source = manualTracks.find((t) => t.track_key === contextMenu.trackKey);
+                  setSwapTrackModal({
+                    sourceTrackKey: contextMenu.trackKey,
+                    sourceTitle: source?.track_title ?? source?.display_title ?? contextMenu.trackKey,
+                    sourceArtist: source?.artist_name ?? '',
+                  });
+                  setSwapTrackQuery('');
+                  setSwapTrackResults([]);
+                  setContextMenu(null);
+                }}
+              >
+                Swap track…
+              </button>
               {manualTracks.find((t) => t.track_key === contextMenu.trackKey)?.display_title && (
                 <button
                   className="w-full px-4 py-2 text-left text-sm text-[#94a3b8] hover:bg-[#1e3050]"
@@ -3183,6 +3330,102 @@ export function PlaylistStudioModal({
               )}
             </div>
           </>
+        )}
+
+        {swapTrackModal && (
+          <div className="fixed inset-0 z-[40010] bg-black/70 p-4" onClick={() => setSwapTrackModal(null)}>
+            <div
+              className="mx-auto mt-8 w-full max-w-3xl rounded-2xl border border-[#2c3e5c] bg-[#101d30] p-4 shadow-[0_12px_40px_rgba(0,0,0,0.65)]"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-[#8faddd]">Swap Playlist Track</p>
+                  <p className="mt-1 text-sm text-white">
+                    Replacing: <span className="font-semibold">{swapTrackModal.sourceTitle}</span>
+                    {swapTrackModal.sourceArtist ? ` - ${swapTrackModal.sourceArtist}` : ''}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSwapTrackModal(null)}
+                  className="rounded-md border border-[#3b4f73] bg-[#1a2842] px-2.5 py-1 text-xs text-[#c8d8f5] hover:bg-[#243652]"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  value={swapTrackQuery}
+                  onChange={(event) => setSwapTrackQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      void searchSwapTrackCandidates();
+                    }
+                  }}
+                  placeholder="Search replacement track by title / artist"
+                  className="w-full rounded-lg border border-[#30466b] bg-[#0f182a] px-3 py-2 text-sm text-white outline-none focus:border-[#5f9bff]"
+                />
+                <button
+                  onClick={() => void searchSwapTrackCandidates()}
+                  disabled={swapTrackSearching}
+                  className={`rounded-md border px-3 py-2 text-xs font-semibold ${
+                    swapTrackSearching
+                      ? 'cursor-not-allowed border-[#3d4a65] bg-[#1f2a41] text-[#8094b9]'
+                      : 'border-[#5f9bff] bg-[#1f4f89] text-white hover:bg-[#2866b1]'
+                  }`}
+                >
+                  {swapTrackSearching ? 'Searching...' : 'Search'}
+                </button>
+              </div>
+
+              <div className="mt-3 max-h-[420px] overflow-y-auto rounded-lg border border-[#2f4465] bg-[#111d31]">
+                {swapTrackResults.length === 0 ? (
+                  <div className="px-3 py-6 text-xs text-[#9db3da]">No results yet. Search to find a replacement track.</div>
+                ) : (
+                  <div className="space-y-1 p-2">
+                    {swapTrackResults.map((candidate) => {
+                      const meta: string[] = [];
+                      if (candidate.album_title) meta.push(candidate.album_title);
+                      if (candidate.inventory_id) meta.push(`#${candidate.inventory_id}`);
+                      if (candidate.position) meta.push(candidate.position);
+                      const isCurrent = candidate.track_key === swapTrackModal.sourceTrackKey;
+
+                      return (
+                        <div
+                          key={candidate.track_key}
+                          className="flex items-center justify-between gap-2 rounded-md border border-[#324968] bg-[#101a2f] px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium text-white">
+                              {candidate.title} - {candidate.artist}
+                            </div>
+                            <div className="truncate text-xs text-[#9db5de]">
+                              {meta.join(' • ')}
+                              {meta.length > 0 ? ' • ' : ''}
+                              Match {Math.round(candidate.score * 100)}%
+                            </div>
+                          </div>
+                          <button
+                            disabled={swapTrackApplying || isCurrent}
+                            onClick={() => applySwapTrack(candidate)}
+                            className={`shrink-0 rounded-md border px-2 py-1 text-xs font-semibold ${
+                              swapTrackApplying || isCurrent
+                                ? 'cursor-not-allowed border-[#3d4a65] bg-[#1f2a41] text-[#8094b9]'
+                                : 'border-[#4cab73] bg-[#1f6d42] text-white hover:bg-[#298f57]'
+                            }`}
+                          >
+                            {isCurrent ? 'Current' : 'Swap'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         )}
     </div>
   );
