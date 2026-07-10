@@ -3548,6 +3548,44 @@ function CollectionBrowserPage() {
       };
 
       const nextManualTrackKeys = !playlist.isSmart ? dedupeTrackKeys(playlist.trackKeys ?? []) : [];
+      const previousManualTrackKeys = !playlist.isSmart ? dedupeTrackKeys(previous?.trackKeys ?? []) : [];
+
+      const deriveReplacementPairs = (beforeKeys: string[], afterKeys: string[]) => {
+        if (beforeKeys.length === 0 || afterKeys.length === 0) return [] as Array<{ fromTrackKey: string; toTrackKey: string }>;
+
+        const beforeSet = new Set(beforeKeys);
+        const afterSet = new Set(afterKeys);
+        const removed = beforeKeys.filter((key) => !afterSet.has(key));
+        const added = afterKeys.filter((key) => !beforeSet.has(key));
+
+        if (removed.length === 0 || added.length === 0) return [] as Array<{ fromTrackKey: string; toTrackKey: string }>;
+        if (removed.length !== added.length) return [] as Array<{ fromTrackKey: string; toTrackKey: string }>;
+
+        if (removed.length === 1 && added.length === 1) {
+          return [{ fromTrackKey: removed[0], toTrackKey: added[0] }];
+        }
+
+        const addedSet = new Set(added);
+        const removedSet = new Set(removed);
+        const usedAdded = new Set<string>();
+        const pairs: Array<{ fromTrackKey: string; toTrackKey: string }> = [];
+
+        const maxLen = Math.max(beforeKeys.length, afterKeys.length);
+        for (let index = 0; index < maxLen; index += 1) {
+          const fromTrackKey = beforeKeys[index];
+          const toTrackKey = afterKeys[index];
+          if (!fromTrackKey || !toTrackKey || fromTrackKey === toTrackKey) continue;
+          if (!removedSet.has(fromTrackKey) || !addedSet.has(toTrackKey) || usedAdded.has(toTrackKey)) continue;
+
+          pairs.push({ fromTrackKey, toTrackKey });
+          usedAdded.add(toTrackKey);
+        }
+
+        if (pairs.length !== removed.length) return [] as Array<{ fromTrackKey: string; toTrackKey: string }>;
+        return pairs;
+      };
+
+      const replacementPairs = deriveReplacementPairs(previousManualTrackKeys, nextManualTrackKeys);
 
       const { error } = await supabase
         .from('collection_playlists')
@@ -3591,6 +3629,26 @@ function CollectionBrowserPage() {
 
         const { data: { session } } = await supabase.auth.getSession();
         const accessToken = session?.access_token;
+
+        for (const pair of replacementPairs) {
+          const swapResponse = await fetch(`/api/playlists/${playlist.id}/swap-track`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+            },
+            body: JSON.stringify({
+              fromTrackKey: pair.fromTrackKey,
+              toTrackKey: pair.toTrackKey,
+            }),
+          });
+
+          const swapPayload = await swapResponse.json().catch(() => ({}));
+          if (!swapResponse.ok && swapResponse.status !== 207) {
+            throw new Error(swapPayload?.error || `Failed to propagate playlist swap (${swapResponse.status})`);
+          }
+        }
+
         const propagateResponse = await fetch(`/api/playlists/${playlist.id}`, {
           method: 'POST',
           headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
