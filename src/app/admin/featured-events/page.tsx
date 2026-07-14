@@ -76,7 +76,9 @@ export default function Page() {
     );
 
     // Remove id from updates to satisfy Supabase Update type
-    const { id: _id, ...updateFields } = updates;
+    const updateFields = Object.fromEntries(
+      Object.entries(updates).filter(([key]) => key !== "id")
+    ) as Partial<Omit<FeaturedEvent, "id">>;
 
     const { error } = await supabase
       .from("events")

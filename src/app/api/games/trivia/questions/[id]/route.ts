@@ -172,7 +172,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   });
 
   const nextStatus = (patch.status as string | undefined) ?? undefined;
-  const effectiveStatus = nextStatus ?? existingQuestion.status;
   if (nextStatus === "published") {
     patch.published_at = now;
     patch.archived_at = null;

@@ -576,7 +576,7 @@ export async function syncStoredPlaylistCallOrderTitlesForSession(
     const changed = nextCallOrder.some((entry, index) => entry !== playlist.call_order[index]);
     if (!changed) continue;
 
-    await withPlaylistTableFallback<void>(async (tableName, _selectClause, letterColumn) => {
+    await withPlaylistTableFallback<void>(async (tableName) => {
       const updateColumn = tableName === GAME_PLAYLISTS_TABLE ? "playlist_letter" : "crate_letter";
       const { error } = await getDynamicTableDb(db)
         .from(tableName)

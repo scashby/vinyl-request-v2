@@ -1,4 +1,3 @@
-// @ts-nocheck — release_tracks / releases / inventory / masters not in TriviaDatabase; use supabaseAdmin
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
 import { isForSaleInventory } from "src/lib/saleUtils";
@@ -9,7 +8,14 @@ export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   if (q.length < 2) return NextResponse.json({ data: [] });
 
-  const db = supabaseAdmin as unknown as { from: (t: string) => unknown };
+  type QueryLike = {
+    select: (columns: string) => QueryLike;
+    ilike: (column: string, pattern: string) => QueryLike;
+    not: (column: string, operator: string, value: unknown) => QueryLike;
+    in: (column: string, values: unknown[]) => QueryLike;
+    limit: (count: number) => Promise<unknown>;
+  };
+  const db = supabaseAdmin as unknown as { from: (table: string) => QueryLike };
 
   // Search release_tracks by title_override and by recordings.title via join.
   const [{ data: byTitle, error: err1 }, { data: byRecording, error: err2 }] = await Promise.all([

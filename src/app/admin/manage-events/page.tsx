@@ -133,7 +133,7 @@ export default function Page() {
       'venue_logo_archived_archived_archived_archived_archived_archived_updated_at'
     ];
     // Normalize allowed_tags to always be a string[] or remove it BEFORE filtering
-    let normalized = { ...updates };
+    const normalized = { ...updates };
     if ('allowed_tags' in normalized) {
       if (typeof normalized.allowed_tags === 'string') {
         normalized.allowed_tags = [normalized.allowed_tags];

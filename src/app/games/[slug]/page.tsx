@@ -219,7 +219,7 @@ export default async function GamePage({
             {/* Logo */}
             <div className="flex items-center justify-center w-20 h-20 rounded-2xl bg-black/60 ring-1 ring-white/15 overflow-hidden shrink-0">
               {logoPath ? (
-                // eslint-disable-next-line @next/next/no-img-element
+                 
                 <Image unoptimized width={1200} height={1200}
                   src={logoPath}
                   alt={`${game.title} logo`}

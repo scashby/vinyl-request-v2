@@ -199,7 +199,6 @@ export default function BingoSetupPage() {
   const [themeName, setThemeName] = useState('');
 
   const [creating, setCreating] = useState(false);
-  const [downloadingRoundsSessionId, setDownloadingRoundsSessionId] = useState<number | null>(null);
   const [reshufflingSessionId, setReshufflingSessionId] = useState<number | null>(null);
   const [sessionPlaylistsMap, setSessionPlaylistsMap] = useState<Record<number, BingoSessionPlaylistInfo[]>>({});
   const [openPlaylistPanelId, setOpenPlaylistPanelId] = useState<number | null>(null);
@@ -811,26 +810,6 @@ export default function BingoSetupPage() {
     const filename = round ? `bingo-${sessionId}-round-${round}-call-sheet.pdf` : `bingo-${sessionId}-call-sheet.pdf`;
     doc.save(filename);
     return true;
-  };
-
-  const downloadAllRoundSheets = async (session: Session) => {
-    if (downloadingRoundsSessionId !== null) return;
-    setDownloadingRoundsSessionId(session.id);
-
-    try {
-      for (let round = 1; round <= Math.max(1, session.round_count); round += 1) {
-        const ok = await downloadCallSheet(session.id, round, { suppressErrorAlert: true });
-        if (!ok) {
-          alert(`Failed to download round ${round} sheet. Stopped bulk download.`);
-          return;
-        }
-        await new Promise<void>((resolve) => {
-          window.setTimeout(() => resolve(), 120);
-        });
-      }
-    } finally {
-      setDownloadingRoundsSessionId(null);
-    }
   };
 
   return (

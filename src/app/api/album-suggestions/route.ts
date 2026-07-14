@@ -256,7 +256,7 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const updateData: Record<string, string | null> = {};
+    const updateData: { status?: string; admin_notes?: string | null } = {};
     
     if (status) {
       updateData.status = status;
@@ -269,7 +269,7 @@ export async function PUT(request: NextRequest) {
     // Update with request-scoped client (RLS will apply)
     const { data, error } = await supabase
       .from('album_suggestions')
-      .update(updateData as any)
+      .update(updateData)
       .eq('id', id)
       .select();
 

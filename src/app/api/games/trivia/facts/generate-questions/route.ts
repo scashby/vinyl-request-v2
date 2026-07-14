@@ -84,7 +84,7 @@ async function insertQuestion(
   if (!code) return null;
 
   // Shuffle MC options so correct answer isn't always first
-  let options = [...(payload.options_payload ?? [])];
+  const options = [...(payload.options_payload ?? [])];
   if (options.length > 1) {
     // Fisher-Yates shuffle
     for (let i = options.length - 1; i > 0; i--) {

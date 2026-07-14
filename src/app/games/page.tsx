@@ -252,7 +252,7 @@ function GameTile({ game }: { game: PublicGame }) {
         {/* Logo area */}
         <div className="mb-4 flex items-center justify-center w-16 h-16 rounded-xl bg-black/40 ring-1 ring-white/10 overflow-hidden shrink-0">
           {game.logoPath ? (
-            // eslint-disable-next-line @next/next/no-img-element
+             
             <Image unoptimized width={1200} height={1200}
               src={game.logoPath}
               alt={`${game.title} logo`}

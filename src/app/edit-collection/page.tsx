@@ -9,7 +9,7 @@ import ColumnSelector from '../../components/ColumnSelector';
 import TrackContextMenu, { type TrackContextMenuPlaylist } from '../../components/TrackContextMenu';
 import { ColumnId, COLUMN_DEFINITIONS, COLUMN_GROUPS, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
 import type { Album } from '../../types/album';
-import { toSafeStringArray, toSafeSearchString } from '../../types/album';
+import { toSafeStringArray } from '../../types/album';
 import EditAlbumModal from './EditAlbumModal';
 import NewCrateModal from './crates/NewCrateModal';
 import NewSmartCrateModal from './crates/NewSmartCrateModal';
@@ -1037,16 +1037,6 @@ const isAlbumForSale = (album: Album): boolean => isForSaleInventory(album);
 const getAlbumFormatLabel = (album: Album): string => {
   const label = getDisplayFormat(getAlbumFormat(album)).trim();
   return label || 'Unknown';
-};
-
-const getAlbumTrackSearchText = (album: Album): string => {
-  const releaseTracks = (album.release?.release_tracks ?? []).map((track) =>
-    [track.position ?? '', track.recording?.title ?? ''].filter(Boolean).join(' ')
-  );
-  const fallbackTracks = (album.tracks ?? []).map((track) =>
-    [track.position ?? '', track.title ?? '', track.artist ?? ''].filter(Boolean).join(' ')
-  );
-  return [...releaseTracks, ...fallbackTracks].join(' ');
 };
 
 const isSaleOnlyCrate = (crate: Crate | null | undefined): boolean => {
@@ -3892,7 +3882,7 @@ function CollectionBrowserPage() {
 
     // Find the closest track element by looking at the event target and its parents
     const target = event.target as HTMLElement;
-    let trackElement = target.closest('[data-track-key]') as HTMLElement | null;
+    const trackElement = target.closest('[data-track-key]') as HTMLElement | null;
     
     if (!trackElement) {
       // If no explicit track marker, try to find a text node that matches a track title
@@ -3903,7 +3893,7 @@ function CollectionBrowserPage() {
           (row) => row.inventoryId === selectedAlbumId && row.trackTitle === title
         );
         if (matchingRow) {
-          openTrackContextMenu(event as any, matchingRow);
+            openTrackContextMenu(event as unknown as ReactMouseEvent, matchingRow);
           return;
         }
         current = current.parentElement;
@@ -3914,7 +3904,7 @@ function CollectionBrowserPage() {
     const trackKey = trackElement.getAttribute('data-track-key');
     const matchingRow = allTrackRows.find((row) => row.key === trackKey);
     if (matchingRow) {
-      openTrackContextMenu(event as any, matchingRow);
+        openTrackContextMenu(event as unknown as ReactMouseEvent, matchingRow);
     }
   }, [allTrackRows, openTrackContextMenu, selectedAlbumId]);
 

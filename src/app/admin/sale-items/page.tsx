@@ -172,7 +172,7 @@ export default function SaleItemsPage() {
 
   const saveEdit = async (id: number) => {
     setSaving(true);
-    const updatePayload: Record<string, unknown> = {};
+    const updatePayload: { current_value?: number; personal_notes?: string } = {};
     if (typeof editValues.sale_price === 'number') {
       updatePayload.current_value = editValues.sale_price;
     }
@@ -183,7 +183,7 @@ export default function SaleItemsPage() {
     
     const { error } = await supabase
       .from('inventory')
-      .update(updatePayload as any)
+      .update(updatePayload)
       .eq('id', id);
 
     if (!error) {

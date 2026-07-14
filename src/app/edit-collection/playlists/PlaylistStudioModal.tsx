@@ -267,22 +267,6 @@ const dedupeTrackKeys = (keys: string[]) => {
   return out;
 };
 
-const formatTrackPositionLabel = (side: string | null, position: string | null) => {
-  const sideValue = String(side ?? '').trim();
-  const positionValue = String(position ?? '').trim();
-  if (!positionValue) return sideValue || null;
-  if (!sideValue) return positionValue;
-  const normalizedSide = sideValue.toUpperCase();
-  const normalizedPosition = positionValue.toUpperCase();
-  if (
-    normalizedPosition === normalizedSide ||
-    normalizedPosition.startsWith(normalizedSide)
-  ) {
-    return positionValue;
-  }
-  return `${sideValue}${positionValue}`;
-};
-
 const isBetweenValue = (
   value: SmartPlaylistRuleValue
 ): value is { min: string | number; max: string | number } => {

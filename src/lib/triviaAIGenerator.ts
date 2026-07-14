@@ -319,6 +319,7 @@ export async function generateQuestionsFromFact(
   context: { genres?: string[] } = {},
   _count = 1 // always generates 1 MC question per Q&A pair
 ): Promise<AIQuestionPayload[]> {
+  void _count;
   if (!process.env.ANTHROPIC_API_KEY) {
     console.warn("[triviaAIGenerator] ANTHROPIC_API_KEY not set — skipping generation");
     return [];

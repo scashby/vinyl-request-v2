@@ -30,7 +30,6 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
   const initialNextCallSeconds = 45;
 
   const db = getBingoDb();
-  const now = new Date().toISOString();
 
   const sessionQuery = (db
     .from("bingo_sessions")

@@ -1072,7 +1072,6 @@ export async function generateSessionCalls(
   playlistIds: number[],
   options?: { roundNumber?: number }
 ): Promise<number> {
-  const roundNumber = options?.roundNumber ?? 1;
   const tracks = await resolvePlaylistTracksForPlaylists(db, playlistIds);
 
   return generateSessionCallsFromTracks(db, sessionId, tracks, options);

@@ -772,7 +772,7 @@ function ClassicMode() {
     <div className="space-y-4">
       <section className="rounded-3xl border border-stone-700 bg-black/45 p-5 space-y-5">
         <h2 className="text-lg font-black uppercase text-stone-200">Template Generator</h2>
-        <p className="text-xs text-stone-500">Generates "who sang / what year / what label" questions directly from inventory metadata. Fast, no AI, no external calls.</p>
+          <p className="text-xs text-stone-500">Generates &quot;who sang / what year / what label&quot; questions directly from inventory metadata. Fast, no AI, no external calls.</p>
 
         <fieldset>
           <legend className="mb-2 text-sm font-semibold text-stone-300">Source</legend>

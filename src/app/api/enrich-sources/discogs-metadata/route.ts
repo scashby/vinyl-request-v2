@@ -297,8 +297,8 @@ export async function POST(req: Request) {
     console.log(`📀 Fetching metadata from Discogs release ${releaseId}...`);
     const discogsData = await fetchDiscogsRelease(releaseId);
 
-    const releaseUpdate: Record<string, unknown> = {};
-    const masterUpdate: Record<string, unknown> = {};
+    const releaseUpdate: Database["public"]["Tables"]["releases"]["Update"] = {};
+    const masterUpdate: Database["public"]["Tables"]["masters"]["Update"] = {};
 
     if (foundReleaseId) {
       releaseUpdate.discogs_release_id = releaseId;
@@ -438,7 +438,7 @@ export async function POST(req: Request) {
     if (Object.keys(releaseUpdate).length > 0) {
       const { error: releaseError } = await supabase
         .from('releases')
-        .update(releaseUpdate as any)
+        .update(releaseUpdate)
         .eq('id', release.id);
 
       if (releaseError) {
@@ -452,7 +452,7 @@ export async function POST(req: Request) {
     if (Object.keys(masterUpdate).length > 0) {
       const { error: masterError } = await supabase
         .from('masters')
-        .update(masterUpdate as any)
+        .update(masterUpdate)
         .eq('id', master.id);
 
       if (masterError) {

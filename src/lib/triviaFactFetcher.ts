@@ -1,4 +1,3 @@
-// @ts-nocheck — masters/artists tables are not in TriviaDatabase schema
 /**
  * triviaFactFetcher.ts
  *
@@ -83,15 +82,6 @@ function sleep(ms: number): Promise<void> {
 
 export function contentHash(text: string): string {
   return createHash("sha256").update(text.trim()).digest("hex");
-}
-
-function domainFromUrl(url: string | null): string | null {
-  if (!url) return null;
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return null;
-  }
 }
 
 /**

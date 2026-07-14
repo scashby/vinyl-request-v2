@@ -361,13 +361,6 @@ export default function MusicTriviaBankPage() {
     setForm((current) => ({ ...current, [key]: value }));
   };
 
-  const updateScope = (index: number, patch: Partial<TriviaQuestionScope>) => {
-    setForm((current) => ({
-      ...current,
-      scopes: current.scopes.map((scope, scopeIndex) => scopeIndex === index ? { ...scope, ...patch } : scope),
-    }));
-  };
-
   const removeScope = (index: number) => {
     setForm((current) => ({
       ...current,

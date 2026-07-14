@@ -16,14 +16,10 @@ import {
   buildFieldDiagnosticsForAlbum,
 } from 'lib/enrichmentDiagnostics';
 import { 
-  type DataCategory, 
   type EnrichmentService,
-  DATA_CATEGORY_CHECK_FIELDS, 
   FIELD_TO_SERVICES,
   SERVICE_DISPLAY_NAMES,
-  SERVICE_ICONS,
-  DATA_CATEGORY_LABELS,
-  DATA_CATEGORY_ICONS
+  SERVICE_ICONS
 } from 'lib/enrichment-data-mapping';
 import type {
   FieldDiagnosticRow,
@@ -369,17 +365,7 @@ const checkedSourcesFromActiveServices = (activeServices: ActiveServiceMap): str
     .sort();
 };
 
-const DEFERRED_CATEGORY_REASONS: Partial<Record<DataCategory, string>> = {};
 const CLASSICAL_ONLY_FIELDS = new Set(['composer', 'conductor', 'orchestra', 'chorus', 'composition']);
-const TRACKED_ENRICHMENT_CATEGORIES = new Set<DataCategory>([
-  'artwork',
-  'credits',
-  'tracklists',
-  'genres',
-  'streaming_links',
-  'release_metadata',
-  'lyrics',
-]);
 
 // Local interface for resolution history
 interface ResolutionHistory {
@@ -1425,29 +1411,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         ? prev.filter((item) => item !== source)
         : [...prev, source]
     ));
-  };
-
-  const toggleCategory = (category: DataCategory) => {
-    const fields = (DATA_CATEGORY_CHECK_FIELDS[category] || []).map(normalizeEnrichmentFieldKey);
-    const validFields = fields.filter((field) => {
-      if (!ALLOWED_COLUMNS.has(field) || NON_ENRICHABLE_FIELDS.has(field)) return false;
-      return getCompatibleServicesForField(field).length > 0;
-    });
-    const dedupedFields = Array.from(new Set(validFields));
-    const allEnabled = dedupedFields.every(f => !!fieldConfig[f]);
-
-    setFieldConfig(prev => {
-      const next = { ...prev };
-      dedupedFields.forEach(f => {
-        if (allEnabled) {
-          delete next[f];
-        } else {
-          const defaults = getCompatibleServicesForField(f);
-          next[f] = new Set(defaults);
-        }
-      });
-      return next;
-    });
   };
 
   function addLog(album: string, action: LogEntry['action'], details: string) {
@@ -3946,216 +3909,5 @@ function StatBox({ label, value, color, onClick, disabled }: { label: string; va
   );
 }
 
-function DataCategoryCard({ 
-  category, 
-  stats,
-  fieldConfig,
-  availableServicesByField,
-  onToggleCategory,
-  onToggleField,
-  onToggleFieldSource,
-  disabled 
-}: { 
-  category: DataCategory; 
-  stats: EnrichmentStats | null;
-  fieldConfig: FieldConfigMap;
-  availableServicesByField?: Record<string, string[]>;
-  onToggleCategory: () => void;
-  onToggleField: (f: string) => void;
-  onToggleFieldSource: (f: string, s: string) => void;
-  disabled: boolean; 
-}) {
-  const fields = (DATA_CATEGORY_CHECK_FIELDS[category] || []).map(normalizeEnrichmentFieldKey);
-  const validFields = fields.filter((field) => {
-    if (!ALLOWED_COLUMNS.has(field) || NON_ENRICHABLE_FIELDS.has(field)) return false;
-    if (!availableServicesByField) return true;
-    return (availableServicesByField[field] || []).length > 0;
-  });
-  const dedupedValidFields = Array.from(new Set(validFields));
-  const selectableFields = dedupedValidFields.filter((field) => !NON_ENRICHABLE_FIELDS.has(field));
-  
-  if (dedupedValidFields.length === 0) return null;
 
-  const activeCount = selectableFields.filter(f => !!fieldConfig[f]).length;
-  const isAllSelected = selectableFields.length > 0 && activeCount === selectableFields.length;
-  const isIndeterminate = activeCount > 0 && !isAllSelected;
-
-  const formatLabel = (f: string) => ENRICHMENT_FIELD_LABELS[f] || f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-  const getCategoryMissing = () => {
-    if (!stats) return 0;
-    switch (category) {
-      case 'artwork':
-        return stats.missingArtwork;
-      case 'credits':
-        return stats.missingCredits;
-      case 'tracklists':
-        return stats.missingTracklists;
-      case 'sonic_domain':
-        return stats.missingAudioAnalysis;
-      case 'genres':
-        return stats.missingGenres;
-      case 'streaming_links':
-        return stats.missingStreamingLinks;
-      case 'release_metadata':
-        return stats.missingReleaseMetadata;
-      case 'lyrics':
-        return stats.missingLyrics || 0;
-      case 'reviews':
-        return stats.missingReviews || 0;
-      case 'chart_data':
-        return stats.missingChartData || 0;
-      case 'cultural_context':
-        return stats.missingContext || 0;
-      case 'similar_albums':
-        return stats.missingSimilar || 0;
-      default:
-        return 0;
-    }
-  };
-
-  const isFieldTracked = (field: string) =>
-    TRACKED_ENRICHMENT_CATEGORIES.has(category)
-    && !!stats?.fieldMissing
-    && Object.prototype.hasOwnProperty.call(stats.fieldMissing, field);
-
-  const isCategoryTracked = () =>
-    dedupedValidFields.every((field) => isFieldTracked(field));
-
-  const getMissing = (field: string) => {
-    if (!stats) return 0;
-    if (stats.fieldMissing && typeof stats.fieldMissing[field] === 'number') {
-      return stats.fieldMissing[field];
-    }
-    if (field === 'image_url') return stats.missingFrontCover || 0;
-    if (field === 'back_image_url') return stats.missingBackCover;
-    if (field === 'spine_image_url') return stats.missingSpine || 0;
-    if (field === 'inner_sleeve_images') return stats.missingInnerSleeve || 0;
-    if (field === 'vinyl_label_images') return stats.missingVinylLabel || 0;
-    if (field.includes('musicians')) return stats.missingMusicians;
-    if (field.includes('producers')) return stats.missingProducers;
-    if (field.includes('engineers')) return stats.missingEngineers || 0;
-    if (field.includes('songwriters')) return stats.missingSongwriters || 0;
-    if (field === 'tracks' || field === 'tracklists') return stats.missingTracklists;
-    if (field.includes('bpm')) return stats.missingTempo;
-    if (field.includes('musical_key')) return stats.missingMusicalKey || 0;
-    if (field.includes('danceability')) return stats.missingDanceability || 0;
-    if (field.includes('energy')) return stats.missingEnergy || 0;
-    if (field === 'genres') return stats.missingGenres;
-    if (field === 'styles') return stats.missingStyles || 0;
-    if (field === 'spotify_id') return stats.missingSpotify;
-    if (field === 'apple_music_id') return stats.missingAppleMusic || 0;
-    if (field === 'lastfm_id') return stats.missingLastFM || 0;
-    if (field === 'barcode') return stats.missingBarcode || 0;
-    if (field === 'labels') return stats.missingLabels || 0;
-    if (field === 'original_release_date') return stats.missingOriginalDate || 0;
-    if (field === 'cat_no') return stats.missingCatalogNumber || 0;
-    return 0;
-  };
-
-  return (
-    // Removed hardcoded background/opacity styles to let CSS Modules handle theme
-    <div className={`w-full text-left bg-white border-2 border-[#D8D8D8] rounded-md p-5 transition-all duration-200 ${disabled ? 'opacity-50 pointer-events-none' : 'hover:border-[#4FC3F7] hover:bg-[#F0F9FF]'}`}>
-      {/* HEADER */}
-      <div 
-        className="flex items-center justify-between pb-2 border-b border-gray-200 mb-2"
-      >
-         <div className="flex items-center gap-2">
-           <input 
-              type="checkbox" 
-              checked={isAllSelected}
-              ref={el => { if(el) el.indeterminate = isIndeterminate; }}
-              onChange={onToggleCategory}
-              disabled={disabled}
-              className="cursor-pointer"
-           />
-           <span className="text-base">{DATA_CATEGORY_ICONS[category]}</span>
-           <span className="text-base font-semibold text-[#1a1a1a]">{DATA_CATEGORY_LABELS[category]}</span>
-         </div>
-         <span
-           className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
-             isCategoryTracked()
-               ? (getCategoryMissing() > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700')
-               : (getCategoryMissing() > 0 ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700')
-           }`}
-           title={isCategoryTracked() ? 'Tracked category count' : 'Untracked category count'}
-         >
-           {getCategoryMissing()}
-         </span>
-      </div>
-
-      {/* FIELD ROWS (Dashboard Style) */}
-      <div className="flex flex-col gap-2">
-         {dedupedValidFields.map(field => {
-            const isUnsupported = NON_ENRICHABLE_FIELDS.has(field);
-            const isEnabled = !!fieldConfig[field];
-            const activeSources = fieldConfig[field] || new Set();
-            const services = availableServicesByField?.[field] || FIELD_TO_SERVICES[field] || [];
-            const missing = getMissing(field);
-            const badgeText = isUnsupported ? 'N/A' : String(missing);
-            const badgeClass = isUnsupported
-              ? 'bg-gray-100 text-gray-500'
-              : (
-                isFieldTracked(field)
-                  ? (missing > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700')
-                  : (missing > 0 ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700')
-              );
-
-            return (
-               <div key={field} className={isEnabled ? "p-2 bg-blue-50 border border-blue-200 rounded" : "p-2 border border-transparent"}>
-                  {/* Row Top: Checkbox + Name + Stats */}
-                  <div className="flex items-center justify-between">
-                     <label className={`flex items-center gap-1.5 text-xs font-medium ${isUnsupported ? 'cursor-not-allowed text-gray-500' : 'cursor-pointer'}`}>
-                        <input 
-                           type="checkbox" 
-                           checked={isEnabled} 
-                           onChange={() => onToggleField(field)}
-                           disabled={disabled || isUnsupported}
-                        />
-                        {formatLabel(field)}
-                     </label>
-                     <span
-                       className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${badgeClass}`}
-                       title={isUnsupported ? 'Not currently supported by implemented sources' : (isFieldTracked(field) ? 'Tracked field count' : 'Untracked field count')}
-                     >
-                       {badgeText}
-                     </span>
-                  </div>
-
-                  {/* Row Bottom: Source Toggles (Only if enabled) */}
-                  {isEnabled && services.length > 0 && (
-                     <div className="flex flex-wrap gap-1.5 ml-5 mt-1">
-                        {services.map(srv => {
-                           const isActive = activeSources.has(srv);
-                           return (
-                              <label 
-                                key={srv} 
-                                title={srv}
-                                className={`flex items-center px-1.5 py-0.5 rounded border text-[10px] cursor-pointer select-none transition-colors ${
-                                  isActive 
-                                    ? "bg-white border-blue-400 text-blue-700 shadow-sm" 
-                                    : "bg-gray-100 border-gray-200 text-gray-500 opacity-60 hover:opacity-100"
-                                }`}
-                              >
-                                 <input 
-                                    type="checkbox" 
-                                    checked={isActive} 
-                                    onChange={() => onToggleFieldSource(field, srv)}
-                                    disabled={disabled}
-                                    className="hidden"
-                                 />
-                                 <span>{SERVICE_ICONS[srv as EnrichmentService]}</span>
-                                 <span className="ml-1">{SERVICE_DISPLAY_NAMES[srv as EnrichmentService] || srv}</span>
-                              </label>
-                           );
-                        })}
-                     </div>
-                  )}
-               </div>
-            );
-         })}
-      </div>
-    </div>
-  );
-}
 // AUDIT: updated for V3 alignment, UI parity, and build stability.

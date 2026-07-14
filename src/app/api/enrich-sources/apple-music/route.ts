@@ -170,7 +170,7 @@ export async function POST(req: Request) {
       value.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
 
     if (release?.id) {
-      const releaseUpdate: Record<string, unknown> = {};
+      const releaseUpdate: { release_date?: string; track_count?: number } = {};
       if (!release.release_date && albumMeta?.releaseDate) {
         releaseUpdate.release_date = albumMeta.releaseDate;
       }
@@ -178,17 +178,17 @@ export async function POST(req: Request) {
         releaseUpdate.track_count = albumMeta.trackCount;
       }
       if (Object.keys(releaseUpdate).length > 0) {
-        await supabase.from('releases').update(releaseUpdate as any).eq('id', release.id);
+        await supabase.from('releases').update(releaseUpdate).eq('id', release.id);
       }
     }
 
     if (master?.id) {
-      const masterUpdate: Record<string, unknown> = {};
+      const masterUpdate: { cover_image_url?: string } = {};
       if (!master.cover_image_url && albumMeta?.artworkUrl) {
         masterUpdate.cover_image_url = albumMeta.artworkUrl;
       }
       if (Object.keys(masterUpdate).length > 0) {
-        await supabase.from('masters').update(masterUpdate as any).eq('id', master.id);
+        await supabase.from('masters').update(masterUpdate).eq('id', master.id);
       }
     }
 

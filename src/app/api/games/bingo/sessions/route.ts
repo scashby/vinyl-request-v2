@@ -193,9 +193,14 @@ export async function GET(request: NextRequest) {
   const eventId = request.nextUrl.searchParams.get("eventId");
   const includeSandbox = request.nextUrl.searchParams.get("includeSandbox") === "true";
 
+  type SessionListQuery = {
+    eq: (column: string, value: unknown) => SessionListQuery;
+    order: (column: string, options: { ascending: boolean }) => Promise<{ data: unknown; error: { message: string } | null }>;
+  };
+
   const queryBase = db
     .from("bingo_sessions")
-    .select("id, event_id, game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, session_code, game_mode, round_modes, card_count, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, is_favorite, favorite_note, is_sandbox, sandbox_source_session_id, sandbox_expires_at, created_at") as any;
+    .select("id, event_id, game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, session_code, game_mode, round_modes, card_count, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, is_favorite, favorite_note, is_sandbox, sandbox_source_session_id, sandbox_expires_at, created_at") as unknown as SessionListQuery;
 
   let result: { data: unknown; error: { message: string } | null };
   if (includeSandbox) {

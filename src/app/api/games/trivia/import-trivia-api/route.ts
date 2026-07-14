@@ -1,4 +1,3 @@
-// @ts-nocheck — trivia_questions and related tables not fully typed; use getTriviaDb with cast
 import { NextRequest, NextResponse } from "next/server";
 import { getTriviaDb } from "src/lib/triviaDb";
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
@@ -28,7 +27,15 @@ type ImportRequest = {
 
 export async function POST(request: NextRequest) {
   const triviaDb = getTriviaDb();
-  const db = triviaDb as unknown as { from: (t: string) => unknown };
+  type TriviaDbQuery = {
+    select: (columns: string) => TriviaDbQuery;
+    eq: (column: string, value: unknown) => TriviaDbQuery;
+    maybeSingle: () => Promise<unknown>;
+    insert: (values: unknown) => TriviaDbQuery;
+    single: () => Promise<unknown>;
+    upsert: (values: unknown, options?: { onConflict?: string }) => Promise<unknown>;
+  };
+  const db = triviaDb as unknown as { from: (table: string) => TriviaDbQuery };
 
   let body: ImportRequest;
   try {
@@ -63,12 +70,16 @@ export async function POST(request: NextRequest) {
 
   // Build collection term set for matching — only import questions about artists/albums/tracks we own
   const collectionTerms = new Set<string>();
-  const supa = supabaseAdmin as unknown as { from: (t: string) => unknown };
+  type QueryLike = {
+    select: (columns: string) => QueryLike;
+    in: (column: string, values: unknown[]) => Promise<unknown>;
+  };
+  const supa = supabaseAdmin as unknown as { from: (table: string) => QueryLike };
 
   const { data: invRows } = await (supa
     .from("inventory")
     .select("release_id")
-    .in("status", ["in_collection", "for_sale", "on_order"]) as any);
+      .in("status", ["in_collection", "for_sale", "on_order"]) as unknown as { data?: Array<{ release_id?: number | null }> | null });
 
   const releaseIds = [...new Set((invRows ?? []).map((r) => r.release_id).filter(Boolean))];
 
@@ -76,7 +87,14 @@ export async function POST(request: NextRequest) {
     const { data: masterRows } = await (supa
       .from("releases")
       .select("masters(title, artists:main_artist_id(name))")
-      .in("id", releaseIds) as any);
+        .in("id", releaseIds) as unknown as {
+        data?: Array<{
+          masters?: {
+            title?: string | null;
+            artists?: { name?: string | null } | null;
+          } | null;
+        }> | null;
+      });
 
     for (const row of masterRows ?? []) {
       if (row.masters?.artists?.name?.length > 2) collectionTerms.add(row.masters.artists.name.toLowerCase());
@@ -86,7 +104,12 @@ export async function POST(request: NextRequest) {
     const { data: trackRows } = await (supa
       .from("release_tracks")
       .select("title_override, recordings(title, track_artist)")
-      .in("release_id", releaseIds) as any);
+        .in("release_id", releaseIds) as unknown as {
+        data?: Array<{
+          title_override?: string | null;
+          recordings?: { title?: string | null; track_artist?: string | null } | null;
+        }> | null;
+      });
 
     for (const row of trackRows ?? []) {
       const title = row.title_override || row.recordings?.title;

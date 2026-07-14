@@ -111,14 +111,6 @@ export default function DecadeDashJumbotronPage() {
   const showOverlay = showThanksOverlay || (!!session?.host_overlay && session.host_overlay !== "none");
   const logoUrl = session?.event?.venue_logo_url ?? "";
 
-  const toggleFullscreen = useCallback(() => {
-    if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen().catch(() => undefined);
-    } else {
-      document.exitFullscreen().catch(() => undefined);
-    }
-  }, []);
-
   return (
     <div ref={containerRef} className="min-h-screen bg-[radial-gradient(circle_at_50%_0%,#0369a1,transparent_38%),linear-gradient(180deg,#020202,#0d0d0d)] p-8 text-white">
       <div className="mx-auto max-w-7xl space-y-6">

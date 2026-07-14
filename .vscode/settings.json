@@ -9,5 +9,8 @@
       "envManager": "ms-python.python:venv",
       "packageManager": "ms-python.python:pip"
     }
-  ]
+  ],
+  "chat.tools.terminal.autoApprove": {
+    "command": true
+  }
 }
