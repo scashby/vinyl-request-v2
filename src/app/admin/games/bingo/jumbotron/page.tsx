@@ -422,6 +422,11 @@ export default function BingoJumbotronPage() {
   const thanksHeadingText = previewThanksHeading || session?.thanks_heading_text?.trim() || "Thank You For Playing!";
   const thanksSubheadingText = previewThanksSubheading || session?.thanks_subheading_text?.trim() || "Vinyl Music Bingo";
   const thanksEventsHeadingText = previewThanksEventsHeading || session?.thanks_events_heading_text?.trim() || "Find Us Next At";
+  const thanksEngagementHeadline = "Keep Vinyl Music Bingo growing.";
+  const thanksEngagementBody = "Tell your friends, follow us, like and subscribe, and leave a 5-star review.";
+  const thanksEngagementFooter = "Your support keeps the music spinning.";
+  const instagramQrUrl = "https://kjcselhhkknhnzeovron.supabase.co/storage/v1/object/public/event-images/insta-qrcode.png";
+  const linktreeQrUrl = "https://kjcselhhkknhnzeovron.supabase.co/storage/v1/object/public/event-images/linktree-qrcode.png";
 
   const effectiveVenueLogo = previewVenueLogo ?? session?.event?.venue_logo_url ?? null;
   const effectiveVenueName = previewVenueName ?? session?.event?.title ?? null;
@@ -526,6 +531,44 @@ export default function BingoJumbotronPage() {
             {thanksHeadingText}
           </h2>
           <p className="relative z-10 text-[5.5vw] font-black uppercase tracking-[0.12em] text-sky-600">{thanksSubheadingText}</p>
+
+          <div className="relative z-10 w-full max-w-[72vw] rounded-[2rem] border border-amber-300/70 bg-white/76 px-[2.2vw] py-[1.5vw] shadow-[0_18px_40px_rgba(120,53,15,0.12)] backdrop-blur-sm">
+            <p className="text-[2.1vw] font-black uppercase tracking-[0.08em] leading-tight text-amber-700">{thanksEngagementHeadline}</p>
+            <p className="mt-[0.55vw] text-[1.45vw] font-semibold leading-snug text-stone-800">{thanksEngagementBody}</p>
+            <p className="mt-[0.5vw] text-[1.2vw] text-stone-600">{thanksEngagementFooter}</p>
+
+            <div className="mt-[1.2vw] grid grid-cols-2 gap-[1vw]">
+              <div className="rounded-[1.3rem] border border-amber-300/70 bg-white/85 px-[1vw] py-[0.9vw] text-center">
+                <p className="text-[0.92vw] font-bold uppercase tracking-[0.14em] text-amber-800">Instagram</p>
+                <div className="mx-auto mt-[0.5vw] w-[9vw] min-w-[90px]">
+                  <Image
+                    unoptimized
+                    src={instagramQrUrl}
+                    alt="Instagram QR code"
+                    width={768}
+                    height={768}
+                    className="h-auto w-full rounded-[0.6vw]"
+                  />
+                </div>
+                <p className="mt-[0.4vw] text-[0.78vw] font-medium text-stone-600">Follow us</p>
+              </div>
+
+              <div className="rounded-[1.3rem] border border-amber-300/70 bg-white/85 px-[1vw] py-[0.9vw] text-center">
+                <p className="text-[0.92vw] font-bold uppercase tracking-[0.14em] text-amber-800">Linktree</p>
+                <div className="mx-auto mt-[0.5vw] w-[9vw] min-w-[90px]">
+                  <Image
+                    unoptimized
+                    src={linktreeQrUrl}
+                    alt="Linktree QR code"
+                    width={768}
+                    height={768}
+                    className="h-auto w-full rounded-[0.6vw]"
+                  />
+                </div>
+                <p className="mt-[0.4vw] text-[0.78vw] font-medium text-stone-600">Everything in one place</p>
+              </div>
+            </div>
+          </div>
 
           {upcomingEvents.length > 0 ? (
             <div className="relative z-10 w-full max-w-[80vw]">
