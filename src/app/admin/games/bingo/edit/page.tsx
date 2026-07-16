@@ -39,6 +39,7 @@ type Session = {
   game_mode: string;
   round_modes: RoundModesEntry[] | null;
   card_count: number;
+  cards_per_round_enabled?: boolean;
   round_count: number;
   remove_resleeve_seconds: number;
   place_vinyl_seconds: number;
@@ -79,6 +80,7 @@ export default function BingoEditSessionPage() {
   const [roundModes, setRoundModes] = useState<RoundModesEntry[]>([]);
   const [roundPlaylistIds, setRoundPlaylistIds] = useState<RoundPlaylistEntry[]>([]);
   const [roundPlaylistOverrideRounds, setRoundPlaylistOverrideRounds] = useState<number[]>([]);
+  const [cardsPerRoundEnabled, setCardsPerRoundEnabled] = useState(false);
   const [cardCount, setCardCount] = useState(40);
   const [roundCount, setRoundCount] = useState(3);
   const [removeResleeveSeconds, setRemoveResleeveSeconds] = useState(20);
@@ -108,6 +110,7 @@ export default function BingoEditSessionPage() {
     [presets, selectedPresetId]
   );
   const usingPreset = selectedPreset !== null;
+  const perRoundMastersEnabled = cardsPerRoundEnabled && !usingPreset;
 
   const derivedSecondsToNextCall = useMemo(
     () =>
@@ -180,6 +183,7 @@ export default function BingoEditSessionPage() {
         setRoundModes([]);
       }
       setCardCount(sessionPayload.card_count ?? 40);
+      setCardsPerRoundEnabled(Boolean(sessionPayload.cards_per_round_enabled));
       setRoundCount(sessionPayload.round_count ?? 3);
       setRemoveResleeveSeconds(sessionPayload.remove_resleeve_seconds ?? 20);
       setPlaceVinylSeconds(sessionPayload.place_vinyl_seconds ?? 8);
@@ -249,14 +253,18 @@ export default function BingoEditSessionPage() {
     }
   }, [setPlaylistIdsForRound]);
 
-  const missingPlaylistRounds = useMemo(
-    () => usingPreset || playlistIds.length > 0
-      ? []
-      : Array.from({ length: Math.max(1, roundCount) }, (_, index) => index + 1).filter(
-          (round) => getPlaylistIdsForRound(round).length === 0
-        ),
-    [getPlaylistIdsForRound, playlistIds.length, roundCount, usingPreset]
-  );
+  const missingPlaylistRounds = useMemo(() => {
+    if (usingPreset) return [];
+    if (perRoundMastersEnabled) {
+      return Array.from({ length: Math.max(1, roundCount) }, (_, index) => index + 1).filter(
+        (round) => getPlaylistIdsForRound(round).length === 0
+      );
+    }
+    if (playlistIds.length > 0) return [];
+    return Array.from({ length: Math.max(1, roundCount) }, (_, index) => index + 1).filter(
+      (round) => getPlaylistIdsForRound(round).length === 0
+    );
+  }, [getPlaylistIdsForRound, perRoundMastersEnabled, playlistIds.length, roundCount, usingPreset]);
   const hasUsablePlaylistConfiguration = usingPreset || playlistIds.length > 0 || missingPlaylistRounds.length === 0;
 
   const toggleRoundMode = useCallback(
@@ -299,12 +307,24 @@ export default function BingoEditSessionPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          cards_per_round_enabled: perRoundMastersEnabled,
           event_id: eventId,
           game_preset_id: selectedPresetId,
-          master_playlist_ids: usingPreset ? (selectedPreset?.source_playlist_ids ?? playlistIds) : playlistIds,
-          playlist_id: usingPreset ? (selectedPreset?.source_playlist_ids?.[0] ?? playlistIds[0]) : playlistIds[0],
-          playlist_ids: usingPreset ? (selectedPreset?.source_playlist_ids ?? playlistIds) : playlistIds,
-          round_playlist_ids: usingPreset ? [] : roundPlaylistIds,
+          master_playlist_ids: usingPreset ? (selectedPreset?.source_playlist_ids ?? playlistIds) : (perRoundMastersEnabled ? [] : playlistIds),
+          playlist_id: usingPreset
+            ? (selectedPreset?.source_playlist_ids?.[0] ?? playlistIds[0])
+            : (perRoundMastersEnabled
+              ? (Array.from({ length: Math.max(1, roundCount) }, (_, index) => getPlaylistIdsForRound(index + 1)).find((ids) => ids.length > 0)?.[0] ?? null)
+              : playlistIds[0]),
+          playlist_ids: usingPreset ? (selectedPreset?.source_playlist_ids ?? playlistIds) : (perRoundMastersEnabled ? [] : playlistIds),
+          round_playlist_ids: usingPreset
+            ? []
+            : (perRoundMastersEnabled
+              ? Array.from({ length: Math.max(1, roundCount) }, (_, index) => ({
+                  round: index + 1,
+                  playlist_ids: getPlaylistIdsForRound(index + 1),
+                })).filter((entry) => entry.playlist_ids.length > 0)
+              : roundPlaylistIds),
           game_mode: gameMode,
           round_modes: roundModes,
           card_count: cardCount,
@@ -461,10 +481,29 @@ export default function BingoEditSessionPage() {
                 ) : null}
 
                 <label className="text-sm">Master Playlists
+                  <div className="mb-2 mt-1">
+                    <label className="inline-flex items-center gap-2 text-xs font-semibold text-stone-300">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        disabled={usingPreset}
+                        checked={perRoundMastersEnabled}
+                        onChange={(event) => {
+                          const enabled = event.target.checked;
+                          setCardsPerRoundEnabled(enabled);
+                          if (enabled) {
+                            setPlaylistIds([]);
+                            setRoundPlaylistOverrideRounds(Array.from({ length: Math.max(1, roundCount) }, (_, index) => index + 1));
+                          }
+                        }}
+                      />
+                      Use Different Master Playlist Per Round (new card set each round)
+                    </label>
+                  </div>
                   <select
                     multiple
                     size={6}
-                    disabled={usingPreset}
+                    disabled={usingPreset || perRoundMastersEnabled}
                     className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
                     value={playlistIds.map(String)}
                     onChange={(e) => {
@@ -478,7 +517,7 @@ export default function BingoEditSessionPage() {
                       <option key={playlist.id} value={playlist.id}>{playlist.name} ({playlist.track_count})</option>
                     ))}
                   </select>
-                  <p className="mt-2 text-xs text-stone-500">{usingPreset ? "Preset-backed sessions keep the preset's fixed pool and source playlists." : "Leave this empty only if every round below has its own playlist override."}</p>
+                  <p className="mt-2 text-xs text-stone-500">{usingPreset ? "Preset-backed sessions keep the preset's fixed pool and source playlists." : perRoundMastersEnabled ? "Per-round mode is enabled, so master playlists are not used for this session." : "Leave this empty only if every round below has its own playlist override."}</p>
                 </label>
 
                 <div>
@@ -563,7 +602,7 @@ export default function BingoEditSessionPage() {
                     const activeModes = getModesForRound(round);
                     const explicit = roundModes.some((entry) => entry.round === round);
                     const roundPlaylistSelection = getPlaylistIdsForRound(round);
-                    const overrideEnabled = roundPlaylistOverrideRounds.includes(round);
+                    const overrideEnabled = perRoundMastersEnabled || roundPlaylistOverrideRounds.includes(round);
                     const hasPlaylistOverride = overrideEnabled && roundPlaylistSelection.length > 0;
                     return (
                       <div key={round} className="rounded border border-stone-700/70 bg-black/40 p-2">
@@ -590,11 +629,11 @@ export default function BingoEditSessionPage() {
                           <label className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-stone-300">
                             <input
                               type="checkbox"
-                              disabled={usingPreset}
+                              disabled={usingPreset || perRoundMastersEnabled}
                               checked={overrideEnabled}
                               onChange={(event) => setRoundPlaylistOverrideEnabled(round, event.target.checked)}
                             />
-                            Use Playlist Override For Round {round}
+                            {perRoundMastersEnabled ? `Round ${round} Playlist Selection` : `Use Playlist Override For Round ${round}`}
                           </label>
                           {overrideEnabled ? (
                             <>

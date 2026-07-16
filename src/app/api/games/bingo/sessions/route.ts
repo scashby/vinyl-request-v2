@@ -39,6 +39,7 @@ type CreateSessionBody = {
   game_mode?: GameMode;
   round_modes?: { round: number; modes: GameMode[] }[];
   card_count?: number;
+  cards_per_round_enabled?: boolean;
   card_layout?: "2-up" | "4-up";
   card_label_mode?: "track_artist" | "track_only";
   round_count?: number;
@@ -84,6 +85,7 @@ type SessionListRow = {
   game_mode: string;
   round_modes: { round: number; modes: GameMode[] }[] | null;
   card_count: number;
+  cards_per_round_enabled: boolean;
   status: string;
   current_round: number;
   round_count: number;
@@ -200,7 +202,7 @@ export async function GET(request: NextRequest) {
 
   const queryBase = db
     .from("bingo_sessions")
-    .select("id, event_id, game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, session_code, game_mode, round_modes, card_count, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, is_favorite, favorite_note, is_sandbox, sandbox_source_session_id, sandbox_expires_at, created_at") as unknown as SessionListQuery;
+    .select("id, event_id, game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, session_code, game_mode, round_modes, card_count, cards_per_round_enabled, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, is_favorite, favorite_note, is_sandbox, sandbox_source_session_id, sandbox_expires_at, created_at") as unknown as SessionListQuery;
 
   let result: { data: unknown; error: { message: string } | null };
   if (includeSandbox) {
@@ -391,6 +393,7 @@ export async function POST(request: NextRequest) {
     const sonosDelayMs = body.sonos_output_delay_ms ?? 75;
     const callRevealDelaySeconds = body.call_reveal_delay_seconds ?? 10;
     const defaultIntermissionSeconds = body.default_intermission_seconds ?? 600;
+    const cardsPerRoundEnabled = body.cards_per_round_enabled === true;
     const secondsToNextCall = 45;
 
     const { data: session, error: insertError } = await db
@@ -407,6 +410,7 @@ export async function POST(request: NextRequest) {
         game_mode: gameMode,
         round_modes: roundModes.length > 0 ? roundModes : null,
         card_count: cardCount,
+        cards_per_round_enabled: cardsPerRoundEnabled,
         card_layout: body.card_layout ?? "2-up",
         card_label_mode: body.card_label_mode ?? "track_artist",
         round_count: roundCount,

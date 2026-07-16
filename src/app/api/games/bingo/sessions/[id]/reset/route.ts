@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
 import { backfillMissingLegacyPlaylists, getPlaylistsForSession, getPlaylistByLetter } from "src/lib/bingoCrateModel";
-import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
+import { generateCards, planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
 import { getRoundSnapshotTracks } from "src/lib/bingoGameModel";
 
 export const runtime = "nodejs";
@@ -10,6 +10,10 @@ type SessionRow = {
   id: number;
   playlist_id: number;
   playlist_ids: number[] | null;
+  card_count: number;
+  card_label_mode: "track_artist" | "track_only";
+  session_code: string;
+  cards_per_round_enabled: boolean;
 };
 
 function resolveSessionPlaylistIds(session: SessionRow): number[] {
@@ -33,7 +37,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
 
   const sessionQuery = (db
     .from("bingo_sessions")
-    .select("id, playlist_id, playlist_ids") as unknown as {
+    .select("id, playlist_id, playlist_ids, card_count, card_label_mode, session_code, cards_per_round_enabled") as unknown as {
       eq: (column: string, value: number) => {
         maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
       };
@@ -212,6 +216,23 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
     .eq("id", sessionId);
 
   if (sessionError) return NextResponse.json({ error: sessionError.message }, { status: 500 });
+
+  if (typedSession.cards_per_round_enabled) {
+    const { error: deleteCardsError } = await db
+      .from("bingo_cards")
+      .delete()
+      .eq("session_id", sessionId);
+
+    if (deleteCardsError) return NextResponse.json({ error: deleteCardsError.message }, { status: 500 });
+
+    await generateCards(
+      db,
+      sessionId,
+      Math.max(1, Number(typedSession.card_count ?? 1)),
+      typedSession.card_label_mode ?? "track_artist",
+      typedSession.session_code ?? `BINGO-${sessionId}`
+    );
+  }
 
   return NextResponse.json({ ok: true }, { status: 200 });
 }

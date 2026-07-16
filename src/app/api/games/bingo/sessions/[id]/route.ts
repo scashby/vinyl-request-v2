@@ -29,6 +29,7 @@ type BingoSessionPatch = {
   session_code?: string;
   game_mode?: string;
   card_count?: number;
+  cards_per_round_enabled?: boolean;
   card_layout?: string;
   card_label_mode?: string;
   round_count?: number;
@@ -91,6 +92,7 @@ type SessionRow = {
   game_mode: string;
   round_modes: { round: number; modes: GameMode[] }[] | null;
   card_count: number;
+  cards_per_round_enabled: boolean;
   card_layout: string;
   card_label_mode: string;
   round_count: number;
@@ -205,7 +207,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   await purgeExpiredSandboxSessions(db);
   const sessionQuery = (db
     .from("bingo_sessions")
-    .select("id, event_id, game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, session_code, game_mode, round_modes, card_count, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, seconds_to_next_call, sonos_output_delay_ms, countdown_started_at, paused_remaining_seconds, paused_at, current_call_index, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at, next_game_scheduled_at, next_game_rules_text, welcome_heading_text, welcome_message_text, welcome_rules_text, welcome_tiebreak_text, intermission_heading_text, intermission_message_text, intermission_footer_text, thanks_heading_text, thanks_subheading_text, thanks_events_heading_text, call_reveal_delay_seconds, call_reveal_at, bingo_overlay, default_intermission_seconds, is_favorite, favorite_note, is_sandbox, sandbox_source_session_id, sandbox_expires_at, active_playlist_letter_by_round, theme_enabled, theme_name") as unknown as {
+    .select("id, event_id, game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, session_code, game_mode, round_modes, card_count, cards_per_round_enabled, card_layout, card_label_mode, round_count, current_round, round_end_policy, tie_break_policy, pool_exhaustion_policy, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, seconds_to_next_call, sonos_output_delay_ms, countdown_started_at, paused_remaining_seconds, paused_at, current_call_index, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, status, created_at, started_at, ended_at, next_game_scheduled_at, next_game_rules_text, welcome_heading_text, welcome_message_text, welcome_rules_text, welcome_tiebreak_text, intermission_heading_text, intermission_message_text, intermission_footer_text, thanks_heading_text, thanks_subheading_text, thanks_events_heading_text, call_reveal_delay_seconds, call_reveal_at, bingo_overlay, default_intermission_seconds, is_favorite, favorite_note, is_sandbox, sandbox_source_session_id, sandbox_expires_at, active_playlist_letter_by_round, theme_enabled, theme_name") as unknown as {
       eq: (column: string, value: number) => {
         maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
       };
@@ -323,6 +325,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "game_mode",
     "round_modes",
     "card_count",
+    "cards_per_round_enabled",
     "round_count",
     "remove_resleeve_seconds",
     "place_vinyl_seconds",
@@ -390,6 +393,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
   if (patch.card_count !== undefined) {
     patch.card_count = Math.max(1, Math.floor(Number(patch.card_count)));
+  }
+  if (patch.cards_per_round_enabled !== undefined) {
+    patch.cards_per_round_enabled = Boolean(patch.cards_per_round_enabled);
   }
   if (patch.round_count !== undefined) {
     patch.round_count = Math.max(1, Math.floor(Number(patch.round_count)));

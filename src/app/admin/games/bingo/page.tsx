@@ -54,6 +54,7 @@ type Session = {
   status: string;
   current_round: number;
   round_count: number;
+  cards_per_round_enabled?: boolean;
   remove_resleeve_seconds: number;
   place_vinyl_seconds: number;
   cue_seconds: number;
@@ -172,6 +173,7 @@ export default function BingoSetupPage() {
   const [roundModes, setRoundModes] = useState<RoundModesEntry[]>([]);
   const [roundPlaylistIds, setRoundPlaylistIds] = useState<RoundPlaylistEntry[]>([]);
   const [roundPlaylistOverrideRounds, setRoundPlaylistOverrideRounds] = useState<number[]>([]);
+  const [useDifferentMastersPerRound, setUseDifferentMastersPerRound] = useState(false);
   const [cardCount, setCardCount] = useState(40);
   const [roundCount, setRoundCount] = useState(3);
   const [removeResleeveSeconds, setRemoveResleeveSeconds] = useState(20);
@@ -217,6 +219,7 @@ export default function BingoSetupPage() {
     [presets, selectedTracklistPresetId]
   );
   const usingTracklistPreset = selectedTracklistPreset !== null;
+  const perRoundMastersEnabled = useDifferentMastersPerRound && !usingTracklistPreset;
   const effectiveTrackCount = usingTracklistPreset ? selectedTracklistPreset.pool_size : selectedPlaylistTrackCount;
   const getTrackCountForPlaylistIds = useCallback(
     (playlistIds: number[]) => playlistIds.reduce((sum, id) => sum + (trackCountByPlaylistId.get(id) ?? 0), 0),
@@ -261,6 +264,7 @@ export default function BingoSetupPage() {
     setSelectedPlaylistIds(selectedTracklistPreset.source_playlist_ids);
     setRoundPlaylistIds([]);
     setRoundPlaylistOverrideRounds([]);
+    setUseDifferentMastersPerRound(false);
   }, [selectedTracklistPreset]);
 
   useEffect(() => {
@@ -355,14 +359,18 @@ export default function BingoSetupPage() {
     }
   }, [setPlaylistsForRound]);
 
-  const missingPlaylistRounds = useMemo(
-    () => usingTracklistPreset || hasSelectedPlaylists
-      ? []
-      : Array.from({ length: Math.max(1, roundCount) }, (_, index) => index + 1).filter(
-          (round) => getPlaylistIdsForRound(round).length === 0
-        ),
-    [getPlaylistIdsForRound, hasSelectedPlaylists, roundCount, usingTracklistPreset]
-  );
+  const missingPlaylistRounds = useMemo(() => {
+    if (usingTracklistPreset) return [];
+    if (perRoundMastersEnabled) {
+      return Array.from({ length: Math.max(1, roundCount) }, (_, index) => index + 1).filter(
+        (round) => getPlaylistIdsForRound(round).length === 0
+      );
+    }
+    if (hasSelectedPlaylists) return [];
+    return Array.from({ length: Math.max(1, roundCount) }, (_, index) => index + 1).filter(
+      (round) => getPlaylistIdsForRound(round).length === 0
+    );
+  }, [getPlaylistIdsForRound, hasSelectedPlaylists, perRoundMastersEnabled, roundCount, usingTracklistPreset]);
   const hasUsablePlaylistConfiguration = usingTracklistPreset || hasSelectedPlaylists || missingPlaylistRounds.length === 0;
 
   const toggleRoundMode = useCallback(
@@ -537,13 +545,28 @@ export default function BingoSetupPage() {
     setCreating(true);
     try {
       const presetPlaylistIds = selectedTracklistPreset?.source_playlist_ids ?? [];
+      const configuredRoundPlaylists = Array.from({ length: Math.max(1, roundCount) }, (_, index) => {
+        const round = index + 1;
+        return {
+          round,
+          playlist_ids: getPlaylistIdsForRound(round),
+        };
+      }).filter((entry) => entry.playlist_ids.length > 0);
+      const masterPlaylistIds = usingTracklistPreset
+        ? presetPlaylistIds
+        : perRoundMastersEnabled
+          ? []
+          : selectedPlaylistIds;
+      const primaryPlaylistId =
+        masterPlaylistIds[0] ?? configuredRoundPlaylists[0]?.playlist_ids[0] ?? null;
       const payloadBody = {
         event_id: eventId ? Number(eventId) : null,
         game_preset_id: selectedTracklistPresetId,
-        master_playlist_ids: usingTracklistPreset ? presetPlaylistIds : selectedPlaylistIds,
-        playlist_id: (usingTracklistPreset ? presetPlaylistIds : selectedPlaylistIds)[0],
-        playlist_ids: usingTracklistPreset ? presetPlaylistIds : selectedPlaylistIds,
-        round_playlist_ids: usingTracklistPreset ? [] : roundPlaylistIds,
+        master_playlist_ids: masterPlaylistIds,
+        playlist_id: primaryPlaylistId,
+        playlist_ids: masterPlaylistIds,
+        round_playlist_ids: usingTracklistPreset ? [] : (perRoundMastersEnabled ? configuredRoundPlaylists : roundPlaylistIds),
+        cards_per_round_enabled: perRoundMastersEnabled,
         game_mode: derivedGameMode,
         round_modes: roundModes,
         card_count: cardCount,
@@ -926,11 +949,36 @@ export default function BingoSetupPage() {
 
           {/* Playlists */}
           <div className="mt-4">
+            <label className="inline-flex items-center gap-2 text-sm font-semibold text-stone-200">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                disabled={usingTracklistPreset}
+                checked={perRoundMastersEnabled}
+                onChange={(event) => {
+                  const enabled = event.target.checked;
+                  setUseDifferentMastersPerRound(enabled);
+                  if (enabled) {
+                    setSelectedPlaylistIds([]);
+                    setRoundPlaylistOverrideRounds(Array.from({ length: Math.max(1, roundCount) }, (_, index) => index + 1));
+                  }
+                }}
+              />
+              Use Different Master Playlist Per Round (new card set each round)
+            </label>
+            <p className="mt-1 text-xs text-stone-500">
+              {usingTracklistPreset
+                ? "Disabled while reusing a tracklist favorite."
+                : "When enabled, each round uses its own playlist selection and cards are regenerated between rounds."}
+            </p>
+          </div>
+
+          <div className="mt-4">
             <label className="block text-sm">Master Playlists (optional if every round has its own override) <InlineFieldHelp label="Playlist" />
               <select
                 multiple
                 size={5}
-                disabled={usingTracklistPreset}
+                disabled={usingTracklistPreset || perRoundMastersEnabled}
                 className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
                 value={selectedPlaylistIds.map(String)}
                 onChange={(e) => {
@@ -942,7 +990,13 @@ export default function BingoSetupPage() {
               >
                 {playlists.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.track_count})</option>)}
               </select>
-              <p className="mt-2 text-xs text-stone-500">{usingTracklistPreset ? "Tracklist favorites use a fixed pool and source playlists." : "Leave this empty if each round below should use its own themed playlist set."}</p>
+              <p className="mt-2 text-xs text-stone-500">
+                {usingTracklistPreset
+                  ? "Tracklist favorites use a fixed pool and source playlists."
+                  : perRoundMastersEnabled
+                    ? "Per-round mode is enabled, so master playlists are not used for this session."
+                    : "Leave this empty if each round below should use its own themed playlist set."}
+              </p>
               <a
                 href="/edit-collection?playlistStudio=1&playlistView=manual&viewMode=playlist&trackSource=playlists&folderMode=playlists"
                 target="_blank"
@@ -986,7 +1040,7 @@ export default function BingoSetupPage() {
                 const round = index + 1;
                 const activeModes = getModesForRound(round);
                 const roundPlaylistSelection = getPlaylistIdsForRound(round);
-                const overrideEnabled = roundPlaylistOverrideRounds.includes(round);
+                const overrideEnabled = perRoundMastersEnabled || roundPlaylistOverrideRounds.includes(round);
                 const usesOverride = overrideEnabled && roundPlaylistSelection.length > 0;
                 const roundTrackCount = getTrackCountForPlaylistIds(roundPlaylistSelection);
                 return (
@@ -1012,11 +1066,11 @@ export default function BingoSetupPage() {
                       <label className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-stone-300">
                         <input
                           type="checkbox"
-                          disabled={usingTracklistPreset}
+                          disabled={usingTracklistPreset || perRoundMastersEnabled}
                           checked={overrideEnabled}
                           onChange={(event) => setRoundPlaylistOverrideEnabled(round, event.target.checked)}
                         />
-                        Use Playlist Override For Round {round}
+                        {perRoundMastersEnabled ? `Round ${round} Playlist Selection` : `Use Playlist Override For Round ${round}`}
                       </label>
                       {overrideEnabled ? (
                         <>

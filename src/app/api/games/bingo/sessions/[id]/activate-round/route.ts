@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
-import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
+import { generateCards, planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
 import { getPlaylistByLetter } from "src/lib/bingoCrateModel";
 import { getRoundSnapshotTracks } from "src/lib/bingoGameModel";
 import { resolveRoundPlaylistIds, type RoundPlaylistEntry } from "src/lib/bingoRoundPlaylists";
@@ -32,6 +32,10 @@ type SessionRow = {
   playlist_ids: number[] | null;
   round_playlist_ids: RoundPlaylistEntry[] | null;
   round_count: number;
+  card_count: number;
+  card_label_mode: "track_artist" | "track_only";
+  session_code: string;
+  cards_per_round_enabled: boolean;
   active_playlist_letter_by_round: { round: number; letter: string }[] | null;
 };
 
@@ -57,7 +61,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const sessionQuery = (db
       .from("bingo_sessions")
-      .select("id, playlist_id, playlist_ids, round_playlist_ids, round_count, active_playlist_letter_by_round") as unknown as {
+      .select("id, playlist_id, playlist_ids, round_playlist_ids, round_count, card_count, card_label_mode, session_code, cards_per_round_enabled, active_playlist_letter_by_round") as unknown as {
         eq: (column: string, value: number) => {
           maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
         };
@@ -223,6 +227,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .eq("id", sessionId);
 
     if (updateSessionError) return NextResponse.json({ error: updateSessionError.message }, { status: 500 });
+
+    if (typedSession.cards_per_round_enabled) {
+      const { error: deleteCardsError } = await db
+        .from("bingo_cards")
+        .delete()
+        .eq("session_id", sessionId);
+
+      if (deleteCardsError) return NextResponse.json({ error: deleteCardsError.message }, { status: 500 });
+
+      await generateCards(
+        db,
+        sessionId,
+        Math.max(1, Number(typedSession.card_count ?? 1)),
+        typedSession.card_label_mode ?? "track_artist",
+        typedSession.session_code ?? `BINGO-${sessionId}`
+      );
+    }
 
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error) {
