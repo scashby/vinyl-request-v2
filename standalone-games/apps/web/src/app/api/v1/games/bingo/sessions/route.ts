@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantRequestContext } from "@/lib/tenantContext";
 import { getRequestEntitlements, hasEntitlement } from "@/lib/entitlements";
+import { getTenantPlaylistsRepository } from "@/lib/tenantPlaylistsRepositoryFactory";
 import { getTenantPlaylistSnapshotsRepository } from "@/lib/tenantPlaylistSnapshotsRepositoryFactory";
 import { generateStandaloneBingoCards } from "@/lib/standaloneBingoCardEngine";
 import { getStandaloneBingoCardsRepository } from "@/lib/standaloneBingoCardsRepositoryFactory";
@@ -18,14 +19,25 @@ interface SnapshotPayloadItem {
 
 interface SnapshotPayload {
   items?: SnapshotPayloadItem[];
+  itemCount?: number;
+  playlistName?: string;
 }
 
 interface CreateSessionBody {
   playlistSnapshotId?: string;
+  playlist_id?: string;
+  playlist_ids?: string[];
+  master_playlist_ids?: string[];
+  round_playlist_ids?: Array<{ round?: number; playlist_ids?: string[] }>;
+  cards_per_round_enabled?: boolean;
   roundCount?: number;
+  round_count?: number;
   cardCount?: number;
+  card_count?: number;
   gameMode?: BingoGameMode;
+  game_mode?: BingoGameMode;
   callIntervalSeconds?: number;
+  call_interval_seconds?: number;
 }
 
 function isValidGameMode(value: unknown): value is BingoGameMode {
@@ -79,31 +91,15 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json()) as CreateSessionBody;
 
-    if (!body.playlistSnapshotId || body.playlistSnapshotId.trim().length === 0) {
-      return NextResponse.json(
-        { ok: false, error: "playlistSnapshotId is required." },
-        { status: 400 }
-      );
-    }
-
     const snapshotRepo = getTenantPlaylistSnapshotsRepository();
-    const snapshot = await snapshotRepo.getById(
-      ctx.tenantId,
-      body.playlistSnapshotId
-    );
+    const playlistRepo = getTenantPlaylistsRepository();
 
-    if (!snapshot) {
-      return NextResponse.json(
-        { ok: false, error: "playlistSnapshotId does not exist for this tenant." },
-        { status: 404 }
-      );
-    }
-
-    const roundCount = body.roundCount ?? 3;
-    const cardCount = body.cardCount ?? 40;
-    const callIntervalSeconds = body.callIntervalSeconds ?? 45;
-    const gameMode: BingoGameMode = isValidGameMode(body.gameMode)
-      ? body.gameMode
+    const roundCount = body.round_count ?? body.roundCount ?? 3;
+    const cardCount = body.card_count ?? body.cardCount ?? 40;
+    const callIntervalSeconds = body.call_interval_seconds ?? body.callIntervalSeconds ?? 45;
+    const requestedGameMode = body.game_mode ?? body.gameMode;
+    const gameMode: BingoGameMode = isValidGameMode(requestedGameMode)
+      ? requestedGameMode
       : "single_line";
 
     if (!Number.isInteger(roundCount) || roundCount < 1) {
@@ -127,11 +123,110 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const explicitPlaylistIds = [
+      ...(Array.isArray(body.master_playlist_ids) ? body.master_playlist_ids : []),
+      ...(Array.isArray(body.playlist_ids) ? body.playlist_ids : []),
+      ...(body.playlist_id ? [body.playlist_id] : []),
+    ]
+      .map((value) => String(value).trim())
+      .filter((value, index, source) => value.length > 0 && source.indexOf(value) === index);
+
+    const roundPlaylistIds = (Array.isArray(body.round_playlist_ids) ? body.round_playlist_ids : [])
+      .flatMap((entry) => (Array.isArray(entry.playlist_ids) ? entry.playlist_ids : []))
+      .map((value) => String(value).trim())
+      .filter((value, index, source) => value.length > 0 && source.indexOf(value) === index);
+
+    let snapshot = null;
+
+    if (body.playlistSnapshotId && body.playlistSnapshotId.trim().length > 0) {
+      snapshot = await snapshotRepo.getById(ctx.tenantId, body.playlistSnapshotId);
+      if (!snapshot) {
+        return NextResponse.json(
+          { ok: false, error: "playlistSnapshotId does not exist for this tenant." },
+          { status: 404 }
+        );
+      }
+    } else {
+      const sourcePlaylistIds = [...explicitPlaylistIds, ...roundPlaylistIds].filter(
+        (value, index, source) => source.indexOf(value) === index
+      );
+
+      if (sourcePlaylistIds.length === 0) {
+        return NextResponse.json(
+          { ok: false, error: "At least one playlist or playlist snapshot is required." },
+          { status: 400 }
+        );
+      }
+
+      const [playlists, snapshots] = await Promise.all([
+        playlistRepo.listByTenant(ctx.tenantId),
+        snapshotRepo.listByTenant(ctx.tenantId),
+      ]);
+
+      const playlistById = new Map(playlists.map((playlist) => [playlist.id, playlist]));
+      const latestSnapshotByPlaylistId = new Map<string, (typeof snapshots)[number]>();
+
+      for (const candidate of snapshots) {
+        if (!latestSnapshotByPlaylistId.has(candidate.tenantPlaylistId)) {
+          latestSnapshotByPlaylistId.set(candidate.tenantPlaylistId, candidate);
+        }
+      }
+
+      const resolvedSnapshots = sourcePlaylistIds.map((playlistId) => {
+        const playlist = playlistById.get(playlistId);
+        const resolvedSnapshot = latestSnapshotByPlaylistId.get(playlistId);
+        return {
+          playlist,
+          snapshot: resolvedSnapshot ?? null,
+        };
+      });
+
+      const missing = resolvedSnapshots.filter((entry) => !entry.playlist || !entry.snapshot);
+      if (missing.length > 0) {
+        return NextResponse.json(
+          { ok: false, error: "Every selected playlist must have an imported snapshot before creating a session." },
+          { status: 400 }
+        );
+      }
+
+      const combinedItems = resolvedSnapshots.flatMap((entry) => {
+        const payload = (entry.snapshot?.snapshotPayload ?? {}) as SnapshotPayload;
+        return Array.isArray(payload.items) ? payload.items : [];
+      });
+
+      if (combinedItems.length === 0) {
+        return NextResponse.json(
+          { ok: false, error: "Selected playlists do not contain any snapshot items." },
+          { status: 400 }
+        );
+      }
+
+      const snapshotName = `Session Source · ${new Date().toLocaleString()}`;
+      const firstPlaylistId = sourcePlaylistIds[0] as string;
+      snapshot = await snapshotRepo.create({
+        tenantId: ctx.tenantId,
+        tenantPlaylistId: firstPlaylistId,
+        createdByUserId: ctx.userId,
+        snapshotName,
+        snapshotPayload: {
+          playlistName: resolvedSnapshots
+            .map((entry) => entry.playlist?.name ?? "")
+            .filter((value) => value.length > 0)
+            .join(" + "),
+          itemCount: combinedItems.length,
+          items: combinedItems,
+          sourcePlaylistIds,
+          roundPlaylistIds: Array.isArray(body.round_playlist_ids) ? body.round_playlist_ids : [],
+          cardsPerRoundEnabled: Boolean(body.cards_per_round_enabled),
+        },
+      });
+    }
+
     const repo = getStandaloneBingoSessionsRepository();
     const session = await repo.create({
       tenantId: ctx.tenantId,
       createdByUserId: ctx.userId,
-      playlistSnapshotId: body.playlistSnapshotId,
+      playlistSnapshotId: snapshot.id,
       roundCount,
       cardCount,
       gameMode,
