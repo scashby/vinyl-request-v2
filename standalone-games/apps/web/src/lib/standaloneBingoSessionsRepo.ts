@@ -52,7 +52,7 @@ function makeSessionCode(): string {
   return code;
 }
 
-class InMemoryStandaloneBingoSessionsRepository
+export class InMemoryStandaloneBingoSessionsRepository
   implements StandaloneBingoSessionsRepository
 {
   private readonly sessions: StandaloneBingoSessionRecord[] = [];
@@ -83,16 +83,4 @@ class InMemoryStandaloneBingoSessionsRepository
     this.sessions.push(session);
     return session;
   }
-}
-
-const globalStore = globalThis as unknown as {
-  __standaloneBingoRepo?: StandaloneBingoSessionsRepository;
-};
-
-export function getStandaloneBingoSessionsRepository(): StandaloneBingoSessionsRepository {
-  if (!globalStore.__standaloneBingoRepo) {
-    globalStore.__standaloneBingoRepo = new InMemoryStandaloneBingoSessionsRepository();
-  }
-
-  return globalStore.__standaloneBingoRepo;
 }

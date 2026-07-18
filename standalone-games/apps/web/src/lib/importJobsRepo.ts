@@ -51,7 +51,7 @@ function makeId(): string {
   return `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 }
 
-class InMemoryImportJobsRepository implements ImportJobsRepository {
+export class InMemoryImportJobsRepository implements ImportJobsRepository {
   private readonly jobs: ImportJobRecord[] = [];
 
   async listByTenant(tenantId: string): Promise<ImportJobRecord[]> {
@@ -78,16 +78,4 @@ class InMemoryImportJobsRepository implements ImportJobsRepository {
     this.jobs.push(job);
     return job;
   }
-}
-
-const globalStore = globalThis as unknown as {
-  __standaloneImportJobsRepo?: ImportJobsRepository;
-};
-
-export function getImportJobsRepository(): ImportJobsRepository {
-  if (!globalStore.__standaloneImportJobsRepo) {
-    globalStore.__standaloneImportJobsRepo = new InMemoryImportJobsRepository();
-  }
-
-  return globalStore.__standaloneImportJobsRepo;
 }
