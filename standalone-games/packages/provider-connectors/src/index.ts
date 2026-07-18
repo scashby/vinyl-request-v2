@@ -58,3 +58,5 @@ export interface ProviderAdapter {
 export interface ProviderAdapterRegistry {
   get: (provider: ProviderName) => ProviderAdapter;
 }
+
+export { createStubProviderRegistry } from "./stubs";
