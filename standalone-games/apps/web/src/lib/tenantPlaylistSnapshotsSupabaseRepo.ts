@@ -63,4 +63,18 @@ export class SupabaseTenantPlaylistSnapshotsRepository implements TenantPlaylist
 
     return Boolean(data);
   }
+
+  async getById(tenantId: string, snapshotId: string): Promise<TenantPlaylistSnapshotRecord | null> {
+    const supabase = getStandaloneSupabaseClient();
+    const { data, error } = await supabase
+      .from("sg_tenant_playlist_snapshots")
+      .select("id, tenant_id, tenant_playlist_id, snapshot_name, snapshot_payload, created_by_user_id, created_at")
+      .eq("tenant_id", tenantId)
+      .eq("id", snapshotId)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+
+    return data ? mapRow(data as Record<string, unknown>) : null;
+  }
 }

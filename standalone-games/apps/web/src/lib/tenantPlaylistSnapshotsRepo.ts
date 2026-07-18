@@ -20,6 +20,7 @@ export interface TenantPlaylistSnapshotsRepository {
   listByTenant(tenantId: string): Promise<TenantPlaylistSnapshotRecord[]>;
   create(input: CreateTenantPlaylistSnapshotInput): Promise<TenantPlaylistSnapshotRecord>;
   existsForTenant(tenantId: string, snapshotId: string): Promise<boolean>;
+  getById(tenantId: string, snapshotId: string): Promise<TenantPlaylistSnapshotRecord | null>;
 }
 
 function makeId(): string {
@@ -56,6 +57,14 @@ export class InMemoryTenantPlaylistSnapshotsRepository implements TenantPlaylist
   async existsForTenant(tenantId: string, snapshotId: string): Promise<boolean> {
     return this.snapshots.some(
       (snapshot) => snapshot.tenantId === tenantId && snapshot.id === snapshotId
+    );
+  }
+
+  async getById(tenantId: string, snapshotId: string): Promise<TenantPlaylistSnapshotRecord | null> {
+    return (
+      this.snapshots.find(
+        (snapshot) => snapshot.tenantId === tenantId && snapshot.id === snapshotId
+      ) ?? null
     );
   }
 }
