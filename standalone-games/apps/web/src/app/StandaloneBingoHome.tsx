@@ -38,6 +38,23 @@ type CallRecord = {
   calledAt?: string | null;
 };
 
+type CardRecord = {
+  id: string;
+  cardIndex: number;
+  cardIdentifier: string;
+  createdAt: string;
+};
+
+type CardValidationResponse = {
+  card_identifier: string;
+  is_winner: boolean;
+  active_modes: string[];
+  winning_patterns: Array<{ mode: string; label: string }>;
+  mistakes: Array<{ mode: string; message: string; missing_cells: Array<{ label: string }> }>;
+  marked_square_count: number;
+  playable_square_count: number;
+};
+
 type StandaloneBingoHomeProps = {
   tenantId: string;
   userId: string;
@@ -72,11 +89,16 @@ export default function StandaloneBingoHome({
   const [snapshots, setSnapshots] = useState<SnapshotRecord[]>([]);
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [calls, setCalls] = useState<CallRecord[]>([]);
+  const [cards, setCards] = useState<CardRecord[]>([]);
   const [selectedSnapshotId, setSelectedSnapshotId] = useState("");
   const [selectedSessionId, setSelectedSessionId] = useState(initialSessionId);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [advancing, setAdvancing] = useState(false);
+  const [winnerCheckInput, setWinnerCheckInput] = useState("");
+  const [winnerCheckResult, setWinnerCheckResult] = useState<CardValidationResponse | null>(null);
+  const [winnerCheckError, setWinnerCheckError] = useState<string | null>(null);
+  const [checkingWinner, setCheckingWinner] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const requestHeaders = useMemo(
@@ -155,6 +177,20 @@ export default function StandaloneBingoHome({
     }
   }
 
+  async function loadCards(sessionId: string) {
+    try {
+      const nextCards = await fetchJson<CardRecord[]>(
+        `/api/v1/games/bingo/sessions/${sessionId}/cards`
+      );
+      setCards(nextCards);
+      if (nextCards.length > 0 && !winnerCheckInput) {
+        setWinnerCheckInput(nextCards[0]!.cardIdentifier);
+      }
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load cards.");
+    }
+  }
+
   useEffect(() => {
     void loadBaseData();
   }, [tenantId, userId, entitlements]);
@@ -162,10 +198,15 @@ export default function StandaloneBingoHome({
   useEffect(() => {
     if (!selectedSessionId) {
       setCalls([]);
+      setCards([]);
+      setWinnerCheckInput("");
+      setWinnerCheckResult(null);
+      setWinnerCheckError(null);
       return;
     }
 
     void loadCalls(selectedSessionId);
+    void loadCards(selectedSessionId);
     const timer = window.setInterval(() => {
       void loadCalls(selectedSessionId);
     }, 5000);
@@ -191,7 +232,7 @@ export default function StandaloneBingoHome({
       });
       await loadBaseData();
       setSelectedSessionId(created.id);
-      await loadCalls(created.id);
+      await Promise.all([loadCalls(created.id), loadCards(created.id)]);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Failed to create session.");
     } finally {
@@ -214,6 +255,30 @@ export default function StandaloneBingoHome({
       await Promise.all([loadBaseData(), loadCalls(selectedSessionId)]);
     } finally {
       setAdvancing(false);
+    }
+  }
+
+  async function handleWinnerCheck() {
+    if (!selectedSessionId) return;
+    const cardIdentifier = winnerCheckInput.trim().toUpperCase();
+    if (!cardIdentifier) return;
+
+    setCheckingWinner(true);
+    setWinnerCheckError(null);
+    try {
+      const result = await fetchJson<CardValidationResponse>(
+        `/api/v1/games/bingo/cards/validate?sessionId=${encodeURIComponent(
+          selectedSessionId
+        )}&cardIdentifier=${encodeURIComponent(cardIdentifier)}`
+      );
+      setWinnerCheckResult(result);
+    } catch (checkError) {
+      setWinnerCheckResult(null);
+      setWinnerCheckError(
+        checkError instanceof Error ? checkError.message : "Failed to validate card."
+      );
+    } finally {
+      setCheckingWinner(false);
     }
   }
 
@@ -329,6 +394,93 @@ export default function StandaloneBingoHome({
                     ))}
                   </div>
                   <p style={{ margin: 0, fontSize: 13, color: "#d9d1c3" }}>Completed or live calls: {completedCalls.length} · Remaining: {pendingCalls.length}</p>
+                </div>
+
+                <div style={{ marginTop: 20, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, background: "rgba(0,0,0,0.2)", padding: 16 }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 20 }}>Winner Check</h3>
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10 }}>
+                    <input
+                      value={winnerCheckInput}
+                      onChange={(event) => setWinnerCheckInput(event.target.value)}
+                      placeholder="Enter card identifier"
+                      style={{
+                        width: "100%",
+                        borderRadius: 12,
+                        border: "1px solid rgba(255,255,255,0.16)",
+                        background: "rgba(255,255,255,0.03)",
+                        color: "#f5efe6",
+                        padding: "10px 12px",
+                        fontSize: 14,
+                      }}
+                    />
+                    <button onClick={() => void handleWinnerCheck()} disabled={checkingWinner} style={buttonStyle(true)}>
+                      {checkingWinner ? "Checking..." : "Validate"}
+                    </button>
+                  </div>
+
+                  <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+                    <div style={{ fontSize: 13, color: "#d9d1c3" }}>
+                      Cards generated: {cards.length}
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {cards.slice(0, 20).map((card) => (
+                        <button
+                          key={card.id}
+                          onClick={() => setWinnerCheckInput(card.cardIdentifier)}
+                          style={{
+                            ...buttonStyle(false),
+                            padding: "6px 10px",
+                            fontSize: 12,
+                            borderRadius: 10,
+                          }}
+                        >
+                          {card.cardIdentifier}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {winnerCheckError ? (
+                    <div style={{ marginTop: 12, color: "#ffd8d8", border: "1px solid rgba(255,120,120,0.45)", borderRadius: 12, padding: 10, background: "rgba(120,20,20,0.22)" }}>
+                      {winnerCheckError}
+                    </div>
+                  ) : null}
+
+                  {winnerCheckResult ? (
+                    <div style={{
+                      marginTop: 12,
+                      border: winnerCheckResult.is_winner
+                        ? "1px solid rgba(82,214,145,0.7)"
+                        : "1px solid rgba(214,163,82,0.7)",
+                      borderRadius: 12,
+                      padding: 12,
+                      background: winnerCheckResult.is_winner
+                        ? "rgba(24,83,58,0.35)"
+                        : "rgba(83,58,24,0.35)",
+                    }}>
+                      <strong>
+                        {winnerCheckResult.card_identifier} · {winnerCheckResult.is_winner ? "Winner" : "Not Yet Winning"}
+                      </strong>
+                      <div style={{ marginTop: 6, fontSize: 13, color: "#d9d1c3" }}>
+                        Marked: {winnerCheckResult.marked_square_count} / {winnerCheckResult.playable_square_count + 1}
+                      </div>
+                      {winnerCheckResult.winning_patterns.length > 0 ? (
+                        <div style={{ marginTop: 6, fontSize: 13, color: "#f3e5cb" }}>
+                          {winnerCheckResult.winning_patterns
+                            .map((pattern) => `${pattern.mode.replace("_", " ")}: ${pattern.label}`)
+                            .join(" | ")}
+                        </div>
+                      ) : null}
+                      {winnerCheckResult.mistakes.length > 0 ? (
+                        <div style={{ marginTop: 6, fontSize: 13, color: "#f3e5cb" }}>
+                          {winnerCheckResult.mistakes
+                            .slice(0, 2)
+                            .map((mistake) => mistake.message)
+                            .join(" | ")}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               </>
             ) : (

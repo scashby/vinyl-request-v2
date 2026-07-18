@@ -183,6 +183,18 @@ CREATE TABLE IF NOT EXISTS public.sg_game_bingo_calls (
   CONSTRAINT sg_game_bingo_calls_unique UNIQUE (session_id, call_index)
 );
 
+CREATE TABLE IF NOT EXISTS public.sg_game_bingo_cards (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id uuid NOT NULL REFERENCES public.sg_game_bingo_sessions(id) ON DELETE CASCADE,
+  card_index integer NOT NULL,
+  card_identifier text NOT NULL,
+  grid jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT sg_game_bingo_cards_card_index_chk CHECK (card_index >= 1),
+  CONSTRAINT sg_game_bingo_cards_unique_session_index UNIQUE (session_id, card_index),
+  CONSTRAINT sg_game_bingo_cards_unique_identifier UNIQUE (card_identifier)
+);
+
 CREATE INDEX IF NOT EXISTS idx_sg_tenant_memberships_tenant ON public.sg_tenant_memberships(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_sg_provider_connections_tenant ON public.sg_provider_connections(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_sg_import_jobs_tenant ON public.sg_import_jobs(tenant_id, status);
@@ -190,6 +202,8 @@ CREATE INDEX IF NOT EXISTS idx_sg_external_tracks_tenant ON public.sg_external_t
 CREATE INDEX IF NOT EXISTS idx_sg_track_mappings_tenant ON public.sg_track_mappings(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_sg_tenant_playlists_tenant ON public.sg_tenant_playlists(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_sg_bingo_sessions_tenant ON public.sg_game_bingo_sessions(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_sg_bingo_cards_session ON public.sg_game_bingo_cards(session_id);
+CREATE INDEX IF NOT EXISTS idx_sg_bingo_cards_identifier ON public.sg_game_bingo_cards(card_identifier);
 
 ALTER TABLE public.sg_tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sg_users ENABLE ROW LEVEL SECURITY;
@@ -204,6 +218,7 @@ ALTER TABLE public.sg_tenant_playlist_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sg_tenant_playlist_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sg_game_bingo_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sg_game_bingo_calls ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sg_game_bingo_cards ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS sg_tenants_membership_select ON public.sg_tenants;
 CREATE POLICY sg_tenants_membership_select
@@ -397,6 +412,30 @@ WITH CHECK (
     FROM public.sg_game_bingo_sessions s
     JOIN public.sg_tenant_memberships m ON m.tenant_id = s.tenant_id
     WHERE s.id = sg_game_bingo_calls.session_id
+      AND m.user_id = auth.uid()
+      AND m.role IN ('owner', 'admin', 'operator')
+  )
+);
+
+DROP POLICY IF EXISTS sg_bingo_cards_by_session_membership ON public.sg_game_bingo_cards;
+CREATE POLICY sg_bingo_cards_by_session_membership
+ON public.sg_game_bingo_cards
+FOR ALL
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.sg_game_bingo_sessions s
+    JOIN public.sg_tenant_memberships m ON m.tenant_id = s.tenant_id
+    WHERE s.id = sg_game_bingo_cards.session_id
+      AND m.user_id = auth.uid()
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.sg_game_bingo_sessions s
+    JOIN public.sg_tenant_memberships m ON m.tenant_id = s.tenant_id
+    WHERE s.id = sg_game_bingo_cards.session_id
       AND m.user_id = auth.uid()
       AND m.role IN ('owner', 'admin', 'operator')
   )
