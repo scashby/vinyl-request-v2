@@ -96,6 +96,7 @@ export default function StandaloneBingoHome({
   const [creating, setCreating] = useState(false);
   const [advancing, setAdvancing] = useState(false);
   const [controlling, setControlling] = useState<null | "pause" | "resume" | "skip" | "replace_next">(null);
+  const [callPhase, setCallPhase] = useState<"idle" | "prep_started" | "called">("idle");
   const [winnerCheckInput, setWinnerCheckInput] = useState("");
   const [winnerCheckResult, setWinnerCheckResult] = useState<CardValidationResponse | null>(null);
   const [winnerCheckError, setWinnerCheckError] = useState<string | null>(null);
@@ -117,6 +118,13 @@ export default function StandaloneBingoHome({
   const completedCalls = calls.filter(
     (call) => call.status === "completed" || call.status === "called"
   );
+
+  function formatBall(callIndex?: number) {
+    if (!callIndex) return "-";
+    const letters = ["B", "I", "N", "G", "O"];
+    const letter = letters[(Math.max(1, callIndex) - 1) % letters.length] ?? "B";
+    return `${letter}-${callIndex}`;
+  }
 
   async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
     const response = await fetch(input, {
@@ -214,6 +222,10 @@ export default function StandaloneBingoHome({
 
     return () => window.clearInterval(timer);
   }, [selectedSessionId]);
+
+  useEffect(() => {
+    setCallPhase(currentCall ? "idle" : "idle");
+  }, [currentCall?.id]);
 
   async function handleCreateSession() {
     if (!selectedSnapshotId) return;
@@ -416,6 +428,9 @@ export default function StandaloneBingoHome({
                   <div style={{ borderRadius: 24, padding: 24, background: "linear-gradient(135deg, rgba(214,163,82,0.3), rgba(74,53,25,0.45))", minHeight: 220 }}>
                     <p style={{ margin: 0, fontSize: 12, letterSpacing: "0.18em", textTransform: "uppercase", color: "#f2d29b" }}>Current Call</p>
                     <h3 style={{ margin: "12px 0 8px", fontSize: 42, lineHeight: 1.05 }}>{currentCall ? currentCall.trackTitle : "Ready to start"}</h3>
+                    <p style={{ margin: "0 0 8px", fontSize: 14, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#f2d29b" }}>
+                      {currentCall ? formatBall(currentCall.callIndex) : "Awaiting Call"}
+                    </p>
                     <p style={{ margin: 0, fontSize: 22, color: "#f5efe6" }}>{currentCall ? currentCall.artistName : "Press Start Game to reveal the first track."}</p>
                     {currentCall ? <p style={{ marginTop: 14, fontSize: 13, color: "#f0e0bf" }}>Call {currentCall.callIndex} of {calls.length}</p> : null}
                   </div>
@@ -435,6 +450,37 @@ export default function StandaloneBingoHome({
                 </div>
 
                 <div style={{ marginTop: 20, display: "grid", gap: 10 }}>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <button
+                      onClick={() => setCallPhase("prep_started")}
+                      disabled={!currentCall}
+                      style={buttonStyle(callPhase === "prep_started")}
+                    >
+                      Prep Started
+                    </button>
+                    <button
+                      onClick={() => setCallPhase("called")}
+                      disabled={!currentCall}
+                      style={buttonStyle(callPhase === "called")}
+                    >
+                      Called
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCallPhase("idle");
+                        void handleAdvance();
+                      }}
+                      disabled={!currentCall || advancing}
+                      style={buttonStyle(true)}
+                    >
+                      {advancing ? "Completing..." : "Completed"}
+                    </button>
+                  </div>
+                  {currentCall ? (
+                    <p style={{ margin: 0, fontSize: 13, color: "#d9d1c3" }}>
+                      Operator phase: {callPhase === "idle" ? "ready" : callPhase.replace("_", " ")}
+                    </p>
+                  ) : null}
                   <h3 style={{ margin: 0, fontSize: 20 }}>Call Sheet</h3>
                   <div style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, overflow: "hidden", background: "rgba(0,0,0,0.2)" }}>
                     {calls.map((call) => (
