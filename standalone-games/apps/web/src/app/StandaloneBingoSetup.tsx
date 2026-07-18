@@ -253,8 +253,14 @@ export default function StandaloneBingoSetup({
                   <h3 style={{ margin: "8px 0 6px", fontSize: 28 }}>{selectedSession.sessionCode}</h3>
                   <p style={{ margin: 0, color: "#d9d1c3" }}>Status: {selectedSession.status} · Started: {formatTimestamp(selectedSession.startedAt)}</p>
                   <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+                    <a href={`/bingo/prep?${baseQuery}`} target="_blank" rel="noreferrer" style={linkButtonStyle(false)}>
+                      Open Prep
+                    </a>
                     <a href={`/bingo/host?${baseQuery}`} target="_blank" rel="noreferrer" style={linkButtonStyle(true)}>
                       Open Host
+                    </a>
+                    <a href={`/bingo/assistant?${baseQuery}`} target="_blank" rel="noreferrer" style={linkButtonStyle(false)}>
+                      Open Assistant
                     </a>
                     <a href={`/bingo/jumbotron?${baseQuery}`} target="_blank" rel="noreferrer" style={linkButtonStyle(false)}>
                       Open Jumbotron

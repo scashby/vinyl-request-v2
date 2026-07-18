@@ -23,6 +23,7 @@ export interface StandaloneBingoCallsRepository {
   getCurrentCalled(sessionId: string): Promise<StandaloneBingoCallRecord | null>;
   getNextPending(sessionId: string): Promise<StandaloneBingoCallRecord | null>;
   markCompleted(callId: string): Promise<void>;
+  markSkipped(callId: string): Promise<void>;
   markCalled(callId: string, calledAt: string): Promise<StandaloneBingoCallRecord | null>;
 }
 
@@ -79,6 +80,13 @@ export class InMemoryStandaloneBingoCallsRepository implements StandaloneBingoCa
     const call = this.calls.find((entry) => entry.id === callId);
     if (call) {
       call.status = "completed";
+    }
+  }
+
+  async markSkipped(callId: string): Promise<void> {
+    const call = this.calls.find((entry) => entry.id === callId);
+    if (call) {
+      call.status = "skipped";
     }
   }
 
