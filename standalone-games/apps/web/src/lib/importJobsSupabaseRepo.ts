@@ -56,6 +56,7 @@ export class SupabaseImportJobsRepository implements ImportJobsRepository {
       .from("sg_import_jobs")
       .insert({
         tenant_id: input.tenantId,
+        provider_connection_id: input.source.providerConnectionId ?? null,
         requested_by_user_id: input.requestedByUserId,
         provider: input.provider,
         job_type: input.jobType,
