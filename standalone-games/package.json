@@ -1,0 +1,14 @@
+{
+  "name": "@dwd/standalone-games",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @dwd/standalone-web",
+    "build:web": "npm run build --workspace @dwd/standalone-web",
+    "lint:web": "npm run lint --workspace @dwd/standalone-web"
+  }
+}
