@@ -11,6 +11,7 @@ type SessionRecord = {
   id: string;
   sessionCode: string;
   status: "pending" | "running" | "paused" | "completed";
+  currentRound?: number;
   roundCount: number;
   cardCount: number;
 };
@@ -142,7 +143,7 @@ export default function StandaloneBingoPrep({
           <p style={eyebrowStyle}>Standalone Bingo Prep</p>
           <h1 style={{ margin: "8px 0 10px", fontSize: 38 }}>Crate Pull Board</h1>
           <p style={{ margin: 0, color: "#d9d1c3" }}>
-            {session?.sessionCode ?? "-"} · {session?.status ?? "loading"} · Cards {cards.length}
+            {session?.sessionCode ?? "-"} · {session?.status ?? "loading"} · Round {session?.currentRound ?? 1} of {session?.roundCount ?? 1} · Cards {cards.length}
           </p>
           <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
             <a href={`/?${params}`} target="_blank" rel="noreferrer" style={linkStyle}>Setup</a>

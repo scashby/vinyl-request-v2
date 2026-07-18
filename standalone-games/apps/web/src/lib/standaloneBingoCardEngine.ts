@@ -1,5 +1,6 @@
 import type {
   BingoGameMode,
+  StandaloneBingoRoundModesEntry,
   StandaloneBingoSessionRecord,
 } from "@/lib/standaloneBingoSessionsRepo";
 import type {
@@ -188,6 +189,15 @@ function missingCells(
     .map((cell) => ({ label: cell.label }));
 }
 
+function getModesForRound(
+  roundModes: StandaloneBingoRoundModesEntry[] | null | undefined,
+  round: number,
+  fallbackMode: BingoGameMode
+): BingoGameMode[] {
+  const configured = (roundModes ?? []).find((entry) => entry.round === round)?.modes ?? [];
+  return configured.length > 0 ? configured : [fallbackMode];
+}
+
 export function validateStandaloneBingoCard(
   session: StandaloneBingoSessionRecord,
   card: StandaloneBingoCardRecord,
@@ -201,7 +211,7 @@ export function validateStandaloneBingoCard(
 
   const grid = card.grid;
   const patterns = getLinePatterns(grid);
-  const mode = session.gameMode;
+  const activeModes = getModesForRound(session.roundModes, session.currentRound, session.gameMode);
 
   const isMarked = (cell: StandaloneBingoCardCell) => {
     if (cell.free) return true;
@@ -212,7 +222,7 @@ export function validateStandaloneBingoCard(
   const winningPatterns: Array<{ mode: BingoGameMode; label: string }> = [];
   const mistakes: StandaloneBingoValidationResult["mistakes"] = [];
 
-  const pushSingleLike = (requiredLineCount: number) => {
+  const pushSingleLike = (mode: BingoGameMode, requiredLineCount: number) => {
     if (completeLines.length >= requiredLineCount) {
       completeLines.slice(0, requiredLineCount).forEach((line) => {
         winningPatterns.push({ mode, label: line.label });
@@ -228,11 +238,12 @@ export function validateStandaloneBingoCard(
     });
   };
 
-  if (mode === "single_line") pushSingleLike(1);
-  if (mode === "double_line") pushSingleLike(2);
-  if (mode === "triple_line") pushSingleLike(3);
+  for (const mode of activeModes) {
+    if (mode === "single_line") pushSingleLike(mode, 1);
+    if (mode === "double_line") pushSingleLike(mode, 2);
+    if (mode === "triple_line") pushSingleLike(mode, 3);
 
-  if (mode === "criss_cross") {
+    if (mode === "criss_cross") {
     const diagonals = patterns.filter(
       (pattern) => pattern.label === "Diagonal Main" || pattern.label === "Diagonal Anti"
     );
@@ -247,9 +258,9 @@ export function validateStandaloneBingoCard(
         missing_cells: missingCells(target?.cells ?? [], isMarked),
       });
     }
-  }
+    }
 
-  if (mode === "four_corners") {
+    if (mode === "four_corners") {
     const corners = grid.filter(
       (cell) =>
         (cell.row === 0 && cell.col === 0) ||
@@ -266,9 +277,9 @@ export function validateStandaloneBingoCard(
         missing_cells: missingCells(corners, isMarked),
       });
     }
-  }
+    }
 
-  if (mode === "blackout") {
+    if (mode === "blackout") {
     const playable = grid.filter((cell) => !cell.free);
     if (playable.every((cell) => isMarked(cell))) {
       winningPatterns.push({ mode, label: "Blackout" });
@@ -279,14 +290,15 @@ export function validateStandaloneBingoCard(
         missing_cells: missingCells(playable, isMarked),
       });
     }
-  }
+    }
 
-  if (mode === "death") {
+    if (mode === "death") {
     mistakes.push({
       mode,
       message: "Death mode does not use standard winner validation.",
       missing_cells: [],
     });
+    }
   }
 
   const cardPreview = [...grid]
@@ -318,7 +330,7 @@ export function validateStandaloneBingoCard(
   return {
     card_identifier: card.cardIdentifier,
     is_winner: winningPatterns.length > 0,
-    active_modes: [mode],
+    active_modes: activeModes,
     winning_patterns: winningPatterns,
     mistakes,
     expected_free_square_count: 1,

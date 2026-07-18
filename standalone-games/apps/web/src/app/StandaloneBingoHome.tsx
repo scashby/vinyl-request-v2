@@ -20,7 +20,9 @@ type SessionRecord = {
   sessionCode: string;
   status: "pending" | "running" | "paused" | "completed";
   playlistSnapshotId: string;
+  currentRound?: number;
   roundCount: number;
+  roundModes?: Array<{ round: number; modes: string[] }>;
   cardCount: number;
   gameMode: string;
   callIntervalSeconds: number;
@@ -95,7 +97,7 @@ export default function StandaloneBingoHome({
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [advancing, setAdvancing] = useState(false);
-  const [controlling, setControlling] = useState<null | "pause" | "resume" | "skip" | "replace_next">(null);
+  const [controlling, setControlling] = useState<null | "pause" | "resume" | "skip" | "replace_next" | "next_round">(null);
   const [callPhase, setCallPhase] = useState<"idle" | "prep_started" | "called">("idle");
   const [winnerCheckInput, setWinnerCheckInput] = useState("");
   const [winnerCheckResult, setWinnerCheckResult] = useState<CardValidationResponse | null>(null);
@@ -271,7 +273,7 @@ export default function StandaloneBingoHome({
     }
   }
 
-  async function handleControl(action: "pause" | "resume" | "skip" | "replace_next") {
+  async function handleControl(action: "pause" | "resume" | "skip" | "replace_next" | "next_round") {
     if (!selectedSessionId) return;
     setControlling(action);
     setError(null);
@@ -384,7 +386,7 @@ export default function StandaloneBingoHome({
                   <div>
                     <p style={{ margin: 0, fontSize: 12, letterSpacing: "0.18em", textTransform: "uppercase", color: "#d0b07a" }}>Live Session</p>
                     <h2 style={{ margin: "8px 0 0", fontSize: 32 }}>{selectedSession.sessionCode}</h2>
-                    <p style={{ margin: "8px 0 0", color: "#d9d1c3" }}>Status: {selectedSession.status} · Started: {formatTimestamp(selectedSession.startedAt)}</p>
+                    <p style={{ margin: "8px 0 0", color: "#d9d1c3" }}>Status: {selectedSession.status} · Round {(selectedSession.currentRound ?? 1)} of {selectedSession.roundCount} · Started: {formatTimestamp(selectedSession.startedAt)}</p>
                   </div>
                   <div style={{ display: "flex", gap: 10 }}>
                     <button onClick={() => void loadCalls(selectedSession.id)} style={buttonStyle(false)}>Refresh Calls</button>
@@ -414,6 +416,13 @@ export default function StandaloneBingoHome({
                     >
                       {controlling === "replace_next" ? "Replacing..." : "Replace with Next"}
                     </button>
+                    <button
+                      onClick={() => void handleControl("next_round")}
+                      disabled={Boolean(controlling) || (selectedSession.currentRound ?? 1) >= selectedSession.roundCount}
+                      style={buttonStyle(false)}
+                    >
+                      {controlling === "next_round" ? "Advancing Round..." : "Next Round"}
+                    </button>
                   </div>
                 </div>
 
@@ -433,6 +442,9 @@ export default function StandaloneBingoHome({
                     </p>
                     <p style={{ margin: 0, fontSize: 22, color: "#f5efe6" }}>{currentCall ? currentCall.artistName : "Press Start Game to reveal the first track."}</p>
                     {currentCall ? <p style={{ marginTop: 14, fontSize: 13, color: "#f0e0bf" }}>Call {currentCall.callIndex} of {calls.length}</p> : null}
+                    <p style={{ marginTop: 8, fontSize: 13, color: "#f0e0bf" }}>
+                      Active modes: {(selectedSession.roundModes?.find((entry) => entry.round === (selectedSession.currentRound ?? 1))?.modes ?? [selectedSession.gameMode]).join(", ")}
+                    </p>
                   </div>
 
                   <div style={{ borderRadius: 24, padding: 20, background: "rgba(0,0,0,0.24)", border: "1px solid rgba(255,255,255,0.08)" }}>
