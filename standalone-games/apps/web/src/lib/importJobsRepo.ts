@@ -39,9 +39,18 @@ export interface CreateImportJobInput {
   };
 }
 
+export interface UpdateImportJobInput {
+  status?: ImportJobStatus;
+  progressPercent?: number;
+  summary?: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+}
+
 export interface ImportJobsRepository {
   listByTenant(tenantId: string): Promise<ImportJobRecord[]>;
   create(input: CreateImportJobInput): Promise<ImportJobRecord>;
+  update(jobId: string, tenantId: string, input: UpdateImportJobInput): Promise<ImportJobRecord>;
 }
 
 function makeId(): string {
@@ -77,5 +86,41 @@ export class InMemoryImportJobsRepository implements ImportJobsRepository {
 
     this.jobs.push(job);
     return job;
+  }
+
+  async update(
+    jobId: string,
+    tenantId: string,
+    input: UpdateImportJobInput
+  ): Promise<ImportJobRecord> {
+    const index = this.jobs.findIndex(
+      (job) => job.id === jobId && job.tenantId === tenantId
+    );
+
+    if (index < 0) {
+      throw new Error("Import job not found.");
+    }
+
+    const existing = this.jobs[index];
+    const updated: ImportJobRecord = {
+      ...existing,
+      status: input.status ?? existing.status,
+      progressPercent:
+        typeof input.progressPercent === "number"
+          ? Math.min(100, Math.max(0, input.progressPercent))
+          : existing.progressPercent,
+      summary: input.summary ?? existing.summary,
+      startedAt:
+        input.startedAt === undefined
+          ? existing.startedAt
+          : input.startedAt ?? undefined,
+      finishedAt:
+        input.finishedAt === undefined
+          ? existing.finishedAt
+          : input.finishedAt ?? undefined,
+    };
+
+    this.jobs[index] = updated;
+    return updated;
   }
 }
