@@ -237,7 +237,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      accessToken = String(connection.encryptedAccessToken ?? "").trim();
+      accessToken = String(connection.accessToken ?? "").trim();
     }
 
     if (!accessToken || !providerPlaylistId) {

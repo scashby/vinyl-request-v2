@@ -1,4 +1,5 @@
 import { getStandaloneSupabaseClient } from "@/lib/supabaseStandalone";
+import { decryptToken, encryptToken } from "@/lib/tokenCrypto";
 import {
   type CreateProviderConnectionInput,
   type ProviderConnectionRecord,
@@ -13,10 +14,14 @@ function mapRow(row: Record<string, unknown>): ProviderConnectionRecord {
     externalAccountId:
       typeof row.external_account_id === "string" ? row.external_account_id : null,
     connectionStatus: row.connection_status as ProviderConnectionRecord["connectionStatus"],
-    encryptedAccessToken:
-      typeof row.encrypted_access_token === "string" ? row.encrypted_access_token : null,
-    encryptedRefreshToken:
-      typeof row.encrypted_refresh_token === "string" ? row.encrypted_refresh_token : null,
+    accessToken:
+      typeof row.encrypted_access_token === "string" && row.encrypted_access_token
+        ? decryptToken(row.encrypted_access_token)
+        : null,
+    refreshToken:
+      typeof row.encrypted_refresh_token === "string" && row.encrypted_refresh_token
+        ? decryptToken(row.encrypted_refresh_token)
+        : null,
     tokenExpiresAt:
       typeof row.token_expires_at === "string" ? row.token_expires_at : null,
     lastSyncedAt:
@@ -57,8 +62,8 @@ export class SupabaseProviderConnectionsRepository
         provider: input.provider,
         external_account_id: input.externalAccountId,
         connection_status: "active",
-        encrypted_access_token: input.accessToken,
-        encrypted_refresh_token: input.refreshToken,
+        encrypted_access_token: input.accessToken ? encryptToken(input.accessToken) : null,
+        encrypted_refresh_token: input.refreshToken ? encryptToken(input.refreshToken) : null,
         token_expires_at: input.tokenExpiresAt,
       })
       .select(

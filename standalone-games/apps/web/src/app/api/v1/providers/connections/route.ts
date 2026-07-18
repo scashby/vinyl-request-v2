@@ -15,12 +15,17 @@ function isValidProvider(value: unknown): value is ProviderName {
   return value === "spotify" || value === "apple" || value === "tidal" || value === "csv";
 }
 
+function redactConnection<T extends { accessToken?: string | null; refreshToken?: string | null }>(connection: T) {
+  const { accessToken: _accessToken, refreshToken: _refreshToken, ...safe } = connection;
+  return safe;
+}
+
 export async function GET() {
   try {
     const ctx = await getTenantRequestContext();
     const repo = getProviderConnectionsRepository();
     const connections = await repo.listByTenant(ctx.tenantId);
-    return NextResponse.json({ ok: true, data: connections });
+    return NextResponse.json({ ok: true, data: connections.map(redactConnection) });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unexpected error" },
@@ -58,7 +63,7 @@ export async function POST(request: NextRequest) {
       tokenExpiresAt: body.tokenExpiresAt?.trim() || null,
     });
 
-    return NextResponse.json({ ok: true, data: connection }, { status: 201 });
+    return NextResponse.json({ ok: true, data: redactConnection(connection) }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unexpected error" },

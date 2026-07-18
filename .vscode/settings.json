@@ -13,6 +13,8 @@
   "chat.tools.terminal.autoApprove": {
     "command": true,
     "git remote": true,
-    "git pull": true
+    "git pull": true,
+    "npm install": true,
+    "npm run build:web": true
   }
 }
