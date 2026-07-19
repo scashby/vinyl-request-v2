@@ -55,9 +55,8 @@ export function importCsvPlaylistTracks(params: {
     throw new Error(parsed.errors[0]?.message || "CSV parse failed.");
   }
 
-  const tracks: ImportedTrackInput[] = [];
-
-  for (const row of parsed.data ?? []) {
+  const tracks = (parsed.data ?? [])
+    .map((row) => {
       const trackTitle = firstNonEmpty([
         row.title,
         row.track,
@@ -68,16 +67,17 @@ export function importCsvPlaylistTracks(params: {
       const albumName = firstNonEmpty([row.album, row.album_name]);
 
       if (!trackTitle || !artistName) {
-        continue;
+        return null;
       }
 
-      tracks.push({
+      return {
         trackTitle,
         artistName,
         albumName: albumName || null,
         displayTitle: null,
-      });
-  }
+      } satisfies ImportedTrackInput;
+    })
+    .filter((track): track is ImportedTrackInput => Boolean(track));
 
   if (tracks.length === 0) {
     throw new Error("No valid tracks found in CSV.");

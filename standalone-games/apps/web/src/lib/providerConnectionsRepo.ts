@@ -6,8 +6,8 @@ export interface ProviderConnectionRecord {
   provider: ProviderName;
   externalAccountId?: string | null;
   connectionStatus: "active" | "revoked" | "expired" | "error";
-  accessToken?: string | null;
-  refreshToken?: string | null;
+  encryptedAccessToken?: string | null;
+  encryptedRefreshToken?: string | null;
   tokenExpiresAt?: string | null;
   lastSyncedAt?: string | null;
   createdAt: string;
@@ -57,8 +57,8 @@ export class InMemoryProviderConnectionsRepository
       provider: input.provider,
       externalAccountId: input.externalAccountId ?? null,
       connectionStatus: "active",
-      accessToken: input.accessToken ?? null,
-      refreshToken: input.refreshToken ?? null,
+      encryptedAccessToken: input.accessToken ?? null,
+      encryptedRefreshToken: input.refreshToken ?? null,
       tokenExpiresAt: input.tokenExpiresAt ?? null,
       lastSyncedAt: null,
       createdAt: now,
