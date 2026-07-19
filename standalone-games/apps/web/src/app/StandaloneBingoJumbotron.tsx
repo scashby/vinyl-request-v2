@@ -4,27 +4,13 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-type EventRecord = {
-  id: string;
-  title: string;
-  date: string;
-  time?: string | null;
-  location?: string | null;
-  venueLogoUrl?: string | null;
-};
-
 type SessionRecord = {
   id: string;
-  eventId?: string | null;
   sessionCode: string;
   status: "pending" | "running" | "paused" | "completed";
-  bingoOverlay?: string;
-  nextGameScheduledAt?: string | null;
   currentRound?: number;
   roundCount?: number;
   callIntervalSeconds?: number;
-  countdownStartedAt?: string | null;
-  pausedRemainingSeconds?: number | null;
   defaultIntermissionSeconds?: number;
   welcomeHeadingText?: string | null;
   welcomeMessageText?: string | null;
@@ -67,9 +53,7 @@ export default function StandaloneBingoJumbotron({
   const searchParams = useSearchParams();
   const [session, setSession] = useState<SessionRecord | null>(null);
   const [calls, setCalls] = useState<CallRecord[]>([]);
-  const [events, setEvents] = useState<EventRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(Date.now());
 
   const requestHeaders = useMemo(
     () => ({
@@ -87,11 +71,6 @@ export default function StandaloneBingoJumbotron({
     .slice(-(session?.recentCallsLimit ?? 5))
     .reverse();
   const preview = searchParams.get("preview");
-  const liveCountdownSeconds = session?.status === "paused"
-    ? (session.pausedRemainingSeconds ?? session.callIntervalSeconds ?? 0)
-    : session?.countdownStartedAt && session.callIntervalSeconds
-      ? Math.max(0, Math.ceil((new Date(session.countdownStartedAt).getTime() + session.callIntervalSeconds * 1000 - now) / 1000))
-      : null;
 
   function formatBall(callIndex?: number): string {
     if (!callIndex) return "-";
@@ -113,24 +92,17 @@ export default function StandaloneBingoJumbotron({
   }
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
     let cancelled = false;
 
     async function load() {
       try {
-        const [nextSession, nextCalls, nextEvents] = await Promise.all([
+        const [nextSession, nextCalls] = await Promise.all([
           fetchJson<SessionRecord>(`/api/v1/games/bingo/sessions/${sessionId}`),
           fetchJson<CallRecord[]>(`/api/v1/games/bingo/sessions/${sessionId}/calls`),
-          fetchJson<EventRecord[]>(`/api/v1/games/bingo/events`),
         ]);
         if (cancelled) return;
         setSession(nextSession);
         setCalls(nextCalls);
-        setEvents(nextEvents);
       } catch (loadError) {
         if (cancelled) return;
         setError(loadError instanceof Error ? loadError.message : "Failed to load jumbotron data.");
@@ -189,105 +161,6 @@ export default function StandaloneBingoJumbotron({
     );
   }
 
-  const showWelcome = preview === null && session?.bingoOverlay === "welcome";
-  const showCountdown = preview === null && session?.bingoOverlay === "countdown";
-  const showThanks = preview === null && session?.bingoOverlay === "thanks";
-  const showWinner = preview === null && session?.bingoOverlay === "winner";
-  const showTiebreaker = preview === null && session?.bingoOverlay === "tiebreaker";
-  const showPending = preview === null && session?.bingoOverlay === "pending";
-  const countdownSeconds = session?.nextGameScheduledAt
-    ? Math.max(0, Math.ceil((new Date(session.nextGameScheduledAt).getTime() - now) / 1000))
-    : 0;
-  const activeEvent = events.find((event) => event.id === session?.eventId) ?? null;
-  const upcomingEvents = events
-    .filter((event) => !session?.eventId || event.id !== session.eventId)
-    .slice(0, 3);
-
-  if (showWelcome) {
-    return (
-      <main style={jumbotronPageStyle}>
-        <section style={heroCallStyle}>
-          <p style={jumbotronEyebrowStyle}>Welcome</p>
-          <h1 style={{ margin: "16px 0 12px", fontSize: 58 }}>{session?.welcomeHeadingText || "Welcome To Vinyl Music Bingo"}</h1>
-          <p style={{ margin: 0, fontSize: 28, lineHeight: 1.4 }}>{session?.welcomeMessageText || "Get your cards ready and listen for the next call."}</p>
-          <pre style={{ marginTop: 20, whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 24, color: "#f3e5cb" }}>{session?.welcomeRulesText || "Complete the winning pattern before anyone else."}</pre>
-          <p style={{ marginTop: 20, fontSize: 22, color: "#f0ba66" }}>{session?.welcomeTiebreakText || "Ties are resolved by the host."}</p>
-        </section>
-      </main>
-    );
-  }
-
-  if (showCountdown) {
-    return (
-      <main style={jumbotronPageStyle}>
-        <section style={heroCallStyle}>
-          <p style={jumbotronEyebrowStyle}>Intermission</p>
-          <h1 style={{ margin: "16px 0 12px", fontSize: 58 }}>{session?.intermissionHeadingText || "Intermission"}</h1>
-          <p style={{ margin: 0, fontSize: 28 }}>{session?.intermissionMessageText || "Round {round} of {roundCount} begins in"}</p>
-          <p style={{ margin: "24px 0 0", fontSize: 82, fontWeight: 800 }}>{countdownSeconds}s</p>
-          <p style={{ marginTop: 20, fontSize: 22, color: "#f3e5cb" }}>{session?.intermissionFooterText || "Crate reset in progress. Next round starts shortly."}</p>
-        </section>
-      </main>
-    );
-  }
-
-  if (showThanks) {
-    return (
-      <main style={jumbotronPageStyle}>
-        <section style={heroCallStyle}>
-          <p style={jumbotronEyebrowStyle}>Thanks</p>
-          {activeEvent?.venueLogoUrl ? <img src={activeEvent.venueLogoUrl} alt="Venue logo" style={{ width: 140, height: 140, objectFit: "contain", marginBottom: 16 }} /> : null}
-          <h1 style={{ margin: "16px 0 12px", fontSize: 58 }}>{session?.thanksHeadingText || "Thank You For Playing!"}</h1>
-          <p style={{ margin: 0, fontSize: 30 }}>{session?.thanksSubheadingText || "Vinyl Music Bingo"}</p>
-          <p style={{ marginTop: 28, fontSize: 24, color: "#f3e5cb" }}>{session?.thanksEventsHeadingText || "Find Us Next At"}</p>
-          <div style={{ display: "grid", gap: 10, marginTop: 18 }}>
-            {upcomingEvents.map((event) => (
-              <div key={event.id} style={{ fontSize: 20, color: "#fff8ee" }}>
-                {event.title} · {event.date}{event.time ? ` · ${event.time}` : ""}
-              </div>
-            ))}
-          </div>
-        </section>
-      </main>
-    );
-  }
-
-  if (showWinner) {
-    return (
-      <main style={jumbotronPageStyle}>
-        <section style={heroCallStyle}>
-          <p style={jumbotronEyebrowStyle}>Winner</p>
-          <h1 style={{ margin: "16px 0 12px", fontSize: 72 }}>WE HAVE A WINNER!</h1>
-          <p style={{ margin: 0, fontSize: 28 }}>Verify the card with the host station.</p>
-        </section>
-      </main>
-    );
-  }
-
-  if (showTiebreaker) {
-    return (
-      <main style={jumbotronPageStyle}>
-        <section style={heroCallStyle}>
-          <p style={jumbotronEyebrowStyle}>Tiebreaker</p>
-          <h1 style={{ margin: "16px 0 12px", fontSize: 72 }}>TIEBREAKER</h1>
-          <p style={{ margin: 0, fontSize: 28 }}>Hold your cards. The host is resolving a tie.</p>
-        </section>
-      </main>
-    );
-  }
-
-  if (showPending) {
-    return (
-      <main style={jumbotronPageStyle}>
-        <section style={heroCallStyle}>
-          <p style={jumbotronEyebrowStyle}>Pending</p>
-          <h1 style={{ margin: "16px 0 12px", fontSize: 64 }}>Verifying Winner...</h1>
-          <p style={{ margin: 0, fontSize: 28 }}>Please hold while the card is checked.</p>
-        </section>
-      </main>
-    );
-  }
-
   return (
     <main style={jumbotronPageStyle}>
       <div style={{ display: "grid", gap: 24 }}>
@@ -318,9 +191,7 @@ export default function StandaloneBingoJumbotron({
           ) : null}
           <p style={{ margin: 0, fontSize: 34 }}>{currentCall?.artistName ?? "Open the host screen to start the session."}</p>
           {session?.showCountdown ? (
-            <p style={{ marginTop: 18, fontSize: 18, color: "#f3e5cb" }}>
-              {liveCountdownSeconds != null ? `Next call in ${liveCountdownSeconds}s` : "Countdown awaiting start"}
-            </p>
+            <p style={{ marginTop: 18, fontSize: 18, color: "#f3e5cb" }}>Countdown visible in live host flow</p>
           ) : null}
         </section>
 

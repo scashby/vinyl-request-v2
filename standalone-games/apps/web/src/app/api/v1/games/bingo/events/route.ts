@@ -32,7 +32,6 @@ export async function POST(request: NextRequest) {
       date?: string;
       time?: string;
       location?: string;
-      venue_logo_url?: string;
     };
 
     if (!body.title?.trim() || !body.date?.trim()) {
@@ -46,7 +45,6 @@ export async function POST(request: NextRequest) {
       date: body.date.trim(),
       time: body.time?.trim() || null,
       location: body.location?.trim() || null,
-      venueLogoUrl: body.venue_logo_url?.trim() || null,
     });
 
     return NextResponse.json({ ok: true, data: event }, { status: 201 });

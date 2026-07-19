@@ -48,17 +48,6 @@ export class SupabaseStandaloneBingoCallsRepository implements StandaloneBingoCa
     if (error) throw new Error(error.message);
   }
 
-  async replaceSession(sessionId: string, calls: CreateStandaloneBingoCallInput[]): Promise<void> {
-    const supabase = getStandaloneSupabaseClient();
-    const { error: deleteError } = await supabase
-      .from("sg_game_bingo_calls")
-      .delete()
-      .eq("session_id", sessionId);
-
-    if (deleteError) throw new Error(deleteError.message);
-    await this.createMany(sessionId, calls);
-  }
-
   async getCurrentCalled(sessionId: string): Promise<StandaloneBingoCallRecord | null> {
     const supabase = getStandaloneSupabaseClient();
     const { data, error } = await supabase

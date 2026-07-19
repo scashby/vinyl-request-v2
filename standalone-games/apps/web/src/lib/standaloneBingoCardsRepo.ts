@@ -26,7 +26,6 @@ export interface CreateStandaloneBingoCardInput {
 export interface StandaloneBingoCardsRepository {
   listBySession(sessionId: string): Promise<StandaloneBingoCardRecord[]>;
   createMany(sessionId: string, cards: CreateStandaloneBingoCardInput[]): Promise<void>;
-  replaceSession(sessionId: string, cards: CreateStandaloneBingoCardInput[]): Promise<void>;
   getByIdentifier(
     sessionId: string,
     cardIdentifier: string
@@ -66,18 +65,6 @@ export class InMemoryStandaloneBingoCardsRepository
         createdAt,
       });
     }
-  }
-
-  async replaceSession(
-    sessionId: string,
-    cards: CreateStandaloneBingoCardInput[]
-  ): Promise<void> {
-    for (let index = this.cards.length - 1; index >= 0; index -= 1) {
-      if (this.cards[index]?.sessionId === sessionId) {
-        this.cards.splice(index, 1);
-      }
-    }
-    await this.createMany(sessionId, cards);
   }
 
   async getByIdentifier(

@@ -20,7 +20,6 @@ export interface StandaloneBingoCallRecord {
 export interface StandaloneBingoCallsRepository {
   listBySession(sessionId: string): Promise<StandaloneBingoCallRecord[]>;
   createMany(sessionId: string, calls: CreateStandaloneBingoCallInput[]): Promise<void>;
-  replaceSession(sessionId: string, calls: CreateStandaloneBingoCallInput[]): Promise<void>;
   getCurrentCalled(sessionId: string): Promise<StandaloneBingoCallRecord | null>;
   getNextPending(sessionId: string): Promise<StandaloneBingoCallRecord | null>;
   markCompleted(callId: string): Promise<void>;
@@ -60,15 +59,6 @@ export class InMemoryStandaloneBingoCallsRepository implements StandaloneBingoCa
         createdAt,
       });
     }
-  }
-
-  async replaceSession(sessionId: string, calls: CreateStandaloneBingoCallInput[]): Promise<void> {
-    for (let index = this.calls.length - 1; index >= 0; index -= 1) {
-      if (this.calls[index]?.sessionId === sessionId) {
-        this.calls.splice(index, 1);
-      }
-    }
-    await this.createMany(sessionId, calls);
   }
 
   async getCurrentCalled(sessionId: string): Promise<StandaloneBingoCallRecord | null> {

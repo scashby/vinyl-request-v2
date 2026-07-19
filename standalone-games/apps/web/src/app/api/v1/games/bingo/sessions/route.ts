@@ -23,9 +23,6 @@ interface SnapshotPayload {
   items?: SnapshotPayloadItem[];
   itemCount?: number;
   playlistName?: string;
-  masterItems?: SnapshotPayloadItem[];
-  roundItemsByRound?: Array<{ round: number; items: SnapshotPayloadItem[] }>;
-  cardsPerRoundEnabled?: boolean;
 }
 
 interface CreateSessionBody {
@@ -284,21 +281,6 @@ export async function POST(request: NextRequest) {
         return Array.isArray(payload.items) ? payload.items : [];
       });
 
-      const roundItemsByRound = (Array.isArray(body.round_playlist_ids) ? body.round_playlist_ids : [])
-        .map((entry) => {
-          const playlistIds = Array.isArray(entry.playlist_ids) ? entry.playlist_ids.map(String) : [];
-          const items = playlistIds.flatMap((playlistId) => {
-            const snapshotEntry = resolvedSnapshots.find((candidate) => candidate.playlist?.id === playlistId)?.snapshot;
-            const payload = (snapshotEntry?.snapshotPayload ?? {}) as SnapshotPayload;
-            return Array.isArray(payload.items) ? payload.items : [];
-          });
-          return {
-            round: Number(entry.round ?? 1),
-            items,
-          };
-        })
-        .filter((entry) => Number.isInteger(entry.round) && entry.round >= 1 && entry.items.length > 0);
-
       if (combinedItems.length === 0) {
         return NextResponse.json(
           { ok: false, error: "Selected playlists do not contain any snapshot items." },
@@ -320,8 +302,6 @@ export async function POST(request: NextRequest) {
             .join(" + "),
           itemCount: combinedItems.length,
           items: combinedItems,
-          masterItems: combinedItems,
-          roundItemsByRound,
           sourcePlaylistIds,
           roundPlaylistIds: Array.isArray(body.round_playlist_ids) ? body.round_playlist_ids : [],
           cardsPerRoundEnabled: Boolean(body.cards_per_round_enabled),
