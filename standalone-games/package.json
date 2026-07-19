@@ -9,8 +9,6 @@
   "scripts": {
     "dev:web": "npm run dev --workspace @dwd/standalone-web",
     "build:web": "npm run build --workspace @dwd/standalone-web",
-    "lint:web": "npm run lint --workspace @dwd/standalone-web",
-    "bootstrap:test-tenant": "node scripts/bootstrap-test-tenant.mjs",
-    "smoke:test": "node scripts/smoke-test.mjs"
+    "lint:web": "npm run lint --workspace @dwd/standalone-web"
   }
 }
