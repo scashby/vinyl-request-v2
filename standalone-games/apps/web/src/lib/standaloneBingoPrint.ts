@@ -114,3 +114,32 @@ export function generateStandaloneCardsPdf(
 
   return doc;
 }
+
+export function generateStandaloneCrateLabelsPdf(
+  sessionCode: string,
+  playlists: Array<{ playlistLetter: string; playlistName: string; roundNumber: number }>
+) {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text(`Crate Labels - ${sessionCode}`, 12, 18);
+
+  let y = 32;
+  playlists.forEach((playlist, index) => {
+    if (index > 0 && index % 6 === 0) {
+      doc.addPage();
+      y = 20;
+    }
+
+    doc.setDrawColor(40, 40, 40);
+    doc.rect(12, y, 186, 32);
+    doc.setFontSize(28);
+    doc.text(playlist.playlistLetter, 20, y + 18);
+    doc.setFontSize(13);
+    doc.text(`Round ${playlist.roundNumber}`, 40, y + 12);
+    doc.text(playlist.playlistName, 40, y + 22);
+    y += 38;
+  });
+
+  return doc;
+}

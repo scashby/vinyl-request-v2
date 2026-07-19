@@ -23,6 +23,9 @@ type SnapshotRecord = {
     itemCount?: number;
     playlistName?: string;
     items?: Array<unknown>;
+    sourcePlaylistIds?: string[];
+    roundPlaylistIds?: Array<{ round?: number; playlist_ids?: string[] }>;
+    cardsPerRoundEnabled?: boolean;
   } | null;
 };
 
@@ -141,6 +144,7 @@ type EventRecord = {
   date: string;
   time?: string | null;
   location?: string | null;
+  venueLogoUrl?: string | null;
 };
 
 const CREATE_EVENT_OPTION = "__create_new_event__";
@@ -180,6 +184,7 @@ export default function StandaloneBingoSetup({
   const [newEventDate, setNewEventDate] = useState("");
   const [newEventTime, setNewEventTime] = useState("");
   const [newEventLocation, setNewEventLocation] = useState("");
+  const [newEventVenueLogoUrl, setNewEventVenueLogoUrl] = useState("");
   const [selectedTemplateSessionId, setSelectedTemplateSessionId] = useState("");
   const [selectedPresetId, setSelectedPresetId] = useState("");
   const [creatingPresetSessionId, setCreatingPresetSessionId] = useState<string | null>(null);
@@ -474,6 +479,7 @@ export default function StandaloneBingoSetup({
           date: newEventDate,
           time: newEventTime,
           location: newEventLocation,
+          venue_logo_url: newEventVenueLogoUrl,
         }),
       });
       setSelectedEventId(created.id);
@@ -481,6 +487,7 @@ export default function StandaloneBingoSetup({
       setNewEventDate("");
       setNewEventTime("");
       setNewEventLocation("");
+      setNewEventVenueLogoUrl("");
       await loadBaseData();
     } catch (eventError) {
       setError(eventError instanceof Error ? eventError.message : "Failed to create event.");
@@ -550,6 +557,100 @@ export default function StandaloneBingoSetup({
       setError(createError instanceof Error ? createError.message : "Failed to create session.");
     } finally {
       setCreating(false);
+    }
+  }
+
+  function loadSessionIntoForm(session: SessionRecord) {
+    const snapshot = snapshots.find((entry) => entry.id === session.playlistSnapshotId) ?? null;
+    const payload = snapshot?.snapshotPayload ?? null;
+    setSelectedEventId(session.eventId ?? "");
+    setSelectedPlaylistIds(Array.isArray(payload?.sourcePlaylistIds) ? payload.sourcePlaylistIds.map(String) : []);
+    setUseDifferentMastersPerRound(Boolean(payload?.cardsPerRoundEnabled));
+    setRoundPlaylistSelections(
+      Array.from({ length: Math.max(1, session.roundCount) }, (_, index) => {
+        const round = index + 1;
+        const configured = Array.isArray(payload?.roundPlaylistIds)
+          ? payload.roundPlaylistIds.find((entry) => Number(entry.round ?? 0) === round)
+          : null;
+        return {
+          round,
+          playlistIds: Array.isArray(configured?.playlist_ids) ? configured.playlist_ids.map(String) : [],
+        };
+      })
+    );
+    setRoundCount(session.roundCount);
+    setRoundModes((session.roundModes ?? []).map((entry) => ({ round: entry.round, modes: entry.modes as SessionRecord["gameMode"][] })));
+    setCardCount(session.cardCount);
+    setGameMode(session.gameMode);
+    setCallIntervalSeconds(session.callIntervalSeconds);
+    setRemoveResleeveSeconds(session.removeResleeveSeconds ?? 20);
+    setPlaceVinylSeconds(session.placeVinylSeconds ?? 8);
+    setCueSeconds(session.cueSeconds ?? 12);
+    setStartSlideSeconds(session.startSlideSeconds ?? 5);
+    setHostBufferSeconds(session.hostBufferSeconds ?? 2);
+    setSonosOutputDelayMs(session.sonosOutputDelayMs ?? 75);
+    setCallRevealDelaySeconds(session.callRevealDelaySeconds ?? 10);
+    setDefaultIntermissionSeconds(session.defaultIntermissionSeconds ?? 600);
+    setWelcomeHeadingText(session.welcomeHeadingText ?? "Welcome To Vinyl Music Bingo");
+    setWelcomeMessageText(session.welcomeMessageText ?? "Get your cards ready and listen for the next call.");
+    setWelcomeRulesText(session.welcomeRulesText ?? "Complete the winning pattern before anyone else.");
+    setWelcomeTiebreakText(session.welcomeTiebreakText ?? "Ties are resolved by the host.");
+    setIntermissionHeadingText(session.intermissionHeadingText ?? "Intermission");
+    setIntermissionMessageText(session.intermissionMessageText ?? "Round {round} of {roundCount} begins in");
+    setIntermissionFooterText(session.intermissionFooterText ?? "Crate reset in progress. Next round starts shortly.");
+    setThanksHeadingText(session.thanksHeadingText ?? "Thank You For Playing!");
+    setThanksSubheadingText(session.thanksSubheadingText ?? "Vinyl Music Bingo");
+    setThanksEventsHeadingText(session.thanksEventsHeadingText ?? "Find Us Next At");
+    setShowCountdown(session.showCountdown ?? true);
+    setRecentCallsLimit(session.recentCallsLimit ?? 5);
+    setThemeEnabled(session.themeEnabled ?? false);
+    setThemeName(session.themeName ?? "");
+  }
+
+  async function handleSaveSession() {
+    if (!selectedSession) return;
+    setError(null);
+    try {
+      await fetchJson<SessionRecord>(`/api/v1/games/bingo/sessions/${selectedSession.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          event_id: selectedEventId || null,
+          master_playlist_ids: selectedPlaylistIds,
+          round_playlist_ids: roundPlaylistSelections.map((entry) => ({ round: entry.round, playlist_ids: entry.playlistIds })),
+          cards_per_round_enabled: useDifferentMastersPerRound,
+          round_count: roundCount,
+          round_modes: roundModes.filter((entry) => entry.modes.length > 0),
+          card_count: cardCount,
+          game_mode: gameMode,
+          call_interval_seconds: callIntervalSeconds,
+          remove_resleeve_seconds: removeResleeveSeconds,
+          place_vinyl_seconds: placeVinylSeconds,
+          cue_seconds: cueSeconds,
+          start_slide_seconds: startSlideSeconds,
+          host_buffer_seconds: hostBufferSeconds,
+          sonos_output_delay_ms: sonosOutputDelayMs,
+          call_reveal_delay_seconds: callRevealDelaySeconds,
+          default_intermission_seconds: defaultIntermissionSeconds,
+          welcome_heading_text: welcomeHeadingText,
+          welcome_message_text: welcomeMessageText,
+          welcome_rules_text: welcomeRulesText,
+          welcome_tiebreak_text: welcomeTiebreakText,
+          intermission_heading_text: intermissionHeadingText,
+          intermission_message_text: intermissionMessageText,
+          intermission_footer_text: intermissionFooterText,
+          thanks_heading_text: thanksHeadingText,
+          thanks_subheading_text: thanksSubheadingText,
+          thanks_events_heading_text: thanksEventsHeadingText,
+          show_countdown: showCountdown,
+          recent_calls_limit: recentCallsLimit,
+          theme_enabled: themeEnabled,
+          theme_name: themeEnabled ? themeName : null,
+        }),
+      });
+      await loadBaseData();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to save session.");
     }
   }
 
@@ -733,6 +834,10 @@ export default function StandaloneBingoSetup({
                   <div>
                     <label style={fieldLabelStyle}>Location</label>
                     <input value={newEventLocation} onChange={(event) => setNewEventLocation(event.target.value)} style={fieldStyle} />
+                  </div>
+                  <div>
+                    <label style={fieldLabelStyle}>Venue Logo URL</label>
+                    <input value={newEventVenueLogoUrl} onChange={(event) => setNewEventVenueLogoUrl(event.target.value)} style={fieldStyle} />
                   </div>
                   <button onClick={() => void handleCreateEvent()} disabled={creatingEvent} style={buttonStyle(false)}>
                     {creatingEvent ? "Creating Event..." : "Create Event"}
@@ -992,6 +1097,11 @@ export default function StandaloneBingoSetup({
             <button onClick={() => void handleCreateSession()} disabled={!trackConfigValid || creating} style={{ ...buttonStyle(true), marginTop: 14, width: "100%" }}>
               {creating ? "Creating Session..." : "Create Session"}
             </button>
+            {selectedSession ? (
+              <button onClick={() => void handleSaveSession()} style={{ ...buttonStyle(false), marginTop: 10, width: "100%" }}>
+                Save Selected Session Changes
+              </button>
+            ) : null}
           </section>
 
           <section style={panelStyle}>
@@ -1020,6 +1130,7 @@ export default function StandaloneBingoSetup({
                       />
                       Favorite Session Template
                     </label>
+                    <button onClick={() => loadSessionIntoForm(session)} style={buttonStyle(false)}>Edit</button>
                     <button onClick={() => void handleCreatePresetFromSession(session)} style={buttonStyle(false)}>
                       {creatingPresetSessionId === session.id ? "Saving Preset..." : "Save Tracklist Favorite"}
                     </button>

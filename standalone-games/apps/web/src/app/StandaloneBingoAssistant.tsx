@@ -10,6 +10,8 @@ type SessionRecord = {
   currentRound?: number;
   roundCount?: number;
   callIntervalSeconds: number;
+  countdownStartedAt?: string | null;
+  pausedRemainingSeconds?: number | null;
 };
 
 type CallRecord = {
@@ -105,12 +107,18 @@ export default function StandaloneBingoAssistant({
 
   useEffect(() => {
     if (!session) return;
-    if (session.status === "paused" || !currentCall?.calledAt) {
+    if (session.status === "paused") {
+      setRemaining(session.pausedRemainingSeconds ?? session.callIntervalSeconds);
+      return;
+    }
+
+    const referenceStartedAt = session.countdownStartedAt ?? currentCall?.calledAt;
+    if (!referenceStartedAt) {
       setRemaining(session.callIntervalSeconds);
       return;
     }
 
-    const elapsed = Math.floor((Date.now() - new Date(currentCall.calledAt).getTime()) / 1000);
+    const elapsed = Math.floor((Date.now() - new Date(referenceStartedAt).getTime()) / 1000);
     setRemaining(Math.max(0, session.callIntervalSeconds - elapsed));
   }, [currentCall?.calledAt, session]);
 

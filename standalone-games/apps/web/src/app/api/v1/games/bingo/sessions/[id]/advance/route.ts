@@ -51,6 +51,9 @@ export async function POST(
       status: "running",
       startedAt: session.startedAt ?? calledAt,
       endedAt: null,
+      countdownStartedAt: calledAt,
+      pausedAt: null,
+      pausedRemainingSeconds: null,
     });
 
     return NextResponse.json(

@@ -67,6 +67,20 @@ export class SupabaseStandaloneBingoCardsRepository
     if (error) throw new Error(error.message);
   }
 
+  async replaceSession(
+    sessionId: string,
+    cards: CreateStandaloneBingoCardInput[]
+  ): Promise<void> {
+    const supabase = getStandaloneSupabaseClient();
+    const { error: deleteError } = await supabase
+      .from("sg_game_bingo_cards")
+      .delete()
+      .eq("session_id", sessionId);
+
+    if (deleteError) throw new Error(deleteError.message);
+    await this.createMany(sessionId, cards);
+  }
+
   async getByIdentifier(
     sessionId: string,
     cardIdentifier: string

@@ -56,6 +56,11 @@ export interface StandaloneBingoSessionRecord {
   eventId?: string | null;
   sessionCode: string;
   status: "pending" | "running" | "paused" | "completed";
+  bingoOverlay: "none" | "welcome" | "countdown" | "thanks" | "winner" | "pending" | "tiebreaker";
+  nextGameScheduledAt?: string | null;
+  countdownStartedAt?: string | null;
+  pausedAt?: string | null;
+  pausedRemainingSeconds?: number | null;
   playlistSnapshotId: string;
   currentRound: number;
   roundCount: number;
@@ -95,15 +100,45 @@ export interface StandaloneBingoSessionRecord {
 }
 
 export interface UpdateStandaloneBingoSessionInput {
+  eventId?: string | null;
+  roundCount?: number;
+  roundModes?: StandaloneBingoRoundModesEntry[];
+  cardCount?: number;
+  gameMode?: BingoGameMode;
+  callIntervalSeconds?: number;
+  removeResleeveSeconds?: number;
+  placeVinylSeconds?: number;
+  cueSeconds?: number;
+  startSlideSeconds?: number;
+  hostBufferSeconds?: number;
+  sonosOutputDelayMs?: number;
   status?: StandaloneBingoSessionRecord["status"];
   startedAt?: string | null;
   endedAt?: string | null;
   isFavorite?: boolean;
+  welcomeHeadingText?: string | null;
+  welcomeMessageText?: string | null;
+  welcomeRulesText?: string | null;
+  welcomeTiebreakText?: string | null;
+  intermissionHeadingText?: string | null;
+  intermissionMessageText?: string | null;
+  intermissionFooterText?: string | null;
+  thanksHeadingText?: string | null;
+  thanksSubheadingText?: string | null;
+  thanksEventsHeadingText?: string | null;
+  showCountdown?: boolean;
+  recentCallsLimit?: number;
+  themeEnabled?: boolean;
+  themeName?: string | null;
   callRevealDelaySeconds?: number;
   defaultIntermissionSeconds?: number;
   currentRound?: number;
-  roundModes?: StandaloneBingoRoundModesEntry[];
   sandboxExpiresAt?: string | null;
+  bingoOverlay?: StandaloneBingoSessionRecord["bingoOverlay"];
+  nextGameScheduledAt?: string | null;
+  countdownStartedAt?: string | null;
+  pausedAt?: string | null;
+  pausedRemainingSeconds?: number | null;
 }
 
 export interface StandaloneBingoSessionsRepository {
@@ -155,6 +190,11 @@ export class InMemoryStandaloneBingoSessionsRepository
       eventId: input.eventId ?? null,
       sessionCode: makeSessionCode(),
       status: "pending",
+      bingoOverlay: "welcome",
+      nextGameScheduledAt: null,
+      countdownStartedAt: null,
+      pausedAt: null,
+      pausedRemainingSeconds: null,
       playlistSnapshotId: input.playlistSnapshotId,
       currentRound: 1,
       roundCount: input.roundCount,
@@ -216,10 +256,35 @@ export class InMemoryStandaloneBingoSessionsRepository
     const session = await this.getById(tenantId, sessionId);
     if (!session) return null;
 
+    if (input.eventId !== undefined) session.eventId = input.eventId;
+    if (input.roundCount !== undefined) session.roundCount = input.roundCount;
+    if (input.cardCount !== undefined) session.cardCount = input.cardCount;
+    if (input.gameMode !== undefined) session.gameMode = input.gameMode;
+    if (input.callIntervalSeconds !== undefined) session.callIntervalSeconds = input.callIntervalSeconds;
+    if (input.removeResleeveSeconds !== undefined) session.removeResleeveSeconds = input.removeResleeveSeconds;
+    if (input.placeVinylSeconds !== undefined) session.placeVinylSeconds = input.placeVinylSeconds;
+    if (input.cueSeconds !== undefined) session.cueSeconds = input.cueSeconds;
+    if (input.startSlideSeconds !== undefined) session.startSlideSeconds = input.startSlideSeconds;
+    if (input.hostBufferSeconds !== undefined) session.hostBufferSeconds = input.hostBufferSeconds;
+    if (input.sonosOutputDelayMs !== undefined) session.sonosOutputDelayMs = input.sonosOutputDelayMs;
     if (input.status) session.status = input.status;
     if (input.startedAt !== undefined) session.startedAt = input.startedAt;
     if (input.endedAt !== undefined) session.endedAt = input.endedAt;
     if (input.isFavorite !== undefined) session.isFavorite = input.isFavorite;
+    if (input.welcomeHeadingText !== undefined) session.welcomeHeadingText = input.welcomeHeadingText;
+    if (input.welcomeMessageText !== undefined) session.welcomeMessageText = input.welcomeMessageText;
+    if (input.welcomeRulesText !== undefined) session.welcomeRulesText = input.welcomeRulesText;
+    if (input.welcomeTiebreakText !== undefined) session.welcomeTiebreakText = input.welcomeTiebreakText;
+    if (input.intermissionHeadingText !== undefined) session.intermissionHeadingText = input.intermissionHeadingText;
+    if (input.intermissionMessageText !== undefined) session.intermissionMessageText = input.intermissionMessageText;
+    if (input.intermissionFooterText !== undefined) session.intermissionFooterText = input.intermissionFooterText;
+    if (input.thanksHeadingText !== undefined) session.thanksHeadingText = input.thanksHeadingText;
+    if (input.thanksSubheadingText !== undefined) session.thanksSubheadingText = input.thanksSubheadingText;
+    if (input.thanksEventsHeadingText !== undefined) session.thanksEventsHeadingText = input.thanksEventsHeadingText;
+    if (input.showCountdown !== undefined) session.showCountdown = input.showCountdown;
+    if (input.recentCallsLimit !== undefined) session.recentCallsLimit = input.recentCallsLimit;
+    if (input.themeEnabled !== undefined) session.themeEnabled = input.themeEnabled;
+    if (input.themeName !== undefined) session.themeName = input.themeName;
     if (input.callRevealDelaySeconds !== undefined) {
       session.callRevealDelaySeconds = input.callRevealDelaySeconds;
     }
@@ -234,6 +299,21 @@ export class InMemoryStandaloneBingoSessionsRepository
     }
     if (input.sandboxExpiresAt !== undefined) {
       session.sandboxExpiresAt = input.sandboxExpiresAt;
+    }
+    if (input.bingoOverlay !== undefined) {
+      session.bingoOverlay = input.bingoOverlay;
+    }
+    if (input.nextGameScheduledAt !== undefined) {
+      session.nextGameScheduledAt = input.nextGameScheduledAt;
+    }
+    if (input.countdownStartedAt !== undefined) {
+      session.countdownStartedAt = input.countdownStartedAt;
+    }
+    if (input.pausedAt !== undefined) {
+      session.pausedAt = input.pausedAt;
+    }
+    if (input.pausedRemainingSeconds !== undefined) {
+      session.pausedRemainingSeconds = input.pausedRemainingSeconds;
     }
 
     return session;

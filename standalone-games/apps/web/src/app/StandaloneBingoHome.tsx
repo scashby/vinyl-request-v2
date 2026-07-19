@@ -19,6 +19,8 @@ type SessionRecord = {
   id: string;
   sessionCode: string;
   status: "pending" | "running" | "paused" | "completed";
+  bingoOverlay?: string;
+  nextGameScheduledAt?: string | null;
   playlistSnapshotId: string;
   currentRound?: number;
   roundCount: number;
@@ -97,7 +99,7 @@ export default function StandaloneBingoHome({
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [advancing, setAdvancing] = useState(false);
-  const [controlling, setControlling] = useState<null | "pause" | "resume" | "skip" | "replace_next" | "next_round">(null);
+  const [controlling, setControlling] = useState<null | "pause" | "resume" | "skip" | "replace_next" | "next_round" | "welcome" | "live" | "intermission" | "thanks" | "winner" | "tiebreaker" | "pending">(null);
   const [callPhase, setCallPhase] = useState<"idle" | "prep_started" | "called">("idle");
   const [winnerCheckInput, setWinnerCheckInput] = useState("");
   const [winnerCheckResult, setWinnerCheckResult] = useState<CardValidationResponse | null>(null);
@@ -273,7 +275,7 @@ export default function StandaloneBingoHome({
     }
   }
 
-  async function handleControl(action: "pause" | "resume" | "skip" | "replace_next" | "next_round") {
+  async function handleControl(action: "pause" | "resume" | "skip" | "replace_next" | "next_round" | "welcome" | "live" | "intermission" | "thanks" | "winner" | "tiebreaker" | "pending") {
     if (!selectedSessionId) return;
     setControlling(action);
     setError(null);
@@ -431,6 +433,17 @@ export default function StandaloneBingoHome({
                   <a href={`/bingo/prep?tenantId=${encodeURIComponent(tenantId)}&userId=${encodeURIComponent(userId)}&entitlements=${encodeURIComponent(entitlements)}&sessionId=${encodeURIComponent(selectedSession.id)}`} target="_blank" rel="noreferrer" style={anchorStyle}>Prep</a>
                   <a href={`/bingo/assistant?tenantId=${encodeURIComponent(tenantId)}&userId=${encodeURIComponent(userId)}&entitlements=${encodeURIComponent(entitlements)}&sessionId=${encodeURIComponent(selectedSession.id)}`} target="_blank" rel="noreferrer" style={anchorStyle}>Assistant</a>
                   <a href={`/bingo/jumbotron?tenantId=${encodeURIComponent(tenantId)}&userId=${encodeURIComponent(userId)}&entitlements=${encodeURIComponent(entitlements)}&sessionId=${encodeURIComponent(selectedSession.id)}`} target="_blank" rel="noreferrer" style={anchorStyle}>Jumbotron</a>
+                </div>
+                <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button onClick={() => void handleControl("welcome")} style={buttonStyle(false)}>
+                    {selectedSession.bingoOverlay === "welcome" ? "Hide Welcome" : "Welcome"}
+                  </button>
+                  <button onClick={() => void handleControl("pending")} style={buttonStyle(false)}>Pending</button>
+                  <button onClick={() => void handleControl("winner")} style={buttonStyle(false)}>Winner</button>
+                  <button onClick={() => void handleControl("tiebreaker")} style={buttonStyle(false)}>Tiebreaker</button>
+                  <button onClick={() => void handleControl("intermission")} style={buttonStyle(false)}>Intermission</button>
+                  <button onClick={() => void handleControl("live")} style={buttonStyle(false)}>Live</button>
+                  <button onClick={() => void handleControl("thanks")} style={buttonStyle(false)}>Thanks</button>
                 </div>
 
                 <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(320px, 420px)", gap: 16 }}>

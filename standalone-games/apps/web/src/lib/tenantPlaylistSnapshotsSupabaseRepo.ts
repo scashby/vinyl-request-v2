@@ -50,6 +50,28 @@ export class SupabaseTenantPlaylistSnapshotsRepository implements TenantPlaylist
     return mapRow(data as Record<string, unknown>);
   }
 
+  async update(
+    tenantId: string,
+    snapshotId: string,
+    patch: { snapshotPayload?: unknown; snapshotName?: string | null }
+  ): Promise<TenantPlaylistSnapshotRecord | null> {
+    const supabase = getStandaloneSupabaseClient();
+    const updatePatch: Record<string, unknown> = {};
+    if (patch.snapshotPayload !== undefined) updatePatch.snapshot_payload = patch.snapshotPayload;
+    if (patch.snapshotName !== undefined) updatePatch.snapshot_name = patch.snapshotName;
+
+    const { data, error } = await supabase
+      .from("sg_tenant_playlist_snapshots")
+      .update(updatePatch)
+      .eq("tenant_id", tenantId)
+      .eq("id", snapshotId)
+      .select("id, tenant_id, tenant_playlist_id, snapshot_name, snapshot_payload, created_by_user_id, created_at")
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    return data ? mapRow(data as Record<string, unknown>) : null;
+  }
+
   async existsForTenant(tenantId: string, snapshotId: string): Promise<boolean> {
     const supabase = getStandaloneSupabaseClient();
     const { data, error } = await supabase

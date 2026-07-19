@@ -26,6 +26,11 @@ function mapRow(row: Record<string, unknown>): StandaloneBingoSessionRecord {
     eventId: typeof row.event_id === "string" ? row.event_id : null,
     sessionCode: String(row.session_code),
     status: row.status as StandaloneBingoSessionRecord["status"],
+    bingoOverlay: String(row.bingo_overlay ?? "welcome") as StandaloneBingoSessionRecord["bingoOverlay"],
+    nextGameScheduledAt: typeof row.next_game_scheduled_at === "string" ? row.next_game_scheduled_at : null,
+    countdownStartedAt: typeof row.countdown_started_at === "string" ? row.countdown_started_at : null,
+    pausedAt: typeof row.paused_at === "string" ? row.paused_at : null,
+    pausedRemainingSeconds: typeof row.paused_remaining_seconds === "number" ? row.paused_remaining_seconds : null,
     playlistSnapshotId: String(row.playlist_snapshot_id),
     currentRound: Number(row.current_round ?? 1),
     roundCount: Number(row.round_count),
@@ -73,7 +78,7 @@ export class SupabaseStandaloneBingoSessionsRepository
     const { data, error } = await supabase
       .from("sg_game_bingo_sessions")
       .select(
-        "id, tenant_id, created_by_user_id, event_id, session_code, status, playlist_snapshot_id, current_round, round_count, round_modes, card_count, game_mode, call_interval_seconds, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, call_reveal_delay_seconds, default_intermission_seconds, welcome_heading_text, welcome_message_text, welcome_rules_text, welcome_tiebreak_text, intermission_heading_text, intermission_message_text, intermission_footer_text, thanks_heading_text, thanks_subheading_text, thanks_events_heading_text, show_countdown, recent_calls_limit, theme_enabled, theme_name, is_sandbox, sandbox_source_session_id, sandbox_expires_at, is_favorite, created_at, started_at, ended_at"
+        "id, tenant_id, created_by_user_id, event_id, session_code, status, bingo_overlay, next_game_scheduled_at, countdown_started_at, paused_at, paused_remaining_seconds, playlist_snapshot_id, current_round, round_count, round_modes, card_count, game_mode, call_interval_seconds, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, call_reveal_delay_seconds, default_intermission_seconds, welcome_heading_text, welcome_message_text, welcome_rules_text, welcome_tiebreak_text, intermission_heading_text, intermission_message_text, intermission_footer_text, thanks_heading_text, thanks_subheading_text, thanks_events_heading_text, show_countdown, recent_calls_limit, theme_enabled, theme_name, is_sandbox, sandbox_source_session_id, sandbox_expires_at, is_favorite, created_at, started_at, ended_at"
       )
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false });
@@ -93,6 +98,11 @@ export class SupabaseStandaloneBingoSessionsRepository
       tenant_id: input.tenantId,
       created_by_user_id: input.createdByUserId,
       event_id: input.eventId ?? null,
+      bingo_overlay: "welcome",
+      next_game_scheduled_at: null,
+      countdown_started_at: null,
+      paused_at: null,
+      paused_remaining_seconds: null,
       playlist_snapshot_id: input.playlistSnapshotId,
       current_round: 1,
       round_count: input.roundCount,
@@ -132,7 +142,7 @@ export class SupabaseStandaloneBingoSessionsRepository
       .from("sg_game_bingo_sessions")
       .insert(payload)
       .select(
-        "id, tenant_id, created_by_user_id, event_id, session_code, status, playlist_snapshot_id, current_round, round_count, round_modes, card_count, game_mode, call_interval_seconds, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, call_reveal_delay_seconds, default_intermission_seconds, welcome_heading_text, welcome_message_text, welcome_rules_text, welcome_tiebreak_text, intermission_heading_text, intermission_message_text, intermission_footer_text, thanks_heading_text, thanks_subheading_text, thanks_events_heading_text, show_countdown, recent_calls_limit, theme_enabled, theme_name, is_sandbox, sandbox_source_session_id, sandbox_expires_at, is_favorite, created_at, started_at, ended_at"
+        "id, tenant_id, created_by_user_id, event_id, session_code, status, bingo_overlay, next_game_scheduled_at, countdown_started_at, paused_at, paused_remaining_seconds, playlist_snapshot_id, current_round, round_count, round_modes, card_count, game_mode, call_interval_seconds, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, call_reveal_delay_seconds, default_intermission_seconds, welcome_heading_text, welcome_message_text, welcome_rules_text, welcome_tiebreak_text, intermission_heading_text, intermission_message_text, intermission_footer_text, thanks_heading_text, thanks_subheading_text, thanks_events_heading_text, show_countdown, recent_calls_limit, theme_enabled, theme_name, is_sandbox, sandbox_source_session_id, sandbox_expires_at, is_favorite, created_at, started_at, ended_at"
       )
       .single();
 
@@ -151,7 +161,7 @@ export class SupabaseStandaloneBingoSessionsRepository
     const { data, error } = await supabase
       .from("sg_game_bingo_sessions")
       .select(
-        "id, tenant_id, created_by_user_id, event_id, session_code, status, playlist_snapshot_id, current_round, round_count, round_modes, card_count, game_mode, call_interval_seconds, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, call_reveal_delay_seconds, default_intermission_seconds, welcome_heading_text, welcome_message_text, welcome_rules_text, welcome_tiebreak_text, intermission_heading_text, intermission_message_text, intermission_footer_text, thanks_heading_text, thanks_subheading_text, thanks_events_heading_text, show_countdown, recent_calls_limit, theme_enabled, theme_name, is_sandbox, sandbox_source_session_id, sandbox_expires_at, is_favorite, created_at, started_at, ended_at"
+        "id, tenant_id, created_by_user_id, event_id, session_code, status, bingo_overlay, next_game_scheduled_at, countdown_started_at, paused_at, paused_remaining_seconds, playlist_snapshot_id, current_round, round_count, round_modes, card_count, game_mode, call_interval_seconds, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, call_reveal_delay_seconds, default_intermission_seconds, welcome_heading_text, welcome_message_text, welcome_rules_text, welcome_tiebreak_text, intermission_heading_text, intermission_message_text, intermission_footer_text, thanks_heading_text, thanks_subheading_text, thanks_events_heading_text, show_countdown, recent_calls_limit, theme_enabled, theme_name, is_sandbox, sandbox_source_session_id, sandbox_expires_at, is_favorite, created_at, started_at, ended_at"
       )
       .eq("tenant_id", tenantId)
       .eq("id", sessionId)
@@ -172,15 +182,45 @@ export class SupabaseStandaloneBingoSessionsRepository
     const supabase = getStandaloneSupabaseClient();
     const patch: Record<string, unknown> = {};
 
+    if (input.eventId !== undefined) patch.event_id = input.eventId;
+    if (input.roundCount !== undefined) patch.round_count = input.roundCount;
+    if (input.cardCount !== undefined) patch.card_count = input.cardCount;
+    if (input.gameMode !== undefined) patch.game_mode = input.gameMode;
+    if (input.callIntervalSeconds !== undefined) patch.call_interval_seconds = input.callIntervalSeconds;
+    if (input.removeResleeveSeconds !== undefined) patch.remove_resleeve_seconds = input.removeResleeveSeconds;
+    if (input.placeVinylSeconds !== undefined) patch.place_vinyl_seconds = input.placeVinylSeconds;
+    if (input.cueSeconds !== undefined) patch.cue_seconds = input.cueSeconds;
+    if (input.startSlideSeconds !== undefined) patch.start_slide_seconds = input.startSlideSeconds;
+    if (input.hostBufferSeconds !== undefined) patch.host_buffer_seconds = input.hostBufferSeconds;
+    if (input.sonosOutputDelayMs !== undefined) patch.sonos_output_delay_ms = input.sonosOutputDelayMs;
     if (input.status !== undefined) patch.status = input.status;
     if (input.startedAt !== undefined) patch.started_at = input.startedAt;
     if (input.endedAt !== undefined) patch.ended_at = input.endedAt;
     if (input.isFavorite !== undefined) patch.is_favorite = input.isFavorite;
+    if (input.welcomeHeadingText !== undefined) patch.welcome_heading_text = input.welcomeHeadingText;
+    if (input.welcomeMessageText !== undefined) patch.welcome_message_text = input.welcomeMessageText;
+    if (input.welcomeRulesText !== undefined) patch.welcome_rules_text = input.welcomeRulesText;
+    if (input.welcomeTiebreakText !== undefined) patch.welcome_tiebreak_text = input.welcomeTiebreakText;
+    if (input.intermissionHeadingText !== undefined) patch.intermission_heading_text = input.intermissionHeadingText;
+    if (input.intermissionMessageText !== undefined) patch.intermission_message_text = input.intermissionMessageText;
+    if (input.intermissionFooterText !== undefined) patch.intermission_footer_text = input.intermissionFooterText;
+    if (input.thanksHeadingText !== undefined) patch.thanks_heading_text = input.thanksHeadingText;
+    if (input.thanksSubheadingText !== undefined) patch.thanks_subheading_text = input.thanksSubheadingText;
+    if (input.thanksEventsHeadingText !== undefined) patch.thanks_events_heading_text = input.thanksEventsHeadingText;
+    if (input.showCountdown !== undefined) patch.show_countdown = input.showCountdown;
+    if (input.recentCallsLimit !== undefined) patch.recent_calls_limit = input.recentCallsLimit;
+    if (input.themeEnabled !== undefined) patch.theme_enabled = input.themeEnabled;
+    if (input.themeName !== undefined) patch.theme_name = input.themeName;
     if (input.callRevealDelaySeconds !== undefined) patch.call_reveal_delay_seconds = input.callRevealDelaySeconds;
     if (input.defaultIntermissionSeconds !== undefined) patch.default_intermission_seconds = input.defaultIntermissionSeconds;
     if (input.currentRound !== undefined) patch.current_round = input.currentRound;
     if (input.roundModes !== undefined) patch.round_modes = input.roundModes;
     if (input.sandboxExpiresAt !== undefined) patch.sandbox_expires_at = input.sandboxExpiresAt;
+    if (input.bingoOverlay !== undefined) patch.bingo_overlay = input.bingoOverlay;
+    if (input.nextGameScheduledAt !== undefined) patch.next_game_scheduled_at = input.nextGameScheduledAt;
+    if (input.countdownStartedAt !== undefined) patch.countdown_started_at = input.countdownStartedAt;
+    if (input.pausedAt !== undefined) patch.paused_at = input.pausedAt;
+    if (input.pausedRemainingSeconds !== undefined) patch.paused_remaining_seconds = input.pausedRemainingSeconds;
 
     const { data, error } = await supabase
       .from("sg_game_bingo_sessions")
@@ -188,7 +228,7 @@ export class SupabaseStandaloneBingoSessionsRepository
       .eq("tenant_id", tenantId)
       .eq("id", sessionId)
       .select(
-        "id, tenant_id, created_by_user_id, event_id, session_code, status, playlist_snapshot_id, current_round, round_count, round_modes, card_count, game_mode, call_interval_seconds, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, call_reveal_delay_seconds, default_intermission_seconds, welcome_heading_text, welcome_message_text, welcome_rules_text, welcome_tiebreak_text, intermission_heading_text, intermission_message_text, intermission_footer_text, thanks_heading_text, thanks_subheading_text, thanks_events_heading_text, is_sandbox, sandbox_source_session_id, sandbox_expires_at, is_favorite, created_at, started_at, ended_at"
+        "id, tenant_id, created_by_user_id, event_id, session_code, status, bingo_overlay, next_game_scheduled_at, countdown_started_at, paused_at, paused_remaining_seconds, playlist_snapshot_id, current_round, round_count, round_modes, card_count, game_mode, call_interval_seconds, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, call_reveal_delay_seconds, default_intermission_seconds, welcome_heading_text, welcome_message_text, welcome_rules_text, welcome_tiebreak_text, intermission_heading_text, intermission_message_text, intermission_footer_text, thanks_heading_text, thanks_subheading_text, thanks_events_heading_text, is_sandbox, sandbox_source_session_id, sandbox_expires_at, is_favorite, created_at, started_at, ended_at"
       )
       .maybeSingle();
 

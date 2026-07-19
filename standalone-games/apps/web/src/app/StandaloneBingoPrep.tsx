@@ -24,6 +24,12 @@ type CallRecord = {
   status: "pending" | "called" | "skipped" | "completed";
 };
 
+type TrackSearchResult = {
+  track_key: string;
+  track_title: string;
+  artist_name: string;
+};
+
 type CardRecord = {
   id: string;
   cardIndex: number;
@@ -60,6 +66,11 @@ export default function StandaloneBingoPrep({
   const [calls, setCalls] = useState<CallRecord[]>([]);
   const [cards, setCards] = useState<CardRecord[]>([]);
   const [addingCards, setAddingCards] = useState(false);
+  const [swapTargetCallId, setSwapTargetCallId] = useState<string>("");
+  const [swapQuery, setSwapQuery] = useState("");
+  const [swapResults, setSwapResults] = useState<TrackSearchResult[]>([]);
+  const [searchingSwap, setSearchingSwap] = useState(false);
+  const [swappingTrackKey, setSwappingTrackKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const requestHeaders = useMemo(
@@ -124,6 +135,46 @@ export default function StandaloneBingoPrep({
     }
   }
 
+  async function handleSearchSwap() {
+    const query = swapQuery.trim();
+    if (query.length < 2) {
+      setSwapResults([]);
+      return;
+    }
+
+    setSearchingSwap(true);
+    try {
+      const results = await fetchJson<TrackSearchResult[]>(`/api/v1/library/tracks/search?q=${encodeURIComponent(query)}&limit=12`);
+      setSwapResults(results);
+    } catch (searchError) {
+      setError(searchError instanceof Error ? searchError.message : "Failed to search tracks.");
+    } finally {
+      setSearchingSwap(false);
+    }
+  }
+
+  async function handleSwapTrack(toTrackKey: string) {
+    const targetCall = calls.find((call) => call.id === swapTargetCallId);
+    if (!targetCall) return;
+
+    setSwappingTrackKey(toTrackKey);
+    try {
+      const fromTrackKey = `${targetCall.trackTitle.trim().toLowerCase()}::${targetCall.artistName.trim().toLowerCase()}`;
+      await fetchJson(`/api/v1/games/bingo/sessions/${sessionId}/swap-track`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ fromTrackKey, toTrackKey }),
+      });
+      setSwapResults([]);
+      setSwapQuery("");
+      await load();
+    } catch (swapError) {
+      setError(swapError instanceof Error ? swapError.message : "Failed to swap track.");
+    } finally {
+      setSwappingTrackKey(null);
+    }
+  }
+
   function handleDownloadCallSheet() {
     const doc = generateStandaloneCallSheetPdf(session?.sessionCode ?? sessionId, calls);
     doc.save(`bingo-${session?.sessionCode ?? sessionId}-call-sheet.pdf`);
@@ -164,6 +215,35 @@ export default function StandaloneBingoPrep({
 
         <section style={panelStyle}>
           <h2 style={{ marginTop: 0, fontSize: 24 }}>Call Order</h2>
+          <div style={{ marginBottom: 14, display: "grid", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 240px) minmax(0,1fr) auto", gap: 10 }}>
+              <select value={swapTargetCallId} onChange={(event) => setSwapTargetCallId(event.target.value)} style={inputStyle}>
+                <option value="">Select call to replace</option>
+                {calls.map((call) => (
+                  <option key={call.id} value={call.id}>{call.callIndex}. {call.trackTitle} - {call.artistName}</option>
+                ))}
+              </select>
+              <input value={swapQuery} onChange={(event) => setSwapQuery(event.target.value)} placeholder="Search replacement track" style={inputStyle} />
+              <button style={buttonStyle} onClick={() => void handleSearchSwap()} disabled={searchingSwap || !swapTargetCallId}>
+                {searchingSwap ? "Searching..." : "Search"}
+              </button>
+            </div>
+            {swapResults.length > 0 ? (
+              <div style={{ display: "grid", gap: 8 }}>
+                {swapResults.map((result) => (
+                  <div key={result.track_key} style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 10 }}>
+                    <div>
+                      <strong>{result.track_title}</strong>
+                      <div style={{ fontSize: 12, color: "#d9d1c3" }}>{result.artist_name}</div>
+                    </div>
+                    <button style={buttonStyle} onClick={() => void handleSwapTrack(result.track_key)} disabled={swappingTrackKey === result.track_key}>
+                      {swappingTrackKey === result.track_key ? "Swapping..." : "Swap In"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
               <thead>
@@ -237,6 +317,16 @@ const buttonStyle: CSSProperties = {
   fontSize: 13,
   fontWeight: 700,
   cursor: "pointer",
+};
+
+const inputStyle: CSSProperties = {
+  width: "100%",
+  borderRadius: 10,
+  border: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(0,0,0,0.22)",
+  color: "#f5efe6",
+  padding: "8px 10px",
+  fontSize: 13,
 };
 
 const tableHeadStyle: CSSProperties = {

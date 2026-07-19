@@ -19,6 +19,11 @@ export interface CreateTenantPlaylistSnapshotInput {
 export interface TenantPlaylistSnapshotsRepository {
   listByTenant(tenantId: string): Promise<TenantPlaylistSnapshotRecord[]>;
   create(input: CreateTenantPlaylistSnapshotInput): Promise<TenantPlaylistSnapshotRecord>;
+  update(
+    tenantId: string,
+    snapshotId: string,
+    patch: { snapshotPayload?: unknown; snapshotName?: string | null }
+  ): Promise<TenantPlaylistSnapshotRecord | null>;
   existsForTenant(tenantId: string, snapshotId: string): Promise<boolean>;
   getById(tenantId: string, snapshotId: string): Promise<TenantPlaylistSnapshotRecord | null>;
 }
@@ -58,6 +63,18 @@ export class InMemoryTenantPlaylistSnapshotsRepository implements TenantPlaylist
     return this.snapshots.some(
       (snapshot) => snapshot.tenantId === tenantId && snapshot.id === snapshotId
     );
+  }
+
+  async update(
+    tenantId: string,
+    snapshotId: string,
+    patch: { snapshotPayload?: unknown; snapshotName?: string | null }
+  ): Promise<TenantPlaylistSnapshotRecord | null> {
+    const snapshot = await this.getById(tenantId, snapshotId);
+    if (!snapshot) return null;
+    if (patch.snapshotPayload !== undefined) snapshot.snapshotPayload = patch.snapshotPayload;
+    if (patch.snapshotName !== undefined) snapshot.snapshotName = patch.snapshotName;
+    return snapshot;
   }
 
   async getById(tenantId: string, snapshotId: string): Promise<TenantPlaylistSnapshotRecord | null> {
