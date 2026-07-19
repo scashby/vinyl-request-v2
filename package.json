@@ -2,6 +2,9 @@
   "name": "deadwaxdialogues",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "game-deck/apps/*"
+  ],
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --webpack",
