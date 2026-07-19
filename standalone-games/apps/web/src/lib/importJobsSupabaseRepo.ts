@@ -1,19 +1,9 @@
-import { getStandaloneSupabaseClient } from "@/lib/supabaseStandalone";
+import { getStandaloneSupabaseClient, isStandaloneSupabaseConfigured } from "@/lib/supabaseStandalone";
 import {
   type CreateImportJobInput,
   type ImportJobRecord,
   type ImportJobsRepository,
-  type UpdateImportJobInput,
 } from "@/lib/importJobsRepo";
-
-function parseSummary(value: unknown): string | undefined {
-  if (typeof value === "string") return value;
-  if (value && typeof value === "object") {
-    const maybeMessage = (value as { message?: unknown }).message;
-    if (typeof maybeMessage === "string") return maybeMessage;
-  }
-  return undefined;
-}
 
 function mapRow(row: Record<string, unknown>): ImportJobRecord {
   return {
@@ -25,7 +15,7 @@ function mapRow(row: Record<string, unknown>): ImportJobRecord {
     requestedByUserId: String(row.requested_by_user_id),
     progressPercent: Number(row.progress_percent),
     source: (row.source_payload ?? {}) as ImportJobRecord["source"],
-    summary: parseSummary(row.summary),
+    summary: typeof row.summary === "string" ? row.summary : undefined,
     createdAt: String(row.created_at),
     startedAt: typeof row.started_at === "string" ? row.started_at : undefined,
     finishedAt: typeof row.finished_at === "string" ? row.finished_at : undefined,
@@ -62,7 +52,7 @@ export class SupabaseImportJobsRepository implements ImportJobsRepository {
         status: "pending",
         progress_percent: 0,
         source_payload: input.source,
-        summary: { message: "Queued" },
+        summary: "Queued",
       })
       .select(
         "id, tenant_id, provider, job_type, status, requested_by_user_id, progress_percent, source_payload, summary, created_at, started_at, finished_at"
@@ -75,45 +65,13 @@ export class SupabaseImportJobsRepository implements ImportJobsRepository {
 
     return mapRow(data as Record<string, unknown>);
   }
+}
 
-  async update(
-    jobId: string,
-    tenantId: string,
-    input: UpdateImportJobInput
-  ): Promise<ImportJobRecord> {
-    const updates: Record<string, unknown> = {};
-
-    if (input.status !== undefined) {
-      updates.status = input.status;
-    }
-    if (input.progressPercent !== undefined) {
-      updates.progress_percent = Math.min(100, Math.max(0, input.progressPercent));
-    }
-    if (input.summary !== undefined) {
-      updates.summary = { message: input.summary };
-    }
-    if (input.startedAt !== undefined) {
-      updates.started_at = input.startedAt;
-    }
-    if (input.finishedAt !== undefined) {
-      updates.finished_at = input.finishedAt;
-    }
-
-    const supabase = getStandaloneSupabaseClient();
-    const { data, error } = await supabase
-      .from("sg_import_jobs")
-      .update(updates)
-      .eq("id", jobId)
-      .eq("tenant_id", tenantId)
-      .select(
-        "id, tenant_id, provider, job_type, status, requested_by_user_id, progress_percent, source_payload, summary, created_at, started_at, finished_at"
-      )
-      .single();
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return mapRow(data as Record<string, unknown>);
+export function getImportJobsRepository(): ImportJobsRepository {
+  if (isStandaloneSupabaseConfigured()) {
+    return new SupabaseImportJobsRepository();
   }
+
+  const { getImportJobsRepository: getInMemoryRepo } = require("@/lib/importJobsRepo");
+  return getInMemoryRepo();
 }
