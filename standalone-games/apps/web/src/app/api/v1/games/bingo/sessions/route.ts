@@ -1,22 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantRequestContext } from "@/lib/tenantContext";
 import { getRequestEntitlements, hasEntitlement } from "@/lib/entitlements";
-import { getTenantPlaylistSnapshotsRepository } from "@/lib/tenantPlaylistSnapshotsRepositoryFactory";
-import { getStandaloneBingoCallsRepository } from "@/lib/standaloneBingoCallsRepositoryFactory";
+import { getPlaylistSnapshotRepository } from "@/lib/playlistSnapshotRepo";
 import {
   type BingoGameMode,
 } from "@/lib/standaloneBingoSessionsRepo";
 import { getStandaloneBingoSessionsRepository } from "@/lib/standaloneBingoSessionsRepositoryFactory";
-
-interface SnapshotPayloadItem {
-  trackTitle?: string;
-  artistName?: string;
-  canonicalTrackId?: string | null;
-}
-
-interface SnapshotPayload {
-  items?: SnapshotPayloadItem[];
-}
 
 interface CreateSessionBody {
   playlistSnapshotId?: string;
@@ -84,13 +73,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const snapshotRepo = getTenantPlaylistSnapshotsRepository();
-    const snapshot = await snapshotRepo.getById(
+    const snapshotRepo = getPlaylistSnapshotRepository();
+    const snapshotExists = await snapshotRepo.existsForTenant(
       ctx.tenantId,
       body.playlistSnapshotId
     );
 
-    if (!snapshot) {
+    if (!snapshotExists) {
       return NextResponse.json(
         { ok: false, error: "playlistSnapshotId does not exist for this tenant." },
         { status: 404 }
@@ -135,19 +124,6 @@ export async function POST(request: NextRequest) {
       gameMode,
       callIntervalSeconds,
     });
-
-    const snapshotPayload = (snapshot.snapshotPayload ?? {}) as SnapshotPayload;
-    const seededCalls = (snapshotPayload.items ?? [])
-      .map((item, index) => ({
-        callIndex: index + 1,
-        canonicalTrackId: item.canonicalTrackId ?? null,
-        trackTitle: String(item.trackTitle ?? "").trim(),
-        artistName: String(item.artistName ?? "").trim(),
-      }))
-      .filter((item) => item.trackTitle && item.artistName);
-
-    const callsRepo = getStandaloneBingoCallsRepository();
-    await callsRepo.createMany(session.id, seededCalls);
 
     return NextResponse.json({ ok: true, data: session }, { status: 201 });
   } catch (error) {

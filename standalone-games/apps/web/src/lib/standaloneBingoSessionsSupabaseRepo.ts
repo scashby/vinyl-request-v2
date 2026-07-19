@@ -3,7 +3,6 @@ import {
   type CreateStandaloneBingoSessionInput,
   type StandaloneBingoSessionRecord,
   type StandaloneBingoSessionsRepository,
-  type UpdateStandaloneBingoSessionInput,
 } from "@/lib/standaloneBingoSessionsRepo";
 
 function mapRow(row: Record<string, unknown>): StandaloneBingoSessionRecord {
@@ -19,8 +18,6 @@ function mapRow(row: Record<string, unknown>): StandaloneBingoSessionRecord {
     gameMode: row.game_mode as StandaloneBingoSessionRecord["gameMode"],
     callIntervalSeconds: Number(row.call_interval_seconds),
     createdAt: String(row.created_at),
-    startedAt: typeof row.started_at === "string" ? row.started_at : null,
-    endedAt: typeof row.ended_at === "string" ? row.ended_at : null,
   };
 }
 
@@ -32,7 +29,7 @@ export class SupabaseStandaloneBingoSessionsRepository
     const { data, error } = await supabase
       .from("sg_game_bingo_sessions")
       .select(
-        "id, tenant_id, created_by_user_id, session_code, status, playlist_snapshot_id, round_count, card_count, game_mode, call_interval_seconds, created_at, started_at, ended_at"
+        "id, tenant_id, created_by_user_id, session_code, status, playlist_snapshot_id, round_count, card_count, game_mode, call_interval_seconds, created_at"
       )
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false });
@@ -63,7 +60,7 @@ export class SupabaseStandaloneBingoSessionsRepository
       .from("sg_game_bingo_sessions")
       .insert(payload)
       .select(
-        "id, tenant_id, created_by_user_id, session_code, status, playlist_snapshot_id, round_count, card_count, game_mode, call_interval_seconds, created_at, started_at, ended_at"
+        "id, tenant_id, created_by_user_id, session_code, status, playlist_snapshot_id, round_count, card_count, game_mode, call_interval_seconds, created_at"
       )
       .single();
 
@@ -72,56 +69,6 @@ export class SupabaseStandaloneBingoSessionsRepository
     }
 
     return mapRow(data as Record<string, unknown>);
-  }
-
-  async getById(
-    tenantId: string,
-    sessionId: string
-  ): Promise<StandaloneBingoSessionRecord | null> {
-    const supabase = getStandaloneSupabaseClient();
-    const { data, error } = await supabase
-      .from("sg_game_bingo_sessions")
-      .select(
-        "id, tenant_id, created_by_user_id, session_code, status, playlist_snapshot_id, round_count, card_count, game_mode, call_interval_seconds, created_at, started_at, ended_at"
-      )
-      .eq("tenant_id", tenantId)
-      .eq("id", sessionId)
-      .maybeSingle();
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return data ? mapRow(data as Record<string, unknown>) : null;
-  }
-
-  async update(
-    tenantId: string,
-    sessionId: string,
-    input: UpdateStandaloneBingoSessionInput
-  ): Promise<StandaloneBingoSessionRecord | null> {
-    const supabase = getStandaloneSupabaseClient();
-    const patch: Record<string, unknown> = {};
-
-    if (input.status !== undefined) patch.status = input.status;
-    if (input.startedAt !== undefined) patch.started_at = input.startedAt;
-    if (input.endedAt !== undefined) patch.ended_at = input.endedAt;
-
-    const { data, error } = await supabase
-      .from("sg_game_bingo_sessions")
-      .update(patch)
-      .eq("tenant_id", tenantId)
-      .eq("id", sessionId)
-      .select(
-        "id, tenant_id, created_by_user_id, session_code, status, playlist_snapshot_id, round_count, card_count, game_mode, call_interval_seconds, created_at, started_at, ended_at"
-      )
-      .maybeSingle();
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return data ? mapRow(data as Record<string, unknown>) : null;
   }
 
   private buildSessionCode(): string {

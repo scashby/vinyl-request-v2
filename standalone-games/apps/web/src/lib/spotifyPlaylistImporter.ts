@@ -94,9 +94,7 @@ export async function importSpotifyPlaylistTracks(params: {
   );
 
   const tracks: ImportedTrackInput[] = [];
-  let nextPath =
-    `/playlists/${encodeURIComponent(providerPlaylistId)}` +
-    `/items?limit=100&additional_types=track&market=from_token`;
+  let nextPath = `/playlists/${encodeURIComponent(providerPlaylistId)}/tracks?limit=100&market=from_token`;
 
   while (nextPath && tracks.length < maxTracks) {
     const page = await spotifyGet<SpotifyPlaylistItemsResponse>(params.accessToken, nextPath);

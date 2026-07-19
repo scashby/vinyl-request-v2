@@ -29,25 +29,11 @@ export interface StandaloneBingoSessionRecord {
   gameMode: BingoGameMode;
   callIntervalSeconds: number;
   createdAt: string;
-  startedAt?: string | null;
-  endedAt?: string | null;
-}
-
-export interface UpdateStandaloneBingoSessionInput {
-  status?: StandaloneBingoSessionRecord["status"];
-  startedAt?: string | null;
-  endedAt?: string | null;
 }
 
 export interface StandaloneBingoSessionsRepository {
   listByTenant(tenantId: string): Promise<StandaloneBingoSessionRecord[]>;
   create(input: CreateStandaloneBingoSessionInput): Promise<StandaloneBingoSessionRecord>;
-  getById(tenantId: string, sessionId: string): Promise<StandaloneBingoSessionRecord | null>;
-  update(
-    tenantId: string,
-    sessionId: string,
-    input: UpdateStandaloneBingoSessionInput
-  ): Promise<StandaloneBingoSessionRecord | null>;
 }
 
 function makeId(): string {
@@ -92,37 +78,9 @@ export class InMemoryStandaloneBingoSessionsRepository
       gameMode: input.gameMode,
       callIntervalSeconds: input.callIntervalSeconds,
       createdAt: new Date().toISOString(),
-      startedAt: null,
-      endedAt: null,
     };
 
     this.sessions.push(session);
-    return session;
-  }
-
-  async getById(
-    tenantId: string,
-    sessionId: string
-  ): Promise<StandaloneBingoSessionRecord | null> {
-    return (
-      this.sessions.find(
-        (session) => session.tenantId === tenantId && session.id === sessionId
-      ) ?? null
-    );
-  }
-
-  async update(
-    tenantId: string,
-    sessionId: string,
-    input: UpdateStandaloneBingoSessionInput
-  ): Promise<StandaloneBingoSessionRecord | null> {
-    const session = await this.getById(tenantId, sessionId);
-    if (!session) return null;
-
-    if (input.status) session.status = input.status;
-    if (input.startedAt !== undefined) session.startedAt = input.startedAt;
-    if (input.endedAt !== undefined) session.endedAt = input.endedAt;
-
     return session;
   }
 }

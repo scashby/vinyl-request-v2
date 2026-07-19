@@ -1,28 +1,9 @@
-import StandaloneBingoSetup from "./StandaloneBingoSetup";
-
-type HomePageProps = {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-};
-
-function getSingleParam(value: string | string[] | undefined, fallback: string) {
-  if (Array.isArray(value)) {
-    return value[0] ?? fallback;
-  }
-  return value ?? fallback;
-}
-
-export default async function HomePage({ searchParams }: HomePageProps) {
-  const params = searchParams ? await searchParams : {};
-
+export default function HomePage() {
   return (
-    <StandaloneBingoSetup
-      tenantId={getSingleParam(params.tenantId, "7600b5bc-3d26-4d6d-bc8e-2d189b241a00")}
-      userId={getSingleParam(params.userId, "072fba8e-930b-49e1-aff6-e97a6ca0ec82")}
-      entitlements={getSingleParam(
-        params.entitlements,
-        "game:bingo,bundle:core-games,addon:premium-connectors"
-      )}
-      initialSessionId={getSingleParam(params.sessionId, "")}
-    />
+    <main style={{ padding: 24, fontFamily: "ui-sans-serif, system-ui" }}>
+      <h1>Standalone Games</h1>
+      <p>Phase 1 scaffold is active under standalone-games.</p>
+      <p>All new APIs for standalone live under /api/v1 in this app.</p>
+    </main>
   );
 }
