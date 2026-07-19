@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTenantRequestContext } from "@/lib/tenantContext";
 import { getRequestEntitlements, hasEntitlement } from "@/lib/entitlements";
 import { getTenantPlaylistSnapshotsRepository } from "@/lib/tenantPlaylistSnapshotsRepositoryFactory";
-import { generateStandaloneBingoCards } from "@/lib/standaloneBingoCardEngine";
-import { getStandaloneBingoCardsRepository } from "@/lib/standaloneBingoCardsRepositoryFactory";
 import { getStandaloneBingoCallsRepository } from "@/lib/standaloneBingoCallsRepositoryFactory";
 import {
   type BingoGameMode,
@@ -150,17 +148,6 @@ export async function POST(request: NextRequest) {
 
     const callsRepo = getStandaloneBingoCallsRepository();
     await callsRepo.createMany(session.id, seededCalls);
-
-    const cardsRepo = getStandaloneBingoCardsRepository();
-    const generatedCards = generateStandaloneBingoCards(
-      session.sessionCode,
-      seededCalls.map((call) => ({
-        trackTitle: call.trackTitle,
-        artistName: call.artistName,
-      })),
-      cardCount
-    );
-    await cardsRepo.createMany(session.id, generatedCards);
 
     return NextResponse.json({ ok: true, data: session }, { status: 201 });
   } catch (error) {
