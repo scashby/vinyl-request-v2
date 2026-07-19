@@ -4,7 +4,7 @@ import { getRequestEntitlements, hasEntitlement } from "@/lib/entitlements";
 import { getStandaloneBingoCallsRepository } from "@/lib/standaloneBingoCallsRepositoryFactory";
 import { getStandaloneBingoSessionsRepository } from "@/lib/standaloneBingoSessionsRepositoryFactory";
 
-type ControlAction = "pause" | "resume" | "advance" | "skip" | "replace_next" | "next_round";
+type ControlAction = "pause" | "resume" | "advance" | "skip" | "replace_next";
 
 function coerceAction(value: unknown): ControlAction | null {
   if (
@@ -12,8 +12,7 @@ function coerceAction(value: unknown): ControlAction | null {
     value === "resume" ||
     value === "advance" ||
     value === "skip" ||
-    value === "replace_next" ||
-    value === "next_round"
+    value === "replace_next"
   ) {
     return value;
   }
@@ -61,24 +60,6 @@ export async function POST(
 
     if (action === "resume") {
       const updated = await sessionsRepo.update(ctx.tenantId, id, { status: "running" });
-      return NextResponse.json({ ok: true, data: { session: updated } });
-    }
-
-    if (action === "next_round") {
-      if ((session.currentRound ?? 1) >= session.roundCount) {
-        return NextResponse.json(
-          { ok: false, error: "No additional rounds remain for this session." },
-          { status: 400 }
-        );
-      }
-
-      await callsRepo.resetSession(id);
-      const updated = await sessionsRepo.update(ctx.tenantId, id, {
-        currentRound: (session.currentRound ?? 1) + 1,
-        status: "paused",
-        startedAt: session.startedAt ?? new Date().toISOString(),
-        endedAt: null,
-      });
       return NextResponse.json({ ok: true, data: { session: updated } });
     }
 

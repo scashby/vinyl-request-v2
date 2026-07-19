@@ -7,8 +7,6 @@ type SessionRecord = {
   id: string;
   sessionCode: string;
   status: "pending" | "running" | "paused" | "completed";
-  currentRound?: number;
-  roundCount?: number;
   callIntervalSeconds: number;
 };
 
@@ -134,7 +132,7 @@ export default function StandaloneBingoAssistant({
               <p style={eyebrowStyle}>Standalone Bingo Sidekick</p>
               <h1 style={{ margin: "8px 0 0", fontSize: 36 }}>Assistant Board</h1>
               <p style={{ margin: "8px 0 0", color: "#d9d1c3" }}>
-                {session?.sessionCode ?? "-"} · {session?.status ?? "loading"} · Round {session?.currentRound ?? 1} of {session?.roundCount ?? 1}
+                {session?.sessionCode ?? "-"} · {session?.status ?? "loading"}
               </p>
             </div>
             <div style={{ textAlign: "right" }}>

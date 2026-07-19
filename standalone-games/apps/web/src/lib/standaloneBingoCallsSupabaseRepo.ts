@@ -110,14 +110,4 @@ export class SupabaseStandaloneBingoCallsRepository implements StandaloneBingoCa
     if (error) throw new Error(error.message);
     return data ? mapRow(data as Record<string, unknown>) : null;
   }
-
-  async resetSession(sessionId: string): Promise<void> {
-    const supabase = getStandaloneSupabaseClient();
-    const { error } = await supabase
-      .from("sg_game_bingo_calls")
-      .update({ status: "pending", called_at: null })
-      .eq("session_id", sessionId);
-
-    if (error) throw new Error(error.message);
-  }
 }

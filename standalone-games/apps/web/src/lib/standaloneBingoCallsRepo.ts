@@ -25,7 +25,6 @@ export interface StandaloneBingoCallsRepository {
   markCompleted(callId: string): Promise<void>;
   markSkipped(callId: string): Promise<void>;
   markCalled(callId: string, calledAt: string): Promise<StandaloneBingoCallRecord | null>;
-  resetSession(sessionId: string): Promise<void>;
 }
 
 function makeId(): string {
@@ -98,13 +97,5 @@ export class InMemoryStandaloneBingoCallsRepository implements StandaloneBingoCa
     call.status = "called";
     call.calledAt = calledAt;
     return call;
-  }
-
-  async resetSession(sessionId: string): Promise<void> {
-    this.calls.forEach((call) => {
-      if (call.sessionId !== sessionId) return;
-      call.status = "pending";
-      call.calledAt = null;
-    });
   }
 }

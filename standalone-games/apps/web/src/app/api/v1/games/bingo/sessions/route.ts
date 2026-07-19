@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantRequestContext } from "@/lib/tenantContext";
 import { getRequestEntitlements, hasEntitlement } from "@/lib/entitlements";
-import { getStandaloneEventsRepository } from "@/lib/standaloneEventsRepositoryFactory";
 import { getTenantPlaylistsRepository } from "@/lib/tenantPlaylistsRepositoryFactory";
 import { getTenantPlaylistSnapshotsRepository } from "@/lib/tenantPlaylistSnapshotsRepositoryFactory";
 import { generateStandaloneBingoCards } from "@/lib/standaloneBingoCardEngine";
@@ -9,7 +8,6 @@ import { getStandaloneBingoCardsRepository } from "@/lib/standaloneBingoCardsRep
 import { getStandaloneBingoCallsRepository } from "@/lib/standaloneBingoCallsRepositoryFactory";
 import {
   type BingoGameMode,
-  type StandaloneBingoRoundModesEntry,
 } from "@/lib/standaloneBingoSessionsRepo";
 import { getStandaloneBingoSessionsRepository } from "@/lib/standaloneBingoSessionsRepositoryFactory";
 
@@ -27,7 +25,6 @@ interface SnapshotPayload {
 
 interface CreateSessionBody {
   playlistSnapshotId?: string;
-  event_id?: string;
   playlist_id?: string;
   playlist_ids?: string[];
   master_playlist_ids?: string[];
@@ -39,31 +36,8 @@ interface CreateSessionBody {
   card_count?: number;
   gameMode?: BingoGameMode;
   game_mode?: BingoGameMode;
-  round_modes?: Array<{ round?: number; modes?: string[] }>;
   callIntervalSeconds?: number;
   call_interval_seconds?: number;
-  remove_resleeve_seconds?: number;
-  place_vinyl_seconds?: number;
-  cue_seconds?: number;
-  start_slide_seconds?: number;
-  host_buffer_seconds?: number;
-  sonos_output_delay_ms?: number;
-  call_reveal_delay_seconds?: number;
-  default_intermission_seconds?: number;
-  welcome_heading_text?: string;
-  welcome_message_text?: string;
-  welcome_rules_text?: string;
-  welcome_tiebreak_text?: string;
-  intermission_heading_text?: string;
-  intermission_message_text?: string;
-  intermission_footer_text?: string;
-  thanks_heading_text?: string;
-  thanks_subheading_text?: string;
-  thanks_events_heading_text?: string;
-  show_countdown?: boolean;
-  recent_calls_limit?: number;
-  theme_enabled?: boolean;
-  theme_name?: string;
 }
 
 function isValidGameMode(value: unknown): value is BingoGameMode {
@@ -76,20 +50,6 @@ function isValidGameMode(value: unknown): value is BingoGameMode {
     value === "blackout" ||
     value === "death"
   );
-}
-
-function normalizeRoundModes(input: unknown, roundCount: number): StandaloneBingoRoundModesEntry[] {
-  if (!Array.isArray(input)) return [];
-
-  return input
-    .filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null)
-    .map((entry) => ({
-      round: Number(entry.round ?? 1),
-      modes: Array.isArray(entry.modes)
-        ? entry.modes.filter((mode) => isValidGameMode(mode)).map((mode) => mode as BingoGameMode)
-        : [],
-    }))
-    .filter((entry) => Number.isInteger(entry.round) && entry.round >= 1 && entry.round <= roundCount && entry.modes.length > 0);
 }
 
 export async function GET() {
@@ -133,31 +93,14 @@ export async function POST(request: NextRequest) {
 
     const snapshotRepo = getTenantPlaylistSnapshotsRepository();
     const playlistRepo = getTenantPlaylistsRepository();
-    const eventRepo = getStandaloneEventsRepository();
 
     const roundCount = body.round_count ?? body.roundCount ?? 3;
     const cardCount = body.card_count ?? body.cardCount ?? 40;
-    const removeResleeveSeconds = body.remove_resleeve_seconds ?? 20;
-    const placeVinylSeconds = body.place_vinyl_seconds ?? 8;
-    const cueSeconds = body.cue_seconds ?? 12;
-    const startSlideSeconds = body.start_slide_seconds ?? 5;
-    const hostBufferSeconds = body.host_buffer_seconds ?? 2;
-    const sonosOutputDelayMs = body.sonos_output_delay_ms ?? 75;
-    const callRevealDelaySeconds = body.call_reveal_delay_seconds ?? 10;
-    const defaultIntermissionSeconds = body.default_intermission_seconds ?? 600;
-    const derivedCallIntervalSeconds =
-      removeResleeveSeconds +
-      placeVinylSeconds +
-      cueSeconds +
-      startSlideSeconds +
-      hostBufferSeconds +
-      Math.ceil(sonosOutputDelayMs / 1000);
-    const callIntervalSeconds = body.call_interval_seconds ?? body.callIntervalSeconds ?? derivedCallIntervalSeconds;
+    const callIntervalSeconds = body.call_interval_seconds ?? body.callIntervalSeconds ?? 45;
     const requestedGameMode = body.game_mode ?? body.gameMode;
     const gameMode: BingoGameMode = isValidGameMode(requestedGameMode)
       ? requestedGameMode
       : "single_line";
-    const roundModes = normalizeRoundModes(body.round_modes, roundCount);
 
     if (!Number.isInteger(roundCount) || roundCount < 1) {
       return NextResponse.json(
@@ -180,24 +123,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const timingValues = [
-      removeResleeveSeconds,
-      placeVinylSeconds,
-      cueSeconds,
-      startSlideSeconds,
-      hostBufferSeconds,
-      sonosOutputDelayMs,
-      callRevealDelaySeconds,
-      defaultIntermissionSeconds,
-    ];
-
-    if (timingValues.some((value) => !Number.isInteger(value) || value < 0)) {
-      return NextResponse.json(
-        { ok: false, error: "Timing fields must be integers >= 0." },
-        { status: 400 }
-      );
-    }
-
     const explicitPlaylistIds = [
       ...(Array.isArray(body.master_playlist_ids) ? body.master_playlist_ids : []),
       ...(Array.isArray(body.playlist_ids) ? body.playlist_ids : []),
@@ -212,18 +137,6 @@ export async function POST(request: NextRequest) {
       .filter((value, index, source) => value.length > 0 && source.indexOf(value) === index);
 
     let snapshot = null;
-    let eventId: string | null = null;
-
-    if (body.event_id) {
-      const event = await eventRepo.getById(ctx.tenantId, String(body.event_id));
-      if (!event) {
-        return NextResponse.json(
-          { ok: false, error: "event_id does not exist for this tenant." },
-          { status: 404 }
-        );
-      }
-      eventId = event.id;
-    }
 
     if (body.playlistSnapshotId && body.playlistSnapshotId.trim().length > 0) {
       snapshot = await snapshotRepo.getById(ctx.tenantId, body.playlistSnapshotId);
@@ -313,35 +226,11 @@ export async function POST(request: NextRequest) {
     const session = await repo.create({
       tenantId: ctx.tenantId,
       createdByUserId: ctx.userId,
-      eventId,
       playlistSnapshotId: snapshot.id,
       roundCount,
-      roundModes,
       cardCount,
       gameMode,
       callIntervalSeconds,
-      removeResleeveSeconds,
-      placeVinylSeconds,
-      cueSeconds,
-      startSlideSeconds,
-      hostBufferSeconds,
-      sonosOutputDelayMs,
-      callRevealDelaySeconds,
-      defaultIntermissionSeconds,
-      welcomeHeadingText: body.welcome_heading_text?.trim() || undefined,
-      welcomeMessageText: body.welcome_message_text?.trim() || undefined,
-      welcomeRulesText: body.welcome_rules_text?.trim() || undefined,
-      welcomeTiebreakText: body.welcome_tiebreak_text?.trim() || undefined,
-      intermissionHeadingText: body.intermission_heading_text?.trim() || undefined,
-      intermissionMessageText: body.intermission_message_text?.trim() || undefined,
-      intermissionFooterText: body.intermission_footer_text?.trim() || undefined,
-      thanksHeadingText: body.thanks_heading_text?.trim() || undefined,
-      thanksSubheadingText: body.thanks_subheading_text?.trim() || undefined,
-      thanksEventsHeadingText: body.thanks_events_heading_text?.trim() || undefined,
-      showCountdown: body.show_countdown !== false,
-      recentCallsLimit: Number.isFinite(Number(body.recent_calls_limit)) ? Math.max(1, Number(body.recent_calls_limit)) : 5,
-      themeEnabled: body.theme_enabled === true,
-      themeName: body.theme_enabled ? body.theme_name?.trim() || null : null,
     });
 
     const snapshotPayload = (snapshot.snapshotPayload ?? {}) as SnapshotPayload;
