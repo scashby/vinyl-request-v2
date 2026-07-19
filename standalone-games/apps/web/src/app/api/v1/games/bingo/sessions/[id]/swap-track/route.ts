@@ -15,6 +15,9 @@ type SwapBody = {
 type SnapshotItem = {
   trackTitle?: string;
   artistName?: string;
+  albumName?: string | null;
+  side?: string | null;
+  position?: string | null;
   canonicalTrackId?: string | null;
 };
 
@@ -55,7 +58,14 @@ export async function POST(
 
     const snapshotRepo = getTenantPlaylistSnapshotsRepository();
     const snapshots = await snapshotRepo.listByTenant(ctx.tenantId);
-    let replacement: { trackTitle: string; artistName: string; canonicalTrackId: string | null } | null = null;
+    let replacement: {
+      trackTitle: string;
+      artistName: string;
+      albumName: string | null;
+      side: string | null;
+      position: string | null;
+      canonicalTrackId: string | null;
+    } | null = null;
 
     for (const snapshot of snapshots) {
       const items = Array.isArray((snapshot.snapshotPayload as { items?: unknown[] } | null)?.items)
@@ -69,6 +79,9 @@ export async function POST(
           replacement = {
             trackTitle,
             artistName,
+            albumName: typeof item.albumName === "string" ? item.albumName.trim() || null : null,
+            side: typeof item.side === "string" ? item.side.trim() || null : null,
+            position: typeof item.position === "string" ? item.position.trim() || null : null,
             canonicalTrackId: item.canonicalTrackId ?? null,
           };
           break;
@@ -91,6 +104,9 @@ export async function POST(
           canonicalTrackId: call.canonicalTrackId ?? null,
           trackTitle: call.trackTitle,
           artistName: call.artistName,
+          albumName: call.albumName ?? null,
+          side: call.side ?? null,
+          position: call.position ?? null,
         };
       }
       return {
@@ -98,6 +114,9 @@ export async function POST(
         canonicalTrackId: replacement.canonicalTrackId,
         trackTitle: replacement.trackTitle,
         artistName: replacement.artistName,
+        albumName: replacement.albumName,
+        side: replacement.side,
+        position: replacement.position,
       };
     });
 

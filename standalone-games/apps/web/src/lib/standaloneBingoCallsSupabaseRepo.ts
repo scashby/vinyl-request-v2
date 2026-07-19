@@ -13,6 +13,9 @@ function mapRow(row: Record<string, unknown>): StandaloneBingoCallRecord {
     canonicalTrackId: typeof row.canonical_track_id === "string" ? row.canonical_track_id : null,
     trackTitle: String(row.track_title),
     artistName: String(row.artist_name),
+    albumName: typeof row.album_name === "string" ? row.album_name : null,
+    side: typeof row.side === "string" ? row.side : null,
+    position: typeof row.position === "string" ? row.position : null,
     status: row.status as StandaloneBingoCallRecord["status"],
     calledAt: typeof row.called_at === "string" ? row.called_at : null,
     createdAt: String(row.created_at),
@@ -24,7 +27,7 @@ export class SupabaseStandaloneBingoCallsRepository implements StandaloneBingoCa
     const supabase = getStandaloneSupabaseClient();
     const { data, error } = await supabase
       .from("sg_game_bingo_calls")
-      .select("id, session_id, call_index, canonical_track_id, track_title, artist_name, status, called_at, created_at")
+      .select("id, session_id, call_index, canonical_track_id, track_title, artist_name, album_name, side, position, status, called_at, created_at")
       .eq("session_id", sessionId)
       .order("call_index", { ascending: true });
 
@@ -41,6 +44,9 @@ export class SupabaseStandaloneBingoCallsRepository implements StandaloneBingoCa
         canonical_track_id: call.canonicalTrackId ?? null,
         track_title: call.trackTitle,
         artist_name: call.artistName,
+        album_name: call.albumName ?? null,
+        side: call.side ?? null,
+        position: call.position ?? null,
         status: "pending",
       }))
     );
@@ -63,7 +69,7 @@ export class SupabaseStandaloneBingoCallsRepository implements StandaloneBingoCa
     const supabase = getStandaloneSupabaseClient();
     const { data, error } = await supabase
       .from("sg_game_bingo_calls")
-      .select("id, session_id, call_index, canonical_track_id, track_title, artist_name, status, called_at, created_at")
+      .select("id, session_id, call_index, canonical_track_id, track_title, artist_name, album_name, side, position, status, called_at, created_at")
       .eq("session_id", sessionId)
       .eq("status", "called")
       .order("call_index", { ascending: false })
@@ -78,7 +84,7 @@ export class SupabaseStandaloneBingoCallsRepository implements StandaloneBingoCa
     const supabase = getStandaloneSupabaseClient();
     const { data, error } = await supabase
       .from("sg_game_bingo_calls")
-      .select("id, session_id, call_index, canonical_track_id, track_title, artist_name, status, called_at, created_at")
+      .select("id, session_id, call_index, canonical_track_id, track_title, artist_name, album_name, side, position, status, called_at, created_at")
       .eq("session_id", sessionId)
       .eq("status", "pending")
       .order("call_index", { ascending: true })
@@ -115,7 +121,7 @@ export class SupabaseStandaloneBingoCallsRepository implements StandaloneBingoCa
       .from("sg_game_bingo_calls")
       .update({ status: "called", called_at: calledAt })
       .eq("id", callId)
-      .select("id, session_id, call_index, canonical_track_id, track_title, artist_name, status, called_at, created_at")
+      .select("id, session_id, call_index, canonical_track_id, track_title, artist_name, album_name, side, position, status, called_at, created_at")
       .maybeSingle();
 
     if (error) throw new Error(error.message);

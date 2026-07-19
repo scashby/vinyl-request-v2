@@ -20,6 +20,9 @@ type CallRecord = {
   callIndex: number;
   trackTitle: string;
   artistName: string;
+  albumName?: string | null;
+  side?: string | null;
+  position?: string | null;
   status: "pending" | "called" | "skipped" | "completed";
   calledAt?: string | null;
 };
@@ -208,6 +211,11 @@ export default function StandaloneBingoAssistant({
             <p style={eyebrowStyle}>{currentCall ? formatBall(currentCall.callIndex) : "Waiting"}</p>
             <h3 style={{ margin: "10px 0 6px", fontSize: 38 }}>{currentCall?.trackTitle ?? "Waiting for first reveal"}</h3>
             <p style={{ margin: 0, fontSize: 22, color: "#f5efe6" }}>{currentCall?.artistName ?? "Use host controls to begin"}</p>
+            {currentCall ? (
+              <p style={{ marginTop: 8, color: "#d9d1c3" }}>
+                {currentCall.albumName || "Unknown Album"} · Side {currentCall.side || "-"} · Pos {currentCall.position || "-"}
+              </p>
+            ) : null}
           </div>
         </section>
 
@@ -220,6 +228,7 @@ export default function StandaloneBingoAssistant({
                 <div key={call.id} style={rowStyle}>
                   <strong>{formatBall(call.callIndex)} · {call.trackTitle}</strong>
                   <span style={{ color: "#d9d1c3", fontSize: 14 }}>{call.artistName}</span>
+                  <span style={{ color: "#b9ced1", fontSize: 12 }}>{call.albumName || "Unknown Album"} · Side {call.side || "-"} · Pos {call.position || "-"}</span>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button
                       onClick={() => void handleTransport("pull", call.id)}
@@ -257,6 +266,7 @@ export default function StandaloneBingoAssistant({
                 <div key={call.id} style={rowStyle}>
                   <strong>{formatBall(call.callIndex)} · {call.trackTitle}</strong>
                   <span style={{ color: "#d9d1c3", fontSize: 14 }}>{call.artistName}</span>
+                  <span style={{ color: "#b9ced1", fontSize: 12 }}>{call.albumName || "Unknown Album"} · Side {call.side || "-"} · Pos {call.position || "-"}</span>
                 </div>
               ))}
               {recentCalled.length === 0 ? <div style={{ color: "#d9d1c3" }}>No recent calls yet.</div> : null}

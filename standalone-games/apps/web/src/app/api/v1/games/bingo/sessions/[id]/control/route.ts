@@ -13,6 +13,9 @@ type ControlAction = "pause" | "resume" | "advance" | "skip" | "replace_next" | 
 type SnapshotPayloadItem = {
   trackTitle?: string;
   artistName?: string;
+  albumName?: string | null;
+  side?: string | null;
+  position?: string | null;
   canonicalTrackId?: string | null;
 };
 
@@ -176,6 +179,9 @@ export async function POST(
           canonicalTrackId: item.canonicalTrackId ?? null,
           trackTitle: String(item.trackTitle ?? "").trim(),
           artistName: String(item.artistName ?? "").trim(),
+          albumName: typeof item.albumName === "string" ? item.albumName.trim() || null : null,
+          side: typeof item.side === "string" ? item.side.trim() || null : null,
+          position: typeof item.position === "string" ? item.position.trim() || null : null,
         }))
         .filter((item) => item.trackTitle.length > 0 && item.artistName.length > 0);
 

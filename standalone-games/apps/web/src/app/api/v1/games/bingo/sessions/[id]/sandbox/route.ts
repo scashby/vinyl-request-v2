@@ -76,6 +76,9 @@ export async function POST(
         canonicalTrackId: call.canonicalTrackId ?? null,
         trackTitle: call.trackTitle,
         artistName: call.artistName,
+        albumName: call.albumName ?? null,
+        side: call.side ?? null,
+        position: call.position ?? null,
       }))
     );
 

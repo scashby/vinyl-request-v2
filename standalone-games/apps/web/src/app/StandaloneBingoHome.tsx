@@ -39,6 +39,9 @@ type CallRecord = {
   callIndex: number;
   trackTitle: string;
   artistName: string;
+  albumName?: string | null;
+  side?: string | null;
+  position?: string | null;
   status: "pending" | "called" | "skipped" | "completed";
   calledAt?: string | null;
 };
@@ -484,6 +487,11 @@ export default function StandaloneBingoHome({
                       {currentCall ? formatBall(currentCall.callIndex) : "Awaiting Call"}
                     </p>
                     <p style={{ margin: 0, fontSize: 22, color: "#f5efe6" }}>{currentCall ? currentCall.artistName : "Press Start Game to reveal the first track."}</p>
+                    {currentCall ? (
+                      <p style={{ marginTop: 8, fontSize: 14, color: "#f0e0bf" }}>
+                        {currentCall.albumName || "Unknown Album"} · Side {currentCall.side || "-"} · Pos {currentCall.position || "-"}
+                      </p>
+                    ) : null}
                     {currentCall ? <p style={{ marginTop: 14, fontSize: 13, color: "#f0e0bf" }}>Call {currentCall.callIndex} of {calls.length}</p> : null}
                     <p style={{ marginTop: 8, fontSize: 13, color: "#f0e0bf" }}>
                       Active modes: {(selectedSession.roundModes?.find((entry) => entry.round === (selectedSession.currentRound ?? 1))?.modes ?? [selectedSession.gameMode]).join(", ")}
@@ -497,6 +505,7 @@ export default function StandaloneBingoHome({
                         <div key={call.id} style={callRowStyle}>
                           <strong>{call.callIndex}. {call.trackTitle}</strong>
                           <span style={{ fontSize: 13, color: "#d9d1c3" }}>{call.artistName}</span>
+                          <span style={{ fontSize: 12, color: "#bfae8b" }}>{call.albumName || "Unknown Album"} · Side {call.side || "-"} · Pos {call.position || "-"}</span>
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
                             <button
                               onClick={() => void handleTransport("pull", call.id)}

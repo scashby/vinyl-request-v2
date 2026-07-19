@@ -17,6 +17,9 @@ export type StandalonePrintableCall = {
   callIndex: number;
   trackTitle: string;
   artistName: string;
+  albumName?: string | null;
+  side?: string | null;
+  position?: string | null;
   status: string;
 };
 
@@ -37,12 +40,15 @@ export function generateStandaloneCallSheetPdf(
 
   autoTable(doc, {
     startY: 18,
-    head: [["Draw", "Ball", "Track", "Artist", "Status"]],
+    head: [["Draw", "Ball", "Track", "Artist", "Album", "Side", "Pos", "Status"]],
     body: calls.map((call) => [
       call.callIndex,
       formatStandaloneBallLabel(call.callIndex),
       call.trackTitle,
       call.artistName,
+      call.albumName ?? "",
+      call.side ?? "",
+      call.position ?? "",
       call.status,
     ]),
     styles: { fontSize: 8, cellPadding: 1.5 },
@@ -150,7 +156,14 @@ export function generateStandalonePlaylistSheetPdf(
     playlistLetter: string;
     playlistName: string;
     roundNumber: number;
-    callOrder: Array<{ call_index: number; track_title: string; artist_name: string }>;
+    callOrder: Array<{
+      call_index: number;
+      track_title: string;
+      artist_name: string;
+      album_name?: string | null;
+      side?: string | null;
+      position?: string | null;
+    }>;
   }
 ) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -162,12 +175,15 @@ export function generateStandalonePlaylistSheetPdf(
 
   autoTable(doc, {
     startY: 24,
-    head: [["Draw", "Ball", "Track", "Artist"]],
+    head: [["Draw", "Ball", "Track", "Artist", "Album", "Side", "Pos"]],
     body: playlist.callOrder.map((entry) => [
       entry.call_index,
       formatStandaloneBallLabel(entry.call_index),
       entry.track_title,
       entry.artist_name,
+      entry.album_name ?? "",
+      entry.side ?? "",
+      entry.position ?? "",
     ]),
     styles: { fontSize: 8, cellPadding: 1.5 },
     headStyles: { fillColor: [33, 33, 33] },

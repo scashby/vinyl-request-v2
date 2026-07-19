@@ -3,6 +3,9 @@ export interface CreateStandaloneBingoCallInput {
   canonicalTrackId?: string | null;
   trackTitle: string;
   artistName: string;
+  albumName?: string | null;
+  side?: string | null;
+  position?: string | null;
 }
 
 export interface StandaloneBingoCallRecord {
@@ -12,6 +15,9 @@ export interface StandaloneBingoCallRecord {
   canonicalTrackId?: string | null;
   trackTitle: string;
   artistName: string;
+  albumName?: string | null;
+  side?: string | null;
+  position?: string | null;
   status: "pending" | "called" | "skipped" | "completed";
   calledAt?: string | null;
   createdAt: string;
@@ -55,6 +61,9 @@ export class InMemoryStandaloneBingoCallsRepository implements StandaloneBingoCa
         canonicalTrackId: call.canonicalTrackId ?? null,
         trackTitle: call.trackTitle,
         artistName: call.artistName,
+        albumName: call.albumName ?? null,
+        side: call.side ?? null,
+        position: call.position ?? null,
         status: "pending",
         calledAt: null,
         createdAt,

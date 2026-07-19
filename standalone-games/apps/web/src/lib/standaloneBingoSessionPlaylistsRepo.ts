@@ -8,6 +8,9 @@ export interface StandaloneBingoSessionPlaylistRecord {
     call_index: number;
     track_title: string;
     artist_name: string;
+    album_name?: string | null;
+    side?: string | null;
+    position?: string | null;
   }>;
   createdAt: string;
 }
@@ -20,6 +23,9 @@ export interface CreateStandaloneBingoSessionPlaylistInput {
     call_index: number;
     track_title: string;
     artist_name: string;
+    album_name?: string | null;
+    side?: string | null;
+    position?: string | null;
   }>;
 }
 
