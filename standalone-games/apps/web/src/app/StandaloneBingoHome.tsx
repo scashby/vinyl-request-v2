@@ -95,7 +95,6 @@ export default function StandaloneBingoHome({
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [advancing, setAdvancing] = useState(false);
-  const [controlling, setControlling] = useState<null | "pause" | "resume" | "skip" | "replace_next">(null);
   const [winnerCheckInput, setWinnerCheckInput] = useState("");
   const [winnerCheckResult, setWinnerCheckResult] = useState<CardValidationResponse | null>(null);
   const [winnerCheckError, setWinnerCheckError] = useState<string | null>(null);
@@ -259,28 +258,6 @@ export default function StandaloneBingoHome({
     }
   }
 
-  async function handleControl(action: "pause" | "resume" | "skip" | "replace_next") {
-    if (!selectedSessionId) return;
-    setControlling(action);
-    setError(null);
-    try {
-      await fetchJson<{ session: SessionRecord; call?: CallRecord }>(
-        `/api/v1/games/bingo/sessions/${selectedSessionId}/control`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ action }),
-        }
-      );
-      await Promise.all([loadBaseData(), loadCalls(selectedSessionId)]);
-    } catch (controlError) {
-      setError(controlError instanceof Error ? controlError.message : "Failed session control action.");
-      await Promise.all([loadBaseData(), loadCalls(selectedSessionId)]);
-    } finally {
-      setControlling(null);
-    }
-  }
-
   async function handleWinnerCheck() {
     if (!selectedSessionId) return;
     const cardIdentifier = winnerCheckInput.trim().toUpperCase();
@@ -377,39 +354,7 @@ export default function StandaloneBingoHome({
                   <div style={{ display: "flex", gap: 10 }}>
                     <button onClick={() => void loadCalls(selectedSession.id)} style={buttonStyle(false)}>Refresh Calls</button>
                     <button onClick={() => void handleAdvance()} disabled={advancing} style={buttonStyle(true)}>{advancing ? "Advancing..." : currentCall ? "Call Next Track" : "Start Game"}</button>
-                    <button
-                      onClick={() => void handleControl(selectedSession.status === "paused" ? "resume" : "pause")}
-                      disabled={Boolean(controlling)}
-                      style={buttonStyle(false)}
-                    >
-                      {controlling === "pause" || controlling === "resume"
-                        ? "Updating..."
-                        : selectedSession.status === "paused"
-                          ? "Resume"
-                          : "Pause"}
-                    </button>
-                    <button
-                      onClick={() => void handleControl("skip")}
-                      disabled={Boolean(controlling)}
-                      style={buttonStyle(false)}
-                    >
-                      {controlling === "skip" ? "Skipping..." : "Skip"}
-                    </button>
-                    <button
-                      onClick={() => void handleControl("replace_next")}
-                      disabled={Boolean(controlling)}
-                      style={buttonStyle(false)}
-                    >
-                      {controlling === "replace_next" ? "Replacing..." : "Replace with Next"}
-                    </button>
                   </div>
-                </div>
-
-                <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <a href={`/?tenantId=${encodeURIComponent(tenantId)}&userId=${encodeURIComponent(userId)}&entitlements=${encodeURIComponent(entitlements)}&sessionId=${encodeURIComponent(selectedSession.id)}`} target="_blank" rel="noreferrer" style={anchorStyle}>Setup</a>
-                  <a href={`/bingo/prep?tenantId=${encodeURIComponent(tenantId)}&userId=${encodeURIComponent(userId)}&entitlements=${encodeURIComponent(entitlements)}&sessionId=${encodeURIComponent(selectedSession.id)}`} target="_blank" rel="noreferrer" style={anchorStyle}>Prep</a>
-                  <a href={`/bingo/assistant?tenantId=${encodeURIComponent(tenantId)}&userId=${encodeURIComponent(userId)}&entitlements=${encodeURIComponent(entitlements)}&sessionId=${encodeURIComponent(selectedSession.id)}`} target="_blank" rel="noreferrer" style={anchorStyle}>Assistant</a>
-                  <a href={`/bingo/jumbotron?tenantId=${encodeURIComponent(tenantId)}&userId=${encodeURIComponent(userId)}&entitlements=${encodeURIComponent(entitlements)}&sessionId=${encodeURIComponent(selectedSession.id)}`} target="_blank" rel="noreferrer" style={anchorStyle}>Jumbotron</a>
                 </div>
 
                 <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(320px, 420px)", gap: 16 }}>
@@ -584,14 +529,4 @@ const callRowStyle: CSSProperties = {
   borderRadius: 14,
   background: "rgba(255,255,255,0.04)",
   border: "1px solid rgba(255,255,255,0.06)",
-};
-
-const anchorStyle: CSSProperties = {
-  border: "1px solid rgba(255,255,255,0.16)",
-  borderRadius: 999,
-  padding: "8px 12px",
-  color: "#f5efe6",
-  textDecoration: "none",
-  fontSize: 13,
-  background: "rgba(255,255,255,0.04)",
 };

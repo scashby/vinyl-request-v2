@@ -88,16 +88,6 @@ export class SupabaseStandaloneBingoCallsRepository implements StandaloneBingoCa
     if (error) throw new Error(error.message);
   }
 
-  async markSkipped(callId: string): Promise<void> {
-    const supabase = getStandaloneSupabaseClient();
-    const { error } = await supabase
-      .from("sg_game_bingo_calls")
-      .update({ status: "skipped" })
-      .eq("id", callId);
-
-    if (error) throw new Error(error.message);
-  }
-
   async markCalled(callId: string, calledAt: string): Promise<StandaloneBingoCallRecord | null> {
     const supabase = getStandaloneSupabaseClient();
     const { data, error } = await supabase

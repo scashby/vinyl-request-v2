@@ -7,7 +7,6 @@ type SessionRecord = {
   id: string;
   sessionCode: string;
   status: "pending" | "running" | "paused" | "completed";
-  callIntervalSeconds?: number;
 };
 
 type CallRecord = {
@@ -16,7 +15,6 @@ type CallRecord = {
   trackTitle: string;
   artistName: string;
   status: "pending" | "called" | "skipped" | "completed";
-  calledAt?: string | null;
 };
 
 type StandaloneBingoJumbotronProps = {
@@ -47,17 +45,6 @@ export default function StandaloneBingoJumbotron({
 
   const currentCall = [...calls].reverse().find((call) => call.status === "called") ?? null;
   const nextCalls = calls.filter((call) => call.status === "pending").slice(0, 6);
-  const recentCalls = calls
-    .filter((call) => call.status === "called" || call.status === "completed")
-    .slice(-5)
-    .reverse();
-
-  function formatBall(callIndex?: number): string {
-    if (!callIndex) return "-";
-    const letters = ["B", "I", "N", "G", "O"];
-    const letter = letters[(Math.max(1, callIndex) - 1) % letters.length];
-    return `${letter}-${callIndex}`;
-  }
 
   async function fetchJson<T>(input: string): Promise<T> {
     const response = await fetch(input, {
@@ -111,9 +98,6 @@ export default function StandaloneBingoJumbotron({
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 22, fontWeight: 700 }}>{session?.sessionCode ?? "-"}</div>
             <div style={{ color: "#d9d1c3" }}>{session?.status ?? "loading"}</div>
-            {session?.status === "paused" ? (
-              <div style={{ color: "#f0ba66", fontWeight: 700, marginTop: 6 }}>Paused</div>
-            ) : null}
           </div>
         </div>
 
@@ -121,9 +105,6 @@ export default function StandaloneBingoJumbotron({
 
         <section style={heroCallStyle}>
           <p style={jumbotronEyebrowStyle}>Current Call</p>
-          <p style={{ margin: "10px 0 0", color: "#f2d6a4", fontWeight: 700, letterSpacing: "0.08em" }}>
-            {formatBall(currentCall?.callIndex)}
-          </p>
           <h2 style={{ margin: "16px 0 12px", fontSize: 72, lineHeight: 1 }}>{currentCall?.trackTitle ?? "Waiting For First Call"}</h2>
           <p style={{ margin: 0, fontSize: 34 }}>{currentCall?.artistName ?? "Open the host screen to start the session."}</p>
         </section>
@@ -136,19 +117,6 @@ export default function StandaloneBingoJumbotron({
                 <div style={{ color: "#d0b07a", fontSize: 14, marginBottom: 8 }}>#{call.callIndex}</div>
                 <div style={{ fontSize: 24, fontWeight: 700 }}>{call.trackTitle}</div>
                 <div style={{ fontSize: 18, color: "#d9d1c3", marginTop: 8 }}>{call.artistName}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section style={upNextStyle}>
-          <h3 style={{ marginTop: 0, fontSize: 28 }}>Recent Calls</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 12 }}>
-            {recentCalls.map((call) => (
-              <div key={call.id} style={nextCardStyle}>
-                <div style={{ color: "#d0b07a", fontSize: 13 }}>{formatBall(call.callIndex)}</div>
-                <div style={{ fontSize: 18, fontWeight: 700, marginTop: 6 }}>{call.trackTitle}</div>
-                <div style={{ fontSize: 15, color: "#d9d1c3", marginTop: 6 }}>{call.artistName}</div>
               </div>
             ))}
           </div>
