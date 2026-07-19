@@ -4,7 +4,6 @@ import { getRequestEntitlements, hasEntitlement } from "@/lib/entitlements";
 import { getImportJobsRepository } from "@/lib/importJobsRepositoryFactory";
 import { importTracksToTenantPlaylist } from "@/lib/importToTenantPlaylist";
 import { importSpotifyPlaylistTracks } from "@/lib/spotifyPlaylistImporter";
-import { getProviderConnectionsRepository } from "@/lib/providerConnectionsRepositoryFactory";
 import type { ImportJobType, ImportProvider } from "@/lib/importJobsRepo";
 
 interface RunImportJobBody {
@@ -12,7 +11,6 @@ interface RunImportJobBody {
   jobType?: ImportJobType;
   source?: {
     providerPlaylistId?: string;
-    providerConnectionId?: string;
     accessToken?: string;
     uploadName?: string;
   };
@@ -69,7 +67,6 @@ export async function POST(request: NextRequest) {
       provider: body.provider,
       jobType: body.jobType,
       source: {
-        providerConnectionId: body.source?.providerConnectionId,
         providerPlaylistId: body.source?.providerPlaylistId,
         uploadName: body.source?.uploadName,
       },
@@ -101,80 +98,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let accessToken = String(body.source?.accessToken ?? "").trim();
+    const accessToken = String(body.source?.accessToken ?? "").trim();
     const providerPlaylistId = String(body.source?.providerPlaylistId ?? "").trim();
-    const providerConnectionId = String(body.source?.providerConnectionId ?? "").trim();
-
-    if (!accessToken && providerConnectionId) {
-      const providerConnectionsRepo = getProviderConnectionsRepository();
-      const connection = await providerConnectionsRepo.getById(
-        ctx.tenantId,
-        providerConnectionId
-      );
-
-      if (!connection) {
-        await repo.update(job.id, ctx.tenantId, {
-          status: "failed",
-          progressPercent: 100,
-          summary: "Provider connection not found for tenant.",
-          finishedAt: new Date().toISOString(),
-        });
-
-        return NextResponse.json(
-          {
-            ok: false,
-            jobId: job.id,
-            error: "Provider connection not found for tenant.",
-          },
-          { status: 404 }
-        );
-      }
-
-      if (connection.provider !== "spotify") {
-        await repo.update(job.id, ctx.tenantId, {
-          status: "failed",
-          progressPercent: 100,
-          summary: "Provider connection is not a Spotify connection.",
-          finishedAt: new Date().toISOString(),
-        });
-
-        return NextResponse.json(
-          {
-            ok: false,
-            jobId: job.id,
-            error: "Provider connection is not a Spotify connection.",
-          },
-          { status: 400 }
-        );
-      }
-
-      if (connection.connectionStatus !== "active") {
-        await repo.update(job.id, ctx.tenantId, {
-          status: "failed",
-          progressPercent: 100,
-          summary: "Provider connection is not active.",
-          finishedAt: new Date().toISOString(),
-        });
-
-        return NextResponse.json(
-          {
-            ok: false,
-            jobId: job.id,
-            error: "Provider connection is not active.",
-          },
-          { status: 400 }
-        );
-      }
-
-      accessToken = String(connection.encryptedAccessToken ?? "").trim();
-    }
 
     if (!accessToken || !providerPlaylistId) {
       await repo.update(job.id, ctx.tenantId, {
         status: "failed",
         progressPercent: 100,
-        summary:
-          "Spotify import requires source.providerPlaylistId plus source.accessToken or source.providerConnectionId.",
+        summary: "Spotify import requires source.accessToken and source.providerPlaylistId.",
         finishedAt: new Date().toISOString(),
       });
 
@@ -182,8 +113,7 @@ export async function POST(request: NextRequest) {
         {
           ok: false,
           jobId: job.id,
-          error:
-            "Spotify import requires source.providerPlaylistId plus source.accessToken or source.providerConnectionId.",
+          error: "Spotify import requires source.accessToken and source.providerPlaylistId.",
         },
         { status: 400 }
       );
