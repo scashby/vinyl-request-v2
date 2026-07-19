@@ -16,9 +16,12 @@ export default async function BingoAssistantPage({ searchParams }: AssistantPage
 
   return (
     <StandaloneBingoAssistant
-      tenantId={getSingleParam(params.tenantId, "")}
-      userId={getSingleParam(params.userId, "")}
-      entitlements={getSingleParam(params.entitlements, "")}
+      tenantId={getSingleParam(params.tenantId, "7600b5bc-3d26-4d6d-bc8e-2d189b241a00")}
+      userId={getSingleParam(params.userId, "072fba8e-930b-49e1-aff6-e97a6ca0ec82")}
+      entitlements={getSingleParam(
+        params.entitlements,
+        "game:bingo,bundle:core-games,addon:premium-connectors"
+      )}
       sessionId={getSingleParam(params.sessionId, "")}
     />
   );

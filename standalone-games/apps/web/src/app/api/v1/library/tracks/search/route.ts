@@ -5,9 +5,6 @@ import { getTenantPlaylistSnapshotsRepository } from "@/lib/tenantPlaylistSnapsh
 type SnapshotItem = {
   trackTitle?: string;
   artistName?: string;
-  albumName?: string | null;
-  side?: string | null;
-  position?: string | null;
   canonicalTrackId?: string | null;
 };
 
@@ -27,15 +24,7 @@ export async function GET(request: NextRequest) {
 
     const snapshotRepo = getTenantPlaylistSnapshotsRepository();
     const snapshots = await snapshotRepo.listByTenant(ctx.tenantId);
-    const deduped = new Map<string, {
-      track_key: string;
-      track_title: string;
-      artist_name: string;
-      album_name: string | null;
-      side: string | null;
-      position: string | null;
-      canonical_track_id: string | null;
-    }>();
+    const deduped = new Map<string, { track_key: string; track_title: string; artist_name: string; canonical_track_id: string | null }>();
 
     for (const snapshot of snapshots) {
       const items = Array.isArray((snapshot.snapshotPayload as { items?: unknown[] } | null)?.items)
@@ -45,9 +34,6 @@ export async function GET(request: NextRequest) {
       for (const item of items) {
         const trackTitle = String(item.trackTitle ?? "").trim();
         const artistName = String(item.artistName ?? "").trim();
-        const albumName = typeof item.albumName === "string" ? item.albumName.trim() || null : null;
-        const side = typeof item.side === "string" ? item.side.trim() || null : null;
-        const position = typeof item.position === "string" ? item.position.trim() || null : null;
         if (!trackTitle || !artistName) continue;
         const haystack = `${trackTitle} ${artistName}`.toLowerCase();
         if (!haystack.includes(query)) continue;
@@ -57,9 +43,6 @@ export async function GET(request: NextRequest) {
             track_key: trackKey,
             track_title: trackTitle,
             artist_name: artistName,
-            album_name: albumName,
-            side: side,
-            position: position,
             canonical_track_id: item.canonicalTrackId ?? null,
           });
         }

@@ -19,9 +19,6 @@ function mapRow(row: Record<string, unknown>): StandaloneBingoSessionPlaylistRec
             call_index: Number(entry.call_index ?? 0),
             track_title: String(entry.track_title ?? ""),
             artist_name: String(entry.artist_name ?? ""),
-            album_name: typeof entry.album_name === "string" ? String(entry.album_name) : null,
-            side: typeof entry.side === "string" ? String(entry.side) : null,
-            position: typeof entry.position === "string" ? String(entry.position) : null,
           }))
       : [],
     createdAt: String(row.created_at),

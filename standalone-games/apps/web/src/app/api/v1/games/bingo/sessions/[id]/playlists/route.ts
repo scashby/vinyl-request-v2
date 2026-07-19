@@ -5,13 +5,7 @@ import { getStandaloneBingoSessionPlaylistsRepository } from "@/lib/standaloneBi
 import { getTenantPlaylistSnapshotsRepository } from "@/lib/tenantPlaylistSnapshotsRepositoryFactory";
 import { getStandaloneBingoSessionsRepository } from "@/lib/standaloneBingoSessionsRepositoryFactory";
 
-type SnapshotItem = {
-  trackTitle?: string;
-  artistName?: string;
-  albumName?: string | null;
-  side?: string | null;
-  position?: string | null;
-};
+type SnapshotItem = { trackTitle?: string; artistName?: string };
 
 type SnapshotPayload = {
   sourcePlaylistIds?: string[];
@@ -128,9 +122,6 @@ export async function POST(
             call_index: itemIndex + 1,
             track_title: String(item.trackTitle ?? "").trim(),
             artist_name: String(item.artistName ?? "").trim(),
-            album_name: typeof item.albumName === "string" ? item.albumName.trim() || null : null,
-            side: typeof item.side === "string" ? item.side.trim() || null : null,
-            position: typeof item.position === "string" ? item.position.trim() || null : null,
           }))
           .filter((item) => item.track_title && item.artist_name);
 

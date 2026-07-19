@@ -22,9 +22,6 @@ type CallRecord = {
   callIndex: number;
   trackTitle: string;
   artistName: string;
-  albumName?: string | null;
-  side?: string | null;
-  position?: string | null;
   status: "pending" | "called" | "skipped" | "completed";
 };
 
@@ -32,9 +29,6 @@ type TrackSearchResult = {
   track_key: string;
   track_title: string;
   artist_name: string;
-  album_name?: string | null;
-  side?: string | null;
-  position?: string | null;
 };
 
 type CardRecord = {
@@ -255,10 +249,7 @@ export default function StandaloneBingoPrep({
               <select value={swapTargetCallId} onChange={(event) => setSwapTargetCallId(event.target.value)} style={inputStyle}>
                 <option value="">Select call to replace</option>
                 {calls.map((call) => (
-                  <option key={call.id} value={call.id}>
-                    {call.callIndex}. {call.trackTitle} - {call.artistName}
-                    {call.albumName ? ` (${call.albumName})` : ""}
-                  </option>
+                  <option key={call.id} value={call.id}>{call.callIndex}. {call.trackTitle} - {call.artistName}</option>
                 ))}
               </select>
               <input value={swapQuery} onChange={(event) => setSwapQuery(event.target.value)} placeholder="Search replacement track" style={inputStyle} />
@@ -273,9 +264,6 @@ export default function StandaloneBingoPrep({
                     <div>
                       <strong>{result.track_title}</strong>
                       <div style={{ fontSize: 12, color: "#d9d1c3" }}>{result.artist_name}</div>
-                      <div style={{ fontSize: 12, color: "#bfae8b" }}>
-                        {result.album_name || "Unknown Album"} · Side {result.side || "-"} · Pos {result.position || "-"}
-                      </div>
                     </div>
                     <button style={buttonStyle} onClick={() => void handleSwapTrack(result.track_key)} disabled={swappingTrackKey === result.track_key}>
                       {swappingTrackKey === result.track_key ? "Swapping..." : "Swap In"}
@@ -293,9 +281,6 @@ export default function StandaloneBingoPrep({
                   <th style={tableHeadStyle}>Ball</th>
                   <th style={tableHeadStyle}>Track</th>
                   <th style={tableHeadStyle}>Artist</th>
-                  <th style={tableHeadStyle}>Album</th>
-                  <th style={tableHeadStyle}>Side</th>
-                  <th style={tableHeadStyle}>Position</th>
                   <th style={tableHeadStyle}>Status</th>
                 </tr>
               </thead>
@@ -306,9 +291,6 @@ export default function StandaloneBingoPrep({
                     <td style={tableCellStyle}>{formatBall(call.callIndex)}</td>
                     <td style={tableCellStyle}>{call.trackTitle}</td>
                     <td style={tableCellStyle}>{call.artistName}</td>
-                    <td style={tableCellStyle}>{call.albumName || "-"}</td>
-                    <td style={tableCellStyle}>{call.side || "-"}</td>
-                    <td style={tableCellStyle}>{call.position || "-"}</td>
                     <td style={tableCellStyle}>{call.status}</td>
                   </tr>
                 ))}
