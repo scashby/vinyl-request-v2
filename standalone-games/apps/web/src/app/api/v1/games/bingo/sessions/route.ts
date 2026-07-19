@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantRequestContext } from "@/lib/tenantContext";
 import { getRequestEntitlements, hasEntitlement } from "@/lib/entitlements";
-import { getPlaylistSnapshotRepository } from "@/lib/playlistSnapshotRepo";
 import {
+  getStandaloneBingoSessionsRepository,
   type BingoGameMode,
 } from "@/lib/standaloneBingoSessionsRepo";
-import { getStandaloneBingoSessionsRepository } from "@/lib/standaloneBingoSessionsRepositoryFactory";
 
 interface CreateSessionBody {
   playlistSnapshotId?: string;
@@ -70,19 +69,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { ok: false, error: "playlistSnapshotId is required." },
         { status: 400 }
-      );
-    }
-
-    const snapshotRepo = getPlaylistSnapshotRepository();
-    const snapshotExists = await snapshotRepo.existsForTenant(
-      ctx.tenantId,
-      body.playlistSnapshotId
-    );
-
-    if (!snapshotExists) {
-      return NextResponse.json(
-        { ok: false, error: "playlistSnapshotId does not exist for this tenant." },
-        { status: 404 }
       );
     }
 

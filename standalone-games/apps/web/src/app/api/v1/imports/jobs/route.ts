@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTenantRequestContext } from "@/lib/tenantContext";
 import { getRequestEntitlements, hasEntitlement } from "@/lib/entitlements";
 import {
+  getImportJobsRepository,
   type ImportJobType,
   type ImportProvider,
 } from "@/lib/importJobsRepo";
-import { getImportJobsRepository } from "@/lib/importJobsRepositoryFactory";
 
 interface CreateImportJobBody {
   provider?: ImportProvider;
