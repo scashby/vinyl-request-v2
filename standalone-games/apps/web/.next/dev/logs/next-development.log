@@ -1,0 +1,2 @@
+{"timestamp":"14:18:05.117","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir '/Users/stephenashby/dwdsite/vinyl-request-v2/standalone-games/apps/web/src/app'"}
+{"timestamp":"14:18:05.145","source":"Server","level":"ERROR","message":"Error: ENOENT: no such file or directory, scandir '/Users/stephenashby/dwdsite/vinyl-request-v2/standalone-games/apps/web/src/app'"}
