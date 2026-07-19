@@ -2,10 +2,6 @@
 
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
-import {
-  generateStandaloneCallSheetPdf,
-  generateStandaloneCardsPdf,
-} from "@/lib/standaloneBingoPrint";
 
 type SessionRecord = {
   id: string;
@@ -27,13 +23,6 @@ type CardRecord = {
   id: string;
   cardIndex: number;
   cardIdentifier: string;
-  grid: Array<{
-    row: number;
-    col: number;
-    track_title: string;
-    artist_name: string;
-    free: boolean;
-  }>;
 };
 
 type StandaloneBingoPrepProps = {
@@ -47,6 +36,16 @@ function formatBall(callIndex: number): string {
   const letters = ["B", "I", "N", "G", "O"];
   const letter = letters[(Math.max(1, callIndex) - 1) % letters.length];
   return `${letter}-${callIndex}`;
+}
+
+function downloadTextFile(content: string, filename: string) {
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function StandaloneBingoPrep({
@@ -124,13 +123,33 @@ export default function StandaloneBingoPrep({
   }
 
   function handleDownloadCallSheet() {
-    const doc = generateStandaloneCallSheetPdf(session?.sessionCode ?? sessionId, calls);
-    doc.save(`bingo-${session?.sessionCode ?? sessionId}-call-sheet.pdf`);
+    const rows = [
+      ["call_index", "ball", "track_title", "artist_name", "status"],
+      ...calls.map((call) => [
+        String(call.callIndex),
+        formatBall(call.callIndex),
+        call.trackTitle,
+        call.artistName,
+        call.status,
+      ]),
+    ];
+
+    const csv = rows
+      .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(","))
+      .join("\n");
+    downloadTextFile(csv, `bingo-${session?.sessionCode ?? sessionId}-call-sheet.csv`);
   }
 
-  function handleDownloadCards(layout: "2-up" | "4-up") {
-    const doc = generateStandaloneCardsPdf(session?.sessionCode ?? sessionId, cards, layout);
-    doc.save(`bingo-${session?.sessionCode ?? sessionId}-cards-${layout}.pdf`);
+  function handleDownloadCards() {
+    const rows = [
+      ["card_index", "card_identifier"],
+      ...cards.map((card) => [String(card.cardIndex), card.cardIdentifier]),
+    ];
+
+    const csv = rows
+      .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(","))
+      .join("\n");
+    downloadTextFile(csv, `bingo-${session?.sessionCode ?? sessionId}-cards.csv`);
   }
 
   const params = new URLSearchParams({ tenantId, userId, entitlements, sessionId }).toString();
@@ -152,8 +171,7 @@ export default function StandaloneBingoPrep({
           </div>
           <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button style={buttonStyle} onClick={handleDownloadCallSheet}>Download Call Sheet</button>
-            <button style={buttonStyle} onClick={() => handleDownloadCards("2-up")}>Cards 2-up</button>
-            <button style={buttonStyle} onClick={() => handleDownloadCards("4-up")}>Cards 4-up</button>
+            <button style={buttonStyle} onClick={handleDownloadCards}>Download Cards</button>
             <button style={buttonStyle} onClick={() => void handleAddCards()} disabled={addingCards}>
               {addingCards ? "Adding Cards..." : `Add ${Math.max(10, session?.cardCount ?? 40)} Cards`}
             </button>

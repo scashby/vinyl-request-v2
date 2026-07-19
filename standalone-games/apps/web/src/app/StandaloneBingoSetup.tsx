@@ -2,10 +2,6 @@
 
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
-import {
-  generateStandaloneCallSheetPdf,
-  generateStandaloneCardsPdf,
-} from "@/lib/standaloneBingoPrint";
 
 type SnapshotRecord = {
   id: string;
@@ -37,19 +33,6 @@ type CallRecord = {
   trackTitle: string;
   artistName: string;
   status: "pending" | "called" | "skipped" | "completed";
-};
-
-type CardRecord = {
-  id: string;
-  cardIndex: number;
-  cardIdentifier: string;
-  grid: Array<{
-    row: number;
-    col: number;
-    track_title: string;
-    artist_name: string;
-    free: boolean;
-  }>;
 };
 
 type StandaloneBingoSetupProps = {
@@ -163,10 +146,6 @@ export default function StandaloneBingoSetup({
     }
   }
 
-  async function loadCards(sessionId: string) {
-    return fetchJson<CardRecord[]>(`/api/v1/games/bingo/sessions/${sessionId}/cards`);
-  }
-
   useEffect(() => {
     void loadBaseData();
   }, [tenantId, userId, entitlements]);
@@ -198,39 +177,10 @@ export default function StandaloneBingoSetup({
       await loadBaseData();
       setSelectedSessionId(created.id);
       await loadCalls(created.id);
-      const hostQuery = new URLSearchParams({
-        tenantId,
-        userId,
-        entitlements,
-        sessionId: created.id,
-      }).toString();
-      window.location.href = `/bingo/host?${hostQuery}`;
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Failed to create session.");
     } finally {
       setCreating(false);
-    }
-  }
-
-  async function handleDownloadCards(layout: "2-up" | "4-up") {
-    if (!selectedSession) return;
-    try {
-      const cards = await loadCards(selectedSession.id);
-      const doc = generateStandaloneCardsPdf(selectedSession.sessionCode, cards, layout);
-      doc.save(`bingo-${selectedSession.sessionCode}-cards-${layout}.pdf`);
-    } catch (downloadError) {
-      setError(downloadError instanceof Error ? downloadError.message : "Failed to download cards PDF.");
-    }
-  }
-
-  async function handleDownloadCallSheet() {
-    if (!selectedSession) return;
-    try {
-      const sessionCalls = await fetchJson<CallRecord[]>(`/api/v1/games/bingo/sessions/${selectedSession.id}/calls`);
-      const doc = generateStandaloneCallSheetPdf(selectedSession.sessionCode, sessionCalls);
-      doc.save(`bingo-${selectedSession.sessionCode}-call-sheet.pdf`);
-    } catch (downloadError) {
-      setError(downloadError instanceof Error ? downloadError.message : "Failed to download call sheet PDF.");
     }
   }
 
@@ -251,11 +201,6 @@ export default function StandaloneBingoSetup({
             This is the standalone setup-first entry page. Use it to choose an imported snapshot,
             create a playable session, then launch the host and jumbotron screens for live testing.
           </p>
-          <div style={{ marginTop: 16 }}>
-            <a href={`/bingo/history?tenantId=${encodeURIComponent(tenantId)}&userId=${encodeURIComponent(userId)}&entitlements=${encodeURIComponent(entitlements)}`} style={linkButtonStyle(false)}>
-              Open History
-            </a>
-          </div>
           {error ? <div style={errorStyle}>{error}</div> : null}
         </section>
 
@@ -320,15 +265,6 @@ export default function StandaloneBingoSetup({
                     <a href={`/bingo/jumbotron?${baseQuery}`} target="_blank" rel="noreferrer" style={linkButtonStyle(false)}>
                       Open Jumbotron
                     </a>
-                    <button onClick={() => void handleDownloadCards("2-up")} style={buttonStyle(false)}>
-                      Cards 2-up
-                    </button>
-                    <button onClick={() => void handleDownloadCards("4-up")} style={buttonStyle(false)}>
-                      Cards 4-up
-                    </button>
-                    <button onClick={() => void handleDownloadCallSheet()} style={buttonStyle(false)}>
-                      Call Sheet
-                    </button>
                   </div>
                 </div>
 
