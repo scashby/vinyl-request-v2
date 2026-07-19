@@ -3,10 +3,6 @@ import { getTenantRequestContext } from "@/lib/tenantContext";
 import { getRequestEntitlements, hasEntitlement } from "@/lib/entitlements";
 import { getStandaloneBingoCallsRepository } from "@/lib/standaloneBingoCallsRepositoryFactory";
 import { getStandaloneBingoSessionsRepository } from "@/lib/standaloneBingoSessionsRepositoryFactory";
-import { getStandaloneBingoSessionEventsRepository } from "@/lib/standaloneBingoSessionEventsRepositoryFactory";
-import { computeStandaloneTransportQueueIds } from "@/lib/standaloneTransportQueue";
-
-const DONE_STATUSES = new Set(["called", "completed", "skipped"]);
 
 export async function POST(
   _request: Request,
@@ -31,31 +27,12 @@ export async function POST(
     }
 
     const callsRepo = getStandaloneBingoCallsRepository();
-    const eventsRepo = getStandaloneBingoSessionEventsRepository();
     const currentCall = await callsRepo.getCurrentCalled(id);
     if (currentCall) {
       await callsRepo.markCompleted(currentCall.id);
     }
 
-    const [allCalls, events] = await Promise.all([
-      callsRepo.listBySession(id),
-      eventsRepo.listBySession(id),
-    ]);
-    const queueIds = computeStandaloneTransportQueueIds(
-      allCalls.map((call) => ({ id: call.id, order: call.callIndex, status: call.status })),
-      events.map((event) => ({
-        eventType: event.eventType,
-        callId: event.payload?.call_id ?? null,
-        afterCallId: event.payload?.after_call_id ?? null,
-      })),
-      {
-        currentOrder: currentCall?.callIndex ?? 0,
-        doneStatuses: DONE_STATUSES,
-      }
-    );
-    const nextCall = queueIds.length > 0
-      ? allCalls.find((call) => call.id === queueIds[0]) ?? null
-      : await callsRepo.getNextPending(id);
+    const nextCall = await callsRepo.getNextPending(id);
     if (!nextCall) {
       const completedSession = await sessionsRepo.update(ctx.tenantId, id, {
         status: "completed",
@@ -70,7 +47,6 @@ export async function POST(
 
     const calledAt = new Date().toISOString();
     const calledCall = await callsRepo.markCalled(nextCall.id, calledAt);
-    await eventsRepo.create(id, "call_set", { call_id: nextCall.id });
     const updatedSession = await sessionsRepo.update(ctx.tenantId, id, {
       status: "running",
       startedAt: session.startedAt ?? calledAt,

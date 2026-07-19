@@ -3,11 +3,6 @@ import { getTenantRequestContext } from "@/lib/tenantContext";
 import { getRequestEntitlements, hasEntitlement } from "@/lib/entitlements";
 import { getStandaloneBingoSessionsRepository } from "@/lib/standaloneBingoSessionsRepositoryFactory";
 import { getTenantPlaylistSnapshotsRepository } from "@/lib/tenantPlaylistSnapshotsRepositoryFactory";
-import { getStandaloneBingoCallsRepository } from "@/lib/standaloneBingoCallsRepositoryFactory";
-import { getStandaloneBingoSessionEventsRepository } from "@/lib/standaloneBingoSessionEventsRepositoryFactory";
-import { computeStandaloneTransportQueueIds } from "@/lib/standaloneTransportQueue";
-
-const DONE_STATUSES = new Set(["called", "completed", "skipped"]);
 
 export async function GET(
   _request: Request,
@@ -32,29 +27,7 @@ export async function GET(
       return NextResponse.json({ ok: false, error: "Session not found." }, { status: 404 });
     }
 
-    const callsRepo = getStandaloneBingoCallsRepository();
-    const eventsRepo = getStandaloneBingoSessionEventsRepository();
-    const [calls, events] = await Promise.all([
-      callsRepo.listBySession(id),
-      eventsRepo.listBySession(id),
-    ]);
-    const currentOrder = [...calls]
-      .filter((call) => call.status === "called")
-      .sort((a, b) => b.callIndex - a.callIndex)[0]?.callIndex ?? 0;
-    const transportQueueCallIds = computeStandaloneTransportQueueIds(
-      calls.map((call) => ({ id: call.id, order: call.callIndex, status: call.status })),
-      events.map((event) => ({
-        eventType: event.eventType,
-        callId: event.payload?.call_id ?? null,
-        afterCallId: event.payload?.after_call_id ?? null,
-      })),
-      {
-        currentOrder,
-        doneStatuses: DONE_STATUSES,
-      }
-    );
-
-    return NextResponse.json({ ok: true, data: { ...session, transportQueueCallIds } });
+    return NextResponse.json({ ok: true, data: session });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unexpected error" },

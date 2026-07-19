@@ -3,7 +3,6 @@ import { getTenantRequestContext } from "@/lib/tenantContext";
 import { getRequestEntitlements, hasEntitlement } from "@/lib/entitlements";
 import { getStandaloneBingoCallsRepository } from "@/lib/standaloneBingoCallsRepositoryFactory";
 import { getStandaloneBingoSessionsRepository } from "@/lib/standaloneBingoSessionsRepositoryFactory";
-import { getStandaloneBingoSessionEventsRepository } from "@/lib/standaloneBingoSessionEventsRepositoryFactory";
 
 export async function POST(
   _request: Request,
@@ -28,16 +27,9 @@ export async function POST(
     }
 
     const callsRepo = getStandaloneBingoCallsRepository();
-    const eventsRepo = getStandaloneBingoSessionEventsRepository();
     await callsRepo.resetSession(id);
-    await eventsRepo.deleteBySession(id);
     const updated = await sessionsRepo.update(ctx.tenantId, id, {
       status: "pending",
-      bingoOverlay: "welcome",
-      nextGameScheduledAt: null,
-      countdownStartedAt: null,
-      pausedAt: null,
-      pausedRemainingSeconds: null,
       startedAt: null,
       endedAt: null,
     });

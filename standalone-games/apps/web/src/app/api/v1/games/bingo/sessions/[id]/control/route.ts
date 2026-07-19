@@ -6,7 +6,6 @@ import { generateStandaloneBingoCards } from "@/lib/standaloneBingoCardEngine";
 import { getStandaloneBingoCardsRepository } from "@/lib/standaloneBingoCardsRepositoryFactory";
 import { getStandaloneBingoSessionsRepository } from "@/lib/standaloneBingoSessionsRepositoryFactory";
 import { getTenantPlaylistSnapshotsRepository } from "@/lib/tenantPlaylistSnapshotsRepositoryFactory";
-import { getStandaloneBingoSessionEventsRepository } from "@/lib/standaloneBingoSessionEventsRepositoryFactory";
 
 type ControlAction = "pause" | "resume" | "advance" | "skip" | "replace_next" | "next_round" | "welcome" | "live" | "intermission" | "thanks" | "winner" | "tiebreaker" | "pending";
 
@@ -73,7 +72,6 @@ export async function POST(
     const sessionsRepo = getStandaloneBingoSessionsRepository();
     const callsRepo = getStandaloneBingoCallsRepository();
     const cardsRepo = getStandaloneBingoCardsRepository();
-    const eventsRepo = getStandaloneBingoSessionEventsRepository();
     const snapshotsRepo = getTenantPlaylistSnapshotsRepository();
     const session = await sessionsRepo.getById(ctx.tenantId, id);
 
@@ -180,7 +178,6 @@ export async function POST(
         .filter((item) => item.trackTitle.length > 0 && item.artistName.length > 0);
 
       await callsRepo.replaceSession(id, nextCalls);
-      await eventsRepo.deleteBySession(id);
 
       if (payload.cardsPerRoundEnabled) {
         const nextCards = generateStandaloneBingoCards(

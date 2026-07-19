@@ -31,7 +31,6 @@ type SessionRecord = {
   createdAt: string;
   startedAt?: string | null;
   endedAt?: string | null;
-  transportQueueCallIds?: string[];
 };
 
 type CallRecord = {
@@ -42,8 +41,6 @@ type CallRecord = {
   status: "pending" | "called" | "skipped" | "completed";
   calledAt?: string | null;
 };
-
-type TransportAction = "pull" | "cue" | "call";
 
 type CardRecord = {
   id: string;
@@ -102,8 +99,8 @@ export default function StandaloneBingoHome({
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [advancing, setAdvancing] = useState(false);
-  const [transporting, setTransporting] = useState<null | `${TransportAction}:${string}`>(null);
   const [controlling, setControlling] = useState<null | "pause" | "resume" | "skip" | "replace_next" | "next_round" | "welcome" | "live" | "intermission" | "thanks" | "winner" | "tiebreaker" | "pending">(null);
+  const [callPhase, setCallPhase] = useState<"idle" | "prep_started" | "called">("idle");
   const [winnerCheckInput, setWinnerCheckInput] = useState("");
   const [winnerCheckResult, setWinnerCheckResult] = useState<CardValidationResponse | null>(null);
   const [winnerCheckError, setWinnerCheckError] = useState<string | null>(null);
@@ -122,14 +119,6 @@ export default function StandaloneBingoHome({
   const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? null;
   const currentCall = [...calls].reverse().find((call) => call.status === "called") ?? null;
   const pendingCalls = calls.filter((call) => call.status === "pending");
-  const queueCalls = useMemo(() => {
-    const byId = new Map(calls.map((call) => [call.id, call]));
-    const fromQueue = (selectedSession?.transportQueueCallIds ?? [])
-      .map((callId) => byId.get(callId) ?? null)
-      .filter((call): call is CallRecord => Boolean(call));
-    if (fromQueue.length > 0) return fromQueue;
-    return pendingCalls;
-  }, [calls, pendingCalls, selectedSession?.transportQueueCallIds]);
   const completedCalls = calls.filter(
     (call) => call.status === "completed" || call.status === "called"
   );
@@ -238,6 +227,10 @@ export default function StandaloneBingoHome({
     return () => window.clearInterval(timer);
   }, [selectedSessionId]);
 
+  useEffect(() => {
+    setCallPhase(currentCall ? "idle" : "idle");
+  }, [currentCall?.id]);
+
   async function handleCreateSession() {
     if (!selectedSnapshotId) return;
     setCreating(true);
@@ -301,29 +294,6 @@ export default function StandaloneBingoHome({
       await Promise.all([loadBaseData(), loadCalls(selectedSessionId)]);
     } finally {
       setControlling(null);
-    }
-  }
-
-  async function handleTransport(action: TransportAction, callId: string) {
-    if (!selectedSessionId) return;
-    const actionKey = `${action}:${callId}` as `${TransportAction}:${string}`;
-    setTransporting(actionKey);
-    setError(null);
-    try {
-      await fetchJson<{ session?: SessionRecord; call?: CallRecord }>(
-        `/api/v1/games/bingo/sessions/${selectedSessionId}/transport`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ action, call_id: callId }),
-        }
-      );
-      await Promise.all([loadBaseData(), loadCalls(selectedSessionId)]);
-    } catch (transportError) {
-      setError(transportError instanceof Error ? transportError.message : "Failed transport action.");
-      await Promise.all([loadBaseData(), loadCalls(selectedSessionId)]);
-    } finally {
-      setTransporting(null);
     }
   }
 
@@ -493,41 +463,49 @@ export default function StandaloneBingoHome({
                   <div style={{ borderRadius: 24, padding: 20, background: "rgba(0,0,0,0.24)", border: "1px solid rgba(255,255,255,0.08)" }}>
                     <h3 style={{ marginTop: 0, fontSize: 20 }}>Next Up</h3>
                     <div style={{ display: "grid", gap: 10 }}>
-                      {queueCalls.slice(0, 8).map((call, index) => (
+                      {pendingCalls.slice(0, 8).map((call) => (
                         <div key={call.id} style={callRowStyle}>
                           <strong>{call.callIndex}. {call.trackTitle}</strong>
                           <span style={{ fontSize: 13, color: "#d9d1c3" }}>{call.artistName}</span>
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
-                            <button
-                              onClick={() => void handleTransport("pull", call.id)}
-                              disabled={Boolean(transporting) || index < 2}
-                              style={buttonStyle(false)}
-                            >
-                              {transporting === `pull:${call.id}` ? "Pulling..." : "Pull"}
-                            </button>
-                            <button
-                              onClick={() => void handleTransport("cue", call.id)}
-                              disabled={Boolean(transporting) || index === 0}
-                              style={buttonStyle(false)}
-                            >
-                              {transporting === `cue:${call.id}` ? "Cueing..." : "Cue"}
-                            </button>
-                            <button
-                              onClick={() => void handleTransport("call", call.id)}
-                              disabled={Boolean(transporting) || index !== 0}
-                              style={buttonStyle(index === 0)}
-                            >
-                              {transporting === `call:${call.id}` ? "Calling..." : "Call"}
-                            </button>
-                          </div>
                         </div>
                       ))}
-                      {queueCalls.length === 0 ? <p style={{ margin: 0 }}>No pending calls remaining.</p> : null}
+                      {pendingCalls.length === 0 ? <p style={{ margin: 0 }}>No pending calls remaining.</p> : null}
                     </div>
                   </div>
                 </div>
 
                 <div style={{ marginTop: 20, display: "grid", gap: 10 }}>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <button
+                      onClick={() => setCallPhase("prep_started")}
+                      disabled={!currentCall}
+                      style={buttonStyle(callPhase === "prep_started")}
+                    >
+                      Prep Started
+                    </button>
+                    <button
+                      onClick={() => setCallPhase("called")}
+                      disabled={!currentCall}
+                      style={buttonStyle(callPhase === "called")}
+                    >
+                      Called
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCallPhase("idle");
+                        void handleAdvance();
+                      }}
+                      disabled={!currentCall || advancing}
+                      style={buttonStyle(true)}
+                    >
+                      {advancing ? "Completing..." : "Completed"}
+                    </button>
+                  </div>
+                  {currentCall ? (
+                    <p style={{ margin: 0, fontSize: 13, color: "#d9d1c3" }}>
+                      Operator phase: {callPhase === "idle" ? "ready" : callPhase.replace("_", " ")}
+                    </p>
+                  ) : null}
                   <h3 style={{ margin: 0, fontSize: 20 }}>Call Sheet</h3>
                   <div style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, overflow: "hidden", background: "rgba(0,0,0,0.2)" }}>
                     {calls.map((call) => (
