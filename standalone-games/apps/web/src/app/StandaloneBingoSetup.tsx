@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   generateStandaloneCallSheetPdf,
   generateStandaloneCardsPdf,
+  generateStandaloneCrateLabelsPdf,
+  generateStandalonePlaylistSheetPdf,
 } from "@/lib/standaloneBingoPrint";
 
 type PlaylistRecord = {
@@ -131,6 +133,20 @@ type CardRecord = {
   }>;
 };
 
+type SessionPlaylistRecord = {
+  id: string;
+  sessionId: string;
+  roundNumber: number;
+  playlistLetter: string;
+  playlistName: string;
+  callOrder: Array<{
+    call_index: number;
+    track_title: string;
+    artist_name: string;
+  }>;
+  createdAt: string;
+};
+
 type StandaloneBingoSetupProps = {
   tenantId: string;
   userId: string;
@@ -177,6 +193,7 @@ export default function StandaloneBingoSetup({
   const [snapshots, setSnapshots] = useState<SnapshotRecord[]>([]);
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [calls, setCalls] = useState<CallRecord[]>([]);
+  const [sessionPlaylists, setSessionPlaylists] = useState<SessionPlaylistRecord[]>([]);
   const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<string[]>([]);
   const [selectedEventId, setSelectedEventId] = useState("");
   const [creatingEvent, setCreatingEvent] = useState(false);
@@ -189,6 +206,7 @@ export default function StandaloneBingoSetup({
   const [selectedPresetId, setSelectedPresetId] = useState("");
   const [creatingPresetSessionId, setCreatingPresetSessionId] = useState<string | null>(null);
   const [creatingSandboxSessionId, setCreatingSandboxSessionId] = useState<string | null>(null);
+  const [playlistActionSessionId, setPlaylistActionSessionId] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState(initialSessionId);
   const [roundCount, setRoundCount] = useState(3);
   const [roundModes, setRoundModes] = useState<RoundModesSelection[]>([]);
@@ -239,6 +257,18 @@ export default function StandaloneBingoSetup({
   const selectedPreset = presets.find((preset) => preset.id === selectedPresetId) ?? null;
   const currentCall = [...calls].reverse().find((call) => call.status === "called") ?? null;
   const nextCalls = calls.filter((call) => call.status === "pending").slice(0, 5);
+  const sessionPlaylistsByLetter = useMemo(() => {
+    const grouped = new Map<string, SessionPlaylistRecord[]>();
+    for (const playlist of sessionPlaylists) {
+      const current = grouped.get(playlist.playlistLetter) ?? [];
+      current.push(playlist);
+      grouped.set(playlist.playlistLetter, current);
+    }
+    for (const value of grouped.values()) {
+      value.sort((a, b) => a.roundNumber - b.roundNumber);
+    }
+    return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [sessionPlaylists]);
   const snapshotByPlaylistId = useMemo(() => {
     const next = new Map<string, SnapshotRecord>();
     for (const snapshot of snapshots) {
@@ -348,6 +378,17 @@ export default function StandaloneBingoSetup({
     return fetchJson<CardRecord[]>(`/api/v1/games/bingo/sessions/${sessionId}/cards`);
   }
 
+  async function loadSessionPlaylists(sessionId: string) {
+    try {
+      const nextPlaylists = await fetchJson<SessionPlaylistRecord[]>(
+        `/api/v1/games/bingo/sessions/${sessionId}/playlists`
+      );
+      setSessionPlaylists(nextPlaylists);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load session playlists.");
+    }
+  }
+
   useEffect(() => {
     void loadBaseData();
   }, [tenantId, userId, entitlements]);
@@ -355,9 +396,11 @@ export default function StandaloneBingoSetup({
   useEffect(() => {
     if (!selectedSessionId) {
       setCalls([]);
+      setSessionPlaylists([]);
       return;
     }
     void loadCalls(selectedSessionId);
+    void loadSessionPlaylists(selectedSessionId);
   }, [selectedSessionId]);
 
   useEffect(() => {
@@ -770,6 +813,98 @@ export default function StandaloneBingoSetup({
     }
   }
 
+  async function handleGenerateExtraPlaylists(sessionId: string) {
+    setPlaylistActionSessionId(sessionId);
+    try {
+      const nextPlaylists = await fetchJson<SessionPlaylistRecord[]>(
+        `/api/v1/games/bingo/sessions/${sessionId}/playlists`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ playlist_letters: ["A", "B", "C"], replace_existing: true }),
+        }
+      );
+      setSessionPlaylists(nextPlaylists);
+    } catch (playlistError) {
+      setError(playlistError instanceof Error ? playlistError.message : "Failed to generate game playlists.");
+    } finally {
+      setPlaylistActionSessionId(null);
+    }
+  }
+
+  async function handleReshuffleAllPlaylists(sessionId: string) {
+    setPlaylistActionSessionId(sessionId);
+    try {
+      const nextPlaylists = await fetchJson<SessionPlaylistRecord[]>(
+        `/api/v1/games/bingo/sessions/${sessionId}/playlists`,
+        {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ reshuffle_all: true }),
+        }
+      );
+      setSessionPlaylists(nextPlaylists);
+    } catch (playlistError) {
+      setError(playlistError instanceof Error ? playlistError.message : "Failed to reshuffle game playlists.");
+    } finally {
+      setPlaylistActionSessionId(null);
+    }
+  }
+
+  async function handleReshufflePlaylistLetter(sessionId: string, playlistLetter: string) {
+    setPlaylistActionSessionId(sessionId);
+    try {
+      const nextPlaylists = await fetchJson<SessionPlaylistRecord[]>(
+        `/api/v1/games/bingo/sessions/${sessionId}/playlists`,
+        {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ playlist_letter: playlistLetter }),
+        }
+      );
+      setSessionPlaylists(nextPlaylists);
+    } catch (playlistError) {
+      setError(playlistError instanceof Error ? playlistError.message : "Failed to reshuffle playlist.");
+    } finally {
+      setPlaylistActionSessionId(null);
+    }
+  }
+
+  async function handleDeletePlaylistLetter(sessionId: string, playlistLetter: string) {
+    setPlaylistActionSessionId(sessionId);
+    try {
+      const nextPlaylists = await fetchJson<SessionPlaylistRecord[]>(
+        `/api/v1/games/bingo/sessions/${sessionId}/playlists?playlist_letter=${encodeURIComponent(playlistLetter)}`,
+        {
+          method: "DELETE",
+        }
+      );
+      setSessionPlaylists(nextPlaylists);
+    } catch (playlistError) {
+      setError(playlistError instanceof Error ? playlistError.message : "Failed to delete playlist.");
+    } finally {
+      setPlaylistActionSessionId(null);
+    }
+  }
+
+  function handleDownloadCrateLabels(session: SessionRecord) {
+    const doc = generateStandaloneCrateLabelsPdf(
+      session.sessionCode,
+      [...sessionPlaylists].sort((a, b) => {
+        if (a.playlistLetter === b.playlistLetter) return a.roundNumber - b.roundNumber;
+        return a.playlistLetter.localeCompare(b.playlistLetter);
+      })
+    );
+    doc.save(`bingo-${session.sessionCode}-crate-labels.pdf`);
+  }
+
+  function handleDownloadPlaylistSheet(session: SessionRecord, playlist: SessionPlaylistRecord) {
+    const doc = generateStandalonePlaylistSheetPdf(session.sessionCode, playlist);
+    doc.save(
+      `bingo-${session.sessionCode}-playlist-${playlist.playlistLetter}-round-${playlist.roundNumber}.pdf`
+    );
+  }
+
   const baseQuery = new URLSearchParams({
     tenantId,
     userId,
@@ -1137,6 +1272,12 @@ export default function StandaloneBingoSetup({
                     <button onClick={() => void handleCreateSandbox(session)} style={buttonStyle(false)}>
                       {creatingSandboxSessionId === session.id ? "Starting Sandbox..." : "Start Sandbox Dry Run"}
                     </button>
+                    <button onClick={() => void handleGenerateExtraPlaylists(session.id)} style={buttonStyle(false)}>
+                      {playlistActionSessionId === session.id ? "Working..." : "Generate Extra Game Playlists"}
+                    </button>
+                    <button onClick={() => void handleReshuffleAllPlaylists(session.id)} style={buttonStyle(false)}>
+                      {playlistActionSessionId === session.id ? "Working..." : "Reshuffle All Playlists"}
+                    </button>
                     <button onClick={() => void handleResetSession(session.id)} style={buttonStyle(false)}>Reset Game</button>
                     <button onClick={() => void handleDeleteSession(session.id)} style={{ ...buttonStyle(false), border: "1px solid rgba(160,60,60,0.45)", color: "#ffd8d8" }}>Delete</button>
                   </div>
@@ -1192,7 +1333,63 @@ export default function StandaloneBingoSetup({
                     <button onClick={() => void handleDownloadCallSheet()} style={buttonStyle(false)}>
                       Call Sheet
                     </button>
+                    <button onClick={() => handleDownloadCrateLabels(selectedSession)} style={buttonStyle(false)}>
+                      Crate Labels
+                    </button>
                   </div>
+                </div>
+
+                <div style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 18, padding: 18, background: "rgba(0,0,0,0.18)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <div>
+                      <p style={eyebrowStyle}>Game Playlists</p>
+                      <h4 style={{ margin: "8px 0 0", fontSize: 22 }}>Crate Set</h4>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <button onClick={() => void handleGenerateExtraPlaylists(selectedSession.id)} style={buttonStyle(false)}>
+                        {playlistActionSessionId === selectedSession.id ? "Working..." : "Generate"}
+                      </button>
+                      <button onClick={() => void handleReshuffleAllPlaylists(selectedSession.id)} style={buttonStyle(false)}>
+                        {playlistActionSessionId === selectedSession.id ? "Working..." : "Reshuffle All"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {sessionPlaylistsByLetter.length === 0 ? (
+                    <div style={{ marginTop: 12, color: "#d9d1c3" }}>
+                      No generated game playlists yet.
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
+                      {sessionPlaylistsByLetter.map(([letter, rows]) => (
+                        <div key={letter} style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 12, background: "rgba(255,255,255,0.02)" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <strong>Playlist {letter}</strong>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                              <button onClick={() => void handleReshufflePlaylistLetter(selectedSession.id, letter)} style={buttonStyle(false)}>
+                                Reshuffle
+                              </button>
+                              <button onClick={() => void handleDeletePlaylistLetter(selectedSession.id, letter)} style={{ ...buttonStyle(false), border: "1px solid rgba(160,60,60,0.45)", color: "#ffd8d8" }}>
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                          <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+                            {rows.map((playlist) => (
+                              <div key={playlist.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", borderTop: "1px dashed rgba(255,255,255,0.14)", paddingTop: 8 }}>
+                                <span style={{ color: "#d9d1c3", fontSize: 13 }}>
+                                  Round {playlist.roundNumber} · {playlist.playlistName} · {playlist.callOrder.length} calls
+                                </span>
+                                <button onClick={() => handleDownloadPlaylistSheet(selectedSession, playlist)} style={buttonStyle(false)}>
+                                  Download Sheet
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(260px, 320px)", gap: 16 }}>
