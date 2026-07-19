@@ -3,7 +3,6 @@ import { getTenantRequestContext } from "@/lib/tenantContext";
 import { getRequestEntitlements, hasEntitlement } from "@/lib/entitlements";
 import { getImportJobsRepository } from "@/lib/importJobsRepositoryFactory";
 import { importTracksToTenantPlaylist } from "@/lib/importToTenantPlaylist";
-import { importCsvPlaylistTracks } from "@/lib/csvPlaylistImporter";
 import { importSpotifyPlaylistTracks } from "@/lib/spotifyPlaylistImporter";
 import { getProviderConnectionsRepository } from "@/lib/providerConnectionsRepositoryFactory";
 import type { ImportJobType, ImportProvider } from "@/lib/importJobsRepo";
@@ -15,7 +14,6 @@ interface RunImportJobBody {
     providerPlaylistId?: string;
     providerConnectionId?: string;
     accessToken?: string;
-    csvText?: string;
     uploadName?: string;
   };
   playlistName?: string;
@@ -85,7 +83,7 @@ export async function POST(request: NextRequest) {
       startedAt: now,
     });
 
-    if (body.provider !== "spotify" && body.provider !== "csv") {
+    if (body.provider !== "spotify") {
       await repo.update(job.id, ctx.tenantId, {
         status: "failed",
         progressPercent: 100,
@@ -100,75 +98,6 @@ export async function POST(request: NextRequest) {
           error: `Provider ${body.provider} is not implemented yet for run-import endpoint.`,
         },
         { status: 501 }
-      );
-    }
-
-    if (body.provider === "csv") {
-      const csvText = String(body.source?.csvText ?? "").trim();
-      const playlistName = String(body.playlistName ?? body.source?.uploadName ?? "CSV Import").trim();
-
-      if (!csvText) {
-        await repo.update(job.id, ctx.tenantId, {
-          status: "failed",
-          progressPercent: 100,
-          summary: "CSV import requires source.csvText.",
-          finishedAt: new Date().toISOString(),
-        });
-
-        return NextResponse.json(
-          {
-            ok: false,
-            jobId: job.id,
-            error: "CSV import requires source.csvText.",
-          },
-          { status: 400 }
-        );
-      }
-
-      await repo.update(job.id, ctx.tenantId, {
-        progressPercent: 30,
-        summary: "Parsing CSV rows",
-      });
-
-      const csvResult = importCsvPlaylistTracks({
-        csvText,
-        playlistName,
-      });
-
-      await repo.update(job.id, ctx.tenantId, {
-        progressPercent: 70,
-        summary: "Creating tenant playlist and snapshot",
-      });
-
-      const importResult = await importTracksToTenantPlaylist({
-        tenantId: ctx.tenantId,
-        userId: ctx.userId,
-        provider: "csv",
-        providerPlaylistId: null,
-        playlistName: csvResult.playlistName,
-        description: "Imported from CSV",
-        snapshotName: `${csvResult.playlistName} Snapshot`,
-        tracks: csvResult.tracks,
-      });
-
-      const completedJob = await repo.update(job.id, ctx.tenantId, {
-        status: "completed",
-        progressPercent: 100,
-        summary: `Imported ${csvResult.tracks.length} tracks from CSV.`,
-        finishedAt: new Date().toISOString(),
-      });
-
-      return NextResponse.json(
-        {
-          ok: true,
-          data: {
-            job: completedJob,
-            playlist: importResult.playlist,
-            snapshot: importResult.snapshot,
-            importedTrackCount: csvResult.tracks.length,
-          },
-        },
-        { status: 201 }
       );
     }
 
