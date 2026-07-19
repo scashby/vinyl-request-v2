@@ -143,35 +143,3 @@ export function generateStandaloneCrateLabelsPdf(
 
   return doc;
 }
-
-export function generateStandalonePlaylistSheetPdf(
-  sessionCode: string,
-  playlist: {
-    playlistLetter: string;
-    playlistName: string;
-    roundNumber: number;
-    callOrder: Array<{ call_index: number; track_title: string; artist_name: string }>;
-  }
-) {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.text(`Playlist Sheet - ${sessionCode}`, 10, 12);
-  doc.setFontSize(11);
-  doc.text(`Round ${playlist.roundNumber} · ${playlist.playlistLetter} · ${playlist.playlistName}`, 10, 18);
-
-  autoTable(doc, {
-    startY: 24,
-    head: [["Draw", "Ball", "Track", "Artist"]],
-    body: playlist.callOrder.map((entry) => [
-      entry.call_index,
-      formatStandaloneBallLabel(entry.call_index),
-      entry.track_title,
-      entry.artist_name,
-    ]),
-    styles: { fontSize: 8, cellPadding: 1.5 },
-    headStyles: { fillColor: [33, 33, 33] },
-  });
-
-  return doc;
-}
