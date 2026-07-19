@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   generateStandaloneCallSheetPdf,
   generateStandaloneCardsPdf,
+  generateStandalonePlaylistSheetPdf,
 } from "@/lib/standaloneBingoPrint";
 
 type SessionRecord = {
@@ -50,6 +51,20 @@ type StandaloneBingoPrepProps = {
   sessionId: string;
 };
 
+type SessionPlaylistRecord = {
+  id: string;
+  sessionId: string;
+  roundNumber: number;
+  playlistLetter: string;
+  playlistName: string;
+  callOrder: Array<{
+    call_index: number;
+    track_title: string;
+    artist_name: string;
+  }>;
+  createdAt: string;
+};
+
 function formatBall(callIndex: number): string {
   const letters = ["B", "I", "N", "G", "O"];
   const letter = letters[(Math.max(1, callIndex) - 1) % letters.length];
@@ -65,6 +80,7 @@ export default function StandaloneBingoPrep({
   const [session, setSession] = useState<SessionRecord | null>(null);
   const [calls, setCalls] = useState<CallRecord[]>([]);
   const [cards, setCards] = useState<CardRecord[]>([]);
+  const [sessionPlaylists, setSessionPlaylists] = useState<SessionPlaylistRecord[]>([]);
   const [addingCards, setAddingCards] = useState(false);
   const [swapTargetCallId, setSwapTargetCallId] = useState<string>("");
   const [swapQuery, setSwapQuery] = useState("");
@@ -105,9 +121,11 @@ export default function StandaloneBingoPrep({
         fetchJson<CallRecord[]>(`/api/v1/games/bingo/sessions/${sessionId}/calls`),
         fetchJson<CardRecord[]>(`/api/v1/games/bingo/sessions/${sessionId}/cards`),
       ]);
+      const nextPlaylists = await fetchJson<SessionPlaylistRecord[]>(`/api/v1/games/bingo/sessions/${sessionId}/playlists`);
       setSession(nextSession);
       setCalls(nextCalls);
       setCards(nextCards);
+      setSessionPlaylists(nextPlaylists);
       setError(null);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load prep data.");
@@ -184,6 +202,17 @@ export default function StandaloneBingoPrep({
     const doc = generateStandaloneCardsPdf(session?.sessionCode ?? sessionId, cards, layout);
     doc.save(`bingo-${session?.sessionCode ?? sessionId}-cards-${layout}.pdf`);
   }
+
+  function handleDownloadPlaylistSheet(playlist: SessionPlaylistRecord) {
+    const doc = generateStandalonePlaylistSheetPdf(session?.sessionCode ?? sessionId, playlist);
+    doc.save(
+      `bingo-${session?.sessionCode ?? sessionId}-playlist-${playlist.playlistLetter}-round-${playlist.roundNumber}.pdf`
+    );
+  }
+
+  const activeRoundPlaylists = sessionPlaylists
+    .filter((playlist) => playlist.roundNumber === (session?.currentRound ?? 1))
+    .sort((a, b) => a.playlistLetter.localeCompare(b.playlistLetter));
 
   const params = new URLSearchParams({ tenantId, userId, entitlements, sessionId }).toString();
 
@@ -269,6 +298,27 @@ export default function StandaloneBingoPrep({
             </table>
           </div>
         </section>
+
+        <section style={panelStyle}>
+          <h2 style={{ marginTop: 0, fontSize: 24 }}>Active Round Playlists</h2>
+          <p style={{ marginTop: 0, color: "#d9d1c3" }}>
+            Round {session?.currentRound ?? 1} crate outputs for print and operator staging.
+          </p>
+          <div style={{ display: "grid", gap: 10 }}>
+            {activeRoundPlaylists.map((playlist) => (
+              <div key={playlist.id} style={rowStyle}>
+                <strong>{playlist.playlistLetter} · {playlist.playlistName}</strong>
+                <span style={{ color: "#d9d1c3", fontSize: 14 }}>{playlist.callOrder.length} calls</span>
+                <button style={buttonStyle} onClick={() => handleDownloadPlaylistSheet(playlist)}>
+                  Download Playlist Sheet
+                </button>
+              </div>
+            ))}
+            {activeRoundPlaylists.length === 0 ? (
+              <div style={{ color: "#d9d1c3" }}>No generated playlists found for this round.</div>
+            ) : null}
+          </div>
+        </section>
       </div>
     </main>
   );
@@ -317,6 +367,15 @@ const buttonStyle: CSSProperties = {
   fontSize: 13,
   fontWeight: 700,
   cursor: "pointer",
+};
+
+const rowStyle: CSSProperties = {
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 14,
+  padding: 12,
+  background: "rgba(0,0,0,0.2)",
+  display: "grid",
+  gap: 6,
 };
 
 const inputStyle: CSSProperties = {

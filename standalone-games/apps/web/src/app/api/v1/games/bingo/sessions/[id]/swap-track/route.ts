@@ -4,6 +4,7 @@ import { getRequestEntitlements, hasEntitlement } from "@/lib/entitlements";
 import { getStandaloneBingoCallsRepository } from "@/lib/standaloneBingoCallsRepositoryFactory";
 import { getStandaloneBingoCardsRepository } from "@/lib/standaloneBingoCardsRepositoryFactory";
 import { getStandaloneBingoSessionsRepository } from "@/lib/standaloneBingoSessionsRepositoryFactory";
+import { getStandaloneBingoSessionEventsRepository } from "@/lib/standaloneBingoSessionEventsRepositoryFactory";
 import { getTenantPlaylistSnapshotsRepository } from "@/lib/tenantPlaylistSnapshotsRepositoryFactory";
 
 type SwapBody = {
@@ -101,6 +102,7 @@ export async function POST(
     });
 
     const cardsRepo = getStandaloneBingoCardsRepository();
+    const eventsRepo = getStandaloneBingoSessionEventsRepository();
     const cards = await cardsRepo.listBySession(id);
     const updatedCards = cards.map((card) => ({
       cardIndex: card.cardIndex,
@@ -118,6 +120,7 @@ export async function POST(
 
     await callsRepo.replaceSession(id, updatedCalls);
     await cardsRepo.replaceSession(id, updatedCards);
+    await eventsRepo.deleteBySession(id);
 
     return NextResponse.json({ ok: true, data: { updatedCalls: updatedCalls.length, updatedCards: updatedCards.length } });
   } catch (error) {

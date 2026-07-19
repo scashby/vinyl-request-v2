@@ -12,6 +12,7 @@ type SessionRecord = {
   callIntervalSeconds: number;
   countdownStartedAt?: string | null;
   pausedRemainingSeconds?: number | null;
+  transportQueueCallIds?: string[];
 };
 
 type CallRecord = {
@@ -30,6 +31,8 @@ type StandaloneBingoAssistantProps = {
   sessionId: string;
 };
 
+type TransportAction = "pull" | "cue" | "call";
+
 function formatBall(callIndex: number): string {
   const letters = ["B", "I", "N", "G", "O"];
   const letter = letters[(Math.max(1, callIndex) - 1) % letters.length];
@@ -46,6 +49,7 @@ export default function StandaloneBingoAssistant({
   const [calls, setCalls] = useState<CallRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [remaining, setRemaining] = useState(0);
+  const [transporting, setTransporting] = useState<null | `${TransportAction}:${string}`>(null);
 
   const requestHeaders = useMemo(
     () => ({
@@ -57,15 +61,27 @@ export default function StandaloneBingoAssistant({
   );
 
   const currentCall = [...calls].reverse().find((call) => call.status === "called") ?? null;
-  const prepRows = calls.filter((call) => call.status === "pending").slice(0, 2);
+  const queueRows = (() => {
+    const byId = new Map(calls.map((call) => [call.id, call]));
+    const fromQueue = (session?.transportQueueCallIds ?? [])
+      .map((id) => byId.get(id) ?? null)
+      .filter((call): call is CallRecord => Boolean(call));
+    if (fromQueue.length > 0) return fromQueue;
+    return calls.filter((call) => call.status === "pending");
+  })();
+  const prepRows = queueRows.slice(0, 2);
   const recentCalled = calls
     .filter((call) => call.status === "called" || call.status === "completed")
     .slice(-5)
     .reverse();
 
-  async function fetchJson<T>(input: string): Promise<T> {
+  async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
     const response = await fetch(input, {
-      headers: requestHeaders,
+      ...init,
+      headers: {
+        ...requestHeaders,
+        ...(init?.headers ?? {}),
+      },
       cache: "no-store",
     });
     const payload = (await response.json()) as { ok?: boolean; error?: string; data?: T };
@@ -131,6 +147,29 @@ export default function StandaloneBingoAssistant({
     return () => window.clearInterval(timer);
   }, [session]);
 
+  async function handleTransport(action: TransportAction, callId: string) {
+    const actionKey = `${action}:${callId}` as `${TransportAction}:${string}`;
+    setTransporting(actionKey);
+    try {
+      await fetchJson(`/api/v1/games/bingo/sessions/${sessionId}/transport`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action, call_id: callId }),
+      });
+      const [nextSession, nextCalls] = await Promise.all([
+        fetchJson<SessionRecord>(`/api/v1/games/bingo/sessions/${sessionId}`),
+        fetchJson<CallRecord[]>(`/api/v1/games/bingo/sessions/${sessionId}/calls`),
+      ]);
+      setSession(nextSession);
+      setCalls(nextCalls);
+      setError(null);
+    } catch (transportError) {
+      setError(transportError instanceof Error ? transportError.message : "Failed transport action.");
+    } finally {
+      setTransporting(null);
+    }
+  }
+
   const params = new URLSearchParams({ tenantId, userId, entitlements, sessionId }).toString();
 
   return (
@@ -177,10 +216,33 @@ export default function StandaloneBingoAssistant({
             <h2 style={{ marginTop: 0, fontSize: 22 }}>Prep Queue</h2>
             <p style={{ marginTop: 0, color: "#d9d1c3" }}>Next two records to pull and stage.</p>
             <div style={{ display: "grid", gap: 10 }}>
-              {prepRows.map((call) => (
+              {queueRows.slice(0, 6).map((call, index) => (
                 <div key={call.id} style={rowStyle}>
                   <strong>{formatBall(call.callIndex)} · {call.trackTitle}</strong>
                   <span style={{ color: "#d9d1c3", fontSize: 14 }}>{call.artistName}</span>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      onClick={() => void handleTransport("pull", call.id)}
+                      disabled={Boolean(transporting) || index < 2}
+                      style={buttonStyle(false)}
+                    >
+                      {transporting === `pull:${call.id}` ? "Pulling..." : "Pull"}
+                    </button>
+                    <button
+                      onClick={() => void handleTransport("cue", call.id)}
+                      disabled={Boolean(transporting) || index === 0}
+                      style={buttonStyle(false)}
+                    >
+                      {transporting === `cue:${call.id}` ? "Cueing..." : "Cue"}
+                    </button>
+                    <button
+                      onClick={() => void handleTransport("call", call.id)}
+                      disabled={Boolean(transporting) || index !== 0}
+                      style={buttonStyle(index === 0)}
+                    >
+                      {transporting === `call:${call.id}` ? "Calling..." : "Call"}
+                    </button>
+                  </div>
                 </div>
               ))}
               {prepRows.length === 0 ? <div style={{ color: "#d9d1c3" }}>No pending prep rows.</div> : null}
@@ -244,6 +306,20 @@ const rowStyle: CSSProperties = {
   display: "grid",
   gap: 6,
 };
+
+function buttonStyle(primary: boolean): CSSProperties {
+  return {
+    appearance: "none",
+    border: primary ? "1px solid rgba(130,216,227,0.7)" : "1px solid rgba(255,255,255,0.16)",
+    borderRadius: 999,
+    background: primary ? "#82d8e3" : "rgba(255,255,255,0.04)",
+    color: primary ? "#05222b" : "#f5efe6",
+    padding: "6px 10px",
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: "pointer",
+  };
+}
 
 const linkStyle: CSSProperties = {
   border: "1px solid rgba(255,255,255,0.2)",
