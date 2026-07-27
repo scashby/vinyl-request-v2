@@ -70,6 +70,7 @@ type CreateSessionBody = {
   favorite_note?: string | null;
   theme_enabled?: boolean;
   theme_name?: string | null;
+  game_structure?: "shared_pool" | "fixed_crates";
 };
 
 type SessionListRow = {
@@ -103,6 +104,7 @@ type SessionListRow = {
   is_sandbox: boolean;
   sandbox_source_session_id: number | null;
   sandbox_expires_at: string | null;
+  game_structure: string;
   created_at: string;
 };
 
@@ -200,7 +202,7 @@ export async function GET(request: NextRequest) {
 
   const queryBase = db
     .from("bingo_sessions")
-    .select("id, event_id, game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, session_code, game_mode, round_modes, card_count, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, is_favorite, favorite_note, is_sandbox, sandbox_source_session_id, sandbox_expires_at, created_at") as unknown as SessionListQuery;
+    .select("id, event_id, game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, session_code, game_mode, round_modes, card_count, status, current_round, round_count, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, sonos_output_delay_ms, seconds_to_next_call, call_reveal_delay_seconds, show_countdown, recent_calls_limit, next_game_rules_text, is_favorite, favorite_note, is_sandbox, sandbox_source_session_id, sandbox_expires_at, game_structure, created_at") as unknown as SessionListQuery;
 
   let result: { data: unknown; error: { message: string } | null };
   if (includeSandbox) {
@@ -314,6 +316,7 @@ export async function POST(request: NextRequest) {
     const cardCount = estimatedPlayers * setsNeeded;
     const roundModes = normalizeRoundModes(body.round_modes, roundCount);
     const roundPlaylistIds = normalizeRoundPlaylistIds(body.round_playlist_ids, roundCount);
+    const gameStructure = body.game_structure === "fixed_crates" ? "fixed_crates" : "shared_pool";
     const resolvedPlaylistsByRound = collectResolvedPlaylistIdsByRound(
       {
         playlist_id: selectedPlaylistIds[0] ?? null,
@@ -327,6 +330,22 @@ export async function POST(request: NextRequest) {
       if ((resolvedPlaylistsByRound.get(round) ?? []).length === 0) {
         return NextResponse.json(
           { error: `Round ${round} needs at least one playlist or a master playlist selection.` },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (gameStructure === "fixed_crates") {
+      const missingRounds: number[] = [];
+      for (let round = 1; round <= roundCount; round += 1) {
+        const hasOverride = roundPlaylistIds.some((entry) => entry.round === round && entry.playlist_ids.length > 0);
+        if (!hasOverride) missingRounds.push(round);
+      }
+      if (missingRounds.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Fixed Crates mode requires a distinct crate playlist for every round. Missing: round ${missingRounds.join(", ")}.`,
+          },
           { status: 400 }
         );
       }
@@ -448,6 +467,7 @@ export async function POST(request: NextRequest) {
         favorite_note: body.favorite_note?.trim() || null,
         theme_enabled: body.theme_enabled ?? false,
         theme_name: body.theme_enabled ? (body.theme_name?.trim() || null) : null,
+        game_structure: gameStructure,
       })
       .select("id, session_code, playlist_id, card_count, card_label_mode")
       .single();

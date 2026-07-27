@@ -172,6 +172,7 @@ export default function BingoSetupPage() {
   const [roundModes, setRoundModes] = useState<RoundModesEntry[]>([]);
   const [roundPlaylistIds, setRoundPlaylistIds] = useState<RoundPlaylistEntry[]>([]);
   const [roundPlaylistOverrideRounds, setRoundPlaylistOverrideRounds] = useState<number[]>([]);
+  const [gameStructure, setGameStructure] = useState<"shared_pool" | "fixed_crates">("shared_pool");
   const [cardCount, setCardCount] = useState(40);
   const [roundCount, setRoundCount] = useState(3);
   const [removeResleeveSeconds, setRemoveResleeveSeconds] = useState(20);
@@ -218,6 +219,12 @@ export default function BingoSetupPage() {
   );
   const usingTracklistPreset = selectedTracklistPreset !== null;
   const effectiveTrackCount = usingTracklistPreset ? selectedTracklistPreset.pool_size : selectedPlaylistTrackCount;
+
+  useEffect(() => {
+    if (gameStructure === "fixed_crates" && selectedTracklistPresetId !== null) {
+      setSelectedTracklistPresetId(null);
+    }
+  }, [gameStructure, selectedTracklistPresetId]);
   const getTrackCountForPlaylistIds = useCallback(
     (playlistIds: number[]) => playlistIds.reduce((sum, id) => sum + (trackCountByPlaylistId.get(id) ?? 0), 0),
     [trackCountByPlaylistId]
@@ -356,14 +363,23 @@ export default function BingoSetupPage() {
   }, [setPlaylistsForRound]);
 
   const missingPlaylistRounds = useMemo(
-    () => usingTracklistPreset || hasSelectedPlaylists
-      ? []
-      : Array.from({ length: Math.max(1, roundCount) }, (_, index) => index + 1).filter(
+    () => {
+      if (gameStructure === "fixed_crates") {
+        return Array.from({ length: Math.max(1, roundCount) }, (_, index) => index + 1).filter(
           (round) => getPlaylistIdsForRound(round).length === 0
-        ),
-    [getPlaylistIdsForRound, hasSelectedPlaylists, roundCount, usingTracklistPreset]
+        );
+      }
+      return usingTracklistPreset || hasSelectedPlaylists
+        ? []
+        : Array.from({ length: Math.max(1, roundCount) }, (_, index) => index + 1).filter(
+            (round) => getPlaylistIdsForRound(round).length === 0
+          );
+    },
+    [gameStructure, getPlaylistIdsForRound, hasSelectedPlaylists, roundCount, usingTracklistPreset]
   );
-  const hasUsablePlaylistConfiguration = usingTracklistPreset || hasSelectedPlaylists || missingPlaylistRounds.length === 0;
+  const hasUsablePlaylistConfiguration = gameStructure === "fixed_crates"
+    ? missingPlaylistRounds.length === 0
+    : usingTracklistPreset || hasSelectedPlaylists || missingPlaylistRounds.length === 0;
 
   const toggleRoundMode = useCallback(
     (round: number, mode: GameMode) => {
@@ -544,6 +560,7 @@ export default function BingoSetupPage() {
         playlist_id: (usingTracklistPreset ? presetPlaylistIds : selectedPlaylistIds)[0],
         playlist_ids: usingTracklistPreset ? presetPlaylistIds : selectedPlaylistIds,
         round_playlist_ids: usingTracklistPreset ? [] : roundPlaylistIds,
+        game_structure: gameStructure,
         game_mode: derivedGameMode,
         round_modes: roundModes,
         card_count: cardCount,
@@ -903,7 +920,8 @@ export default function BingoSetupPage() {
           <div className="mt-4">
             <label className="block text-sm">Reuse Game Tracklist Favorite (optional)
               <select
-                className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2"
+                disabled={gameStructure === "fixed_crates"}
+                className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
                 value={selectedTracklistPresetId ?? ""}
                 onChange={(e) => setSelectedTracklistPresetId(Number(e.target.value) || null)}
               >
@@ -914,6 +932,9 @@ export default function BingoSetupPage() {
                   </option>
                 ))}
               </select>
+              {gameStructure === "fixed_crates" ? (
+                <p className="mt-1 text-xs text-stone-500">Tracklist favorites use a single shared pool and aren&apos;t compatible with Fixed Crates mode.</p>
+              ) : null}
             </label>
             {selectedTracklistPreset ? (
               <div className="mt-2 rounded border border-stone-700/70 bg-stone-950/40 p-3 text-xs text-stone-300">
@@ -924,13 +945,45 @@ export default function BingoSetupPage() {
             ) : null}
           </div>
 
+          {/* Game structure */}
+          <div className="mt-4">
+            <label className="block text-sm">Game Structure</label>
+            <div className="mt-1 flex flex-wrap gap-2 text-xs">
+              <label className={`cursor-pointer rounded border px-3 py-2 ${gameStructure === "shared_pool" ? "border-amber-500 bg-amber-900/30 text-amber-100" : "border-stone-700 bg-stone-900 text-stone-300"}`}>
+                <input
+                  type="radio"
+                  name="game_structure"
+                  className="mr-2"
+                  checked={gameStructure === "shared_pool"}
+                  onChange={() => setGameStructure("shared_pool")}
+                />
+                Shared Pool (resort each round)
+              </label>
+              <label className={`cursor-pointer rounded border px-3 py-2 ${gameStructure === "fixed_crates" ? "border-amber-500 bg-amber-900/30 text-amber-100" : "border-stone-700 bg-stone-900 text-stone-300"}`}>
+                <input
+                  type="radio"
+                  name="game_structure"
+                  className="mr-2"
+                  checked={gameStructure === "fixed_crates"}
+                  onChange={() => setGameStructure("fixed_crates")}
+                />
+                Fixed Crates (distinct playlist per round)
+              </label>
+            </div>
+            <p className="mt-2 text-xs text-stone-500">
+              {gameStructure === "fixed_crates"
+                ? "Each round below requires its own dedicated crate playlist (75+ tracks). A full, separately printable card set is generated per crate — nothing is resorted between rounds."
+                : "One master pool is reshuffled between rounds — ideal when hauling a limited set of records to a remote gig."}
+            </p>
+          </div>
+
           {/* Playlists */}
           <div className="mt-4">
-            <label className="block text-sm">Master Playlists (optional if every round has its own override) <InlineFieldHelp label="Playlist" />
+            <label className="block text-sm">Master Playlists {gameStructure === "fixed_crates" ? "(not used in Fixed Crates mode — assign a crate per round below)" : "(optional if every round has its own override)"} <InlineFieldHelp label="Playlist" />
               <select
                 multiple
                 size={5}
-                disabled={usingTracklistPreset}
+                disabled={usingTracklistPreset || gameStructure === "fixed_crates"}
                 className="mt-1 w-full rounded border border-stone-700 bg-stone-950 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
                 value={selectedPlaylistIds.map(String)}
                 onChange={(e) => {
@@ -986,7 +1039,8 @@ export default function BingoSetupPage() {
                 const round = index + 1;
                 const activeModes = getModesForRound(round);
                 const roundPlaylistSelection = getPlaylistIdsForRound(round);
-                const overrideEnabled = roundPlaylistOverrideRounds.includes(round);
+                const isFixedCrates = gameStructure === "fixed_crates";
+                const overrideEnabled = isFixedCrates || roundPlaylistOverrideRounds.includes(round);
                 const usesOverride = overrideEnabled && roundPlaylistSelection.length > 0;
                 const roundTrackCount = getTrackCountForPlaylistIds(roundPlaylistSelection);
                 return (
@@ -1012,11 +1066,11 @@ export default function BingoSetupPage() {
                       <label className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-stone-300">
                         <input
                           type="checkbox"
-                          disabled={usingTracklistPreset}
+                          disabled={usingTracklistPreset || isFixedCrates}
                           checked={overrideEnabled}
                           onChange={(event) => setRoundPlaylistOverrideEnabled(round, event.target.checked)}
                         />
-                        Use Playlist Override For Round {round}
+                        {isFixedCrates ? `Crate Playlist For Round ${round} (required)` : `Use Playlist Override For Round ${round}`}
                       </label>
                       {overrideEnabled ? (
                         <>
@@ -1040,18 +1094,22 @@ export default function BingoSetupPage() {
                             ))}
                           </select>
                           <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-                            <button
-                              type="button"
-                              disabled={usingTracklistPreset}
-                              onClick={() => setPlaylistsForRound(round, [])}
-                              className="rounded border border-stone-700 px-2 py-1 text-stone-300 hover:border-amber-500 hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              Clear Override
-                            </button>
+                            {isFixedCrates ? null : (
+                              <button
+                                type="button"
+                                disabled={usingTracklistPreset}
+                                onClick={() => setPlaylistsForRound(round, [])}
+                                className="rounded border border-stone-700 px-2 py-1 text-stone-300 hover:border-amber-500 hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                Clear Override
+                              </button>
+                            )}
                             <span className={usesOverride ? (roundTrackCount >= minimumTracksForSetup ? "text-emerald-300" : "text-rose-300") : "text-stone-500"}>
                               {usesOverride
                                 ? `${roundTrackCount} tracks selected${roundTrackCount >= minimumTracksForSetup ? " · enough for this round's game playlist." : ` · need at least ${minimumTracksForSetup} tracks.`}`
-                                : "Select one or more playlists for this round override."}
+                                : isFixedCrates
+                                  ? "Select this round's crate playlist."
+                                  : "Select one or more playlists for this round override."}
                             </span>
                           </div>
                         </>

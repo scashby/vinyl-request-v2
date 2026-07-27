@@ -20,6 +20,7 @@ type Session = {
   status: string;
   is_sandbox?: boolean;
   sandbox_expires_at?: string | null;
+  game_structure?: "shared_pool" | "fixed_crates";
 };
 
 type Call = {
@@ -254,6 +255,28 @@ export default function BingoPrepPage() {
     doc.save(`bingo-${sessionId}-cards-${layout}.pdf`);
   };
 
+  const downloadCrateCards = async (round: number, layout: "2-up" | "4-up") => {
+    const previewRes = await fetch(`/api/games/bingo/sessions/${sessionId}/rounds/${round}/card-preview`);
+    if (!previewRes.ok) return;
+    const payload = await previewRes.json();
+    const previewCards = (payload.data ?? []) as Array<{
+      card_number: number;
+      card_identifier: string;
+      grid: Array<{ row: number; col: number; label: string }>;
+    }>;
+    const baseCards = previewCards.map((row) => ({
+      card_number: row.card_number,
+      card_identifier: row.card_identifier ?? "",
+      grid: row.grid.map((cell) => ({ row: cell.row, col: cell.col, label: cell.label })),
+    })) as PrintableCard[];
+
+    const title = session
+      ? `Music Bingo · Crate ${round} · ${session.playlist_name} · ${session.session_code}`
+      : `Music Bingo · Crate ${round} · Session ${sessionId}`;
+    const doc = generateBingoCardsPdf(baseCards, layout, title);
+    doc.save(`bingo-${sessionId}-crate-${round}-cards-${layout}.pdf`);
+  };
+
   const createAdditionalCards = async () => {
     const additionalCount = Math.max(1, session?.round_count ?? 1) * 100;
     const response = await fetch(`/api/games/bingo/cards`, {
@@ -405,6 +428,17 @@ export default function BingoPrepPage() {
                 <button onClick={downloadRoundIndex} className="rounded bg-amber-700 px-3 py-2">Round Index PDF</button>
                 <button onClick={createAdditionalCards} className="rounded bg-stone-800 px-3 py-2">Add {Math.max(1, session?.round_count ?? 1) * 100} Cards</button>
                 <button onClick={() => downloadCards("4-up")} className="rounded bg-stone-800 px-3 py-2">Cards Pack PDF (4-up)</button>
+                {session?.game_structure === "fixed_crates"
+                  ? Array.from({ length: Math.max(1, session?.round_count ?? 1) }, (_, idx) => idx + 1).map((round) => (
+                      <button
+                        key={round}
+                        onClick={() => downloadCrateCards(round, "4-up")}
+                        className="rounded bg-stone-800 px-3 py-2"
+                      >
+                        Print Crate {round} Cards (PDF)
+                      </button>
+                    ))
+                  : null}
                 {!session?.is_sandbox ? (
                   <button
                     onClick={startSandboxDryRun}

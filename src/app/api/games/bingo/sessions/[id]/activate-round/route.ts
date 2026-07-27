@@ -4,6 +4,7 @@ import { planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/li
 import { getPlaylistByLetter } from "src/lib/bingoCrateModel";
 import { getRoundSnapshotTracks } from "src/lib/bingoGameModel";
 import { resolveRoundPlaylistIds, type RoundPlaylistEntry } from "src/lib/bingoRoundPlaylists";
+import { rehydrateBingoCardLabels } from "src/lib/playlistMetadataSync";
 
 export const runtime = "nodejs";
 
@@ -183,6 +184,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
     }
+
+    // Keep printed/displayed card labels in sync with whichever tracks this round's calls now
+    // point at. No-op for sessions where every round shares the same tracks (ball_number -> track
+    // never changes there); required for correctness when a round's calls genuinely differ, e.g.
+    // Fixed Crates mode.
+    await rehydrateBingoCardLabels(sessionId);
 
     // Reset queue/cue history so transport lane starts clean for the new round.
     const { error: clearEventsError } = await db

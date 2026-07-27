@@ -256,6 +256,7 @@ export type BingoDatabase = {
           is_sandbox: boolean;
           sandbox_source_session_id: number | null;
           sandbox_expires_at: string | null;
+          game_structure: string;
         };
         Insert: {
           id?: number;
@@ -320,6 +321,7 @@ export type BingoDatabase = {
           is_sandbox?: boolean;
           sandbox_source_session_id?: number | null;
           sandbox_expires_at?: string | null;
+          game_structure?: string;
         };
         Update: {
           id?: number;
@@ -384,6 +386,7 @@ export type BingoDatabase = {
           is_sandbox?: boolean;
           sandbox_source_session_id?: number | null;
           sandbox_expires_at?: string | null;
+          game_structure?: string;
         };
         Relationships: [];
       };
