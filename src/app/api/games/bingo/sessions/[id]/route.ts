@@ -30,6 +30,7 @@ type BingoSessionPatch = {
   game_mode?: string;
   card_count?: number;
   cards_per_round_enabled?: boolean;
+  game_structure?: string;
   card_layout?: string;
   card_label_mode?: string;
   round_count?: number;
@@ -327,6 +328,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "round_modes",
     "card_count",
     "cards_per_round_enabled",
+    "game_structure",
     "round_count",
     "remove_resleeve_seconds",
     "place_vinyl_seconds",
@@ -397,6 +399,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
   if (patch.cards_per_round_enabled !== undefined) {
     patch.cards_per_round_enabled = Boolean(patch.cards_per_round_enabled);
+  }
+  if (patch.game_structure !== undefined) {
+    patch.game_structure = patch.game_structure === "fixed_crates" ? "fixed_crates" : "shared_pool";
   }
   if (patch.round_count !== undefined) {
     patch.round_count = Math.max(1, Math.floor(Number(patch.round_count)));

@@ -40,6 +40,7 @@ type Session = {
   round_modes: RoundModesEntry[] | null;
   card_count: number;
   cards_per_round_enabled?: boolean;
+  game_structure?: "shared_pool" | "fixed_crates";
   round_count: number;
   remove_resleeve_seconds: number;
   place_vinyl_seconds: number;
@@ -80,7 +81,7 @@ export default function BingoEditSessionPage() {
   const [roundModes, setRoundModes] = useState<RoundModesEntry[]>([]);
   const [roundPlaylistIds, setRoundPlaylistIds] = useState<RoundPlaylistEntry[]>([]);
   const [roundPlaylistOverrideRounds, setRoundPlaylistOverrideRounds] = useState<number[]>([]);
-  const [cardsPerRoundEnabled, setCardsPerRoundEnabled] = useState(false);
+  const [gameStructure, setGameStructure] = useState<"shared_pool" | "fixed_crates">("shared_pool");
   const [cardCount, setCardCount] = useState(40);
   const [roundCount, setRoundCount] = useState(3);
   const [removeResleeveSeconds, setRemoveResleeveSeconds] = useState(20);
@@ -110,7 +111,7 @@ export default function BingoEditSessionPage() {
     [presets, selectedPresetId]
   );
   const usingPreset = selectedPreset !== null;
-  const perRoundMastersEnabled = cardsPerRoundEnabled && !usingPreset;
+  const perRoundMastersEnabled = gameStructure === "fixed_crates" && !usingPreset;
 
   const derivedSecondsToNextCall = useMemo(
     () =>
@@ -183,7 +184,12 @@ export default function BingoEditSessionPage() {
         setRoundModes([]);
       }
       setCardCount(sessionPayload.card_count ?? 40);
-      setCardsPerRoundEnabled(Boolean(sessionPayload.cards_per_round_enabled));
+      setGameStructure(
+        sessionPayload.game_structure === "fixed_crates"
+          || (!sessionPayload.game_structure && sessionPayload.cards_per_round_enabled)
+          ? "fixed_crates"
+          : "shared_pool"
+      );
       setRoundCount(sessionPayload.round_count ?? 3);
       setRemoveResleeveSeconds(sessionPayload.remove_resleeve_seconds ?? 20);
       setPlaceVinylSeconds(sessionPayload.place_vinyl_seconds ?? 8);
@@ -308,6 +314,7 @@ export default function BingoEditSessionPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cards_per_round_enabled: perRoundMastersEnabled,
+          game_structure: gameStructure,
           event_id: eventId,
           game_preset_id: selectedPresetId,
           master_playlist_ids: usingPreset ? (selectedPreset?.source_playlist_ids ?? playlistIds) : (perRoundMastersEnabled ? [] : playlistIds),
@@ -481,23 +488,32 @@ export default function BingoEditSessionPage() {
                 ) : null}
 
                 <label className="text-sm">Master Playlists
-                  <div className="mb-2 mt-1">
-                    <label className="inline-flex items-center gap-2 text-xs font-semibold text-stone-300">
+                  <div className="mb-2 mt-1 flex flex-wrap gap-2 text-xs">
+                    <label className={`cursor-pointer rounded border px-3 py-2 ${gameStructure === "shared_pool" ? "border-amber-500 bg-amber-900/30 text-amber-100" : "border-stone-700 bg-stone-900 text-stone-300"}`}>
                       <input
-                        type="checkbox"
-                        className="h-4 w-4"
+                        type="radio"
+                        name="game_structure_edit"
+                        className="mr-2"
                         disabled={usingPreset}
-                        checked={perRoundMastersEnabled}
-                        onChange={(event) => {
-                          const enabled = event.target.checked;
-                          setCardsPerRoundEnabled(enabled);
-                          if (enabled) {
-                            setPlaylistIds([]);
-                            setRoundPlaylistOverrideRounds(Array.from({ length: Math.max(1, roundCount) }, (_, index) => index + 1));
-                          }
+                        checked={gameStructure === "shared_pool"}
+                        onChange={() => setGameStructure("shared_pool")}
+                      />
+                      Shared Pool (resort each round)
+                    </label>
+                    <label className={`cursor-pointer rounded border px-3 py-2 ${gameStructure === "fixed_crates" ? "border-amber-500 bg-amber-900/30 text-amber-100" : "border-stone-700 bg-stone-900 text-stone-300"}`}>
+                      <input
+                        type="radio"
+                        name="game_structure_edit"
+                        className="mr-2"
+                        disabled={usingPreset}
+                        checked={gameStructure === "fixed_crates"}
+                        onChange={() => {
+                          setGameStructure("fixed_crates");
+                          setPlaylistIds([]);
+                          setRoundPlaylistOverrideRounds(Array.from({ length: Math.max(1, roundCount) }, (_, index) => index + 1));
                         }}
                       />
-                      Use Different Master Playlist Per Round (new card set each round)
+                      Fixed Crates (distinct playlist per round)
                     </label>
                   </div>
                   <select
@@ -633,7 +649,7 @@ export default function BingoEditSessionPage() {
                               checked={overrideEnabled}
                               onChange={(event) => setRoundPlaylistOverrideEnabled(round, event.target.checked)}
                             />
-                            {perRoundMastersEnabled ? `Round ${round} Playlist Selection` : `Use Playlist Override For Round ${round}`}
+                            {perRoundMastersEnabled ? `Crate Playlist For Round ${round} (required)` : `Use Playlist Override For Round ${round}`}
                           </label>
                           {overrideEnabled ? (
                             <>
