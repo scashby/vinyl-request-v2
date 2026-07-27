@@ -203,6 +203,7 @@ export type BingoDatabase = {
           session_code: string;
           game_mode: string;
           card_count: number;
+          cards_per_round_enabled: boolean;
           card_layout: string;
           card_label_mode: string;
           round_count: number;
@@ -269,6 +270,7 @@ export type BingoDatabase = {
           session_code: string;
           game_mode: string;
           card_count?: number;
+          cards_per_round_enabled?: boolean;
           card_layout?: string;
           card_label_mode?: string;
           round_count?: number;
@@ -334,6 +336,7 @@ export type BingoDatabase = {
           session_code?: string;
           game_mode?: string;
           card_count?: number;
+          cards_per_round_enabled?: boolean;
           card_layout?: string;
           card_label_mode?: string;
           round_count?: number;

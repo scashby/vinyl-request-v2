@@ -20,6 +20,7 @@ type SourceSessionRow = {
   game_mode: string;
   round_modes: { round: number; modes: string[] }[] | null;
   card_count: number;
+  cards_per_round_enabled: boolean;
   card_layout: string;
   card_label_mode: string;
   round_count: number;
@@ -139,7 +140,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
   const db = getBingoDb();
   const sourceQuery = (db
     .from("bingo_sessions")
-    .select("id, event_id, game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, session_code, game_mode, round_modes, card_count, card_layout, card_label_mode, round_count, round_end_policy, tie_break_policy, pool_exhaustion_policy, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, seconds_to_next_call, sonos_output_delay_ms, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, next_game_rules_text, welcome_heading_text, welcome_message_text, welcome_rules_text, welcome_tiebreak_text, intermission_heading_text, intermission_message_text, intermission_footer_text, thanks_heading_text, thanks_subheading_text, thanks_events_heading_text, call_reveal_delay_seconds, default_intermission_seconds, active_playlist_letter_by_round, theme_enabled, theme_name, is_sandbox") as unknown as {
+    .select("id, event_id, game_preset_id, playlist_id, playlist_ids, master_playlist_ids, round_playlist_ids, session_code, game_mode, round_modes, card_count, cards_per_round_enabled, card_layout, card_label_mode, round_count, round_end_policy, tie_break_policy, pool_exhaustion_policy, remove_resleeve_seconds, place_vinyl_seconds, cue_seconds, start_slide_seconds, host_buffer_seconds, seconds_to_next_call, sonos_output_delay_ms, recent_calls_limit, show_title, show_logo, show_rounds, show_countdown, next_game_rules_text, welcome_heading_text, welcome_message_text, welcome_rules_text, welcome_tiebreak_text, intermission_heading_text, intermission_message_text, intermission_footer_text, thanks_heading_text, thanks_subheading_text, thanks_events_heading_text, call_reveal_delay_seconds, default_intermission_seconds, active_playlist_letter_by_round, theme_enabled, theme_name, is_sandbox") as unknown as {
       eq: (column: string, value: number) => {
         maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
       };
@@ -173,6 +174,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
         game_mode: typedSource.game_mode,
         round_modes: typedSource.round_modes,
         card_count: typedSource.card_count,
+        cards_per_round_enabled: typedSource.cards_per_round_enabled,
         card_layout: typedSource.card_layout,
         card_label_mode: typedSource.card_label_mode,
         round_count: typedSource.round_count,

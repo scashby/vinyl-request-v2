@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS public.bingo_sessions (
   game_mode text NOT NULL,
   round_modes jsonb,
   card_count integer NOT NULL DEFAULT 40,
+  cards_per_round_enabled boolean NOT NULL DEFAULT false,
   card_layout text NOT NULL DEFAULT '2-up',
   card_label_mode text NOT NULL DEFAULT 'track_artist',
   round_count integer NOT NULL DEFAULT 3,
@@ -73,6 +74,7 @@ ALTER TABLE public.bingo_sessions
   ADD COLUMN IF NOT EXISTS sonos_output_delay_ms integer NOT NULL DEFAULT 75,
   ADD COLUMN IF NOT EXISTS round_modes jsonb,
   ADD COLUMN IF NOT EXISTS master_playlist_ids jsonb,
+  ADD COLUMN IF NOT EXISTS cards_per_round_enabled boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS round_crate_ids jsonb,
   ADD COLUMN IF NOT EXISTS is_favorite boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS favorite_note text;
